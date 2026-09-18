@@ -171,7 +171,7 @@ final class Plugin {
             $stagingAdmission = new MediaBindingStagingAdmission(new WpdbMediaRepository($wpdb), new WpdbAuthorityRepository($wpdb));
             add_filter('nhk_v3_staging_acceptance_admission', new AuthorityStagingAdmission(), 10, 5);
             add_filter('nhk_v3_staging_acceptance_admission', $stagingAdmission, 20, 5);
-            add_filter('nhk_v3_staging_acceptance_admission', new VideoStagingAdmission(), 30, 5);
+            add_filter('nhk_v3_staging_acceptance_admission', new VideoStagingAdmission(new WpdbVideoRepository($wpdb)), 30, 5);
         }
         $sharedAttachmentBridge = null;
         $claimOwnerUrl = static fn (\NHK\Core\Domain\Knowledge\KnowledgeClaim $claim): ?string => null;

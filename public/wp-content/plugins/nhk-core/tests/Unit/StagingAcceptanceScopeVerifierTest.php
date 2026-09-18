@@ -4,8 +4,10 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Governance\StagingAcceptanceScopeVerifier;
+use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Capture\CaptureRecord;
 use NHK\Core\Domain\Governance\{Proposal, ProposalState};
+use NHK\Core\Domain\Video\Video;
 use NHK\Core\Shared\Uuid\UuidCodec;
 use PHPUnit\Framework\TestCase;
 
@@ -157,8 +159,11 @@ final class StagingAcceptanceScopeVerifierTest extends TestCase
 
     public function test_video_update_scope_binds_capture_target_operation_and_revision(): void
     {
-        $capture = new CaptureRecord(UuidCodec::newV7(), 'video-scope', hash('sha256', 'video-scope'), 'SEMANTICS_RECONCILED', 'IN_PROGRESS');
         $videoId = UuidCodec::newV7();
+        $capture = new CaptureRecord(UuidCodec::newV7(), 'video-scope', hash('sha256', 'video-scope'), 'SEMANTICS_RECONCILED', 'IN_PROGRESS', null, null, [[
+            'kind' => 'video',
+            'video_proposal' => ['payload' => ['canonical_id' => $videoId ?? '', 'metadata' => ['source' => ['platform' => 'youtube', 'external_video_id' => 'dQw4w9WgXcQ', 'canonical_source_url' => 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'], 'subject_resolution_packet' => ['status' => 'RESOLVED', 'type' => 'classification', 'id' => $videoId ?? '', 'revision' => 1]]]],
+        ]]);
         $plan = ['entity_type' => 'video', 'operation' => 'update', 'subject_id' => $videoId, 'target_uuid' => $videoId, 'expected_revision' => 5, 'fingerprint' => hash('sha256', 'video-plan')];
         $verifier = $this->verifier();
         $scope = $verifier->issueForVideoPlan($capture, $plan);
@@ -198,7 +203,8 @@ final class StagingAcceptanceScopeVerifierTest extends TestCase
         $plan = [
             'entity_type' => 'video',
             'operation' => 'ingest',
-            'subject_id' => $videoId,
+            'subject_id' => $subjectId,
+            'proposed_uuid' => $videoId,
             'fingerprint' => hash('sha256', 'video-ingest-plan'),
             'proposal_command_fingerprint' => hash('sha256', 'video-ingest-command'),
         ];
@@ -234,7 +240,13 @@ final class StagingAcceptanceScopeVerifierTest extends TestCase
 
     private function verifier(): StagingAcceptanceScopeVerifier
     {
-        return new StagingAcceptanceScopeVerifier(static fn (): string => 'staging', 'test-secret', static fn (): bool => true);
+        return new StagingAcceptanceScopeVerifier(static fn (): string => 'staging', 'test-secret', static fn (): bool => true, can: static fn (): bool => true, videos: new class implements VideoRepository {
+            public function findByCanonicalId(string $id): ?Video { return new Video($id, 'youtube', 'dQw4w9WgXcQ', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', revision: 5); }
+            public function findByExternalReference(string $platform, string $externalId): ?Video { return null; }
+            public function create(Video $video): Video { return $video; }
+            public function update(Video $video, int $expectedRevision): Video { return $video; }
+            public function list(bool $includeRetired = false): array { return []; }
+        });
     }
 
     /** @param array<string,mixed> $input @param array<string,mixed> $packet @return array<string,mixed> */

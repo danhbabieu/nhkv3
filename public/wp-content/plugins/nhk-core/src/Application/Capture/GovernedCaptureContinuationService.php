@@ -387,7 +387,9 @@ final class GovernedCaptureContinuationService
     /** @param array<string,mixed> $plan @param array<string,mixed> $context @return array<string,mixed> */
     private function scopeVideoPlan(string $captureId, array $plan, array $context): array
     {
-        if (($plan['entity_type'] ?? '') !== 'video' || !in_array((string) ($plan['operation'] ?? ''), ['update', 'retire', 'reactivate'], true) || !is_callable($this->videoScopeIssuer)) return $plan;
+        if (($plan['entity_type'] ?? '') !== 'video' || !in_array((string) ($plan['operation'] ?? ''), ['ingest', 'update'], true) || !is_callable($this->videoScopeIssuer)) return $plan;
+        if (!is_array($plan['payload'] ?? null)) $plan['payload'] = [];
+        unset($plan['payload']['staging_acceptance'], $plan['payload']['capture_fingerprint'], $plan['payload']['scope_fingerprint']);
         $scope = ($this->videoScopeIssuer)($captureId, $plan);
         if (!is_array($scope)) throw new \RuntimeException('STAGING_SCOPE_REQUIRED');
         $plan['payload']['capture_id'] = $captureId;

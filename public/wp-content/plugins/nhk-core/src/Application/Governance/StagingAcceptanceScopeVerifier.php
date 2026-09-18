@@ -5,6 +5,8 @@ namespace NHK\Core\Application\Governance;
 
 use NHK\Core\Domain\Capture\CaptureRecord;
 use NHK\Core\Domain\Governance\{CommandCanonicalizer, Proposal};
+use NHK\Core\Contracts\Video\VideoRepository;
+use NHK\Core\Domain\Video\YouTubeSourceSnapshot;
 use NHK\Core\Shared\Uuid\UuidCodec;
 
 /**
@@ -23,6 +25,7 @@ final class StagingAcceptanceScopeVerifier
         private $admission = null,
         private int $ttlSeconds = 900,
         private $can = null,
+        private ?VideoRepository $videos = null,
     ) {}
 
     /** @param list<array<string,mixed>> $assets @return array<string,mixed> */
@@ -143,21 +146,73 @@ final class StagingAcceptanceScopeVerifier
         $entityType = strtolower(trim((string) ($plan['entity_type'] ?? '')));
         $targetUuid = trim((string) ($plan['target_uuid'] ?? $plan['subject_id'] ?? ''));
         $expectedRevision = (int) ($plan['expected_revision'] ?? 0);
-        $planFingerprint = trim((string) ($plan['fingerprint'] ?? ''));
-        if ($entityType !== 'video' || !in_array($operation, ['update', 'retire', 'reactivate'], true)) throw new \RuntimeException('STAGING_VIDEO_OPERATION_INVALID');
-        if (!UuidCodec::isValid($targetUuid) || $expectedRevision < 1 || !preg_match('/^[a-f0-9]{64}$/i', $planFingerprint)) throw new \RuntimeException('STAGING_VIDEO_BINDING_REQUIRED');
+        $planFingerprint = trim((string) ($plan['plan_fingerprint'] ?? $plan['fingerprint'] ?? ''));
+        if ($entityType !== 'video' || !in_array($operation, ['ingest', 'update'], true)) throw new \RuntimeException('STAGING_VIDEO_OPERATION_INVALID');
+        if (!preg_match('/^[a-f0-9]{64}$/i', $planFingerprint)) throw new \RuntimeException('STAGING_VIDEO_BINDING_REQUIRED');
+        $video = $this->videoPayload($capture);
+        $metadata = is_array($video['metadata'] ?? null) ? $video['metadata'] : [];
+        $source = is_array($metadata['source'] ?? null) ? $metadata['source'] : (is_array($metadata['source_snapshot'] ?? null) ? $metadata['source_snapshot'] : []);
+        $platform = strtolower(trim((string) ($plan['platform'] ?? $source['platform'] ?? '')));
+        $externalId = trim((string) ($plan['external_video_id'] ?? $source['external_video_id'] ?? ''));
+        $sourceUrl = trim((string) ($plan['canonical_source_url'] ?? $source['canonical_source_url'] ?? ''));
+        if ($platform === 'youtube') {
+            try { $sourceSnapshot = YouTubeSourceSnapshot::fromArray(['platform' => $platform, 'external_video_id' => $externalId, 'canonical_source_url' => $sourceUrl]); } catch (\Throwable) { throw new \RuntimeException('STAGING_VIDEO_SOURCE_INVALID'); }
+            $platform = $sourceSnapshot->platform;
+            $externalId = $sourceSnapshot->externalVideoId;
+            $sourceUrl = $sourceSnapshot->canonicalSourceUrl;
+        }
+        $subjectPacket = is_array($metadata['subject_resolution_packet'] ?? null) ? $metadata['subject_resolution_packet'] : [];
+        $subjectId = trim((string) ($plan['subject_id'] ?? $subjectPacket['id'] ?? ''));
+        $subjectType = strtolower(trim((string) ($plan['subject_type'] ?? $subjectPacket['type'] ?? '')));
+        $proposedUuid = trim((string) ($plan['proposed_uuid'] ?? $video['canonical_id'] ?? $targetUuid));
+        if (!UuidCodec::isValid($proposedUuid) || !UuidCodec::isValid($subjectId) || $subjectType === '') throw new \RuntimeException('STAGING_VIDEO_BINDING_REQUIRED');
+        if ($operation === 'update') {
+            if (!UuidCodec::isValid($targetUuid) || $expectedRevision < 1) throw new \RuntimeException('STAGING_VIDEO_BINDING_REQUIRED');
+            if ($this->videos !== null) {
+                $canonical = $this->videos->findByCanonicalId($targetUuid);
+                if ($canonical === null || $canonical->revision !== $expectedRevision) throw new \RuntimeException('TARGET_REVISION_CHANGED');
+            }
+        } else {
+            if ($expectedRevision !== 0) throw new \RuntimeException('STAGING_VIDEO_BINDING_REQUIRED');
+            if ($this->videos === null) throw new \RuntimeException('STAGING_VIDEO_DUPLICATE_AUDIT_REQUIRED');
+            if ($this->videos->findByExternalReference($platform, $externalId) !== null) throw new \RuntimeException('STAGING_VIDEO_DUPLICATE');
+        }
+        $proposalCommandFingerprint = trim((string) ($plan['proposal_command_fingerprint'] ?? ''));
+        if ($proposalCommandFingerprint === '') $proposalCommandFingerprint = hash('sha256', CommandCanonicalizer::canonicalize($this->withoutAuthorization($plan)));
         $base = [
             'approved' => true, 'environment' => 'staging', 'capture_id' => $capture->captureId,
-            'capture_fingerprint' => $capture->requestFingerprint, 'operation_family' => 'governed_video_plan',
+            'capture_fingerprint' => $capture->requestFingerprint, 'request_fingerprint' => $capture->requestFingerprint,
+            'semantic_write_policy' => 'PROJECT_BUILD', 'operation_family' => 'governed_video_plan',
             'entity_type' => 'video', 'operation' => $operation, 'writer' => 'canonical_governed',
-            'entrypoint' => 'nhk.capture.ingest', 'target_uuid' => $targetUuid,
-            'expected_revision' => $expectedRevision, 'plan_fingerprint' => $planFingerprint,
+            'entrypoint' => 'nhk.capture.ingest', 'canonical_entrypoint' => 'nhk.capture.ingest',
+            'target_uuid' => $operation === 'update' ? $targetUuid : null, 'proposed_uuid' => $proposedUuid,
+            'create_semantics' => $operation === 'ingest' ? 'ingest' : null, 'expected_revision' => $expectedRevision,
+            'platform' => $platform, 'external_video_id' => $externalId, 'canonical_source_url' => $sourceUrl,
+            'subject' => ['type' => $subjectType, 'uuid' => $subjectId, 'revision' => max(0, (int) ($subjectPacket['revision'] ?? $plan['subject_revision'] ?? 0))],
+            'plan_fingerprint' => $planFingerprint, 'proposal_command_fingerprint' => $proposalCommandFingerprint,
             'issued_at' => gmdate('c'), 'expires_at' => gmdate('c', time() + max(1, $this->ttlSeconds)),
         ];
         $input = is_array($capture->context['planning_input'] ?? null) ? $capture->context['planning_input'] : [];
         if (!(bool) ($this->admission)($base, $capture, $input, [])) throw new \RuntimeException('STAGING_SCOPE_NOT_ADMITTED');
         $fingerprint = hash('sha256', CommandCanonicalizer::canonicalize($base));
         return $base + ['fingerprint' => $fingerprint, 'signature' => hash_hmac('sha256', $fingerprint, $this->secret())];
+    }
+
+    /** @return array<string,mixed> */
+    private function videoPayload(CaptureRecord $capture): array
+    {
+        $assets = array_values(array_filter($capture->assets, static fn (mixed $asset): bool => is_array($asset) && ($asset['kind'] ?? '') === 'video'));
+        if (count($assets) !== 1 || !is_array($assets[0]['video_proposal'] ?? null)) throw new \RuntimeException('STAGING_VIDEO_PLAN_REQUIRED');
+        $payload = $assets[0]['video_proposal']['payload'] ?? [];
+        if (!is_array($payload)) throw new \RuntimeException('STAGING_VIDEO_PLAN_REQUIRED');
+        return $payload;
+    }
+
+    /** @param array<string,mixed> $value @return array<string,mixed> */
+    private function withoutAuthorization(array $value): array
+    {
+        foreach (['staging_acceptance', 'signature', 'fingerprint', 'approved', 'scope_fingerprint'] as $key) unset($value[$key]);
+        return $value;
     }
 
     /** @param list<array<string,mixed>> $assets @return array<string,mixed>|null */

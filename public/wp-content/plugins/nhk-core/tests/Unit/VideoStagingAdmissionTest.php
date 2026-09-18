@@ -5,7 +5,9 @@ namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Governance\VideoStagingAdmission;
 use NHK\Core\Application\Governance\StagingAcceptanceScopeVerifier;
+use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Capture\CaptureRecord;
+use NHK\Core\Domain\Video\Video;
 use PHPUnit\Framework\TestCase;
 
 final class VideoStagingAdmissionTest extends TestCase
@@ -75,7 +77,13 @@ final class VideoStagingAdmissionTest extends TestCase
             'proposed_uuid' => $videoId, 'subject' => ['type' => 'classification', 'uuid' => $subjectId, 'revision' => 1],
         ];
 
-        self::assertTrue((new VideoStagingAdmission())(false, $scope, $capture, [], []));
+        self::assertTrue((new VideoStagingAdmission(new class implements VideoRepository {
+            public function findByCanonicalId(string $id): ?Video { return null; }
+            public function findByExternalReference(string $platform, string $externalId): ?Video { return null; }
+            public function create(Video $video): Video { return $video; }
+            public function update(Video $video, int $expectedRevision): Video { return $video; }
+            public function list(bool $includeRetired = false): array { return []; }
+        }))(false, $scope, $capture, [], []));
     }
 
     /** @return array{0:CaptureRecord,1:array<string,mixed>} */
@@ -87,13 +95,13 @@ final class VideoStagingAdmissionTest extends TestCase
         $subjectId = \NHK\Core\Shared\Uuid\UuidCodec::newV7();
         $capture = new CaptureRecord($captureId, 'generic-video', $fingerprint, 'SEMANTICS_RECONCILED', 'FAILED_RETRYABLE', null, null, [[
             'kind' => 'video', 'video_proposal' => ['payload' => ['canonical_id' => $videoId, 'expected_revision' => 5, 'metadata' => ['subject_resolution_packet' => ['id' => $subjectId, 'type' => 'variant']]]],
-        ]], [], [], []);
+        ]], ['purpose' => 'VIDEO'], [], []);
         return [$capture, [
-            'approved' => true, 'environment' => 'staging', 'operation_family' => 'governed_video_plan',
+            'approved' => true, 'environment' => 'staging', 'semantic_write_policy' => 'PROJECT_BUILD', 'operation_family' => 'governed_video_plan',
             'entity_type' => 'video', 'operation' => 'update', 'writer' => 'canonical_governed',
             'entrypoint' => 'nhk.capture.ingest', 'capture_id' => $captureId,
             'capture_fingerprint' => $fingerprint, 'target_uuid' => $videoId, 'subject_id' => $subjectId,
-            'expected_revision' => 5,
+            'expected_revision' => 5, 'plan_fingerprint' => hash('sha256', 'plan'), 'proposal_command_fingerprint' => hash('sha256', 'command'),
         ]];
     }
 

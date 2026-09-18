@@ -35,6 +35,7 @@ final class StagingAcceptanceScope
         'evidence:create' => 'source_evidence_reconciliation',
         'evidence:ingest' => 'source_evidence_reconciliation',
         'video:update' => 'governed_video_plan',
+        'video:ingest' => 'governed_video_plan',
         'video:retire' => 'governed_video_plan',
         'video:reactivate' => 'governed_video_plan',
     ];
@@ -67,8 +68,21 @@ final class StagingAcceptanceScope
             if ($proposalCaptureId === '' || !hash_equals($captureId, $proposalCaptureId)) throw new \RuntimeException('STAGING_CAPTURE_SCOPE_MISMATCH');
             if (!hash_equals((string) ($scope['capture_fingerprint'] ?? ''), (string) ($proposal->payload['capture_fingerprint'] ?? ''))) throw new \RuntimeException('STAGING_CAPTURE_FINGERPRINT_MISMATCH');
             if ((string) ($scope['entity_type'] ?? '') !== 'video' || (string) ($scope['operation'] ?? '') !== $proposal->operation) throw new \RuntimeException('STAGING_OPERATION_SCOPE_MISMATCH');
-            if ((string) ($scope['target_uuid'] ?? '') !== (string) ($proposal->targetUuid ?? $proposal->subjectId)) throw new \RuntimeException('STAGING_TARGET_SCOPE_MISMATCH');
-            if ((int) ($scope['expected_revision'] ?? 0) !== (int) $proposal->expectedRevision) throw new \RuntimeException('STAGING_EXPECTED_REVISION_SCOPE_MISMATCH');
+            $scopeTarget = (string) ($scope['target_uuid'] ?? $scope['proposed_uuid'] ?? '');
+            if ($scopeTarget !== (string) ($proposal->targetUuid ?? $proposal->subjectId)) throw new \RuntimeException('STAGING_TARGET_SCOPE_MISMATCH');
+            $scopeRevision = (int) ($scope['expected_revision'] ?? 0);
+            $proposalRevision = (int) ($proposal->expectedRevision ?? 0);
+            if ($scopeRevision !== $proposalRevision) throw new \RuntimeException('STAGING_EXPECTED_REVISION_SCOPE_MISMATCH');
+            foreach (['platform', 'external_video_id', 'canonical_source_url', 'plan_fingerprint', 'proposal_command_fingerprint'] as $field) {
+                if (!array_key_exists($field, $scope)) continue;
+                $proposalValue = $proposal->payload[$field] ?? null;
+                if ($proposalValue !== null && (string) $scope[$field] !== (string) $proposalValue) throw new \RuntimeException('STAGING_VIDEO_BINDING_MISMATCH');
+            }
+            if (is_array($scope['subject'] ?? null)) {
+                $subject = is_array($proposal->payload['metadata']['subject_resolution_packet'] ?? null) ? $proposal->payload['metadata']['subject_resolution_packet'] : [];
+                if (($subject['id'] ?? null) !== null && (string) ($scope['subject']['uuid'] ?? '') !== (string) $subject['id']) throw new \RuntimeException('STAGING_SUBJECT_SCOPE_MISMATCH');
+                if (($subject['type'] ?? null) !== null && (string) ($scope['subject']['type'] ?? '') !== (string) $subject['type']) throw new \RuntimeException('STAGING_SUBJECT_SCOPE_MISMATCH');
+            }
             self::assertNoFuzzyLocator($scope);
             return;
         }
