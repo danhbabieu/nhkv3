@@ -1,5 +1,32 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-18 — Authority staging admission was an Atherton allowlist (LOCAL READY / DEPLOY PENDING)
+
+SCOPE: Repaired the repository-owned Authority staging admission provider. No
+Capture, proposal, semantic record, database, staging/production object or
+live Atmos data was changed.
+
+ROOT_CAUSE: `StagingAcceptanceScopeVerifier::issueForAuthorityPlan()` reached
+the registered `nhk_v3_staging_acceptance_admission` hook, but
+`AuthorityStagingAdmission` admitted only one hard-coded Atherton Capture,
+request fingerprint, candidate IDs, Brand target and request name. The fresh
+Atmos Authority Capture therefore failed before server scope issuance with
+`STAGING_SCOPE_NOT_ADMITTED`; `STAGING_ACCEPTANCE_ISSUED=NO`. Admin
+AUTO_APPROVE settings were not the issuer and did not bypass this admission.
+
+FIX: Admission now validates the server-constructed exact Capture binding,
+plan fingerprint, structured Authority/Mixed purpose, candidate uniqueness,
+registered Authority entity/operation shapes and exact relation target/revision
+shape. It contains no Capture/entity/brand/name exception. HMAC signing,
+expiry, Proposal eligibility, OperationScopedStagingGuard, Controlled Apply
+and canonical read-back remain unchanged and fail closed.
+
+VERIFICATION: Focused Authority admission and verifier tests are required
+before deployment; live staging scope issuance/read-back remains pending. No
+semantic mutation was run.
+
+STATUS: `AUTHORITY_STAGING_ADMISSION_GENERIC_LOCAL_READY / DEPLOY_PENDING / SEMANTIC_MUTATION_NONE`
+
 # Checkpoint — 2026-09-18 — W64 staging admission boot fatal fixed (LOCAL READY / DEPLOY PENDING)
 
 SCOPE: Repaired the plugin composition-root import for the already-existing

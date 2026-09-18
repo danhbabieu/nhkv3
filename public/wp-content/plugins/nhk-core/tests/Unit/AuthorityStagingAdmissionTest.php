@@ -23,6 +23,26 @@ final class AuthorityStagingAdmissionTest extends TestCase
         self::assertTrue((new AuthorityStagingAdmission())(false, $scope, $capture, $input, []));
     }
 
+    public function test_admission_is_not_an_atherton_or_capture_allowlist(): void
+    {
+        [$scope, $capture, $input] = $this->fixture();
+        $capture = new CaptureRecord(
+            '01a0b259-27d6-7466-8646-5afa50d1bf20',
+            'atmos',
+            str_repeat('b', 64),
+            'AUTHORITY_PLANNED',
+            'IN_PROGRESS',
+            context: ['purpose' => 'AUTHORITY']
+        );
+        $scope['capture_id'] = $capture->captureId;
+        $scope['capture_fingerprint'] = $capture->requestFingerprint;
+        $scope['candidate_bindings'][0]['candidate_id'] = 'candidate-atmos-relation';
+        $scope['candidate_bindings'][1]['candidate_id'] = 'candidate-atmos-model';
+        $input['authority_intent']['requests'][0]['name'] = 'Atmos';
+
+        self::assertTrue((new AuthorityStagingAdmission())(false, $scope, $capture, $input, []));
+    }
+
     /** @dataProvider tamperProvider */
     public function test_scope_fails_closed_for_any_non_exact_value(string $field): void
     {
@@ -30,9 +50,9 @@ final class AuthorityStagingAdmissionTest extends TestCase
         if ($field === 'capture_id') $scope['capture_id'] = '01a0b162-9cd5-7989-aa08-cec3322bd450';
         if ($field === 'request_fingerprint') $scope['capture_fingerprint'] = str_repeat('a', 64);
         if ($field === 'plan_fingerprint') $scope['plan_fingerprint'] = str_repeat('z', 64);
-        if ($field === 'candidate') $scope['candidate_bindings'][0]['candidate_id'] = 'candidate-other';
+        if ($field === 'candidate') $scope['candidate_bindings'][0]['candidate_id'] = $scope['candidate_bindings'][1]['candidate_id'];
         if ($field === 'target') $scope['candidate_bindings'][0]['target_uuid'] = '01a090fd-9a71-7665-af5f-08f6e25b533f';
-        if ($field === 'operation') $scope['candidate_bindings'][0]['predicate'] = 'about';
+        if ($field === 'operation') $scope['candidate_bindings'][0]['operation'] = 'not_registered';
         if ($field === 'production') $scope['environment'] = 'production';
         if ($field === 'wildcard') $scope['candidate_bindings'][0]['candidate_id'] = '*';
 
@@ -47,7 +67,7 @@ final class AuthorityStagingAdmissionTest extends TestCase
     /** @return array{0:array<string,mixed>,1:CaptureRecord,2:array<string,mixed>} */
     private function fixture(): array
     {
-        $capture = new CaptureRecord('01a0b162-9cd5-7989-aa08-cec3322bd45f', 'atherton', '06ede91a4097f27c1001f07be919f0f1c01f69a34e4d5f921ac6aa37c19ac142', 'AUTHORITY_PLANNED', 'IN_PROGRESS');
+        $capture = new CaptureRecord('01a0b162-9cd5-7989-aa08-cec3322bd45f', 'atherton', '06ede91a4097f27c1001f07be919f0f1c01f69a34e4d5f921ac6aa37c19ac142', 'AUTHORITY_PLANNED', 'IN_PROGRESS', context: ['purpose' => 'AUTHORITY']);
         return [[
             'approved' => true, 'environment' => 'staging', 'capture_id' => $capture->captureId,
             'capture_fingerprint' => $capture->requestFingerprint, 'operation_family' => 'governed_authority_plan',

@@ -4,16 +4,20 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Governance;
 
 use NHK\Core\Domain\Capture\CaptureRecord;
+use NHK\Core\Shared\Uuid\UuidCodec;
 
 /**
- * Repository-owned admission for the explicitly approved Atherton Authority
- * plan. The shared verifier remains responsible for expiry and HMAC signing.
+ * Admission for a server-issued Authority plan scope.
+ *
+ * The exact Capture, plan fingerprint and candidate bindings are assembled by
+ * StagingAcceptanceScopeVerifier from the approved plan, then signed. This
+ * hook only admits a structurally valid packet; policy, eligibility, apply
+ * and canonical read-back remain separate governance stages.
  */
 final class AuthorityStagingAdmission
 {
-    private const CAPTURE_ID = '01a0b162-9cd5-7989-aa08-cec3322bd45f';
-    private const REQUEST_FINGERPRINT = '06ede91a4097f27c1001f07be919f0f1c01f69a34e4d5f921ac6aa37c19ac142';
-    private const BRAND_UUID = '01a090fd-9a71-7665-af5f-08f6e25b533e';
+    private const ENTITY_TYPES = ['brand', 'model', 'variant', 'movement', 'music', 'component', 'classification', 'specimen', 'product'];
+    private const OPERATIONS = ['create', 'ingest', 'update', 'rename', 'rekey', 'merge', 'retire', 'reactivate'];
 
     /** @param array<string,mixed> $scope @param array<string,mixed> $input @param list<array<string,mixed>> $assets */
     public function __invoke(bool $admitted, array $scope, CaptureRecord $capture, array $input, array $assets): bool
@@ -24,50 +28,51 @@ final class AuthorityStagingAdmission
             || ($scope['operation_family'] ?? '') !== 'governed_authority_plan'
             || ($scope['writer'] ?? '') !== 'canonical_governed'
             || ($scope['entrypoint'] ?? '') !== 'nhk.capture.ingest'
-            || strtoupper((string) ($scope['intent'] ?? '')) !== 'AUTHORITY'
-            || ($scope['capture_id'] ?? '') !== self::CAPTURE_ID
-            || ($scope['capture_fingerprint'] ?? '') !== self::REQUEST_FINGERPRINT
-            // The shared verifier signs the current plan at runtime. Keep only
-            // its canonical hash shape here; binding this provider to a release
-            // checkpoint would make an exact, freshly re-approved plan stale.
+            || !in_array(strtoupper((string) ($scope['intent'] ?? '')), ['AUTHORITY', 'MIXED'], true)
+            || ($scope['capture_id'] ?? '') !== $capture->captureId
+            || ($scope['capture_fingerprint'] ?? '') !== $capture->requestFingerprint
             || preg_match('/^[a-f0-9]{64}$/i', (string) ($scope['plan_fingerprint'] ?? '')) !== 1
-            || $capture->captureId !== self::CAPTURE_ID
-            || $capture->requestFingerprint !== self::REQUEST_FINGERPRINT) return false;
+            || !in_array((string) ($capture->context['purpose'] ?? ''), ['AUTHORITY', 'MIXED'], true)) return false;
 
         $bindings = array_values(array_filter((array) ($scope['candidate_bindings'] ?? []), 'is_array'));
-        usort($bindings, static fn (array $left, array $right): int => strcmp((string) ($left['candidate_id'] ?? ''), (string) ($right['candidate_id'] ?? '')));
-        $expected = [
-            [
-                'candidate_id' => 'candidate-43e3d1452693c18a7119',
-                'entity_type' => 'relation',
-                'operation' => 'relation_create',
-                'subject_id' => '',
-                'source_type' => 'model',
-                'source_uuid' => '',
-                'source_revision' => 1,
-                'predicate' => 'model_of',
-                'target_type' => 'brand',
-                'target_uuid' => self::BRAND_UUID,
-                'target_revision' => 2,
-                'expected_revision' => null,
-            ],
-            [
-                'candidate_id' => 'candidate-831c785e8e84398ce3c7',
-                'entity_type' => 'model',
-                'operation' => 'create',
-                'subject_id' => 'model',
-                'target_uuid' => '',
-                'expected_revision' => null,
-            ],
-        ];
-        if ($bindings !== $expected) return false;
+        if ($bindings === []) return false;
+        $candidateIds = [];
+        foreach ($bindings as $binding) {
+            $candidateId = trim((string) ($binding['candidate_id'] ?? ''));
+            $entityType = strtolower(trim((string) ($binding['entity_type'] ?? '')));
+            $operation = strtolower(trim((string) ($binding['operation'] ?? '')));
+            if ($candidateId === '' || str_contains($candidateId, '*') || in_array($candidateId, $candidateIds, true)
+                || (!in_array($entityType, self::ENTITY_TYPES, true) && $entityType !== 'relation')
+                || ($entityType !== 'relation' && !in_array($operation, self::OPERATIONS, true))) return false;
+            $candidateIds[] = $candidateId;
+            if ($entityType === 'relation' ? !$this->validRelationBinding($binding) : !$this->validAuthorityBinding($binding, $operation, $entityType)) return false;
+        }
 
-        $requests = array_values(array_filter((array) ($input['authority_intent']['requests'] ?? []), 'is_array'));
-        if (count($requests) !== 1) return false;
-        $request = $requests[0];
-        return ($request['entity_type'] ?? '') === 'model'
-            && strtolower((string) ($request['operation'] ?? 'create')) === 'create'
-            && ($request['name'] ?? '') === 'Atherton'
-            && (($request['payload']['brand_uuid'] ?? '') === self::BRAND_UUID);
+        // The persisted planning input is request context, not an approval
+        // switch. Approval caused this issuer to run; structured requests keep
+        // malformed or legacy Captures from receiving a staging scope.
+        return array_values(array_filter((array) ($input['authority_intent']['requests'] ?? []), 'is_array')) !== [];
+    }
+
+    /** @param array<string,mixed> $binding */
+    private function validAuthorityBinding(array $binding, string $operation, string $entityType): bool
+    {
+        if ($operation === 'create' && (string) ($binding['subject_id'] ?? '') !== $entityType) return false;
+        if (in_array($operation, ['create', 'ingest'], true)) return ($binding['target_uuid'] ?? '') === '' && ($binding['expected_revision'] ?? null) === null;
+        return UuidCodec::isValid((string) ($binding['target_uuid'] ?? '')) && (int) ($binding['expected_revision'] ?? 0) >= 1;
+    }
+
+    /** @param array<string,mixed> $binding */
+    private function validRelationBinding(array $binding): bool
+    {
+        if (strtolower((string) ($binding['operation'] ?? '')) !== 'relation_create'
+            || trim((string) ($binding['predicate'] ?? '')) === ''
+            || trim((string) ($binding['source_type'] ?? '')) === ''
+            || trim((string) ($binding['target_type'] ?? '')) === ''
+            || !UuidCodec::isValid((string) ($binding['target_uuid'] ?? ''))
+            || (int) ($binding['target_revision'] ?? 0) < 1) return false;
+        // A relation source may be created by an earlier candidate in the
+        // same plan, so source_uuid can legitimately bind later.
+        return ($binding['source_uuid'] ?? '') === '' || UuidCodec::isValid((string) $binding['source_uuid']);
     }
 }
