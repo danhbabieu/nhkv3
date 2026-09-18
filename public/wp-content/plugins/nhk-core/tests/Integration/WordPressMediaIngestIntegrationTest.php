@@ -326,13 +326,19 @@ final class WordPressMediaIngestIntegrationTest extends TestCase
             self::assertContains('original', array_map(static fn ($asset): string => $asset->kind, $mediaAssets));
             self::assertContains('derivative', array_map(static fn ($asset): string => $asset->kind, $mediaAssets));
             self::assertContains('PUBLIC', array_map(static fn ($asset): string => $asset->visibility, $mediaAssets));
+            $derivativeAsset = array_values(array_filter($mediaAssets, static fn ($asset): bool => $asset->kind === 'derivative' && $asset->visibility === 'PUBLIC'))[0] ?? null;
+            $sourceAsset = array_values(array_filter($mediaAssets, static fn ($asset): bool => $asset->kind === 'original' && $asset->visibility === 'PRIVATE'))[0] ?? null;
+            self::assertNotNull($derivativeAsset);
+            self::assertNotNull($sourceAsset);
+            $mappingAssetBinary = $wpdb->get_var($wpdb->prepare("SELECT asset_uuid FROM {$wpdb->prefix}nhk_media_wordpress_attachments WHERE attachment_id=%d", $attachmentId));
+            self::assertIsString($mappingAssetBinary);
+            self::assertSame($derivativeAsset->assetId, UuidCodec::fromBinary($mappingAssetBinary));
+            self::assertNotSame($sourceAsset->assetId, UuidCodec::fromBinary($mappingAssetBinary));
             $sourceRelative = (string) get_post_meta($attachmentId, '_nhk_source_original_file', true);
             self::assertNotSame('', $sourceRelative);
             self::assertStringStartsWith('private/', $sourceRelative);
             self::assertNotNull(PrivateMediaSourceStorage::fromWordPress()->path($sourceRelative));
             self::assertSame('source-original.png', (string) get_post_meta($attachmentId, '_nhk_original_filename', true));
-            $sourceAsset = array_values(array_filter($mediaAssets, static fn ($asset): bool => $asset->kind === 'original'))[0] ?? null;
-            self::assertNotNull($sourceAsset);
             self::assertSame('source-original.png', $sourceAsset->metadata['original_filename'] ?? null);
         } finally {
             if ($attachmentId > 0 && function_exists('wp_delete_attachment')) wp_delete_attachment($attachmentId, true);

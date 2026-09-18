@@ -47,6 +47,41 @@ final class WordPressMediaAttachmentReadbackConsistencyTest extends TestCase
         self::assertSame($assetId, $result['asset_id']);
     }
 
+    /** @dataProvider incompletePhysicalFactsProvider */
+    public function test_binding_fails_closed_when_any_required_physical_fact_is_missing(string $missingFact): void
+    {
+        $mediaId = UuidCodec::newV7();
+        $assetId = UuidCodec::newV7();
+        $asset = new MediaAsset($assetId, $mediaId, 'derivative', 'uploads/public.webp', hash('sha256', 'canonical'), 'image/webp', 9, 640, 480, 'PUBLIC');
+        $media = new Media($mediaId, 'wp-attachment:1:79', 'Readback', 'ready');
+        $bridge = $this->bridge($media, $asset, $mediaId, $assetId, 'uploads/public.webp');
+        $facts = [
+            'checksum' => $asset->checksum,
+            'byte_size' => $asset->byteSize,
+            'width' => $asset->width,
+            'height' => $asset->height,
+            'mime_type' => $asset->mimeType,
+        ];
+        unset($facts[$missingFact]);
+
+        $result = $bridge->bindingForAttachment(79, $facts);
+
+        self::assertSame('INCONSISTENT', $result['readback_state']);
+        self::assertSame('ATTACHMENT_PHYSICAL_READBACK_REQUIRED', $result['error_code']);
+    }
+
+    /** @return array<string,array{string}> */
+    public static function incompletePhysicalFactsProvider(): array
+    {
+        return [
+            'checksum' => ['checksum'],
+            'byte size' => ['byte_size'],
+            'width' => ['width'],
+            'height' => ['height'],
+            'mime' => ['mime_type'],
+        ];
+    }
+
     private function bridge(Media $media, MediaAsset $asset, string $mediaId, string $assetId, string $storageKey): WordPressMediaAttachmentBridge
     {
         $mediaRepository = new class($media) implements MediaRepository {
