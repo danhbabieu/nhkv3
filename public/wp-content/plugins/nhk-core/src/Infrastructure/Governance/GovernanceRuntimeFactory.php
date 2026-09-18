@@ -56,7 +56,7 @@ final class GovernanceRuntimeFactory
             if ($record === null) return false;
             return method_exists($record, 'active') ? (bool) $record->active() : (bool) ($record->active ?? false);
         };
-        $eligibility = new ProposalEligibilityService($proposalRepository, new DependencyGraph(new WpdbDependencyRepository($wpdb)), new WpdbEligibilityReader($authority, $proposalRepository, $graphRepository, $media, $videos, $claims, $sources, $evidence), new VideoProposalEligibilityEvaluator($videos, $endpoints, new PredicateRegistry(), new CanonicalDependencyValidator($claims, $sources, $evidence), new SubjectResolutionService(new CanonicalAuthoritySubjectResolver($authority, $types)), $targetActive), $classifiedAsPolicy);
+        $eligibility = new ProposalEligibilityService($proposalRepository, new DependencyGraph(new WpdbDependencyRepository($wpdb)), new WpdbEligibilityReader($authority, $proposalRepository, $graphRepository, $media, $videos, $claims, $sources, $evidence), new VideoProposalEligibilityEvaluator($videos, $endpoints, new PredicateRegistry(), new CanonicalDependencyValidator($claims, $sources, $evidence), new SubjectResolutionService(new CanonicalAuthoritySubjectResolver($authority, $types)), $targetActive), $classifiedAsPolicy, $usages);
         $authorityService = new AuthorityService($authority, $types, new \NHK\Core\Infrastructure\Authority\WpdbAuditSink($governanceAudit));
         $mediaService = new MediaService($media, $assets, $usages);
         $attachmentBridge = $sharedAttachmentBridge ?? new WordPressMediaAttachmentBridge($wpdb, $mediaService, $media, $assets);

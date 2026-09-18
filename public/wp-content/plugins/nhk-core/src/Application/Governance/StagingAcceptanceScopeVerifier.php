@@ -109,6 +109,43 @@ final class StagingAcceptanceScopeVerifier
             && hash_equals((string) ($scope['request_fingerprint'] ?? ''), $requestFingerprint);
     }
 
+    /** @param array<string,mixed> $plan @return array<string,mixed> */
+    public function issueForCaptureDependencyPlan(CaptureRecord $capture, array $plan): array
+    {
+        $environment = $this->environmentName();
+        if (in_array($environment, ['production', 'prod'], true)) throw new \RuntimeException('STAGING_PRODUCTION_FORBIDDEN');
+        if ($environment !== 'staging') throw new \RuntimeException('STAGING_SCOPE_ENVIRONMENT_REQUIRED');
+        if ($this->secret() === '') throw new \RuntimeException('STAGING_SCOPE_SIGNING_KEY_REQUIRED');
+        $this->requireCapability();
+        if (!is_callable($this->admission)) throw new \RuntimeException('STAGING_SCOPE_ADMISSION_REQUIRED');
+        $entityType = strtolower(trim((string) ($plan['entity_type'] ?? '')));
+        $operation = strtolower(trim((string) ($plan['operation'] ?? '')));
+        $family = match ($entityType) {
+            'source', 'evidence' => 'source_evidence_reconciliation',
+            'knowledge' => 'knowledge_delta',
+            default => null,
+        };
+        if ($family === null || !in_array($operation, ['ingest', 'create'], true)) throw new \RuntimeException('STAGING_DEPENDENCY_OPERATION_INVALID');
+        $payload = is_array($plan['payload'] ?? null) ? $plan['payload'] : [];
+        $payload['capture_fingerprint'] = $capture->requestFingerprint;
+        $payloadFingerprint = hash('sha256', CommandCanonicalizer::canonicalize($this->withoutAuthorization($payload)));
+        $planFingerprint = hash('sha256', CommandCanonicalizer::canonicalize($this->withoutAuthorization($plan)));
+        $base = [
+            'approved' => true, 'environment' => 'staging', 'capture_id' => $capture->captureId,
+            'capture_fingerprint' => $capture->requestFingerprint, 'request_fingerprint' => $capture->requestFingerprint,
+            'semantic_write_policy' => 'PROJECT_BUILD', 'operation_family' => $family,
+            'entity_type' => $entityType, 'operation' => $operation, 'writer' => 'canonical_governed',
+            'entrypoint' => 'nhk.capture.ingest', 'canonical_entrypoint' => 'nhk.capture.ingest',
+            'subject_id' => (string) ($plan['subject_id'] ?? ''), 'expected_revision' => (int) ($plan['expected_revision'] ?? 0),
+            'plan_fingerprint' => $planFingerprint, 'proposal_command_fingerprint' => $payloadFingerprint,
+            'payload_fingerprint' => $payloadFingerprint,
+            'issued_at' => gmdate('c'), 'expires_at' => gmdate('c', time() + max(1, $this->ttlSeconds)),
+        ];
+        if (!(bool) ($this->admission)($base, $capture, (array) ($capture->context['planning_input'] ?? []), [])) throw new \RuntimeException('STAGING_SCOPE_NOT_ADMITTED');
+        $fingerprint = hash('sha256', CommandCanonicalizer::canonicalize($base));
+        return $base + ['fingerprint' => $fingerprint, 'signature' => hash_hmac('sha256', $fingerprint, $this->secret())];
+    }
+
     /** @param array<string,mixed> $plan @param list<string> $candidateIds @return array<string,mixed> */
     public function issueForAuthorityPlan(CaptureRecord $capture, array $plan, array $candidateIds): array
     {
@@ -256,7 +293,7 @@ final class StagingAcceptanceScopeVerifier
     /** @param array<string,mixed> $value @return array<string,mixed> */
     private function withoutAuthorization(array $value): array
     {
-        foreach (['staging_acceptance', 'signature', 'fingerprint', 'approved', 'scope_fingerprint'] as $key) unset($value[$key]);
+        foreach (['staging_acceptance', 'signature', 'fingerprint', 'approved', 'scope_fingerprint', 'proposal_command_fingerprint'] as $key) unset($value[$key]);
         return $value;
     }
 

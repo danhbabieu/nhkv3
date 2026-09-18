@@ -9,6 +9,8 @@ use NHK\Core\Application\Semantic\SubjectResolutionService;
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Contracts\Governance\{DependencyRepository, EligibilityReader, ProposalRepository};
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
+use NHK\Core\Contracts\Media\MediaUsageRepository;
+use NHK\Core\Domain\Media\MediaUsage;
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Authority\{AuthorityEntity, EntityTypeDefinition, EntityTypeRegistry};
 use NHK\Core\Domain\Governance\{DependencyGraph, Proposal, ProposalState};
@@ -84,7 +86,35 @@ final class ProposalEligibilityServiceTest extends TestCase
         self::assertTrue($service->check($relation->id)->ready);
     }
 
-    private function service(Proposal $proposal, ?SubjectResolutionService $subjectResolver = null, ?EligibilityReader $relationReader = null): ProposalEligibilityService
+    public function test_media_usage_revision_is_read_from_usage_not_media_or_post_revision(): void
+    {
+        $usage = new MediaUsage('01a0b452-153e-79a7-81fd-cc7c2bfda2ef', self::SUBJECT, 'wp_post', '1:596', 'featured_primary', revision: 4, placementKey: 'featured_primary');
+        $proposal = new Proposal(self::ID, self::SUBJECT, 'replace', [
+            'media' => ['id' => self::SUBJECT],
+            'target' => ['type' => 'wp_post', 'blog_id' => 1, 'post_id' => 596],
+            'usage_id' => $usage->usageId,
+            'expected_usage_revision' => 4,
+        ], 'media-usage-content', 1, 'media-usage-dependency', ProposalState::APPROVED, targetUuid: null, entityType: 'media');
+        $reader = new class implements EligibilityReader {
+            public function isApplied(string $dependencyUuid): bool { return true; }
+            public function targetRevision(string $targetUuid): ?int { return $targetUuid === '1:596' ? 999 : 9; }
+            public function targetExists(string $targetUuid): bool { return true; }
+        };
+        $usages = new class($usage) implements MediaUsageRepository {
+            public function __construct(private MediaUsage $usage) {}
+            public function create(MediaUsage $usage): MediaUsage { return $usage; }
+            public function listByMediaId(string $mediaId, ?string $role = null): array { return []; }
+            public function listByEndpoint(string $endpointType, string $endpointKey, ?string $role = null): array { return $endpointType === 'wp_post' && $endpointKey === '1:596' ? [$this->usage] : []; }
+        };
+        $service = $this->service($proposal, mediaUsages: $usages, relationReader: $reader);
+
+        self::assertTrue($service->check($proposal->id)->ready);
+
+        $stale = new Proposal(self::ID, self::SUBJECT, 'replace', array_replace($proposal->payload, ['expected_usage_revision' => 3]), 'media-usage-content-stale', 1, 'media-usage-dependency', ProposalState::APPROVED, targetUuid: null, entityType: 'media');
+        self::assertContains('TARGET_REVISION_CHANGED', $this->service($stale, mediaUsages: $usages, relationReader: $reader)->check($stale->id)->reasons);
+    }
+
+    private function service(Proposal $proposal, ?SubjectResolutionService $subjectResolver = null, ?EligibilityReader $relationReader = null, ?MediaUsageRepository $mediaUsages = null): ProposalEligibilityService
     {
         $repository = new class($proposal) implements ProposalRepository {
             public function __construct(private Proposal $proposal) {}
@@ -143,7 +173,7 @@ final class ProposalEligibilityServiceTest extends TestCase
         $endpoints = new EndpointTypeRegistry();
         $endpoints->register('variant', new AuthorityEndpointResolver($types, $authority));
         $evaluator = new VideoProposalEligibilityEvaluator($videos, $endpoints, new PredicateRegistry(), new CanonicalDependencyValidator($claims, $sources, $evidence), $subjectResolver);
-        return new ProposalEligibilityService($repository, new DependencyGraph(new class implements DependencyRepository { public function directDependencies(string $proposalId): array { return []; } public function add(string $proposalId, string $dependencyUuid): void {} }), $reader, $evaluator);
+        return new ProposalEligibilityService($repository, new DependencyGraph(new class implements DependencyRepository { public function directDependencies(string $proposalId): array { return []; } public function add(string $proposalId, string $dependencyUuid): void {} }), $reader, $evaluator, null, $mediaUsages);
     }
 
     private function proposal(array $metadata): Proposal

@@ -1,5 +1,59 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-18 — MediaUsage replace CAS/readback fixed (LOCAL / NO LIVE MUTATION)
+
+SCOPE: Traced MediaUsage revision ownership from MediaUsage/WPDB persistence
+through MediaBindingService, proposal subject binding, ProposalEligibilityService,
+ControlledApply, the MCP media-usage adapter and canonical readback. No live
+WordPress semantic/content data, attachment or MediaUsage row was mutated;
+no deployment was attempted.
+
+ROOT_CAUSE: `nhk.media.get`/REST/Admin projections omitted the MediaUsage
+revision and exact placement/target identity, forcing clients to guess
+`expected_usage_revision`. In addition, media `replace`/`remove` eligibility
+fell through the generic entity CAS branch and compared the Media subject
+revision, rather than the exact active MediaUsage row revision.
+
+FIXED_BOUNDARY: Governance eligibility now resolves the exact Usage by target
+and `usage_id`, compares its current revision, rejects retired/stale rows with
+`TARGET_REVISION_CHANGED`, and skips the unrelated generic Media/owner CAS for
+MediaUsage add/replace/remove. MCP `nhk.media.get`, REST and Admin readback
+expose `usage_id`, `media_id`, target, role, placement, sort order, active state
+and current revision. MCP docs explicitly require callers to use that revision.
+
+VERIFICATION: Focused Media/Governance/MCP/Admin tests pass 63 tests / 729
+assertions. Full local suite reached 2,116 tests but is not green because the
+configured environment lacks the required WordPress integration bootstrap and
+has unrelated pre-existing failures; no live acceptance was run.
+
+STATUS: `MEDIAUSAGE_REPLACE_CAS_READBACK_FIXED_LOCAL / DEPLOYMENT_PENDING`
+
+# Checkpoint — 2026-09-18 — Video Capture provenance staging-scope loss fixed (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE: The Capture continuation scoped only the final Video plan. In a
+new provenance path, `VIDEO_SOURCE_GOVERNANCE` first submitted newly planned
+Source/Knowledge/Evidence children; their governed Proposals reached the
+staging OperationScopedStagingGuard without a signed packet and failed with
+`STAGING_SCOPE_REQUIRED` before final Video governance.
+
+FIXED_BOUNDARY: GovernedCaptureContinuationService now scopes each new
+Capture-owned provenance dependency immediately before Governance using the
+existing StagingAcceptanceScopeVerifier/signer and generic admission boundary.
+The final Video plan is still scoped after provenance and relation attachment,
+with no guard relaxation, duplicate HMAC, direct writer or object-specific
+allowlist. StagingAcceptanceScope now verifies exact dependency payload
+fingerprints as well as the existing Video bindings.
+
+VERIFICATION: Added a live-shaped unit regression covering new YouTube Video,
+exact resolved subject, Source/Claim/Evidence dependency Governance,
+VIDEO_SOURCE_GOVERNANCE, final Video Proposal payload scope, `video:ingest`,
+`expected_revision=0`, `create_semantics=ingest`, HMAC verification and the
+OperationScopedStagingGuard. Focused Video/Capture/Governance/Staging/
+Source/Evidence tests pass 101 tests / 428 assertions. Deployment and live
+retry remain pending; no staging or production mutation was performed.
+
+STATUS: `VIDEO_CAPTURE_PROVENANCE_SCOPE_LOSS_FIXED_LOCAL / DEPLOYMENT_PENDING`
+
 # Checkpoint — 2026-09-18 — Homepage bounded latest-feed read model (LOCAL / NO LIVE MUTATION)
 
 SCOPE: Replaced the homepage latest-feed merge inputs with bounded candidate

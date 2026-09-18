@@ -22,7 +22,7 @@ use NHK\Core\Infrastructure\Migration\ClaimProjectionMigration016;
 use NHK\Core\Infrastructure\Migration\{EditorialCaptureAddendumMigration018, EditorialCaptureMigration017, GovernanceSubjectBindingMigration020, MediaBindingOperationMigration022, MediaUsageMetadataMigration021, VisualSupportRequirementMigration019};
 use NHK\Core\Infrastructure\Migration\MigrationDatabaseGuard;
 use NHK\Core\Application\Governance\GovernanceCapabilities;
-use NHK\Core\Application\Governance\{AuthorityStagingAdmission, MediaBindingStagingAdmission, VideoStagingAdmission};
+use NHK\Core\Application\Governance\{AuthorityStagingAdmission, CaptureDependencyStagingAdmission, MediaBindingStagingAdmission, VideoStagingAdmission};
 use NHK\Core\Application\Runtime\SemanticWritePolicyResolver;
 use NHK\Core\Application\Mcp\{McpAbilityRegistration, McpArticleIngestHandler, McpGovernanceHandler, McpReadHandler, McpSemanticContextResolver, McpToolCatalog, McpTransport, McpDocumentationRegistry};
 use NHK\Core\Application\Media\{ImageIngestEntrypoint, MediaBatchUploadService, MediaBindingService};
@@ -171,6 +171,7 @@ final class Plugin {
             $stagingAdmission = new MediaBindingStagingAdmission(new WpdbMediaRepository($wpdb), new WpdbAuthorityRepository($wpdb));
             add_filter('nhk_v3_staging_acceptance_admission', new AuthorityStagingAdmission(), 10, 5);
             add_filter('nhk_v3_staging_acceptance_admission', $stagingAdmission, 20, 5);
+            add_filter('nhk_v3_staging_acceptance_admission', new CaptureDependencyStagingAdmission(), 25, 5);
             add_filter('nhk_v3_staging_acceptance_admission', new VideoStagingAdmission(new WpdbVideoRepository($wpdb)), 30, 5);
         }
         $sharedAttachmentBridge = null;
@@ -724,6 +725,11 @@ final class Plugin {
                     return $stagingScopeVerifier->issueForVideoPlan($capture, $plan);
                 },
                 pendingVideoProposals: $proposalRepository,
+                dependencyScopeIssuer: static function (string $captureId, array $plan) use ($captureRepository, $stagingScopeVerifier): array {
+                    $capture = $captureRepository->findById($captureId);
+                    if (!$capture instanceof CaptureRecord) throw new \RuntimeException('STAGING_CAPTURE_NOT_FOUND');
+                    return $stagingScopeVerifier->issueForCaptureDependencyPlan($capture, $plan);
+                },
             );
             $articleReceipts = new WpdbArticleOperationReceiptRepository($wpdb);
             $categoryGateway = new CategoryGateway(new WpCategoryStore());

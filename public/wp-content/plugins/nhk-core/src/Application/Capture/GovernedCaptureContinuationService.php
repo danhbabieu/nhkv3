@@ -53,6 +53,8 @@ final class GovernedCaptureContinuationService
         /** @var callable(string,array<string,mixed>):array<string,mixed>|null */
         private $videoScopeIssuer = null,
         private ?PendingVideoProposalLookup $pendingVideoProposals = null,
+        /** @var callable(string,array<string,mixed>):array<string,mixed>|null */
+        private $dependencyScopeIssuer = null,
     ) {
         $this->completion = $completion ?? new CompletionCoordinator();
     }
@@ -519,6 +521,24 @@ final class GovernedCaptureContinuationService
         return $plan;
     }
 
+    /** @param array<string,mixed> $plan @return array<string,mixed> */
+    private function scopeDependencyPlan(string $captureId, array $plan): array
+    {
+        if (!in_array((string) ($plan['entity_type'] ?? ''), ['source', 'knowledge', 'evidence'], true)
+            || !in_array((string) ($plan['operation'] ?? ''), ['ingest', 'create'], true)
+            || !is_callable($this->dependencyScopeIssuer)) return $plan;
+        $payload = is_array($plan['payload'] ?? null) ? $plan['payload'] : [];
+        unset($payload['staging_acceptance'], $payload['capture_fingerprint'], $payload['scope_fingerprint'], $payload['proposal_command_fingerprint']);
+        $payload['capture_id'] = $captureId;
+        $plan['payload'] = $payload;
+        $scope = ($this->dependencyScopeIssuer)($captureId, $plan);
+        if (!is_array($scope)) throw new \RuntimeException('STAGING_SCOPE_REQUIRED');
+        $plan['payload']['capture_fingerprint'] = (string) ($scope['capture_fingerprint'] ?? '');
+        $plan['payload']['proposal_command_fingerprint'] = (string) ($scope['proposal_command_fingerprint'] ?? '');
+        $plan['payload']['staging_acceptance'] = $scope;
+        return $plan;
+    }
+
     /** @param list<array<string,mixed>> $subjects @param list<array<string,mixed>> $variants */
     private function knowledgeSubject(array $subjects, array $variants, string $intent, array $primary = []): ?array
     {
@@ -576,6 +596,7 @@ final class GovernedCaptureContinuationService
             }
             $kind = count($dependencyWrites) === 0 ? 'source' : 'claim';
             $phase = $kind === 'source' ? 'VIDEO_SOURCE_GOVERNANCE' : 'VIDEO_CLAIM_GOVERNANCE';
+            $dependency = $this->scopeDependencyPlan($this->currentCaptureId, $dependency);
             $write = $this->reusedDependency($dependency, $provenancePlan, $kind, $phase)
                 ?? $this->runGovernedChild($dependency, $control, $lifecycle, $phase);
             $dependencyWrites[] = $write;
@@ -604,6 +625,7 @@ final class GovernedCaptureContinuationService
             return;
         }
         $evidenceArguments = (array) ($withEvidence['dependencies'][2] ?? []);
+        $evidenceArguments = $this->scopeDependencyPlan($this->currentCaptureId, $evidenceArguments);
         try {
             $this->budget?->check('VIDEO_PROVENANCE_EVIDENCE');
         } catch (\Throwable $error) {

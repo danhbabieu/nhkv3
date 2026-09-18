@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Governance;
 
-use NHK\Core\Domain\Governance\Proposal;
+use NHK\Core\Domain\Governance\{CommandCanonicalizer, Proposal};
 use NHK\Core\Shared\Uuid\UuidCodec;
 
 /** Exact binding rules for a verified staging Capture acceptance scope. */
@@ -95,6 +95,26 @@ final class StagingAcceptanceScope
                 $subject = is_array($proposal->payload['metadata']['subject_resolution_packet'] ?? null) ? $proposal->payload['metadata']['subject_resolution_packet'] : [];
                 if (($subject['id'] ?? null) !== null && (string) ($scope['subject']['uuid'] ?? '') !== (string) $subject['id']) throw new \RuntimeException('STAGING_SUBJECT_SCOPE_MISMATCH');
                 if (($subject['type'] ?? null) !== null && (string) ($scope['subject']['type'] ?? '') !== (string) $subject['type']) throw new \RuntimeException('STAGING_SUBJECT_SCOPE_MISMATCH');
+            }
+            self::assertNoFuzzyLocator($scope);
+            return;
+        }
+
+        if (in_array($expectedFamily, ['source_evidence_reconciliation', 'knowledge_delta'], true)) {
+            if (!hash_equals($captureId, (string) ($proposal->payload['capture_id'] ?? ''))
+                || !hash_equals((string) ($scope['capture_fingerprint'] ?? ''), (string) ($proposal->payload['capture_fingerprint'] ?? ''))
+                || (string) ($scope['entity_type'] ?? '') !== $proposal->entityType
+                || (string) ($scope['operation'] ?? '') !== $proposal->operation
+                || (string) ($scope['subject_id'] ?? '') !== $proposal->subjectId
+                || (int) ($scope['expected_revision'] ?? 0) !== (int) ($proposal->expectedRevision ?? 0)) {
+                throw new \RuntimeException('STAGING_DEPENDENCY_SCOPE_MISMATCH');
+            }
+            $payload = $proposal->payload;
+            unset($payload['staging_acceptance'], $payload['proposal_command_fingerprint']);
+            $payloadFingerprint = hash('sha256', CommandCanonicalizer::canonicalize($payload));
+            if (!hash_equals((string) ($scope['payload_fingerprint'] ?? ''), $payloadFingerprint)
+                || !hash_equals((string) ($scope['proposal_command_fingerprint'] ?? ''), $payloadFingerprint)) {
+                throw new \RuntimeException('STAGING_DEPENDENCY_PAYLOAD_MISMATCH');
             }
             self::assertNoFuzzyLocator($scope);
             return;

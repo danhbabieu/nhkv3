@@ -177,7 +177,7 @@ final class McpToolCatalog
             self::tool('nhk.article.trash', 'Move one native WordPress Post to trash with state-token CAS.', ['post_id' => ['type' => 'integer', 'minimum' => 1], 'expected_state_token' => ['type' => 'string', 'pattern' => '^[a-fA-F0-9]{64}$'], 'idempotency_key' => ['type' => 'string', 'minLength' => 1]], ['post_id', 'expected_state_token', 'idempotency_key'], true),
             self::tool('nhk.article.restore', 'Restore one trashed native WordPress Post to draft with state-token CAS.', ['post_id' => ['type' => 'integer', 'minimum' => 1], 'expected_state_token' => ['type' => 'string', 'pattern' => '^[a-fA-F0-9]{64}$'], 'idempotency_key' => ['type' => 'string', 'minLength' => 1]], ['post_id', 'expected_state_token', 'idempotency_key'], true),
             self::tool('nhk.entity.get', 'Read one active Authority entity by type and UUID.', ['type' => ['type' => 'string', 'minLength' => 1], 'id' => self::uuidField()], ['type', 'id']),
-            self::tool('nhk.media.get', 'Read one active Media identity and its public assets.', ['id' => self::uuidField()], ['id']),
+            self::tool('nhk.media.get', 'Read one active Media identity, public assets and active MediaUsage read-back. Each usage includes usage_id, media_id, target_type/target_id, role, placement_key, sort_order, active and the current revision; use that revision as expected_usage_revision for replace/remove.', ['id' => self::uuidField()], ['id']),
             self::tool('nhk.media.update', 'Create a governed Proposal to repair bounded metadata on one existing canonical Media. The binary, Media identity, MediaAsset records and MediaUsage rows are never replaced or rewritten.', [
                 'media_ref' => ['type' => 'object', 'properties' => [
                     'id' => self::uuidField(),
@@ -200,7 +200,7 @@ final class McpToolCatalog
                 'selection_policy' => ['type' => 'string', 'enum' => ['PINNED', 'AUTO']],
                 'seo' => ['type' => 'object', 'properties' => ['alt_text' => ['type' => 'string', 'maxLength' => 1000], 'caption' => ['type' => 'string', 'maxLength' => 2000], 'title' => ['type' => 'string', 'maxLength' => 255]], 'additionalProperties' => false],
             ], ['idempotency_key', 'media', 'target'], true),
-            self::tool('nhk.media.usage', 'Create one governed MediaUsage add, replace, remove or representative binding operation. The target is exact; policy, proposal, eligibility, Controlled Apply and canonical read-back remain the shared Governance pipeline.', [
+            self::tool('nhk.media.usage', 'Create one governed MediaUsage add, replace, remove or representative binding operation. For replace/remove, first call nhk.media.get and use the exact active usage_id plus its current revision as expected_usage_revision; never guess the revision. The target is exact; policy, proposal, eligibility, Controlled Apply and canonical read-back remain the shared Governance pipeline.', [
                 'idempotency_key' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 191],
                 'operation' => ['type' => 'string', 'enum' => ['add', 'replace', 'remove', 'representative_bind']],
                 'media' => ['type' => 'object', 'properties' => ['id' => self::uuidField()], 'required' => ['id'], 'additionalProperties' => false],

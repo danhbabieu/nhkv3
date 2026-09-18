@@ -488,7 +488,7 @@ availability; local HTTP wire smoke remains an environment check.
 | `nhk.article.ingest` | Article operation receipt + governed semantic delta | WRITE | Yes | Receipt + semantic revisions | Controlled Apply only | READY for reconcile; create/update fail closed |
 | `nhk.capture.ingest` | Editorial Capture + bounded semantic enrichment | WRITE | Yes | Capture revision + Article draft token when Article intent requires it | Bounded neighborhood read; relation writes remain governed | PR1 intent routing implemented; guarded runtime acceptance remains pending |
 | `nhk.entity.get` | Authority | READ | No | N/A | No raw edge | READY for registered type + UUID |
-| `nhk.media.get` | Media + public assets/usages | READ | No | N/A | No raw edge | READY for active ready Media/public assets |
+| `nhk.media.get` | Media + public assets + active MediaUsage read-back | READ | No | N/A | No raw edge | READY for active ready Media/public assets |
 | `nhk.media.binding.get` | Durable Media binding receipt | READ | No | N/A | No raw edge | READY; operation ID or idempotency key |
 | `nhk.media.bind` | Exact Media → registered Entity `representative` MediaUsage | WRITE / INTERNAL | Yes | Durable staged receipt, Usage revision and final read-back | No Graph edge; contextual SEO on Usage | READY for exact locators; pinned representative protected from system auto |
 | `nhk.media.ingest` | Media/MediaAsset/MediaUsage or governed WordPress image attachment | WRITE / INTERNAL | Yes | Both paths enter the governed Media service; file path creates/resolves one Media, retains PRIVATE source-original and projects PUBLIC derivatives/attachment | Usage is placement; attachment is storage/projection only | Internal/admin compatibility boundary; new submissions use Capture |
@@ -683,7 +683,15 @@ size, dimensions and visibility. Usage includes endpoint type/key, controlled
 role, order and contextual SEO fields. Article roles are `featured_primary`,
 `inline_primary` and `inline_supporting`; the five existing generic roles
 remain in the same registry. `nhk.media.get` returns active ready Media, public
-deliverable assets and reader-safe usage.
+deliverable assets and reader-safe usage. Each active usage includes its
+stable `usage_id`, current `media_id`, exact `target_type`/`target_id`,
+`role`, `placement_key`, `sort_order`, `active` state and current `revision`.
+For governed `nhk.media.usage` `replace` or `remove`, callers must first read
+the exact active usage from `nhk.media.get`, then send its `usage_id` and
+returned `revision` as `expected_usage_revision`; clients must never guess the
+revision. The revision belongs to the MediaUsage row, not the Media, target
+owner or WordPress Post revision. A stale value fails closed with
+`TARGET_REVISION_CHANGED`.
 
 `nhk.media.upload-batch` is the primary multipart transport for one or more
 images. It accepts `files[]`, an idempotency key, optional batch metadata and

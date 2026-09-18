@@ -7,7 +7,7 @@ use NHK\Core\Application\Capture\GovernedCaptureContinuationService;
 use NHK\Core\Application\Capture\CaptureVideoProvenancePlanner;
 use NHK\Core\Application\Capture\CaptureOrchestrationBudget;
 use NHK\Core\Application\Governance\StagingAcceptanceScopeVerifier;
-use NHK\Core\Application\Governance\VideoStagingAdmission;
+use NHK\Core\Application\Governance\{CaptureDependencyStagingAdmission, OperationScopedStagingGuard, VideoStagingAdmission};
 use NHK\Core\Application\Governance\GovernanceAutomationPolicyResolver;
 use NHK\Core\Application\Semantic\ClaimReusePolicy;
 use NHK\Core\Application\Video\{VideoEditorialGenerator, VideoEditorialResumePlanner, VideoSearchDocument, VideoSeoProjection, VideoService};
@@ -154,13 +154,66 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
             'subject_resolution' => ['primary' => ['id' => $subjectId, 'type' => 'classification', 'match' => 'uuid_exact', 'revision' => 2], 'resolved' => []],
         ]);
 
-        self::assertSame('APPLIED', $result['status']);
+        self::assertSame('APPLIED', $result['status'], json_encode($result, JSON_UNESCAPED_UNICODE));
         self::assertSame(1, $issued);
         self::assertIsArray($createdVideoPayload);
         self::assertArrayHasKey('staging_acceptance', $createdVideoPayload);
         self::assertSame($videoId, $createdVideoPayload['staging_acceptance']['proposed_uuid']);
         self::assertSame(0, $createdVideoPayload['staging_acceptance']['expected_revision']);
         self::assertSame('video:ingest', 'video:' . $createdVideoPayload['staging_acceptance']['operation']);
+    }
+
+    public function test_live_shaped_video_provenance_scopes_new_dependencies_before_final_video_command(): void
+    {
+        $captureId = UuidCodec::newV7();
+        $videoId = UuidCodec::newV7();
+        $subjectId = UuidCodec::newV7();
+        $capture = new \NHK\Core\Domain\Capture\CaptureRecord($captureId, 'live-shaped', hash('sha256', 'live-shaped'), 'SEMANTICS_RECONCILED', 'IN_PROGRESS', context: ['purpose' => 'VIDEO'], assets: [[
+            'kind' => 'video', 'video_proposal' => ['entity_type' => 'video', 'operation' => 'ingest', 'subject_id' => $videoId, 'idempotency_key' => 'live-shaped:video', 'fingerprint' => hash('sha256', 'video-plan'), 'payload' => [
+                'canonical_id' => $videoId, 'metadata' => ['source' => ['platform' => 'youtube', 'external_video_id' => 'GHvh8-iXPoE', 'canonical_source_url' => 'https://www.youtube.com/watch?v=GHvh8-iXPoE'], 'subject_resolution_packet' => ['status' => 'RESOLVED', 'match' => 'uuid_exact', 'type' => 'variant', 'id' => $subjectId, 'revision' => 1]],
+            ]],
+        ]]);
+        $videos = new class implements VideoRepository {
+            public function findByCanonicalId(string $id): ?Video { return null; }
+            public function findByExternalReference(string $platform, string $externalId): ?Video { return null; }
+            public function create(Video $video): Video { return $video; }
+            public function update(Video $video, int $expectedRevision): Video { return $video; }
+            public function list(bool $includeRetired = false): array { return []; }
+        };
+        $admission = static function (array $scope, \NHK\Core\Domain\Capture\CaptureRecord $record, array $input, array $assets) use ($videos): bool {
+            return (new CaptureDependencyStagingAdmission())(false, $scope, $record, $input, $assets)
+                || (new VideoStagingAdmission($videos))(false, $scope, $record, $input, $assets);
+        };
+        $verifier = new StagingAcceptanceScopeVerifier(static fn (): string => 'staging', 'test-secret', $admission, can: static fn (): bool => true, videos: $videos);
+        $created = [];
+        $proposals = [];
+        $governance = new class($created, $proposals) implements GovernedLifecycle {
+            public function __construct(private array &$created, private array &$proposals) {}
+            public function createFromArguments(array $arguments): Proposal { $id = UuidCodec::newV7(); $this->created[] = $arguments; return $this->proposals[$id] = new Proposal($id, (string) $arguments['subject_id'], (string) $arguments['operation'], (array) $arguments['payload'], 'content', $arguments['expected_revision'] ?? null, 'dependency', ProposalState::APPROVED, idempotencyKey: (string) $arguments['idempotency_key'], targetUuid: ($arguments['entity_type'] ?? '') === 'video' ? (string) ($arguments['payload']['canonical_id'] ?? '') : null, entityType: (string) $arguments['entity_type']); }
+            public function submit(string $id): Proposal { return $this->proposals[$id]; }
+            public function review(string $id): array { $p = $this->proposals[$id]; return ['state' => 'approved', 'entity_type' => $p->entityType, 'operation' => $p->operation, 'subject_id' => $p->subjectId, 'target_uuid' => $p->targetUuid, 'payload' => $p->payload, 'content_fingerprint' => $p->contentFingerprint, 'dependency_fingerprint' => $p->dependencyFingerprint]; }
+            public function approve(string $id, string $contentFingerprint, string $dependencyFingerprint, string $actor): Proposal { return $this->proposals[$id]; }
+            public function eligibility(string $id): array { return ['ready' => true]; }
+        };
+        $service = new GovernedCaptureContinuationService(
+            $governance,
+            static function (string $proposalId) use (&$proposals, $verifier): array { $proposal = $proposals[$proposalId]; (new OperationScopedStagingGuard(static fn (): string => 'staging', static fn (): bool => true, scopeVerifier: [$verifier, 'verifyProposal']))->assertAllowed($proposal); $id = UuidCodec::newV7(); return ['canonical_id' => $id, 'canonical_readback' => ['canonical_id' => $id, 'entity_type' => $proposal->entityType, 'active' => true, 'revision' => 1]]; },
+            $this->policies(['source', 'knowledge', 'evidence', 'video'], ['source' => 'AUTO_PUBLISH', 'knowledge' => 'AUTO_PUBLISH', 'evidence' => 'AUTO_PUBLISH', 'video' => 'AUTO_PUBLISH']),
+            static fn (): bool => true,
+            null,
+            new CaptureVideoProvenancePlanner(),
+            videoScopeIssuer: static function (string $id, array $plan) use ($verifier, $capture): array { return $verifier->issueForVideoPlan($capture, $plan); },
+            dependencyScopeIssuer: static function (string $id, array $plan) use ($verifier, $capture): array { return $verifier->issueForCaptureDependencyPlan($capture, $plan); },
+        );
+        $result = $service->execute($captureId, 'live-shaped', ['content_intent' => ['intent' => 'VIDEO'], 'assets' => $capture->assets, 'subject_resolution' => ['primary' => ['id' => $subjectId, 'type' => 'variant', 'match' => 'uuid_exact', 'revision' => 1], 'resolved' => []]]);
+        self::assertSame('APPLIED', $result['status'], json_encode($result, JSON_UNESCAPED_UNICODE));
+        self::assertCount(4, $created);
+        $videoCommands = array_values(array_filter($created, static fn (array $command): bool => ($command['entity_type'] ?? '') === 'video'));
+        self::assertCount(1, $videoCommands);
+        self::assertSame('ingest', $videoCommands[0]['operation']);
+        self::assertSame(0, $videoCommands[0]['payload']['staging_acceptance']['expected_revision']);
+        self::assertSame('ingest', $videoCommands[0]['payload']['staging_acceptance']['create_semantics']);
+        self::assertArrayHasKey('staging_acceptance', $videoCommands[0]['payload']);
     }
 
     public function test_existing_capture_continuation_runs_governance_and_requires_explicit_approval(): void

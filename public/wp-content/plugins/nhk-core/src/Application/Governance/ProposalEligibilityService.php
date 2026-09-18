@@ -4,12 +4,13 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Governance;
 
 use NHK\Core\Contracts\Governance\{EligibilityReader, ProposalRepository};
+use NHK\Core\Contracts\Media\MediaUsageRepository;
 use NHK\Core\Application\Graph\ClassifiedAsPolicy;
 use NHK\Core\Domain\Governance\{DependencyGraph, EligibilityResult, ProposalState, ProposalSubjectBindingValidator};
 
 final class ProposalEligibilityService
 {
-    public function __construct(private ProposalRepository $proposals, private DependencyGraph $dependencies, private EligibilityReader $reader, private ?VideoProposalEligibilityEvaluator $video = null, private ?ClassifiedAsPolicy $classifiedAs = null) {}
+    public function __construct(private ProposalRepository $proposals, private DependencyGraph $dependencies, private EligibilityReader $reader, private ?VideoProposalEligibilityEvaluator $video = null, private ?ClassifiedAsPolicy $classifiedAs = null, private ?MediaUsageRepository $mediaUsages = null) {}
 
     public function check(string $proposalId): EligibilityResult
     {
@@ -51,7 +52,23 @@ final class ProposalEligibilityService
             }
             if (in_array($proposal->operation, ['replace', 'remove'], true)) {
                 if (!preg_match('/^[0-9A-Fa-f-]{36}$/', (string) ($proposal->payload['usage_id'] ?? ''))) $reasons[] = 'MEDIA_USAGE_ID_REQUIRED';
-                if ((int) ($proposal->payload['expected_usage_revision'] ?? 0) < 1) $reasons[] = 'MEDIA_USAGE_REVISION_REQUIRED';
+                $expectedUsageRevision = (int) ($proposal->payload['expected_usage_revision'] ?? 0);
+                if ($expectedUsageRevision < 1) {
+                    $reasons[] = 'MEDIA_USAGE_REVISION_REQUIRED';
+                } elseif ($this->mediaUsages !== null) {
+                    $usageId = (string) ($proposal->payload['usage_id'] ?? '');
+                    $usage = null;
+                    if ($targetType === 'wp_post') {
+                        foreach ($this->mediaUsages->listByEndpoint('wp_post', $endpointKey) as $candidate) {
+                            if ($candidate->usageId === $usageId) { $usage = $candidate; break; }
+                        }
+                    } elseif ($proposal->targetUuid !== null) {
+                        foreach ($this->mediaUsages->listByEndpoint($targetType, $proposal->targetUuid) as $candidate) {
+                            if ($candidate->usageId === $usageId) { $usage = $candidate; break; }
+                        }
+                    }
+                    if ($usage === null || $usage->activeSlot === 'retired' || $usage->revision !== $expectedUsageRevision) $reasons[] = 'TARGET_REVISION_CHANGED';
+                }
             }
         }
         if ($proposal->operation === 'merge') {
@@ -79,7 +96,7 @@ final class ProposalEligibilityService
             $sourceId = (string) ($proposal->payload['source_uuid'] ?? $proposal->subjectId);
             $targetId = (string) ($proposal->payload['target_uuid'] ?? '');
             if ($sourceRevision < 1 || $targetRevision < 1 || $this->reader->targetRevision($sourceId) !== $sourceRevision || $this->reader->targetRevision($targetId) !== $targetRevision) $reasons[] = 'TARGET_REVISION_CHANGED';
-        } elseif (!$isCreation && $proposal->subjectId !== '' && $proposal->expectedRevision > 0 && $this->reader->targetRevision($proposal->targetUuid ?: $proposal->subjectId) !== $proposal->expectedRevision) $reasons[] = 'TARGET_REVISION_CHANGED';
+        } elseif (!$isCreation && !($proposal->entityType === 'media' && in_array($proposal->operation, ['add', 'replace', 'remove'], true)) && $proposal->subjectId !== '' && $proposal->expectedRevision > 0 && $this->reader->targetRevision($proposal->targetUuid ?: $proposal->subjectId) !== $proposal->expectedRevision) $reasons[] = 'TARGET_REVISION_CHANGED';
         $dependencyRevisions = $proposal->payload['dependency_revisions'] ?? [];
         if (is_array($dependencyRevisions)) {
             foreach ($dependencyRevisions as $dependencyUuid => $expectedRevision) {
