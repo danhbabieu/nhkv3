@@ -54,6 +54,18 @@ final class FrontendPresentationContractTest extends TestCase
         self::assertStringNotContainsString("['loading' => 'eager', 'fetchpriority' => 'high', 'alt' => get_the_title()]", $source);
     }
 
+    public function test_homepage_hero_and_video_cards_keep_responsive_and_lazy_image_contracts(): void
+    {
+        $home = $this->read('front-page.php');
+        $video = $this->read('template-parts/presentation/video-card.php');
+        self::assertStringContainsString("\$item['srcset']", $home);
+        self::assertStringContainsString("\$item['sizes']", $home);
+        self::assertStringContainsString('fetchpriority="high"', $home);
+        self::assertStringContainsString('loading="lazy"', $home);
+        self::assertStringContainsString('decoding="async"', $video);
+        self::assertStringNotContainsString('fetchpriority="high"', $video);
+    }
+
     public function test_entity_detail_renders_dossier_knowledge_gallery_and_path_aware_related_content(): void
     {
         $source = $this->read('entity.php');

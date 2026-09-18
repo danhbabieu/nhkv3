@@ -74,4 +74,24 @@ final class VideoThumbnailSelectorTest extends TestCase
             'thumbnail_urls' => ['https://i.ytimg.com/vi/example/default.jpg', 'https://i.ytimg.com/vi/example/maxresdefault.jpg'],
         ]));
     }
+
+    public function test_compact_presentation_prefers_medium_candidate_without_changing_canonical_selection(): void
+    {
+        $selector = new VideoThumbnailSelector();
+        self::assertSame('mqdefault', $selector->selectCompact([
+            ['variant' => 'maxresdefault', 'url' => 'https://img.youtube.test/maxresdefault.jpg', 'width' => 1280, 'height' => 720],
+            ['variant' => 'mqdefault', 'url' => 'https://img.youtube.test/mqdefault.jpg', 'width' => 320, 'height' => 180],
+        ])['variant']);
+        self::assertSame('maxresdefault', $selector->fromSource([
+            'thumbnail_selection' => ['url' => 'https://img.youtube.test/maxresdefault.jpg', 'variant' => 'maxresdefault', 'width' => 1280, 'height' => 720],
+        ])['variant']);
+    }
+
+    public function test_compact_presentation_falls_back_to_persisted_canonical_thumbnail(): void
+    {
+        $selected = (new VideoThumbnailSelector())->presentationFromSource([
+            'thumbnail_selection' => ['url' => 'https://img.youtube.test/maxresdefault.jpg', 'variant' => 'maxresdefault', 'width' => 1280, 'height' => 720],
+        ]);
+        self::assertSame('https://img.youtube.test/maxresdefault.jpg', $selected['url']);
+    }
 }

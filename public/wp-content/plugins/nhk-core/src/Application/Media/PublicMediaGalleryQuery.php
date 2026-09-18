@@ -65,6 +65,9 @@ final class PublicMediaGalleryQuery
             'height' => $image['height'] ?? null,
             'has_real_image' => $image !== null,
             'article_url' => $articleUrl,
+            'attachment_id' => $image['attachment_id'] ?? null,
+            'srcset' => $image['srcset'] ?? null,
+            'sizes' => $image['sizes'] ?? null,
         ];
     }
 
@@ -88,10 +91,14 @@ final class PublicMediaGalleryQuery
             : basename(str_replace('\\', '/', $asset->storageKey));
         if ($filename === '') return null;
         $path = (new PublicMediaAssetUrlResolver())->path($filename);
+        $attachmentId = (int) ($asset->metadata['wordpress_attachment_id'] ?? 0);
         return [
             'image_url' => function_exists('home_url') ? (string) home_url($path) : $path,
             'width' => $asset->width,
             'height' => $asset->height,
+            'attachment_id' => $attachmentId > 0 ? $attachmentId : null,
+            'srcset' => $attachmentId > 0 && function_exists('wp_get_attachment_image_srcset') ? (string) wp_get_attachment_image_srcset($attachmentId, 'large') : null,
+            'sizes' => $attachmentId > 0 && function_exists('wp_get_attachment_image_sizes') ? (string) wp_get_attachment_image_sizes($attachmentId, 'large') : null,
         ];
     }
 

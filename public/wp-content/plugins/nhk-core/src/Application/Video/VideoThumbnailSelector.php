@@ -11,6 +11,7 @@ namespace NHK\Core\Application\Video;
 final class VideoThumbnailSelector
 {
     private const PRIORITY = ['maxresdefault', 'sddefault', 'hqdefault', 'mqdefault', 'default'];
+    private const COMPACT_PRIORITY = ['mqdefault', 'hqdefault', 'sddefault', 'maxresdefault', 'default'];
 
     /** @param callable(string):array<string,mixed>|null $probe */
     public function __construct(private $probe = null)
@@ -32,6 +33,18 @@ final class VideoThumbnailSelector
     /** @param list<array<string,mixed>|string> $candidates @return array<string,mixed> */
     public function select(array $candidates): array
     {
+        return $this->selectWithPriority($candidates, self::PRIORITY);
+    }
+
+    /** @param list<array<string,mixed>|string> $candidates @return array<string,mixed> */
+    public function selectCompact(array $candidates): array
+    {
+        return $this->selectWithPriority($candidates, self::COMPACT_PRIORITY);
+    }
+
+    /** @param list<array<string,mixed>|string> $candidates @param list<string> $priority @return array<string,mixed> */
+    private function selectWithPriority(array $candidates, array $priority): array
+    {
         $normalized = [];
         foreach ($candidates as $candidate) {
             $candidate = is_string($candidate) ? ['url' => $candidate] : $candidate;
@@ -39,10 +52,10 @@ final class VideoThumbnailSelector
             $url = trim((string) ($candidate['url'] ?? ''));
             if ($url === '' || strtolower((string) parse_url($url, PHP_URL_SCHEME)) !== 'https') continue;
             $variant = $this->variant((string) ($candidate['variant'] ?? ''), $url);
-            if (!in_array($variant, self::PRIORITY, true)) continue;
+            if (!in_array($variant, $priority, true)) continue;
             $normalized[$variant] = ['variant' => $variant, 'url' => $url];
         }
-        foreach (self::PRIORITY as $variant) {
+        foreach ($priority as $variant) {
             if (!isset($normalized[$variant])) continue;
             $candidate = $normalized[$variant];
             $probe = $this->probeCandidate($candidate, $candidates);
@@ -57,6 +70,22 @@ final class VideoThumbnailSelector
             ];
         }
         return [];
+    }
+
+    /** Compact presentation only; canonical source selection remains unchanged. */
+    public function presentationFromSource(array $source): array
+    {
+        $selection = is_array($source['thumbnail_presentation'] ?? null) ? $source['thumbnail_presentation'] : [];
+        if ($selection !== []) {
+            $selected = $this->fromSource(['thumbnail_selection' => $selection]);
+            if ($selected !== []) return $selected;
+        }
+        $candidates = is_array($source['thumbnail_candidates'] ?? null) ? $source['thumbnail_candidates'] : [];
+        if ($candidates !== []) {
+            $selected = $this->selectCompact($candidates);
+            if ($selected !== []) return $selected;
+        }
+        return $this->fromSource($source);
     }
 
     /** @param array<string,mixed> $source @return array<string,mixed> */
@@ -95,6 +124,8 @@ final class VideoThumbnailSelector
                 if (!is_array($original) || (string) ($original['url'] ?? '') !== $candidate['url']) continue;
                 $width = (int) ($original['actual_width'] ?? 0);
                 $height = (int) ($original['actual_height'] ?? 0);
+                $width = $width > 0 ? $width : (int) ($original['width'] ?? 0);
+                $height = $height > 0 ? $height : (int) ($original['height'] ?? 0);
                 if ($width > 0 && $height > 0) $result = ['status' => 200, 'width' => $width, 'height' => $height, 'mime_type' => 'image/*'];
             }
         }

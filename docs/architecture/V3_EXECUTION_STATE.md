@@ -1,4 +1,78 @@
 # NHK V3 Execution State
+
+# Checkpoint — 2026-09-18 — Performance Phase 3 compact Video thumbnails and Hero responsive source (LOCAL FIX / DEPLOYMENT PENDING)
+
+SCOPE: Added presentation-only compact Video thumbnail selection and
+attachment-backed Hero responsive attributes. No Video identity, canonical
+source URL, Media identity, semantic record, database, deployment or live
+data was changed.
+
+ROOT_CAUSE: Homepage compact Video items consumed the canonical persisted
+thumbnail selection, so a verified maxresdefault.jpg source could be
+requested for a roughly 78px slot. YouTube API thumbnail dimensions and
+variants were not retained as a separate presentation candidate set. Hero
+Media projection exposed only its canonical /anh/ URL and intrinsic
+dimensions; when a real WordPress attachment mapping existed, the renderer
+did not project srcset/sizes.
+
+FIX: YouTube source snapshots now retain bounded API-provided thumbnail
+candidates and a separately selected compact presentation candidate.
+Compact selection prefers mqdefault, hqdefault, then sddefault and
+falls back to the already verified canonical selection; no URL is synthesized
+by filename replacement. Homepage Video modules consume only the compact
+presentation projection, while detail/source projection keeps canonical
+selection. Public Media projection emits WordPress srcset/sizes only
+when wordpress_attachment_id is present and the native APIs return data;
+non-attachment Hero Media keeps the validated URL fallback. Video cards keep
+lazy loading, dimensions and no iframe behavior.
+
+VERIFICATION: Focused Video/Home/Media/Frontend suite passes 47 tests / 201
+assertions with one existing warning. Changed-file PHP lint and git diff
+--check pass. Full suite remains blocked by existing WordPress/MySQL
+bootstrap, acceptance configuration and unrelated contract failures. Live
+verification is pending because localhost is unavailable and the demo host
+does not resolve in this environment.
+
+STATUS: PERFORMANCE_PHASE3_LOCAL_READY / LIVE_VERIFY_PENDING / DEPLOYMENT_PENDING / SEMANTIC_MUTATION_NONE
+# Checkpoint — 2026-09-18 — Performance Phase 3.5 live acceptance and legacy video compatibility (LOCAL READY / LIVE UNVERIFIED)
+
+SCOPE: Performed a read-only browser acceptance against `https://demo.1945.vn/`
+and the requested regression routes. The live homepage loaded, the public Video
+archive exposed 12 video links, the compact video cards were lazy-loaded in the
+rendered presentation, and the tested Video detail exposed the external YouTube
+embed boundary. `/tri-thuc/`, `/tri-thuc/page/2/`, `/video/`, one Video detail,
+`/thu-vien/`, `/thuong-hieu/` and `/loai-dong-ho/` all returned their expected
+public surfaces. No form submission, cache change, deployment, database write,
+source sync or semantic mutation occurred.
+
+CONTRACT DECISION: `VIDEO_YOUTUBE_SOURCE_CONTRACT` and
+`VIDEO_SEMANTIC_INGEST_CONTRACT` treat thumbnail references/candidates as
+persisted source-snapshot data. The current runtime may derive compact
+presentation from persisted `thumbnail_presentation` or validated persisted
+`thumbnail_candidates`; legacy `thumbnail_selection` remains a safe canonical
+fallback. It must not synthesize a YouTube URL, rewrite a filename, or probe and
+persist a new selection from a public read. Therefore no legacy mass sync is
+authorized by this checkpoint. A governed source sync would require a fresh
+runtime owner/path and exact bounded scope, which were not available here.
+
+LOCAL VERIFICATION: The existing unstaged Phase 3 slice carries compact
+candidate selection, candidate dimensions, `thumbnail_presentation`, responsive
+Hero `srcset`/`sizes`, lazy async Video cards and focused regressions. Focused
+Video/frontend suites pass 40 tests / 181 assertions with one existing warning
+and 25 PHPUnit deprecations. PHP lint and `git diff --check` pass. The worktree
+contains pre-existing user changes in the Phase 3 files; they remain uncommitted
+and were preserved.
+
+LIVE EVIDENCE GAP: The connected browser surface did not expose rendered
+`srcset`, `sizes`, `fetchpriority`, intrinsic candidate width, network resource
+width, or persisted Video metadata. The live host therefore cannot be claimed
+to have the local Phase 3 build. Hero responsive fields, exact Video
+NEW_METADATA/LEGACY_METADATA/INVALID counts, oversized-before/after counts,
+broken-thumbnail count and image candidate-width audit remain unverified until
+the current build is deployed and a target-runtime/read-back audit is run.
+
+STATUS: `PERFORMANCE_PHASE3_5_LOCAL_READY / DEPLOYMENT_AND_RUNTIME_READBACK_PENDING / SEMANTIC_MUTATION_NONE`
+
 # Checkpoint — 2026-09-18 — Close Video pre-apply staging admission and stale enrichment (LOCAL FIX / DEPLOYMENT PENDING)
 
 SCOPE: Corrected the generic Video ingest revision semantics and refreshed

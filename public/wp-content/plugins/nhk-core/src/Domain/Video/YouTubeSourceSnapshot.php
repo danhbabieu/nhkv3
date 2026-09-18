@@ -25,6 +25,7 @@ final readonly class YouTubeSourceSnapshot
         public ?string $fetchedAt = null,
         public string $sourceHash = '',
         public array $thumbnailSelection = [],
+        public array $thumbnailCandidates = [],
     ) {
         if ($platform !== 'youtube' || !preg_match('/^[A-Za-z0-9_-]{11}$/', $externalVideoId) || $canonicalSourceUrl !== 'https://www.youtube.com/watch?v=' . $externalVideoId) {
             throw new InvalidVideoReference('YouTube source snapshot identity is invalid.');
@@ -63,6 +64,7 @@ final readonly class YouTubeSourceSnapshot
             self::nullableString($data['fetched_at'] ?? null),
             self::nullableString($data['source_hash'] ?? null) ?? '',
             is_array($data['thumbnail_selection'] ?? null) ? $data['thumbnail_selection'] : [],
+            self::thumbnailCandidates($data['thumbnail_candidates'] ?? []),
         );
     }
 
@@ -89,6 +91,7 @@ final readonly class YouTubeSourceSnapshot
             'fetched_at' => $this->fetchedAt,
             'source_hash' => $this->sourceHash,
             'thumbnail_selection' => $this->thumbnailSelection,
+            'thumbnail_candidates' => $this->thumbnailCandidates,
         ];
     }
 
@@ -110,5 +113,23 @@ final readonly class YouTubeSourceSnapshot
     {
         if (!is_array($values)) return [];
         return array_values(array_filter(array_map(static fn (mixed $value): string => trim((string) $value), $values), static fn (string $value): bool => $value !== ''));
+    }
+
+    /** @return list<array{variant:string,url:string,width:int,height:int}> */
+    private static function thumbnailCandidates(mixed $values): array
+    {
+        if (!is_array($values)) return [];
+        $result = [];
+        foreach ($values as $value) {
+            if (!is_array($value)) continue;
+            $variant = trim((string) ($value['variant'] ?? ''));
+            $url = trim((string) ($value['url'] ?? ''));
+            $width = (int) ($value['width'] ?? 0);
+            $height = (int) ($value['height'] ?? 0);
+            if ($variant === '' || filter_var($url, FILTER_VALIDATE_URL) === false || $width < 1 || $height < 1) continue;
+            $result[] = ['variant' => $variant, 'url' => $url, 'width' => $width, 'height' => $height];
+            if (count($result) >= 10) break;
+        }
+        return $result;
     }
 }

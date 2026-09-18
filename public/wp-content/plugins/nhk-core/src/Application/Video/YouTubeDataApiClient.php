@@ -37,13 +37,17 @@ final class YouTubeDataApiClient
         $details = is_array($item['contentDetails'] ?? null) ? $item['contentDetails'] : [];
         $status = is_array($item['status'] ?? null) ? $item['status'] : [];
         $thumbnailCandidates = $this->thumbnailCandidates($snippet['thumbnails'] ?? []);
-        $thumbnailSelection = (new VideoThumbnailSelector($this->thumbnailProbe ?? $this->wordpressThumbnailProbe(...)))->select($thumbnailCandidates);
+        $selector = new VideoThumbnailSelector($this->thumbnailProbe ?? $this->wordpressThumbnailProbe(...));
+        $thumbnailSelection = $selector->select($thumbnailCandidates);
+        $thumbnailPresentation = $selector->selectCompact($thumbnailCandidates);
         return [
             'channel_id' => $snippet['channelId'] ?? null, 'channel_title' => $snippet['channelTitle'] ?? null,
             'title' => $snippet['title'] ?? null, 'description' => $snippet['description'] ?? null,
             'published_at' => $snippet['publishedAt'] ?? null, 'duration_seconds' => $this->duration((string) ($details['duration'] ?? '')),
             'thumbnails' => array_values(array_map(static fn (array $item): string => $item['url'], $thumbnailCandidates)),
+            'thumbnail_candidates' => $thumbnailCandidates,
             'thumbnail_selection' => $thumbnailSelection,
+            'thumbnail_presentation' => $thumbnailPresentation,
             'tags' => $snippet['tags'] ?? [],
             'default_language' => $snippet['defaultLanguage'] ?? ($snippet['defaultAudioLanguage'] ?? null),
             'caption_availability' => (($details['caption'] ?? 'false') === 'true') ? 'available' : 'unavailable',
@@ -73,7 +77,7 @@ final class YouTubeDataApiClient
         $candidates = [];
         foreach ($thumbnails as $name => $item) {
             if (!is_array($item) || trim((string) ($item['url'] ?? '')) === '') continue;
-            $candidates[] = ['variant' => (string) $name, 'url' => trim((string) $item['url'])];
+            $candidates[] = ['variant' => (string) $name, 'url' => trim((string) $item['url']), 'width' => (int) ($item['width'] ?? 0), 'height' => (int) ($item['height'] ?? 0)];
         }
         return $candidates;
     }

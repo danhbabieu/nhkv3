@@ -117,7 +117,7 @@ final class HomeSemanticQuery
                 if (isset($source['availability']) && !in_array($source['availability'], ['available','unknown'], true)) continue;
                 $editorial = is_array($metadata['editorial'] ?? null) ? $metadata['editorial'] : [];
                 $title = trim((string) ($editorial['title'] ?? '')) ?: ($item->title ?: 'Video');
-                $thumbnail = (new \NHK\Core\Application\Video\VideoThumbnailSelector())->fromSource($source);
+                $thumbnail = (new \NHK\Core\Application\Video\VideoThumbnailSelector())->presentationFromSource($source);
                 $modules['videos_total']++;
                 if (count($modules['videos']) >= 6) continue;
                 $modules['videos'][] = [
@@ -154,7 +154,7 @@ final class HomeSemanticQuery
             $editorial = is_array($metadata['editorial'] ?? null) ? $metadata['editorial'] : [];
             $url = (new PublicSeoProjection())->project((new VideoUrlPolicy())->project($video, new VideoPublicContextSelector()), ['type' => 'VideoObject'])['internal_link'] ?? null;
             if (!is_string($url) || $url === '' || (($source['availability'] ?? 'unknown') !== 'available')) continue;
-            $thumbnail = (new \NHK\Core\Application\Video\VideoThumbnailSelector())->fromSource($source);
+            $thumbnail = (new \NHK\Core\Application\Video\VideoThumbnailSelector())->presentationFromSource($source);
             $items[] = $this->feedItem('video', 'Video', (string) (($editorial['title'] ?? '') ?: $video->title ?: 'Video'), $url, $this->videoPublishedAt($video), $video->createdAt, (string) ($editorial['summary'] ?? ''), $thumbnail['url'] ?? null, $thumbnail['width'] ?? null, $thumbnail['height'] ?? null, $video->canonicalId);
         }
         foreach ($this->mediaItems() as $media) {
