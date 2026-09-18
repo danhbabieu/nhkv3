@@ -93,7 +93,7 @@ final class GovernedCaptureContinuationService
             $semanticNotRequired = !$this->semanticDeltaRequested($context) && in_array(strtoupper(trim((string) ($context['content_intent']['intent'] ?? ''))), ['IMAGE_ARTICLE', 'TEXT_ARTICLE'], true);
             $blockers = $skippedVideoChildren !== [] ? ['VIDEO_CHILD_UNCHANGED_ON_TEXT_ADDENDUM'] : ($semanticNotRequired || $reusedClaims !== [] ? [] : ['SEMANTIC_SUBJECT_OR_DELTA_REQUIRED']);
             $status = $semanticNotRequired ? 'SKIPPED' : 'REVIEW_REQUIRED';
-            return ['status' => $status, 'writes' => $skippedVideoChildren, 'reused_claims' => $reusedClaims, 'video_children' => $videoChildren, 'blockers' => $blockers, 'requirements' => ['semantic_delta' => ['applicability' => $semanticNotRequired ? 'NOT_REQUIRED' : 'REQUIRED', 'policy' => 'VERIFY', 'state' => $semanticNotRequired ? 'SKIPPED' : 'PENDING', 'evidence' => ['intent' => strtoupper(trim((string) ($context['content_intent']['intent'] ?? ''))), 'status' => strtoupper(trim((string) ($context['content_intent']['semantic_delta']['status'] ?? 'NONE')))]]], 'governance' => ['lifecycle' => [], 'status' => $status, 'skipped_video_children' => count($skippedVideoChildren)], 'completion' => $this->completion->aggregateCapture($this->currentCaptureId, [], ['canonical_state' => 'COMPLETE', 'blockers' => $blockers])];
+            return ['status' => $status, 'writes' => $skippedVideoChildren, 'reused_claims' => $reusedClaims, 'video_children' => $videoChildren, 'blockers' => $blockers, 'requirements' => ['semantic_delta' => ['applicability' => $semanticNotRequired ? 'NOT_REQUIRED' : 'REQUIRED', 'policy' => 'VERIFY', 'state' => $semanticNotRequired ? 'SKIPPED' : 'PENDING', 'evidence' => ['intent' => strtoupper(trim((string) ($context['content_intent']['intent'] ?? ''))), 'status' => strtoupper(trim((string) ($context['content_intent']['semantic_delta']['status'] ?? 'NONE')))]]], 'governance' => $this->governanceReadback([], [], $status, $skippedVideoChildren), 'completion' => $this->completion->aggregateCapture($this->currentCaptureId, [], ['canonical_state' => 'COMPLETE', 'blockers' => $blockers])];
         }
 
         $writes = [];
@@ -200,7 +200,7 @@ final class GovernedCaptureContinuationService
         $status = $blocked !== [] ? 'SYSTEM_BLOCKED' : ($retryable !== [] ? 'FAILED_RETRYABLE' : ($pending !== [] ? 'REVIEW_REQUIRED' : 'APPLIED'));
         $failureWrites = $blocked !== [] ? $blocked : $retryable;
         $failureBlockers = $failureWrites !== [] ? array_values(array_unique(array_merge(...array_map(static fn (array $write): array => (array) ($write['blockers'] ?? []), $failureWrites)))) : ($pending !== [] ? ['GOVERNANCE_APPROVAL_REQUIRED'] : ($skippedVideoChildren !== [] ? ['VIDEO_CHILD_UNCHANGED_ON_TEXT_ADDENDUM'] : []));
-        $result = ['status' => $status, 'writes' => array_merge($skippedVideoChildren, $writes), 'reused_claims' => $reusedClaims, 'video_children' => $videoChildren, 'blockers' => $failureBlockers, 'governance' => ['lifecycle' => array_values(array_unique($lifecycle)), 'status' => $status, 'applied_count' => count($applied), 'pending_count' => count($pending), 'retryable_count' => count($retryable), 'skipped_video_children' => count($skippedVideoChildren)]];
+        $result = ['status' => $status, 'writes' => array_merge($skippedVideoChildren, $writes), 'reused_claims' => $reusedClaims, 'video_children' => $videoChildren, 'blockers' => $failureBlockers, 'governance' => $this->governanceReadback($writes, $lifecycle, $status, $skippedVideoChildren)];
         if ($pending !== []) {
             $identity = $pending[0];
             $result['proposal_id'] = $identity['proposal_id'] ?? null;
@@ -213,6 +213,41 @@ final class GovernedCaptureContinuationService
             'blockers' => $failureBlockers,
         ]);
         return $result;
+    }
+
+    /** @param list<array<string,mixed>> $writes @param list<string> $lifecycle @param list<array<string,mixed>> $skipped @return array<string,mixed> */
+    private function governanceReadback(array $writes, array $lifecycle, string $status, array $skipped): array
+    {
+        $proposals = [];
+        foreach ($writes as $write) {
+            if (!is_array($write)) continue;
+            $proposalId = trim((string) ($write['proposal_id'] ?? ''));
+            // Proposal identity is accepted only from a Governance lifecycle
+            // receipt. Never derive it from a Video or Capture UUID.
+            if (!UuidCodec::isValid($proposalId)) continue;
+            $proposals[$proposalId] = [
+                'id' => $proposalId,
+                'entity_type' => (string) ($write['entity_type'] ?? ''),
+                'operation' => (string) ($write['operation'] ?? ''),
+                'status' => (string) ($write['status'] ?? ''),
+                'proposal_state' => (string) ($write['proposal_state'] ?? ''),
+                'content_fingerprint' => (string) ($write['content_fingerprint'] ?? ''),
+                'dependency_fingerprint' => (string) ($write['dependency_fingerprint'] ?? ''),
+            ];
+        }
+        $proposals = array_values($proposals);
+        $pending = array_values(array_filter($proposals, static fn (array $proposal): bool => $proposal['status'] === 'REVIEW_REQUIRED'));
+        return [
+            'lifecycle' => array_values(array_unique($lifecycle)),
+            'status' => $status,
+            'approval_required' => $pending !== [],
+            'proposal_ids' => array_values(array_map(static fn (array $proposal): string => $proposal['id'], $proposals)),
+            'proposals' => $proposals,
+            'applied_count' => count(array_filter($proposals, static fn (array $proposal): bool => $proposal['status'] === 'APPLIED')),
+            'pending_count' => count($pending),
+            'retryable_count' => count(array_filter($proposals, static fn (array $proposal): bool => $proposal['status'] === 'FAILED_RETRYABLE')),
+            'skipped_video_children' => count($skipped),
+        ];
     }
 
     /** @return list<array<string,mixed>> */

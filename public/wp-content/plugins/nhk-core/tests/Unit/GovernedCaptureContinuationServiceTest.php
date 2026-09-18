@@ -966,6 +966,47 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
         self::assertSame(['EXTERNAL_RATE_LIMIT'], $result['blockers']);
     }
 
+    public function test_pending_video_governance_exposes_persisted_proposal_and_binding_fingerprints(): void
+    {
+        $videoId = UuidCodec::newV7();
+        $proposalId = UuidCodec::newV7();
+        $proposal = new Proposal($proposalId, $videoId, 'ingest', [
+            'canonical_id' => $videoId,
+            'metadata' => ['source' => ['platform' => 'youtube', 'external_video_id' => 'mT4GmDAuWYY']],
+        ], 'content-video-fingerprint', null, 'dependency-video-fingerprint', ProposalState::DRAFT, idempotencyKey: 'capture:video:pending', entityType: 'video');
+        $governance = $this->createMock(GovernedLifecycle::class);
+        $governance->expects(self::once())->method('createFromArguments')->willReturn($proposal);
+        $governance->expects(self::exactly(2))->method('review')->with($proposalId)->willReturnOnConsecutiveCalls(
+            ['state' => 'draft', 'entity_type' => 'video', 'operation' => 'ingest', 'subject_id' => $videoId, 'payload' => $proposal->payload, 'content_fingerprint' => $proposal->contentFingerprint, 'dependency_fingerprint' => $proposal->dependencyFingerprint],
+            ['state' => 'submitted', 'entity_type' => 'video', 'operation' => 'ingest', 'subject_id' => $videoId, 'payload' => $proposal->payload, 'content_fingerprint' => $proposal->contentFingerprint, 'dependency_fingerprint' => $proposal->dependencyFingerprint],
+        );
+        $governance->expects(self::once())->method('submit')->with($proposalId)->willReturn($proposal->transition(ProposalState::SUBMITTED, 'test'));
+        $governance->expects(self::never())->method('approve');
+        $service = new GovernedCaptureContinuationService($governance, static fn (): array => [], $this->policies(['video'], ['video' => 'REVIEW_REQUIRED']), static fn (): bool => true);
+
+        $result = $service->execute('01a0b506-9e0c-763e-a796-a69e2d6df497', 'capture:video:pending', [
+            'content_intent' => ['intent' => 'VIDEO'],
+            'assets' => [['kind' => 'video', 'video_proposal' => ['entity_type' => 'video', 'operation' => 'ingest', 'subject_id' => $videoId, 'payload' => $proposal->payload]]],
+        ]);
+
+        self::assertSame('REVIEW_REQUIRED', $result['status']);
+        self::assertTrue($result['governance']['approval_required']);
+        self::assertSame([$proposalId], $result['governance']['proposal_ids']);
+        self::assertNotSame($videoId, $result['governance']['proposal_ids'][0]);
+        self::assertSame('content-video-fingerprint', $result['governance']['proposals'][0]['content_fingerprint']);
+        self::assertSame('dependency-video-fingerprint', $result['governance']['proposals'][0]['dependency_fingerprint']);
+
+        $capture = new \NHK\Core\Domain\Capture\CaptureRecord(
+            '01a0b506-9e0c-763e-a796-a69e2d6df497',
+            'capture:video:pending',
+            hash('sha256', 'capture:video:pending'),
+            'SEMANTICS_RECONCILED',
+            'REVIEW_REQUIRED',
+            diagnostics: ['semantic_write_back' => $result],
+        );
+        self::assertSame([$proposalId], $capture->toArray()['governance']['proposal_ids']);
+    }
+
     public function test_applied_proposal_replay_uses_persisted_readback_without_reapplying(): void
     {
         $proposalId = UuidCodec::newV7();

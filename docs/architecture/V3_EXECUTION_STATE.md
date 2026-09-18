@@ -1,5 +1,59 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-18 — Performance Phase 3.7 legacy Video metadata contract resolution (READ-ONLY / NO SYNC PATH)
+
+SCOPE: Read-only contract and executable-catalog audit for legacy YouTube
+thumbnail metadata on `wcTQ0OmRSPQ` and `cl5SdBfm5uo`. No source refresh,
+proposal, database write, semantic mutation, deployment or public-read remote
+probe was performed.
+
+CONTRACT DECISION: `thumbnail_candidates` is persisted YouTube source-snapshot
+data owned by the Video source boundary. `thumbnail_presentation` is also a
+persisted source-metadata field; its value is presentation-derived from the
+bounded API candidate set, but it is not a public-query cache or a second
+semantic owner. `thumbnail_selection` is the persisted canonical source
+selection used as the safe fallback. None of these fields authorizes URL
+synthesis or a public-request probe.
+
+SYNC AUDIT: `VideoSyncService` is the current comparison-only boundary and
+reports `NO_CHANGE`, `SOURCE_CHANGED`, `SOURCE_UNAVAILABLE` or
+`REVIEW_REQUIRED`. `YouTubeSourceAdapter`/`YouTubeDataApiClient` can resolve a
+fresh official-API snapshot for intake, but the executable MCP catalog exposes
+no governed Video source-refresh/sync command or capability. Therefore
+`SYNC_OWNER=UNASSIGNED_FOR_MUTATION`, `SYNC_ACTION=NONE_EXPOSED`,
+`SYNC_CAPABILITY=NONE`, `SYNC_IDEMPOTENCY_RULE=NOT_APPLICABLE_UNTIL_A_REGISTERED_COMMAND`,
+`SYNC_READBACK_RULE=NOT_APPLICABLE`, and `SYNC_MUTATION_SCOPE=NONE`.
+
+BACKWARD COMPATIBILITY: `LEGACY_READ_THROUGH_ALLOWED=YES` only for the local,
+deterministic presentation compatibility path owned by
+`HomeSemanticQuery` → `VideoThumbnailSelector::presentationFromSource()`.
+It reads persisted `thumbnail_presentation`/`thumbnail_candidates` and falls
+back to persisted `thumbnail_selection`; it performs no remote call, has
+bounded O(1) work per Video and cannot repair metadata. For both affected
+Videos the verified result remains the persisted `maxresdefault.jpg` fallback
+(1280×720), so no compact-count reduction is claimed.
+
+STRATEGY TRADE-OFF: Governed source sync would provide authoritative refreshed
+candidate/presentation metadata and durable cacheability, but currently needs a
+new registered command plus exact Video IDs, current revisions, idempotency,
+Proposal → approval → eligibility → Controlled Apply and canonical read-back.
+Presentation read-through is immediately safe and operationally cheap, but
+cannot produce compact candidates when legacy source metadata is absent and
+retains the oversized fallback. A per-request remote lookup is rejected as
+unbounded, non-cache-owned and contract-incompatible.
+
+FUTURE SYNC PLAN ONLY: For each exact affected Video, read current canonical
+Video and revision → acquire/compare official YouTube snapshot → check revision
+and create the registered governed source-refresh command → Controlled Apply →
+canonical read-back → verify candidates and presentation → verify unchanged
+Video UUID/external identity → verify homepage compact selection. Scope must
+remain the two verified IDs, never a mass archive sync.
+
+VERIFICATION: Focused thumbnail/source-sync tests pass 8 tests / 16
+assertions. Existing worktree changes were preserved. `git diff --check`
+passes. Status: `PERFORMANCE_PHASE3_7_CONTRACT_RESOLVED / NO_SYNC_PATH /
+SEMANTIC_MUTATION_NONE`.
+
 # Checkpoint — 2026-09-18 — Performance Phase 3.6 deployed runtime parity audit (READ-ONLY / LEGACY METADATA BLOCKER CONFIRMED)
 
 SCOPE: Read-only staging audit through the canonical WordPress bootstrap,
@@ -14025,3 +14079,34 @@ assertions, with 13 existing deprecations, 25 PHPUnit deprecations and 12
 environment-gated skips. PHP lint and `git diff --check` pass.
 
 STATUS: `VIDEO_LEGACY_RETRY_REBUILD_LOCAL_READY / DEPLOYMENT_PENDING / SEMANTIC_MUTATION_NONE`.
+
+# Checkpoint — 2026-09-18 — Governed Video Proposal UUID Capture read-back (LOCAL READY / DEPLOYMENT PENDING)
+
+SCOPE: Repaired the governed Video Capture read-back when policy stops the
+Capture at `GOVERNANCE_APPROVAL_REQUIRED`. No live Capture retry, Capture,
+Video, Proposal, database, deployment or direct writer mutation was performed.
+
+ROOT_CAUSE: `runGovernedPlan()` creates or reuses the durable Proposal through
+Governance and `pending()` already retained its real UUID and binding
+fingerprints, but the aggregate semantic write-back reduced Governance to
+counts and the Capture serializer did not project the persisted Governance
+packet. The public MCP Capture response therefore exposed neither the Proposal
+UUID nor the approval fingerprints; Video UUID was never a valid substitute.
+
+FIX: Capture Governance read-back now collects only valid Proposal UUIDs from
+Governance lifecycle receipts and exposes `approval_required`, `proposal_ids`
+and per-proposal `entity_type`, `operation`, status and persisted content /
+dependency fingerprints. `CaptureRecord::toArray()` exposes that same persisted
+diagnostic projection as top-level `governance`; it never derives identity from
+Capture or Video. Existing Proposal idempotency/review/apply lifecycle remains
+unchanged, so retries reuse the persisted Proposal rather than creating a
+second one.
+
+VERIFICATION: Focused continuation, Video provenance, Editorial Capture
+continuation and Governance core tests pass 114 tests / 472 assertions (with
+existing deprecations). MCP transport selection was attempted, but its
+WordPress integration bootstrap emitted a database-connection page before a
+usable summary. PHP lint and `git diff --check` pass. No live acceptance was
+run.
+
+STATUS: `GOVERNED_VIDEO_PROPOSAL_READBACK_LOCAL_READY / DEPLOYMENT_PENDING / NO_LIVE_ACCEPTANCE`.

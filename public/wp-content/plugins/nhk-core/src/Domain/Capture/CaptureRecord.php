@@ -35,6 +35,12 @@ final readonly class CaptureRecord
     /** @return array<string,mixed> */
     public function toArray(): array
     {
+        $semanticWriteBack = is_array($this->diagnostics['semantic_write_back'] ?? null)
+            ? $this->diagnostics['semantic_write_back']
+            : [];
+        $governance = is_array($semanticWriteBack['governance'] ?? null)
+            ? $semanticWriteBack['governance']
+            : null;
         return [
             'capture_id' => $this->captureId,
             'purpose' => (string) ($this->context['purpose'] ?? CapturePurpose::EDITORIAL->value),
@@ -51,6 +57,9 @@ final readonly class CaptureRecord
             'plan_fingerprint' => $this->context['plan_fingerprint'] ?? null,
             'authority_intent' => $this->context['authority_intent'] ?? null,
             'diagnostics' => $this->diagnostics,
+            // Canonical projection of persisted Capture diagnostics. No
+            // owner UUID is ever promoted to a Proposal UUID here.
+            'governance' => $governance,
             'phase_receipts' => $this->phaseReceipts,
             'revision' => $this->revision,
             'created_at' => $this->createdAt,
