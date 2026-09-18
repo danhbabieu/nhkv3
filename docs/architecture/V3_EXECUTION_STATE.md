@@ -1,4 +1,31 @@
 # NHK V3 Execution State
+# Checkpoint — 2026-09-18 — Close Video pre-apply staging admission and stale enrichment (LOCAL FIX / DEPLOYMENT PENDING)
+
+SCOPE: Corrected the generic Video ingest revision semantics and refreshed
+derived Knowledge enrichment when an existing Capture retry re-enters a
+pre-apply Video create. A canonically absent Video now produces no owner CAS
+revision (`expected_revision=null` in the governed command and `0` in the
+server-issued staging packet); Capture revision and reserved child UUID are
+not treated as canonical Video revision or persistence.
+
+ROOT_CAUSE: `VideoStagingAdmission` correctly rejected `video:ingest` unless
+the staging packet carried `create_semantics=ingest` and
+`expected_revision=0`. The retry producer could retain the fresh-intake
+revision default of `1`. Separately, `VideoEditorialResumePlanner` reused
+persisted derived `knowledge_enrichment` metadata on pre-apply recovery, so a
+valid current Classification handoff could remain represented as
+`NO_SUPPORTED_SUBJECT`.
+
+VERIFICATION: Exact reject branch is
+`Application/Governance/VideoStagingAdmission.php::__invoke()` in the ingest
+branch, where non-zero expected revision returns false; the verifier then
+raises `STAGING_SCOPE_NOT_ADMITTED`. Focused Video suites pass 51 tests / 214
+assertions; continuation/governance suites pass 46 tests / 211 assertions
+with 10 existing deprecations. PHP lint and `git diff --check` pass. Regression
+covers high Capture revision, absent canonical/external Video, immutable UUID,
+fresh ingest scope, and Classification enrichment refresh.
+
+STATUS: `VIDEO_PRE_APPLY_ADMISSION_AND_ENRICHMENT_LOCAL_READY / DEPLOYMENT_PENDING / SEMANTIC_MUTATION_NONE`
 
 # Checkpoint — 2026-09-18 — Published Article lifecycle continuation (LOCAL FIX / DEPLOYMENT PENDING)
 
