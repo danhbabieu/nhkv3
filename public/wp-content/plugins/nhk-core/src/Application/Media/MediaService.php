@@ -155,6 +155,31 @@ final class MediaService
         }
     }
 
+    /** @param array<string,mixed> $spec */
+    public function reconcileAsset(string $mediaId, string $assetId, array $spec): MediaAsset
+    {
+        $media = $this->media->findByCanonicalId($mediaId);
+        $asset = $this->assets->findByAssetId($assetId);
+        if (!$media || !$asset || $asset->mediaId !== $mediaId) {
+            throw new MediaException('Media asset reconciliation target is invalid.');
+        }
+        $candidate = new MediaAsset(
+            $asset->assetId,
+            $asset->mediaId,
+            $asset->kind,
+            (string) ($spec['storage_key'] ?? $asset->storageKey),
+            (string) ($spec['checksum'] ?? $asset->checksum),
+            (string) ($spec['mime_type'] ?? $asset->mimeType),
+            (int) ($spec['byte_size'] ?? $asset->byteSize),
+            array_key_exists('width', $spec) ? ($spec['width'] === null ? null : (int) $spec['width']) : $asset->width,
+            array_key_exists('height', $spec) ? ($spec['height'] === null ? null : (int) $spec['height']) : $asset->height,
+            $asset->visibility,
+            is_array($spec['metadata'] ?? null) ? array_replace($asset->metadata, $spec['metadata']) : $asset->metadata,
+        );
+        if ($candidate->storageKey === $asset->storageKey && $candidate->checksum === $asset->checksum && $candidate->mimeType === $asset->mimeType && $candidate->byteSize === $asset->byteSize && $candidate->width === $asset->width && $candidate->height === $asset->height && $candidate->metadata === $asset->metadata) return $asset;
+        return $this->assets->update($candidate, 1);
+    }
+
     public function addUsage(string $mediaId, string $endpointType, string $endpointKey, string $role, int $sortOrder = 0, string $altText = '', string $caption = '', array $keywordGroups = [], string $title = '', string $placementKey = ''): MediaUsage
     {
         if (!$this->media->findByCanonicalId($mediaId)) throw new MediaException('Media not found.');

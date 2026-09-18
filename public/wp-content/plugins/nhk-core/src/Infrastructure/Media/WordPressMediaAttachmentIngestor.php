@@ -167,7 +167,7 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
     {
         if ($attachmentId < 1 || !function_exists('get_post') || !function_exists('get_post_meta')) return null;
         $post = get_post($attachmentId);
-        if (!$post instanceof \WP_Post || $post->post_type !== 'attachment') return null;
+        if (!$post instanceof \WP_Post || $post->post_type !== 'attachment') return ['attachment_id' => $attachmentId, 'readback_state' => 'NOT_FOUND', 'error_code' => 'ATTACHMENT_NOT_FOUND'];
         $status = function_exists('get_post_status') ? (string) get_post_status($attachmentId) : (string) ($post->post_status ?? '');
         if (in_array($status, ['trash', 'private', 'draft', 'pending'], true)) return null;
         $mime = function_exists('get_post_mime_type') ? (string) get_post_mime_type($attachmentId) : '';
@@ -179,7 +179,7 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
         $path = $baseDir !== '' && $relative !== '' ? $baseDir . '/' . ltrim($relative, '/') : '';
         $baseReal = $baseDir !== '' ? realpath($baseDir) : false;
         $pathReal = $path !== '' ? realpath($path) : false;
-        if ($baseReal === false || $pathReal === false || !is_file($pathReal) || !$this->within($baseReal, $pathReal)) return null;
+        if ($baseReal === false || $pathReal === false || !is_file($pathReal) || !$this->within($baseReal, $pathReal)) return ['attachment_id' => $attachmentId, 'readback_state' => 'UNAVAILABLE', 'error_code' => 'ATTACHMENT_PHYSICAL_UNAVAILABLE'];
         $metadata = function_exists('wp_get_attachment_metadata') ? wp_get_attachment_metadata($attachmentId) : [];
         $metadata = is_array($metadata) ? $metadata : [];
         $filename = basename($relative);
@@ -213,6 +213,17 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
                 'height' => (int) ($derivative['height'] ?? 0),
                 'filesize' => $derivativeReal !== false && is_file($derivativeReal) && $this->within($baseReal, $derivativeReal) ? (int) filesize($derivativeReal) : 0,
             ];
+        }
+        if ($this->semanticMedia instanceof WordPressMediaAttachmentBridge) {
+            $binding = $this->semanticMedia->bindingForAttachment($attachmentId);
+            if ($binding === null) {
+                $result['readback_state'] = 'INCONSISTENT';
+                $result['error_code'] = 'ATTACHMENT_MAPPING_MISSING';
+            } else {
+                $result = array_merge($result, $binding);
+            }
+        } else {
+            $result['readback_state'] = 'VERIFIED';
         }
         return $result;
     }
