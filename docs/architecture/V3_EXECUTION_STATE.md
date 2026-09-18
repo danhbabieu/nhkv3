@@ -1,5 +1,27 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-18 — Video retry recovers pre-apply Capture (LOCAL FIX / DEPLOYMENT PENDING)
+
+SCOPE: Repaired existing-Capture Video retry when the immutable child UUID was
+persisted before the first governed create reached Proposal/Apply. The retry
+planner now reconciles canonical UUID and external identity authoritatively;
+when both are absent it returns a fresh governed `video/ingest` continuation
+using the same Capture payload, immutable UUID and external source identity.
+
+IDENTITY LAW: A planned child UUID no longer implies canonical persistence.
+Existing canonical UUIDs continue through update/reuse. An external identity
+owned by a different canonical Video fails closed as `VIDEO_IDENTITY_CONFLICT`
+and is classified `SYSTEM_BLOCKED`; no duplicate writer or overwrite path is
+introduced.
+
+VERIFICATION: VideoEditorialResumePlanner passes 9 tests / 48 assertions;
+GovernedCaptureContinuationService, CaptureVideoProvenancePlanner and
+CompletionConvergence focused suites pass 77 tests / 332 assertions. PHP lint
+and `git diff --check` pass. No database, staging, production, deployment or
+push mutation occurred.
+
+STATUS: `VIDEO_PRE_APPLY_RETRY_RECOVERY_LOCAL_READY / DEPLOYMENT_PENDING / SEMANTIC_MUTATION_NONE`
+
 # Checkpoint — 2026-09-18 — Homepage request-scope read deduplication (LOCAL FIX / DEPLOYMENT PENDING)
 
 SCOPE: Audited the homepage semantic assembly and removed repeated read-model

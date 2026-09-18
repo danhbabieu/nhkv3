@@ -27,7 +27,21 @@ final class VideoEditorialResumePlanner
         $payload = is_array($videoProposal['payload'] ?? null) ? $videoProposal['payload'] : [];
         $videoId = trim((string) ($payload['canonical_id'] ?? $videoProposal['target_uuid'] ?? $videoProposal['subject_id'] ?? ''));
         $video = $videoId !== '' ? $this->videos->findByCanonicalId($videoId) : null;
-        if (!$video instanceof Video) throw new \RuntimeException('VIDEO_CANONICAL_READBACK_UNAVAILABLE');
+        $proposalSource = $this->sourceFromProposal($payload);
+        $external = $this->externalVideo($proposalSource);
+        $externalVideo = $external === null ? null : $this->videos->findByExternalReference($external['platform'], $external['external_video_id']);
+
+        // An immutable child UUID is planned identity, not proof that the
+        // governed create reached Controlled Apply. Reconcile both
+        // authoritative identities before choosing update versus create.
+        if ($video instanceof Video && $externalVideo instanceof Video && $externalVideo->canonicalId !== $video->canonicalId) {
+            throw new \RuntimeException('VIDEO_IDENTITY_CONFLICT');
+        }
+        if (!$video instanceof Video) {
+            if ($externalVideo instanceof Video) throw new \RuntimeException('VIDEO_IDENTITY_CONFLICT');
+            if ($videoId === '' || $external === null) throw new \RuntimeException('VIDEO_SOURCE_IDENTITY_UNAVAILABLE');
+            return $this->preApplyCreatePlan($videoProposal, $payload, $videoId, $external, $context);
+        }
 
         $metadata = is_array($video->metadata) ? $video->metadata : [];
         $proposalMetadata = is_array($payload['metadata'] ?? null) ? $payload['metadata'] : null;
@@ -107,6 +121,56 @@ final class VideoEditorialResumePlanner
                 'metadata' => $metadata,
                 'thumbnail_media_id' => $video->thumbnailMediaId ?? '',
             ],
+        ];
+    }
+
+    /** @return array<string,mixed> */
+    private function preApplyCreatePlan(array $videoProposal, array $payload, string $videoId, array $external, array $context): array
+    {
+        $metadata = is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [];
+        $metadata['source'] = array_merge(is_array($metadata['source'] ?? null) ? $metadata['source'] : [], $external);
+        $payload['canonical_id'] = $videoId;
+        $payload['metadata'] = $metadata;
+        $payload['url'] = (string) ($payload['url'] ?? $external['canonical_source_url'] ?? '');
+        $fingerprint = hash('sha256', CommandCanonicalizer::canonicalize([
+            'canonical_id' => $videoId,
+            'source' => $external,
+            'payload' => $payload,
+        ]));
+        $idempotencyKey = trim((string) ($videoProposal['idempotency_key'] ?? ''));
+        if ($idempotencyKey === '') $idempotencyKey = 'capture:' . (string) ($context['capture_id'] ?? $videoId) . ':video-create:' . $fingerprint;
+
+        return [
+            'status' => 'REBUILD_INGEST',
+            'operation' => 'ingest',
+            'entity_type' => 'video',
+            'subject_id' => $videoId,
+            'target_uuid' => null,
+            'fingerprint' => $fingerprint,
+            'idempotency_key' => $idempotencyKey,
+            'payload' => $payload,
+        ];
+    }
+
+    /** @return array<string,mixed> */
+    private function sourceFromProposal(array $payload): array
+    {
+        $metadata = is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [];
+        return is_array($metadata['source'] ?? null)
+            ? $metadata['source']
+            : (is_array($metadata['source_snapshot'] ?? null) ? $metadata['source_snapshot'] : []);
+    }
+
+    /** @return array{platform:string,external_video_id:string,canonical_source_url:string}|null */
+    private function externalVideo(array $source): ?array
+    {
+        $platform = strtolower(trim((string) ($source['platform'] ?? '')));
+        $externalId = trim((string) ($source['external_video_id'] ?? ''));
+        if ($platform === '' || $externalId === '') return null;
+        return [
+            'platform' => $platform,
+            'external_video_id' => $externalId,
+            'canonical_source_url' => trim((string) ($source['canonical_source_url'] ?? '')),
         ];
     }
 

@@ -81,8 +81,9 @@ final class VideoEditorialResumePlannerTest extends TestCase
         self::assertSame($plan['payload']['metadata']['editorial_input_fingerprint'], $repository->findByCanonicalId($videoId)?->metadata['editorial_input_fingerprint']);
     }
 
-    public function test_video_resume_fails_closed_before_proposal_when_canonical_owner_cannot_be_read(): void
+    public function test_video_resume_reenters_governed_ingest_when_capture_only_has_planned_identity(): void
     {
+        $videoId = '01a0aaf8-2a84-7287-bbd8-70af4d5485e4';
         $repository = new class implements VideoRepository {
             public function findByCanonicalId(string $id): ?Video { return null; }
             public function findByExternalReference(string $platform, string $externalId): ?Video { return null; }
@@ -92,8 +93,39 @@ final class VideoEditorialResumePlannerTest extends TestCase
         };
         $planner = new VideoEditorialResumePlanner($repository, new VideoEditorialGenerator(), new VideoSeoProjection());
 
-        $this->expectExceptionMessage('VIDEO_CANONICAL_READBACK_UNAVAILABLE');
-        $planner->plan(['payload' => ['canonical_id' => '01a0aaf8-2a84-7287-bbd8-70af4d5485e4']], $this->resumeContext());
+        $plan = $planner->plan(['operation' => 'ingest', 'entity_type' => 'video', 'idempotency_key' => 'capture:retry:video', 'payload' => [
+            'canonical_id' => $videoId,
+            'url' => 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+            'metadata' => ['source' => ['platform' => 'youtube', 'external_video_id' => 'dQw4w9WgXcQ', 'canonical_source_url' => 'https://www.youtube.com/watch?v=dQw4w9WgXcQ']],
+        ]], $this->resumeContext() + ['capture_id' => 'capture-retry']);
+
+        self::assertSame('REBUILD_INGEST', $plan['status']);
+        self::assertSame('ingest', $plan['operation']);
+        self::assertSame($videoId, $plan['subject_id']);
+        self::assertNull($plan['target_uuid']);
+        self::assertSame('capture:retry:video', $plan['idempotency_key']);
+        self::assertSame($videoId, $plan['payload']['canonical_id']);
+        self::assertSame('dQw4w9WgXcQ', $plan['payload']['metadata']['source']['external_video_id']);
+    }
+
+    public function test_video_resume_fails_closed_when_external_identity_belongs_to_another_canonical_owner(): void
+    {
+        $expectedId = '01a0aaf8-2a84-7287-bbd8-70af4d5485e4';
+        $repository = new VideoEditorialResumeTestRepository(new Video(
+            '01a0b384-6e09-71a6-8f58-df48654d6aee',
+            'youtube',
+            'dQw4w9WgXcQ',
+            'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+            'Existing video',
+            ['source' => ['platform' => 'youtube', 'external_video_id' => 'dQw4w9WgXcQ']],
+        ));
+        $planner = new VideoEditorialResumePlanner($repository, new VideoEditorialGenerator(), new VideoSeoProjection());
+
+        $this->expectExceptionMessage('VIDEO_IDENTITY_CONFLICT');
+        $planner->plan(['payload' => [
+            'canonical_id' => $expectedId,
+            'metadata' => ['source' => ['platform' => 'youtube', 'external_video_id' => 'dQw4w9WgXcQ']],
+        ]], $this->resumeContext());
     }
 
     public function test_same_effective_resume_input_reuses_existing_fingerprint_without_update_plan(): void
