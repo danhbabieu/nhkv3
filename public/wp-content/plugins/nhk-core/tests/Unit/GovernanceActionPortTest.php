@@ -81,6 +81,14 @@ final class GovernanceActionPortTest extends TestCase
         self::assertInstanceOf(ControlledApplyService::class, $runtime->controlledApply);
     }
 
+    public function test_plugin_boot_registers_the_canonical_staging_admission_provider(): void
+    {
+        $source = file_get_contents(__DIR__ . '/../../src/Plugin.php');
+        self::assertIsString($source);
+        self::assertStringContainsString("add_filter('nhk_v3_staging_acceptance_admission', \$stagingAdmission, 10, 4);", $source);
+        self::assertStringContainsString('new MediaBindingStagingAdmission(', $source);
+    }
+
     public function test_runtime_factory_uses_the_shared_wordpress_attachment_bridge_for_controlled_apply(): void
     {
         $wpdb = new \stdClass();
