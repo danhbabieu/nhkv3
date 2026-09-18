@@ -27,6 +27,23 @@ final class StagingAcceptanceScopeVerifierTest extends TestCase
         self::assertTrue($verifier->verifyBindingRequest($packet, $this->bindingRequest($capture, $input, $packet)));
     }
 
+    public function test_media_metadata_scope_binds_exact_capture_media_revision_and_payload(): void
+    {
+        $capture = new CaptureRecord(UuidCodec::newV7(), 'media-metadata-scope', hash('sha256', 'media-metadata-scope'), 'RECEIVED', 'IN_PROGRESS');
+        $mediaId = UuidCodec::newV7();
+        $operation = ['operation' => 'update', 'media_ref' => ['id' => $mediaId], 'name' => 'Bộ máy Odo 36/10', 'expected_revision' => 4];
+        $verifier = new StagingAcceptanceScopeVerifier(static fn (): string => 'staging', 'test-secret', static fn (): bool => true, can: static fn (): bool => true);
+        $scope = $verifier->issueForMediaMetadataUpdate($capture, $operation, $mediaId, 4);
+        $payload = array_replace($operation, ['operation' => 'update', 'media' => ['id' => $mediaId], 'capture_id' => $capture->captureId, 'capture_fingerprint' => $capture->requestFingerprint, 'staging_acceptance' => $scope]);
+        $proposal = new Proposal(UuidCodec::newV7(), $mediaId, 'update', $payload, 'content', 4, 'dependency', ProposalState::APPROVED, idempotencyKey: 'media-metadata-scope', entityType: 'media');
+
+        self::assertTrue($verifier->verifyProposal($scope, $proposal));
+        $tampered = $payload;
+        $tampered['name'] = 'Tampered';
+        $wrong = new Proposal($proposal->id, $proposal->subjectId, $proposal->operation, $tampered, $proposal->contentFingerprint, $proposal->expectedRevision, $proposal->dependencyFingerprint, $proposal->state, idempotencyKey: $proposal->idempotencyKey, entityType: 'media');
+        self::assertFalse($verifier->verifyProposal($scope, $wrong));
+    }
+
     public function test_dynamic_scope_binds_target_stable_key_and_revision(): void
     {
         [$capture, $input, $assets] = $this->fixture();

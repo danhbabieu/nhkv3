@@ -132,6 +132,14 @@ MediaAsset checksum or MediaUsage UUIDs. Completion requires the updated Media
 read-back. Direct SQL, `wp_update_attachment` and a new upload are not repair
 paths.
 
+For a Capture `MEDIA_ENRICHMENT` metadata-only repair, the server issues an
+immutable staging scope bound to the exact Capture fingerprint, Media UUID,
+expected revision and payload fingerprint before creating the Proposal. Missing,
+stale or tampered scope remains fail-closed. This path does not run generic
+subject reconciliation and does not infer or create `featured_primary` usage;
+MediaUsage is changed only by explicit `media_bindings[]` or placement
+operations. Completion requires read-back of every requested Media owner.
+
 ## Universal MCP post-ingest reconciliation — 2026-09-09
 
 Sau mỗi MCP Media ingest đã đọc lại được, Media phải chạy bounded semantic

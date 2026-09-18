@@ -71,6 +71,22 @@ final class MediaBatchUploadServiceTest extends TestCase
         }
     }
 
+    public function test_numbered_ordered_text_maps_by_stable_ordinal(): void
+    {
+        $files = [$this->file('one.jpg', 'one'), $this->file('two.jpg', 'two')];
+        $titles = [];
+        $ingestor = new class($titles) implements WordPressMediaAttachmentIngestor {
+            public function __construct(private array &$titles) {}
+            public function ingest(array $file, string $filename, string $title, int $maxWidth, int $maxHeight, int $quality): array { $this->titles[] = $title; return ['attachment_id' => count($this->titles), 'canonical_url' => '/' . $filename, 'filename' => $filename, 'mime' => 'image/webp', 'filesize' => 1, 'width' => 1, 'height' => 1]; }
+            public function read(int $attachmentId): ?array { return ['attachment_id' => $attachmentId]; }
+        };
+        $repository = new class implements MediaBatchUploadRepository { public function find(string $idempotencyKey): ?array { return null; } public function save(string $idempotencyKey, array $record): void {} };
+        try {
+            (new MediaBatchUploadService($ingestor, $repository))->upload('numbered-order', ['description' => "Ảnh 1: Bộ máy Odo 36/10\nẢnh 2: Bộ máy Odo 36/8"], ['files' => $files]);
+            self::assertSame(['Bộ máy Odo 36/10', 'Bộ máy Odo 36/8'], $titles);
+        } finally { foreach ($files as $file) @unlink((string) $file['tmp_name']); }
+    }
+
     public function test_per_item_media_context_is_preserved_separately_from_batch_context(): void
     {
         $files = [$this->file('front.jpg', 'front'), $this->file('paper.jpg', 'paper')];
@@ -136,11 +152,13 @@ final class MediaBatchUploadServiceTest extends TestCase
         @unlink($first['tmp_name']); @unlink($second['tmp_name']);
     }
 
-    public function test_missing_trustworthy_filename_context_is_reported_per_file(): void
+    public function test_ambiguous_batch_context_keeps_original_filename_stem_without_fake_title(): void
     {
         $file = $this->file('IMG_0001.jpg', 'bytes');
-        $ingestor = new class implements WordPressMediaAttachmentIngestor {
-            public function ingest(array $file, string $filename, string $title, int $maxWidth, int $maxHeight, int $quality): array { return []; }
+        $titles = [];
+        $ingestor = new class($titles) implements WordPressMediaAttachmentIngestor {
+            public function __construct(private array &$titles) {}
+            public function ingest(array $file, string $filename, string $title, int $maxWidth, int $maxHeight, int $quality): array { $this->titles[] = $title; return ['attachment_id' => 1, 'canonical_url' => '/image.webp', 'filename' => 'image.webp', 'mime' => 'image/webp', 'filesize' => 5, 'width' => 1, 'height' => 1]; }
             public function read(int $attachmentId): ?array { return null; }
         };
         $repository = new class implements MediaBatchUploadRepository {
@@ -150,8 +168,9 @@ final class MediaBatchUploadServiceTest extends TestCase
 
         try {
             $result = (new MediaBatchUploadService($ingestor, $repository))->upload('missing-context', [], ['files' => [$file]]);
-            self::assertSame(0, $result['succeeded']);
-            self::assertSame('TRUSTWORTHY_FILENAME_CONTEXT_REQUIRED', $result['errors'][0]['code']);
+            self::assertSame(1, $result['succeeded']);
+            self::assertSame('IMG_0001', $titles[0] ?? '');
+            self::assertTrue($result['items'][0]['metadata_pending_title']);
         } finally {
             @unlink($file['tmp_name']);
         }

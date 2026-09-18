@@ -361,6 +361,19 @@ otherwise the adapter uses a safe neutral item fallback and preserves the
 context for review. MediaUsage presentation metadata remains separate from
 canonical Media metadata.
 
+The widget presents per-image title, alt text and caption fields before commit.
+An ambiguous batch never invents a public title such as `Ảnh tải lên N`; the
+adapter retains an honest original filename stem and marks the item as needing
+title completion. `Ảnh N: ...` and equivalent ordered mappings are accepted only
+when every ordinal is present exactly once.
+
+For existing Media metadata repair, the normal Capture/operator path issues a
+server-signed exact staging scope for each `media_operations[]` update and binds
+it to the Capture, UUID, expected revision and payload. Metadata-only updates
+must not reconcile a subject or create `featured_primary`; only explicit
+`media_bindings[]` or placement operations may change MediaUsage. Final Capture
+read-back must verify every requested Media owner.
+
 The transport classification is PRIMARY/RECOMMENDED for
 `nhk.media.upload-batch`, SECONDARY/IMPORT for `wp_upload_media_from_url` when
 the source is already a public HTTPS URL, and FALLBACK/COMPATIBILITY for

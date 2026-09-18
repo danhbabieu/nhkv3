@@ -24,6 +24,7 @@ final class StagingAcceptanceScope
         'media:replace' => 'media_usage_reconciliation',
         'media:remove' => 'media_usage_reconciliation',
         'media:ingest' => 'media_usage_reconciliation',
+        'media:update' => 'media_metadata_reconciliation',
         'relation:relation_create' => 'governed_relation_reconciliation',
         'relation:relation_retire' => 'governed_relation_reconciliation',
         'relation:relation_reactivate' => 'governed_relation_reconciliation',
@@ -115,6 +116,25 @@ final class StagingAcceptanceScope
             if (!hash_equals((string) ($scope['payload_fingerprint'] ?? ''), $payloadFingerprint)
                 || !hash_equals((string) ($scope['proposal_command_fingerprint'] ?? ''), $payloadFingerprint)) {
                 throw new \RuntimeException('STAGING_DEPENDENCY_PAYLOAD_MISMATCH');
+            }
+            self::assertNoFuzzyLocator($scope);
+            return;
+        }
+
+        if ($expectedFamily === 'media_metadata_reconciliation') {
+            if (!hash_equals($captureId, (string) ($proposal->payload['capture_id'] ?? ''))
+                || !hash_equals((string) ($scope['capture_fingerprint'] ?? ''), (string) ($proposal->payload['capture_fingerprint'] ?? ''))
+                || (string) ($scope['entity_type'] ?? '') !== 'media'
+                || (string) ($scope['operation'] ?? '') !== 'update'
+                || (string) ($scope['target_uuid'] ?? '') !== $proposal->subjectId
+                || (int) ($scope['expected_revision'] ?? 0) !== (int) $proposal->expectedRevision) {
+                throw new \RuntimeException('STAGING_MEDIA_METADATA_SCOPE_MISMATCH');
+            }
+            $payload = $proposal->payload;
+            unset($payload['staging_acceptance'], $payload['proposal_command_fingerprint']);
+            $payloadFingerprint = hash('sha256', CommandCanonicalizer::canonicalize($payload));
+            if (!hash_equals((string) ($scope['payload_fingerprint'] ?? ''), $payloadFingerprint)) {
+                throw new \RuntimeException('STAGING_MEDIA_METADATA_PAYLOAD_MISMATCH');
             }
             self::assertNoFuzzyLocator($scope);
             return;

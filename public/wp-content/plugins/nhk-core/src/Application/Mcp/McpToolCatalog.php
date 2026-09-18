@@ -233,6 +233,12 @@ final class McpToolCatalog
                         'file_id' => ['type' => 'string', 'minLength' => 1],
                         'mime_type' => ['type' => 'string'],
                         'file_name' => ['type' => 'string'],
+                        'media' => ['type' => 'object', 'properties' => [
+                            'title' => ['type' => 'string', 'maxLength' => 255],
+                            'alt_text' => ['type' => 'string', 'maxLength' => 1000],
+                            'caption' => ['type' => 'string', 'maxLength' => 2000],
+                            'description' => ['type' => 'string', 'maxLength' => 2000],
+                        ], 'additionalProperties' => false],
                     ],
                     'required' => ['download_url', 'file_id'],
                     'additionalProperties' => false,

@@ -22,7 +22,7 @@ use NHK\Core\Infrastructure\Migration\ClaimProjectionMigration016;
 use NHK\Core\Infrastructure\Migration\{EditorialCaptureAddendumMigration018, EditorialCaptureMigration017, GovernanceSubjectBindingMigration020, MediaBindingOperationMigration022, MediaUsageMetadataMigration021, VisualSupportRequirementMigration019};
 use NHK\Core\Infrastructure\Migration\MigrationDatabaseGuard;
 use NHK\Core\Application\Governance\GovernanceCapabilities;
-use NHK\Core\Application\Governance\{AuthorityStagingAdmission, CaptureDependencyStagingAdmission, MediaBindingStagingAdmission, VideoStagingAdmission};
+use NHK\Core\Application\Governance\{AuthorityStagingAdmission, CaptureDependencyStagingAdmission, MediaBindingStagingAdmission, MediaMetadataStagingAdmission, VideoStagingAdmission};
 use NHK\Core\Application\Runtime\SemanticWritePolicyResolver;
 use NHK\Core\Application\Mcp\{McpAbilityRegistration, McpArticleIngestHandler, McpGovernanceHandler, McpReadHandler, McpSemanticContextResolver, McpToolCatalog, McpTransport, McpDocumentationRegistry};
 use NHK\Core\Application\Media\{ImageIngestEntrypoint, MediaBatchUploadService, MediaBindingService};
@@ -171,6 +171,7 @@ final class Plugin {
             $stagingAdmission = new MediaBindingStagingAdmission(new WpdbMediaRepository($wpdb), new WpdbAuthorityRepository($wpdb));
             add_filter('nhk_v3_staging_acceptance_admission', new AuthorityStagingAdmission(), 10, 5);
             add_filter('nhk_v3_staging_acceptance_admission', $stagingAdmission, 20, 5);
+            add_filter('nhk_v3_staging_acceptance_admission', new MediaMetadataStagingAdmission(new WpdbMediaRepository($wpdb)), 22, 5);
             add_filter('nhk_v3_staging_acceptance_admission', new CaptureDependencyStagingAdmission(), 25, 5);
             add_filter('nhk_v3_staging_acceptance_admission', new VideoStagingAdmission(new WpdbVideoRepository($wpdb)), 30, 5);
         }
@@ -1024,10 +1025,23 @@ final class Plugin {
                         $mediaRef = is_array($mediaOperation['media'] ?? null) ? $mediaOperation['media'] : (is_array($mediaOperation['media_ref'] ?? null) ? $mediaOperation['media_ref'] : []);
                         $media = $mediaBindingService->resolveMediaReference($mediaRef);
                         if ($operation === 'update') {
-                            $payload = array_replace($mediaOperation, ['operation' => $operation, 'media' => ['id' => $media->canonicalId]]);
+                            $expectedRevision = max(1, (int) ($mediaOperation['expected_revision'] ?? $media->revision));
+                            $payload = array_replace($mediaOperation, ['operation' => $operation, 'media' => ['id' => $media->canonicalId], 'capture_id' => (string) ($context['capture']['capture_id'] ?? ''), 'capture_fingerprint' => (string) ($context['capture_fingerprint'] ?? '')]);
+                            $environment = defined('WP_ENVIRONMENT_TYPE') ? strtolower((string) constant('WP_ENVIRONMENT_TYPE')) : (function_exists('wp_get_environment_type') ? strtolower((string) wp_get_environment_type()) : strtolower((string) (getenv('WP_ENVIRONMENT_TYPE') ?: 'unknown')));
+                            if ($environment === 'staging') {
+                                $captureRecord = $context['capture_record'] ?? null;
+                                if (!$captureRecord instanceof \NHK\Core\Domain\Capture\CaptureRecord) throw new \RuntimeException('CAPTURE_SCOPE_BINDING_UNAVAILABLE');
+                                $scope = $stagingScopeVerifier->issueForMediaMetadataUpdate(
+                                    $captureRecord,
+                                    $payload,
+                                    $media->canonicalId,
+                                    $expectedRevision,
+                                );
+                                $payload['staging_acceptance'] = $scope;
+                            }
                             $governedMediaOperations[] = $mcpGovernance->ingestFromArguments([
                                 'operation' => 'update', 'entity_type' => 'media', 'subject_id' => $media->canonicalId,
-                                'expected_revision' => max(1, (int) ($mediaOperation['expected_revision'] ?? $media->revision)),
+                                'expected_revision' => $expectedRevision,
                                 'idempotency_key' => (string) ($mediaOperation['idempotency_key'] ?? ($context['capture']['capture_id'] ?? '') . ':media-metadata:' . $index),
                                 'payload' => $payload,
                             ]);
@@ -1046,6 +1060,22 @@ final class Plugin {
                             'expected_revision' => null, 'idempotency_key' => (string) ($mediaOperation['idempotency_key'] ?? ($context['capture']['capture_id'] ?? '') . ':media-operation:' . $index),
                             'target' => $target, 'payload' => $payload,
                         ]);
+                    }
+                    $metadataOnly = $typedBindings === [] && $governedMediaOperations !== [] && array_reduce(
+                        (array) ($context['media_operations'] ?? []),
+                        static fn (bool $only, mixed $operation): bool => $only && is_array($operation) && strtolower(trim((string) ($operation['operation'] ?? ''))) === 'update',
+                        true,
+                    );
+                    if ($metadataOnly && strtoupper(trim((string) ($context['content_intent']['intent'] ?? ''))) === 'MEDIA_ENRICHMENT') {
+                        $readback = [];
+                        foreach ((array) ($context['media_operations'] ?? []) as $mediaOperation) {
+                            $mediaRef = is_array($mediaOperation['media'] ?? null) ? $mediaOperation['media'] : (is_array($mediaOperation['media_ref'] ?? null) ? $mediaOperation['media_ref'] : []);
+                            $current = $mediaBindingService->resolveMediaReference($mediaRef);
+                            $readback[] = ['media_id' => $current->canonicalId, 'name' => $current->canonicalName, 'revision' => $current->revision, 'status' => 'verified'];
+                        }
+                        $mediaIds = array_values(array_unique(array_column($readback, 'media_id')));
+                        $trace('MEDIA_METADATA_RECONCILIATION', 'VERIFIED', ['capture_id' => (string) ($context['capture']['capture_id'] ?? ''), 'media_count' => count($mediaIds)]);
+                        return ['status' => 'RECONCILED', 'media_ids' => $mediaIds, 'media_complete' => true, 'blockers' => [], 'media_usage' => [], 'media_readback' => $readback, 'canonical_readback' => ['media' => $readback, 'media_usage' => []], 'frontend_verified' => null, 'binding_results' => [], 'governed_media_operations' => $governedMediaOperations, 'metadata_only' => true];
                     }
                     if (strtoupper(trim((string) ($context['content_intent']['intent'] ?? ''))) === 'MEDIA_ENRICHMENT') {
                         $trace('MEDIA_USAGE_RECONCILIATION', 'STARTED', ['capture_id' => (string) ($context['capture']['capture_id'] ?? '')]);
@@ -1188,6 +1218,14 @@ final class Plugin {
                     if ($articleId < 1) {
                         $intent = strtoupper(trim((string) (($context['content_intent']['intent'] ?? ''))));
                         if ($intent === 'MEDIA_ENRICHMENT') {
+                            $metadataReadback = array_values(array_filter((array) ($media['media_readback'] ?? []), 'is_array'));
+                            if (($media['metadata_only'] ?? false) === true) {
+                                $expectedIds = array_values(array_unique(array_map(static fn (array $operation): string => trim((string) (($operation['media']['id'] ?? $operation['media_ref']['id'] ?? ''))), (array) ($context['media_operations'] ?? []))));
+                                $actualIds = array_values(array_unique(array_map(static fn (array $item): string => trim((string) ($item['media_id'] ?? '')), $metadataReadback)));
+                                sort($expectedIds); sort($actualIds);
+                                if ($expectedIds === [] || $expectedIds !== $actualIds || count(array_filter($metadataReadback, static fn (array $item): bool => ($item['status'] ?? '') === 'verified' && trim((string) ($item['name'] ?? '')) !== '')) !== count($expectedIds)) return ['status' => 'unavailable', 'reason' => 'MEDIA_OWNER_READBACK_UNVERIFIED', 'media_readback' => $metadataReadback];
+                                return ['status' => 'verified', 'frontend_verified' => null, 'media_readback' => $metadataReadback, 'media_usage' => [], 'article_owner' => 'NOT_REQUIRED'];
+                            }
                             $verified = [];
                             foreach ($bindingResults as $binding) {
                                 $readback = is_array($binding['readback'] ?? null) ? $binding['readback'] : [];

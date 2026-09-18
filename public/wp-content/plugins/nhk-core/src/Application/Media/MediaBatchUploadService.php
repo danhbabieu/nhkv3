@@ -50,7 +50,7 @@ final class MediaBatchUploadService
                 if (!is_file($path) || !is_readable($path) || (int) filesize($path) !== $size) throw new \InvalidArgumentException('FILE_READBACK_INVALID');
                 $totalBytes += $size;
                 if ($totalBytes > self::MAX_BATCH_BYTES) throw new \InvalidArgumentException('BATCH_SIZE_LIMIT');
-                $item = $normalizedItems[$index];
+                $item = array_replace(['filename' => (string) ($file['name'] ?? '')], $normalizedItems[$index]);
                 $title = $this->itemTitle($item, $index, count($files), $metadata, $orderedDescriptions);
                 if ($title === '') throw new \InvalidArgumentException('TRUSTWORTHY_FILENAME_CONTEXT_REQUIRED');
                 $filename = trim((string) ($item['filename'] ?? $file['name'] ?? ''));
@@ -63,6 +63,7 @@ final class MediaBatchUploadService
                 if (is_array($item['visual_context'] ?? null)) $manifestItem['visual_context'] = $item['visual_context'];
                 $mediaContext = $this->mediaContext($item);
                 if ($mediaContext !== []) $manifestItem['media_context'] = $mediaContext;
+                if (!isset($mediaContext['title']) && trim((string) ($item['filename'] ?? $file['name'] ?? '')) !== '') $manifestItem['metadata_pending_title'] = true;
                 $results[] = $manifestItem;
             } catch (\Throwable $error) {
                 $errors[] = ['client_file_id' => $clientId, 'upload_status' => 'FAILED', 'code' => $error->getMessage() !== '' ? $error->getMessage() : 'UPLOAD_FAILED'];
@@ -112,11 +113,16 @@ final class MediaBatchUploadService
         $explicit = trim((string) ($media['title'] ?? $item['title'] ?? ''));
         if ($explicit !== '') return $explicit;
         if (isset($orderedDescriptions[$index])) return $orderedDescriptions[$index];
-        if ($count === 1) return trim((string) ($metadata['description'] ?? ''));
-        // A batch instruction is context, not an implicit title. Keep the
-        // physical attachment name deterministic and item-scoped until an
-        // explicit per-item semantic title is supplied.
-        return 'Ảnh tải lên ' . ($index + 1);
+        if ($count === 1) {
+            $singleContext = trim((string) ($metadata['description'] ?? ''));
+            if ($singleContext !== '') return $singleContext;
+        }
+        // Batch context is never a semantic title. Keep an honest, item-scoped
+        // filename stem until an operator supplies a title.
+        $filename = trim((string) ($item['filename'] ?? ''));
+        if ($filename === '') return '';
+        $stem = trim((string) pathinfo($filename, PATHINFO_FILENAME));
+        return $stem !== '' ? $stem : '';
     }
 
     /** @param array<string,mixed> $item @return array<string,string> */

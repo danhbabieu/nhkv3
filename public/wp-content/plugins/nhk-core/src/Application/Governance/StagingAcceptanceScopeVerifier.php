@@ -68,6 +68,34 @@ final class StagingAcceptanceScopeVerifier
         return $base + ['fingerprint' => $fingerprint, 'signature' => hash_hmac('sha256', $fingerprint, $this->secret())];
     }
 
+    /** Issue one exact scope for an existing Media metadata update. */
+    public function issueForMediaMetadataUpdate(CaptureRecord $capture, array $operation, string $mediaId, int $expectedRevision): array
+    {
+        $environment = $this->environmentName();
+        if (in_array($environment, ['production', 'prod'], true)) throw new \RuntimeException('STAGING_PRODUCTION_FORBIDDEN');
+        if ($environment !== 'staging') throw new \RuntimeException('STAGING_SCOPE_ENVIRONMENT_REQUIRED');
+        if ($this->secret() === '') throw new \RuntimeException('STAGING_SCOPE_SIGNING_KEY_REQUIRED');
+        $this->requireCapability();
+        if (!is_callable($this->admission)) throw new \RuntimeException('STAGING_SCOPE_ADMISSION_REQUIRED');
+        if (!UuidCodec::isValid($mediaId) || $expectedRevision < 1) throw new \RuntimeException('STAGING_MEDIA_METADATA_BINDING_REQUIRED');
+        $operation['operation'] = 'update';
+        $operation['media'] = ['id' => $mediaId];
+        $operation['capture_id'] = $capture->captureId;
+        $operation['capture_fingerprint'] = $capture->requestFingerprint;
+        $payloadFingerprint = hash('sha256', CommandCanonicalizer::canonicalize($operation));
+        $base = [
+            'approved' => true, 'environment' => 'staging', 'capture_id' => $capture->captureId,
+            'capture_fingerprint' => $capture->requestFingerprint, 'request_fingerprint' => $capture->requestFingerprint,
+            'operation_family' => 'media_metadata_reconciliation', 'entity_type' => 'media', 'operation' => 'update',
+            'writer' => 'canonical_governed', 'entrypoint' => 'nhk.capture.ingest', 'target_uuid' => $mediaId,
+            'expected_revision' => $expectedRevision, 'payload_fingerprint' => $payloadFingerprint,
+            'issued_at' => gmdate('c'), 'expires_at' => gmdate('c', time() + max(1, $this->ttlSeconds)),
+        ];
+        if (!(bool) ($this->admission)($base, $capture, ['intent' => 'MEDIA_ENRICHMENT', 'media_operations' => [$operation]], [])) throw new \RuntimeException('STAGING_SCOPE_NOT_ADMITTED');
+        $fingerprint = hash('sha256', CommandCanonicalizer::canonicalize($base));
+        return $base + ['fingerprint' => $fingerprint, 'signature' => hash_hmac('sha256', $fingerprint, $this->secret())];
+    }
+
     /** @param array{video_id:string,expected_revision:int,expected_source_revision:?int,idempotency_key:string} $request @return array<string,mixed> */
     public function issueForVideoSourceRefresh(CaptureRecord $capture, array $request): array
     {

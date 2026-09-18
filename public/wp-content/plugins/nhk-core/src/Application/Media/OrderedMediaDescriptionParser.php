@@ -13,7 +13,18 @@ final class OrderedMediaDescriptionParser
     /** @return list<string>|null */
     public function map(string $text, int $count): ?array
     {
-        if ($count < 2 || !preg_match('/\blần\s+lượt\s+(?:là\s+)?(.+)/iu', trim($text), $matches)) return null;
+        if ($count < 2) return null;
+        $trimmed = trim($text);
+        if (preg_match_all('/(?:^|\n)\s*Ảnh\s*(\d+)\s*:\s*(.+?)(?=\n\s*Ảnh\s*\d+\s*:|$)/iu', $trimmed, $numbered, PREG_SET_ORDER)) {
+            $mapped = array_fill(0, $count, '');
+            foreach ($numbered as $match) {
+                $ordinal = (int) ($match[1] ?? 0) - 1;
+                if ($ordinal < 0 || $ordinal >= $count || $mapped[$ordinal] !== '') return null;
+                $mapped[$ordinal] = trim((string) ($match[2] ?? ''), " \t\n\r.,;:!");
+            }
+            return in_array('', $mapped, true) ? null : $mapped;
+        }
+        if (!preg_match('/\blần\s+lượt\s+(?:là\s+)?(.+)/iu', $trimmed, $matches)) return null;
         $body = trim((string) ($matches[1] ?? ''), " \t\n\r.,;:!");
         if ($body === '') return null;
         $parts = preg_split('/\s*(?:,|;|\n|\s+và\s+)\s*/iu', $body, -1, PREG_SPLIT_NO_EMPTY);

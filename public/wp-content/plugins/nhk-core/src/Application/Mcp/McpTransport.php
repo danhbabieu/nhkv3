@@ -267,6 +267,7 @@ final class McpTransport
                 'client_file_id' => (string) ($reference['file_id'] ?? ''),
                 'filename' => (string) ($reference['file_name'] ?? ''),
                 'sort_order' => $index,
+                'media' => is_array($reference['media'] ?? null) ? $reference['media'] : [],
             ];
         }
         try {
