@@ -176,6 +176,13 @@ final class WordPressMediaIngestIntegrationTest extends TestCase
             self::assertSame(hash_file('sha256', $uploadedPath), $afterSource->checksum);
             self::assertSame('PRIVATE', $afterSource->visibility);
             self::assertSame('PUBLIC', $afterDerivative->visibility);
+            $mapping = $wpdb->get_row($wpdb->prepare(
+                "SELECT asset_uuid, storage_key FROM {$wpdb->prefix}nhk_media_wordpress_attachments WHERE attachment_id=%d",
+                $attachmentId,
+            ), ARRAY_A);
+            self::assertIsArray($mapping);
+            self::assertSame($beforeSource->assetId, UuidCodec::fromBinary((string) ($mapping['asset_uuid'] ?? '')));
+            self::assertSame($afterSource->storageKey, (string) ($mapping['storage_key'] ?? ''));
             self::assertSame($beforeUsageIds, $afterUsageIds);
             self::assertSame($beforeUsageIds['count'], $afterUsageIds['count']);
             self::assertCount(2, $afterUsageIds['ids']);
