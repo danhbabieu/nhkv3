@@ -1,5 +1,51 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-18 — Video Capture classification handoff/readback hardening (LOCAL FIX / DEPLOYMENT PENDING)
+
+SCOPE: Closed a proven Video Capture semantic handoff defect: valid resolved
+`classification` subjects were excluded by both Video research subject
+selection and Knowledge enrichment selection, causing `NO_SUPPORTED_SUBJECT`
+and downstream `NO_SEMANTIC_ATTACHMENT` despite a valid Capture subject
+packet. The WPDB external-reference reader now normalizes YouTube URL forms
+before identity lookup. No Capture, Video, Source, Claim, Evidence, Graph,
+staging/production record, deployment or push was mutated.
+
+VERIFICATION: Focused Video/Capture suite passes 115 tests / 497 assertions;
+PHP lint and `git diff --check` pass. Full Unit reaches 1,898 tests / 9,415
+assertions with one unrelated `DemoCutoverCliContractTest` diagnostic mismatch.
+Video integration tests are infrastructure-skipped because the guarded
+WordPress/MySQL bootstrap is unavailable in this environment. Existing
+homepage changes remain preserved and are outside this checkpoint.
+
+STATUS: `VIDEO_CLASSIFICATION_HANDOFF_LOCAL_READY / DEPLOYMENT_PENDING / SEMANTIC_MUTATION_NONE`
+
+# Checkpoint — 2026-09-18 — Homepage unified latest feed (LOCAL FIX / DEPLOY PENDING)
+
+SCOPE: Added a bounded, read-only homepage latest-feed projection combining
+public WordPress Articles with eligible public Video, Media, Knowledge and
+Authority Entity items. Normalized presentation fields include type label,
+title, canonical public URL, owner timestamp, summary, visual dimensions and
+orientation. Cards use representative/public visuals when available and a
+neutral type fallback otherwise. Unified feed now renders after Hero and before
+curated editorial content; Hero, Admin configuration, entity routes, Video,
+Tri thức and Media routes remain unchanged. No semantic mutation, database
+write, staging/production change, deployment or push occurred.
+
+ORDERING: Reuses `LatestFirstOrder` with timestamp descending and canonical
+tie-breaker. WordPress posts retain native editorial date; Video prefers the
+source publication timestamp; semantic items use their owner creation time
+when no publication timestamp exists. Internal tie-breaker metadata is removed
+before theme rendering.
+
+VERIFICATION: PHP lint passes for changed PHP files; focused Home/frontend
+suite passes 89 tests / 842 assertions; `git diff --check` passes. Full local
+PHPUnit ran 2,031 tests but remains non-green because the existing environment
+lacks the guarded WordPress/MySQL integration bootstrap and has unrelated
+deployment/acceptance failures. Live staging was read-only audited and still
+serves the pre-change homepage because no deployment was authorized.
+
+STATUS: `HOMEPAGE_UNIFIED_LATEST_FEED_LOCAL_READY / DEPLOYMENT_PENDING / SEMANTIC_MUTATION_NONE`
+
 # Checkpoint — 2026-09-18 — Capture Video canonical owner binding (LOCAL FIX / DEPLOY PENDING)
 
 SCOPE: Repaired the generic Capture Video provenance planner so a supplied
