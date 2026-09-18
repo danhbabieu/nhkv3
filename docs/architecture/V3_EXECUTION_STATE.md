@@ -1,5 +1,26 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-18 — Slice 3 Task 2 final P2 visual-support and gallery wiring (LOCAL ONLY)
+
+SCOPE: Closed the final contextual media projection P2 findings in the isolated
+worktree. VisualSupport now resolves permitted MediaUsage fields with
+representative provenance only for the registered representative role, labels
+technical/evidence usage as `MEDIA_USAGE`, then falls back per field through
+neutral Media, verified read-only WordPress Attachment metadata identified by
+`wordpress_attachment_id`, and explicit `MISSING`. Public gallery production
+bootstraps now pass the same read-only attachment boundary through both
+FrontendSemanticBootstrap and EntityDossierBootstrap. No writer, direct SQL,
+semantic mutation, upload, staging/live change or deploy was used.
+
+COMMITS: `28b38b43` adds RED regressions and `d1010f1f` contains the minimal
+production fix. The existing bridge gained a read-only attachment metadata
+method; constructor compatibility for existing projections is preserved.
+
+VERIFICATION: Focused contextual/frontend/visual/Contract suites pass 118
+tests / 978 assertions with warnings only. Changed files pass PHP lint,
+`composer lint` and `git diff --check`. Integration/live acceptance was not
+run and no external runtime state was changed.
+
 # Checkpoint — 2026-09-17 — Conversational Authority structured update transport (LOCAL ONLY)
 
 SCOPE: Repaired the existing `nhk.capture.ingest` Conversational Authority
