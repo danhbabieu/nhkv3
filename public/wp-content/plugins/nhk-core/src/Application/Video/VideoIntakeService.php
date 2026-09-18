@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Video;
 
-use NHK\Core\Domain\PublicIdentity\PublicUrlResult;
+use NHK\Core\Application\Entity\PublicRouteResolver;
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Video\{VideoEditorialEnrichmentContext, VideoIntakePreview, VideoSourceRights};
 use NHK\Core\Shared\Uuid\UuidCodec;
@@ -93,7 +93,8 @@ final class VideoIntakeService
         if ($resolution->diagnostic !== null) $package['source_diagnostic'] = $resolution->diagnostic;
         $complete = $this->completeness->evaluate($package);
         $package['completeness'] = ['publishable' => $complete->publishable, 'blockers' => $complete->blockers, 'warnings' => $complete->warnings];
-        $package['seo_projection'] = $this->seo->project($package, new PublicUrlResult(null, false, ['PUBLIC_IDENTITY_UNAVAILABLE']));
+        $watchPath = PublicRouteResolver::videoPath((string) $editorial['title'], (string) $snapshot['external_video_id']) ?? '/video/' . strtolower((string) $snapshot['external_video_id']) . '/';
+        $package['seo_projection'] = $this->seo->project($package, $watchPath);
         $warnings = array_values(array_unique(array_merge($complete->blockers, $complete->warnings, $category['warnings'] ?? [], $resolution->diagnostic !== null ? [$resolution->diagnostic] : [])));
         return new VideoIntakePreview($videoId, $existing === null ? 'ingest' : 'update', $existing?->revision ?? 1, $package, $warnings, $research['ambiguous']);
     }

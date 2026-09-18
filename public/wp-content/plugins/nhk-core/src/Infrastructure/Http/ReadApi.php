@@ -18,7 +18,7 @@ use NHK\Core\Application\Video\{VideoPublicContextSelector, VideoUrlPolicy};
 
 final class ReadApi
 {
-    public function __construct(private MediaRepository $media, private MediaAssetRepository $assets, private MediaUsageRepository $usages, private VideoRepository $videos, private KnowledgeRepository $claims, private SourceRepository $sources, private EvidenceRepository $evidence, private ?MigrationStatus $status = null, private ?PublicMediaAssetDelivery $delivery = null, private ?PublicIdentityRepository $identities = null, private ?VideoUrlPolicy $videoPolicy = null) { $this->delivery ??= PublicMediaAssetDelivery::fromEnvironment($assets, $media); }
+    public function __construct(private MediaRepository $media, private MediaAssetRepository $assets, private MediaUsageRepository $usages, private VideoRepository $videos, private KnowledgeRepository $claims, private SourceRepository $sources, private EvidenceRepository $evidence, private ?MigrationStatus $status = null, private ?PublicMediaAssetDelivery $delivery = null) { $this->delivery ??= PublicMediaAssetDelivery::fromEnvironment($assets, $media); }
 
     public function register(): void
     {
@@ -45,8 +45,7 @@ final class ReadApi
         $matches = array_values(array_filter($this->videos->list(), fn (Video $item): bool => $item->active && $item->hasValidPublicReference() && $policy->project($item, new VideoPublicContextSelector())['path'] === '/' . $slug . '/'));
         $video = count($matches) === 1 ? $matches[0] : null;
         if (!$video || !$video->active || !$video->hasValidPublicReference()) return new \WP_Error('nhk_video_not_found', 'Video was not found.', ['status' => 404]);
-        $url = $policy->project($video, new VideoPublicContextSelector());
-        return ['platform' => $video->platform, 'external_id' => $video->externalVideoId, 'public_url' => $url->finalPath, 'title' => $video->title];
+        return ['platform' => $video->platform, 'external_id' => $video->externalVideoId, 'url' => $video->canonicalUrl, 'title' => $video->title];
     }
 
     private function claim(\WP_REST_Request $request): array|\WP_Error

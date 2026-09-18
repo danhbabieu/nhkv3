@@ -56,7 +56,7 @@ final class PublicEntityCollectionQuery
     }
 
     /** @return array{available:bool,type:string,page:int,per_page:int,total:int,query:string,items:list<array<string,mixed>>} */
-    public function archive(string $type, int $page = 1, int $perPage = 24, string $query = '', bool $includeUrlResult = false): array
+    public function archive(string $type, int $page = 1, int $perPage = 24, string $query = ''): array
     {
         $page = max(1, $page); $perPage = min(100, max(1, $perPage)); $query = trim($query); $items = [];
         if (!$this->isAvailable() || !$this->types->has($type)) return ['available' => $this->isAvailable(), 'type' => $type, 'page' => $page, 'per_page' => $perPage, 'total' => 0, 'query' => $query, 'items' => []];

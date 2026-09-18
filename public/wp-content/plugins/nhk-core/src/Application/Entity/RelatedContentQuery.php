@@ -8,9 +8,6 @@ use NHK\Core\Application\Graph\PredicateTraversalPolicy;
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Contracts\Media\MediaRepository;
 use NHK\Core\Contracts\Video\VideoRepository;
-use NHK\Core\Contracts\PublicIdentity\PublicIdentityRepository;
-use NHK\Core\Application\Seo\PublicSeoProjection;
-use NHK\Core\Application\Video\{VideoPublicContextSelector, VideoUrlPolicy};
 use NHK\Core\Application\Entity\PublicEntityEligibilityPolicy;
 use NHK\Core\Domain\Authority\{AuthorityEntity, EntityTypeRegistry};
 use NHK\Core\Domain\Graph\NodeReference;
@@ -25,7 +22,7 @@ use NHK\Core\Application\Presentation\LatestFirstOrder;
 
 final class RelatedContentQuery
 {
-    public function __construct(private GraphService $graph, private AuthorityRepository $authority, private MediaRepository $media, private VideoRepository $videos, private EntityTypeRegistry $types, private ?MigrationStatus $status = null, private ?PublicEntityEligibilityPolicy $eligibility = null, ?PredicateTraversalPolicy $policy = null, private ?PublicRouteResolver $routes = null, private ?PublicIdentityRepository $identities = null, private ?VideoUrlPolicy $videoPolicy = null) { $this->policy = $policy ?? new PredicateTraversalPolicy(new \NHK\Core\Domain\Graph\PredicateRegistry()); }
+    public function __construct(private GraphService $graph, private AuthorityRepository $authority, private MediaRepository $media, private VideoRepository $videos, private EntityTypeRegistry $types, private ?MigrationStatus $status = null, private ?PublicEntityEligibilityPolicy $eligibility = null, ?PredicateTraversalPolicy $policy = null) { $this->policy = $policy ?? new PredicateTraversalPolicy(new \NHK\Core\Domain\Graph\PredicateRegistry()); }
     private PredicateTraversalPolicy $policy;
 
     /** @return array{entities:list<array<string,mixed>>,articles:list<array<string,mixed>>,media:list<array<string,mixed>>,videos:list<array<string,mixed>>} */

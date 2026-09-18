@@ -153,11 +153,8 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
         $filePath = trim((string) ($context['file_path'] ?? ''));
         if ($filePath === '' || !is_file($filePath) || !is_readable($filePath) || !function_exists('wp_upload_bits') || !function_exists('wp_insert_attachment')) throw new \RuntimeException('WORDPRESS_MEDIA_ATTACHMENT_UNAVAILABLE');
         $filename = basename($asset->storageKey);
-        $normalizedFilename = trim((string) ($context['normalized_filename'] ?? ''));
         $original = (string) ($context['original_filename'] ?? $filename);
-        if ($normalizedFilename !== '') {
-            $filename = basename($normalizedFilename);
-        } elseif (preg_match('/^(IMG|DSC|DSCF|PXL)[-_]?/i', $original) === 1) {
+        if (preg_match('/^(IMG|DSC|DSCF|PXL)[-_]?/i', $original) === 1) {
             $filename = (new MediaFilenameNormalizer())->normalize($media->canonicalName, (string) ($context['view'] ?? 'image'), $original, isset($context['filename_suffix']) ? (string) $context['filename_suffix'] : null);
         }
         $contents = file_get_contents($filePath);

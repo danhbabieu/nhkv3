@@ -20,7 +20,6 @@ use NHK\Core\Application\Video\{
     YouTubeUrlNormalizer
 };
 use NHK\Core\Contracts\Video\VideoRepository;
-use NHK\Core\Contracts\PublicIdentity\PublicIdentityRepository;
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
 use NHK\Core\Domain\Authority\{AuthorityEntity, CanonicalEntityTypeCatalog, EntityTypeRegistry};
 use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim, Source, KnowledgeEnrichmentCandidate, KnowledgeFacetProfile};
@@ -32,7 +31,6 @@ use NHK\Core\Domain\Video\{
     VideoSourceRights,
     YouTubeSourceSnapshot
 };
-use NHK\Core\Domain\PublicIdentity\{HistoricPublicRoute, PublicIdentity, PublicIdentityMutationResult, PublicUrlResult};
 use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Tests\Support\InMemoryAuthorityRepository;
 use PHPUnit\Framework\TestCase;
@@ -476,12 +474,12 @@ final class VideoSemanticCoreTest extends TestCase
             'source' => ['external_video_id' => 'dQw4w9WgXcQ', 'published_at' => '2026-09-02T00:00:00Z', 'duration_seconds' => 420, 'thumbnail_urls' => ['https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg']],
             'editorial' => ['title' => 'Odo 36/8 — Âm thanh đồng hồ cổ', 'summary' => 'Tìm hiểu âm thanh qua bối cảnh biên tập NHK.', 'body' => 'Nội dung độc lập hữu ích.'],
             'seo' => ['title' => 'Odo 36/8 — Âm thanh đồng hồ cổ', 'description' => 'Một mô tả SEO trung thực.'],
-        ], new PublicUrlResult('/video/odo-36-8-dqw4w9wxcq/', true, identityRevision: 9));
+        ], 'https://nhk.example/video/odo-36-8-dqw4w9wxcq/');
 
         self::assertSame('VideoObject', $projection['video_object']['@type']);
         self::assertSame('https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ', $projection['video_object']['embedUrl']);
         self::assertSame('PT7M', $projection['video_object']['duration']);
-        self::assertSame('/video/odo-36-8-dqw4w9wxcq/', $projection['canonical']);
+        self::assertSame('https://nhk.example/video/odo-36-8-dqw4w9wxcq/', $projection['canonical']);
         self::assertArrayNotHasKey('canonical_id', $projection['video_object']);
     }
 
@@ -857,13 +855,7 @@ final class VideoSemanticCoreTest extends TestCase
         $unavailable = Video::fromUrl('https://youtu.be/9bZkp7q19f0', 'Unavailable', ['source_snapshot' => ['availability' => 'deleted']]);
         $notIndexable = Video::fromUrl('https://youtu.be/aqz-KE-bpKQ', 'No index', ['source_snapshot' => ['availability' => 'available'], 'indexable' => false]);
 
-        $items = (new VideoSitemapProjection(new class implements PublicIdentityRepository {
-            public function findByOwner(string $ownerKind, string $ownerId): ?PublicIdentity { return $ownerKind === 'video' ? new PublicIdentity('identity-001', 'video', $ownerId, 'video', 'nhk-title', 'video', 'public-route-v1', 1) : null; }
-            public function findByRoute(string $routeType, string $collisionScope, string $slug): ?PublicIdentity { return null; }
-            public function create(PublicIdentity $identity): PublicIdentityMutationResult { return PublicIdentityMutationResult::accepted($identity); }
-            public function update(PublicIdentity $identity, int $expectedRevision): PublicIdentityMutationResult { return PublicIdentityMutationResult::accepted($identity); }
-            public function appendHistoricRoute(HistoricPublicRoute $historicRoute): PublicIdentityMutationResult { return PublicIdentityMutationResult::accepted(); }
-        }))->project([$valid, $unavailable, $notIndexable], 'https://nhk.example');
+        $items = (new VideoSitemapProjection())->project([$valid, $unavailable, $notIndexable], 'https://nhk.example');
 
         self::assertCount(1, $items);
         self::assertSame('https://nhk.example/video/nha-kho-title/', $items[0]['loc']);

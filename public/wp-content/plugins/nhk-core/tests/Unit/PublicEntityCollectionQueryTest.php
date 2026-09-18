@@ -9,8 +9,6 @@ use NHK\Core\Application\Graph\{BrandAggregationQuery, GraphService};
 use NHK\Core\Application\Knowledge\EntityKnowledgeProjection;
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
 use NHK\Core\Domain\Authority\{CanonicalEntityTypeCatalog, EntityTypeRegistry};
-use NHK\Core\Contracts\PublicIdentity\PublicIdentityRepository;
-use NHK\Core\Domain\PublicIdentity\{HistoricPublicRoute, PublicIdentity, PublicIdentityMutationResult};
 use NHK\Core\Domain\Graph\{EndpointTypeRegistry, FakeEndpointResolver, NodeReference, PredicateRegistry};
 use NHK\Core\Domain\Knowledge\KnowledgeClaim;
 use NHK\Core\Shared\Uuid\UuidCodec;
@@ -26,18 +24,16 @@ final class PublicEntityCollectionQueryTest extends TestCase
         $types = new EntityTypeRegistry();
         CanonicalEntityTypeCatalog::registerInto($types);
         $repository = new InMemoryAuthorityRepository();
-        $identities = new CollectionTestPublicIdentityRepository();
-        $routes = new PublicRouteResolver($repository, $types, null, null, $identities);
-        return ['query' => new PublicEntityCollectionQuery($repository, $types, new PublicIdentityContract($types), new PublicEntityEligibilityPolicy($repository, $types, $routes), $routes), 'repository' => $repository, 'identities' => $identities];
+        $routes = new PublicRouteResolver($repository, $types);
+        return ['query' => new PublicEntityCollectionQuery($repository, $types, new PublicIdentityContract($types), new PublicEntityEligibilityPolicy($repository, $types, $routes), $routes), 'repository' => $repository];
     }
 
     public function test_archive_counts_only_publicly_eligible_routeable_items_and_uses_canonical_urls(): void
     {
-        ['query' => $query, 'repository' => $repository, 'identities' => $identities] = $this->query();
+        ['query' => $query, 'repository' => $repository] = $this->query();
         $authority = new AuthorityService($repository, $query->types());
         $brand = $authority->create('brand', 'brand-one', 'Brand One');
         $authority->create('brand', 'hidden', 'Video');
-        $this->persist($identities, $brand, 'brand-one', 'root');
 
         $archive = $query->archive('brand');
 
@@ -49,10 +45,9 @@ final class PublicEntityCollectionQueryTest extends TestCase
 
     public function test_detail_and_archive_apply_the_same_identity_and_eligibility_decisions(): void
     {
-        ['query' => $query, 'repository' => $repository, 'identities' => $identities] = $this->query();
+        ['query' => $query, 'repository' => $repository] = $this->query();
         $authority = new AuthorityService($repository, $query->types());
         $movement = $authority->create('movement', 'cal-100', 'Cal 100');
-        $this->persist($identities, $movement, 'cal-100', 'namespace:movement');
 
         self::assertSame('/bo-may/cal-100/', $query->detail('movement', 'cal-100')['url']);
         self::assertSame('/bo-may/cal-100/', $query->archive('movement')['items'][0]['url']);
@@ -228,14 +223,12 @@ final class PublicEntityCollectionQueryTest extends TestCase
         $authority = new AuthorityService($repository, $types);
         $brand = $authority->create('brand', 'brand-one', 'Brand One');
         $model = $authority->create('model', 'model-one', 'Model One', ['brand_uuid' => $brand->canonicalId]);
-        $identities = new CollectionTestPublicIdentityRepository();
-        $this->persist($identities, $brand, 'brand-one', 'root'); $this->persist($identities, $model, 'model-one', 'brand:' . $brand->canonicalId);
         $endpoints = new EndpointTypeRegistry();
         $endpoints->register('brand', new FakeEndpointResolver('brand', [$brand->canonicalId]));
         $endpoints->register('model', new FakeEndpointResolver('model', [$model->canonicalId]));
         $graph = new GraphService($graphRepository = new InMemoryGraphRepository(), $endpoints, new PredicateRegistry(), new InMemoryAuditSink());
         $graph->create(new NodeReference('model', $model->canonicalId), 'model_of', new NodeReference('brand', $brand->canonicalId));
-        $routes = new PublicRouteResolver($repository, $types, null, null, $identities);
+        $routes = new PublicRouteResolver($repository, $types);
         $query = new PublicEntityCollectionQuery($repository, $types, new PublicIdentityContract($types), new PublicEntityEligibilityPolicy($repository, $types, $routes), $routes, new BrandAggregationQuery($graph, $repository, $types, $routes));
 
         $detail = $query->detail('brand', 'brand-one');
@@ -244,21 +237,6 @@ final class PublicEntityCollectionQueryTest extends TestCase
         self::assertSame('Model One', $detail['aggregation']['models'][0]['name']);
         self::assertSame('/brand-one/model-one/', $detail['aggregation']['models'][0]['url']);
     }
-
-    private function persist(CollectionTestPublicIdentityRepository $repository, \NHK\Core\Domain\Authority\AuthorityEntity $entity, string $slug, string $scope): void
-    {
-        $repository->identities[$entity->canonicalId] = new PublicIdentity('identity-' . $entity->canonicalId, 'authority', $entity->canonicalId, $entity->entityType, $slug, $scope, 'public-route-v1', 1);
-    }
-}
-
-final class CollectionTestPublicIdentityRepository implements PublicIdentityRepository
-{
-    public array $identities = [];
-    public function findByOwner(string $ownerKind, string $ownerId): ?PublicIdentity { $identity = $this->identities[$ownerId] ?? null; return $identity && $identity->ownerKind === $ownerKind ? $identity : null; }
-    public function findByRoute(string $routeType, string $collisionScope, string $slug): ?PublicIdentity { foreach ($this->identities as $identity) if ($identity->routeType === $routeType && $identity->collisionScope === $collisionScope && $identity->currentSlug === $slug) return $identity; return null; }
-    public function create(PublicIdentity $identity): PublicIdentityMutationResult { return PublicIdentityMutationResult::accepted($identity); }
-    public function update(PublicIdentity $identity, int $expectedRevision): PublicIdentityMutationResult { return PublicIdentityMutationResult::accepted($identity); }
-    public function appendHistoricRoute(HistoricPublicRoute $historicRoute): PublicIdentityMutationResult { return PublicIdentityMutationResult::acceptedHistoricRoute($historicRoute); }
 }
 
 final class NullPublicIdentityRepository implements \NHK\Core\Contracts\PublicIdentity\PublicIdentityRepository

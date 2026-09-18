@@ -7,9 +7,6 @@ use NHK\Core\Application\Compliance\PublicClaimCopyPolicy;
 use NHK\Core\Application\Dictionary\DictionaryObservationRegistry;
 use NHK\Core\Application\Seo\PublicSeoProjection;
 use NHK\Core\Domain\Article\ArticleResearchResult;
-use NHK\Core\Application\Seo\PublicSeoProjection;
-use NHK\Core\Domain\PublicIdentity\PublicUrlResult;
-use NHK\Core\Shared\Text\VietnameseSlugNormalizer;
 
 /** Read-only Article research orchestration; injected callbacks are application/repository boundaries. */
 final class ArticleResearchPreflight

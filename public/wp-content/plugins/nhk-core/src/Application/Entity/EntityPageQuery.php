@@ -71,7 +71,6 @@ final class EntityPageQuery
         $query = trim($query); $items = [];
         foreach ($this->authority->listByType($type, true) as $entity) {
             if (!$entity->active()) continue;
-            if ($this->publicPath($entity) === null) continue;
             $publicPayload = array_intersect_key($entity->payload, array_fill_keys($this->types->get($entity->entityType)->allowedFields, true));
             if ($query !== '' && !$this->matches($query, $entity->canonicalName, $entity->stableKey, $this->json($publicPayload))) continue;
             $items[] = $this->serialize($entity);
