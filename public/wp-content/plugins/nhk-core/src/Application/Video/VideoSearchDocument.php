@@ -5,11 +5,12 @@ namespace NHK\Core\Application\Video;
 
 use NHK\Core\Application\Seo\PublicSeoProjection;
 use NHK\Core\Contracts\Authority\AuthorityRepository;
+use NHK\Core\Contracts\PublicIdentity\PublicIdentityRepository;
 use NHK\Core\Domain\Video\Video;
 
 final class VideoSearchDocument
 {
-    public function __construct(private AuthorityRepository $authority)
+    public function __construct(private AuthorityRepository $authority, private ?PublicIdentityRepository $identities = null, private ?VideoUrlPolicy $policy = null)
     {
     }
 

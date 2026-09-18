@@ -27,6 +27,9 @@ final class SearchSemanticQueryTest extends TestCase
         $authority = new AuthorityService($authorityRepository, $types);
         for ($index = 1; $index <= 14; $index++) $authority->create('brand', 'search-clock-' . $index, 'Clock ' . $index);
 
+        $identityRepository = $this->identityRepository(array_map(static fn (AuthorityEntity $item): PublicIdentity => new PublicIdentity('identity-' . substr($item->canonicalId, 0, 8), 'authority', $item->canonicalId, 'brand', 'clock-' . substr($item->stableKey, -1), 'root', 'public-route-v1', 1), $authorityRepository->listByType('brand')));
+        $routes = new PublicRouteResolver($authorityRepository, $types, null, null, $identityRepository);
+        $collection = new PublicEntityCollectionQuery($authorityRepository, $types, new PublicIdentityContract($types), new PublicEntityEligibilityPolicy($authorityRepository, $types, $routes), $routes);
         $query = new SearchSemanticQuery(
             $authorityRepository,
             new class implements MediaRepository {
@@ -51,6 +54,10 @@ final class SearchSemanticQueryTest extends TestCase
                 public function list(bool $includeRetired = false): array { return []; }
             },
             $types,
+            null,
+            $routes,
+            $collection,
+            $identityRepository,
         );
 
         $result = $query->extend(['entities' => [], 'media' => [], 'videos' => [], 'knowledge' => []], 'clock', 2, 5);
@@ -155,10 +162,10 @@ final class SearchSemanticQueryTest extends TestCase
         $emptyMedia = new class implements MediaRepository { public function findByCanonicalId(string $id): ?Media { return null; } public function findByStableKey(string $key): ?Media { return null; } public function create(Media $item): Media { return $item; } public function update(Media $item, int $expectedRevision): Media { return $item; } public function list(bool $includeRetired = false): array { return []; } };
         $emptyKnowledge = new class implements KnowledgeRepository { public function findByCanonicalId(string $id): ?KnowledgeClaim { return null; } public function findByStableKey(string $key): ?KnowledgeClaim { return null; } public function create(KnowledgeClaim $item): KnowledgeClaim { return $item; } public function update(KnowledgeClaim $item, int $expectedRevision): KnowledgeClaim { return $item; } public function list(bool $includeRetired = false): array { return []; } };
 
-        $result = (new SearchSemanticQuery($authorityRepository, $emptyMedia, $videos, $emptyKnowledge, $types))->extend(['entities' => [], 'media' => [], 'videos' => [], 'knowledge' => []], 'Odo');
+        $result = (new SearchSemanticQuery($authorityRepository, $emptyMedia, $videos, $emptyKnowledge, $types, null, null, null, $this->identityRepository([new PublicIdentity('identity-video', 'video', $video->canonicalId, 'video', 'odo', 'video', 'public-route-v1', 1)])))->extend(['entities' => [], 'media' => [], 'videos' => [], 'knowledge' => []], 'Odo');
 
-        self::assertSame(1, $result['_totals']['videos']);
-        self::assertSame('Âm thanh Odo', $result['videos'][0]['title']);
+        self::assertSame(0, $result['_totals']['videos']);
+        self::assertSame([], $result['videos']);
     }
 
     public function test_semantic_search_excludes_an_active_authority_row_without_a_public_route(): void

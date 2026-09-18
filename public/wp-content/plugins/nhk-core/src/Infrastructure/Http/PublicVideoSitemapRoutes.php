@@ -6,6 +6,8 @@ namespace NHK\Core\Infrastructure\Http;
 use NHK\Core\Application\Video\VideoSitemapProjection;
 use NHK\Core\Application\Seo\PublicSeoProjection;
 use NHK\Core\Contracts\Video\VideoRepository;
+use NHK\Core\Contracts\PublicIdentity\PublicIdentityRepository;
+use NHK\Core\Application\Video\VideoUrlPolicy;
 use NHK\Core\Shared\Migration\MigrationStatus;
 
 final class PublicVideoSitemapRoutes
@@ -26,7 +28,7 @@ final class PublicVideoSitemapRoutes
     {
         if ((string) get_query_var('nhk_video_sitemap') !== '1' || ($this->status !== null && !$this->status->videoStorageReady())) return;
         $base = function_exists('home_url') ? (string) home_url('/') : '';
-        $items = (new VideoSitemapProjection())->project($this->videos->list(), $base);
+        $items = (new VideoSitemapProjection($this->identities, $this->policy))->project($this->videos->list(), $base);
         header('Content-Type: application/xml; charset=UTF-8');
         echo '<?xml version="1.0" encoding="UTF-8"?>';
         echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">';

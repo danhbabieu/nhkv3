@@ -11,22 +11,24 @@ use PHPUnit\Framework\TestCase;
 
 final class PublicRouteResolverTest extends TestCase
 {
-    private function resolver(InMemoryAuthorityRepository &$repository, ?EntityTypeRegistry &$types = null): PublicRouteResolver
+    private function resolver(InMemoryAuthorityRepository &$repository, ?EntityTypeRegistry &$types = null, ?TestPublicIdentityRepository &$identity = null): PublicRouteResolver
     {
         $types = new EntityTypeRegistry();
         CanonicalEntityTypeCatalog::registerInto($types);
         $repository = new InMemoryAuthorityRepository();
-        return new PublicRouteResolver($repository, $types);
+        $identity = new TestPublicIdentityRepository();
+        return new PublicRouteResolver($repository, $types, null, null, $identity);
     }
 
     public function test_brand_model_and_variant_use_public_slug_hierarchy(): void
     {
-        $repository = new InMemoryAuthorityRepository(); $types = null;
-        $resolver = $this->resolver($repository, $types);
+        $repository = new InMemoryAuthorityRepository(); $types = null; $identity = null;
+        $resolver = $this->resolver($repository, $types, $identity);
         $authority = new AuthorityService($repository, $types);
         $brand = $authority->create('brand', 'nhk:brand:odo', 'Ô Đô');
         $model = $authority->create('model', 'nhk:model:odo-36', 'Ô Đô 36', ['brand_uuid' => $brand->canonicalId]);
         $variant = $authority->create('variant', 'nhk:variant:odo-36-8', 'Ô Đô 36 8', ['model_uuid' => $model->canonicalId]);
+        $this->persist($identity, $brand, 'odo', 'root'); $this->persist($identity, $model, 'odo-36', 'brand:' . $brand->canonicalId); $this->persist($identity, $variant, 'odo-36-8', 'model:' . $model->canonicalId);
 
         self::assertSame('/odo/', $resolver->path($brand));
         self::assertSame('/odo/odo-36/', $resolver->path($model));
@@ -36,8 +38,8 @@ final class PublicRouteResolverTest extends TestCase
 
     public function test_reserved_root_and_ambiguous_public_slug_fail_closed(): void
     {
-        $repository = new InMemoryAuthorityRepository(); $types = null;
-        $resolver = $this->resolver($repository, $types);
+        $repository = new InMemoryAuthorityRepository(); $types = null; $identity = null;
+        $resolver = $this->resolver($repository, $types, $identity);
         $authority = new AuthorityService($repository, $types);
         $reserved = $authority->create('brand', 'nhk:brand:reserved', 'Video');
         $authority->create('brand', 'nhk:brand:first', 'Shared');
@@ -49,12 +51,13 @@ final class PublicRouteResolverTest extends TestCase
 
     public function test_slug_contract_is_shared_and_collision_safe_for_siblings(): void
     {
-        $repository = new InMemoryAuthorityRepository(); $types = null;
-        $resolver = $this->resolver($repository, $types);
+        $repository = new InMemoryAuthorityRepository(); $types = null; $identity = null;
+        $resolver = $this->resolver($repository, $types, $identity);
         $authority = new AuthorityService($repository, $types);
         $brand = $authority->create('brand', 'nhk:brand:slug', 'Vê Đét');
         $first = $authority->create('model', 'nhk:model:first', 'Mẫu Chung', ['brand_uuid' => $brand->canonicalId]);
         $second = $authority->create('model', 'nhk:model:second', 'Mẫu Chung', ['brand_uuid' => $brand->canonicalId]);
+        $this->persist($identity, $brand, 've-det', 'root');
 
         self::assertSame('ve-det', PublicRouteResolver::slug(' Vê Đét '));
         self::assertNull($resolver->path($first));
@@ -231,9 +234,16 @@ final class PublicRouteResolverTest extends TestCase
         $this->resolver($repository, $types);
         $authority = new AuthorityService($repository, $types);
         $brand = $authority->create('brand', 'nhk:brand:foo', 'Foo');
-        $resolver = new PublicRouteResolver($repository, $types, null, static fn (string $slug): bool => $slug === 'foo');
+        $identity = new TestPublicIdentityRepository();
+        $this->persist($identity, $brand, 'foo', 'root');
+        $resolver = new PublicRouteResolver($repository, $types, null, static fn (string $slug): bool => $slug === 'foo', $identity);
 
         self::assertNull($resolver->path($brand));
-        self::assertNotNull($resolver->resolve('brand', ['foo']), 'Incoming collision resolution remains available to the HTTP boundary so it can emit IDENTITY_CONFLICT.');
+        self::assertNull($resolver->resolve('brand', ['foo']));
+    }
+
+    private function persist(TestPublicIdentityRepository $repository, \NHK\Core\Domain\Authority\AuthorityEntity $entity, string $slug, string $scope): void
+    {
+        $repository->identities[$entity->canonicalId] = new \NHK\Core\Domain\PublicIdentity\PublicIdentity('identity-' . $entity->canonicalId, 'authority', $entity->canonicalId, $entity->entityType, $slug, $scope, 'public-route-v1', 1);
     }
 }

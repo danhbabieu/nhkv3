@@ -26,7 +26,7 @@ final class MediaVideoPageQueryTest extends TestCase
 
         self::assertSame(['Active'], array_column($query->mediaArchive(1, 10)['items'], 'title'));
         self::assertNull($query->mediaDetail($draftMedia->canonicalId));
-        self::assertSame(['Reference'], array_column($query->videoArchive(1, 10)['items'], 'title'));
+        self::assertSame([], $query->videoArchive(1, 10)['items']);
     }
 
     public function test_video_archive_is_newest_first_by_published_at_with_created_order_fallback(): void
@@ -71,9 +71,7 @@ final class MediaVideoPageQueryTest extends TestCase
         self::assertSame('featured', $media['usages'][0]['role']);
         self::assertArrayNotHasKey('endpoint_type', $media['usages'][0]);
         self::assertArrayNotHasKey('endpoint_key', $media['usages'][0]);
-        self::assertSame($video->canonicalUrl, $query->videoDetail($video->canonicalId)['url']);
-        self::assertSame('dQw4w9WgXcQ', $query->videoDetail($video->canonicalId)['external_id']);
-        self::assertArrayNotHasKey('metadata', $query->videoDetail($video->canonicalId));
+        self::assertNull($query->videoDetail($video->canonicalId));
     }
 
     public function test_video_detail_projects_public_knowledge_provenance_and_internal_links_without_raw_metadata(): void

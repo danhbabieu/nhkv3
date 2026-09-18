@@ -9,6 +9,9 @@ use NHK\Core\Application\Seo\SitemapIndexabilityProjection;
 
 final class VideoSitemapProjection
 {
+    public function __construct(private ?PublicIdentityRepository $identities = null, private ?VideoUrlPolicy $policy = null)
+    {
+    }
     /** @param list<Video> $videos @return list<array<string,string>> */
     public function project(array $videos, string $baseUrl = ''): array
     {

@@ -8,15 +8,13 @@ use NHK\Core\Application\PublicIdentity\{CanonicalPublicSlugPolicy, PublicIdenti
 use NHK\Core\Contracts\PublicIdentity\PublicIdentityRepository;
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Domain\Authority\{AuthorityEntity, EntityTypeRegistry};
-use NHK\Core\Shared\Uuid\UuidCodec;
+use NHK\Core\Domain\PublicIdentity\PublicUrlResult;
+use NHK\Core\Shared\Text\VietnameseSlugNormalizer;
 
 final class PublicRouteResolver
 {
-    /** @var array<string,string> */
-    private const NAMESPACES = [
-        'movement' => 'bo-may', 'music' => 'ban-nhac', 'component' => 'linh-kien',
-        'classification' => 'phan-loai', 'specimen' => 'hien-vat', 'product' => 'san-pham',
-    ];
+    private PublicUrlProjector $projector;
+    private PublicIdentityRepository $identities;
 
     /** @var list<string> */
     private const RESERVED_ROOTS = [
@@ -103,17 +101,20 @@ final class PublicRouteResolver
         $slug = self::slug($title);
         return $slug !== '' ? '/video/' . $slug . '/' : null;
     }
+    public static function existingSemanticPath(string $type, string $id): ?string { return null; }
+    public static function videoPath(string $title, string $externalId): ?string { if (!preg_match('/^[A-Za-z0-9_-]{11}$/', $externalId)) return null; $slug = self::slug($title); return '/video/' . ($slug !== '' ? $slug . '-' . strtolower($externalId) : 'video-' . strtolower($externalId)) . '/'; }
+    public static function slug(string $value): string { $result = (new VietnameseSlugNormalizer(191))->normalize($value); return str_replace('o-do', 'odo', $result->value()); }
+    public static function reservedRoots(): array { return AuthorityUrlPolicy::reservedRoots(); }
+    public static function namespaceFor(string $type): ?string { return AuthorityUrlPolicy::namespaces()[$type] ?? null; }
 
     /** @param list<string> $segments */
     public function resolve(string $type, array $segments): ?AuthorityEntity
     {
         if (!$this->types->has($type) || $segments === []) return null;
-        $slugs = array_values(array_filter(array_map(static fn (mixed $value): string => self::slug((string) $value), $segments), static fn (string $value): bool => $value !== ''));
-        if (count($slugs) !== count($segments)) return null;
-        if ($type === 'brand' && count($slugs) === 1) return $this->unique($type, $slugs[0]);
-        if ($type === 'model' && count($slugs) === 2) {
-            $brand = $this->unique('brand', $slugs[0]);
-            return $brand ? $this->uniqueChild('model', $slugs[1], $brand->canonicalId) : null;
+        $matches = [];
+        foreach ($this->authority->listByType($type, true) as $entity) {
+            $path = $this->path($entity);
+            if ($path !== null && explode('/', trim($path, '/')) === array_values($segments)) $matches[] = $entity;
         }
         if ($type === 'variant' && count($slugs) === 3) {
             $brand = $this->unique('brand', $slugs[0]);

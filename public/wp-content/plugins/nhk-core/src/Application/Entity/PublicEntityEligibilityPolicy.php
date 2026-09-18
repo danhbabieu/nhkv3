@@ -17,9 +17,6 @@ final class PublicEntityEligibilityPolicy
         if (!$entity || !$this->types->has($entity->entityType)) return PublicEligibilityResult::blocked('UNKNOWN_TYPE');
         if (!$entity->active()) return PublicEligibilityResult::blocked('INACTIVE');
 
-        $identity = (new PublicIdentityContract($this->types))->resolve($entity);
-        if ($identity === null) return PublicEligibilityResult::blocked('INVALID_IDENTITY');
-
         $parentResult = $this->parentResult($entity);
         if ($parentResult !== null) {
             if (!$parentResult->eligible) return $parentResult;
@@ -28,7 +25,8 @@ final class PublicEntityEligibilityPolicy
             $result = PublicEligibilityResult::eligible();
         }
 
-        if ($this->routes->path($entity) === null) return PublicEligibilityResult::blocked('UNAVAILABLE');
+        $url = $this->routes->result($entity);
+        if (!$url->eligible) return PublicEligibilityResult::blocked(...($url->blockers ?: ['UNAVAILABLE']));
         return $result;
     }
 
