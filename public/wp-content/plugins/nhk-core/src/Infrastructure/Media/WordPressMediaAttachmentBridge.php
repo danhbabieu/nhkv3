@@ -210,8 +210,8 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
             }
             if ($source instanceof MediaAsset && $derivative instanceof MediaAsset) {
                 $currentChecksum = hash_file('sha256', $filePath);
-                if (is_string($currentChecksum) && $currentChecksum !== '' && $source->checksum === $currentChecksum && $existingMedia->readiness === 'ready') {
-                    $this->saveMapping($existingMedia, $source, $attachmentId);
+                if (is_string($currentChecksum) && $currentChecksum !== '' && $derivative->checksum === $currentChecksum && $existingMedia->readiness === 'ready') {
+                    $this->saveMapping($existingMedia, $derivative, $attachmentId);
                     $this->adoptionPhase($attachmentId, 'SOURCE_ORIGINAL_READY', $existingMedia->canonicalId);
                     $this->adoptionPhase($attachmentId, 'PUBLIC_DERIVATIVE_READY', $existingMedia->canonicalId);
                     $this->adoptionPhase($attachmentId, 'ATTACHMENT_BINDING_READY', $existingMedia->canonicalId);
@@ -361,7 +361,7 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
                 $updatedSource = $this->mediaService->reconcileAsset($existingMedia->canonicalId, $existingSource->assetId, $sourceAsset);
                 $updatedDerivative = $this->mediaService->reconcileAsset($existingMedia->canonicalId, $existingDerivative->assetId, $derivativeAsset);
                 $readyMedia = $existingMedia->readiness === 'ready' ? $existingMedia : $this->mediaService->update($existingMedia->canonicalId, $existingMedia->canonicalName, 'ready', $existingMedia->provenance, $existingMedia->revision);
-                $this->saveMapping($readyMedia, $updatedSource, $attachmentId);
+                $this->saveMapping($readyMedia, $updatedDerivative, $attachmentId);
                 $this->adoptionPhase($attachmentId, 'SOURCE_ORIGINAL_READY', $readyMedia->canonicalId);
                 $this->adoptionPhase($attachmentId, 'PUBLIC_DERIVATIVE_READY', $readyMedia->canonicalId);
                 $this->adoptionPhase($attachmentId, 'ATTACHMENT_BINDING_READY', $readyMedia->canonicalId);
@@ -372,11 +372,16 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
             $media = $this->mediaService->ingest($media->stableKey, $media->canonicalName, 'draft', $media->provenance, [$derivativeAsset]);
             $media = $this->mediaService->update($media->canonicalId, $media->canonicalName, 'ready', $media->provenance, $media->revision);
             $source = null;
-            foreach ($this->assets->listByMediaId($media->canonicalId) as $asset) if ($asset->storageKey === $sourceKey) { $source = $asset; break; }
+            $derivative = null;
+            foreach ($this->assets->listByMediaId($media->canonicalId) as $asset) {
+                if ($asset->storageKey === $sourceKey) $source = $asset;
+                if ($asset->storageKey === $storageKey && $asset->kind === 'derivative') $derivative = $asset;
+            }
             if (!$source instanceof MediaAsset) throw new RuntimeException('WORDPRESS_MEDIA_SOURCE_ASSET_UNAVAILABLE');
+            if (!$derivative instanceof MediaAsset) throw new RuntimeException('WORDPRESS_MEDIA_DERIVATIVE_ASSET_UNAVAILABLE');
             $this->adoptionPhase($attachmentId, 'SOURCE_ASSET_READY', $media->canonicalId);
             $this->adoptionPhase($attachmentId, 'ATTACHMENT_BINDING_STARTED', $media->canonicalId);
-            $this->saveMapping($media, $source, $attachmentId);
+            $this->saveMapping($media, $derivative, $attachmentId);
             $this->adoptionPhase($attachmentId, 'ATTACHMENT_BINDING_READY', $media->canonicalId);
             $this->adoptionPhase($attachmentId, 'COMPLETE', $media->canonicalId);
             return $media->canonicalId;
@@ -654,14 +659,18 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
         if (!$asset instanceof MediaAsset || $asset->mediaId !== $media->canonicalId) return ['attachment_id' => $attachmentId, 'media_id' => $media->canonicalId, 'readback_state' => 'INCONSISTENT', 'error_code' => 'ATTACHMENT_CANONICAL_ASSET_MISSING'];
         if ((string) ($row['storage_key'] ?? '') !== $asset->storageKey) return ['attachment_id' => $attachmentId, 'media_id' => $media->canonicalId, 'asset_id' => $asset->assetId, 'readback_state' => 'INCONSISTENT', 'error_code' => 'ATTACHMENT_STORAGE_MAPPING_MISMATCH'];
         if ($physicalFacts === []) return ['attachment_id' => $attachmentId, 'media_id' => $media->canonicalId, 'asset_id' => $asset->assetId, 'readback_state' => 'INCONSISTENT', 'error_code' => 'ATTACHMENT_PHYSICAL_READBACK_REQUIRED'];
-        foreach ([
+        $requiredFacts = [
             'checksum' => $asset->checksum,
             'byte_size' => $asset->byteSize,
-            'width' => $asset->width,
-            'height' => $asset->height,
             'mime_type' => $asset->mimeType,
-        ] as $fact => $expected) {
-            if (array_key_exists($fact, $physicalFacts) && $physicalFacts[$fact] !== $expected) {
+        ];
+        if ($asset->width !== null) $requiredFacts['width'] = $asset->width;
+        if ($asset->height !== null) $requiredFacts['height'] = $asset->height;
+        foreach ($requiredFacts as $fact => $expected) {
+            if (!array_key_exists($fact, $physicalFacts) || $physicalFacts[$fact] === null || $physicalFacts[$fact] === '') {
+                return ['attachment_id' => $attachmentId, 'media_id' => $media->canonicalId, 'asset_id' => $asset->assetId, 'readback_state' => 'INCONSISTENT', 'error_code' => 'ATTACHMENT_PHYSICAL_READBACK_REQUIRED'];
+            }
+            if ($physicalFacts[$fact] !== $expected) {
                 $errorCode = $fact === 'checksum' ? 'ATTACHMENT_PHYSICAL_CHECKSUM_MISMATCH' : 'ATTACHMENT_PHYSICAL_FACT_MISMATCH';
                 return ['attachment_id' => $attachmentId, 'media_id' => $media->canonicalId, 'asset_id' => $asset->assetId, 'readback_state' => 'INCONSISTENT', 'error_code' => $errorCode];
             }
