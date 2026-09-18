@@ -61,6 +61,14 @@ final class PluginBootWiringTest extends TestCase
         );
     }
 
+    public function test_media_binding_read_ability_has_registered_operation_repository_and_dispatch_case(): void
+    {
+        $plugin = (string) file_get_contents(__DIR__ . '/../../src/Plugin.php');
+        $registration = (string) file_get_contents(__DIR__ . '/../../src/Application/Mcp/McpAbilityRegistration.php');
+        self::assertStringContainsString('new WpdbMediaBindingOperationRepository($wpdb)', $plugin);
+        self::assertStringContainsString("'nhk.media.binding.get' => \$read->mediaBindingGet", $registration);
+    }
+
     public function test_easy_mcp_native_file_adapter_is_registered_without_changing_the_nhk_entrypoint(): void
     {
         $plugin = (string) file_get_contents(__DIR__ . '/../../src/Plugin.php');

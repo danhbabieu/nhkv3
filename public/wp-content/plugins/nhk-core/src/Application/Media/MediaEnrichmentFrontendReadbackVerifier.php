@@ -3,7 +3,6 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Media;
 
-use NHK\Core\Application\Entity\{EntityMediaProjection, PublicEntityEligibilityPolicy};
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Contracts\Media\MediaUsageRepository;
 use NHK\Core\Domain\Authority\EntityTypeRegistry;
@@ -16,8 +15,10 @@ final class MediaEnrichmentFrontendReadbackVerifier
     public function __construct(
         private AuthorityRepository $authority,
         private EntityTypeRegistry $types,
-        private PublicEntityEligibilityPolicy $eligibility,
-        private EntityMediaProjection $projection,
+        /** @param callable(object|null):bool $publicReadable */
+        private $publicReadable,
+        /** @param callable(string,string):array<string,mixed> $projection */
+        private $projection,
         private MediaUsageRepository $usages,
     ) {}
 
@@ -29,13 +30,12 @@ final class MediaEnrichmentFrontendReadbackVerifier
         $expectedMediaId = trim($expectedMediaId);
         if (!$this->types->has($targetType) || !UuidCodec::isValid($targetId) || !UuidCodec::isValid($expectedMediaId)) return $this->failed('PUBLIC_TARGET_REFERENCE_INVALID');
         $target = $this->authority->findByCanonicalId($targetId);
-        $decision = $this->eligibility->evaluate($target);
-        if ($target === null || !$decision->eligible) return $this->failed('PUBLIC_TARGET_NOT_READABLE');
+        if ($target === null || !(bool) ($this->publicReadable)($target)) return $this->failed('PUBLIC_TARGET_NOT_READABLE');
 
         $active = array_values(array_filter($this->usages->listByEndpoint($targetType, $targetId, MediaUsageRoleRegistry::REPRESENTATIVE), static fn (mixed $usage): bool => $usage instanceof MediaUsage && $usage->activeSlot !== 'retired' && ($usage->activeSlot === null || $usage->activeSlot === 'representative')));
         if (count($active) !== 1 || $active[0]->mediaId !== $expectedMediaId) return $this->failed('CANONICAL_REPRESENTATIVE_MISMATCH', ['active_representative_count' => count($active)]);
 
-        $projection = $this->projection->forEntity($targetType, $targetId);
+        $projection = ($this->projection)($targetType, $targetId);
         $representative = is_array($projection['representative'] ?? null) ? $projection['representative'] : null;
         if ($representative === null || (string) ($representative['media_id'] ?? '') !== $expectedMediaId) return $this->failed('PUBLIC_REPRESENTATIVE_PROJECTION_MISMATCH');
         return ['status' => 'verified', 'target_type' => $targetType, 'target_id' => $targetId, 'media_id' => $expectedMediaId, 'active_representative_count' => 1, 'projection' => ['media_id' => $representative['media_id'], 'asset_id' => $representative['asset_id'] ?? '', 'url' => $representative['url'] ?? '']];

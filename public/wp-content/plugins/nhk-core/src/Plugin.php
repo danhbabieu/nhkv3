@@ -268,7 +268,7 @@ final class Plugin {
             $publicRoutes = new PublicRouteResolver($authority, $types, $publicContexts);
             $publicEligibility = new PublicEntityEligibilityPolicy($authority, $types, $publicRoutes, $publicContexts);
             $entityMediaProjection = new EntityMediaProjection($media, $assets, $usages);
-            $frontendReadback = new MediaEnrichmentFrontendReadbackVerifier($authority, $types, $publicEligibility, $entityMediaProjection, $usages);
+            $frontendReadback = new MediaEnrichmentFrontendReadbackVerifier($authority, $types, static fn (?object $entity): bool => $entity !== null && $publicEligibility->evaluate($entity)->eligible, static fn (string $type, string $id): array => $entityMediaProjection->forEntity($type, $id), $usages);
             $publicCollection = new PublicEntityCollectionQuery($authority, $types, new PublicIdentityContract($types), $publicEligibility, $publicRoutes, new BrandAggregationQuery($graphService, $authority, $types, $publicRoutes, $publicEligibility), static fn (): bool => $publicStatus->authorityStorageReady(), $entityMediaProjection, new EntityKnowledgeProjection($claims, $evidence, $sources, $publicStatus));
             $governanceRuntime = GovernanceRuntimeFactory::fromWordPress($wpdb, $sharedAttachmentBridge);
             $stagingScopeVerifier = $governanceRuntime->stagingScopeVerifier ?? new \NHK\Core\Application\Governance\StagingAcceptanceScopeVerifier(
