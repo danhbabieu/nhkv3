@@ -1,5 +1,34 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-18 — Generic dynamic Video staging acceptance (LOCAL READY / DEPLOY PENDING)
+
+SCOPE: Implemented one generic server-issued, Capture-owned staging scope for
+Video ingest and update/correction. No per-Video admission class, object
+allowlist, database migration, Proposal retrofit, staging/production mutation,
+remote source edit, push or deployment was performed.
+
+IMPLEMENTATION: `StagingAcceptanceScopeVerifier` now binds the persisted
+Capture/request fingerprint, canonical Capture entrypoint, PROJECT_BUILD policy,
+operation family, Video platform/external identity/source URL, proposed or
+target UUID, operation, expected revision, resolved subject packet, plan and
+Proposal command fingerprints, expiry and HMAC. Ingest performs a read-only
+external-identity duplicate audit; update keeps exact CAS revision semantics.
+`VideoStagingAdmission` is registry/provider-driven and rejects direct Video
+entrypoints, client packets, wrong intent, wrong source/subject, duplicates,
+stale revisions and production. `StagingAcceptanceScope` recognizes
+`video:ingest`; Capture continuation attaches only the server-issued packet.
+
+BOUNDARIES: The scope authorizes only its exact Video plan. Knowledge,
+Source/Evidence, Graph, Authority, Article and unrelated Media writes remain
+separately governed. Production and direct Video writers remain blocked.
+
+VERIFICATION: Focused Video/Capture/Governance suite passes 288 tests / 1,149
+assertions with 11 skipped and existing deprecations. Composer PHP lint passed;
+diff and secret checks are pending in this checkpoint. Deployment and live
+acceptance remain pending.
+
+STATUS: `GENERIC_DYNAMIC_VIDEO_STAGING_ACCEPTANCE_LOCAL_READY / DEPLOY_PENDING / SEMANTIC_MUTATION_NONE`
+
 # Checkpoint — 2026-09-18 — Homepage hero admin presentation config (LOCAL READY / DEPLOY PENDING)
 
 SCOPE: Added the Admin Workbench section “Ảnh Hero trang chủ” for the existing
