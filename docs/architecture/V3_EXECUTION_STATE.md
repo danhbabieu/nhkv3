@@ -1,5 +1,36 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-18 — Homepage server performance audit (READ-ONLY / INSTRUMENTATION BLOCKED)
+
+SCOPE: Audited the real staging homepage through the connected browser and
+inspected the local homepage/read-model and repository boundaries. No semantic
+mutation, database write, cache purge, deployment, source sync, push, pull or
+reset was performed.
+
+EVIDENCE: Chrome rendered `https://demo.1945.vn/` in an authenticated
+`nhk_admin` session. The snapshot contained 73,757 serialized HTML bytes, 631
+DOM elements, 38 images, 9 scripts, 7 linked stylesheets and 5 visible latest
+feed items. The shell could not resolve the staging hostname, while Chrome
+could; this is a tool/environment discrepancy, not a DNS root-cause finding.
+
+RUNTIME: The last verified staging source/build revision remains
+`c236e537f230b849d297e6b881415ad1e442fbe7`, while local HEAD is
+`f67685c8385b9c65802ed2606679c7f6a494aab0`; fresh REST health/identity access
+was blocked by the browser client policy. Live timing must therefore not be
+used as evidence for the current checkout.
+
+FINDING: `HomeSemanticQuery::latestFeed()` statically assembles complete
+Media/Video/Knowledge/Authority lists, performs per-item projection/detail
+work, merges and sorts them, then slices 12. The underlying list boundaries
+are unbounded `SELECT * ... ORDER BY id` reads. This is a static hotspot only;
+PHP render time, DB query count/time, module timings, source-read counts,
+OPcache, page/object/LiteSpeed cache behavior and DNS/TLS/TTFB remain
+`UNVERIFIED` because no safe runtime instrumentation surface was available.
+
+REPORT: `docs/superpowers/reports/2026-09-18-server-performance-audit.md`.
+Status: `SERVER_PERFORMANCE_AUDIT_COMPLETE=NO / STATIC_LATEST_FEED_HOTSPOT /
+RUNTIME_INSTRUMENTATION_BLOCKED / NO_MUTATION`.
+
 # Checkpoint — 2026-09-18 — Homepage presentation-safe visual policy (LOCAL / NO LIVE MUTATION)
 
 SCOPE: Added a read-only compact-card visual policy for the homepage latest
