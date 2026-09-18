@@ -36,10 +36,13 @@ record or staging/production data was changed.
 
 GUARDRAILS: The package does not replace or weaken Public Clock, 400-day,
 cuckoo or Atherton scopes. The shared `StagingAcceptanceScopeVerifier` still
-issues the Capture ID/fingerprint, scope fingerprint, HMAC signature, expiry
-and capability-bound packet at runtime. No target revision is invented: the
-typed Media binding contract resolves the exact existing Classification and
-does not require Proposal/relation/video optimistic-revision fields.
+issues the Capture ID/fingerprint, scope fingerprint, HMAC signature and
+expiry at runtime. The canonical Capture entrypoint requires the existing
+`nhk_ingest_articles` capability; direct compatibility `nhk.media.bind`
+remains internal-only and is not an alternate entrypoint. No target revision
+is invented: the typed Media binding contract resolves the exact existing
+Classification and does not require Proposal/relation/video optimistic-
+revision fields.
 
 PRESENTATION: The exact requested title, alt text and caption are recorded as
 the bounded presentation payload. The scope remains fail-closed outside the

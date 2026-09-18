@@ -208,7 +208,8 @@ after the Constitution.
     - server-issued Capture `capture_id` and exact `capture_fingerprint`
     - server-issued scope `fingerprint`, HMAC `signature`, `issued_at` and `expires_at`
     - exact binding packet matching the IDs, target, operation, role and selection fields above
-    - runtime staging environment, signing secret, capability context and canonical final readback
+    - runtime staging environment, signing secret, canonical `nhk_ingest_articles` capability and final readback
+    - direct compatibility `nhk.media.bind` remains internal-only and is not an alternate entrypoint
   - restrictions:
     - exact IDs and exact stable key only; no wildcard or fuzzy target resolution
     - no new Media, attachment, MediaAsset or Classification
