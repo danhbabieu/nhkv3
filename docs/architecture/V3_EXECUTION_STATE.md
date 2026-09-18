@@ -1,5 +1,43 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-18 — Performance Phase 3 live recheck (READ-ONLY / DEPLOYMENT BLOCKER CONFIRMED)
+
+SCOPE: Rechecked the staging homepage and required public routes without any
+form submission, deployment, cache change, database write, source sync or
+semantic mutation. HEAD is `e6e26e89e72a52964fe9d4748220ed9e4a494654` and the
+worktree was clean before this evidence note.
+
+LIVE EVIDENCE: `https://demo.1945.vn/` rendered HTTP-successfully in the
+connected browser and exposed the expected homepage, Hero, “Mới nhất trong
+kho” and Video surfaces. The required `/tri-thuc/`, `/tri-thuc/page/2/`,
+`/video/`, one Video detail, `/thu-vien/`, `/thuong-hieu/` and
+`/loai-dong-ho/` routes also rendered their expected public headings and main
+content. The live homepage latest Video cards still request
+`maxresdefault.jpg` at intrinsic 1280×720 for a roughly 78px slot; the Video
+archive showed 12 cards, six maxres thumbnails and six default archive
+fallbacks. No live Video card exposed compact `srcset`/`sizes`.
+
+HERO EVIDENCE: The current selected attachment-backed Hero markup exposed
+`srcset`, `sizes`, `loading="eager"` and `fetchpriority="high"`; later slides
+exposed lazy loading. Because the live page still served the pre-Phase-3 Video
+projection and the browser could not expose persisted metadata/build identity,
+full Phase 3 Hero candidate/read-back parity remains unverified.
+
+LEGACY DECISION: The Video source and semantic contracts retain thumbnail
+candidates/presentation as persisted source-snapshot data. Public reads may
+use persisted candidates or safely fall back to persisted canonical
+`thumbnail_selection`, but may not synthesize URLs, probe-and-persist or mass
+sync legacy records. `LEGACY_SYNC_REQUIRED` remains undetermined from the
+public surface and no sync is authorized.
+
+LOCAL VERIFICATION: Focused Phase 3 Video/Home/Media/Frontend tests pass 41
+tests / 174 assertions with one existing warning. PHP lint for changed PHP
+files, Hero JavaScript syntax check and `git diff --check` pass. No code fix is
+authorized by this recheck because the observed gap is deployed-build/runtime
+parity, not a contradicted local implementation.
+
+STATUS: `PERFORMANCE_PHASE3_LIVE_UNVERIFIED / DEPLOYMENT_REQUIRED / SEMANTIC_MUTATION_NONE`
+
 # Checkpoint — 2026-09-18 — Performance Phase 3 compact Video thumbnails and Hero responsive source (LOCAL FIX / DEPLOYMENT PENDING)
 
 SCOPE: Added presentation-only compact Video thumbnail selection and
