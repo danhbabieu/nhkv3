@@ -47,13 +47,20 @@ if ($wpLoaded && is_readable($root . '/public/wp-content/plugins/nhk-core/nhk-co
 $check('nhk_core_bootstrap', $pluginLoaded, 'NHK_CORE_BOOTSTRAP_FAILED');
 
 $documentationReady = false;
+$documentationFailure = 'CANONICAL_DOCUMENTATION_UNAVAILABLE';
 if ($autoloadLoaded && class_exists('NHK\\Core\\Application\\Mcp\\McpDocumentationRegistry')) {
     try {
         $bootstrap = (new NHK\Core\Application\Mcp\McpDocumentationRegistry($root, defined('NHK_CORE_VERSION') ? (string) NHK_CORE_VERSION : '0.1.0'))->bootstrap();
         $documentationReady = isset($bootstrap['runtime_version'], $bootstrap['documentation_version'], $bootstrap['manifest_hash'], $bootstrap['read_first'], $bootstrap['documentation_status_index'], $bootstrap['execution_state_content']);
-    } catch (Throwable) { $documentationReady = false; }
+        if (!$documentationReady) $documentationFailure = 'CANONICAL_DOCUMENTATION_UNAVAILABLE';
+        elseif (preg_match('/^[a-f0-9]{40}$/i', (string) ($bootstrap['source_revision'] ?? '')) !== 1) { $documentationReady = false; $documentationFailure = 'DOC_SOURCE_REVISION_UNAVAILABLE'; }
+        elseif (!hash_equals($head, (string) $bootstrap['source_revision'])) { $documentationReady = false; $documentationFailure = 'DOC_BUILD_STALE'; }
+    } catch (Throwable $error) {
+        $documentationReady = false;
+        $documentationFailure = property_exists($error, 'reasonCode') && is_string($error->reasonCode) ? $error->reasonCode : 'CANONICAL_DOCUMENTATION_UNAVAILABLE';
+    }
 }
-$check('canonical_documentation', $documentationReady, 'CANONICAL_DOCUMENTATION_UNAVAILABLE');
+$check('canonical_documentation', $documentationReady, $documentationFailure);
 
 if ($wpLoaded) {
     global $wpdb;

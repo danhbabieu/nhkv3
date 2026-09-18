@@ -80,10 +80,27 @@ final class McpDocumentationRegistry
     /** @return list<string> */
     public static function documentPaths(): array { return array_values(array_map(static fn (array $definition): string => $definition['path'], self::DOCUMENTS)); }
 
-    /** @return array<string,mixed> */
-    public static function buildSnapshot(string $sourceRoot, string $destination, string $runtimeVersion, ?string $generatedAt = null): array
+    /**
+     * Resolve the immutable source identity from the checkout that owns docs/.
+     * The Git checkout is the only source of this identity; callers may not
+     * supply a replacement revision that is not the checkout's current HEAD.
+     */
+    public static function sourceRevision(string $sourceRoot): string
     {
         $sourceRoot = self::realDirectory($sourceRoot, 'DOCS_NOT_AVAILABLE');
+        $revision = self::readSourceRevision($sourceRoot);
+        if ($revision === null) throw new McpDocumentationException('DOC_SOURCE_REVISION_UNAVAILABLE', null, ['source_root' => $sourceRoot]);
+        return $revision;
+    }
+
+    /** @return array<string,mixed> */
+    public static function buildSnapshot(string $sourceRoot, string $destination, string $runtimeVersion, ?string $generatedAt = null, ?string $sourceRevision = null): array
+    {
+        $sourceRoot = self::realDirectory($sourceRoot, 'DOCS_NOT_AVAILABLE');
+        $checkoutRevision = self::sourceRevision($sourceRoot);
+        if ($sourceRevision !== null && (!preg_match('/^[0-9a-f]{40}$/i', $sourceRevision) || !hash_equals($checkoutRevision, strtolower($sourceRevision)))) {
+            throw new McpDocumentationException('DOC_SOURCE_REVISION_MISMATCH', null, ['expected' => $checkoutRevision, 'actual' => $sourceRevision]);
+        }
         $destination = rtrim($destination, DIRECTORY_SEPARATOR);
         if (!is_dir($destination) && !mkdir($destination, 0755, true) && !is_dir($destination)) throw new McpDocumentationException('DOCS_NOT_AVAILABLE');
         $entries = [];
@@ -101,7 +118,7 @@ final class McpDocumentationRegistry
             $entries[] = self::entry($key, $definition, $definition['path'], $content);
         }
         usort($entries, static fn (array $left, array $right): int => strcmp($left['path'], $right['path']));
-        $manifest = self::manifest($entries, $runtimeVersion, $generatedAt ?? self::generatedAt(), self::readSourceRevision($sourceRoot));
+        $manifest = self::manifest($entries, $runtimeVersion, $generatedAt ?? self::generatedAt(), $checkoutRevision);
         $manifestPath = $destination . DIRECTORY_SEPARATOR . 'manifest.json';
         if (is_file($manifestPath)) @chmod($manifestPath, 0644);
         if (file_put_contents($manifestPath, self::json($manifest) . "\n", LOCK_EX) === false) throw new McpDocumentationException('DOCS_NOT_AVAILABLE');
@@ -246,7 +263,7 @@ final class McpDocumentationRegistry
             $entries[] = self::entry($key, $definition, $definition['path'], $content);
         }
         usort($entries, static fn (array $left, array $right): int => strcmp($left['path'], $right['path']));
-        return self::manifest($entries, $this->runtimeVersion, self::generatedAt(), self::readSourceRevision($root));
+        return self::manifest($entries, $this->runtimeVersion, self::generatedAt(), self::sourceRevision($root));
     }
 
     /** @return array<string,mixed> */
@@ -275,9 +292,10 @@ final class McpDocumentationRegistry
         // source of the runtime version; adopt it for all subsequent
         // projections from this registry instance.
         if ($this->runtimeVersion === 'unknown') $this->runtimeVersion = (string) $decoded['runtime_version'];
-        if ($decoded['source_revision'] !== null && (!is_string($decoded['source_revision']) || preg_match('/^[a-f0-9]{40}$/i', $decoded['source_revision']) !== 1)) self::invalidManifest('source_revision_invalid');
+        if (!is_string($decoded['source_revision']) || preg_match('/^[a-f0-9]{40}$/i', $decoded['source_revision']) !== 1) self::invalidManifest('source_revision_invalid');
         $sourceRevision = self::readSourceRevision($root);
-        if ($sourceRevision !== null && $decoded['source_revision'] !== $sourceRevision) self::invalidManifest('source_revision_mismatch', ['expected' => $sourceRevision, 'actual' => $decoded['source_revision']]);
+        if (self::hasGitMetadata($root) && $sourceRevision === null) self::invalidManifest('source_revision_unavailable');
+        if ($sourceRevision !== null && !hash_equals($sourceRevision, strtolower($decoded['source_revision']))) self::invalidManifest('source_revision_mismatch', ['expected' => $sourceRevision, 'actual' => $decoded['source_revision']]);
         if (!is_string($decoded['generated_at']) || strtotime($decoded['generated_at']) === false) self::invalidManifest('generated_at_invalid');
         foreach (['entry_point' => 'docs/constitution/READ_FIRST.md', 'status_index' => 'docs/architecture/CURRENT_DOCUMENTATION_STATUS_INDEX.md', 'execution_state' => 'docs/architecture/V3_EXECUTION_STATE.md'] as $field => $expected) {
             if ($decoded[$field] !== $expected) self::invalidManifest('canonical_path_mismatch', ['field' => $field, 'expected' => $expected, 'actual' => $decoded[$field]]);
@@ -394,9 +412,29 @@ final class McpDocumentationRegistry
 
     private static function readSourceRevision(string $root): ?string
     {
-        if (!is_dir($root . DIRECTORY_SEPARATOR . '.git') && !is_file($root . DIRECTORY_SEPARATOR . '.git')) return null;
-        $revision = function_exists('shell_exec') ? shell_exec('git -C ' . escapeshellarg($root) . ' rev-parse HEAD 2>/dev/null') : null; $revision = is_string($revision) ? trim($revision) : '';
+        if (!self::hasGitMetadata($root)) return null;
+        $revision = '';
+        if (function_exists('proc_open')) {
+            $pipes = [];
+            $process = @proc_open('git -C ' . escapeshellarg($root) . ' rev-parse --verify HEAD 2>/dev/null', [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+            if (is_resource($process)) {
+                $stdout = stream_get_contents($pipes[1]);
+                fclose($pipes[1]);
+                fclose($pipes[2]);
+                $exitCode = proc_close($process);
+                $revision = $exitCode === 0 && is_string($stdout) ? trim($stdout) : '';
+            }
+        }
+        if ($revision === '' && function_exists('shell_exec')) {
+            $fallback = shell_exec('git -C ' . escapeshellarg($root) . ' rev-parse --verify HEAD 2>/dev/null');
+            $revision = is_string($fallback) ? trim($fallback) : '';
+        }
         return preg_match('/^[0-9a-f]{40}$/i', $revision) === 1 ? $revision : null;
+    }
+
+    private static function hasGitMetadata(string $root): bool
+    {
+        return is_dir($root . DIRECTORY_SEPARATOR . '.git') || is_file($root . DIRECTORY_SEPARATOR . '.git');
     }
 
     /** The same deterministic runtime-package identity used by DEMO deploy. */

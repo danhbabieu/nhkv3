@@ -160,6 +160,28 @@ final class RemoteMcpDocumentationVerifierTest extends TestCase
         self::assertSame('DEPLOYMENT_NOT_ACTIVE', $result->reasonCode);
     }
 
+    public function test_source_revision_mismatch_is_rejected_as_a_release_tuple_mismatch(): void
+    {
+        $expected = $this->expectedBootstrap();
+        $actual = $expected;
+        $actual['source_revision'] = str_repeat('0', 40);
+        $verifier = $this->verifierFor($actual);
+
+        $result = $verifier->verify('https://demo.example', $expected, str_repeat('f', 64));
+
+        self::assertSame('RELEASE_TUPLE_MISMATCH', $result->reasonCode);
+    }
+
+    public function test_missing_source_revision_is_not_a_valid_expected_release(): void
+    {
+        $expected = $this->expectedBootstrap();
+        $expected['source_revision'] = null;
+
+        $result = $this->verifierFor($expected)->verify('https://demo.example', $expected, str_repeat('f', 64));
+
+        self::assertSame('MCP_BOOTSTRAP_UNAVAILABLE', $result->reasonCode);
+    }
+
     public function test_unavailable_or_malformed_mcp_fails_closed(): void
     {
         $verifier = new RemoteMcpDocumentationVerifier(static fn (): array => ['status' => 502, 'body' => 'upstream unavailable']);

@@ -93,6 +93,7 @@ final class RemoteMcpDocumentationVerifier
     {
         return preg_match('/^[a-f0-9]{64}$/i', (string) ($expected['documentation_version'] ?? '')) === 1
             && preg_match('/^[a-f0-9]{64}$/i', (string) ($expected['manifest_hash'] ?? '')) === 1
+            && preg_match('/^[a-f0-9]{40}$/i', (string) ($expected['source_revision'] ?? '')) === 1
             && preg_match('/^[a-f0-9]{64}$/i', $buildIdentity) === 1
             && $this->fileMap($expected['files'] ?? ($expected['manifest']['files'] ?? null)) !== null
             && isset($expected['runtime_version'], $expected['source_revision'], $expected['catalog_version'], $expected['resource_version'], $expected['release_identity']);

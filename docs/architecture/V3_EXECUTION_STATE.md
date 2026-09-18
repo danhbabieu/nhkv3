@@ -1,5 +1,59 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-18 — Generic Media enrichment staging admission (LOCAL READY / LIVE VERIFY PENDING)
+
+SCOPE: Repaired the missing canonical admission provider for a typed
+`MEDIA_ENRICHMENT` Capture that binds an existing Media to an exact eligible
+Classification as a pinned user-selected representative. No staging/live
+semantic mutation or server-side file change was performed.
+
+ROOT_CAUSE: `StagingAcceptanceScopeVerifier` invoked
+`nhk_v3_staging_acceptance_admission`, but `nhk-core` registered no
+`add_filter` provider. The verifier therefore always received its fail-closed
+default and returned `STAGING_SCOPE_NOT_ADMITTED` before MediaBindingService.
+
+FIX: Added `MediaBindingStagingAdmission` and registered it from the canonical
+`Plugin::boot()` composition root. The provider compares the immutable Capture
+identity and request bindings, resolves active canonical Media and target
+records, and admits only registry-eligible exact representative bindings with
+`USER_EXPLICIT`/`PINNED`. It has no static UUID whitelist and does not alter
+production behavior; signing, expiry and HMAC remain owned by
+`StagingAcceptanceScopeVerifier`.
+
+VERIFICATION: Focused scope/MediaBinding/Governance suite passes 31 tests / 78
+assertions. Full PHPUnit reaches 2,002 tests but is environment-blocked by 15
+integration failures and 36 errors because `NHK_WP_TEST_PATH` is unset. Full
+plugin PHP lint passes, `git diff --check` passes, and changed-scope secret
+scan is clean. Live verification remains pending after server pull.
+
+STATUS: `MEDIA_ENRICHMENT_STAGING_ADMISSION_LOCAL_READY / LIVE_VERIFY_PENDING`
+
+# Checkpoint — 2026-09-18 — Canonical documentation source revision (LOCAL READY)
+
+SCOPE: Closed the documentation snapshot identity gap at the generator and
+manifest boundary. No staging/production data, deployment target or remote
+checkout was changed.
+
+ROOT_CAUSE: The v2 manifest carried `source_revision` as nullable state. The
+generator and source projection could therefore write or project `NULL` when
+the checkout revision was unavailable, while the deployment path only rejected
+some downstream mismatches.
+
+FIX: `McpDocumentationRegistry::sourceRevision()` now resolves the exact Git
+checkout HEAD and fails closed when unavailable. `buildSnapshot()` validates
+that identity and records it in the existing manifest hash/release tuple;
+`generate:mcp-docs` passes the resolved revision explicitly. Manifest reads,
+bootstrap, preflight and `RemoteMcpDocumentationVerifier` reject missing or
+mismatched revisions. No hardcoded commit or second source of truth is used.
+
+VERIFICATION: Focused registry/verifier regressions cover exact generated JSON
+read-back, missing and mismatched revision rejection, bootstrap projection and
+release-tuple mismatch. Final post-commit generator identity and test counts
+are recorded in the task handoff; generated manifest remains an immutable
+artifact and is not edited manually.
+
+STATUS: `CANONICAL_DOC_SOURCE_REVISION_FAIL_CLOSED / LOCAL_READY`
+
 # Checkpoint — 2026-09-18 — Video W64 staging scope propagation (CODE FIXED / LIVE VERIFY PENDING)
 
 SCOPE: Repaired the generic Capture-owned Video governed update path so a

@@ -138,7 +138,7 @@ final class McpDocumentationRegistryTest extends TestCase
         self::assertTrue(mkdir($directory, 0755, true));
         try {
             $registry = new McpDocumentationRegistry($directory, 'runtime-parity');
-            McpDocumentationRegistry::buildSnapshot(dirname(__DIR__, 6), $directory, 'runtime-parity', '2026-09-09T00:00:00+00:00');
+            $manifest = McpDocumentationRegistry::buildSnapshot(dirname(__DIR__, 6), $directory, 'runtime-parity', '2026-09-09T00:00:00+00:00');
             $bootstrap = $registry->bootstrap();
             $listed = $registry->list();
             $document = $registry->get('AGENTS.md', 1, 1);
@@ -148,6 +148,53 @@ final class McpDocumentationRegistryTest extends TestCase
                 self::assertSame($bootstrap['manifest_hash'], $projection['manifest_hash']);
             }
             self::assertSame($bootstrap['manifest_hash'], $bootstrap['manifest']['manifest_hash']);
+            self::assertSame($manifest['source_revision'], $bootstrap['source_revision']);
+            self::assertSame($manifest['source_revision'], json_decode((string) file_get_contents($directory . '/manifest.json'), true, 512, JSON_THROW_ON_ERROR)['source_revision']);
+        } finally {
+            $this->removeDirectory($directory);
+        }
+    }
+
+    public function test_generator_boundary_records_exact_checkout_head_and_bootstrap_projects_it(): void
+    {
+        $directory = sys_get_temp_dir() . '/nhk-docs-exact-head-' . bin2hex(random_bytes(5));
+        self::assertTrue(mkdir($directory, 0755, true));
+        try {
+            $expected = trim((string) shell_exec('git -C ' . escapeshellarg(dirname(__DIR__, 6)) . ' rev-parse --verify HEAD 2>/dev/null'));
+            self::assertMatchesRegularExpression('/^[a-f0-9]{40}$/', $expected);
+            $manifest = McpDocumentationRegistry::buildSnapshot(dirname(__DIR__, 6), $directory, 'runtime-a', '2026-09-09T00:00:00+00:00', $expected);
+            self::assertSame($expected, $manifest['source_revision']);
+            $persisted = json_decode((string) file_get_contents($directory . '/manifest.json'), true, 512, JSON_THROW_ON_ERROR);
+            self::assertSame($expected, $persisted['source_revision']);
+            self::assertSame($expected, (new McpDocumentationRegistry($directory, 'runtime-a'))->bootstrap()['source_revision']);
+        } finally {
+            $this->removeDirectory($directory);
+        }
+    }
+
+    public function test_snapshot_generation_fails_closed_without_a_git_source_revision(): void
+    {
+        $source = sys_get_temp_dir() . '/nhk-docs-no-git-' . bin2hex(random_bytes(5));
+        $destination = $source . '-destination';
+        self::assertTrue(mkdir($source, 0755, true));
+        try {
+            copy(dirname(__DIR__, 6) . '/AGENTS.md', $source . '/AGENTS.md');
+            $this->copyDirectory(dirname(__DIR__, 6) . '/docs', $source . '/docs');
+            $this->expectExceptionMessage('DOC_SOURCE_REVISION_UNAVAILABLE');
+            McpDocumentationRegistry::buildSnapshot($source, $destination, 'runtime-a');
+        } finally {
+            $this->removeDirectory($source);
+            $this->removeDirectory($destination);
+        }
+    }
+
+    public function test_snapshot_generation_rejects_a_revision_that_is_not_checkout_head(): void
+    {
+        $directory = sys_get_temp_dir() . '/nhk-docs-source-mismatch-' . bin2hex(random_bytes(5));
+        self::assertTrue(mkdir($directory, 0755, true));
+        try {
+            $this->expectExceptionMessage('DOC_SOURCE_REVISION_MISMATCH');
+            McpDocumentationRegistry::buildSnapshot(dirname(__DIR__, 6), $directory, 'runtime-a', null, str_repeat('0', 40));
         } finally {
             $this->removeDirectory($directory);
         }
@@ -259,6 +306,10 @@ final class McpDocumentationRegistryTest extends TestCase
                 $manifest['documentation_version'] = str_repeat('f', 64);
                 return $manifest;
             },
+            'missing-source-revision' => static function (array $manifest): array {
+                $manifest['source_revision'] = null;
+                return $manifest;
+            },
         ];
 
         $expectedDiagnostics = [
@@ -267,6 +318,7 @@ final class McpDocumentationRegistryTest extends TestCase
             'duplicate-key' => 'duplicate_document_key',
             'hash-mismatch' => 'document_hash_mismatch',
             'version-mismatch' => 'documentation_version_mismatch',
+            'missing-source-revision' => 'source_revision_invalid',
         ];
 
         foreach ($scenarios as $name => $mutator) {
@@ -323,5 +375,16 @@ final class McpDocumentationRegistryTest extends TestCase
         $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($directory, \FilesystemIterator::SKIP_DOTS), \RecursiveIteratorIterator::CHILD_FIRST);
         foreach ($iterator as $item) $item->isDir() ? rmdir($item->getPathname()) : unlink($item->getPathname());
         rmdir($directory);
+    }
+
+    private function copyDirectory(string $source, string $destination): void
+    {
+        self::assertTrue(mkdir($destination, 0755, true));
+        $iterator = new \FilesystemIterator($source, \FilesystemIterator::SKIP_DOTS);
+        foreach ($iterator as $item) {
+            $target = $destination . '/' . $item->getBasename();
+            if ($item->isDir()) $this->copyDirectory($item->getPathname(), $target);
+            else self::assertTrue(copy($item->getPathname(), $target));
+        }
     }
 }
