@@ -124,7 +124,6 @@ final class CompletionCoordinator
     {
         $packets = [];
         $blockers = $this->strings($evidence['blockers'] ?? []);
-        $skippedRequirements = $this->skippedRequirements($evidence['skipped_requirements'] ?? []);
         foreach ($children as $child) {
             if (!is_array($child)) continue;
             $packet = is_array($child['completion'] ?? null)
@@ -145,10 +144,7 @@ final class CompletionCoordinator
         }));
         if ($missingRequiredOwners !== []) $blockers[] = 'REQUIRED_OWNER_READBACK_UNVERIFIED';
         $canonical = ($evidence['canonical_state'] ?? null) === 'BLOCKED' ? 'BLOCKED' : 'COMPLETE';
-        $complete = $canonical === 'COMPLETE'
-            && ($packets !== [] || $skippedRequirements !== [])
-            && $blockers === []
-            && array_reduce($packets, static fn (bool $ok, array $packet): bool => $ok && ($packet['complete'] ?? false) === true, true);
+        $complete = $canonical === 'COMPLETE' && $packets !== [] && $blockers === [] && array_reduce($packets, static fn (bool $ok, array $packet): bool => $ok && ($packet['complete'] ?? false) === true, true);
         $resumeChildren = [];
         foreach ($missingRequiredOwners as $required) $resumeChildren[] = $this->resumeChild($required['owner_type']);
         foreach ($packets as $packet) {
@@ -170,16 +166,8 @@ final class CompletionCoordinator
             'status' => $complete ? 'COMPLETE' : ($canonical === 'BLOCKED' ? 'BLOCKED' : 'PARTIAL'),
             'blockers' => array_values(array_unique($blockers)),
             'children' => $packets,
-            'skipped_requirements' => $skippedRequirements,
             'resume_hints' => ['resume_children' => $resumeChildren],
         ];
-    }
-
-    /** @return list<array<string,mixed>> */
-    private function skippedRequirements(mixed $value): array
-    {
-        if (!is_array($value)) return [];
-        return array_values(array_filter($value, static fn (mixed $item): bool => is_array($item) && trim((string) ($item['name'] ?? '')) !== ''));
     }
 
     private function readBack(mixed $value): bool

@@ -4,112 +4,14 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Capture\{EditorialCaptureContinuationService, EditorialCaptureCoordinator};
-use NHK\Core\Application\Article\ArticlePublicationGate;
 use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, SubjectResolutionService, TextInputInterpreter};
 use NHK\Core\Contracts\Capture\{CaptureAddendumRepository, CaptureRepository};
-use NHK\Core\Domain\Article\EditorialPostState;
 use NHK\Core\Domain\Capture\{CaptureAddendumRecord, CaptureRecord, CaptureStage};
 use NHK\Core\Shared\Uuid\UuidCodec;
 use PHPUnit\Framework\TestCase;
 
 final class CaptureMediaIdsReuseTest extends TestCase
 {
-    public function test_capture_to_article_reconciles_media_before_research_and_publication_gate(): void
-    {
-        $captures = new CaptureMediaIdsCaptureRepository();
-        $events = [];
-        $mediaId = UuidCodec::newV7();
-        $articleUsageIds = [UuidCodec::newV7(), UuidCodec::newV7()];
-        $researchUsageIds = [];
-        $coordinator = new EditorialCaptureCoordinator(
-            $captures,
-            static fn (array $input): array => ['items' => [['client_file_id' => 'front', 'media_id' => $mediaId, 'attachment_id' => 77, 'attachment_readback_status' => 'verified']]],
-            static fn (array $input): array => ['post_id' => 573, 'state_token' => 'state-573'],
-            new TextInputInterpreter(),
-            new SubjectResolutionService(static fn (string $hint): array => []),
-            new ClaimRetrievalEngine(static fn (array $subject): array => ['status' => 'available', 'items' => []], static fn (array $subject, array $neighborhood): array => []),
-            static function (array $context) use (&$events): array {
-                $events[] = 'semantic_writeback';
-                return ['status' => 'SKIPPED', 'writes' => [], 'requirements' => ['semantic_delta' => ['applicability' => 'NOT_REQUIRED', 'policy' => 'VERIFY', 'state' => 'SKIPPED']]];
-            },
-            new ArticleComposer(),
-            static function (array $context) use (&$events, $mediaId, $articleUsageIds): array {
-                $events[] = 'article_media_reconcile';
-                self::assertSame([$mediaId], array_values(array_filter(array_map(
-                    static fn (mixed $asset): string => is_array($asset) ? (string) ($asset['media_id'] ?? '') : '',
-                    (array) ($context['assets'] ?? []),
-                ))));
-                return [
-                    'status' => 'RECONCILED',
-                    'media_complete' => true,
-                    'slots' => [
-                        'featured_primary' => ['placeholder' => false, 'media_id' => $mediaId],
-                        'inline_primary' => ['placeholder' => false, 'media_id' => $mediaId],
-                    ],
-                    'canonical_readback' => [
-                        'media_usage' => [
-                            'state' => 'VERIFIED',
-                            'endpoint_type' => 'wp_post',
-                            'endpoint_key' => '1:573',
-                            'roles' => ['featured_primary', 'inline_primary'],
-                            'usage_ids' => $articleUsageIds,
-                            'source' => 'ARTICLE_MEDIA_RECONCILIATION',
-                        ],
-                    ],
-                ];
-            },
-            static function (array $context) use (&$events, &$researchUsageIds): array {
-                $events[] = 'article_research';
-                $media = is_array($context['media'] ?? null) ? $context['media'] : [];
-                $researchUsageIds = (array) ($media['canonical_readback']['media_usage']['usage_ids'] ?? []);
-                $events[] = 'publication_gate';
-                $articleId = (int) ($context['article_id'] ?? 0);
-                $draft = new EditorialPostState(
-                    $articleId,
-                    '1:' . $articleId,
-                    'post',
-                    'draft',
-                    'Bài ảnh kiểm tra thứ tự MediaUsage',
-                    'Nội dung biên tập cục bộ.',
-                    '',
-                    'bai-anh-kiem-tra-thu-tu-mediausage',
-                    '/bai-anh-kiem-tra-thu-tu-mediausage/',
-                    1,
-                    1,
-                );
-                $evidence = array_fill_keys([
-                    'research_acceptable', 'subject_resolved', 'duplicate_intent_handled',
-                    'category_resolved', 'semantic_plan_complete', 'semantic_readback_verified',
-                    'media_usage_complete', 'real_image_requirements_met', 'claim_compliance_acceptable',
-                    'seo_projection_valid', 'internal_links_valid', 'structured_data_valid',
-                    'public_route_ready', 'rendered_public_verification',
-                ], true);
-                $evidence['rendered_public_verification_status'] = 'verified';
-                $evidence['requirements'] = [
-                    'semantic_delta' => ['applicability' => 'NOT_REQUIRED', 'policy' => 'VERIFY', 'state' => 'SKIPPED'],
-                    'article_media' => ['applicability' => 'REQUIRED', 'policy' => 'VERIFY', 'state' => 'VERIFIED'],
-                    'public_route' => ['applicability' => 'REQUIRED', 'policy' => 'VERIFY', 'state' => 'VERIFIED'],
-                    'rendered_public' => ['applicability' => 'REQUIRED', 'policy' => 'VERIFY', 'state' => 'VERIFIED'],
-                ];
-                $evidence['media_snapshot'] = $media;
-
-                return (new ArticlePublicationGate())->check($draft, $evidence, $draft->token)->toArray();
-            },
-            static fn (array $context): array => ['status' => 'verified'],
-        );
-
-        $result = $coordinator->execute([
-            'idempotency_key' => 'capture-article-media-ordering',
-            'intent' => 'IMAGE_ARTICLE',
-            'title' => 'Bài ảnh kiểm tra thứ tự MediaUsage',
-            'text' => 'Nội dung biên tập cục bộ.',
-        ]);
-
-        self::assertSame(['semantic_writeback', 'article_media_reconcile', 'article_research', 'publication_gate'], $events);
-        self::assertSame($articleUsageIds, $researchUsageIds);
-        self::assertSame(573, $result->articleId);
-    }
-
     public function test_attach_assets_accepts_existing_media_ids_without_physical_files(): void
     {
         $captures = new CaptureMediaIdsCaptureRepository();

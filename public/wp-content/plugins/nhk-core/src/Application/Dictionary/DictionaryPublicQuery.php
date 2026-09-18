@@ -70,7 +70,7 @@ final class DictionaryPublicQuery
         }
         $image = null;
         if ($eligible && is_callable($this->imageResolver)) {
-            try { $value = ($this->imageResolver)($concept->conceptId, 'preferred_illustration'); if (is_array($value)) $image = $value; }
+            try { $value = ($this->imageResolver)($concept->conceptId); if (is_array($value)) $image = $value; }
             catch (\Throwable) { $image = null; }
         }
         return [

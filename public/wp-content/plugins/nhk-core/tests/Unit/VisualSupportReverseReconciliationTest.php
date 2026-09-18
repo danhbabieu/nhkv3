@@ -4,8 +4,8 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Media\{VisualSupportPublicProjection, VisualSupportRequirementService, VisualSupportReverseReconciliationService};
-use NHK\Core\Contracts\Media\{MediaUsageRepository, VisualSupportRequirementRepository};
-use NHK\Core\Domain\Media\{Media, MediaAsset, MediaUsage, MediaUsageRoleRegistry, VisualSupportRequirement, VisualSupportRequirementStateRegistry};
+use NHK\Core\Contracts\Media\VisualSupportRequirementRepository;
+use NHK\Core\Domain\Media\{Media, MediaAsset, VisualSupportRequirement, VisualSupportRequirementStateRegistry};
 use PHPUnit\Framework\TestCase;
 
 final class VisualSupportReverseReconciliationTest extends TestCase
@@ -128,57 +128,6 @@ final class VisualSupportReverseReconciliationTest extends TestCase
         self::assertNull((new VisualSupportPublicProjection())->resolve($repo->findById($requirement->canonicalId), $media, [$this->asset('PRIVATE')]));
     }
 
-    public function test_public_projection_uses_usage_neutral_attachment_precedence_and_excludes_private_source_path(): void
-    {
-        $repo = new VisualSupportMemoryRepository();
-        $context = $this->context(self::SUBJECT, 'CASE_INTERIOR', 'specimen_observation', 'specimen_observation');
-        $requirement = (new VisualSupportRequirementService($repo))->require(self::SUBJECT, 'specimen_observation', 'specimen_observation', 'CASE_INTERIOR', 'technical_detail');
-        $media = new Media($this->media($context)->canonicalId, 'media-neutral-title', 'Neutral media name', 'ready', ['visual_support_contexts' => [$context]], true, 1);
-        $asset = $this->asset('PUBLIC', $media->canonicalId, ['canonical_filename' => 'case-interior.webp', 'wordpress_attachment_id' => 77]);
-        $usageRepository = new VisualSupportUsageMemoryRepository([
-            new MediaUsage(
-                '018f5b74-5f0a-7d2e-9a93-c0e7d6dc3371',
-                $media->canonicalId,
-                'entity',
-                self::SUBJECT,
-                MediaUsageRoleRegistry::TECHNICAL_DETAIL,
-                1,
-                'Usage alt text',
-                '',
-                [],
-                ''
-            ),
-        ]);
-        $projection = new VisualSupportPublicProjection($usageRepository, static fn (int $id): array => [
-            'attachment_id' => $id,
-            'caption' => 'Verified attachment caption',
-            'alt' => 'Attachment alt fallback',
-            'title' => 'Attachment title fallback',
-        ]);
-
-        $this->reconciler($repo)->reconcile($media, [$asset]);
-        $result = $projection->resolve($repo->findById($requirement->canonicalId), $media, [$asset]);
-
-        self::assertIsArray($result);
-        self::assertSame('Neutral media name', $result['title']);
-        self::assertSame('Usage alt text', $result['alt']);
-        self::assertSame('Verified attachment caption', $result['caption']);
-        self::assertSame('MEDIA_USAGE', $result['metadata_source']);
-        self::assertSame('/anh/case-interior.webp', $result['url']);
-        self::assertStringNotContainsString('private/', $result['url']);
-    }
-
-    public function test_public_projection_returns_null_for_resolved_requirement_without_public_asset(): void
-    {
-        $repo = new VisualSupportMemoryRepository();
-        $context = $this->context(self::SUBJECT, 'DIAL');
-        $requirement = (new VisualSupportRequirementService($repo))->require(self::SUBJECT, 'variant', 'configuration', 'DIAL', 'technical_detail');
-        $media = $this->media($context);
-        $this->reconciler($repo)->reconcile($media, [$this->asset('PRIVATE', $media->canonicalId)]);
-
-        self::assertNull((new VisualSupportPublicProjection())->resolve($repo->findById($requirement->canonicalId), $media, [$this->asset('PRIVATE', $media->canonicalId)]));
-    }
-
     public function test_visual_support_does_not_create_claim_evidence_graph_or_broaden_specimen(): void
     {
         $repo = new VisualSupportMemoryRepository();
@@ -211,24 +160,15 @@ final class VisualSupportReverseReconciliationTest extends TestCase
         return new Media($id ?? '018f5b74-5f0a-7d2e-9a93-c0e7d6dc3341', 'capture.media.' . strtolower($context['feature_key']), 'Captured visual', $readiness, ['visual_support_contexts' => [$context]], true, 1);
     }
 
-    private function asset(string $visibility, ?string $mediaId = null, array $metadata = []): MediaAsset
+    private function asset(string $visibility, ?string $mediaId = null): MediaAsset
     {
-        return new MediaAsset('018f5b74-5f0a-7d2e-9a93-c0e7d6dc3351', $mediaId ?? '018f5b74-5f0a-7d2e-9a93-c0e7d6dc3341', 'original', 'capture/visual.jpg', str_repeat('a', 64), 'image/jpeg', 1000, 800, 600, $visibility, $metadata);
+        return new MediaAsset('018f5b74-5f0a-7d2e-9a93-c0e7d6dc3351', $mediaId ?? '018f5b74-5f0a-7d2e-9a93-c0e7d6dc3341', 'original', 'capture/visual.jpg', str_repeat('a', 64), 'image/jpeg', 1000, 800, 600, $visibility, []);
     }
 
     private function reconciler(VisualSupportMemoryRepository $repo): VisualSupportReverseReconciliationService
     {
         return new VisualSupportReverseReconciliationService($repo);
     }
-}
-
-final class VisualSupportUsageMemoryRepository implements MediaUsageRepository
-{
-    /** @param list<MediaUsage> $usages */
-    public function __construct(private array $usages) {}
-    public function listByMediaId(string $mediaId, ?string $role = null): array { return array_values(array_filter($this->usages, static fn (MediaUsage $usage): bool => $usage->mediaId === $mediaId && ($role === null || $usage->role === $role))); }
-    public function listByEndpoint(string $endpointType, string $endpointKey, ?string $role = null): array { return []; }
-    public function create(MediaUsage $usage): MediaUsage { return $usage; }
 }
 
 final class VisualSupportMemoryRepository implements VisualSupportRequirementRepository

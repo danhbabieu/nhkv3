@@ -167,7 +167,7 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
     {
         if ($attachmentId < 1 || !function_exists('get_post') || !function_exists('get_post_meta')) return null;
         $post = get_post($attachmentId);
-        if (!$post instanceof \WP_Post || $post->post_type !== 'attachment') return ['attachment_id' => $attachmentId, 'readback_state' => 'NOT_FOUND', 'error_code' => 'ATTACHMENT_NOT_FOUND'];
+        if (!$post instanceof \WP_Post || $post->post_type !== 'attachment') return null;
         $status = function_exists('get_post_status') ? (string) get_post_status($attachmentId) : (string) ($post->post_status ?? '');
         if (in_array($status, ['trash', 'private', 'draft', 'pending'], true)) return null;
         $mime = function_exists('get_post_mime_type') ? (string) get_post_mime_type($attachmentId) : '';
@@ -192,12 +192,6 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
         $metadata = is_array($metadata) ? $metadata : [];
         $filename = basename($relative);
         if ($filename === '') return null;
-        $physicalInfo = @getimagesize($pathReal);
-        $physicalChecksum = hash_file('sha256', $pathReal);
-        $physicalSize = filesize($pathReal);
-        if (!is_array($physicalInfo) || !is_string($physicalChecksum) || $physicalChecksum === '' || $physicalSize === false || $physicalSize < 1) {
-            return ['attachment_id' => $attachmentId, 'readback_state' => 'UNAVAILABLE', 'error_code' => 'ATTACHMENT_PHYSICAL_READBACK_FAILED'];
-        }
         $canonicalPath = (new \NHK\Core\Application\Media\PublicMediaAssetUrlResolver())->path($filename);
         $canonicalUrl = function_exists('home_url') ? (string) home_url($canonicalPath) : $canonicalPath;
         $result = [
@@ -232,24 +226,6 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
                 'height' => (int) ($derivative['height'] ?? 0),
                 'filesize' => $derivativeReal !== false && is_file($derivativeReal) && $this->within($baseReal, $derivativeReal) ? (int) filesize($derivativeReal) : 0,
             ];
-        }
-        if ($this->semanticMedia instanceof WordPressMediaAttachmentBridge) {
-            $binding = $this->semanticMedia->bindingForAttachment($attachmentId, [
-                'checksum' => $physicalChecksum,
-                'byte_size' => (int) $physicalSize,
-                'width' => (int) ($physicalInfo[0] ?? 0),
-                'height' => (int) ($physicalInfo[1] ?? 0),
-                'mime_type' => strtolower((string) ($physicalInfo['mime'] ?? $mime)),
-            ]);
-            if ($binding === null) {
-                $result['readback_state'] = 'INCONSISTENT';
-                $result['error_code'] = 'ATTACHMENT_MAPPING_MISSING';
-            } else {
-                $result = array_merge($result, $binding);
-            }
-        } else {
-            $result['readback_state'] = 'INCONSISTENT';
-            $result['error_code'] = 'ATTACHMENT_CANONICAL_READBACK_UNAVAILABLE';
         }
         return $result;
     }

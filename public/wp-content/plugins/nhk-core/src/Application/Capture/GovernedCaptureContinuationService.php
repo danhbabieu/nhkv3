@@ -63,11 +63,10 @@ final class GovernedCaptureContinuationService
         $proposalIds = array_values(array_filter(array_map('strval', (array) ($control['proposal_ids'] ?? [])), static fn (string $id): bool => UuidCodec::isValid($id)));
         $resumeChildren = array_values(array_unique(array_map('strtolower', array_map('strval', (array) ($control['resume_children'] ?? [])))));
         $reusedClaims = $this->reusedClaims($context);
-        $semanticDeltaRequested = $this->semanticDeltaRequested($context);
         $videoOnlyResume = $proposalIds === []
             && ($context['existing_capture_continuation'] ?? false) === true
             && in_array('video', $resumeChildren, true);
-        $plans = $proposalIds !== [] ? array_map(static fn (string $id): array => ['proposal_id' => $id], $proposalIds) : $this->plans($captureId, $continuationKey, $context, !$videoOnlyResume, $semanticDeltaRequested);
+        $plans = $proposalIds !== [] ? array_map(static fn (string $id): array => ['proposal_id' => $id], $proposalIds) : $this->plans($captureId, $continuationKey, $context, !$videoOnlyResume);
         $skippedVideoChildren = [];
         $videoChildren = [];
         if ($proposalIds === [] && ($context['existing_capture_continuation'] ?? false) === true) {
@@ -201,7 +200,6 @@ final class GovernedCaptureContinuationService
         $failureWrites = $blocked !== [] ? $blocked : $retryable;
         $failureBlockers = $failureWrites !== [] ? array_values(array_unique(array_merge(...array_map(static fn (array $write): array => (array) ($write['blockers'] ?? []), $failureWrites)))) : ($pending !== [] ? ['GOVERNANCE_APPROVAL_REQUIRED'] : ($skippedVideoChildren !== [] ? ['VIDEO_CHILD_UNCHANGED_ON_TEXT_ADDENDUM'] : []));
         $result = ['status' => $status, 'writes' => array_merge($skippedVideoChildren, $writes), 'reused_claims' => $reusedClaims, 'video_children' => $videoChildren, 'blockers' => $failureBlockers, 'governance' => ['lifecycle' => array_values(array_unique($lifecycle)), 'status' => $status, 'applied_count' => count($applied), 'pending_count' => count($pending), 'retryable_count' => count($retryable), 'skipped_video_children' => count($skippedVideoChildren)]];
-        $result['requirements'] = ['semantic_delta' => $this->semanticRequirement($context, $semanticDeltaRequested, $writes, $status, $failureBlockers)];
         if ($pending !== []) {
             $identity = $pending[0];
             $result['proposal_id'] = $identity['proposal_id'] ?? null;
@@ -216,78 +214,9 @@ final class GovernedCaptureContinuationService
         return $result;
     }
 
-    /**
-     * Only an explicit semantic delta may acquire semantic child plans.
-     * Captures predating the intent packet retain their legacy continuation
-     * behavior until the persisted packet is available.
-     */
-    private function semanticDeltaRequested(array $context): bool
-    {
-        if (!array_key_exists('content_intent', $context)) return true;
-        $intentPacket = is_array($context['content_intent'] ?? null) ? $context['content_intent'] : [];
-        $intent = strtoupper(trim((string) ($intentPacket['intent'] ?? '')));
-        $purpose = strtoupper(trim((string) ($context['purpose'] ?? $intentPacket['purpose'] ?? '')));
-        if (!array_key_exists('semantic_delta', $intentPacket)) {
-            return in_array($intent, ['KNOWLEDGE_DELTA', 'AUTHORITY', 'MIXED'], true) || $purpose === 'MIXED';
-        }
-        $status = strtoupper(trim((string) (($intentPacket['semantic_delta']['status'] ?? 'NONE'))));
-
-        return $status === 'REQUIRED'
-            && ($purpose === 'MIXED' || in_array($intent, ['KNOWLEDGE_DELTA', 'AUTHORITY', 'MIXED'], true));
-    }
-
-    /** @return string|null */
-    private function identityBlocker(array $context): ?string
-    {
-        $status = strtolower(trim((string) (($context['subject_resolution']['status'] ?? ''))));
-        return match ($status) {
-            'ambiguous' => 'SUBJECT_AMBIGUOUS',
-            'conflict' => 'SUBJECT_CONFLICT_REVIEW_REQUIRED',
-            default => null,
-        };
-    }
-
-    /** @param list<array<string,mixed>> $writes @param list<string> $blockers @return array<string,mixed> */
-    private function semanticRequirement(array $context, bool $requested, array $writes, string $status, array $blockers): array
-    {
-        $intentPacket = is_array($context['content_intent'] ?? null) ? $context['content_intent'] : [];
-        $intent = strtoupper(trim((string) ($intentPacket['intent'] ?? '')));
-        $deltaStatus = strtoupper(trim((string) ($intentPacket['semantic_delta']['status'] ?? 'NONE')));
-        $evidence = ['intent' => $intent, 'status' => $deltaStatus];
-        if (!$requested) {
-            return [
-                'applicability' => in_array($intent, ['TEXT_ARTICLE', 'IMAGE_ARTICLE'], true) ? 'NOT_REQUIRED' : 'NOT_APPLICABLE',
-                'policy' => 'VERIFY',
-                'state' => $status === 'SYSTEM_BLOCKED' ? 'BLOCKED' : 'SKIPPED',
-                'evidence' => $evidence,
-            ];
-        }
-
-        $semanticWrites = array_values(array_filter($writes, static fn (array $write): bool => strtolower(trim((string) ($write['entity_type'] ?? ''))) !== 'video'));
-        $allApplied = $semanticWrites !== [] && array_reduce($semanticWrites, static function (bool $complete, array $write): bool {
-            return $complete
-                && ($write['status'] ?? '') === 'APPLIED'
-                && is_array($write['canonical_readback'] ?? null)
-                && trim((string) ($write['canonical_readback']['canonical_id'] ?? '')) !== '';
-        }, true);
-        $hardBlocked = $status === 'SYSTEM_BLOCKED'
-            || $semanticWrites === [] && in_array('TARGET_REVISION_CHANGED', $blockers, true)
-            || array_reduce($semanticWrites, static fn (bool $blocked, array $write): bool => $blocked || ($write['status'] ?? '') === 'SYSTEM_BLOCKED', false);
-
-        return [
-            'applicability' => 'REQUIRED',
-            'policy' => $hardBlocked ? 'HARD_BLOCK' : ($allApplied ? 'VERIFY' : 'HUMAN_REVIEW'),
-            'state' => $hardBlocked ? 'BLOCKED' : ($allApplied ? 'VERIFIED' : 'PENDING'),
-            'evidence' => $evidence + ['writeback_status' => strtoupper($status), 'blockers' => array_values(array_map('strval', $blockers))],
-        ];
-    }
-
     /** @return list<array<string,mixed>> */
-    private function plans(string $captureId, string $continuationKey, array $context, bool $includeSemanticChildren = true, ?bool $semanticDeltaRequested = null): array
+    private function plans(string $captureId, string $continuationKey, array $context, bool $includeSemanticChildren = true): array
     {
-        // Direct legacy planner callers predate the persisted intent packet;
-        // execute() always supplies the classified decision explicitly.
-        $semanticDeltaRequested ??= true;
         $resolved = is_array($context['subject_resolution']['resolved'] ?? null) ? $context['subject_resolution']['resolved'] : [];
         // Explicit child resume is bound to the original Capture subject. A
         // text-only reparse may legitimately resolve nothing, so preserve the
@@ -311,7 +240,7 @@ final class GovernedCaptureContinuationService
         // must name already-resolved claim/source UUIDs. A source packet can
         // be submitted first; its canonical read-back is then used by a later
         // idempotent continuation for evidence packets.
-        foreach ($semanticDeltaRequested ? (array) ($context['provenance_packets']['sources'] ?? []) : [] as $source) {
+        foreach ((array) ($context['provenance_packets']['sources'] ?? []) as $source) {
             if (!is_array($source)) continue;
             $stableKey = trim((string) ($source['stable_key'] ?? ''));
             $title = trim((string) ($source['title'] ?? ''));
@@ -325,7 +254,7 @@ final class GovernedCaptureContinuationService
             ];
             $plans[] = $this->arguments('source', 'ingest', $stableKey, $payload, 'capture:' . $captureId . ':source:' . hash('sha256', CommandCanonicalizer::canonicalize($payload)));
         }
-        foreach ($semanticDeltaRequested ? (array) ($context['provenance_packets']['evidence'] ?? []) : [] as $evidence) {
+        foreach ((array) ($context['provenance_packets']['evidence'] ?? []) as $evidence) {
             if (!is_array($evidence)) continue;
             $claimId = trim((string) ($evidence['claim_id'] ?? ''));
             $sourceId = trim((string) ($evidence['source_id'] ?? ''));

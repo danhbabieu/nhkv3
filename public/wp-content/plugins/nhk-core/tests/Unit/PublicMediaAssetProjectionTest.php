@@ -4,8 +4,6 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Media\{PublicMediaAssetSelector, PublicMediaGalleryQuery};
-use NHK\Core\Contracts\Media\MediaUsageRepository;
-use NHK\Core\Domain\Media\{MediaSeoStateRegistry, MediaUsage, MediaUsageRoleRegistry};
 use NHK\Core\Infrastructure\Media\WordPressMediaAttachmentIngestor;
 use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository};
 use NHK\Core\Domain\Media\{Media, MediaAsset};
@@ -84,47 +82,6 @@ final class PublicMediaAssetProjectionTest extends TestCase
         self::assertNull((new PublicMediaAssetSelector())->canonical([$oversized]));
     }
 
-    public function test_gallery_exposes_only_public_delivery_path_and_reports_missing_without_public_asset(): void
-    {
-        $mediaId = UuidCodec::newV7();
-        $media = new Media($mediaId, 'private-source-proof', 'Ảnh có nguồn riêng tư', 'ready');
-        $private = $this->asset($mediaId, 'original', 'private/source-original.jpg', 'private-source', 2400, 1600, 'PRIVATE', ['source_original' => true]);
-        $public = $this->asset($mediaId, 'derivative', 'uploads/public-proof.webp', 'public-derivative', 1200, 800, 'PUBLIC', ['canonical_filename' => 'public-proof.webp']);
-        $item = (new PublicMediaGalleryQuery($this->mediaRepository([$media]), $this->assetRepository([$private, $public])))->archive()['items'][0];
-
-        self::assertSame(MediaSeoStateRegistry::COMPLETE, $item['state']);
-        self::assertTrue($item['eligible']);
-        self::assertSame('/anh/public-proof.webp', parse_url((string) $item['image_url'], PHP_URL_PATH));
-        self::assertStringNotContainsString('private/', (string) $item['image_url']);
-        self::assertStringNotContainsString('source-original', (string) $item['image_url']);
-
-        $withoutPublicAsset = new Media(UuidCodec::newV7(), 'private-only', 'Private only', 'ready');
-        $missing = (new PublicMediaGalleryQuery($this->mediaRepository([$withoutPublicAsset]), $this->assetRepository([
-            $this->asset($withoutPublicAsset->canonicalId, 'original', 'private/only.jpg', 'private-only', 1200, 800, 'PRIVATE'),
-        ])))->archive()['items'][0];
-
-        self::assertSame(MediaSeoStateRegistry::MISSING, $missing['state']);
-        self::assertFalse($missing['eligible']);
-        self::assertNull($missing['image_url']);
-    }
-
-    public function test_gallery_uses_approved_contextual_usage_text_without_article_usage_leakage(): void
-    {
-        $mediaId = UuidCodec::newV7();
-        $media = new Media($mediaId, 'neutral-media-name', 'Neutral media name', 'ready');
-        $asset = $this->asset($mediaId, 'derivative', 'uploads/contextual.webp', 'contextual', 800, 600, 'PUBLIC', ['canonical_filename' => 'contextual.webp']);
-        $usage = new MediaUsage('018f5b74-5f0a-7d2e-9a93-c0e7d6dc3381', $mediaId, 'entity', 'entity-1', MediaUsageRoleRegistry::REPRESENTATIVE, 1, 'Approved contextual alt', 'Approved contextual caption', [], 'Approved contextual title');
-        $articleUsage = new MediaUsage('018f5b74-5f0a-7d2e-9a93-c0e7d6dc3382', $mediaId, 'wp_post', '99', MediaUsageRoleRegistry::FEATURED_PRIMARY, 0, 'Article alt must not leak', 'Article caption must not leak', [], 'Article title must not leak', 1, 'article:99:featured_primary');
-
-        $item = (new PublicMediaGalleryQuery($this->mediaRepository([$media]), $this->assetRepository([$asset]), null, new PublicMediaUsageMemoryRepository([$usage, $articleUsage])))->archive()['items'][0];
-
-        self::assertSame('Approved contextual title', $item['title']);
-        self::assertSame('Approved contextual alt', $item['alt']);
-        self::assertSame('Approved contextual caption', $item['caption']);
-        self::assertSame('SUBJECT_REPRESENTATIVE', $item['metadata_source']);
-        self::assertStringNotContainsString('Article', $item['title'] . $item['alt'] . $item['caption']);
-    }
-
     /** @param array<string,mixed> $metadata */
     private function asset(string $mediaId, string $kind, string $storageKey, string $seed, int $width, int $height, string $visibility, array $metadata = []): MediaAsset
     {
@@ -154,13 +111,4 @@ final class PublicMediaAssetProjectionTest extends TestCase
             public function findByChecksum(string $checksum): array { return []; }
         };
     }
-}
-
-final class PublicMediaUsageMemoryRepository implements MediaUsageRepository
-{
-    /** @param list<MediaUsage> $usages */
-    public function __construct(private array $usages) {}
-    public function listByMediaId(string $mediaId, ?string $role = null): array { return array_values(array_filter($this->usages, static fn (MediaUsage $usage): bool => $usage->mediaId === $mediaId && ($role === null || $usage->role === $role))); }
-    public function listByEndpoint(string $endpointType, string $endpointKey, ?string $role = null): array { return []; }
-    public function create(MediaUsage $usage): MediaUsage { return $usage; }
 }

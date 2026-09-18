@@ -61,18 +61,9 @@ final class ArticleResearchPreflight
         $links = $this->links($relations, is_array($inventory['posts'] ?? null) ? $inventory['posts'] : [], $warnings);
         $media = is_array($inventory['media'] ?? null) ? $inventory['media'] : [];
         $articleMedia = is_array($inventory['article_media'] ?? null) ? $inventory['article_media'] : [];
-        $articleMediaReadback = is_array($articleMedia['canonical_readback']['media_usage'] ?? null) ? $articleMedia['canonical_readback']['media_usage'] : [];
-        $articleUsageIds = array_values(array_unique(array_filter(array_map('strval', (array) ($articleMediaReadback['usage_ids'] ?? [])), static fn (string $id): bool => trim($id) !== '')));
-        if ($articleMediaReadback !== []) {
-            foreach ((array) ($articleMediaReadback['blockers'] ?? []) as $blocker) {
-                $blocker = trim((string) $blocker);
-                if ($blocker !== '') $blockers[] = $blocker;
-            }
-        }
         $mediaComplete = array_key_exists('media_complete', $articleMedia)
             ? $articleMedia['media_complete'] === true
             : count(array_filter($media, static fn (array $item): bool => ($item['ready'] ?? false) && ($item['public'] ?? false))) > 0;
-        if ($articleMediaReadback !== [] && strtoupper(trim((string) ($articleMediaReadback['state'] ?? ''))) !== 'VERIFIED') $mediaComplete = false;
         if (!$mediaComplete) $warnings[] = 'MEDIA_PLACEHOLDER_OR_UNAVAILABLE';
         $category = $this->categoryPlan(
             array_key_exists('post_id', $articleContext) ? (is_array($inventory['current_categories'] ?? null) ? $inventory['current_categories'] : []) : [],
@@ -104,15 +95,6 @@ final class ArticleResearchPreflight
         $blueprint = ['primary_subject' => $resolution['primary'] ?? null, 'intent' => trim($topic), 'title_intent' => $plannedTitle, 'h1_intent' => $plannedTitle, 'slug_intent' => $this->slug($plannedTitle), 'meta_description_intent' => $plannedTitle, 'outline' => [], 'media_complete' => $mediaComplete, 'structured_data_applicable' => true, 'canonical_expectation' => 'PUBLIC_CANONICAL_ROUTE', 'indexability_expectation' => 'INDEXABLE_IF_PUBLISHED'];
         $mediaPlan = ['candidates' => $media, 'media_complete' => $mediaComplete];
         if ($articleMedia !== []) $mediaPlan = array_merge($articleMedia, $mediaPlan, ['media_complete' => $mediaComplete]);
-        if ($articleMediaReadback !== []) {
-            $mediaPlan['article_usage_ids'] = $articleUsageIds;
-            $mediaPlan['article_endpoint_key'] = trim((string) ($articleMediaReadback['endpoint_key'] ?? ''));
-            $mediaPlan['article_media_state'] = strtoupper(trim((string) ($articleMediaReadback['state'] ?? '')));
-            $mediaPlan['state'] = strtoupper(trim((string) ($articleMediaReadback['state'] ?? '')));
-        } elseif ($articleMedia !== []) {
-            // Representative usages are intentionally not Article slot evidence.
-            $mediaPlan['article_usage_ids'] = [];
-        }
         if (!isset($mediaPlan['diagnostics'])) {
             $mediaPlan['diagnostics'] = [];
             if (($articleMedia['featured_primary']['placeholder'] ?? false) === true) $mediaPlan['diagnostics'][] = ['code' => 'ARTICLE_MEDIA_FEATURED_MISSING'];

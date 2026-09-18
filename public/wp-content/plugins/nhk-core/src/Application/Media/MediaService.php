@@ -155,35 +155,10 @@ final class MediaService
         }
     }
 
-    /** @param array<string,mixed> $spec */
-    public function reconcileAsset(string $mediaId, string $assetId, array $spec): MediaAsset
-    {
-        $media = $this->media->findByCanonicalId($mediaId);
-        $asset = $this->assets->findByAssetId($assetId);
-        if (!$media || !$asset || $asset->mediaId !== $mediaId) {
-            throw new MediaException('Media asset reconciliation target is invalid.');
-        }
-        $candidate = new MediaAsset(
-            $asset->assetId,
-            $asset->mediaId,
-            $asset->kind,
-            (string) ($spec['storage_key'] ?? $asset->storageKey),
-            (string) ($spec['checksum'] ?? $asset->checksum),
-            (string) ($spec['mime_type'] ?? $asset->mimeType),
-            (int) ($spec['byte_size'] ?? $asset->byteSize),
-            array_key_exists('width', $spec) ? ($spec['width'] === null ? null : (int) $spec['width']) : $asset->width,
-            array_key_exists('height', $spec) ? ($spec['height'] === null ? null : (int) $spec['height']) : $asset->height,
-            $asset->visibility,
-            is_array($spec['metadata'] ?? null) ? array_replace($asset->metadata, $spec['metadata']) : $asset->metadata,
-        );
-        if ($candidate->storageKey === $asset->storageKey && $candidate->checksum === $asset->checksum && $candidate->mimeType === $asset->mimeType && $candidate->byteSize === $asset->byteSize && $candidate->width === $asset->width && $candidate->height === $asset->height && $candidate->metadata === $asset->metadata) return $asset;
-        return $this->assets->update($candidate, 1);
-    }
-
-    public function addUsage(string $mediaId, string $endpointType, string $endpointKey, string $role, int $sortOrder = 0, string $altText = '', string $caption = '', array $keywordGroups = [], string $title = '', string $placementKey = '', string $selectionSource = 'SYSTEM_AUTO', string $selectionPolicy = 'AUTO', ?string $activeSlot = null): MediaUsage
+    public function addUsage(string $mediaId, string $endpointType, string $endpointKey, string $role, int $sortOrder = 0, string $altText = '', string $caption = '', array $keywordGroups = [], string $title = '', string $placementKey = ''): MediaUsage
     {
         if (!$this->media->findByCanonicalId($mediaId)) throw new MediaException('Media not found.');
-        $candidate = new MediaUsage(UuidCodec::newV7(), $mediaId, $endpointType, $endpointKey, $role, $sortOrder, $altText, $caption, $keywordGroups, $title, 1, $placementKey, $selectionSource, $selectionPolicy, $activeSlot);
+        $candidate = new MediaUsage(UuidCodec::newV7(), $mediaId, $endpointType, $endpointKey, $role, $sortOrder, $altText, $caption, $keywordGroups, $title, 1, $placementKey);
         return $this->reconcileUsageCandidate($candidate);
     }
 
@@ -227,10 +202,7 @@ final class MediaService
             && $left->caption === $right->caption
             && $left->keywordGroups === $right->keywordGroups
             && $left->title === $right->title
-            && $left->placementKey === $right->placementKey
-            && $left->selectionSource === $right->selectionSource
-            && $left->selectionPolicy === $right->selectionPolicy
-            && $left->activeSlot === $right->activeSlot;
+            && $left->placementKey === $right->placementKey;
     }
 
     private function upsertUsage(MediaUsage $existing, MediaUsage $candidate): MediaUsage
@@ -238,7 +210,7 @@ final class MediaService
         if (!$this->usages instanceof MediaUsageUpdater) throw new MediaException('Media usage update capability is unavailable.');
         $attempts = 0;
         while (true) {
-            $updated = new MediaUsage($existing->usageId, $candidate->mediaId, $candidate->endpointType, $candidate->endpointKey, $candidate->role, $candidate->sortOrder, $candidate->altText, $candidate->caption, $candidate->keywordGroups, $candidate->title, $existing->revision, $candidate->placementKey, $candidate->selectionSource, $candidate->selectionPolicy, $candidate->activeSlot);
+            $updated = new MediaUsage($existing->usageId, $candidate->mediaId, $candidate->endpointType, $candidate->endpointKey, $candidate->role, $candidate->sortOrder, $candidate->altText, $candidate->caption, $candidate->keywordGroups, $candidate->title, $existing->revision, $candidate->placementKey);
             try {
                 return $this->usages->update($updated);
             } catch (MediaException $error) {

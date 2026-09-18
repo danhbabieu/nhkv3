@@ -27,34 +27,21 @@ final class ArticlePublicationGate
         }
         $this->requireTrue($evidence, 'duplicate_intent_handled', 'DUPLICATE_INTENT_UNRESOLVED', $blockers);
         $this->requireTrue($evidence, 'category_resolved', 'CATEGORY_UNRESOLVED', $blockers);
-        $requirements = is_array($evidence['requirements'] ?? null) ? $evidence['requirements'] : [];
-        $semanticRequirement = is_array($requirements['semantic_delta'] ?? null) ? $requirements['semantic_delta'] : null;
-        if (!$this->skipRequirement('semantic_delta', $semanticRequirement)) {
-            $this->requireTrue($evidence, 'semantic_plan_complete', 'SEMANTIC_PLAN_INCOMPLETE', $blockers);
-            $this->requireTrue($evidence, 'semantic_readback_verified', 'SEMANTIC_READBACK_UNVERIFIED', $blockers);
-            if ($semanticRequirement !== null && strtoupper(trim((string) ($semanticRequirement['state'] ?? ''))) !== 'VERIFIED') {
-                $this->addBlocker($blockers, 'SEMANTIC_READBACK_UNVERIFIED');
+        $this->requireTrue($evidence, 'semantic_plan_complete', 'SEMANTIC_PLAN_INCOMPLETE', $blockers);
+        $this->requireTrue($evidence, 'semantic_readback_verified', 'SEMANTIC_READBACK_UNVERIFIED', $blockers);
+        $mediaSnapshot = is_array($evidence['media_snapshot'] ?? null) ? $evidence['media_snapshot'] : [];
+        if ($mediaSnapshot === []) {
+            $this->requireTrue($evidence, 'media_usage_complete', 'MEDIAUSAGE_INCOMPLETE', $blockers);
+        } else {
+            $featuredMissing = ($mediaSnapshot['featured_primary']['placeholder'] ?? true) === true;
+            $inlineMissing = ($mediaSnapshot['inline_primary']['placeholder'] ?? true) === true;
+            if ($featuredMissing) {
+                if (!in_array('MEDIAUSAGE_INCOMPLETE', $blockers, true)) $blockers[] = 'MEDIAUSAGE_INCOMPLETE';
+                $blockers[] = 'ARTICLE_MEDIA_FEATURED_MISSING';
+            } elseif (($evidence['media_usage_complete'] ?? false) !== true) {
+                $warnings[] = 'MEDIAUSAGE_INCOMPLETE';
             }
-        }
-        $articleMediaRequirement = is_array($requirements['article_media'] ?? null) ? $requirements['article_media'] : null;
-        if ($articleMediaRequirement !== null && !$this->skipRequirement('article_media', $articleMediaRequirement) && strtoupper(trim((string) ($articleMediaRequirement['state'] ?? ''))) !== 'VERIFIED') {
-            $this->addBlocker($blockers, 'MEDIAUSAGE_INCOMPLETE');
-        }
-        if (!$this->skipRequirement('article_media', $articleMediaRequirement)) {
-            $mediaSnapshot = is_array($evidence['media_snapshot'] ?? null) ? $evidence['media_snapshot'] : [];
-            if ($mediaSnapshot === []) {
-                $this->requireTrue($evidence, 'media_usage_complete', 'MEDIAUSAGE_INCOMPLETE', $blockers);
-            } else {
-                $featuredMissing = ($mediaSnapshot['featured_primary']['placeholder'] ?? true) === true;
-                $inlineMissing = ($mediaSnapshot['inline_primary']['placeholder'] ?? true) === true;
-                if ($featuredMissing) {
-                    if (!in_array('MEDIAUSAGE_INCOMPLETE', $blockers, true)) $blockers[] = 'MEDIAUSAGE_INCOMPLETE';
-                    $blockers[] = 'ARTICLE_MEDIA_FEATURED_MISSING';
-                } elseif (($evidence['media_usage_complete'] ?? false) !== true) {
-                    $warnings[] = 'MEDIAUSAGE_INCOMPLETE';
-                }
-                if ($inlineMissing) $warnings[] = 'ARTICLE_MEDIA_INLINE_MISSING';
-            }
+            if ($inlineMissing) $warnings[] = 'ARTICLE_MEDIA_INLINE_MISSING';
         }
         $this->optionalTrue($evidence, 'real_image_requirements_met', 'REAL_IMAGE_REQUIREMENTS_UNMET', 'REAL_IMAGE_INCOMPLETE', $blockers, $warnings);
         $this->requireTrue($evidence, 'claim_compliance_acceptable', 'PUBLIC_CLAIM_COMPLIANCE_BLOCKED', $blockers);
@@ -62,34 +49,9 @@ final class ArticlePublicationGate
         $this->optionalTrue($evidence, 'internal_links_valid', 'INTERNAL_LINKS_INVALID', 'INTERNAL_LINKS_INCOMPLETE', $blockers, $warnings);
         if (in_array(($evidence['structured_data_status'] ?? ''), ['unavailable', 'incomplete'], true)) $warnings[] = 'STRUCTURED_DATA_INCOMPLETE';
         else $this->requireTrue($evidence, 'structured_data_valid', 'STRUCTURED_DATA_INVALID', $blockers);
-        $publicRouteRequirement = is_array($requirements['public_route'] ?? null) ? $requirements['public_route'] : null;
-        if (!$this->skipRequirement('public_route', $publicRouteRequirement)) {
-            $this->requireTrue($evidence, 'public_route_ready', 'PUBLIC_ROUTE_NOT_READY', $blockers);
-            if ($publicRouteRequirement !== null && strtoupper(trim((string) ($publicRouteRequirement['state'] ?? ''))) !== 'VERIFIED') {
-                $this->addBlocker($blockers, 'PUBLIC_ROUTE_NOT_READY');
-            }
-        }
-        $renderedRequirement = is_array($requirements['rendered_public'] ?? null) ? $requirements['rendered_public'] : null;
-        $renderedPublicStatus = strtolower(trim((string) ($evidence['rendered_public_verification_status'] ?? '')));
-        $renderedPublicCompatibilityState = in_array($renderedPublicStatus, ['unavailable', 'not_present'], true);
-        if ($renderedRequirement === null) {
-            if ($renderedPublicCompatibilityState) $warnings[] = 'RENDERED_PUBLIC_VERIFICATION_UNAVAILABLE';
-            else $this->requireTrue($evidence, 'rendered_public_verification', 'RENDERED_PUBLIC_VERIFICATION_UNAVAILABLE', $blockers);
-        } elseif ($this->skipRequirement('rendered_public', $renderedRequirement)) {
-            if ($renderedPublicCompatibilityState) {
-                $warnings[] = 'RENDERED_PUBLIC_VERIFICATION_UNAVAILABLE';
-            } elseif ($renderedPublicStatus !== 'verified' || ($evidence['rendered_public_verification'] ?? false) !== true) {
-                $this->addBlocker($blockers, 'RENDERED_PUBLIC_VERIFICATION_UNAVAILABLE');
-            }
-        } else {
-            if ($renderedPublicCompatibilityState) $warnings[] = 'RENDERED_PUBLIC_VERIFICATION_UNAVAILABLE';
-            elseif ($renderedPublicStatus !== 'verified' || ($evidence['rendered_public_verification'] ?? false) !== true) {
-                $this->addBlocker($blockers, 'RENDERED_PUBLIC_VERIFICATION_UNAVAILABLE');
-            }
-            if ($renderedRequirement !== null && strtoupper(trim((string) ($renderedRequirement['state'] ?? ''))) !== 'VERIFIED') {
-                $this->addBlocker($blockers, 'RENDERED_PUBLIC_VERIFICATION_UNAVAILABLE');
-            }
-        }
+        $this->requireTrue($evidence, 'public_route_ready', 'PUBLIC_ROUTE_NOT_READY', $blockers);
+        if (($evidence['rendered_public_verification_status'] ?? '') === 'unavailable') $warnings[] = 'RENDERED_PUBLIC_VERIFICATION_UNAVAILABLE';
+        else $this->requireTrue($evidence, 'rendered_public_verification', 'RENDERED_PUBLIC_VERIFICATION_UNAVAILABLE', $blockers);
         return new ArticlePublicationGateResult($blockers === [], $blockers, $warnings);
     }
 
@@ -114,23 +76,5 @@ final class ArticlePublicationGate
         $index = array_search($from, $blockers, true);
         if ($index !== false) $blockers[$index] = $to;
         else $blockers[] = $to;
-    }
-
-    /** @param array<string,mixed>|null $requirement */
-    private function skipRequirement(string $name, ?array $requirement): bool
-    {
-        if ($requirement === null) return false;
-        $applicability = strtoupper(trim((string) ($requirement['applicability'] ?? '')));
-        $policy = strtoupper(trim((string) ($requirement['policy'] ?? '')));
-        $state = strtoupper(trim((string) ($requirement['state'] ?? '')));
-        return $policy === 'VERIFY'
-            && $state === 'SKIPPED'
-            && ($applicability === 'NOT_APPLICABLE' || ($name === 'semantic_delta' && $applicability === 'NOT_REQUIRED'));
-    }
-
-    /** @param list<string> $blockers */
-    private function addBlocker(array &$blockers, string $blocker): void
-    {
-        if (!in_array($blocker, $blockers, true)) $blockers[] = $blocker;
     }
 }

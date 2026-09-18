@@ -893,14 +893,4 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
             public function write(array $policies): void {}
         });
     }
-
-    /** @return list<string> */
-    private function relationTypes(array $result): array
-    {
-        return array_values(array_map(static function (array $plan): string {
-            $payload = is_array($plan['payload'] ?? null) ? $plan['payload'] : [];
-            if (($plan['entity_type'] ?? '') !== 'relation' || ($payload['source_type'] ?? '') !== 'wp_post' || ($payload['predicate'] ?? '') !== 'about') return '';
-            return 'wp_post --about--> subject';
-        }, array_values(array_filter((array) ($result['plans'] ?? []), 'is_array'))));
-    }
 }

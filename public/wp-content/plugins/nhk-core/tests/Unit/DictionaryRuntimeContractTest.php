@@ -3,56 +3,29 @@ declare(strict_types=1);
 
 namespace NHK\Tests\Unit;
 
-use NHK\Core\Application\Dictionary\{DictionaryCurationService, DictionaryPublicQuery, DictionaryRuntime};
-use NHK\Core\Application\Media\MediaService;
-use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository, MediaUsageRepository};
 use PHPUnit\Framework\TestCase;
 
 final class DictionaryRuntimeContractTest extends TestCase
 {
-    public function test_dictionary_runtime_exposes_the_existing_curation_and_public_query_boundaries(): void
+    public function test_runtime_searches_existing_knowledge_and_revalidates_approved_destinations(): void
     {
-        $runtime = new DictionaryRuntime($this->database());
+        $source = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/Dictionary/DictionaryRuntime.php');
 
-        self::assertInstanceOf(DictionaryCurationService::class, $runtime->curation());
-        self::assertInstanceOf(DictionaryPublicQuery::class, $runtime->publicQuery());
-        self::assertTrue(method_exists(DictionaryCurationService::class, 'selectPreferredIllustration'));
+        self::assertStringContainsString('WpdbKnowledgeRepository', $source);
+        self::assertStringContainsString('knowledgeLookup: function', $source);
+        self::assertStringContainsString('approvedLabelRows(', $source);
+        self::assertStringContainsString('revalidateDelegatedDestination(', $source);
     }
 
-    public function test_dictionary_runtime_wires_media_reuse_dependencies_into_curation(): void
+    public function test_public_auto_link_terms_come_only_from_approved_dictionary_labels(): void
     {
-        $runtime = new DictionaryRuntime($this->database());
-        $curation = $runtime->curation();
-        $reflection = new \ReflectionObject($curation);
+        $source = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/Dictionary/DictionaryRuntime.php');
+        self::assertMatchesRegularExpression('/public function publicTerms\(\): array\s*\{(?P<body>.*?)\n    \}/s', $source);
+        preg_match('/public function publicTerms\(\): array\s*\{(?P<body>.*?)\n    \}/s', $source, $match);
+        $body = (string) ($match['body'] ?? '');
 
-        $wired = $reflection->hasProperty('mediaService')
-            && $reflection->hasProperty('media')
-            && $reflection->hasProperty('assets')
-            && $reflection->hasProperty('usages');
-
-        self::assertTrue($wired, 'Dictionary curation must receive MediaService, MediaRepository, MediaAssetRepository and MediaUsageRepository.');
-        if (!$wired) return;
-
-        self::assertInstanceOf(MediaService::class, $reflection->getProperty('mediaService')->getValue($curation));
-        self::assertInstanceOf(MediaRepository::class, $reflection->getProperty('media')->getValue($curation));
-        self::assertInstanceOf(MediaAssetRepository::class, $reflection->getProperty('assets')->getValue($curation));
-        self::assertInstanceOf(MediaUsageRepository::class, $reflection->getProperty('usages')->getValue($curation));
-    }
-
-    public function test_dictionary_runtime_does_not_expose_a_second_media_owner_boundary(): void
-    {
-        $runtime = new DictionaryRuntime($this->database());
-
-        self::assertInstanceOf(DictionaryCurationService::class, $runtime->curation());
-        self::assertFalse(method_exists(DictionaryCurationService::class, 'createMedia'));
-        self::assertFalse(method_exists(DictionaryCurationService::class, 'createEvidence'));
-        self::assertFalse(method_exists(DictionaryCurationService::class, 'createGraphRelation'));
-    }
-
-    private function database(): object
-    {
-        return new class {
-            public string $prefix = 'wp_';
-        };
+        self::assertStringContainsString('$this->publicQuery->hub(2000)', $body);
+        self::assertStringNotContainsString('$this->types->all()', $body);
+        self::assertStringNotContainsString('$this->authority->listByType', $body);
     }
 }

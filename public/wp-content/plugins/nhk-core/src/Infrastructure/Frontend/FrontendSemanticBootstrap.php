@@ -9,14 +9,14 @@ use NHK\Core\Application\Graph\{GraphService, PredicateTraversalPolicy, RelatedS
 use NHK\Core\Application\Knowledge\{EntityKnowledgeProjection, KnowledgePageQuery};
 use NHK\Core\Application\Home\HomeHeroMediaSelector;
 use NHK\Core\Application\Projection\{ClaimProjectionService, ClaimScopeResolver, GraphProjectionPolicy, LiveLedgerProjectionBuilder, ProjectionEventSubscriber, ProjectionInvalidationService};
-use NHK\Core\Application\Media\{MediaService, PublicMediaAssetDelivery, PublicMediaArticleLinkResolver, PublicMediaGalleryQuery};
+use NHK\Core\Application\Media\{PublicMediaAssetDelivery, PublicMediaArticleLinkResolver, PublicMediaGalleryQuery};
 use NHK\Core\Domain\Authority\{AuthorityEntity, CanonicalEntityTypeCatalog, EntityTypeRegistry};
 use NHK\Core\Domain\Graph\{EndpointTypeRegistry, PredicateRegistry};
 use NHK\Core\Infrastructure\Admin\SemanticDossierCoverageAdminPage;
 use NHK\Core\Infrastructure\Authority\WpdbAuthorityRepository;
 use NHK\Core\Infrastructure\Graph\{CoreEndpointResolverRegistrar, WpdbAuditSink, WpdbGraphRepository};
 use NHK\Core\Infrastructure\Knowledge\{WpdbEvidenceRepository, WpdbKnowledgeRepository, WpdbSourceRepository};
-use NHK\Core\Infrastructure\Media\{WordPressMediaAttachmentBridge, WpdbMediaAssetRepository, WpdbMediaRepository, WpdbMediaUsageRepository};
+use NHK\Core\Infrastructure\Media\{WpdbMediaAssetRepository, WpdbMediaRepository, WpdbMediaUsageRepository};
 use NHK\Core\Infrastructure\Video\WpdbVideoRepository;
 use NHK\Core\Infrastructure\Projection\{WpdbProjectionDependencyIndex, WpdbProjectionRevisionStore, WpdbProjectionSchema};
 use NHK\Core\Infrastructure\Http\{CollectorProfileApi, ProjectionAdminApi};
@@ -72,8 +72,7 @@ final class FrontendSemanticBootstrap
         $projectionAdmin = new ProjectionAdminApi($claimProjection);
         add_action('rest_api_init', [$projectionAdmin, 'register']);
 
-        $attachmentBridge = new WordPressMediaAttachmentBridge($wpdb, new MediaService($media, $assets, $usages), $media, $assets);
-        $gallery = new PublicMediaGalleryQuery($media, $assets, PublicMediaAssetDelivery::fromEnvironment($assets, $media), $usages, PublicMediaArticleLinkResolver::fromWordPress(), attachmentReader: static fn (int $attachmentId): array => $attachmentBridge->readAttachmentMetadata($attachmentId));
+        $gallery = new PublicMediaGalleryQuery($media, $assets, PublicMediaAssetDelivery::fromEnvironment($assets, $media), $usages, PublicMediaArticleLinkResolver::fromWordPress());
         $entityMedia = new EntityMediaProjection($media, $assets, $usages);
         $entityKnowledge = new EntityKnowledgeProjection($claims, $evidence, $sources, $status);
         $knowledgeArchive = new KnowledgePageQuery($claims, $evidence, $sources, $status);

@@ -36,23 +36,9 @@ final class ArticleMediaCoordinator
         $subjectIds = array_values(array_filter(array_map('strval', (array) ($context['subject_ids'] ?? [])), static fn (string $id): bool => trim($id) !== ''));
         $subjectScopeLocked = $subjectIds !== [] && (($context['subject_scope_locked'] ?? true) === true);
         $captureMediaContext = array_key_exists('capture_has_physical_assets', $context) || array_key_exists('capture_id', $context);
-        $contentIntent = strtoupper(trim((string) ($context['content_intent']['intent'] ?? $context['content_intent'] ?? '')));
-        $singleRealImage = $contentIntent === 'IMAGE_ARTICLE'
-            && count($captureOwnedMediaIds) === 1
-            && ($context['single_real_image_exception'] ?? false) === true
-            && $this->mediaIsReadyAndPublic($captureOwnedMediaIds[0]);
-        // Preserve the existing explicit Article selection contract when the
-        // caller is reconciling an Article outside the Capture path. The
-        // bounded Capture exception above remains the only way committed
-        // Capture IDs can collapse both mandatory roles.
-        $explicitSingleMediaSelection = $captureOwnedMediaIds === []
-            && $contentIntent === 'IMAGE_ARTICLE'
-            && ($context['single_real_image_exception'] ?? false) === true
-            && trim((string) ($selectedMediaBySlot[MediaUsageRoleRegistry::FEATURED_PRIMARY] ?? '')) !== ''
-            && trim((string) ($selectedMediaBySlot[MediaUsageRoleRegistry::FEATURED_PRIMARY] ?? '')) === trim((string) ($selectedMediaBySlot[MediaUsageRoleRegistry::INLINE_PRIMARY] ?? ''))
-            && $this->mediaIsReadyAndPublic(trim((string) ($selectedMediaBySlot[MediaUsageRoleRegistry::FEATURED_PRIMARY] ?? '')));
-        $singleRealImage = $singleRealImage || $explicitSingleMediaSelection;
-        $enforceDistinctMandatoryMedia = $contentIntent !== '' && !$singleRealImage;
+        $singleRealImageException = ($context['single_real_image_exception'] ?? false) === true;
+        $contentIntent = strtoupper(trim((string) ($context['content_intent']['intent'] ?? '')));
+        $enforceDistinctMandatoryMedia = $contentIntent !== '' && !$singleRealImageException;
         $allowHistoricalReuse = !$captureMediaContext
             ? (($context['allow_unscoped_reuse'] ?? true) === true)
             : ($subjectScopeLocked && (($context['allow_scoped_reuse'] ?? false) === true || ($context['allow_unscoped_reuse'] ?? false) === true));
@@ -73,17 +59,6 @@ final class ArticleMediaCoordinator
             foreach (($editorial['unmapped_attachment_ids'] ?? []) as $attachmentId) $diagnostics[] = ['code' => 'WORDPRESS_ATTACHMENT_UNMAPPED', 'attachment_id' => (int) $attachmentId];
         }
         if (!$allowHistoricalReuse && $captureMediaContext) $selectedMediaBySlot = [];
-        if ($captureOwnedMediaIds !== []) {
-            if (($selectedMediaBySlot[MediaUsageRoleRegistry::FEATURED_PRIMARY] ?? '') === '') $selectedMediaBySlot[MediaUsageRoleRegistry::FEATURED_PRIMARY] = $captureOwnedMediaIds[0];
-            if (($selectedMediaBySlot[MediaUsageRoleRegistry::INLINE_PRIMARY] ?? '') === '' && (count($captureOwnedMediaIds) > 1 || $singleRealImage)) {
-                $selectedMediaBySlot[MediaUsageRoleRegistry::INLINE_PRIMARY] = $captureOwnedMediaIds[count($captureOwnedMediaIds) > 1 ? 1 : 0];
-            }
-        }
-        foreach ($captureOwnedMediaIds as $captureOwnedMediaId) {
-            if (!$this->mediaIsReadyAndPublic($captureOwnedMediaId)) {
-                $diagnostics[] = ['code' => 'MEDIAUSAGE_INCOMPLETE', 'media_id' => $captureOwnedMediaId];
-            }
-        }
         foreach (MediaUsageRoleRegistry::mandatoryArticleRoles() as $slot) {
             $blueprint = MediaSeoBlueprint::forPost($postId, $slot, $context, MediaSeoStateRegistry::PLACEHOLDER);
             $existing = $this->existingSlotMedia($endpointKey, $slot);
@@ -118,8 +93,7 @@ final class ArticleMediaCoordinator
         $diagnostics[] = ['code' => 'MEDIA_USAGE_RECONCILIATION', 'status' => $usagePlan['status'], 'actions' => $usagePlan['actions']];
         $state = array_filter($slots, static fn (array $slot): bool => $slot['placeholder']) !== [] ? MediaSeoStateRegistry::PLACEHOLDER : (in_array('MEDIA_LOW_RESOLUTION', array_column($diagnostics, 'code'), true) ? MediaSeoStateRegistry::LOW_RESOLUTION : MediaSeoStateRegistry::COMPLETE);
         $guidance = $this->guidance($slots, $context);
-        $canonicalReadback = $this->canonicalReadback($endpointKey, $slots, $diagnostics);
-        $result = new ArticleMediaResult($postId, $endpointKey, $state, $slotMedia, $slots, $diagnostics, is_array($editorial) ? (string) ($editorial['state_token'] ?? '') : '', $guidance, $canonicalReadback);
+        $result = new ArticleMediaResult($postId, $endpointKey, $state, $slotMedia, $slots, $diagnostics, is_array($editorial) ? (string) ($editorial['state_token'] ?? '') : '', $guidance);
         if ($this->wordpress !== null) {
             $payload = $result->toArray();
             $payload['force_inline_reconcile'] = ($context['force_inline_reconcile'] ?? false) === true;
@@ -154,8 +128,7 @@ final class ArticleMediaCoordinator
                 }
             }
             $state = array_filter($slots, static fn (array $slot): bool => $slot['placeholder']) !== [] ? MediaSeoStateRegistry::PLACEHOLDER : (in_array('MEDIA_LOW_RESOLUTION', array_column($diagnostics, 'code'), true) ? MediaSeoStateRegistry::LOW_RESOLUTION : MediaSeoStateRegistry::COMPLETE);
-            $canonicalReadback = $this->canonicalReadback($endpointKey, $slots, $diagnostics);
-            $result = new ArticleMediaResult($postId, $endpointKey, $state, $slotMedia, $slots, $diagnostics, (string) ($readback['state_token'] ?? ''), $this->guidance($slots, $context), $canonicalReadback);
+            $result = new ArticleMediaResult($postId, $endpointKey, $state, $slotMedia, $slots, $diagnostics, (string) ($readback['state_token'] ?? ''), $this->guidance($slots, $context));
         }
         return $result;
     }
@@ -219,73 +192,7 @@ final class ArticleMediaCoordinator
         $media = $this->media->findByCanonicalId($id);
         if ($media === null || !$media->active || $media->readiness !== 'ready' || $media->isSystemPlaceholder()) return null;
         if ($requireSubjectScope && !$this->matchesSubjectScope($media, $blueprint, true)) return null;
-        return $this->mediaIsReadyAndPublic($media->canonicalId) ? $media : null;
-    }
-
-    private function mediaIsReadyAndPublic(string $mediaId): bool
-    {
-        $media = $this->media->findByCanonicalId($mediaId);
-        if ($media === null || !$media->active || $media->readiness !== 'ready' || $media->isSystemPlaceholder()) return false;
-        foreach ($this->assets->listByMediaId($mediaId) as $asset) if ($asset->visibility === 'PUBLIC') return true;
-        return false;
-    }
-
-    /** @param array<string,array<string,mixed>> $slots @param list<array<string,mixed>> $diagnostics @return array<string,mixed> */
-    private function canonicalReadback(string $endpointKey, array $slots, array $diagnostics): array
-    {
-        $requiredRoles = MediaUsageRoleRegistry::mandatoryArticleRoles();
-        $usageRows = [];
-        $usageIds = [];
-        $roles = [];
-        $blockers = [];
-        foreach ($requiredRoles as $role) {
-            $rows = array_values(array_filter($this->usages->listByEndpoint('wp_post', $endpointKey, $role), static fn (mixed $usage): bool => $usage instanceof \NHK\Core\Domain\Media\MediaUsage));
-            if (count($rows) !== 1) {
-                $blockers[] = 'MEDIAUSAGE_INCOMPLETE';
-                continue;
-            }
-            $usage = $rows[0];
-            $expectedMediaId = trim((string) ($slots[$role]['media_id'] ?? ''));
-            $usageId = trim($usage->usageId);
-            $usageMediaId = trim($usage->mediaId);
-            $valid = $usage->endpointType === 'wp_post'
-                && $usage->endpointKey === $endpointKey
-                && $usage->role === $role
-                && $usageId !== ''
-                && $expectedMediaId !== ''
-                && $usageMediaId === $expectedMediaId
-                && !$this->mediaIsPlaceholder($usageMediaId)
-                && $this->mediaIsReadyAndPublic($usageMediaId);
-            if (!$valid) {
-                $blockers[] = 'MEDIAUSAGE_INCOMPLETE';
-                $blockers[] = $role === MediaUsageRoleRegistry::FEATURED_PRIMARY ? 'ARTICLE_MEDIA_FEATURED_MISSING' : 'ARTICLE_MEDIA_INLINE_MISSING';
-                continue;
-            }
-            $usageRows[] = $usage;
-            $usageIds[] = $usageId;
-            $roles[] = $role;
-        }
-        foreach ($diagnostics as $diagnostic) {
-            $code = is_array($diagnostic) ? trim((string) ($diagnostic['code'] ?? '')) : '';
-            if (in_array($code, ['MEDIAUSAGE_INCOMPLETE', 'ARTICLE_MEDIA_FEATURED_MISSING', 'ARTICLE_MEDIA_INLINE_MISSING'], true)) $blockers[] = $code;
-        }
-        $blockers = array_values(array_unique($blockers));
-        return [
-            'media_usage' => [
-                'state' => $blockers === [] && count($usageRows) === count($requiredRoles) ? 'VERIFIED' : 'REVIEW_REQUIRED',
-                'endpoint_type' => 'wp_post',
-                'endpoint_key' => $endpointKey,
-                'roles' => $roles,
-                'usage_ids' => $usageIds,
-                'source' => 'ARTICLE_MEDIA_RECONCILIATION',
-                'blockers' => $blockers,
-            ],
-        ];
-    }
-
-    private function mediaIsPlaceholder(string $mediaId): bool
-    {
-        return $this->media->findByCanonicalId($mediaId)?->isSystemPlaceholder() ?? true;
+        return $this->assets->listByMediaId($media->canonicalId) === [] ? null : $media;
     }
 
     /** @param list<string> $used */
