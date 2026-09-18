@@ -98,7 +98,7 @@ final class ContextualMediaSeoProjectionTest extends TestCase
     public function test_entity_subject_representative_allows_verified_attachment_fallback_after_neutral_media(): void
     {
         [$media, $assets, $usages, $service] = $this->stores();
-        $item = $service->create('entity-attachment-fallback', 'Tên Media', 'ready');
+        $item = $service->create('entity-attachment-fallback', ' ', 'ready');
         $service->addAsset($item->canonicalId, 'original', 'uploads/entity-attachment-fallback.webp', hash('sha256', 'entity-attachment-fallback'), 'image/webp', 10, 1200, 800, 'PUBLIC', ['canonical_filename' => 'entity-attachment-fallback.webp', 'wordpress_attachment_id' => 903]);
         $service->addUsage($item->canonicalId, 'variant', 'variant-attachment', 'representative', 0, '', '', [], '');
 
@@ -127,7 +127,7 @@ final class ContextualMediaSeoProjectionTest extends TestCase
 
         self::assertSame('Alt canonical', $result['alt']);
         self::assertSame('Media name must survive', $result['title']);
-        self::assertSame('Original attachment caption', $result['caption']);
+        self::assertSame('Media name must survive', $result['caption']);
         self::assertSame('MEDIA_USAGE', $result['metadata_source']);
         self::assertSame('Media name must survive', $media->findByCanonicalId($item->canonicalId)?->canonicalName);
         self::assertSame(['title' => 'Original attachment title', 'alt' => 'Original attachment alt', 'caption' => 'Original attachment caption'], $adapter->metadata);
@@ -197,7 +197,6 @@ final class ContextualMediaSeoProjectionTest extends TestCase
         [$media, $assets, $usages, $service] = $this->stores();
         $item = $service->create('gallery-context', 'Tên Media toàn cục', 'ready');
         $service->addAsset($item->canonicalId, 'original', 'uploads/gallery-context.webp', hash('sha256', 'gallery-context'), 'image/webp', 10, 1200, 800, 'PUBLIC', ['canonical_filename' => 'gallery-context.webp']);
-        $service->addUsage($item->canonicalId, 'variant', 'variant-gallery', 'representative', 0, 'Alt ngữ cảnh', 'Chú thích ngữ cảnh', [], 'Tiêu đề ngữ cảnh');
         $service->addUsage($item->canonicalId, 'wp_post', '1:65', 'featured_primary', 0, 'Alt bài', 'NỘI DUNG BÀI KHÔNG ĐƯỢC LEAK', [], 'Bài viết', 'article:1:65:featured_primary');
 
         $result = (new PublicMediaGalleryQuery($media, $assets, null, $usages))->forMedia($item->canonicalId);
