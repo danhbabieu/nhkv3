@@ -539,7 +539,8 @@ final class GovernedCaptureContinuationService
             $writes[] = $this->classifiedFailure((array) ($complete['video_proposal'] ?? []), $error);
             return;
         }
-        $videoWrite = $this->runGovernedChild((array) ($complete['video_proposal'] ?? []), $control, $lifecycle, 'VIDEO_GOVERNANCE');
+        $videoProposal = $this->scopeVideoPlan($this->currentCaptureId, (array) ($complete['video_proposal'] ?? []), []);
+        $videoWrite = $this->runGovernedChild($videoProposal, $control, $lifecycle, 'VIDEO_GOVERNANCE');
         $videoWrite['evidence_handoff'] = [
             'source_id' => $canonicalIds[0],
             'claim_id' => $canonicalIds[1],

@@ -1,5 +1,42 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-18 — Generic dynamic Video provenance scope propagation (LOCAL FIX / DEPLOY PENDING)
+
+SCOPE: Repaired the Capture-owned Video provenance continuation so the final
+governed Video proposal receives the same server-issued staging packet as the
+direct Video plan path. No Capture, Video, Proposal, staging/production record,
+remote source or deployment was mutated.
+
+ROOT_CAUSE: The `capture_video_provenance` branch planned Source/Claim/Evidence
+dependencies and then called `runGovernedChild()` directly for the completed
+Video proposal. It bypassed `scopeVideoPlan()`, so `issueForVideoPlan()` was
+never called and no `payload.staging_acceptance` was attached. The exact
+failure was `OperationScopedStagingGuard::assertAllowed()` at the missing
+packet branch (`if (!is_array($scope))`) which throws `STAGING_SCOPE_REQUIRED`.
+Admission, duplicate audit, canonicalization, subject packet, revision and
+HMAC verification were therefore not the failing boundary.
+
+FIX: Route the completed provenance Video proposal through the existing generic
+`scopeVideoPlan()` boundary immediately before governed Video execution. This
+issues/attaches the exact server packet without bypassing any guard, adding an
+object-specific allowlist, hard-coding IDs or changing production behavior.
+
+REGRESSION: Added a live-shaped continuation test using Capture
+`01a0b384-6a83-7f99-b231-d784b9ab9542`, Video
+`01a0b384-6e09-71a6-8f58-df48654d6aee`, YouTube ID `2Fx8Wp4Hzyk` and the exact
+classification subject packet. It proves the issuer is called once and the
+final Video proposal carries `video:ingest`, the proposed UUID and
+`expected_revision=0` before governance.
+
+VERIFICATION: Focused staging/Capture/Video/Governance tests pass 110 tests /
+461 assertions; additional Video planner/core suites pass 82 tests / 342
+assertions. Unit suite passes 1,889 tests / 9,387 assertions with 3 unrelated
+baseline failures in DemoCutover and image-policy contracts. Full configured
+suite has the same 3 Unit failures plus environment-gated integration errors;
+no external state changed.
+
+STATUS: `GENERIC_DYNAMIC_VIDEO_PROVENANCE_SCOPE_LOCAL_READY / DEPLOYMENT_PENDING / SEMANTIC_MUTATION_NONE`
+
 # Checkpoint — 2026-09-18 — Generic Authority relation-only staging admission (LOCAL READY / DEPLOY PENDING)
 
 SCOPE: Repaired the canonical Authority staging admission boundary for
