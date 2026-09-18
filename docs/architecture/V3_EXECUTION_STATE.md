@@ -12037,6 +12037,35 @@ attempted.
 
 STATUS: `SLICE_2_ARTICLE_MEDIA_ORDERING_LOCAL_READY / LIVE_ACCEPTANCE_BLOCKED`.
 
+# Checkpoint — 2026-09-18 — Slice 3 Task 2 final identity/wiring review fix (LOCAL ONLY)
+
+SCOPE: Closed the final review findings without broadening the projection
+surface. `ArticleMediaSeoProjection::forPost()` has no canonical subject
+identity input, so it no longer selects an arbitrary non-Article
+representative Usage from the shared Media. The Article chain is now
+`Article Usage → neutral Media → verified Attachment/MISSING`; a subject-
+specific representative fallback remains intentionally unavailable until an
+explicit subject identity is supplied and proven. `VisualSupportPublicProjection`
+initializes its optional repository candidate list before the compatibility
+branch, eliminating warnings without changing its constructor contract.
+
+RULING: Repository search found no production hook, service consumer or
+bootstrap path that accepts `VisualSupportPublicProjection`; it is not wired
+because creating a new runtime path would invent architecture. Record
+`NO_RUNTIME_CONSUMER` and leave the read-only class available for its canonical
+caller when one is introduced by an approved contract.
+
+VERIFICATION: RED regression tests first failed on cross-subject metadata
+selection and uninitialized candidates. Final focused contextual suite passes
+22 tests / 107 assertions with one pre-existing warning. No staging/live
+acceptance, deployment, database write, upload, Video or Graph mutation was
+performed.
+
+COMMITS: `d2b5a8aa` (RED regressions), `2dea903c` (ruling-aligned test
+expectations), `4351e00d` (production fix).
+
+STATUS: `SLICE_3_TASK_2_FINAL_REVIEW_FIX_LOCAL_READY / FORMAL_ACCEPTANCE_PENDING`.
+
 # Checkpoint — 2026-09-18 — Slice 3 Task 2 contextual media metadata fix round (LOCAL ONLY)
 
 SCOPE: Added fail-closed regression coverage and minimal read-only projection
