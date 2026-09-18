@@ -280,6 +280,16 @@
 .nhk-admin-technical dd { margin:0; overflow-wrap:anywhere; }
 .nhk-admin-detail { margin-top:16px; }
 .nhk-admin-empty { color:var(--nhk-admin-text-soft); padding:16px; background:var(--nhk-admin-surface-soft); }
+.nhk-hero-status { display:inline-block; padding:8px 12px; border-radius:8px; background:var(--nhk-admin-surface-soft); }
+.nhk-hero-slots { display:grid; gap:8px; max-width:760px; padding:0; list-style:none; }
+.nhk-hero-slot { display:flex; align-items:center; gap:12px; padding:10px; border:1px solid var(--nhk-admin-border); border-radius:8px; background:#fff; cursor:grab; }
+.nhk-hero-slot.is-dragging { opacity:.55; }
+.nhk-hero-slot img { width:96px; height:72px; object-fit:contain; background:var(--nhk-admin-surface-soft); border-radius:4px; }
+.nhk-hero-slot span { display:grid; gap:3px; min-width:0; flex:1; }
+.nhk-hero-slot small { color:var(--nhk-admin-text-soft); overflow-wrap:anywhere; }
+.nhk-hero-add { display:flex; flex-wrap:wrap; align-items:end; gap:8px; margin:16px 0; }
+.nhk-hero-add label { display:grid; gap:5px; }
+.nhk-hero-add select { min-width:320px; min-height:36px; }
 @media (max-width: 800px) { .nhk-admin-hero { grid-template-columns:1fr; } .nhk-admin-grid, .nhk-admin-state-list, .nhk-admin-readback__grid { grid-template-columns:1fr; } .nhk-admin-result-card { grid-template-columns:1fr; } .nhk-admin-result-card a { grid-column:auto; grid-row:auto; } }
 .nhk-admin-state--attention { border-top-color: var(--nhk-admin-attention); }
 .nhk-admin-state--blocked { border-top-color: var(--nhk-admin-blocked); }

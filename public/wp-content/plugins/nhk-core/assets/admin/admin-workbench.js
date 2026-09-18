@@ -257,4 +257,48 @@
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mediaUsageWorkspace);
     else mediaUsageWorkspace();
+
+    function homeHeroWorkspace() {
+        var root = document.querySelector('[data-nhk-hero-config]');
+        if (!root) return;
+        var slots = root.querySelector('[data-nhk-hero-slots]');
+        var add = root.querySelector('[data-hero-add]');
+        var addButton = root.querySelector('[data-hero-add-button]');
+        var status = root.querySelector('[data-nhk-hero-status]');
+        var dragged = null;
+        function refresh() {
+            var count = slots.querySelectorAll('[data-hero-id]').length;
+            status.innerHTML = 'Manual: <strong>' + count + '</strong> ảnh · Auto fallback: <strong>' + (5 - count) + '</strong> ảnh';
+        }
+        function bind(slot) {
+            slot.addEventListener('dragstart', function () { dragged = slot; slot.classList.add('is-dragging'); });
+            slot.addEventListener('dragend', function () { slot.classList.remove('is-dragging'); dragged = null; });
+            slot.addEventListener('dragover', function (event) {
+                event.preventDefault();
+                if (dragged && dragged !== slot) slots.insertBefore(dragged, slot);
+            });
+            var remove = slot.querySelector('[data-hero-remove]');
+            if (remove) remove.addEventListener('click', function () { slot.remove(); refresh(); });
+        }
+        slots.querySelectorAll('[data-hero-id]').forEach(bind);
+        if (addButton) addButton.addEventListener('click', function () {
+            var id = add.value;
+            if (!id || slots.querySelectorAll('[data-hero-id]').length >= 5) return;
+            var option = add.options[add.selectedIndex];
+            var slot = document.createElement('li');
+            slot.className = 'nhk-hero-slot';
+            slot.draggable = true;
+            slot.setAttribute('data-hero-id', id);
+            slot.innerHTML = '<span><strong>' + option.textContent.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</strong><small>' + id + '</small></span><input type="hidden" name="media_ids[]" value="' + id.replace(/"/g, '&quot;') + '"><button type="button" class="button-link-delete" data-hero-remove>Xóa</button>';
+            slots.appendChild(slot);
+            option.remove();
+            add.selectedIndex = 0;
+            bind(slot);
+            refresh();
+        });
+        refresh();
+    }
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', homeHeroWorkspace);
+    else homeHeroWorkspace();
 }());

@@ -1,5 +1,27 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-18 — Homepage hero admin presentation config (LOCAL READY / DEPLOY PENDING)
+
+SCOPE: Added the Admin Workbench section “Ảnh Hero trang chủ” for the existing
+`nhk_v3_home_hero_media_ids` presentation option. Owners can inspect current
+manual selections, add eligible existing public image Media, remove items,
+drag-sort order and save the bounded configuration. The UI reports manual and
+deterministic auto-fallback counts and shows dimensions/orientation.
+
+BOUNDARY: Validation is presentation-only: IDs are normalized, de-duplicated,
+order-preserving and capped at five; missing, unavailable, non-image or
+non-public projections are rejected. No Media, MediaAsset, MediaUsage,
+Authority, Knowledge, Graph or WordPress editorial record is rewritten. The
+existing frontend selector and option remain unchanged.
+
+VERIFICATION: Focused Hero/config/selector/Admin Workbench tests pass 19 tests
+/ 198 assertions; PHP lint, JavaScript syntax and `git diff --check` pass. Full
+Unit suite reaches 1,876 tests / 9,330 assertions with 3 unrelated baseline
+failures in DemoCutover CLI and Video staging admission, plus existing warnings
+and deprecations. No deploy, push, live read or semantic mutation was performed.
+
+STATUS: `HOME_HERO_ADMIN_LOCAL_READY / DEPLOYMENT_PENDING / SEMANTIC_MUTATION_NONE`
+
 # Checkpoint — 2026-09-18 — Remaining live-acceptance boundary repairs (LOCAL READY / DEPLOY PENDING)
 
 SCOPE: Repaired local-only attachment mapping/readback, exact existing-Media

@@ -59,6 +59,8 @@ final class AdminWorkbenchArchitectureTest extends TestCase
         self::assertStringContainsString("remove_action('toplevel_page_nhk-v3', [AdminPage::class, 'render']);", $page);
         self::assertStringContainsString("remove_menu_page('nhk-v3');", $page);
         self::assertStringContainsString("'nhk-v3-advanced', [AdminPage::class, 'render']", $page);
+        self::assertStringContainsString('HomeHeroAdminPage::register();', $page);
+        self::assertStringContainsString('HomeHeroAdminPage::render();', $page);
     }
 
     public function test_video_detail_renders_readback_layers_and_only_links_eligible_projection(): void
@@ -98,6 +100,7 @@ final class AdminWorkbenchArchitectureTest extends TestCase
             $base . 'AdminMediaAdapter.php',
             $base . 'AdminKnowledgeAdapter.php',
             $base . 'AdminGovernanceAdapter.php',
+            $base . 'HomeHeroAdminPage.php',
         ];
     }
 
