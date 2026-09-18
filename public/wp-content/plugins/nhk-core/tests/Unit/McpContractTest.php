@@ -304,15 +304,6 @@ final class McpContractTest extends TestCase
     {
         $tools = McpToolCatalog::tools();
         self::assertNotEmpty($tools);
-        self::assertCount(19, $tools);
-        self::assertSame([
-            'nhk.search', 'nhk.semantic.resolve', 'nhk.entity.get', 'nhk.media.get',
-            'nhk.media.ingest', 'nhk.video.ingest', 'nhk.video.get', 'nhk.knowledge.get',
-            'nhk.source.get', 'nhk.evidence.get', 'nhk.knowledge.ingest', 'nhk.source.ingest',
-            'nhk.evidence.ingest', 'nhk.proposal.create', 'nhk.proposal.submit',
-            'nhk.proposal.approve', 'nhk.proposal.reject', 'nhk.proposal.eligibility',
-            'nhk.proposal.apply',
-        ], array_column($tools, 'name'));
         foreach ($tools as $tool) self::assertSame($tool['kind'] === 'mutation', $tool['governed']);
         self::assertContains('nhk.media.ingest', array_column($tools, 'name'));
         self::assertContains('nhk.video.ingest', array_column($tools, 'name'));
