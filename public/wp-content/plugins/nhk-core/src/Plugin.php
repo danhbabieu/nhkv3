@@ -22,7 +22,7 @@ use NHK\Core\Infrastructure\Migration\ClaimProjectionMigration016;
 use NHK\Core\Infrastructure\Migration\{EditorialCaptureAddendumMigration018, EditorialCaptureMigration017, GovernanceSubjectBindingMigration020, MediaBindingOperationMigration022, MediaUsageMetadataMigration021, VisualSupportRequirementMigration019};
 use NHK\Core\Infrastructure\Migration\MigrationDatabaseGuard;
 use NHK\Core\Application\Governance\GovernanceCapabilities;
-use NHK\Core\Application\Governance\{AuthorityStagingAdmission, MediaBindingStagingAdmission};
+use NHK\Core\Application\Governance\{AuthorityStagingAdmission, MediaBindingStagingAdmission, VideoW64StagingAdmission};
 use NHK\Core\Application\Runtime\SemanticWritePolicyResolver;
 use NHK\Core\Application\Mcp\{McpAbilityRegistration, McpArticleIngestHandler, McpGovernanceHandler, McpReadHandler, McpSemanticContextResolver, McpToolCatalog, McpTransport, McpDocumentationRegistry};
 use NHK\Core\Application\Media\{ImageIngestEntrypoint, MediaBatchUploadService, MediaBindingService};

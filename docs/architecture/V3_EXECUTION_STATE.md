@@ -1,5 +1,26 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-18 — W64 staging admission boot fatal fixed (LOCAL READY / DEPLOY PENDING)
+
+SCOPE: Repaired the plugin composition-root import for the already-existing
+`VideoW64StagingAdmission` class. No runtime data, staging/production object or
+semantic mutation was changed.
+
+ROOT_CAUSE: `Plugin.php` registered `VideoW64StagingAdmission` without importing
+its actual namespace (`NHK\\Core\\Application\\Governance`), so PHP resolved
+the symbol as `NHK\\Core\\VideoW64StagingAdmission` and aborted WordPress
+bootstrap with a fatal class-not-found error.
+
+FIX: Added the missing namespace import. The registration remains the existing
+bounded, fail-closed W64 admission provider.
+
+VERIFICATION: PHP lint, Composer autoload class resolution, `git diff --check`
+and the focused W64/Governance test selection pass (11 tests / 33 assertions;
+existing warnings/deprecations remain). Remote deployment and live readback are
+pending.
+
+STATUS: `W64_BOOT_FATAL_LOCAL_FIXED / DEPLOY_PENDING / SEMANTIC_MUTATION_NONE`
+
 # Checkpoint — 2026-09-18 — Media binding receipt dispatch and frontend readback proof (LOCAL READY / LIVE VERIFY PENDING)
 
 SCOPE: Narrowed the repair to the already-existing Media binding receipt read
