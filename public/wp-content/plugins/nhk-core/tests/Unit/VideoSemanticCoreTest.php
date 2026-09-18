@@ -709,6 +709,27 @@ final class VideoSemanticCoreTest extends TestCase
         self::assertSame('variant', $result['candidates'][0]['scope']);
     }
 
+    public function test_classification_subject_is_preserved_through_video_enrichment(): void
+    {
+        $classificationId = '01a09e44-539a-7f1a-938a-d7d91bb689a3';
+        $planner = new VideoKnowledgeEnrichmentPlanner($this->knowledgePlanner());
+
+        $result = $planner([
+            'resolved' => [[
+                'id' => $classificationId,
+                'type' => 'classification',
+                'name' => 'Đồng hồ công cộng',
+            ]],
+            'user_hint' => ['value' => 'Âm thanh đồng hồ công cộng.', 'kind' => 'USER_HINT'],
+        ]);
+
+        self::assertSame($classificationId, $result['subject']['id']);
+        self::assertSame('classification', $result['subject']['type']);
+        self::assertNotContains('NO_SUPPORTED_SUBJECT', $result['diagnostics']);
+        self::assertNotEmpty($result['candidates']);
+        self::assertSame('entity', $result['candidates'][0]['scope']);
+    }
+
     public function test_video_knowledge_planner_marks_equally_plausible_variants_ambiguous(): void
     {
         $planner = new VideoKnowledgeEnrichmentPlanner($this->knowledgePlanner());

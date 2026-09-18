@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Infrastructure\Video;
 
 use NHK\Core\Contracts\Video\VideoRepository;
+use NHK\Core\Application\Video\YouTubeUrlNormalizer;
 use NHK\Core\Domain\Video\{Video, VideoException};
 use NHK\Core\Shared\Uuid\UuidCodec;
 
@@ -23,6 +24,7 @@ final class WpdbVideoRepository implements VideoRepository
 
     public function findByExternalReference(string $platform, string $externalId): ?Video
     {
+        [$platform, $externalId] = $this->normalizeExternalReference($platform, $externalId);
         return $this->hydrate($this->database->get_row($this->database->prepare("SELECT * FROM {$this->table} WHERE platform=%s AND external_video_id=%s LIMIT 1", $platform, $externalId), ARRAY_A));
     }
 
@@ -97,5 +99,17 @@ final class WpdbVideoRepository implements VideoRepository
             && $left->thumbnailMediaId === $right->thumbnailMediaId
             && $left->active === $right->active
             && $left->revision === $right->revision;
+    }
+
+    /** @return array{0:string,1:string} */
+    private function normalizeExternalReference(string $platform, string $externalId): array
+    {
+        $platform = strtolower(trim($platform));
+        $externalId = trim($externalId);
+        if ($platform === 'youtube' && preg_match('#^https?://#i', $externalId) === 1) {
+            $identity = YouTubeUrlNormalizer::normalize($externalId);
+            return [$identity->platform, $identity->externalVideoId];
+        }
+        return [$platform, $externalId];
     }
 }

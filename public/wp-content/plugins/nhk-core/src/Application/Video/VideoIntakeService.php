@@ -136,7 +136,11 @@ final class VideoIntakeService
         if (count($explicit) > 1) return null;
 
         $resolved = array_values(array_filter((array) ($research['resolved'] ?? []), static fn (mixed $item): bool => is_array($item) && UuidCodec::isValid((string) ($item['id'] ?? '')) && trim((string) ($item['type'] ?? '')) !== ''));
-        foreach (['specimen', 'variant', 'model', 'movement', 'brand'] as $type) {
+        // Classification is a valid Video about-target (not a fallback
+        // taxonomy). Preserve an explicitly resolved classification so the
+        // Capture handoff can reach enrichment and governed attachment
+        // planning without being downgraded to an unsupported subject.
+        foreach (['classification', 'specimen', 'variant', 'model', 'movement', 'brand'] as $type) {
             $ambiguousMatches = array_values(array_filter((array) ($research['ambiguous'] ?? []), static fn (mixed $item): bool => is_array($item) && strtolower(trim((string) ($item['type'] ?? ''))) === $type));
             if ($ambiguousMatches !== []) return null;
             $matches = array_values(array_filter($resolved, static fn (array $item): bool => strtolower((string) ($item['type'] ?? '')) === $type));

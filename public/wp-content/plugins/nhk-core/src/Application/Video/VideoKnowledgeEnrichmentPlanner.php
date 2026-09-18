@@ -63,7 +63,7 @@ final readonly class VideoKnowledgeEnrichmentPlanner
     {
         $intended = array_values(array_filter($context['intended_targets'] ?? [], static fn (mixed $target): bool => is_array($target) && is_string($target['id'] ?? null) && is_string($target['type'] ?? null)));
         if ($intended !== []) {
-            foreach (['specimen', 'variant', 'model', 'movement', 'brand'] as $type) {
+            foreach (['classification', 'specimen', 'variant', 'model', 'movement', 'brand'] as $type) {
                 $matches = array_values(array_filter($intended, static fn (array $target): bool => $target['type'] === $type));
                 if (count($matches) > 1) {
                     $diagnostics[] = 'AMBIGUOUS_SUBJECT';
@@ -81,7 +81,7 @@ final readonly class VideoKnowledgeEnrichmentPlanner
         $supported = array_values(array_filter($resolved, fn (array $target): bool => $this->contains($contextText, (string) ($target['name'] ?? ''))));
         if ($supported !== []) $resolved = $supported;
         $ambiguous = $context['ambiguous'] ?? [];
-        foreach (['specimen', 'variant', 'model', 'movement', 'brand'] as $type) {
+        foreach (['classification', 'specimen', 'variant', 'model', 'movement', 'brand'] as $type) {
             $matches = array_values(array_filter($resolved, static fn (array $target): bool => $target['type'] === $type));
             $ambiguousMatches = array_values(array_filter($ambiguous, static fn (mixed $item): bool => is_array($item) && ($item['type'] ?? null) === $type));
             if ($ambiguousMatches !== [] || count($matches) > 1) {
