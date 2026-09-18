@@ -3,17 +3,79 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Dictionary;
 
+use NHK\Core\Application\Media\{MediaService, PublicMediaAssetSelector};
 use NHK\Core\Contracts\Dictionary\{DictionaryCandidateRepository, DictionaryConceptRepository};
+use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository, MediaUsageRepository, MediaUsageUpdater};
 use NHK\Core\Domain\Dictionary\{DictionaryCandidate, DictionaryCandidateState, DictionaryConcept, DictionaryLabel};
+use NHK\Core\Domain\Media\{Media, MediaUsage, MediaUsageRoleRegistry};
 use NHK\Core\Shared\Uuid\UuidCodec;
 
 final class DictionaryCurationService
 {
     private DictionaryTermNormalizer $normalizer;
 
-    public function __construct(private DictionaryCandidateRepository $candidates, private DictionaryConceptRepository $concepts, private $idGenerator = null, ?DictionaryTermNormalizer $normalizer = null)
+    public function __construct(
+        private DictionaryCandidateRepository $candidates,
+        private DictionaryConceptRepository $concepts,
+        private $idGenerator = null,
+        ?DictionaryTermNormalizer $normalizer = null,
+        private ?MediaService $mediaService = null,
+        private ?MediaRepository $media = null,
+        private ?MediaAssetRepository $assets = null,
+        private ?MediaUsageRepository $usages = null,
+    )
     {
         $this->normalizer = $normalizer ?? new DictionaryTermNormalizer();
+    }
+
+    /**
+     * Pin an existing canonical public Media as the concept illustration.
+     * This is a usage reconciliation only: Media, assets and attachments are
+     * never created or copied by dictionary curation.
+     *
+     * @return MediaUsage|array<string,mixed>
+     */
+    public function selectPreferredIllustration(string $conceptId, int $expectedRevision, string $mediaId, string $title = '', string $altText = '', string $caption = ''): MediaUsage|array
+    {
+        $concept = $this->concepts->findById($conceptId);
+        if (!$concept instanceof DictionaryConcept) return $this->blocked('BLOCKED', 'DICTIONARY_CONCEPT_NOT_FOUND');
+        if ($concept->revision !== $expectedRevision) return $this->blocked('BLOCKED', 'DICTIONARY_CONCEPT_REVISION_CONFLICT');
+        if (!$concept->approved()) return $this->blocked('BLOCKED', 'DICTIONARY_CONCEPT_NOT_APPROVED');
+
+        $candidate = $this->candidates->listForReview(100);
+        foreach ($candidate as $item) {
+            if (!$item instanceof DictionaryCandidate) continue;
+            if ($item->state === DictionaryCandidateState::REJECTED) return $this->blocked('BLOCKED', 'DICTIONARY_CANDIDATE_REJECTED');
+        }
+        if (($concept->context['illustration_scope']['ambiguous'] ?? false) === true) return $this->blocked('REVIEW_REQUIRED', 'MEDIA_SCOPE_AMBIGUOUS');
+        if (!$this->mediaService instanceof MediaService || !$this->media instanceof MediaRepository || !$this->assets instanceof MediaAssetRepository || !$this->usages instanceof MediaUsageRepository) {
+            return $this->blocked('REVIEW_REQUIRED', 'MEDIA_REUSE_BOUNDARY_UNAVAILABLE');
+        }
+
+        $media = $this->media->findByCanonicalId($mediaId);
+        if (!$media instanceof Media) return $this->blocked('BLOCKED', 'MEDIA_NOT_FOUND');
+        if (!$media->active || $media->readiness !== 'ready') return $this->blocked('REVIEW_REQUIRED', 'MEDIA_NOT_READY');
+        if ($media->isSystemPlaceholder()) return $this->blocked('REVIEW_REQUIRED', 'MEDIA_PLACEHOLDER_NOT_ALLOWED');
+        if (!(new PublicMediaAssetSelector())->canonical($this->assets->listByMediaId($mediaId)) instanceof \NHK\Core\Domain\Media\MediaAsset) return $this->blocked('REVIEW_REQUIRED', 'MEDIA_PUBLIC_ASSET_REQUIRED');
+
+        $endpointType = 'dictionary_concept';
+        $placement = 'preferred_illustration';
+        $role = MediaUsageRoleRegistry::REPRESENTATIVE;
+        $existing = array_values(array_filter($this->usages->listByEndpoint($endpointType, $conceptId, $role), static fn (mixed $usage): bool => $usage instanceof MediaUsage && $usage->placementKey === $placement));
+        if (count($existing) > 1) return $this->blocked('REVIEW_REQUIRED', 'DICTIONARY_ILLUSTRATION_CONFLICT');
+
+        $existingUsage = $existing[0] ?? null;
+        $selectionSource = 'USER_EXPLICIT';
+        $selectionPolicy = 'PINNED';
+        $activeSlot = $placement;
+        if ($existingUsage instanceof MediaUsage) {
+            if (!$this->usages instanceof MediaUsageUpdater) return $this->blocked('REVIEW_REQUIRED', 'MEDIA_USAGE_UPDATE_UNAVAILABLE');
+            $candidateUsage = new MediaUsage($existingUsage->usageId, $mediaId, $endpointType, $conceptId, $role, 0, trim($altText), trim($caption), [], trim($title), $existingUsage->revision, $placement, $selectionSource, $selectionPolicy, $activeSlot);
+            if ($this->sameUsage($existingUsage, $candidateUsage)) return $existingUsage;
+            return $this->usages->update($candidateUsage);
+        }
+
+        return $this->mediaService->addUsage($mediaId, $endpointType, $conceptId, $role, 0, trim($altText), trim($caption), [], trim($title), $placement, $selectionSource, $selectionPolicy, $activeSlot);
     }
 
     public function createDraftFromCandidate(string $candidateId, int $expectedRevision, string $preferredLabel, string $definition, array $context = []): array
@@ -79,5 +141,27 @@ final class DictionaryCurationService
     {
         if (is_callable($this->idGenerator)) return (string) ($this->idGenerator)();
         return UuidCodec::newV7();
+    }
+
+    private function blocked(string $status, string $reason): array
+    {
+        return ['status' => $status, 'reason' => $reason];
+    }
+
+    private function sameUsage(MediaUsage $left, MediaUsage $right): bool
+    {
+        return $left->mediaId === $right->mediaId
+            && $left->endpointType === $right->endpointType
+            && $left->endpointKey === $right->endpointKey
+            && $left->role === $right->role
+            && $left->sortOrder === $right->sortOrder
+            && $left->altText === $right->altText
+            && $left->caption === $right->caption
+            && $left->keywordGroups === $right->keywordGroups
+            && $left->title === $right->title
+            && $left->placementKey === $right->placementKey
+            && $left->selectionSource === $right->selectionSource
+            && $left->selectionPolicy === $right->selectionPolicy
+            && $left->activeSlot === $right->activeSlot;
     }
 }

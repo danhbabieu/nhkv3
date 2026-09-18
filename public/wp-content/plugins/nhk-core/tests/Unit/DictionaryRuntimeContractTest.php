@@ -16,7 +16,7 @@ final class DictionaryRuntimeContractTest extends TestCase
 
         self::assertInstanceOf(DictionaryCurationService::class, $runtime->curation());
         self::assertInstanceOf(DictionaryPublicQuery::class, $runtime->publicQuery());
-        self::assertFalse(method_exists(DictionaryCurationService::class, 'selectPreferredIllustration'));
+        self::assertTrue(method_exists(DictionaryCurationService::class, 'selectPreferredIllustration'));
     }
 
     public function test_dictionary_runtime_wires_media_reuse_dependencies_into_curation(): void

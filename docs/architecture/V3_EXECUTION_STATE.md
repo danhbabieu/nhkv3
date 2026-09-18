@@ -12037,6 +12037,62 @@ attempted.
 
 STATUS: `SLICE_2_ARTICLE_MEDIA_ORDERING_LOCAL_READY / LIVE_ACCEPTANCE_BLOCKED`.
 
+# Checkpoint — 2026-09-18 — Slice 5 Task 2 Dictionary canonical illustration reuse (LOCAL ONLY)
+
+SCOPE: Added the governed Dictionary preferred-illustration operation. An
+approved, revision-matched and unambiguous concept may reuse an existing ready
+canonical Media with an eligible public asset through one typed
+`MediaUsage`. The exact endpoint, role, placement and explicit pinned
+selection metadata are enforced. Replacement reconciles the existing
+Dictionary Usage in place when the typed updater is available and leaves
+Article/Model usages untouched. Runtime public projection prefers the exact
+pinned placement before the existing representative fallback. No Media,
+Attachment, Evidence, Claim or Graph writer was introduced.
+
+VERIFICATION: Focused Dictionary/media suite PASS — 51 tests / 233 assertions;
+`composer lint`, changed-file PHP lint and `git diff --check` pass. One existing
+`preg_match()` warning remains at `MediaService.php:328` in contextual
+projection tests. No staging/live/database/deployment mutation was performed.
+
+STATUS: `SLICE_5_TASK_2_LOCAL_READY / FORMAL_REVIEW_PENDING / LIVE_ACCEPTANCE_BLOCKED`.
+
+# Checkpoint — 2026-09-18 — Slice 4 Task 2 formal acceptance (LOCAL ONLY)
+
+SCOPE: Final independent review accepted Slice 4 Task 2. Attachment readback
+selects the physical representation actually mapped: raster attachments use
+the retained PRIVATE source-original, while WebP attachments use the PUBLIC
+derivative. Required checksum, byte size, MIME, dimensions, storage and
+readiness facts are validated and missing facts fail closed.
+
+VERIFICATION: Focused/Contract tests pass; guarded WordPress integration is
+`INFRASTRUCTURE_UNAVAILABLE` with eight skips. Lint, composer lint, diff check
+and changed-scope secret review pass. No staging/live acceptance, deployment,
+database write, upload, Video or Graph mutation occurred.
+
+REVIEW: Independent reviewer `01a0b277-a2e4-7bc0-931e-b7add992391a` returned
+`ACCEPTED` for the full Task 2 range through `dc65e937`.
+
+STATUS: `SLICE_4_TASK_2_ACCEPTED_LOCAL / LIVE_ACCEPTANCE_BLOCKED`.
+
+# Checkpoint — 2026-09-18 — Slice 4 complete (LOCAL ONLY)
+
+SCOPE: Completed Slice 4 Task 3 verification for edited attachment hooks,
+canonical Media/Usage identity preservation, source/derivative visibility,
+stable attachment mapping and typed `UNAVAILABLE`/`INCONSISTENT` readback.
+Runtime hook assertions remain guarded by the WordPress integration bootstrap;
+no source-text substitute is used.
+
+VERIFICATION: Focused/Contract suites pass at 71 tests / 731 assertions;
+eight guarded integration tests are explicitly `INFRASTRUCTURE_UNAVAILABLE`.
+Full Unit is 1,829 tests with four unrelated baseline failures. Lint, composer
+lint, diff check and changed-scope secret review pass. No staging/live
+acceptance, deployment, database write, upload, Video or Graph mutation.
+
+REVIEW: Independent reviewer `01a0b280-d79f-7af1-8a68-95c81fa9a4e8` returned
+`ACCEPTED` for the Task 3 range through `f84d2f93`.
+
+STATUS: `SLICE_4_COMPLETE_LOCAL / LIVE_ACCEPTANCE_BLOCKED`.
+
 # Checkpoint — 2026-09-18 — Slice 4 Task 2 canonical attachment readback fix (LOCAL ONLY)
 
 SCOPE: Closed the review findings without adding a writer or changing the
