@@ -25,6 +25,28 @@ final class MediaBindingStagingAdmissionTest extends TestCase
         self::assertTrue((new MediaBindingStagingAdmission($media, $authority))(false, $scope, $capture, $input, []));
     }
 
+    /** @dataProvider representativeAuthorityTypeProvider */
+    public function test_registered_authority_representative_types_are_admitted_through_capture_scope(string $type): void
+    {
+        [$scope, $capture, $input] = $this->fixture($type);
+        $media = $this->createMock(MediaRepository::class);
+        $authority = $this->createMock(AuthorityRepository::class);
+        $media->method('findByCanonicalId')->willReturn(new Media($scope['media_ids'][0], 'nhk:media:fixture', 'Representative image', 'ready'));
+        $authority->method('findByCanonicalId')->willReturn(new AuthorityEntity($scope['target']['id'], $type, 'nhk:' . $type . ':fixture', 'Fixture', 1, []));
+
+        self::assertTrue((new MediaBindingStagingAdmission($media, $authority))(false, $scope, $capture, $input, []));
+    }
+
+    public static function representativeAuthorityTypeProvider(): array
+    {
+        return array_map(static fn (string $type): array => [$type], [
+            'brand', 'classification', 'model', 'variant', 'movement', 'component',
+            // Public Authority profiles with a valid image context are covered
+            // by the same shared policy, not a separate entrypoint allow-list.
+            'music', 'specimen', 'product',
+        ]);
+    }
+
     /** @dataProvider invalidAdmissionProvider */
     public function test_admission_fails_closed_for_tampering_or_unsupported_targets(string $case): void
     {
@@ -51,12 +73,12 @@ final class MediaBindingStagingAdmissionTest extends TestCase
     }
 
     /** @return array{0:array<string,mixed>,1:CaptureRecord,2:array<string,mixed>} */
-    private function fixture(): array
+    private function fixture(string $type = 'classification'): array
     {
         $capture = new CaptureRecord(UuidCodec::newV7(), 'media-enrichment', hash('sha256', 'capture'), 'ASSETS_STORED', 'IN_PROGRESS');
         $mediaId = UuidCodec::newV7();
         $targetId = UuidCodec::newV7();
-        $binding = ['media_ref' => ['media_id' => $mediaId], 'target' => ['type' => 'classification', 'id' => $targetId], 'role' => 'representative', 'selection_source' => 'USER_EXPLICIT', 'selection_policy' => 'PINNED'];
+        $binding = ['media_ref' => ['media_id' => $mediaId], 'target' => ['type' => $type, 'id' => $targetId], 'role' => 'representative', 'selection_source' => 'USER_EXPLICIT', 'selection_policy' => 'PINNED'];
         $entry = ['media_id' => $mediaId, 'target' => $binding['target'], 'role' => 'representative', 'selection_source' => 'USER_EXPLICIT', 'selection_policy' => 'PINNED'];
         return [[
             'approved' => true, 'environment' => 'staging', 'capture_id' => $capture->captureId,

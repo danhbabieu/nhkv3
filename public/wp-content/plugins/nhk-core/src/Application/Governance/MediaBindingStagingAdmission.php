@@ -63,7 +63,10 @@ final class MediaBindingStagingAdmission
                 || (isset($target['stable_key']) && (string) $target['stable_key'] !== $targetEntity->stableKey)
                 || (isset($target['revision']) && (int) $target['revision'] !== $targetEntity->revision)
                 || !$this->eligibility->isEligible($type, [
-                    'scope' => 'representative',
+                    // The server-issued packet binds an exact Authority UUID;
+                    // admission must evaluate that strongest evidence rather
+                    // than pretend it came from a broader candidate scope.
+                    'scope' => 'exact',
                     'scope_justified' => true,
                     'representative_relevance' => true,
                 ])) return false;

@@ -207,6 +207,28 @@ target types with explicit scope evidence, then `MediaBindingService` scores
 the candidates. A tie or missing scope returns `REVIEW_REQUIRED`; reachable
 Knowledge/Brand/parent nodes and filename/title similarity are never promoted.
 
+### Authority representative target policy — 2026-09-18
+
+The shared `RepresentativeEligibilityRegistry` is the single policy owner for
+Authority targets that may receive a `representative` MediaUsage. The current
+registered public Authority profiles are `brand`, `classification`, `model`,
+`variant`, `movement`, `component`, `music`, `specimen` and `product`. Their
+representative scope recipes are respectively `exact`, `representative`,
+`broader`, `exact`, `exact`, `exact`, `exact`, `exact` and `exact`.
+
+This policy is consumed by both bounded representative discovery and staging
+admission; Capture does not maintain a second type-specific allow-list. A
+target must still resolve to an existing active Authority entity, and the
+Media must be canonical, active, non-placeholder and read-back eligible.
+`nhk.capture.ingest` is the only normal operator entrypoint. `nhk.media.bind`
+and `nhk.media.usage` remain internal/admin compatibility or Governance
+boundaries and continue to fail closed without their exact staging packet and
+capabilities. `USER_EXPLICIT/PINNED` is the owner-selected path; replacement
+demotes the previous active slot and preserves its history, while idempotent
+replay returns the existing receipt without a second active usage. Public
+entity projections read the current active representative usage only; absent,
+retired or unavailable Media remains an honest empty/unavailable state.
+
 ## Canonical file-to-Media workflow — 2026-09-08
 
 Đường upload file canonical là:
@@ -333,7 +355,8 @@ read-back and remain idempotent at the Governance proposal/attempt boundary.
 
 For `wp_post`, an applied MediaUsage mutation is still subject to
 `OwnerPublicationApplicationService` and `ArticlePublicationGate` before an
-AUTO_PUBLISH result can become public. Authority targets (Classification,
-Brand, Model and Movement) use the representative role only. Movement
-generation/type remains the registered Movement payload contract; no new
-entity type, endpoint type or registry entry is invented by MediaUsage.
+AUTO_PUBLISH result can become public. Authority targets use the
+representative role only when admitted by the registered
+`RepresentativeEligibilityRegistry` profiles. Movement generation/type
+remains the registered Movement payload contract; no new entity type,
+endpoint type or registry entry is invented by MediaUsage.

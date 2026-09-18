@@ -13529,3 +13529,53 @@ visual verification of the new local template remains pending deployment/local
 render harness.
 
 STATUS: `HOME_LATEST_HERO_LOCAL_READY / LIVE_OLD_BUILD / DEPLOYMENT_PENDING / SEMANTIC_MUTATION_NONE`.
+
+# Checkpoint — 2026-09-18 — Generic Authority representative Media admission (LOCAL ONLY)
+
+SCOPE: Repaired the shared staging admission policy for exact representative
+MediaUsage bindings through `nhk.capture.ingest`. No Media #589, Vedette 37,
+Authority record, Article, staging or production data was changed; no direct
+database write, deployment, SSH or push was performed.
+
+ROOT_CAUSE: `MediaBindingStagingAdmission` is the admission owner invoked by
+`StagingAcceptanceScopeVerifier`, while `RepresentativeEligibilityRegistry`
+is the shared representative target policy consumed by admission and bounded
+discovery. The registry omitted `brand`, `movement` and `component` (and the
+other public Authority profiles), so an exact target packet could be issued but
+was rejected before `MEDIA_RECONCILED` with `STAGING_SCOPE_NOT_ADMITTED`.
+Admission also evaluated an exact UUID packet as `scope=representative`, which
+made the existing recipe comparison reject exact-target profiles. Direct
+`nhk.media.bind` remains internal/admin and still fails closed without its
+exact staging scope/capability; this fix does not open that writer.
+
+FIX: The single shared registry now covers all registered public Authority
+profiles with representative image context: `brand`, `classification`,
+`model`, `variant`, `movement`, `component`, `music`, `specimen` and `product`.
+Exact bounded evidence is treated monotonically as stronger than each less
+specific recipe. Staging admission now passes `scope=exact`, while retaining
+exact active Authority/media validation, USER_EXPLICIT/PINNED semantics,
+server-issued Capture binding, Governance boundaries, replacement/demotion,
+idempotency and final read-back invariants.
+
+VERIFICATION: Focused representative staging, Capture, MediaBinding,
+Governance and public projection selection passes 441 tests / 2,044
+assertions. Required admission matrix covers classification, brand, model,
+variant, movement and component, plus music/specimen/product public profiles.
+Existing replacement, one-active-slot, idempotency, invalid-target and direct
+writer fail-closed coverage remains green. Media/Capture integration selection
+was discovered but skipped (29 tests, 0 assertions) because the WordPress test
+bootstrap is unavailable. Full Unit execution reached 2,076 tests / 9,479
+assertions with unrelated pre-existing environment/bootstrap errors and
+configuration-gated failures; the existing DemoCutover diagnostic mismatch
+also remains. PHP lint, documentation snapshot generation and diff check remain
+required before checkpoint commit.
+
+DOCUMENTATION: `04_MEDIA_MODEL.md` and
+`NHK_V3_CONTENT_OPERATIONS_CONTROL_PLANE.md` now document the shared target
+matrix, canonical Capture entrypoint, internal direct writers, explicit pinned
+semantics, uniqueness/replacement and projection behavior. The canonical
+snapshot was regenerated through `composer generate:mcp-docs`; its final
+source revision, documentation version and manifest hash are reported from the
+verified manifest at checkpoint handoff.
+
+STATUS: `GENERIC_AUTHORITY_REPRESENTATIVE_SCOPE_LOCAL_READY / INTEGRATION_BOOTSTRAP_BLOCKED / NO_LIVE_ACCEPTANCE / NO_DEPLOYMENT`.

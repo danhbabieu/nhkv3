@@ -529,6 +529,21 @@ Operation-scoped policy keys are target-aware where configured, for example
 MCP share this resolver and the existing Admin proposal queue. They do not
 introduce a parallel Media approval system.
 
+Representative Authority targets are governed by the shared
+`RepresentativeEligibilityRegistry`, not by target-specific Capture branches.
+The current public Authority profiles admitted for a representative slot are
+`brand`, `classification`, `model`, `variant`, `movement`, `component`,
+`music`, `specimen` and `product`. A normal user request enters through
+`nhk.capture.ingest` with an exact canonical Media, exact active Authority
+target and `USER_EXPLICIT/PINNED`; the server issues the bounded staging packet
+and the canonical Media binding service performs reconciliation and verified
+read-back. Direct `nhk.media.bind`/`nhk.media.usage` calls remain internal/admin
+compatibility or Governance paths and missing scope/capability continues to
+return `STAGING_SCOPE_REQUIRED` or the corresponding fail-closed admission
+diagnostic. Replacement preserves the old usage as history/demoted context and
+keeps exactly one active representative slot; replay of the same idempotency
+packet is deterministic.
+
 `MediaBindingService` owns the MediaUsage mutation; Graph remains the owner of
 relations. Article targets do not publish merely because a Usage proposal was
 approved: AUTO_PUBLISH must still pass
