@@ -1,5 +1,33 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-18 — Homepage request-scope read deduplication (LOCAL FIX / DEPLOYMENT PENDING)
+
+SCOPE: Audited the homepage semantic assembly and removed repeated read-model
+work inside one request. HomeSemanticQuery now memoizes the sorted Media and
+Video source lists, public Media gallery cards and Authority detail projections
+used by the unified latest feed. The change is request-local only; no
+persistent cache, stale public projection or new invalidation contract was
+introduced. Hero, unified feed ordering, public eligibility and presentation
+contracts remain unchanged. The below-fold featured article image is now lazy
+and no longer marked high priority, leaving the first Hero slide as the sole
+homepage LCP candidate with `fetchpriority=high`.
+
+ROOT_CAUSE: Homepage assembly previously listed Media and Video more than once,
+resolved each Media gallery card again while building Hero candidates and the
+latest feed, and rebuilt the same Authority detail projection while assembling
+latest items. The source contracts expose list/read boundaries but the
+repository has no verified general-purpose homepage cache with invalidation.
+
+VERIFICATION: Focused HomeSemanticQuery suite passes 9 tests / 22 assertions;
+PHP lint and git diff checks pass. The new regression test proves one source
+list read, one Video list read and one Media public-card lookup for the shared
+request. Live demo DNS and web fetch were unavailable in this environment, so
+browser metrics, HTTP timing, query counts and before/after Core Web Vitals
+remain deployment/runtime evidence gates. No semantic mutation, database
+write, staging/production change, deployment or push occurred.
+
+STATUS: `HOMEPAGE_REQUEST_SCOPE_DEDUP_LOCAL_READY / DEPLOYMENT_PENDING / SEMANTIC_MUTATION_NONE`
+
 # Checkpoint — 2026-09-18 — Media Capture completion owner resolution (LOCAL FIX / DEPLOYMENT PENDING)
 
 SCOPE: Repaired the canonical Capture completion boundary for `MEDIA_ENRICHMENT`.

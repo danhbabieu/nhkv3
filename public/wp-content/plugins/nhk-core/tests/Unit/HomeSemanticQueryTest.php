@@ -141,6 +141,38 @@ final class HomeSemanticQueryTest extends TestCase
         self::assertArrayHasKey('tie_breaker', $modules['latest_feed'][0]);
     }
 
+    public function test_home_reuses_request_scope_source_and_media_projection_reads(): void
+    {
+        $media = new Media($mediaId = UuidCodec::newV7(), 'memo-photo', 'Ảnh memo', 'ready');
+        $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'derivative', 'memo.webp', hash('sha256', 'memo'), 'image/webp', 1, 640, 480, 'PUBLIC', ['canonical_filename' => 'memo.webp']);
+        $mediaRepo = new class([$media]) implements MediaRepository {
+            public int $listCalls = 0;
+            public int $findCalls = 0;
+            public function __construct(private array $items) {}
+            public function findByCanonicalId(string $id): ?Media { $this->findCalls++; foreach ($this->items as $item) if ($item->canonicalId === $id) return $item; return null; }
+            public function findByStableKey(string $key): ?Media { return null; }
+            public function create(Media $media): Media { return $media; }
+            public function update(Media $media, int $expectedRevision): Media { return $media; }
+            public function list(bool $includeRetired = false): array { $this->listCalls++; return $this->items; }
+        };
+        $videoRepo = new class([]) implements VideoRepository {
+            public int $listCalls = 0;
+            public function findByCanonicalId(string $id): ?Video { return null; }
+            public function findByExternalReference(string $platform, string $id): ?Video { return null; }
+            public function create(Video $video): Video { return $video; }
+            public function update(Video $video, int $expectedRevision): Video { return $video; }
+            public function list(bool $includeRetired = false): array { $this->listCalls++; return []; }
+        };
+        $gallery = new PublicMediaGalleryQuery($mediaRepo, $this->assets([$asset]));
+
+        (new HomeSemanticQuery(new InMemoryAuthorityRepository(), $mediaRepo, $videoRepo, new EntityTypeRegistry(), null, null, null, $gallery))
+            ->extend(['entities' => [], 'media' => [], 'videos' => []]);
+
+        self::assertSame(1, $mediaRepo->listCalls);
+        self::assertSame(1, $mediaRepo->findCalls);
+        self::assertSame(1, $videoRepo->listCalls);
+    }
+
     private function media(array $items): MediaRepository
     {
         return new class($items) implements MediaRepository {

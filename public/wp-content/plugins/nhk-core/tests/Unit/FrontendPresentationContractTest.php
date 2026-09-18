@@ -46,6 +46,14 @@ final class FrontendPresentationContractTest extends TestCase
         self::assertLessThan(strpos($source, 'class="featured-section"'), strpos($source, 'class="hero-latest-feed"'));
     }
 
+    public function test_homepage_prioritizes_only_the_hero_lcp_image(): void
+    {
+        $source = $this->read('front-page.php');
+        self::assertStringContainsString('$index === 0 ? \'loading="eager" fetchpriority="high"\' : \'loading="lazy"\'', $source);
+        self::assertStringContainsString("['loading' => 'lazy', 'alt' => get_the_title()]", $source);
+        self::assertStringNotContainsString("['loading' => 'eager', 'fetchpriority' => 'high', 'alt' => get_the_title()]", $source);
+    }
+
     public function test_entity_detail_renders_dossier_knowledge_gallery_and_path_aware_related_content(): void
     {
         $source = $this->read('entity.php');
