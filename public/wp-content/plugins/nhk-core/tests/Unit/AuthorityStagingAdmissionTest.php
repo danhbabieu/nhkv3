@@ -24,6 +24,13 @@ final class AuthorityStagingAdmissionTest extends TestCase
         self::assertTrue((new AuthorityStagingAdmission())(false, $scope, $capture, $input, []));
     }
 
+    public function test_relation_only_approved_plan_is_admitted_without_entity_requests(): void
+    {
+        [$scope, $capture, $input] = $this->relationOnlyFixture();
+
+        self::assertTrue((new AuthorityStagingAdmission())(false, $scope, $capture, $input, []));
+    }
+
     public function test_admission_is_not_an_atherton_or_capture_allowlist(): void
     {
         [$scope, $capture, $input] = $this->fixture();
@@ -93,5 +100,43 @@ final class AuthorityStagingAdmissionTest extends TestCase
         unset($binding);
         $scope['dependency_fingerprint'] = hash('sha256', CommandCanonicalizer::canonicalize(array_map(static fn (array $binding): array => [$binding['candidate_id'], $binding['dependencies']], $scope['candidate_bindings'])));
         return [$scope, $capture, ['authority_intent' => ['requests' => [['entity_type' => 'model', 'operation' => 'create', 'name' => 'Atherton', 'payload' => ['brand_uuid' => '01a090fd-9a71-7665-af5f-08f6e25b533e']]]]]];
+    }
+
+    /** @return array{0:array<string,mixed>,1:CaptureRecord,2:array<string,mixed>} */
+    private function relationOnlyFixture(): array
+    {
+        $capture = new CaptureRecord(
+            '01a0b2bd-d342-7f0e-9931-f03505c9cac7',
+            'relation-only',
+            str_repeat('d', 64),
+            'AUTHORITY_PLANNED',
+            'IN_PROGRESS',
+            context: ['purpose' => 'AUTHORITY']
+        );
+        $relations = [
+            ['candidate_id' => 'relation-model-of', 'source_type' => 'model', 'source_uuid' => '01a00000-0000-7000-8000-000000000001', 'source_revision' => 3, 'predicate' => 'model_of', 'target_type' => 'brand', 'target_uuid' => '01a00000-0000-7000-8000-000000000002', 'target_revision' => 4],
+            ['candidate_id' => 'relation-classified-as', 'source_type' => 'model', 'source_uuid' => '01a00000-0000-7000-8000-000000000001', 'source_revision' => 3, 'predicate' => 'classified_as', 'target_type' => 'classification', 'target_uuid' => '01a00000-0000-7000-8000-000000000003', 'target_revision' => 2],
+            ['candidate_id' => 'relation-about', 'source_type' => 'brand', 'source_uuid' => '01a00000-0000-7000-8000-000000000002', 'source_revision' => 4, 'predicate' => 'about', 'target_type' => 'knowledge', 'target_uuid' => '01a00000-0000-7000-8000-000000000004', 'target_revision' => 5],
+        ];
+        $bindings = [];
+        foreach ($relations as $relation) {
+            $binding = ['candidate_id' => $relation['candidate_id'], 'entity_type' => 'relation', 'operation' => 'relation_create', 'subject_id' => $relation['source_uuid'], 'dependencies' => []] + $relation;
+            $binding['candidate_payload_fingerprint'] = str_repeat('a', 64);
+            $binding['dependency_fingerprint'] = hash('sha256', CommandCanonicalizer::canonicalize([]));
+            $binding['binding_fingerprint'] = hash('sha256', CommandCanonicalizer::canonicalize($binding));
+            $bindings[] = $binding;
+        }
+        $candidateIds = array_column($bindings, 'candidate_id');
+        $scope = [
+            'approved' => true, 'environment' => 'staging', 'capture_id' => $capture->captureId,
+            'capture_fingerprint' => $capture->requestFingerprint, 'request_fingerprint' => $capture->requestFingerprint,
+            'operation_family' => 'governed_authority_plan', 'writer' => 'canonical_governed',
+            'entrypoint' => 'nhk.capture.ingest', 'intent' => 'AUTHORITY',
+            'plan_fingerprint' => str_repeat('e', 64), 'candidate_bindings' => $bindings,
+            'approved_candidate_ids' => $candidateIds,
+        ];
+        $scope['dependency_fingerprint'] = hash('sha256', CommandCanonicalizer::canonicalize(array_map(static fn (array $binding): array => [$binding['candidate_id'], $binding['dependencies']], $bindings)));
+
+        return [$scope, $capture, ['authority_intent' => ['relation_intents' => [['predicate' => 'about']]]]];
     }
 }

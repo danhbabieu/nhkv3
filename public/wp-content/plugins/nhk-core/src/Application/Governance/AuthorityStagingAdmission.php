@@ -64,10 +64,13 @@ final class AuthorityStagingAdmission
             || !preg_match('/^[a-f0-9]{64}$/i', (string) ($scope['dependency_fingerprint'] ?? ''))
             || !hash_equals((string) $scope['dependency_fingerprint'], hash('sha256', \NHK\Core\Domain\Governance\CommandCanonicalizer::canonicalize($dependencyClosure)))) return false;
 
-        // The persisted planning input is request context, not an approval
-        // switch. Approval caused this issuer to run; structured requests keep
-        // malformed or legacy Captures from receiving a staging scope.
-        return array_values(array_filter((array) ($input['authority_intent']['requests'] ?? []), 'is_array')) !== [];
+        // The immutable approved plan has already been reduced to the exact
+        // signed candidate bindings above. Do not require a particular input
+        // shape here: relation-only plans legitimately contain
+        // `relation_intents` without entity `requests`. The scope is admitted
+        // from its Capture/plan/candidate bindings, never from a data-specific
+        // request allowlist.
+        return true;
     }
 
     /** @param array<string,mixed> $binding */
