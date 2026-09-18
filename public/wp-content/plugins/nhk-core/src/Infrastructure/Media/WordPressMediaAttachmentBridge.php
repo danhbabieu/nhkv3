@@ -210,7 +210,7 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
             }
             if ($source instanceof MediaAsset && $derivative instanceof MediaAsset) {
                 $currentChecksum = hash_file('sha256', $filePath);
-                $mappedAsset = strtolower((string) get_post_mime_type($attachmentId)) === 'image/webp' ? $derivative : $source;
+                $mappedAsset = $this->assetRepresentedByAttachment((string) get_post_mime_type($attachmentId), $source, $derivative);
                 if (is_string($currentChecksum) && $currentChecksum !== '' && $mappedAsset->checksum === $currentChecksum && $existingMedia->readiness === 'ready') {
                     // WordPress keeps raster attachments on their original
                     // _wp_attached_file. Map/read back that physical raster
@@ -412,6 +412,11 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
         $root = is_array($upload) ? (string) ($upload['basedir'] ?? '') : '';
         if ($root === '') throw new RuntimeException('WORDPRESS_MEDIA_PUBLIC_STORAGE_UNAVAILABLE');
         return rtrim($root, '/\\');
+    }
+
+    private function assetRepresentedByAttachment(string $attachmentMime, MediaAsset $source, MediaAsset $derivative): MediaAsset
+    {
+        return strtolower($attachmentMime) === 'image/webp' ? $derivative : $source;
     }
 
     private function sourceExtension(string $mime): string
