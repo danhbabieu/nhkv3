@@ -5,7 +5,7 @@ namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Entity\EntityMediaProjection;
 use NHK\Core\Application\Media\MediaEnrichmentFrontendReadbackVerifier;
-use NHK\Core\Application\Mcp\McpReadHandler;
+use NHK\Core\Application\Mcp\{McpAbilityRegistration, McpReadHandler, McpToolCatalog};
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaBindingOperationRepository, MediaRepository, MediaUsageRepository};
 use NHK\Core\Domain\Authority\{AuthorityEntity, CanonicalEntityTypeCatalog, EntityTypeRegistry};
@@ -15,6 +15,13 @@ use PHPUnit\Framework\TestCase;
 
 final class MediaBindingReadbackContractTest extends TestCase
 {
+    public function test_media_binding_read_is_registered_described_and_dispatchable(): void
+    {
+        self::assertTrue(McpToolCatalog::has('nhk.media.binding.get'));
+        self::assertTrue(McpToolCatalog::hasExecutableDispatchHandler('nhk.media.binding.get'));
+        self::assertSame('nhk-v3/media-binding-get', McpAbilityRegistration::abilityNameForTool('nhk.media.binding.get'));
+    }
+
     public function test_durable_binding_receipt_reads_by_operation_and_idempotency_key(): void
     {
         $operationId = UuidCodec::newV7();

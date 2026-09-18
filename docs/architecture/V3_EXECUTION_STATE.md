@@ -1,5 +1,39 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-18 — Media binding receipt dispatch and frontend readback proof (LOCAL READY / LIVE VERIFY PENDING)
+
+SCOPE: Narrowed the repair to the already-existing Media binding receipt read
+path and the Capture-owned `MEDIA_ENRICHMENT` final readback. No frontend
+renderer, representative resolver, MediaUsage, Capture, semantic record,
+staging/production data, deployment, SSH/rsync or remote checkout was changed.
+
+ROOT_CAUSE: `nhk.media.binding.get` was present in the catalog, WordPress
+Ability map and canonical dispatch registry, but
+`McpAbilityRegistration::execute()` had no matching read case and therefore
+fell through to the misleading `NHK V3 read ability is not registered.` error.
+The final Media enrichment readback also returned no machine-verifiable public
+projection proof even when the Classification card already rendered the right
+representative image.
+
+FIX: The read handler now resolves the durable binding operation by
+`operation_id` or idempotency key through the existing repository, and the
+Ability registration is wired to the WPDB repository. The generic frontend
+readback verifier requires an eligible public target, exactly one active
+representative MediaUsage, a ready/public canonical projection and exact Media
+UUID equality; every mismatch fails closed. The final Capture readback exposes
+`frontend_verified=true` only after that proof succeeds. No static UUID
+allowlist or renderer special case was added.
+
+VERIFICATION: Focused Unit selection passes 67 tests / 784 assertions; broader
+MCP/Media/Completion/Plugin Unit selection passes 255 tests / 2,293 assertions
+with one existing warning and deprecations; NHK Contract passes 6 tests / 48
+assertions; full plugin PHP lint and `git diff --check` pass; changed-scope
+secret scan is clean. Catalog/docs were not changed, so documentation
+generation was not required. Live registered/descriptor/dispatch and receipt
+read-back remain pending until the deployed checkout contains this revision.
+
+STATUS: `MEDIA_BINDING_RECEIPT_DISPATCH_LOCAL_READY / FRONTEND_READBACK_PROOF_LOCAL_READY / LIVE_VERIFY_PENDING / SEMANTIC_MUTATION_NONE`
+
 # Checkpoint — 2026-09-18 — Bounded W64 Video staging admission (LOCAL READY / DEPLOY PENDING)
 
 SCOPE: Added the smallest repository-owned staging admission package for the
