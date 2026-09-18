@@ -12224,7 +12224,8 @@ deprecations. `composer lint`, changed-scope PHP lint, `git diff --check` and
 changed-scope secret review pass. No staging/live acceptance, deployment,
 database write, upload, Video or Graph mutation was performed.
 
-COMMITS: `3f982b4e` (RED regression), `8bbf719f` (production fix).
+COMMITS: `3f982b4e` (RED regression), `8bbf719f` and `164a4f89`
+(production fix and single fact-selection boundary).
 
 STATUS: `SLICE_4_TASK_2_RASTER_ALIGNMENT_LOCAL_READY / FORMAL_REVIEW_PENDING / LIVE_ACCEPTANCE_BLOCKED`.
 
