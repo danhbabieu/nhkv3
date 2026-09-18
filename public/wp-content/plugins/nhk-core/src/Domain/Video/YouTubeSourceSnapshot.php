@@ -26,6 +26,7 @@ final readonly class YouTubeSourceSnapshot
         public string $sourceHash = '',
         public array $thumbnailSelection = [],
         public array $thumbnailCandidates = [],
+        public array $thumbnailPresentation = [],
     ) {
         if ($platform !== 'youtube' || !preg_match('/^[A-Za-z0-9_-]{11}$/', $externalVideoId) || $canonicalSourceUrl !== 'https://www.youtube.com/watch?v=' . $externalVideoId) {
             throw new InvalidVideoReference('YouTube source snapshot identity is invalid.');
@@ -65,6 +66,7 @@ final readonly class YouTubeSourceSnapshot
             self::nullableString($data['source_hash'] ?? null) ?? '',
             is_array($data['thumbnail_selection'] ?? null) ? $data['thumbnail_selection'] : [],
             self::thumbnailCandidates($data['thumbnail_candidates'] ?? []),
+            is_array($data['thumbnail_presentation'] ?? null) ? $data['thumbnail_presentation'] : [],
         );
     }
 
@@ -92,6 +94,7 @@ final readonly class YouTubeSourceSnapshot
             'source_hash' => $this->sourceHash,
             'thumbnail_selection' => $this->thumbnailSelection,
             'thumbnail_candidates' => $this->thumbnailCandidates,
+            'thumbnail_presentation' => $this->thumbnailPresentation,
         ];
     }
 

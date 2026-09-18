@@ -71,6 +71,7 @@ final class McpContractTest extends TestCase
             'nhk.article.publish', 'nhk.article.publish.review', 'nhk.article.publish.approve', 'nhk.article.trash', 'nhk.article.restore',
             'nhk.entity.get',
             'nhk.media.get',
+            'nhk.media.update',
             'nhk.media.binding.get',
             'nhk.media.bind',
             'nhk.media.usage',
@@ -80,6 +81,7 @@ final class McpContractTest extends TestCase
             'nhk.media.ingest',
             'nhk.media.attachment.get',
             'nhk.video.ingest',
+            'nhk.video.source.refresh',
             'nhk.video.get',
             'nhk.knowledge.get',
             'nhk.source.get',
@@ -278,6 +280,7 @@ final class McpContractTest extends TestCase
             'merge',
             'rename',
             'update',
+            'source_refresh',
             'retire',
             'reactivate',
             'collector_facet_update',
@@ -488,7 +491,9 @@ final class McpContractTest extends TestCase
             'nhk-v3/article-trash',
             'nhk-v3/article-restore',
             'nhk-v3/video-ingest',
+            'nhk-v3/video-source-refresh',
             'nhk-v3/media-ingest',
+            'nhk-v3/media-update',
             'nhk-v3/media-bind',
             'nhk-v3/media-usage',
             'nhk-v3/media-upload-batch',
@@ -560,6 +565,33 @@ final class McpContractTest extends TestCase
         self::assertSame('nhk-v3/media-ingest', McpAbilityRegistration::abilityNameForTool('nhk.media.ingest'));
         self::assertContains('nhk-v3/media-ingest', McpAbilityRegistration::governedAbilityNames());
         self::assertArrayNotHasKey('nhk.media.ingest', McpAbilityRegistration::explicitExclusionReasons());
+    }
+
+    public function test_media_update_is_registered_exposed_and_dispatchable(): void
+    {
+        self::assertTrue(McpToolCatalog::has('nhk.media.update'));
+        self::assertTrue(McpToolCatalog::isGoverned('nhk.media.update'));
+        self::assertTrue(McpToolCatalog::hasExecutableDispatchHandler('nhk.media.update'));
+        self::assertSame('nhk-v3/media-update', McpAbilityRegistration::abilityNameForTool('nhk.media.update'));
+        self::assertSame('wp_ability_nhk_v3_media_update', McpAbilityRegistration::connectorToolNameForAbility('nhk-v3/media-update'));
+        self::assertTrue(McpAbilityRegistration::callableParity()['nhk.media.update']['easy_mcp_descriptor_exposed']);
+        self::assertTrue(McpAbilityRegistration::callableParity()['nhk.media.update']['callable_dispatched']);
+    }
+
+    public function test_media_update_requires_internal_capability_before_service_dispatch(): void
+    {
+        $transport = new McpTransport(
+            $this->readHandler(),
+            new McpGovernanceHandler(new GovernanceService(new InMemoryProposalRepository())),
+            static fn (string $capability): bool => $capability === 'read',
+        );
+        $response = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/call', 'params' => [
+            'name' => 'nhk.media.update',
+            'arguments' => ['media_ref' => ['id' => UuidCodec::newV7()], 'expected_revision' => 1, 'name' => 'Repair', 'idempotency_key' => 'media-update-test'],
+        ]]);
+        self::assertSame(200, $response['status']);
+        self::assertTrue($response['body']['result']['isError']);
+        self::assertSame('DIRECT_WRITE_BLOCKED', $response['body']['result']['structuredContent']['error']['code']);
     }
 
     public function test_multipart_batch_upload_is_exposed_as_a_file_capable_ability(): void

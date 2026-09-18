@@ -1,5 +1,30 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-18 — Performance Phase 3.8 governed Video source refresh (LOCAL / NO LIVE MUTATION)
+
+SCOPE: Implemented the bounded internal/admin `nhk.video.source.refresh`
+command and registered `video + source_refresh` Controlled Apply operation.
+No staging/live refresh, remote API call, database write, deployment or
+semantic mutation was performed in this checkpoint.
+
+OWNERSHIP: `VideoSyncService` remains comparison-only. The application command
+`VideoSourceRefreshCommand` owns source-refresh planning and idempotency binding;
+`VideoService::applySourceRefresh` is the application writer over the canonical
+`VideoRepository`; `CanonicalApplyReadBackVerifier` owns final Video read-back;
+Governance owns Proposal, CAS eligibility and Controlled Apply.
+
+BOUNDARY: The command accepts one Video UUID, expected Video revision, optional
+expected source revision and idempotency key. It derives the YouTube identity
+from the canonical Video, validates the official API snapshot and creates a
+Proposal. Controlled Apply replaces only the existing `source` or
+`source_snapshot` field, including bounded thumbnail candidates/presentation.
+Editorial title/body, subject, Graph relations, Media identity and active state
+are preserved. API failure, malformed snapshots, stale Video/source revisions
+and changed idempotency bindings fail closed with zero source mutation.
+
+STATUS: `VIDEO_SOURCE_REFRESH_LOCAL_READY / CAS_AND_IDEMPOTENCY_IMPLEMENTED /
+CANONICAL_READBACK_WIRED / LIVE_MUTATION_NONE`
+
 # Checkpoint — 2026-09-18 — Performance Phase 3.7 legacy Video metadata contract resolution (READ-ONLY / NO SYNC PATH)
 
 SCOPE: Read-only contract and executable-catalog audit for legacy YouTube
@@ -14110,3 +14135,32 @@ usable summary. PHP lint and `git diff --check` pass. No live acceptance was
 run.
 
 STATUS: `GOVERNED_VIDEO_PROPOSAL_READBACK_LOCAL_READY / DEPLOYMENT_PENDING / NO_LIVE_ACCEPTANCE`.
+
+# Checkpoint — 2026-09-18 — Existing Video Capture retry reuses pending Proposal (LOCAL READY / DEPLOYMENT PENDING)
+
+SCOPE: Fixed the generic existing-Capture Video retry path after Proposal
+creation. No Capture, Video, Proposal, database, staging packet or live
+acceptance was mutated; no live retry was run.
+
+ROOT_CAUSE: `plans()` rebuilt the Video provenance/ingest plan from the
+Capture-derived asset on retry and `scopeVideoPlan()` issued a new staging
+packet before Governance looked up the persisted pending Proposal. The packet
+was consequently admitted as a fresh ingest against derived state and could
+reach `StagingAcceptanceScopeVerifier::issueForVideoPlan()` line 200, where
+`VideoStagingAdmission::__invoke()` rejected it as `STAGING_SCOPE_NOT_ADMITTED`.
+
+FIX: When an existing Capture has a matching persisted Video ingest Proposal
+with `REVIEW_REQUIRED`, the continuation now carries the canonical Proposal
+UUID directly to `runGovernedPlan()`. Governance performs the authoritative
+review/read-back, preserving approval state and content/dependency fingerprints;
+the pre-proposal staging issuer is not called. Fresh Captures and existing
+Captures without a pending Proposal retain the normal scope-admission path.
+
+VERIFICATION: Fixture-shaped retry regression passes with Proposal count one,
+same Video UUID, YouTube external ID, canonical source URL, subject packet and
+`expected_revision=0`; the scope issuer is asserted not to run. Wrong/tampered
+scope coverage remains green in the existing verifier/admission tests. Focused
+continuation/verifier/admission/publication slice passes 55 tests / 253
+assertions with existing deprecations. PHP lint and `git diff --check` pass.
+
+STATUS: `EXISTING_VIDEO_RETRY_PROPOSAL_REUSE_LOCAL_READY / DEPLOYMENT_PENDING / NO_LIVE_ACCEPTANCE`.

@@ -11,6 +11,11 @@ final class VideoService
 {
     public function __construct(private VideoRepository $videos, private $dictionaryObserver = null) {}
 
+    public function find(string $id): ?Video
+    {
+        return $this->videos->findByCanonicalId($id);
+    }
+
     public function ingestUrl(string $url, string $title = '', array $metadata = [], ?string $thumbnailMediaId = null, ?string $canonicalId = null, bool $active = true): Video
     {
         $normalized = Video::fromUrl($url);
@@ -50,13 +55,27 @@ final class VideoService
         ), $video->revision);
     }
 
-    public function update(string $id, string $title, array $metadata, ?string $thumbnailMediaId, int $revision): Video
+    public function update(string $id, string $title, array $metadata, ?string $thumbnailMediaId, int $revision, bool $observe = true): Video
     {
         $current = $this->videos->findByCanonicalId($id);
         if (!$current) throw new VideoException('Video not found.');
         $video = $this->videos->update(new Video($current->canonicalId, $current->platform, $current->externalVideoId, $current->canonicalUrl, $title, $metadata, $thumbnailMediaId, $current->active, $current->revision), $revision);
-        $this->observe($video);
+        if ($observe) $this->observe($video);
         return $video;
+    }
+
+    public function applySourceRefresh(string $id, array $sourceSnapshot, string $sourceKey, int $expectedSourceRevision, int $expectedVideoRevision): Video
+    {
+        $current = $this->videos->findByCanonicalId($id);
+        if ($current === null) throw new VideoException('VIDEO_NOT_FOUND');
+        if ($current->revision !== $expectedVideoRevision) throw new VideoException('VIDEO_REVISION_CONFLICT');
+        $existing = is_array($current->metadata[$sourceKey] ?? null) ? $current->metadata[$sourceKey] : [];
+        $actualSourceRevision = max(0, (int) ($existing['source_revision'] ?? $current->metadata['source_revision'] ?? 0));
+        if ($actualSourceRevision !== $expectedSourceRevision) throw new VideoException('SOURCE_REVISION_CONFLICT');
+        if (!in_array($sourceKey, ['source', 'source_snapshot'], true)) throw new VideoException('SOURCE_FIELD_SCOPE_INVALID');
+        $metadata = $current->metadata;
+        $metadata[$sourceKey] = $sourceSnapshot;
+        return $this->update($id, $current->title, $metadata, $current->thumbnailMediaId, $expectedVideoRevision, false);
     }
 
     public function retire(string $id, int $revision): Video { return $this->changeState($id, $revision, false); }

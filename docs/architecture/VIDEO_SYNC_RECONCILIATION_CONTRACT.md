@@ -16,3 +16,26 @@ provenance and historical relations.
 The current `VideoSyncService` is a read-only comparison boundary. Applying a
 new snapshot or reconciliation proposal remains subject to the existing
 Proposal → human approval → eligibility → Controlled Apply lifecycle.
+
+## Governed source refresh — Performance Phase 3.8
+
+The registered internal/admin command `nhk.video.source.refresh` creates a
+`video + source_refresh` Proposal for exactly one canonical Video. It accepts
+only the Video UUID, expected Video revision, optional expected source revision
+and an idempotency key. The command resolves the Video's canonical YouTube
+identity, fetches the official API snapshot through `YouTubeDataApiClient`,
+validates the bounded `YouTubeSourceSnapshot`, compares it with persisted source
+metadata and returns a Proposal; it never writes directly.
+
+Controlled Apply may replace only the existing `source` or `source_snapshot`
+metadata field, including `thumbnail_candidates`, `thumbnail_presentation`,
+canonical thumbnail selection and other fields owned by that snapshot. Video
+title, editorial package, subject handoff, Graph relations, Media identity and
+active/publication state are protected. Both Video revision and source revision
+are checked; stale bindings fail with zero mutation. Source/API failure and
+malformed snapshots create no Proposal and preserve the old snapshot.
+
+Same idempotency key and request binding replays the same Proposal. A changed
+binding conflicts. Controlled Apply returns the canonical Video read-back; a
+no-change comparison is represented as a governed no-op Proposal and does not
+increment source or Video revision.

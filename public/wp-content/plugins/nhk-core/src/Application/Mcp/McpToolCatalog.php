@@ -178,6 +178,18 @@ final class McpToolCatalog
             self::tool('nhk.article.restore', 'Restore one trashed native WordPress Post to draft with state-token CAS.', ['post_id' => ['type' => 'integer', 'minimum' => 1], 'expected_state_token' => ['type' => 'string', 'pattern' => '^[a-fA-F0-9]{64}$'], 'idempotency_key' => ['type' => 'string', 'minLength' => 1]], ['post_id', 'expected_state_token', 'idempotency_key'], true),
             self::tool('nhk.entity.get', 'Read one active Authority entity by type and UUID.', ['type' => ['type' => 'string', 'minLength' => 1], 'id' => self::uuidField()], ['type', 'id']),
             self::tool('nhk.media.get', 'Read one active Media identity and its public assets.', ['id' => self::uuidField()], ['id']),
+            self::tool('nhk.media.update', 'Create a governed Proposal to repair bounded metadata on one existing canonical Media. The binary, Media identity, MediaAsset records and MediaUsage rows are never replaced or rewritten.', [
+                'media_ref' => ['type' => 'object', 'properties' => [
+                    'id' => self::uuidField(),
+                    'stable_key' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 191],
+                    'attachment_id' => ['type' => 'integer', 'minimum' => 1],
+                ], 'minProperties' => 1, 'additionalProperties' => false],
+                'expected_revision' => ['type' => 'integer', 'minimum' => 1],
+                'name' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 255],
+                'readiness' => ['type' => 'string', 'enum' => ['draft', 'ready', 'blocked']],
+                'provenance' => ['type' => 'object'],
+                'idempotency_key' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 191],
+            ], ['media_ref', 'expected_revision', 'idempotency_key'], true),
             self::tool('nhk.media.binding.get', 'Read one durable Media binding operation receipt by operation_id or idempotency_key.', ['operation_id' => self::uuidField(), 'idempotency_key' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 191]], []),
             self::tool('nhk.media.bind', 'Bind an existing canonical Media to one exact Authority Entity as a contextual representative usage with durable idempotency and final read-back. USER_EXPLICIT/PINNED uses the placement boundary; SYSTEM_AUTO/AUTO is wrapped in the shared Governance representative_bind Proposal flow.', [
                 'idempotency_key' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 191],
@@ -284,6 +296,12 @@ final class McpToolCatalog
                     ],
                 ],
             ], ['url'], true),
+            self::tool('nhk.video.source.refresh', 'Create a bounded governed Proposal to refresh only the persisted YouTube source snapshot for one canonical Video. No Video identity, editorial or relation fields are accepted.', [
+                'video_id' => self::uuidField(),
+                'expected_revision' => ['type' => 'integer', 'minimum' => 1],
+                'expected_source_revision' => ['type' => 'integer', 'minimum' => 0],
+                'idempotency_key' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 191],
+            ], ['video_id', 'expected_revision', 'idempotency_key'], true),
             self::tool('nhk.video.get', 'Read one active canonical external Video reference.', ['id' => self::uuidField()], ['id']),
             self::tool('nhk.knowledge.get', 'Read one active Knowledge claim with public evidence.', ['id' => self::uuidField()], ['id']),
             self::tool('nhk.source.get', 'Read one active public Knowledge source with public evidence.', ['id' => self::uuidField()], ['id']),
@@ -538,6 +556,6 @@ final class McpToolCatalog
     /** @return list<string> */
     public static function governedOperations(): array
     {
-        return ['create', 'ingest', 'relation_create', 'rekey', 'merge', 'rename', 'update', 'retire', 'reactivate', 'collector_facet_update', 'relation_retire', 'relation_reactivate'];
+        return ['create', 'ingest', 'relation_create', 'rekey', 'merge', 'rename', 'update', 'source_refresh', 'retire', 'reactivate', 'collector_facet_update', 'relation_retire', 'relation_reactivate'];
     }
 }

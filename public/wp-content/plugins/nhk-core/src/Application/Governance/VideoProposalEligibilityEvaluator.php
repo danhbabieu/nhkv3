@@ -31,6 +31,21 @@ final class VideoProposalEligibilityEvaluator
     /** @return list<string> */
     public function evaluate(Proposal $proposal): array
     {
+        if ($proposal->entityType === 'video' && $proposal->operation === 'source_refresh') {
+            $video = $this->videos->findByCanonicalId($proposal->targetUuid ?: $proposal->subjectId);
+            if ($video === null) return ['VIDEO_NOT_FOUND'];
+            if ($proposal->expectedRevision !== $video->revision) return ['VIDEO_REVISION_CONFLICT'];
+            $payload = $proposal->payload;
+            if (!is_array($payload['source_snapshot'] ?? null)) return ['SOURCE_SNAPSHOT_INVALID'];
+            try { \NHK\Core\Domain\Video\YouTubeSourceSnapshot::fromArray($payload['source_snapshot']); } catch (\Throwable) { return ['SOURCE_SNAPSHOT_INVALID']; }
+            $key = (string) ($payload['source_key'] ?? '');
+            if (!in_array($key, ['source', 'source_snapshot'], true)) return ['SOURCE_FIELD_SCOPE_INVALID'];
+            $stored = is_array($video->metadata[$key] ?? null) ? $video->metadata[$key] : [];
+            $actual = max(0, (int) ($stored['source_revision'] ?? $video->metadata['source_revision'] ?? 0));
+            if ($actual !== (int) ($payload['expected_source_revision'] ?? -1)) return ['SOURCE_REVISION_CONFLICT'];
+            if (($payload['source_snapshot']['external_video_id'] ?? '') !== $video->externalVideoId) return ['SOURCE_IDENTITY_CONFLICT'];
+            return [];
+        }
         if ($proposal->entityType !== 'video' || $proposal->operation !== 'ingest') return [];
         $metadata = is_array($proposal->payload['metadata'] ?? null) ? $proposal->payload['metadata'] : [];
         $attachments = $metadata['semantic_attachments'] ?? null;

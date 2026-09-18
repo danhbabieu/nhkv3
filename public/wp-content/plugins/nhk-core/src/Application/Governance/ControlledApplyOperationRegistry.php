@@ -12,7 +12,7 @@ final class ControlledApplyOperationRegistry implements OperationCompatibility
         'source' => ['create', 'ingest', 'update', 'retire', 'reactivate'],
         'evidence' => ['create', 'ingest', 'update', 'retire', 'reactivate'],
         'media' => ['ingest', 'update', 'add', 'replace', 'remove', 'representative_bind', 'relation_create', 'relation_retire', 'relation_reactivate'],
-        'video' => ['ingest', 'update', 'retire', 'reactivate', 'relation_create', 'relation_retire', 'relation_reactivate'],
+        'video' => ['ingest', 'update', 'source_refresh', 'retire', 'reactivate', 'relation_create', 'relation_retire', 'relation_reactivate'],
         'wp_post' => ['relation_create', 'relation_retire', 'relation_reactivate'],
         'relation' => ['relation_create', 'relation_retire', 'relation_reactivate'],
     ];

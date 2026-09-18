@@ -399,6 +399,11 @@ the bounded canonical metadata delta. It uses the same Proposal → Governance �
 Controlled Apply → canonical read-back lifecycle; it never rewrites the binary,
 stable key, attachment identity or MediaUsage rows.
 
+The standalone internal/admin capability `nhk.media.update` is the connector
+projection of that same existing-Media repair boundary. It requires an exact
+Media locator, an explicit expected revision and idempotency key, and returns a
+governed Proposal until the normal approval/apply/read-back lifecycle completes.
+
 ### Documentation bootstrap surface
 
 The normal read-only MCP catalog exposes `nhk.documentation.bootstrap`,

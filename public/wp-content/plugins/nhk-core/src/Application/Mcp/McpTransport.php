@@ -5,6 +5,7 @@ namespace NHK\Core\Application\Mcp;
 
 use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Core\Application\Video\VideoIntakeService;
+use NHK\Core\Application\Video\VideoSourceRefreshCommand;
 use NHK\Core\Contracts\Media\WordPressMediaAttachmentIngestor;
 use NHK\Core\Application\Media\{ImageIngestEntrypoint, MediaBatchUploadService, MediaBindingService};
 use NHK\Core\Application\WordPress\{CategoryGateway, EditorialDraftGateway};
@@ -44,6 +45,7 @@ final class McpTransport
         private ?ImageIngestEntrypoint $imageIngest = null,
         private ?SemanticWritePolicyResolver $semanticWritePolicy = null,
         private ?MediaBindingService $mediaBinding = null,
+        private ?VideoSourceRefreshCommand $videoSourceRefresh = null,
     ) {}
 
     /** @return array{status:int,body:?array} */
@@ -148,10 +150,11 @@ final class McpTransport
             'nhk.capture.ingest' => 'nhk_ingest_articles',
             'nhk.category.create', 'nhk.category.update', 'nhk.category.assign', 'nhk.category.unassign', 'nhk.category.delete', 'nhk.article.draft.create', 'nhk.article.draft.update', 'nhk.article.publish', 'nhk.article.publish.review', 'nhk.article.publish.approve', 'nhk.article.trash', 'nhk.article.restore' => 'nhk_ingest_articles',
             'nhk.proposal.create' => 'nhk_create_proposals',
-            'nhk.media.ingest', 'nhk.media.bind', 'nhk.media.usage' => 'nhk_create_proposals',
+            'nhk.media.ingest', 'nhk.media.update', 'nhk.media.bind', 'nhk.media.usage' => 'nhk_create_proposals',
             'nhk.media.upload-batch' => 'upload_files',
             'nhk.media.widget-upload' => 'upload_files',
             'nhk.video.ingest' => 'nhk_create_proposals',
+            'nhk.video.source.refresh' => 'nhk_create_proposals',
             'nhk.knowledge.ingest', 'nhk.source.ingest', 'nhk.evidence.ingest' => 'nhk_create_proposals',
             'nhk.proposal.submit' => 'nhk_submit_proposals',
             'nhk.proposal.review' => 'nhk_view_governance',
@@ -197,6 +200,7 @@ final class McpTransport
             'nhk.article.restore' => $this->drafts?->restore((int) ($arguments['post_id'] ?? 0), (string) ($arguments['expected_state_token'] ?? ''), (string) ($arguments['idempotency_key'] ?? '')) ?? throw new \RuntimeException('EDITORIAL_DRAFT_GATEWAY_UNAVAILABLE'),
             'nhk.entity.get' => $this->read->entityGet((string) ($arguments['type'] ?? ''), (string) ($arguments['id'] ?? '')),
             'nhk.media.get' => $this->read->mediaGet((string) ($arguments['id'] ?? '')),
+            'nhk.media.update' => $this->mediaUpdate($arguments),
             'nhk.media.binding.get' => $this->mediaBinding?->get((string) ($arguments['operation_id'] ?? ''), (string) ($arguments['idempotency_key'] ?? '')) ?? throw new \RuntimeException('MEDIA_BINDING_SERVICE_UNAVAILABLE'),
             'nhk.media.bind' => $this->mediaBind($arguments),
             'nhk.media.usage' => $this->mediaUsage($arguments),
@@ -206,6 +210,7 @@ final class McpTransport
             'nhk.media.upload-widget.open' => ['resourceUri' => McpAppsResourceRegistry::IMAGE_UPLOAD_URI],
             'nhk.media.attachment.get' => $this->read->mediaAttachmentGet((int) ($arguments['attachment_id'] ?? 0)),
             'nhk.video.ingest' => $this->videoIngest($arguments),
+            'nhk.video.source.refresh' => $this->videoSourceRefresh?->prepare((string) ($arguments['video_id'] ?? ''), (int) ($arguments['expected_revision'] ?? 0), array_key_exists('expected_source_revision', $arguments) ? (int) $arguments['expected_source_revision'] : null, (string) ($arguments['idempotency_key'] ?? '')) ?? throw new \RuntimeException('VIDEO_SOURCE_REFRESH_UNAVAILABLE'),
             'nhk.video.get' => $this->read->videoGet((string) ($arguments['id'] ?? '')),
             'nhk.knowledge.get' => $this->read->knowledgeGet((string) ($arguments['id'] ?? '')),
             'nhk.source.get' => $this->read->sourceGet((string) ($arguments['id'] ?? '')),
@@ -617,6 +622,27 @@ final class McpTransport
                 'target_revision' => $target->revision,
                 'target_uuid' => $target->canonicalId,
             ],
+        ]);
+        return $this->ingestProposal($proposal);
+    }
+
+    /** Create a bounded existing-Media metadata Proposal; apply remains Governance-owned. */
+    private function mediaUpdate(array $arguments): array
+    {
+        if ($this->mediaBinding === null) throw new \RuntimeException('MEDIA_UPDATE_SERVICE_UNAVAILABLE');
+        $media = $this->mediaBinding->resolveMediaReference((array) ($arguments['media_ref'] ?? []));
+        $payload = ['operation' => 'update', 'media' => ['id' => $media->canonicalId]];
+        foreach (['name', 'readiness', 'provenance'] as $field) {
+            if (array_key_exists($field, $arguments)) $payload[$field] = $arguments[$field];
+        }
+        if (count($payload) === 2) throw new \InvalidArgumentException('MEDIA_UPDATE_DELTA_REQUIRED');
+        $proposal = $this->governance->createFromArguments([
+            'operation' => 'update',
+            'entity_type' => 'media',
+            'subject_id' => $media->canonicalId,
+            'expected_revision' => (int) $arguments['expected_revision'],
+            'idempotency_key' => (string) $arguments['idempotency_key'],
+            'payload' => $payload,
         ]);
         return $this->ingestProposal($proposal);
     }

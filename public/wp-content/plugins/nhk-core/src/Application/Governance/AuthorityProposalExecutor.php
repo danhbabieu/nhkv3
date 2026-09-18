@@ -95,6 +95,23 @@ final class AuthorityProposalExecutor
             $this->assertVideoCompleteness($video, $attachments);
             return $this->video->activateAfterSemanticAttachments($video);
         }
+        if ($proposal->entityType === 'video' && $proposal->operation === 'source_refresh') {
+            if (!$this->video) throw new \RuntimeException('Video executor is not configured.');
+            $payload = $proposal->payload;
+            if (!is_array($payload['source_snapshot'] ?? null)) throw new \RuntimeException('SOURCE_SNAPSHOT_INVALID');
+            if (($payload['no_op'] ?? false) === true) {
+                $current = $this->video->find($proposal->targetUuid ?: $proposal->subjectId);
+                if ($current === null || $current->revision !== (int) $proposal->expectedRevision) throw new \RuntimeException('VIDEO_REVISION_CONFLICT');
+                return $current;
+            }
+            return $this->video->applySourceRefresh(
+                $proposal->targetUuid ?: $proposal->subjectId,
+                $payload['source_snapshot'],
+                (string) ($payload['source_key'] ?? ''),
+                (int) ($payload['expected_source_revision'] ?? 0),
+                (int) $proposal->expectedRevision,
+            );
+        }
         if ($proposal->entityType === 'video' && in_array($proposal->operation, ['update', 'retire', 'reactivate'], true)) {
             if (!$this->video) throw new \RuntimeException('Video executor is not configured.');
             $payload = $proposal->payload;
