@@ -12016,6 +12016,34 @@ attempted.
 
 STATUS: `SLICE_2_ARTICLE_MEDIA_ORDERING_LOCAL_READY / LIVE_ACCEPTANCE_BLOCKED`.
 
+# Checkpoint — 2026-09-18 — Slice 3 Task 2 contextual media metadata fix round (LOCAL ONLY)
+
+SCOPE: Added fail-closed regression coverage and minimal read-only projection
+fixes for Article, Gallery and VisualSupport metadata precedence. Article now
+resolves exact Article Usage, then a permitted non-Article representative
+Usage for the same Media, then neutral Media, then verified Attachment per
+field. Gallery retains permitted non-Article Usage first, falls through to
+neutral Media and exact Attachment metadata, and reports registered `MISSING`
+when all metadata is empty. VisualSupport accepts an optional
+`MediaUsageRepository` without changing existing constructors or adding a
+semantic writer. No new role, endpoint, relation, URL field or mutation path
+was introduced.
+
+VERIFICATION: The regression suite was RED at 18 tests / 77 assertions with
+three expected failures before production changes. After fixes, focused
+contextual/affected/Contract suites PASS at 57 tests / 275 assertions with one
+existing warning. Changed-file PHP lint, `composer lint` and `git diff
+--check` pass. Guarded WordPress integration remains unavailable because
+`NHK_WP_TEST_PATH` and `NHK_WP_TEST_DB` are unset. No live/staging acceptance,
+deployment, push, database write, upload, Video or Graph mutation was
+performed.
+
+COMMITS: `6b87557e` (regressions), `97c16abc` (production fixes).
+FORMAL REVIEW: Independent acceptance remains pending; this checkpoint does
+not mark Slice 3 Task 2 complete.
+
+STATUS: `SLICE_3_TASK_2_REVIEW_PENDING / LIVE_ACCEPTANCE_BLOCKED`.
+
 # Checkpoint — 2026-09-17 — Slice 2 Task 3 publication evidence review fix (LOCAL ONLY)
 
 SCOPE: Replaced the vacuous publication-gate media evidence fixture with an
