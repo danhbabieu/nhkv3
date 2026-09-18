@@ -59,7 +59,7 @@ final class EditorialCaptureAssetFollowUpTest extends TestCase
         self::assertSame($first['addendum']['addendum_id'], $governanceReplay['addendum']['addendum_id']);
         self::assertSame('COMPLETED', $governanceReplay['addendum']['status']);
         self::assertSame(1, $calls['physical']);
-        self::assertSame(1, $calls['adoption']);
+        self::assertSame(0, $calls['adoption']);
         self::assertSame(0, $calls['draft']);
         self::assertSame('media-dial', $first['capture']['assets'][0]['media_id']);
         self::assertSame('ATTACH_ASSETS', $first['addendum']['payload']['followup_mode']);

@@ -39,4 +39,19 @@ final class ExistingMediaReferenceResolverTest extends TestCase
         $this->expectExceptionMessage('MEDIA_REFERENCE_NOT_FOUND');
         $resolver->resolve([UuidCodec::newV7()]);
     }
+
+    public function test_same_media_reuse_requires_the_attachment_readback_to_confirm_the_exact_mapping(): void
+    {
+        $mediaId = UuidCodec::newV7();
+        $otherMediaId = UuidCodec::newV7();
+        $media = $this->createMock(MediaRepository::class);
+        $assets = $this->createMock(MediaAssetRepository::class);
+        $attachments = $this->createMock(WordPressMediaAttachmentIngestor::class);
+        $media->method('findByCanonicalId')->willReturn(new Media($mediaId, 'media-574', 'Existing media'));
+        $assets->method('listByMediaId')->willReturn([new MediaAsset(UuidCodec::newV7(), $mediaId, 'derivative', 'uploads/existing.webp', str_repeat('9', 64), 'image/webp', 100, 10, 20, 'PUBLIC', ['wordpress_attachment_id' => 574])]);
+        $attachments->method('read')->with(574)->willReturn(['attachment_id' => 574, 'media_id' => $otherMediaId, 'filename' => 'existing.webp']);
+
+        $this->expectExceptionMessage('MEDIA_ATTACHMENT_MAPPING_INCONSISTENT');
+        (new ExistingMediaReferenceResolver($media, $assets, $attachments))->resolve([$mediaId]);
+    }
 }

@@ -976,7 +976,7 @@ final class Plugin {
                     return $governanceResult + ['candidate_writes' => array_merge($candidates, $videoCandidates), 'reused_claims' => $reusedClaims, 'relation_hints' => (array) ($interpretation['relation_hints'] ?? []), 'subject_resolution' => $context['subject_resolution'] ?? [], 'governance_available' => $mcpGovernance instanceof McpGovernanceHandler];
                 },
                 new ArticleComposer(),
-                static function (array $context) use ($articleMedia, $mediaService, $usages, $mediaBindingService, $mcpGovernance): array {
+                static function (array $context) use ($articleMedia, $mediaService, $usages, $mediaBindingService, $mcpGovernance, $wordpressAttachments): array {
                     $trace = static function (string $stage, string $status, array $details = []): void {
                         $payload = array_merge(['stage' => $stage, 'status' => $status, 'at' => gmdate('c')], $details);
                         if (function_exists('do_action')) { try { do_action('nhk_v3_capture_stage_trace', $payload); } catch (\Throwable) { } }
@@ -987,6 +987,16 @@ final class Plugin {
                     };
                     $assets = is_array($context['assets'] ?? null) ? $context['assets'] : [];
                     $mediaIds = array_values(array_filter(array_map(static fn (mixed $asset): string => is_array($asset) ? trim((string) ($asset['media_id'] ?? '')) : '', $assets)));
+                    if ($mediaIds === []) {
+                        foreach ($assets as $asset) {
+                            $attachmentId = is_array($asset) ? (int) ($asset['attachment_id'] ?? 0) : 0;
+                            if ($attachmentId < 1) continue;
+                            $readback = $wordpressAttachments->read($attachmentId);
+                            $mappedId = is_array($readback) ? trim((string) ($readback['media_id'] ?? '')) : '';
+                            if ($mappedId !== '') $mediaIds[] = $mappedId;
+                        }
+                        $mediaIds = array_values(array_unique($mediaIds));
+                    }
                     $bindingResults = [];
                     $typedBindings = is_array($context['media_bindings'] ?? null) ? $context['media_bindings'] : [];
                     if ($typedBindings !== []) {

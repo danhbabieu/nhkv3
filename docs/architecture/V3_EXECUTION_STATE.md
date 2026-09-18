@@ -1,35 +1,30 @@
 # NHK V3 Execution State
 
-# Checkpoint — 2026-09-18 — Remaining live-acceptance defects locally repaired (LOCAL READY / DEPLOY PENDING)
+# Checkpoint — 2026-09-18 — Generic staging admission checkpoint completed (LOCAL READY / DEPLOY PENDING)
 
-SCOPE: Repaired local implementation gaps evidenced by the latest @v-4 live
-acceptance report. No deploy, push, SSH, live read, staging/production
-mutation or semantic data change was performed.
+SCOPE: Completed the current generic staging-admission slice and reconciled the
+full Unit result against the exact parent revision. No deploy, push, SSH, live
+read, staging/production mutation or semantic data change was performed.
 
-ROOT_CAUSES: The WordPress Ability read composition root supplied no attachment
-reader to `McpReadHandler`; attachment reads therefore fell through to null.
-Existing `media_ids` followups were re-entering attachment adoption despite an
-already verified canonical Media/Attachment mapping. Ordinary Article retries
-still converted candidate claims and the unconditional `wp_post` subject edge
-into Governance plans because the continuation planner used a single-variant
-shortcut. Publication compliance evaluated the full scoped Knowledge inventory
-instead of the Article claim trace/directly asserted copy.
+ROOT_CAUSES: The current diff needed one remaining follow-up assertion aligned
+with the canonical rule that a verified Media/Attachment mapping is not adopted
+again. The deployment CLI diagnostic mismatch is present in the exact parent
+revision and remains an environment-contract baseline failure.
 
-FIX: Ability bootstrap now wires the canonical attachment ingestor/bridge, and
-attachment readback includes mapped Media identity plus typed mapping status.
-Verified existing Media/Attachment assets bypass physical re-adoption while
-the MediaService storage-key/checksum collision guard remains unchanged.
-Semantic planning is now gated by `content_intent.semantic_delta`; ordinary
-`IMAGE_ARTICLE`/`TEXT_ARTICLE` retries return `NOT_REQUIRED`/`SKIPPED` with no
-Governance or `wp_post` Graph plan, while explicit Knowledge/legacy semantic
-paths remain governed. Compliance evaluates selected claim IDs/traces and
-exactly asserted claim text, not unrelated neighborhood claims.
+FIX: The follow-up test now records zero adoption calls for an already verified
+canonical Media/Attachment mapping; production behavior and idempotency remain
+unchanged. The generic server-issued exact packet, capability, fingerprint,
+revision and fail-closed admission changes remain the implementation under
+review.
 
-VERIFICATION: Focused MCP/Media/Capture/Article suite passes 138 tests / 1,021
-assertions with existing deprecations. PHP lint and `git diff --check` pass.
-Deployment and live acceptance remain pending; no external state was changed.
+VERIFICATION: Exact parent comparison ran 61 tests / 272 assertions and showed
+3 baseline failures. Current full Unit runs 1,868 tests / 9,301 assertions
+with exactly 1 baseline `DemoCutoverCliContractTest` diagnostic mismatch;
+focused follow-up/media tests pass 2 tests / 18 assertions. Warnings and
+deprecations remain as reported by PHPUnit. Deployment and live acceptance
+remain pending; no external state was changed.
 
-STATUS: `LIVE_ACCEPTANCE_DEFECTS_LOCAL_READY / DEPLOYMENT_PENDING / SEMANTIC_MUTATION_NONE`
+STATUS: `GENERIC_CAPTURE_MEDIA_STAGING_ADMISSION_LOCAL_READY / DEPLOYMENT_PENDING / SEMANTIC_MUTATION_NONE`
 
 # Checkpoint — 2026-09-18 — Generic Capture/Media staging admission (LOCAL READY / DEPLOY PENDING)
 

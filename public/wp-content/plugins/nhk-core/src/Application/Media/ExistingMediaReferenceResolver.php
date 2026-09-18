@@ -37,6 +37,8 @@ final class ExistingMediaReferenceResolver
             if ($attachmentId < 1) throw new \InvalidArgumentException('MEDIA_ATTACHMENT_BINDING_NOT_FOUND');
             $attachment = $this->attachments->read($attachmentId);
             if (!is_array($attachment) || (int) ($attachment['attachment_id'] ?? 0) !== $attachmentId) throw new \InvalidArgumentException('MEDIA_ATTACHMENT_READBACK_FAILED');
+            $readbackMediaId = trim((string) ($attachment['media_id'] ?? ''));
+            if ($readbackMediaId !== '' && $readbackMediaId !== $mediaId) throw new \InvalidArgumentException('MEDIA_ATTACHMENT_MAPPING_INCONSISTENT');
             $resolved[] = [
                 'client_file_id' => $mediaId,
                 'media_id' => $mediaId,

@@ -179,7 +179,15 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
         $path = $baseDir !== '' && $relative !== '' ? $baseDir . '/' . ltrim($relative, '/') : '';
         $baseReal = $baseDir !== '' ? realpath($baseDir) : false;
         $pathReal = $path !== '' ? realpath($path) : false;
-        if ($baseReal === false || $pathReal === false || !is_file($pathReal) || !$this->within($baseReal, $pathReal)) return null;
+        $mapping = null;
+        if ($this->semanticMedia !== null && method_exists($this->semanticMedia, 'attachmentMapping')) {
+            $mapping = $this->semanticMedia->attachmentMapping($attachmentId);
+            if (($mapping['status'] ?? '') === 'INCONSISTENT') return ['attachment_id' => $attachmentId, 'mapping_status' => 'INCONSISTENT', 'media_id' => $mapping['media_id'] ?? null, 'mapping_error' => 'MEDIA_ATTACHMENT_MAPPING_INCONSISTENT'];
+        }
+        if ($baseReal === false || $pathReal === false || !is_file($pathReal) || !$this->within($baseReal, $pathReal)) {
+            if (($mapping['status'] ?? '') !== 'MAPPED') return null;
+            return ['attachment_id' => $attachmentId, 'filename' => basename($relative), 'original_filename' => (string) get_post_meta($attachmentId, '_nhk_original_filename', true), 'mime' => $mime, 'width' => 0, 'height' => 0, 'filesize' => 0, 'derivatives' => [], 'mapping_status' => 'MAPPED', 'media_id' => $mapping['media_id'] ?? null, 'readback_status' => 'MAPPED_CANONICAL_MEDIA'];
+        }
         $metadata = function_exists('wp_get_attachment_metadata') ? wp_get_attachment_metadata($attachmentId) : [];
         $metadata = is_array($metadata) ? $metadata : [];
         $filename = basename($relative);
@@ -197,8 +205,7 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
             'filesize' => (int) filesize($pathReal),
             'derivatives' => [],
         ];
-        if ($this->semanticMedia !== null && method_exists($this->semanticMedia, 'attachmentMapping')) {
-            $mapping = $this->semanticMedia->attachmentMapping($attachmentId);
+        if ($mapping !== null) {
             $result['mapping_status'] = (string) ($mapping['status'] ?? 'INCONSISTENT');
             $result['media_id'] = $mapping['media_id'] ?? null;
             if ($result['mapping_status'] === 'INCONSISTENT') $result['mapping_error'] = 'MEDIA_ATTACHMENT_MAPPING_INCONSISTENT';

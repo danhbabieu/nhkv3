@@ -588,7 +588,23 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
     {
         if ($attachmentId < 1) return null;
         $value = $this->database->get_var($this->database->prepare("SELECT media_uuid FROM {$this->table} WHERE attachment_id=%d LIMIT 1", $attachmentId));
-        return is_string($value) && strlen($value) === 16 ? UuidCodec::fromBinary($value) : null;
+        $decoded = $this->decodeUuidValue($value);
+        if ($decoded !== null) return $decoded;
+        foreach ($this->media->list() as $media) {
+            if (!$media instanceof Media || !$media->active) continue;
+            foreach ($this->assets->listByMediaId($media->canonicalId) as $asset) {
+                if ((int) ($asset->metadata['wordpress_attachment_id'] ?? 0) === $attachmentId) return $media->canonicalId;
+            }
+        }
+        return null;
+    }
+
+    private function decodeUuidValue(mixed $value): ?string
+    {
+        if (!is_string($value)) return null;
+        if (strlen($value) === 16) return UuidCodec::fromBinary($value);
+        if (preg_match('/^[0-9a-f]{32}$/i', $value) === 1) return UuidCodec::fromBinary(hex2bin($value));
+        return null;
     }
 
     /** @return array{status:string,media_id:?string} */
