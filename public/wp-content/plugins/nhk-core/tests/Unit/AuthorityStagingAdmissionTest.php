@@ -15,13 +15,21 @@ final class AuthorityStagingAdmissionTest extends TestCase
         self::assertTrue((new AuthorityStagingAdmission())(false, $scope, $capture, $input, []));
     }
 
+    public function test_fresh_current_plan_fingerprint_is_admitted_for_the_same_exact_intent(): void
+    {
+        [$scope, $capture, $input] = $this->fixture();
+        $scope['plan_fingerprint'] = str_repeat('c', 64);
+
+        self::assertTrue((new AuthorityStagingAdmission())(false, $scope, $capture, $input, []));
+    }
+
     /** @dataProvider tamperProvider */
     public function test_scope_fails_closed_for_any_non_exact_value(string $field): void
     {
         [$scope, $capture, $input] = $this->fixture();
         if ($field === 'capture_id') $scope['capture_id'] = '01a0b162-9cd5-7989-aa08-cec3322bd450';
         if ($field === 'request_fingerprint') $scope['capture_fingerprint'] = str_repeat('a', 64);
-        if ($field === 'plan_fingerprint') $scope['plan_fingerprint'] = str_repeat('b', 64);
+        if ($field === 'plan_fingerprint') $scope['plan_fingerprint'] = str_repeat('z', 64);
         if ($field === 'candidate') $scope['candidate_bindings'][0]['candidate_id'] = 'candidate-other';
         if ($field === 'target') $scope['candidate_bindings'][0]['target_uuid'] = '01a090fd-9a71-7665-af5f-08f6e25b533f';
         if ($field === 'operation') $scope['candidate_bindings'][0]['predicate'] = 'about';

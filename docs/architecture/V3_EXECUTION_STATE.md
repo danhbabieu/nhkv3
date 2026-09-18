@@ -142,6 +142,28 @@ pending.
 
 STATUS: `ATHERTON_SCOPE_LOCAL_READY / STAGING_DEPLOY_PENDING / SEMANTIC_MUTATION_NONE`
 
+# Checkpoint — 2026-09-18 — Atherton fresh-plan admission binding (LOCAL READY / DEPLOY PENDING)
+
+ROOT_CAUSE: `AuthorityCaptureService` correctly returned `PLAN_REAPPROVAL_REQUIRED`
+when the approved pre-deploy fingerprint differed from the freshly replanned
+fingerprint. The stale repository binding was a second, fixed comparison in
+`AuthorityStagingAdmission`: it required the old `PLAN_FINGERPRINT` constant,
+which made every fresh plan fail even after valid reapproval.
+
+FIX: The provider now authorizes the exact Atherton Capture/request intent,
+candidate IDs, Model name, `model_of` predicate, Hermle target UUID and target
+revision, staging environment and governed operation family. It accepts only
+the verifier's canonical 64-hex fingerprint shape; the shared
+`StagingAcceptanceScopeVerifier` remains responsible for issuing the current
+plan fingerprint, HMAC signature and expiry. No wildcard or production path is
+introduced.
+
+VERIFICATION: Added coverage for fresh-plan admission while retaining the
+pre-deploy reapproval guard and fail-closed tamper cases. No Proposal, Apply,
+database write or Graph write was performed.
+
+STATUS: `ATHERTON_FRESH_PLAN_ADMISSION_LOCAL_READY / STAGING_DEPLOY_PENDING / SEMANTIC_MUTATION_NONE`
+
 # Checkpoint — 2026-09-18 — Generic Media enrichment staging admission (LOCAL READY / LIVE VERIFY PENDING)
 
 SCOPE: Repaired the missing canonical admission provider for a typed

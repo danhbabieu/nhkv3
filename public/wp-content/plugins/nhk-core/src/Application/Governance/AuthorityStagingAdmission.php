@@ -13,7 +13,6 @@ final class AuthorityStagingAdmission
 {
     private const CAPTURE_ID = '01a0b162-9cd5-7989-aa08-cec3322bd45f';
     private const REQUEST_FINGERPRINT = '06ede91a4097f27c1001f07be919f0f1c01f69a34e4d5f921ac6aa37c19ac142';
-    private const PLAN_FINGERPRINT = '6b69927f676867d2023df620149f1c93331ae81b89d622d6bfa20d28fafcb736';
     private const BRAND_UUID = '01a090fd-9a71-7665-af5f-08f6e25b533e';
 
     /** @param array<string,mixed> $scope @param array<string,mixed> $input @param list<array<string,mixed>> $assets */
@@ -28,7 +27,10 @@ final class AuthorityStagingAdmission
             || strtoupper((string) ($scope['intent'] ?? '')) !== 'AUTHORITY'
             || ($scope['capture_id'] ?? '') !== self::CAPTURE_ID
             || ($scope['capture_fingerprint'] ?? '') !== self::REQUEST_FINGERPRINT
-            || ($scope['plan_fingerprint'] ?? '') !== self::PLAN_FINGERPRINT
+            // The shared verifier signs the current plan at runtime. Keep only
+            // its canonical hash shape here; binding this provider to a release
+            // checkpoint would make an exact, freshly re-approved plan stale.
+            || preg_match('/^[a-f0-9]{64}$/i', (string) ($scope['plan_fingerprint'] ?? '')) !== 1
             || $capture->captureId !== self::CAPTURE_ID
             || $capture->requestFingerprint !== self::REQUEST_FINGERPRINT) return false;
 

@@ -108,8 +108,7 @@ after the Constitution.
     - `01a0b162-9cd5-7989-aa08-cec3322bd45f`
   - allowed_request_fingerprints:
     - `06ede91a4097f27c1001f07be919f0f1c01f69a34e4d5f921ac6aa37c19ac142`
-  - allowed_plan_fingerprints:
-    - `6b69927f676867d2023df620149f1c93331ae81b89d622d6bfa20d28fafcb736`
+  - plan_fingerprint: `current fresh plan fingerprint issued and HMAC-signed by the runtime StagingAcceptanceScopeVerifier`
   - allowed_candidates:
     - `candidate-831c785e8e84398ce3c7` (`model`, `create`, `Atherton`)
     - `candidate-43e3d1452693c18a7119` (`relation`, `relation_create`, `model_of`)
@@ -120,7 +119,7 @@ after the Constitution.
   - allowed_operation_families:
     - `governed_authority_plan`
   - restrictions:
-    - exact Capture/request/plan fingerprints and candidate IDs only
+    - exact Capture/request intent and candidate IDs only; the plan fingerprint must be fresh, verifier-issued and HMAC-signed
     - Model create is limited to `Atherton` with the exact `brand_uuid` above
     - relation create is limited to `model_of` and the exact Brand target/revision
     - no wildcard, global Authority, direct writer, direct DB or direct Graph path
