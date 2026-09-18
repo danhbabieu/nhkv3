@@ -22,7 +22,7 @@ final class MediaBindingStagingAdmissionTest extends TestCase
         $media->method('findByCanonicalId')->willReturn(new Media($scope['media_ids'][0], 'nhk:media:clock', 'Clock image', 'ready'));
         $authority->method('findByCanonicalId')->willReturn(new AuthorityEntity($scope['target']['id'], 'classification', 'nhk:classification:clock', 'Clock type', 1, []));
 
-        self::assertTrue((new MediaBindingStagingAdmission($media, $authority))($scope, $capture, $input, []));
+        self::assertTrue((new MediaBindingStagingAdmission($media, $authority))(false, $scope, $capture, $input, []));
     }
 
     /** @dataProvider invalidAdmissionProvider */
@@ -42,7 +42,7 @@ final class MediaBindingStagingAdmissionTest extends TestCase
             $input['media_bindings'][0]['target']['type'] = 'unsupported';
         }
 
-        self::assertFalse((new MediaBindingStagingAdmission($media, $authority))($scope, $capture, $input, []));
+        self::assertFalse((new MediaBindingStagingAdmission($media, $authority))(false, $scope, $capture, $input, []));
     }
 
     public static function invalidAdmissionProvider(): array
