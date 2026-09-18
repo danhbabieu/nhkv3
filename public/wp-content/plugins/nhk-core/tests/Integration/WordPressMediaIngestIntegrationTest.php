@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace NHK\Tests\Integration;
 
 use NHK\Core\Application\Media\{ImageIngestEntrypoint, MediaBatchUploadService, MediaService, PublicImageSizingPolicy};
-use NHK\Core\Domain\Media\Media;
+use NHK\Core\Domain\Media\{Media, MediaUsage};
 use NHK\Core\Infrastructure\Media\{PrivateMediaSourceStorage, WpdbMediaAssetRepository, WpdbMediaRepository, WpdbMediaUsageRepository, WordPressMediaAttachmentBridge, WordPressMediaAttachmentIngestor, WordPressMediaAttachmentWriteGuard};
 use NHK\Core\Infrastructure\Mcp\ChatGptMcpGateway;
 use NHK\Core\Infrastructure\Migration\{MediaAssetMetadataMigration008, MediaMigration004, MediaWordPressBridgeMigration012};
@@ -155,8 +155,9 @@ final class WordPressMediaIngestIntegrationTest extends TestCase
 
             $mediaId = (string) $bridge->adoptAttachment($attachmentId, ['canonical_name' => 'Edited readback', 'seo_slug' => 'edited-readback']);
             self::assertNotSame('', $mediaId);
-            $articleUsage = $usages->create(new NHKCoreDomainMediaMediaUsage(UuidCodec::newV7(), $mediaId, 'wp_post', '1:572', 'featured', 0, 'Article alt', 'Article caption'));
-            $dictionaryUsage = $usages->create(new NHKCoreDomainMediaMediaUsage(UuidCodec::newV7(), $mediaId, 'dictionary', 'clock-face', 'illustration', 0, 'Dictionary alt', 'Dictionary caption'));
+            $articleUsage = $usages->create(new MediaUsage(UuidCodec::newV7(), $mediaId, 'wp_post', '1:572', 'featured', 0, 'Article alt', 'Article caption'));
+            $dictionaryUsage = $usages->create(new MediaUsage(UuidCodec::newV7(), $mediaId, 'dictionary', 'clock-face', 'illustration', 0, 'Dictionary alt', 'Dictionary caption'));
+            $beforeUsageIds = $this->usageSnapshot($usages, $mediaId);
             $beforeAssets = $assets->listByMediaId($mediaId);
             $beforeMediaIds = array_map(static fn ($asset): string => $asset->assetId, $beforeAssets);
             $beforeSource = array_values(array_filter($beforeAssets, static fn ($asset): bool => $asset->kind === 'original'))[0];
@@ -167,6 +168,7 @@ final class WordPressMediaIngestIntegrationTest extends TestCase
             self::assertSame($mediaId, $reAdopted);
             $secondAdoption = $bridge->adoptAttachment($attachmentId, ['selection_source' => 'IMAGE_EDITOR']);
             self::assertSame($mediaId, $secondAdoption);
+            $afterUsageIds = $this->usageSnapshot($usages, $mediaId);
             $afterAssets = $assets->listByMediaId($mediaId);
             self::assertSame($beforeMediaIds, array_map(static fn ($asset): string => $asset->assetId, $afterAssets));
             $afterSource = array_values(array_filter($afterAssets, static fn ($asset): bool => $asset->assetId === $beforeSource->assetId))[0];
@@ -174,8 +176,11 @@ final class WordPressMediaIngestIntegrationTest extends TestCase
             self::assertSame(hash_file('sha256', $uploadedPath), $afterSource->checksum);
             self::assertSame('PRIVATE', $afterSource->visibility);
             self::assertSame('PUBLIC', $afterDerivative->visibility);
-            self::assertSame($articleUsage->usageId, $usages->listByMediaId($mediaId)[0]->usageId);
-            self::assertContains($dictionaryUsage->usageId, array_map(static fn ($usage): string => $usage->usageId, $usages->listByMediaId($mediaId)));
+            self::assertSame($beforeUsageIds, $afterUsageIds);
+            self::assertSame($beforeUsageIds['count'], $afterUsageIds['count']);
+            self::assertCount(2, $afterUsageIds['ids']);
+            self::assertContains($articleUsage->usageId, $afterUsageIds['ids']);
+            self::assertContains($dictionaryUsage->usageId, $afterUsageIds['ids']);
             self::assertSame('VERIFIED', $ingestor->read($attachmentId)['readback_state']);
         } finally {
             if ($attachmentId > 0 && function_exists('wp_delete_attachment')) wp_delete_attachment($attachmentId, true);
@@ -245,7 +250,14 @@ final class WordPressMediaIngestIntegrationTest extends TestCase
             }
             $first = (string) $bridge->adoptAttachment($attachmentId, ['canonical_name' => 'Conflicting mapping']);
             $mediaIds[] = $first;
-            $media->create(new NHKCoreDomainMediaMedia(UuidCodec::newV7(), 'wp-attachment:' . max(1, (int) get_current_blog_id()) . ':' . $attachmentId, 'Conflicting second identity', 'draft'));
+            $conflictingMedia = $media->create(new Media(UuidCodec::newV7(), 'wp-attachment-conflict:' . max(1, (int) get_current_blog_id()) . ':' . $attachmentId, 'Conflicting second identity', 'draft'));
+            $mediaIds[] = $conflictingMedia->canonicalId;
+            $mappingTable = $wpdb->prefix . 'nhk_media_wordpress_attachments';
+            self::assertSame(1, (int) $wpdb->query($wpdb->prepare(
+                "UPDATE {$mappingTable} SET media_uuid=%s WHERE attachment_id=%d",
+                UuidCodec::toBinary($conflictingMedia->canonicalId),
+                $attachmentId,
+            )));
             $countBefore = count($media->list());
             $read = (new WordPressMediaAttachmentIngestor())->read($attachmentId);
             self::assertIsArray($read);
@@ -410,6 +422,14 @@ final class WordPressMediaIngestIntegrationTest extends TestCase
             'orientation 6' => [6, 'red', 'blue'],
             'orientation 8' => [8, 'blue', 'red'],
         ];
+    }
+
+    /** @return array{count:int,ids:list<string>} */
+    private function usageSnapshot(WpdbMediaUsageRepository $usages, string $mediaId): array
+    {
+        $ids = array_map(static fn (MediaUsage $usage): string => $usage->usageId, $usages->listByMediaId($mediaId));
+        sort($ids);
+        return ['count' => count($ids), 'ids' => array_values($ids)];
     }
 
     public function test_structured_reference_uses_gateway_materialization_then_native_attachment_adoption(): void

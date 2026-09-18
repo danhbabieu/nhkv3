@@ -3,6 +3,12 @@ declare(strict_types=1);
 
 namespace NHK\Tests\Unit;
 
+use NHK\Core\Application\Mcp\McpReadHandler;
+use NHK\Core\Contracts\Authority\AuthorityRepository;
+use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository};
+use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository, MediaUsageRepository, WordPressMediaAttachmentIngestor};
+use NHK\Core\Contracts\Video\VideoRepository;
+use NHK\Core\Domain\Authority\EntityTypeRegistry;
 use PHPUnit\Framework\TestCase;
 
 final class FrontendContractTest extends TestCase
@@ -81,15 +87,30 @@ final class FrontendContractTest extends TestCase
 
     public function test_attachment_readback_contract_exposes_canonical_state_without_nulling_inconsistency(): void
     {
-        $ingestor = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Media/WordPressMediaAttachmentIngestor.php');
-        $bridge = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Media/WordPressMediaAttachmentBridge.php');
-        $mcp = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/Mcp/McpReadHandler.php');
+        $reader = new class implements WordPressMediaAttachmentIngestor {
+            public function ingest(array $file, string $filename, string $title, int $maxWidth, int $maxHeight, int $quality): array { return []; }
+            public function read(int $attachmentId): ?array
+            {
+                return $attachmentId === 572
+                    ? ['attachment_id' => 572, 'media_id' => 'media-a', 'readback_state' => 'INCONSISTENT', 'error_code' => 'ATTACHMENT_MAPPING_CONFLICT']
+                    : null;
+            }
+        };
+        $handler = new McpReadHandler(
+            $this->createMock(AuthorityRepository::class),
+            new EntityTypeRegistry(),
+            $this->createMock(MediaRepository::class),
+            $this->createMock(MediaAssetRepository::class),
+            $this->createMock(MediaUsageRepository::class),
+            $this->createMock(VideoRepository::class),
+            $this->createMock(KnowledgeRepository::class),
+            $this->createMock(EvidenceRepository::class),
+            wordpressAttachments: $reader,
+        );
 
-        self::assertStringContainsString('bindingForAttachment', $bridge);
-        self::assertStringContainsString("'readback_state'", $ingestor);
-        self::assertStringContainsString("'INCONSISTENT'", $ingestor);
-        self::assertStringContainsString("'media_id'", $ingestor);
-        self::assertStringContainsString("'error_code'", $mcp);
+        self::assertSame('INCONSISTENT', $handler->mediaAttachmentGet(572)['readback_state']);
+        self::assertSame('ATTACHMENT_MAPPING_CONFLICT', $handler->mediaAttachmentGet(572)['error_code']);
+        self::assertNull($handler->mediaAttachmentGet(999));
     }
 
     public function test_technical_archives_are_redirect_inputs_and_comparison_is_so_sanh(): void
