@@ -1,5 +1,34 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-18 — Deployment release tuple ownership corrected (LOCAL READY / DEPLOY PENDING)
+
+SCOPE: Corrected the canonical remote MCP deployment verifier's release tuple
+comparison. No Capture, Proposal, Authority, Relation, Article, staging or
+production semantic data was mutated.
+
+ROOT_CAUSE: The verifier compared the live `release_identity` against a hash
+calculated from the local documentation registry's entire runtime identity.
+The local build process has no staging host environment, so its environment and
+semantic-write fields were `unknown`/`READ_ONLY`, while the deployed staging
+runtime correctly reported `staging`/`PROJECT_BUILD`. Artifact-bound fields
+were coherent, but the composite hash necessarily diverged and produced a
+false `RELEASE_TUPLE_MISMATCH`.
+
+FIX: The immutable deployment expectation now owns runtime version, source
+revision, documentation/manifest identity, build identity, catalog version,
+resource version and the canonical document file map. The live host owns its
+environment/policy fields; the verifier still requires the live release hash
+to equal `McpReleaseIdentity::hash()` of the complete live tuple. Artifact,
+manifest, source, build, catalog, resource and release-hash mismatches remain
+fail-closed. No hash or current release value is hard-coded.
+
+VERIFICATION: Added focused verifier coverage for host-environment divergence,
+tampered release identity and source/catalog/resource mismatches. Canonical
+deployment and two fresh live bootstrap reads remain pending for this verifier
+revision.
+
+STATUS: `RELEASE_TUPLE_BOUNDARY_LOCAL_READY / DEPLOY_PENDING / SEMANTIC_MUTATION_NONE`
+
 # Checkpoint — 2026-09-18 — Generic Conversational Authority staging workflow (LOCAL READY / DEPLOY PENDING)
 
 SCOPE: Removed the Atherton-specific repository authorization ledger and made

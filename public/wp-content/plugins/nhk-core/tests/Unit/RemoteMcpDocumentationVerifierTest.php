@@ -172,6 +172,49 @@ final class RemoteMcpDocumentationVerifierTest extends TestCase
         self::assertSame('RELEASE_TUPLE_MISMATCH', $result->reasonCode);
     }
 
+    public function test_runtime_environment_is_not_taken_from_local_artifact_expectation(): void
+    {
+        $expected = $this->expectedBootstrap();
+        $expected['environment'] = 'unknown';
+        $expected['semantic_write_policy'] = 'READ_ONLY';
+        $expected['project_build_enabled'] = false;
+
+        $actual = $this->expectedBootstrap();
+        $actual['release_identity'] = McpReleaseIdentity::hash(array_diff_key($actual, ['files' => true]));
+
+        $result = $this->verifierFor($actual)->verify('https://demo.example', $expected, str_repeat('f', 64));
+
+        self::assertSame('pass', $result->status, (string) $result->reasonCode);
+    }
+
+    public function test_tampered_runtime_release_identity_fails_closed(): void
+    {
+        $expected = $this->expectedBootstrap();
+        $actual = $expected;
+        $actual['release_identity'] = str_repeat('0', 64);
+
+        $result = $this->verifierFor($actual)->verify('https://demo.example', $expected, str_repeat('f', 64));
+
+        self::assertSame('RELEASE_TUPLE_MISMATCH', $result->reasonCode);
+    }
+
+    /** @dataProvider artifactIdentityMismatchProvider */
+    public function test_artifact_release_fields_must_match_the_immutable_expectation(string $field): void
+    {
+        $expected = $this->expectedBootstrap();
+        $actual = $expected;
+        $actual[$field] = $field === 'source_revision' ? str_repeat('0', 40) : str_repeat('0', 64);
+
+        $result = $this->verifierFor($actual)->verify('https://demo.example', $expected, str_repeat('f', 64));
+
+        self::assertSame('RELEASE_TUPLE_MISMATCH', $result->reasonCode);
+    }
+
+    public static function artifactIdentityMismatchProvider(): array
+    {
+        return array_map(static fn (string $field): array => [$field], ['source_revision', 'catalog_version', 'resource_version']);
+    }
+
     public function test_missing_source_revision_is_not_a_valid_expected_release(): void
     {
         $expected = $this->expectedBootstrap();

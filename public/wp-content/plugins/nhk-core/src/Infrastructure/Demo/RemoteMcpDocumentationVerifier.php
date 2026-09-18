@@ -41,10 +41,11 @@ final class RemoteMcpDocumentationVerifier
             $alias = $this->tool($url, 'nhk.docs.bootstrap', 6);
             $expectedFiles = $this->filesFromExpected($expectedBootstrap);
             if (!hash_equals($expectedBuildIdentity, (string) ($bootstrap['build_identity'] ?? ''))) return StageResult::blocked('DEPLOYMENT_NOT_ACTIVE');
-            if (!$this->sameIdentity($bootstrap, $expectedBootstrap) || !$this->sameFiles($this->filesFromBootstrap($bootstrap), $expectedFiles)) return StageResult::failed('DOC_MANIFEST_MISMATCH');
+            if (!$this->sameArtifactIdentity($bootstrap, $expectedBootstrap)) return StageResult::failed('RELEASE_TUPLE_MISMATCH');
+            if (!$this->sameFiles($this->filesFromBootstrap($bootstrap), $expectedFiles)) return StageResult::failed('DOC_MANIFEST_MISMATCH');
             if (!$this->sameIdentity($list, $expectedBootstrap) || !$this->sameFiles($list['files'] ?? null, $expectedFiles)) return StageResult::failed('DOC_MANIFEST_MISMATCH');
             if (!$this->sameIdentity($alias, $expectedBootstrap) || ($document['path'] ?? null) !== 'AGENTS.md' || !$this->sameDocumentHash($document, $expectedFiles, 'AGENTS.md')) return StageResult::failed('DOC_MANIFEST_MISMATCH');
-            if (!$this->sameReleaseIdentity($bootstrap, $expectedBootstrap)) return StageResult::failed('RELEASE_TUPLE_MISMATCH');
+            if (!$this->sameReleaseIdentity($bootstrap)) return StageResult::failed('RELEASE_TUPLE_MISMATCH');
             if (!$this->callableProbe($url)) return StageResult::failed('MCP_CAPABILITY_PARITY_MISMATCH');
         } catch (\Throwable) {
             return StageResult::failed('MCP_BOOTSTRAP_UNAVAILABLE');
@@ -106,15 +107,21 @@ final class RemoteMcpDocumentationVerifier
             && hash_equals((string) $expected['manifest_hash'], (string) ($actual['manifest_hash'] ?? ''));
     }
 
-    /** @param array<string,mixed> $actual @param array<string,mixed> $expected */
-    private function sameReleaseIdentity(array $actual, array $expected): bool
+    /** Artifact-bound identity must match the immutable build snapshot. */
+    private function sameArtifactIdentity(array $actual, array $expected): bool
     {
-        $identityFields = ['environment', 'semantic_write_policy', 'project_build_enabled', 'source_revision', 'runtime_version', 'build_identity', 'documentation_version', 'manifest_hash', 'catalog_version', 'resource_version'];
-        foreach ([...$identityFields, 'release_identity'] as $field) {
+        foreach (['runtime_version', 'source_revision', 'build_identity', 'documentation_version', 'manifest_hash', 'catalog_version', 'resource_version'] as $field) {
             if (!array_key_exists($field, $expected) || !array_key_exists($field, $actual) || (string) $actual[$field] !== (string) $expected[$field]) return false;
         }
-        $identity = array_intersect_key($expected, array_fill_keys($identityFields, true));
-        return McpReleaseIdentity::hash($identity) === (string) $expected['release_identity'];
+        return true;
+    }
+
+    /** Live environment/policy belong to the deployed host; the hash must still be self-consistent. */
+    private function sameReleaseIdentity(array $actual): bool
+    {
+        $identityFields = ['environment', 'semantic_write_policy', 'project_build_enabled', 'source_revision', 'runtime_version', 'build_identity', 'documentation_version', 'manifest_hash', 'catalog_version', 'resource_version'];
+        foreach ([...$identityFields, 'release_identity'] as $field) if (!array_key_exists($field, $actual)) return false;
+        return McpReleaseIdentity::hash(array_intersect_key($actual, array_fill_keys($identityFields, true))) === (string) $actual['release_identity'];
     }
 
     private function callableProbe(string $url): bool
