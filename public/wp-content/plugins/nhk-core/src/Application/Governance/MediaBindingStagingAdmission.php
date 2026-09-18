@@ -25,8 +25,9 @@ final class MediaBindingStagingAdmission
     ) {}
 
     /** @param array<string,mixed> $scope @param array<string,mixed> $input @param list<array<string,mixed>> $assets */
-    public function __invoke(array $scope, CaptureRecord $capture, array $input, array $assets): bool
+    public function __invoke(bool $admitted, array $scope, CaptureRecord $capture, array $input, array $assets): bool
     {
+        if ($admitted) return true;
         if (($scope['approved'] ?? false) !== true
             || ($scope['environment'] ?? '') !== 'staging'
             || ($scope['operation_family'] ?? '') !== 'media_usage_reconciliation'

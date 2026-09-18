@@ -85,7 +85,8 @@ final class GovernanceActionPortTest extends TestCase
     {
         $source = file_get_contents(__DIR__ . '/../../src/Plugin.php');
         self::assertIsString($source);
-        self::assertStringContainsString("add_filter('nhk_v3_staging_acceptance_admission', \$stagingAdmission, 10, 4);", $source);
+        self::assertStringContainsString("add_filter('nhk_v3_staging_acceptance_admission', new AuthorityStagingAdmission(), 10, 5);", $source);
+        self::assertStringContainsString("add_filter('nhk_v3_staging_acceptance_admission', \$stagingAdmission, 20, 5);", $source);
         self::assertStringContainsString('new MediaBindingStagingAdmission(', $source);
     }
 

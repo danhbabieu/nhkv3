@@ -1,5 +1,35 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-18 — Canonical Atherton staging scope (LOCAL READY / DEPLOY PENDING)
+
+SCOPE: Added the explicitly authorized Atherton Authority acceptance case to
+the repository policy ledger and the canonical versioned admission provider.
+The provider is registered through the existing
+`nhk_v3_staging_acceptance_admission` filter and matches only the exact Capture,
+request/plan fingerprints, two candidate IDs, Model `Atherton`, registered
+`model_of` relation, Hermle Brand UUID and target revision 2. No MU-plugin,
+server-local workaround, signing-secret change, Proposal creation, Apply,
+database write or Graph write was performed.
+
+ROOT_CAUSE: `AGENTS.md` was the policy authorization ledger, while the runtime
+hook had only a Media provider; no repository-owned Authority provider admitted
+the exact Atherton plan. The existing Media provider also used the wrong hook
+argument count for the shared five-argument filter contract.
+
+FIX: Added `AuthorityStagingAdmission`, wired it ahead of the existing Media
+provider, corrected the Media provider's hook signature, and recorded the
+bounded Atherton scope in `AGENTS.md`. The shared verifier still owns expiry,
+packet fingerprinting and HMAC; the provider adds no alternative admission
+system and contains no secret or wildcard.
+
+VERIFICATION: Focused Authority/Governance/scope tests pass 24 tests / 55
+assertions with existing warnings/deprecations. `composer lint` passes. Diff
+check, secret review and canonical documentation regeneration are required
+before commit. Staging deployment and Atherton Apply remain deliberately
+pending.
+
+STATUS: `ATHERTON_SCOPE_LOCAL_READY / STAGING_DEPLOY_PENDING / SEMANTIC_MUTATION_NONE`
+
 # Checkpoint — 2026-09-18 — Generic Media enrichment staging admission (LOCAL READY / LIVE VERIFY PENDING)
 
 SCOPE: Repaired the missing canonical admission provider for a typed

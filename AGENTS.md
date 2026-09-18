@@ -100,6 +100,31 @@ after the Constitution.
     - governed_proposal_lifecycle
     - canonical_readback
   - fail_closed_outside_scope: `true`
+
+- Additional bounded staging acceptance scope for the Atherton Authority plan
+  (explicitly authorized 2026-09-18):
+  - environment: `staging`
+  - allowed_capture_ids:
+    - `01a0b162-9cd5-7989-aa08-cec3322bd45f`
+  - allowed_request_fingerprints:
+    - `06ede91a4097f27c1001f07be919f0f1c01f69a34e4d5f921ac6aa37c19ac142`
+  - allowed_plan_fingerprints:
+    - `6b69927f676867d2023df620149f1c93331ae81b89d622d6bfa20d28fafcb736`
+  - allowed_candidates:
+    - `candidate-831c785e8e84398ce3c7` (`model`, `create`, `Atherton`)
+    - `candidate-43e3d1452693c18a7119` (`relation`, `relation_create`, `model_of`)
+  - allowed_relation_target:
+    - type: `brand`
+    - uuid: `01a090fd-9a71-7665-af5f-08f6e25b533e`
+    - revision: `2`
+  - allowed_operation_families:
+    - `governed_authority_plan`
+  - restrictions:
+    - exact Capture/request/plan fingerprints and candidate IDs only
+    - Model create is limited to `Atherton` with the exact `brand_uuid` above
+    - relation create is limited to `model_of` and the exact Brand target/revision
+    - no wildcard, global Authority, direct writer, direct DB or direct Graph path
+  - fail_closed_outside_scope: `true`
 - The previously approved Video Capture `01a096c0-97cc-7192-acf2-4735f9bf6582`
   package remains historical evidence and is not part of this Public Clock
   run. Future content families require a newly authorized bounded package.
