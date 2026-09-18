@@ -12056,6 +12056,25 @@ projection tests. No staging/live/database/deployment mutation was performed.
 
 STATUS: `SLICE_5_TASK_2_LOCAL_READY / FORMAL_REVIEW_PENDING / LIVE_ACCEPTANCE_BLOCKED`.
 
+# Checkpoint — 2026-09-18 — Slice 5 Task 3 lexical/projection boundary verification (LOCAL ONLY)
+
+SCOPE: Verified the Dictionary illustration reuse boundary without adding a
+second semantic store or public route. Existing focused tests cover lexical
+definition preservation, contextual pinned image metadata, delegated
+`dedicated`/`indexable` behavior, no Evidence/Graph/binary/Attachment writes,
+and preservation of unrelated Article/Model usages. No sitemap policy was
+changed; the existing canonical sitemap projection remains the sole
+indexability gate.
+
+VERIFICATION: Contract suite PASS — 6 tests / 48 assertions. Full Unit suite
+completed with 1,843 tests / 9,023 assertions and five unrelated baseline
+failures: two remote-deployment CLI expectations, one missing integration
+upload fixture, and two dependent public-media route cases. Existing warnings
+and deprecations remain documented baseline. No live/staging/database/
+deployment mutation was performed.
+
+STATUS: `SLICE_5_TASK_3_LOCAL_READY / FORMAL_REVIEW_PENDING / LIVE_ACCEPTANCE_BLOCKED`.
+
 # Checkpoint — 2026-09-18 — Slice 4 Task 2 formal acceptance (LOCAL ONLY)
 
 SCOPE: Final independent review accepted Slice 4 Task 2. Attachment readback
