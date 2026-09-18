@@ -12180,6 +12180,28 @@ not mark Slice 3 Task 2 complete.
 
 STATUS: `SLICE_3_TASK_2_REVIEW_PENDING / LIVE_ACCEPTANCE_BLOCKED`.
 
+# Checkpoint — 2026-09-18 — Slice 4 Task 2 final readback fix (LOCAL ONLY)
+
+SCOPE: Closed the final attachment readback findings with separate RED and
+production commits. Attachment adoption/replay now binds the WordPress
+attachment to the PUBLIC derivative whose physical bytes are attached; the
+PRIVATE source-original remains retained under the same Media identity and is
+never used as the attachment mapping target. Canonical binding readback now
+requires every applicable checksum, byte size, MIME and dimension fact before
+returning `VERIFIED`; missing facts fail closed as `INCONSISTENT`.
+
+VERIFICATION: Focused Unit plus guarded WordPress integration suites pass at
+61 tests / 634 assertions, with 8 honest integration skips, 2 warnings and
+deprecations. RED coverage demonstrated five missing-fact failures before the
+fix. `composer lint`, changed-scope PHP lint, `git diff --check` and secret
+review pass. No staging/live acceptance, deployment, database write, upload,
+Video or Graph mutation was performed.
+
+COMMITS: `e901d7e0` (RED regression tests), `58881529` (minimal production
+fix).
+
+STATUS: `SLICE_4_TASK_2_FINAL_FIX_LOCAL_READY / LIVE_ACCEPTANCE_BLOCKED`.
+
 # Checkpoint — 2026-09-17 — Slice 2 Task 3 publication evidence review fix (LOCAL ONLY)
 
 SCOPE: Replaced the vacuous publication-gate media evidence fixture with an
