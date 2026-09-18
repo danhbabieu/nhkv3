@@ -210,8 +210,13 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
             }
             if ($source instanceof MediaAsset && $derivative instanceof MediaAsset) {
                 $currentChecksum = hash_file('sha256', $filePath);
-                if (is_string($currentChecksum) && $currentChecksum !== '' && $derivative->checksum === $currentChecksum && $existingMedia->readiness === 'ready') {
-                    $this->saveMapping($existingMedia, $derivative, $attachmentId);
+                $mappedAsset = strtolower((string) get_post_mime_type($attachmentId)) === 'image/webp' ? $derivative : $source;
+                if (is_string($currentChecksum) && $currentChecksum !== '' && $mappedAsset->checksum === $currentChecksum && $existingMedia->readiness === 'ready') {
+                    // WordPress keeps raster attachments on their original
+                    // _wp_attached_file. Map/read back that physical raster
+                    // against the retained source asset; only WebP
+                    // attachments map to the public derivative bytes.
+                    $this->saveMapping($existingMedia, $mappedAsset, $attachmentId);
                     $this->adoptionPhase($attachmentId, 'SOURCE_ORIGINAL_READY', $existingMedia->canonicalId);
                     $this->adoptionPhase($attachmentId, 'PUBLIC_DERIVATIVE_READY', $existingMedia->canonicalId);
                     $this->adoptionPhase($attachmentId, 'ATTACHMENT_BINDING_READY', $existingMedia->canonicalId);
@@ -361,7 +366,10 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
                 $updatedSource = $this->mediaService->reconcileAsset($existingMedia->canonicalId, $existingSource->assetId, $sourceAsset);
                 $updatedDerivative = $this->mediaService->reconcileAsset($existingMedia->canonicalId, $existingDerivative->assetId, $derivativeAsset);
                 $readyMedia = $existingMedia->readiness === 'ready' ? $existingMedia : $this->mediaService->update($existingMedia->canonicalId, $existingMedia->canonicalName, 'ready', $existingMedia->provenance, $existingMedia->revision);
-                $this->saveMapping($readyMedia, $updatedDerivative, $attachmentId);
+                // The attachment remains the raster source file. The WebP
+                // derivative is public, but it is not the bytes represented
+                // by WordPress's _wp_attached_file locator.
+                $this->saveMapping($readyMedia, $updatedSource, $attachmentId);
                 $this->adoptionPhase($attachmentId, 'SOURCE_ORIGINAL_READY', $readyMedia->canonicalId);
                 $this->adoptionPhase($attachmentId, 'PUBLIC_DERIVATIVE_READY', $readyMedia->canonicalId);
                 $this->adoptionPhase($attachmentId, 'ATTACHMENT_BINDING_READY', $readyMedia->canonicalId);
@@ -381,7 +389,9 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
             if (!$derivative instanceof MediaAsset) throw new RuntimeException('WORDPRESS_MEDIA_DERIVATIVE_ASSET_UNAVAILABLE');
             $this->adoptionPhase($attachmentId, 'SOURCE_ASSET_READY', $media->canonicalId);
             $this->adoptionPhase($attachmentId, 'ATTACHMENT_BINDING_STARTED', $media->canonicalId);
-            $this->saveMapping($media, $derivative, $attachmentId);
+            // Keep the attachment mapping aligned with the physical raster
+            // bytes. The public WebP remains a separate derivative asset.
+            $this->saveMapping($media, $source, $attachmentId);
             $this->adoptionPhase($attachmentId, 'ATTACHMENT_BINDING_READY', $media->canonicalId);
             $this->adoptionPhase($attachmentId, 'COMPLETE', $media->canonicalId);
             return $media->canonicalId;
