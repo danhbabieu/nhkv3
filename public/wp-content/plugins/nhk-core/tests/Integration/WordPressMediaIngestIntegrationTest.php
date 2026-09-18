@@ -123,6 +123,150 @@ final class WordPressMediaIngestIntegrationTest extends TestCase
         }
     }
 
+    public function test_edited_mapped_attachment_re_adopts_in_place_and_preserves_usage_ids_and_visibility(): void
+    {
+        global $wpdb;
+        $fixture = ABSPATH . 'wp-admin/images/post-formats-vs.png';
+        $editedFixture = ABSPATH . 'wp-admin/images/post-formats32-vs.png';
+        $attachmentId = 0;
+        $mediaId = '';
+        $sourceKeys = [];
+        $publicPaths = [];
+        $uploadedPath = '';
+        try {
+            $media = new WpdbMediaRepository($wpdb);
+            $assets = new WpdbMediaAssetRepository($wpdb);
+            $usages = new WpdbMediaUsageRepository($wpdb);
+            $service = new MediaService($media, $assets, $usages);
+            $bridge = new WordPressMediaAttachmentBridge($wpdb, $service, $media, $assets);
+            $ingestor = new WordPressMediaAttachmentIngestor($bridge);
+
+            WordPressMediaAttachmentWriteGuard::enter();
+            try {
+                $upload = wp_upload_bits('nhk-edited-readback.png', null, (string) file_get_contents($fixture));
+                self::assertEmpty($upload['error'] ?? null);
+                $uploadedPath = (string) $upload['file'];
+                $attachmentId = (int) wp_insert_attachment(['post_mime_type' => 'image/png', 'post_title' => 'Edited readback', 'post_status' => 'inherit'], $uploadedPath, 0, true);
+                update_post_meta($attachmentId, '_wp_attached_file', _wp_relative_upload_path($uploadedPath));
+                wp_update_attachment_metadata($attachmentId, wp_generate_attachment_metadata($attachmentId, $uploadedPath));
+            } finally {
+                WordPressMediaAttachmentWriteGuard::leave();
+            }
+
+            $mediaId = (string) $bridge->adoptAttachment($attachmentId, ['canonical_name' => 'Edited readback', 'seo_slug' => 'edited-readback']);
+            self::assertNotSame('', $mediaId);
+            $articleUsage = $usages->create(new NHKCoreDomainMediaMediaUsage(UuidCodec::newV7(), $mediaId, 'wp_post', '1:572', 'featured', 0, 'Article alt', 'Article caption'));
+            $dictionaryUsage = $usages->create(new NHKCoreDomainMediaMediaUsage(UuidCodec::newV7(), $mediaId, 'dictionary', 'clock-face', 'illustration', 0, 'Dictionary alt', 'Dictionary caption'));
+            $beforeAssets = $assets->listByMediaId($mediaId);
+            $beforeMediaIds = array_map(static fn ($asset): string => $asset->assetId, $beforeAssets);
+            $beforeSource = array_values(array_filter($beforeAssets, static fn ($asset): bool => $asset->kind === 'original'))[0];
+            $beforeDerivative = array_values(array_filter($beforeAssets, static fn ($asset): bool => $asset->kind === 'derivative'))[0];
+
+            self::assertTrue(copy($editedFixture, $uploadedPath));
+            $reAdopted = $bridge->adoptAttachment($attachmentId, ['selection_source' => 'IMAGE_EDITOR']);
+            self::assertSame($mediaId, $reAdopted);
+            $secondAdoption = $bridge->adoptAttachment($attachmentId, ['selection_source' => 'IMAGE_EDITOR']);
+            self::assertSame($mediaId, $secondAdoption);
+            $afterAssets = $assets->listByMediaId($mediaId);
+            self::assertSame($beforeMediaIds, array_map(static fn ($asset): string => $asset->assetId, $afterAssets));
+            $afterSource = array_values(array_filter($afterAssets, static fn ($asset): bool => $asset->assetId === $beforeSource->assetId))[0];
+            $afterDerivative = array_values(array_filter($afterAssets, static fn ($asset): bool => $asset->assetId === $beforeDerivative->assetId))[0];
+            self::assertSame(hash_file('sha256', $uploadedPath), $afterSource->checksum);
+            self::assertSame('PRIVATE', $afterSource->visibility);
+            self::assertSame('PUBLIC', $afterDerivative->visibility);
+            self::assertSame($articleUsage->usageId, $usages->listByMediaId($mediaId)[0]->usageId);
+            self::assertContains($dictionaryUsage->usageId, array_map(static fn ($usage): string => $usage->usageId, $usages->listByMediaId($mediaId)));
+            self::assertSame('VERIFIED', $ingestor->read($attachmentId)['readback_state']);
+        } finally {
+            if ($attachmentId > 0 && function_exists('wp_delete_attachment')) wp_delete_attachment($attachmentId, true);
+            if ($mediaId !== '') {
+                $internalId = (int) $wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}nhk_media WHERE canonical_uuid=%s", UuidCodec::toBinary($mediaId)));
+                if ($internalId > 0) {
+                    $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_media_usages WHERE media_id=%d", $internalId));
+                    $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_media_assets WHERE media_id=%d", $internalId));
+                    $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_media WHERE id=%d", $internalId));
+                }
+                $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_media_wordpress_attachments WHERE media_uuid=%s", UuidCodec::toBinary($mediaId)));
+            }
+            if ($uploadedPath !== '' && is_file($uploadedPath)) @unlink($uploadedPath);
+        }
+    }
+
+    public function test_existing_attachment_with_missing_physical_file_reads_as_unavailable(): void
+    {
+        global $wpdb;
+        $fixture = ABSPATH . 'wp-admin/images/post-formats-vs.png';
+        $attachmentId = 0;
+        $uploadedPath = '';
+        try {
+            WordPressMediaAttachmentWriteGuard::enter();
+            try {
+                $upload = wp_upload_bits('nhk-missing-physical.png', null, (string) file_get_contents($fixture));
+                self::assertEmpty($upload['error'] ?? null);
+                $uploadedPath = (string) $upload['file'];
+                $attachmentId = (int) wp_insert_attachment(['post_mime_type' => 'image/png', 'post_title' => 'Missing physical', 'post_status' => 'inherit'], $uploadedPath, 0, true);
+                update_post_meta($attachmentId, '_wp_attached_file', _wp_relative_upload_path($uploadedPath));
+            } finally {
+                WordPressMediaAttachmentWriteGuard::leave();
+            }
+            self::assertTrue(unlink($uploadedPath));
+            $read = (new WordPressMediaAttachmentIngestor())->read($attachmentId);
+            self::assertIsArray($read);
+            self::assertSame($attachmentId, $read['attachment_id']);
+            self::assertSame('UNAVAILABLE', $read['readback_state']);
+        } finally {
+            if ($attachmentId > 0 && function_exists('wp_delete_attachment')) wp_delete_attachment($attachmentId, true);
+            if ($uploadedPath !== '' && is_file($uploadedPath)) @unlink($uploadedPath);
+        }
+    }
+
+    public function test_conflicting_attachment_mapping_reads_as_inconsistent_without_duplicate_media(): void
+    {
+        global $wpdb;
+        $fixture = ABSPATH . 'wp-admin/images/post-formats-vs.png';
+        $attachmentId = 0;
+        $uploadedPath = '';
+        $mediaIds = [];
+        try {
+            $media = new WpdbMediaRepository($wpdb);
+            $assets = new WpdbMediaAssetRepository($wpdb);
+            $service = new MediaService($media, $assets, new WpdbMediaUsageRepository($wpdb));
+            $bridge = new WordPressMediaAttachmentBridge($wpdb, $service, $media, $assets);
+            WordPressMediaAttachmentWriteGuard::enter();
+            try {
+                $upload = wp_upload_bits('nhk-conflicting-mapping.png', null, (string) file_get_contents($fixture));
+                self::assertEmpty($upload['error'] ?? null);
+                $uploadedPath = (string) $upload['file'];
+                $attachmentId = (int) wp_insert_attachment(['post_mime_type' => 'image/png', 'post_title' => 'Conflicting mapping', 'post_status' => 'inherit'], $uploadedPath, 0, true);
+                update_post_meta($attachmentId, '_wp_attached_file', _wp_relative_upload_path($uploadedPath));
+                wp_update_attachment_metadata($attachmentId, wp_generate_attachment_metadata($attachmentId, $uploadedPath));
+            } finally {
+                WordPressMediaAttachmentWriteGuard::leave();
+            }
+            $first = (string) $bridge->adoptAttachment($attachmentId, ['canonical_name' => 'Conflicting mapping']);
+            $mediaIds[] = $first;
+            $media->create(new NHKCoreDomainMediaMedia(UuidCodec::newV7(), 'wp-attachment:' . max(1, (int) get_current_blog_id()) . ':' . $attachmentId, 'Conflicting second identity', 'draft'));
+            $countBefore = count($media->list());
+            $read = (new WordPressMediaAttachmentIngestor())->read($attachmentId);
+            self::assertIsArray($read);
+            self::assertSame('INCONSISTENT', $read['readback_state']);
+            self::assertSame('ATTACHMENT_MAPPING_CONFLICT', $read['error_code']);
+            self::assertCount($countBefore, $media->list());
+        } finally {
+            if ($attachmentId > 0 && function_exists('wp_delete_attachment')) wp_delete_attachment($attachmentId, true);
+            foreach ($mediaIds as $mediaId) {
+                $internalId = (int) $wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}nhk_media WHERE canonical_uuid=%s", UuidCodec::toBinary($mediaId)));
+                if ($internalId > 0) {
+                    $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_media_usages WHERE media_id=%d", $internalId));
+                    $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_media_assets WHERE media_id=%d", $internalId));
+                    $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_media WHERE id=%d", $internalId));
+                }
+                $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_media_wordpress_attachments WHERE media_uuid=%s", UuidCodec::toBinary($mediaId)));
+            }
+            if ($uploadedPath !== '' && is_file($uploadedPath)) @unlink($uploadedPath);
+        }
+    }
+
     public function test_real_file_ingest_retains_source_and_repeated_adoption_resolves_one_media(): void
     {
         global $wpdb;

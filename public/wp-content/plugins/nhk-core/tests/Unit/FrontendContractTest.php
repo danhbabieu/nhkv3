@@ -79,6 +79,19 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString('attachmentReader:', $source);
     }
 
+    public function test_attachment_readback_contract_exposes_canonical_state_without_nulling_inconsistency(): void
+    {
+        $ingestor = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Media/WordPressMediaAttachmentIngestor.php');
+        $bridge = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Media/WordPressMediaAttachmentBridge.php');
+        $mcp = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/Mcp/McpReadHandler.php');
+
+        self::assertStringContainsString('bindingForAttachment', $bridge);
+        self::assertStringContainsString("'readback_state'", $ingestor);
+        self::assertStringContainsString("'INCONSISTENT'", $ingestor);
+        self::assertStringContainsString("'media_id'", $ingestor);
+        self::assertStringContainsString("'error_code'", $mcp);
+    }
+
     public function test_technical_archives_are_redirect_inputs_and_comparison_is_so_sanh(): void
     {
         $routes = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/PublicEntityRoutes.php');
