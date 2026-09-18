@@ -60,6 +60,16 @@ final class AuthorityProposalExecutor
             if ($mediaId === '' || $usageId === '' || $readback === []) throw new \RuntimeException('MEDIA_BINDING_FINAL_READBACK_FAILED');
             return new MediaRepresentativeApplyResult($mediaId, $usageId, $binding, $readback);
         }
+        if ($proposal->entityType === 'media' && $proposal->operation === 'update') {
+            if (!$this->media) throw new \RuntimeException('Media executor is not configured.');
+            $current = $this->media->find($proposal->subjectId);
+            if (!$current instanceof Media) throw new \RuntimeException('MEDIA_NOT_FOUND');
+            $payload = $proposal->payload;
+            $name = trim((string) ($payload['name'] ?? $current->canonicalName));
+            $readiness = trim((string) ($payload['readiness'] ?? $current->readiness));
+            $provenance = is_array($payload['provenance'] ?? null) ? $payload['provenance'] : $current->provenance;
+            return $this->media->update($current->canonicalId, $name, $readiness, $provenance, $proposal->expectedRevision);
+        }
         if ($proposal->entityType === 'media' && in_array($proposal->operation, ['add', 'replace', 'remove'], true)) {
             if ($this->mediaBinding === null) throw new \RuntimeException('Media usage executor is not configured.');
             $mutation = $this->mediaBinding->mutate(array_replace($proposal->payload, ['operation' => $proposal->operation]));

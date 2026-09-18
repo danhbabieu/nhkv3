@@ -382,6 +382,23 @@ For images, send the same tool call as multipart with top-level `files[]` and
 keep binary parts out of `arguments`; optional per-file metadata belongs in
 `items[]`. A replay uses the same idempotency key and unchanged payload.
 
+For a multi-image packet, `metadata.description` is submission/batch context
+only. It MUST NOT be used implicitly as the canonical title, alt text, caption
+or description of every Media. `items[i]` is aligned to `files[i]` by stable
+ordinal and may carry an explicit `media` object with per-item `title`,
+`alt_text`, `caption`, `description` and `seo_slug`. Ordered natural-language
+descriptions may be mapped one-to-one only when the parser can prove matching
+cardinality; ambiguous or incomplete lists retain batch context and fail closed
+to neutral item metadata/review rather than inventing descriptions. The
+ordered manifest preserves the Media identity, checksum and ordinal for each
+physical file.
+
+Existing Media metadata correction is a separate governed `media_operations[]`
+item with `operation=update`, an exact `media_ref`, expected Media revision and
+the bounded canonical metadata delta. It uses the same Proposal → Governance →
+Controlled Apply → canonical read-back lifecycle; it never rewrites the binary,
+stable key, attachment identity or MediaUsage rows.
+
 ### Documentation bootstrap surface
 
 The normal read-only MCP catalog exposes `nhk.documentation.bootstrap`,

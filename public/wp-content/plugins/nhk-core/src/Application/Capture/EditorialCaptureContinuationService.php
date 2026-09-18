@@ -302,7 +302,11 @@ final class EditorialCaptureContinuationService
     /** @return list<array<string,mixed>> */
     private function safeItems(array $items): array
     {
-        return array_values(array_map(static function (mixed $item): array { $item = is_array($item) ? $item : []; return array_filter(['client_file_id' => $item['client_file_id'] ?? null, 'sort_order' => $item['sort_order'] ?? null, 'title' => $item['title'] ?? null, 'visual_context' => is_array($item['visual_context'] ?? null) ? $item['visual_context'] : null], static fn (mixed $value): bool => $value !== null && $value !== ''); }, $items));
+        return array_values(array_map(static function (mixed $item): array {
+            $item = is_array($item) ? $item : [];
+            $safe = ['client_file_id' => $item['client_file_id'] ?? null, 'sort_order' => $item['sort_order'] ?? null, 'title' => $item['title'] ?? null, 'media' => is_array($item['media'] ?? null) ? $item['media'] : null, 'media_context' => is_array($item['media_context'] ?? null) ? $item['media_context'] : null, 'visual_context' => is_array($item['visual_context'] ?? null) ? $item['visual_context'] : null];
+            return array_filter($safe, static fn (mixed $value): bool => $value !== null && $value !== '');
+        }, $items));
     }
 
     /** @return list<string> */

@@ -261,7 +261,6 @@ final class McpTransport
             $items[] = [
                 'client_file_id' => (string) ($reference['file_id'] ?? ''),
                 'filename' => (string) ($reference['file_name'] ?? ''),
-                'title' => $description,
                 'sort_order' => $index,
             ];
         }

@@ -54,6 +54,40 @@ final class StagingAcceptanceScopeVerifierTest extends TestCase
         self::assertFalse($this->verifier()->verifyBindingRequest($packet, $request));
     }
 
+    public function test_image_article_reissues_stale_scope_for_compatible_existing_media_retry(): void
+    {
+        [$baseCapture, $input, $assets] = $this->fixture();
+        $input['intent'] = 'IMAGE_ARTICLE';
+        $verifier = new StagingAcceptanceScopeVerifier(
+            static fn (): string => 'staging',
+            'test-secret',
+            static fn (): bool => true,
+            can: static fn (): bool => true,
+        );
+        $old = $verifier->issueForCapture($baseCapture, $input, $assets);
+        $old['expires_at'] = gmdate('c', time() - 60);
+        $capture = new CaptureRecord(
+            $baseCapture->captureId,
+            $baseCapture->idempotencyKey,
+            $baseCapture->requestFingerprint,
+            $baseCapture->stage,
+            $baseCapture->status,
+            context: ['staging_acceptance' => $old],
+            diagnostics: ['failure_history' => [['code' => 'MEDIA_ASSET_STORAGE_KEY_UNAVAILABLE']]],
+        );
+
+        $fresh = $verifier->forCapture($capture, $input, $assets);
+
+        self::assertIsArray($fresh);
+        self::assertNotSame($old['expires_at'], $fresh['expires_at']);
+        self::assertSame($capture->captureId, $fresh['capture_id']);
+        self::assertSame(['media_usage_reconciliation'], [$fresh['operation_family']]);
+        self::assertCount(1, $fresh['bindings']);
+        self::assertSame($input['media_bindings'][0]['media_ref']['media_id'], $fresh['bindings'][0]['media_id']);
+        self::assertTrue($verifier->verifyBindingRequest($fresh, $this->bindingRequest($capture, $input, $fresh)));
+        self::assertSame('MEDIA_ASSET_STORAGE_KEY_UNAVAILABLE', $capture->diagnostics['failure_history'][0]['code']);
+    }
+
     public function test_client_supplied_approved_scope_without_server_signature_is_rejected(): void
     {
         [$capture, $input] = $this->fixture();

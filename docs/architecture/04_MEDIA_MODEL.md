@@ -107,6 +107,31 @@ Usage không tự tạo `depicts`, `about`, Knowledge, Source hoặc Evidence. R
 thay ảnh đại diện. Checksum, tên file, URL attachment và thời điểm upload không
 được dùng để merge hoặc thay canonical Media identity.
 
+## Multi-image metadata ownership — 2026-09-18
+
+Capture/submission text is batch context or an ordered user instruction. It is
+not implicitly a canonical title, alt text, caption or description for every
+Media item. Each file keeps a stable ordinal (`files[i]` ↔ `items[i]`) and may
+carry explicit per-item Media metadata. An ordered natural-language mapping is
+accepted only when its item count matches the file count with sufficient
+confidence; otherwise the batch context is retained and item metadata uses a
+safe neutral fallback or remains review-required. The implementation MUST NOT
+fabricate missing descriptions or duplicate free-form batch text across Media.
+
+Album/submission context, canonical Media metadata and MediaUsage presentation
+metadata remain separate owners. Article-scoped alt text, caption and title are
+MediaUsage context and MUST NOT overwrite canonical Media metadata. A replay
+with the same Capture/item fingerprint preserves identity, ordinal and
+metadata; correction of existing metadata must use the governed Media owner and
+canonical read-back without re-uploading the asset.
+
+The correction operation is a governed Media `update` with the exact canonical
+Media UUID and expected Media revision. It may change canonical name/readiness/
+provenance only; it does not change the stable key, attachment locator,
+MediaAsset checksum or MediaUsage UUIDs. Completion requires the updated Media
+read-back. Direct SQL, `wp_update_attachment` and a new upload are not repair
+paths.
+
 ## Universal MCP post-ingest reconciliation — 2026-09-09
 
 Sau mỗi MCP Media ingest đã đọc lại được, Media phải chạy bounded semantic

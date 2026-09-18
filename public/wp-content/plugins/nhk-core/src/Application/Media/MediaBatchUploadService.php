@@ -37,6 +37,7 @@ final class MediaBatchUploadService
         }
 
         $batchId = function_exists('wp_generate_uuid4') ? wp_generate_uuid4() : $this->uuid();
+        $orderedDescriptions = (new OrderedMediaDescriptionParser())->map((string) ($metadata['description'] ?? ''), count($files));
         $results = [];
         $errors = [];
         $totalBytes = 0;
@@ -50,7 +51,7 @@ final class MediaBatchUploadService
                 $totalBytes += $size;
                 if ($totalBytes > self::MAX_BATCH_BYTES) throw new \InvalidArgumentException('BATCH_SIZE_LIMIT');
                 $item = $normalizedItems[$index];
-                $title = trim((string) ($item['title'] ?? $metadata['description'] ?? ''));
+                $title = $this->itemTitle($item, $index, count($files), $metadata, $orderedDescriptions);
                 if ($title === '') throw new \InvalidArgumentException('TRUSTWORTHY_FILENAME_CONTEXT_REQUIRED');
                 $filename = trim((string) ($item['filename'] ?? $file['name'] ?? ''));
                 $extension = strtolower((string) pathinfo($filename, PATHINFO_EXTENSION));
@@ -58,15 +59,17 @@ final class MediaBatchUploadService
                 $result = $this->ingestor->ingest($file, $filename, $title, PublicImageSizingPolicy::MAX_LONG_EDGE, PublicImageSizingPolicy::MAX_LONG_EDGE, PublicMediaAssetSelector::DEFAULT_WEBP_QUALITY);
                 $checksum = hash_file('sha256', (string) ($file['tmp_name'] ?? ''));
                 if (!is_string($checksum) || $checksum === '') throw new \RuntimeException('CHECKSUM_FAILED');
-                $manifestItem = array_merge($this->manifestItem($result, $checksum, $clientId), ['sort_order' => (int) ($item['sort_order'] ?? $index)]);
+                $manifestItem = array_merge($this->manifestItem($result, $checksum, $clientId), ['ordinal' => $index, 'sort_order' => (int) ($item['sort_order'] ?? $index)]);
                 if (is_array($item['visual_context'] ?? null)) $manifestItem['visual_context'] = $item['visual_context'];
+                $mediaContext = $this->mediaContext($item);
+                if ($mediaContext !== []) $manifestItem['media_context'] = $mediaContext;
                 $results[] = $manifestItem;
             } catch (\Throwable $error) {
                 $errors[] = ['client_file_id' => $clientId, 'upload_status' => 'FAILED', 'code' => $error->getMessage() !== '' ? $error->getMessage() : 'UPLOAD_FAILED'];
             }
         }
-        usort($results, static fn (array $a, array $b): int => ((int) $a['sort_order']) <=> ((int) $b['sort_order']));
-        $manifest = ['batch_id' => $batchId, 'idempotency_key' => $idempotencyKey, 'total_files' => count($files), 'succeeded' => count($results), 'failed' => count($errors), 'partial_success' => $results !== [] && $errors !== [], 'items' => $results, 'errors' => $errors];
+        usort($results, static fn (array $a, array $b): int => ((int) ($a['ordinal'] ?? 0)) <=> ((int) ($b['ordinal'] ?? 0)));
+        $manifest = ['batch_id' => $batchId, 'idempotency_key' => $idempotencyKey, 'batch_context' => $this->batchContext($metadata), 'total_files' => count($files), 'succeeded' => count($results), 'failed' => count($errors), 'partial_success' => $results !== [] && $errors !== [], 'items' => $results, 'errors' => $errors];
         $repository->save($idempotencyKey, ['fingerprint' => $fingerprint, 'manifest' => $manifest]);
         return $manifest;
     }
@@ -100,6 +103,39 @@ final class MediaBatchUploadService
         $normalized = [];
         for ($index = 0; $index < $count; $index++) $normalized[] = is_array($items[$index] ?? null) ? $items[$index] : [];
         return $normalized;
+    }
+
+    /** @param array<string,mixed> $item @param array<string,mixed> $metadata @param list<string>|null $orderedDescriptions */
+    private function itemTitle(array $item, int $index, int $count, array $metadata, ?array $orderedDescriptions): string
+    {
+        $media = is_array($item['media'] ?? null) ? $item['media'] : (is_array($item['media_context'] ?? null) ? $item['media_context'] : []);
+        $explicit = trim((string) ($media['title'] ?? $item['title'] ?? ''));
+        if ($explicit !== '') return $explicit;
+        if (isset($orderedDescriptions[$index])) return $orderedDescriptions[$index];
+        if ($count === 1) return trim((string) ($metadata['description'] ?? ''));
+        // A batch instruction is context, not an implicit title. Keep the
+        // physical attachment name deterministic and item-scoped until an
+        // explicit per-item semantic title is supplied.
+        return 'Ảnh tải lên ' . ($index + 1);
+    }
+
+    /** @param array<string,mixed> $item @return array<string,string> */
+    private function mediaContext(array $item): array
+    {
+        $media = is_array($item['media'] ?? null) ? $item['media'] : (is_array($item['media_context'] ?? null) ? $item['media_context'] : []);
+        $context = [];
+        foreach (['title', 'alt_text', 'caption', 'description', 'seo_slug'] as $field) {
+            $value = trim((string) ($media[$field] ?? $item[$field] ?? ''));
+            if ($value !== '') $context[$field] = $value;
+        }
+        return $context;
+    }
+
+    /** @param array<string,mixed> $metadata @return array<string,string> */
+    private function batchContext(array $metadata): array
+    {
+        $description = trim((string) ($metadata['description'] ?? ''));
+        return $description === '' ? [] : ['description' => $description];
     }
 
     private function fileFingerprint(array $file): array

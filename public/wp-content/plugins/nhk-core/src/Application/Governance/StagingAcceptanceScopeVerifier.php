@@ -225,13 +225,41 @@ final class StagingAcceptanceScopeVerifier
         if ($this->environmentName() !== 'staging') return null;
         $existing = is_array($capture->context['staging_acceptance'] ?? null) ? $capture->context['staging_acceptance'] : null;
         if ($existing !== null) {
+            if (strtoupper(trim((string) ($existing['intent'] ?? ''))) !== strtoupper(trim((string) ($input['intent'] ?? '')))) {
+                throw new \RuntimeException('STAGING_SCOPE_REPLAY_MISMATCH');
+            }
+            $reissue = false;
             foreach ((array) ($input['media_bindings'] ?? []) as $index => $binding) {
                 $request = $this->bindingRequest($capture, $binding, $assets, (int) $index, $existing);
-                if (!$this->verifyBindingRequest($existing, $request)) throw new \RuntimeException('STAGING_SCOPE_REPLAY_MISMATCH');
+                if ($this->verifyBindingRequest($existing, $request)) continue;
+                if (!$this->bindingRequestCompatibleWithPersistedScope($existing, $request, (int) $index)) throw new \RuntimeException('STAGING_SCOPE_REPLAY_MISMATCH');
+                $reissue = true;
             }
-            return $existing;
+            // The Capture request and exact binding identity are immutable,
+            // but the signed scope is ephemeral. Reissue only after the
+            // current canonical admission checks the same request again.
+            return $reissue ? $this->issueForCapture($capture, $input, $assets) : $existing;
         }
         return $this->issueForCapture($capture, $input, $assets);
+    }
+
+    /** @param array<string,mixed> $scope @param array<string,mixed> $request */
+    private function bindingRequestCompatibleWithPersistedScope(array $scope, array $request, int $index): bool
+    {
+        if (($scope['capture_id'] ?? '') !== ($request['capture_id'] ?? '')
+            || ($scope['capture_fingerprint'] ?? '') !== ($request['capture_fingerprint'] ?? '')
+            || ($request['operation'] ?? '') !== 'representative_bind') return false;
+        $binding = is_array($scope['bindings'][$index] ?? null) ? $scope['bindings'][$index] : null;
+        if ($binding === null) return false;
+        $target = is_array($request['target'] ?? null) ? $request['target'] : [];
+        $persistedTarget = is_array($binding['target'] ?? null) ? $binding['target'] : [];
+        foreach (['type', 'id', 'stable_key', 'revision'] as $key) {
+            if (array_key_exists($key, $persistedTarget) && (string) ($target[$key] ?? '') !== (string) $persistedTarget[$key]) return false;
+        }
+        return (string) ($request['media']['id'] ?? '') === (string) ($binding['media_id'] ?? '')
+            && strtoupper((string) ($request['role'] ?? '')) === strtoupper((string) ($binding['role'] ?? ''))
+            && strtoupper((string) ($request['selection_source'] ?? '')) === strtoupper((string) ($binding['selection_source'] ?? ''))
+            && strtoupper((string) ($request['selection_policy'] ?? '')) === strtoupper((string) ($binding['selection_policy'] ?? ''));
     }
 
     /** @param array<string,mixed> $scope @param array<string,mixed> $request */

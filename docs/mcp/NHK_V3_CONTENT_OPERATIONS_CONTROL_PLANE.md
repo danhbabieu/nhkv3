@@ -353,6 +353,14 @@ WebP/responsive outputs are derivatives under the same Media identity. It does
 not use base64 as the default transport or infer semantic relations from image
 content.
 
+The batch description is Capture/album context only. It MUST NOT be implicitly
+copied into every Media title, alt text, caption or description. Per-file
+metadata belongs to the corresponding ordered `items[]` entry; a natural
+language ordered list is mapped only when its cardinality matches the files,
+otherwise the adapter uses a safe neutral item fallback and preserves the
+context for review. MediaUsage presentation metadata remains separate from
+canonical Media metadata.
+
 The transport classification is PRIMARY/RECOMMENDED for
 `nhk.media.upload-batch`, SECONDARY/IMPORT for `wp_upload_media_from_url` when
 the source is already a public HTTPS URL, and FALLBACK/COMPATIBILITY for

@@ -108,6 +108,11 @@ final class MediaService
         return $this->changeState($id, $revision, true);
     }
 
+    public function find(string $id): ?Media
+    {
+        return $this->media->findByCanonicalId($id);
+    }
+
     public function addAsset(string $mediaId, string $kind, string $storageKey, string $checksum, string $mimeType, int $byteSize, ?int $width = null, ?int $height = null, string $visibility = 'PRIVATE', array $metadata = []): MediaAsset
     {
         $parent = $this->media->findByCanonicalId($mediaId);

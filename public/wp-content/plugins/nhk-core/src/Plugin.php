@@ -1015,6 +1015,16 @@ final class Plugin {
                         $operation = strtolower(trim((string) ($mediaOperation['operation'] ?? '')));
                         $mediaRef = is_array($mediaOperation['media'] ?? null) ? $mediaOperation['media'] : (is_array($mediaOperation['media_ref'] ?? null) ? $mediaOperation['media_ref'] : []);
                         $media = $mediaBindingService->resolveMediaReference($mediaRef);
+                        if ($operation === 'update') {
+                            $payload = array_replace($mediaOperation, ['operation' => $operation, 'media' => ['id' => $media->canonicalId]]);
+                            $governedMediaOperations[] = $mcpGovernance->ingestFromArguments([
+                                'operation' => 'update', 'entity_type' => 'media', 'subject_id' => $media->canonicalId,
+                                'expected_revision' => max(1, (int) ($mediaOperation['expected_revision'] ?? $media->revision)),
+                                'idempotency_key' => (string) ($mediaOperation['idempotency_key'] ?? ($context['capture']['capture_id'] ?? '') . ':media-metadata:' . $index),
+                                'payload' => $payload,
+                            ]);
+                            continue;
+                        }
                         $target = is_array($mediaOperation['target'] ?? null) ? $mediaOperation['target'] : [];
                         $targetUuid = null;
                         if (strtolower(trim((string) ($target['type'] ?? ''))) !== 'wp_post') {

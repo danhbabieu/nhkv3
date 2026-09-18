@@ -9,6 +9,102 @@ use PHPUnit\Framework\TestCase;
 
 final class MediaBatchUploadServiceTest extends TestCase
 {
+    public function test_multi_image_batch_context_is_not_fanned_out_as_per_item_title(): void
+    {
+        $files = [$this->file('front.jpg', 'front'), $this->file('paper.jpg', 'paper'), $this->file('back.jpg', 'back')];
+        $titles = [];
+        $ingestor = new class($titles) implements WordPressMediaAttachmentIngestor {
+            public function __construct(private array &$titles) {}
+            public function ingest(array $file, string $filename, string $title, int $maxWidth, int $maxHeight, int $quality): array
+            {
+                $this->titles[] = $title;
+                return ['attachment_id' => count($this->titles), 'canonical_url' => '/' . $filename, 'filename' => $filename, 'mime' => 'image/webp', 'filesize' => (int) ($file['size'] ?? 0), 'width' => 1, 'height' => 1];
+            }
+            public function read(int $attachmentId): ?array { return ['attachment_id' => $attachmentId]; }
+        };
+        $repository = new class implements MediaBatchUploadRepository {
+            public function find(string $idempotencyKey): ?array { return null; }
+            public function save(string $idempotencyKey, array $record): void {}
+        };
+
+        try {
+            (new MediaBatchUploadService($ingestor, $repository))->upload(
+                'ordered-context',
+                ['description' => 'Đây lần lượt là ảnh mặt trước, ảnh giấy hướng dẫn và ảnh mặt sau máy.'],
+                ['files' => $files],
+            );
+            self::assertCount(3, $titles);
+            self::assertNotSame('Đây lần lượt là ảnh mặt trước, ảnh giấy hướng dẫn và ảnh mặt sau máy.', $titles[0]);
+            self::assertCount(3, array_unique($titles));
+        } finally {
+            foreach ($files as $file) @unlink((string) $file['tmp_name']);
+        }
+    }
+
+    public function test_explicit_ordered_description_maps_only_when_cardinality_matches(): void
+    {
+        $files = [$this->file('front.jpg', 'front'), $this->file('paper.jpg', 'paper'), $this->file('back.jpg', 'back')];
+        $titles = [];
+        $ingestor = new class($titles) implements WordPressMediaAttachmentIngestor {
+            public function __construct(private array &$titles) {}
+            public function ingest(array $file, string $filename, string $title, int $maxWidth, int $maxHeight, int $quality): array
+            {
+                $this->titles[] = $title;
+                return ['attachment_id' => count($this->titles), 'canonical_url' => '/' . $filename, 'filename' => $filename, 'mime' => 'image/webp', 'filesize' => (int) ($file['size'] ?? 0), 'width' => 1, 'height' => 1];
+            }
+            public function read(int $attachmentId): ?array { return ['attachment_id' => $attachmentId]; }
+        };
+        $repository = new class implements MediaBatchUploadRepository {
+            public function find(string $idempotencyKey): ?array { return null; }
+            public function save(string $idempotencyKey, array $record): void {}
+        };
+
+        try {
+            (new MediaBatchUploadService($ingestor, $repository))->upload(
+                'ordered-description',
+                ['description' => 'Đây lần lượt là ảnh mặt trước, ảnh giấy hướng dẫn và ảnh mặt sau máy.'],
+                ['files' => $files],
+            );
+            self::assertSame(['ảnh mặt trước', 'ảnh giấy hướng dẫn', 'ảnh mặt sau máy'], $titles);
+        } finally {
+            foreach ($files as $file) @unlink((string) $file['tmp_name']);
+        }
+    }
+
+    public function test_per_item_media_context_is_preserved_separately_from_batch_context(): void
+    {
+        $files = [$this->file('front.jpg', 'front'), $this->file('paper.jpg', 'paper')];
+        $ingestor = new class implements WordPressMediaAttachmentIngestor {
+            public function ingest(array $file, string $filename, string $title, int $maxWidth, int $maxHeight, int $quality): array
+            {
+                return ['attachment_id' => 1, 'canonical_url' => '/' . $filename, 'filename' => $filename, 'mime' => 'image/webp', 'filesize' => (int) ($file['size'] ?? 0), 'width' => 1, 'height' => 1];
+            }
+            public function read(int $attachmentId): ?array { return ['attachment_id' => $attachmentId]; }
+        };
+        $repository = new class implements MediaBatchUploadRepository {
+            public function find(string $idempotencyKey): ?array { return null; }
+            public function save(string $idempotencyKey, array $record): void {}
+        };
+
+        try {
+            $result = (new MediaBatchUploadService($ingestor, $repository))->upload(
+                'per-item-context',
+                ['description' => 'Cùng một bộ ảnh của hiện vật.'],
+                ['files' => $files],
+                [
+                    ['media' => ['title' => 'Mặt trước', 'alt_text' => 'Ảnh mặt trước', 'caption' => 'Mặt trước hiện vật.']],
+                    ['media' => ['title' => 'Tài liệu', 'alt_text' => 'Tờ giấy hướng dẫn', 'caption' => 'Tài liệu đi kèm.']],
+                ],
+            );
+            self::assertSame(['Cùng một bộ ảnh của hiện vật.'], [$result['batch_context']['description']]);
+            self::assertSame('Mặt trước', $result['items'][0]['media_context']['title']);
+            self::assertSame('Tài liệu', $result['items'][1]['media_context']['title']);
+            self::assertSame([0, 1], array_column($result['items'], 'ordinal'));
+        } finally {
+            foreach ($files as $file) @unlink((string) $file['tmp_name']);
+        }
+    }
+
     public function test_batch_returns_ordered_manifest_and_keeps_partial_success(): void
     {
         $first = $this->file('front.jpg', 'jpeg-bytes');
