@@ -5,7 +5,7 @@ namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Dictionary\DictionaryPublicQuery;
 use NHK\Core\Application\Entity\EntityMediaProjection;
-use NHK\Core\Application\Media\{ArticleMediaSeoProjection, MediaService, PublicMediaGalleryQuery, VisualSupportPublicProjection};
+use NHK\Core\Application\Media\{ArticleMediaSeoProjection, MediaService, PreferredImageSeoProjection, PublicMediaGalleryQuery, VisualSupportPublicProjection};
 use NHK\Core\Contracts\Dictionary\DictionaryConceptRepository;
 use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository, MediaUsageRepository, WordPressArticleMediaAdapter};
 use NHK\Core\Domain\Dictionary\DictionaryConcept;
@@ -51,6 +51,68 @@ final class ContextualMediaSeoProjectionTest extends TestCase
         self::assertSame('Alt chủ thể', $result['representative']['alt']);
         self::assertSame('Tên Media trung tính', $result['representative']['title']);
         self::assertSame('Tên Media trung tính', $result['representative']['caption']);
+    }
+
+    public function test_article_caption_falls_through_to_neutral_media_before_attachment(): void
+    {
+        [$media, $assets, $usages, $service] = $this->stores();
+        $item = $service->create('caption-precedence', 'Caption từ Media', 'ready');
+        $asset = $service->addAsset($item->canonicalId, 'original', 'uploads/caption-precedence.webp', hash('sha256', 'caption-precedence'), 'image/webp', 10, 1200, 800, 'PUBLIC', ['canonical_filename' => 'caption-precedence.webp']);
+        $service->addUsage($item->canonicalId, 'wp_post', '1:66', 'featured_primary', 0, 'Alt bài', '', [], 'Tiêu đề bài', 'article:1:66:featured_primary');
+        $adapter = new ContextualAttachmentDouble();
+
+        $result = (new ArticleMediaSeoProjection($media, $assets, $usages, $adapter))->forPost('1:66');
+
+        self::assertSame('Caption từ Media', $result['caption']);
+        self::assertNotSame($adapter->metadata['caption'], $result['caption']);
+        self::assertSame($item->canonicalId, $asset->mediaId);
+    }
+
+    public function test_preferred_image_metadata_source_uses_explicit_field_sources_not_top_level_labels(): void
+    {
+        $result = (new PreferredImageSeoProjection())->project([
+            [
+                'role' => 'representative',
+                'url' => '/preferred.webp',
+                'metadata_source' => 'UNTRUSTED_TOP_LEVEL_LABEL',
+                'title' => 'Untrusted top-level title',
+                'alt' => 'Untrusted top-level alt',
+                'caption' => 'Untrusted top-level caption',
+                'usage_title' => '',
+                'usage_alt' => '',
+                'usage_caption' => '',
+                'subject_title' => 'Tiêu đề chủ thể',
+                'subject_alt' => 'Alt chủ thể',
+                'subject_caption' => 'Chú thích chủ thể',
+                'media_name' => 'Tên Media',
+                'attachment_caption' => 'Chú thích Attachment',
+            ],
+        ]);
+
+        self::assertSame('SUBJECT_REPRESENTATIVE', $result['metadata_source']);
+        self::assertSame('Tiêu đề chủ thể', $result['title']);
+        self::assertSame('Alt chủ thể', $result['alt']);
+        self::assertSame('Chú thích chủ thể', $result['caption']);
+    }
+
+    public function test_entity_subject_representative_allows_verified_attachment_fallback_after_neutral_media(): void
+    {
+        [$media, $assets, $usages, $service] = $this->stores();
+        $item = $service->create('entity-attachment-fallback', 'Tên Media', 'ready');
+        $service->addAsset($item->canonicalId, 'original', 'uploads/entity-attachment-fallback.webp', hash('sha256', 'entity-attachment-fallback'), 'image/webp', 10, 1200, 800, 'PUBLIC', ['canonical_filename' => 'entity-attachment-fallback.webp', 'wordpress_attachment_id' => 903]);
+        $service->addUsage($item->canonicalId, 'variant', 'variant-attachment', 'representative', 0, '', '', [], '');
+
+        $result = (new EntityMediaProjection($media, $assets, $usages, static fn (int $attachmentId): array => [
+            'attachment_id' => $attachmentId,
+            'title' => 'Tiêu đề Attachment',
+            'alt' => 'Alt Attachment',
+            'caption' => 'Chú thích Attachment',
+        ]))->forEntity('variant', 'variant-attachment');
+
+        self::assertSame('WORDPRESS_ATTACHMENT', $result['representative']['metadata_source']);
+        self::assertSame('Tiêu đề Attachment', $result['representative']['title']);
+        self::assertSame('Alt Attachment', $result['representative']['alt']);
+        self::assertSame('Chú thích Attachment', $result['representative']['caption']);
     }
 
     public function test_article_usage_fields_win_over_attachment_and_missing_fields_use_attachment_fallback(): void
@@ -151,6 +213,24 @@ final class ContextualMediaSeoProjectionTest extends TestCase
         self::assertArrayHasKey('image_url', $result);
         self::assertArrayNotHasKey('url', $result);
         self::assertSame('Tên Media toàn cục', $media->findByCanonicalId($item->canonicalId)?->canonicalName);
+    }
+
+    public function test_gallery_uses_permitted_non_article_usage_field_by_field_but_never_article_usage(): void
+    {
+        [$media, $assets, $usages, $service] = $this->stores();
+        $item = $service->create('gallery-contextual', 'Tên Media trung tính', 'ready');
+        $service->addAsset($item->canonicalId, 'original', 'uploads/gallery-contextual.webp', hash('sha256', 'gallery-contextual'), 'image/webp', 10, 1200, 800, 'PUBLIC', ['canonical_filename' => 'gallery-contextual.webp']);
+        $service->addUsage($item->canonicalId, 'classification', 'clock-type.cuckoo', 'representative', 0, 'Alt chủ thể', '', [], '');
+        $service->addUsage($item->canonicalId, 'wp_post', '1:67', 'featured_primary', 0, 'Alt bài không được dùng', 'Caption bài không được dùng', [], 'Bài không được dùng', 'article:1:67:featured_primary');
+
+        $result = (new PublicMediaGalleryQuery($media, $assets, null, $usages))->forMedia($item->canonicalId);
+
+        self::assertSame('Tên Media trung tính', $result['title']);
+        self::assertSame('Alt chủ thể', $result['alt']);
+        self::assertSame('Tên Media trung tính', $result['caption']);
+        self::assertSame('SUBJECT_REPRESENTATIVE', $result['metadata_source']);
+        self::assertSame('Ảnh tư liệu trong kho hình ảnh NHK.', $result['summary']);
+        self::assertArrayNotHasKey('url', $result);
     }
 
     public function test_gallery_missing_card_preserves_ineligible_registered_missing_contract(): void
