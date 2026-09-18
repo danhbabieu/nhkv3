@@ -66,10 +66,7 @@ final class DictionaryCurationServiceTest extends TestCase
         $mediaB = '01a0ab0c-fde0-7c01-a89d-fc5eef832c90';
 
         $beforeUsageIds = array_map(static fn (MediaUsage $usage): string => $usage->usageId, $fixture->usages->items);
-        $beforeArticleModelUsageIds = array_map(
-            static fn (MediaUsage $usage): string => $usage->usageId,
-            array_filter($fixture->usages->items, static fn (MediaUsage $usage): bool => in_array($usage->endpointType, ['wp_post', 'model'], true)),
-        );
+        $beforeArticleModelUsages = $this->usageSnapshots($fixture->usages->items);
         $beforeMediaIds = array_map(static fn (Media $media): string => $media->canonicalId, $fixture->media->items);
         $beforeAssetIds = array_map(static fn (MediaAsset $asset): string => $asset->assetId, $fixture->assets->items);
 
@@ -87,10 +84,7 @@ final class DictionaryCurationServiceTest extends TestCase
         self::assertSame('USER_EXPLICIT', $replacement->selectionSource);
         self::assertSame('PINNED', $replacement->selectionPolicy);
         self::assertNotSame($mediaB, $mediaA, 'Replacement must not rewrite old Article/Model usages on Media A.');
-        self::assertSame($beforeArticleModelUsageIds, array_map(
-            static fn (MediaUsage $usage): string => $usage->usageId,
-            array_filter($fixture->usages->items, static fn (MediaUsage $usage): bool => in_array($usage->endpointType, ['wp_post', 'model'], true)),
-        ));
+        self::assertSame($beforeArticleModelUsages, $this->usageSnapshots($fixture->usages->items));
         $afterUsageIds = array_map(static fn (MediaUsage $usage): string => $usage->usageId, $fixture->usages->items);
         self::assertCount(count($beforeUsageIds) + 1, $afterUsageIds);
         self::assertSame($beforeUsageIds, array_values(array_intersect($beforeUsageIds, $afterUsageIds)));
@@ -99,10 +93,10 @@ final class DictionaryCurationServiceTest extends TestCase
     }
 
     /** @dataProvider blockedIllustrationInputs */
-    public function test_unapproved_or_ineligible_dictionary_illustration_is_typed_blocked_result(string $status, string $mediaId, array $context, string $expectedReason): void
+    public function test_unapproved_or_ineligible_dictionary_illustration_is_typed_blocked_result(string $status, string $mediaId, array $context, string $expectedReason, string $candidateState): void
     {
         $concept = new DictionaryConcept('concept-cuckoo-clock', 'Đồng hồ chim cúc cu', 'Định nghĩa lexical.', $status, null, null, null, array_merge(['public_slug' => 'dong-ho-chim-cuc-cu'], $context), 1);
-        $fixture = $this->mediaFixtureForBoundary($concept);
+        $fixture = $this->mediaFixtureForBoundary($concept, $candidateState);
         $service = $fixture->service;
 
         $result = $service->selectPreferredIllustration($concept->conceptId, $concept->revision, $mediaId);
@@ -116,12 +110,13 @@ final class DictionaryCurationServiceTest extends TestCase
     public static function blockedIllustrationInputs(): array
     {
         return [
-            'draft concept' => [DictionaryConcept::DRAFT, '01a0ab0c-fde0-7c01-a89d-fc5eef832c89', [], 'DICTIONARY_CONCEPT_NOT_APPROVED'],
-            'retired concept' => [DictionaryConcept::RETIRED, '01a0ab0c-fde0-7c01-a89d-fc5eef832c89', [], 'DICTIONARY_CONCEPT_NOT_APPROVED'],
-            'ambiguous concept' => [DictionaryConcept::APPROVED, '01a0ab0c-fde0-7c01-a89d-fc5eef832c89', ['illustration_scope' => ['ambiguous' => true]], 'MEDIA_SCOPE_AMBIGUOUS'],
-            'non-ready media' => [DictionaryConcept::APPROVED, '01a0ab0c-fde0-7c01-a89d-fc5eef832c91', [], 'MEDIA_NOT_READY'],
-            'private media asset' => [DictionaryConcept::APPROVED, '01a0ab0c-fde0-7c01-a89d-fc5eef832c92', [], 'MEDIA_PUBLIC_ASSET_REQUIRED'],
-            'placeholder media' => [DictionaryConcept::APPROVED, '01a0ab0c-fde0-7c01-a89d-fc5eef832c93', [], 'MEDIA_PLACEHOLDER_NOT_ALLOWED'],
+            'draft concept' => [DictionaryConcept::DRAFT, '01a0ab0c-fde0-7c01-a89d-fc5eef832c89', [], 'DICTIONARY_CONCEPT_NOT_APPROVED', DictionaryCandidateState::NEEDS_REVIEW],
+            'retired concept' => [DictionaryConcept::RETIRED, '01a0ab0c-fde0-7c01-a89d-fc5eef832c89', [], 'DICTIONARY_CONCEPT_NOT_APPROVED', DictionaryCandidateState::NEEDS_REVIEW],
+            'rejected candidate' => [DictionaryConcept::APPROVED, '01a0ab0c-fde0-7c01-a89d-fc5eef832c89', [], 'DICTIONARY_CANDIDATE_REJECTED', DictionaryCandidateState::REJECTED],
+            'ambiguous concept' => [DictionaryConcept::APPROVED, '01a0ab0c-fde0-7c01-a89d-fc5eef832c89', ['illustration_scope' => ['ambiguous' => true]], 'MEDIA_SCOPE_AMBIGUOUS', DictionaryCandidateState::NEEDS_REVIEW],
+            'non-ready media' => [DictionaryConcept::APPROVED, '01a0ab0c-fde0-7c01-a89d-fc5eef832c91', [], 'MEDIA_NOT_READY', DictionaryCandidateState::NEEDS_REVIEW],
+            'private media asset' => [DictionaryConcept::APPROVED, '01a0ab0c-fde0-7c01-a89d-fc5eef832c92', [], 'MEDIA_PUBLIC_ASSET_REQUIRED', DictionaryCandidateState::NEEDS_REVIEW],
+            'placeholder media' => [DictionaryConcept::APPROVED, '01a0ab0c-fde0-7c01-a89d-fc5eef832c93', [], 'MEDIA_PLACEHOLDER_NOT_ALLOWED', DictionaryCandidateState::NEEDS_REVIEW],
         ];
     }
 
@@ -146,9 +141,9 @@ final class DictionaryCurationServiceTest extends TestCase
         return $this->mediaFixtureForBoundary($concept)->service;
     }
 
-    public function mediaFixtureForBoundary(DictionaryConcept $concept): DictionaryIllustrationFixture
+    public function mediaFixtureForBoundary(DictionaryConcept $concept, string $candidateState = DictionaryCandidateState::NEEDS_REVIEW): DictionaryIllustrationFixture
     {
-        $candidate = new DictionaryCandidate('candidate-illustration', 'côn 111', hash('sha256', '{}'), ['Côn 111'], DictionaryCandidateState::NEEDS_REVIEW, [], [], 1, 'a', 'b', 1);
+        $candidate = new DictionaryCandidate('candidate-illustration', 'côn 111', hash('sha256', '{}'), ['Côn 111'], $candidateState, [], [], 1, 'a', 'b', 1);
         [$candidateRepo, $conceptRepo] = $this->repositories($candidate, $concept);
         $media = new DictionaryIllustrationMediaRepository([
             new Media('01a0ab0c-fde0-7c01-a89d-fc5eef832c89', 'dictionary-media-a', 'Media A neutral', 'ready'),
@@ -205,6 +200,34 @@ final class DictionaryCurationServiceTest extends TestCase
             public function addLabel(DictionaryLabel $label): DictionaryLabel { $this->labels[] = $label; return $label; }
         };
         return [$candidateRepo, $conceptRepo];
+    }
+
+    /** @param list<MediaUsage> $usages @return array<string,array<string,mixed>> */
+    private function usageSnapshots(array $usages): array
+    {
+        $snapshots = [];
+        foreach ($usages as $usage) {
+            if (!$usage instanceof MediaUsage || !in_array($usage->endpointType, ['wp_post', 'model'], true)) continue;
+            $snapshots[$usage->usageId] = [
+                'usageId' => $usage->usageId,
+                'mediaId' => $usage->mediaId,
+                'endpointType' => $usage->endpointType,
+                'endpointKey' => $usage->endpointKey,
+                'role' => $usage->role,
+                'sortOrder' => $usage->sortOrder,
+                'altText' => $usage->altText,
+                'caption' => $usage->caption,
+                'keywordGroups' => $usage->keywordGroups,
+                'title' => $usage->title,
+                'revision' => $usage->revision,
+                'placementKey' => $usage->placementKey,
+                'selectionSource' => $usage->selectionSource,
+                'selectionPolicy' => $usage->selectionPolicy,
+                'activeSlot' => $usage->activeSlot,
+            ];
+        }
+        ksort($snapshots);
+        return $snapshots;
     }
 }
 
