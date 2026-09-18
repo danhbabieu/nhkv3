@@ -11,7 +11,7 @@ use NHK\Core\Application\Governance\VideoStagingAdmission;
 use NHK\Core\Application\Governance\GovernanceAutomationPolicyResolver;
 use NHK\Core\Application\Semantic\ClaimReusePolicy;
 use NHK\Core\Application\Video\{VideoEditorialGenerator, VideoEditorialResumePlanner, VideoSearchDocument, VideoSeoProjection, VideoService};
-use NHK\Core\Contracts\Governance\{AutomationPolicyStorage, GovernedLifecycle, VideoProposalReconciliationPort};
+use NHK\Core\Contracts\Governance\{AutomationPolicyStorage, GovernedLifecycle, PendingVideoProposalLookup, VideoProposalReconciliationPort};
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Governance\{Proposal, ProposalState};
 use NHK\Core\Domain\Video\Video;
@@ -1072,6 +1072,76 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
         self::assertSame('persisted-content-fingerprint', $result['governance']['proposals'][0]['content_fingerprint']);
         self::assertSame('persisted-dependency-fingerprint', $result['governance']['proposals'][0]['dependency_fingerprint']);
         self::assertSame(['GOVERNANCE_APPROVAL_REQUIRED'], $result['blockers']);
+    }
+
+    public function test_existing_capture_retry_uses_canonical_pending_lookup_when_receipt_is_incomplete(): void
+    {
+        $captureId = '01a0b506-9e0c-763e-a796-a69e2d6df497';
+        $videoId = '01a0b506-a292-7cbe-a356-51fc78fec069';
+        $proposalId = UuidCodec::newV7();
+        $proposal = new Proposal($proposalId, $videoId, 'ingest', [
+            'canonical_id' => $videoId,
+            'expected_revision' => 0,
+            'metadata' => ['source' => ['platform' => 'youtube', 'external_video_id' => 'mT4GmDAuWYY']],
+        ], 'persisted-content', null, 'persisted-dependency', ProposalState::SUBMITTED, idempotencyKey: $captureId . ':video', entityType: 'video');
+        $lookup = new class($proposal) implements PendingVideoProposalLookup {
+            public function __construct(private Proposal $proposal) {}
+            public function findPendingVideoProposals(array $binding): array
+            {
+                return $binding['idempotency_key'] === $this->proposal->idempotencyKey && $binding['video_id'] === $this->proposal->payload['canonical_id'] ? [$this->proposal] : [];
+            }
+        };
+        $governance = $this->createMock(GovernedLifecycle::class);
+        $governance->expects(self::once())->method('review')->with($proposalId)->willReturn([
+            'state' => 'submitted', 'entity_type' => 'video', 'operation' => 'ingest', 'subject_id' => $videoId,
+            'payload' => $proposal->payload, 'content_fingerprint' => $proposal->contentFingerprint,
+            'dependency_fingerprint' => $proposal->dependencyFingerprint,
+        ]);
+        $governance->expects(self::never())->method('createFromArguments');
+        $service = new GovernedCaptureContinuationService(
+            $governance, static fn (): array => throw new \LogicException('must not apply'), $this->policies(['video'], ['video' => 'REVIEW_REQUIRED']), static fn (): bool => true,
+            pendingVideoProposals: $lookup,
+        );
+        $result = $service->execute($captureId, 'retry', [
+            'existing_capture_continuation' => true, 'content_intent' => ['intent' => 'VIDEO'],
+            'assets' => [['kind' => 'video', 'video_proposal' => ['entity_type' => 'video', 'operation' => 'ingest', 'payload' => $proposal->payload]]],
+        ], ['resume_children' => ['video']]);
+        self::assertSame('REVIEW_REQUIRED', $result['status']);
+        self::assertSame([$proposalId], $result['governance']['proposal_ids']);
+        self::assertSame('persisted-content', $result['governance']['proposals'][0]['content_fingerprint']);
+        self::assertSame('persisted-dependency', $result['governance']['proposals'][0]['dependency_fingerprint']);
+    }
+
+    public function test_canonical_lookup_does_not_reuse_different_child_or_terminal_proposal(): void
+    {
+        $videoId = UuidCodec::newV7();
+        $proposal = new Proposal(UuidCodec::newV7(), $videoId, 'ingest', ['canonical_id' => $videoId], 'content', null, 'dependency', ProposalState::APPROVED, idempotencyKey: 'other-capture:video', entityType: 'video');
+        $lookup = new class($proposal) implements PendingVideoProposalLookup {
+            public function __construct(private Proposal $proposal) {}
+            public function findPendingVideoProposals(array $binding): array { return $binding['idempotency_key'] === $this->proposal->idempotencyKey && in_array($this->proposal->state, [ProposalState::DRAFT, ProposalState::SUBMITTED], true) ? [$this->proposal] : []; }
+        };
+        $issuerCalled = false;
+        $service = new GovernedCaptureContinuationService($this->createMock(GovernedLifecycle::class), static fn (): array => [], $this->policies(['video']), static fn (): bool => true, pendingVideoProposals: $lookup, videoScopeIssuer: static function () use (&$issuerCalled): array { $issuerCalled = true; return ['capture_fingerprint' => 'scope']; });
+        $result = $service->execute('capture-new', 'retry', ['existing_capture_continuation' => true, 'content_intent' => ['intent' => 'VIDEO'], 'assets' => [['kind' => 'video', 'video_proposal' => ['entity_type' => 'video', 'operation' => 'ingest', 'payload' => ['canonical_id' => $videoId]]]]], ['resume_children' => ['video']]);
+        self::assertTrue($issuerCalled);
+        self::assertNotSame([$proposal->id], $result['governance']['proposal_ids']);
+    }
+
+    public function test_ambiguous_canonical_pending_lookup_fails_closed(): void
+    {
+        $videoId = UuidCodec::newV7();
+        $proposals = [
+            new Proposal(UuidCodec::newV7(), $videoId, 'ingest', ['canonical_id' => $videoId], 'a', null, 'b', ProposalState::SUBMITTED, idempotencyKey: 'capture:video', entityType: 'video'),
+            new Proposal(UuidCodec::newV7(), $videoId, 'ingest', ['canonical_id' => $videoId], 'c', null, 'd', ProposalState::SUBMITTED, idempotencyKey: 'capture:video', entityType: 'video'),
+        ];
+        $lookup = new class($proposals) implements PendingVideoProposalLookup {
+            public function __construct(private array $proposals) {}
+            public function findPendingVideoProposals(array $binding): array { return $this->proposals; }
+        };
+        $service = new GovernedCaptureContinuationService($this->createMock(GovernedLifecycle::class), static fn (): array => [], $this->policies(['video']), static fn (): bool => true, pendingVideoProposals: $lookup);
+        $result = $service->execute('capture', 'retry', ['existing_capture_continuation' => true, 'content_intent' => ['intent' => 'VIDEO'], 'assets' => [['kind' => 'video', 'video_proposal' => ['entity_type' => 'video', 'operation' => 'ingest', 'payload' => ['canonical_id' => $videoId]]]]], ['resume_children' => ['video']]);
+        self::assertSame('SYSTEM_BLOCKED', $result['status']);
+        self::assertContains('AMBIGUOUS_PENDING_VIDEO_PROPOSAL', $result['blockers']);
     }
 
     public function test_applied_proposal_replay_uses_persisted_readback_without_reapplying(): void

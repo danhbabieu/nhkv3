@@ -723,6 +723,7 @@ final class Plugin {
                     if (!$capture instanceof CaptureRecord) throw new \RuntimeException('STAGING_CAPTURE_NOT_FOUND');
                     return $stagingScopeVerifier->issueForVideoPlan($capture, $plan);
                 },
+                pendingVideoProposals: $proposalRepository,
             );
             $articleReceipts = new WpdbArticleOperationReceiptRepository($wpdb);
             $categoryGateway = new CategoryGateway(new WpCategoryStore());

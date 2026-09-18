@@ -1,5 +1,35 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-18 — Existing-Capture Video Proposal canonical reuse regression (LOCAL / NO LIVE MUTATION)
+
+SCOPE: Fixed the continuation regression where a pending Video Proposal was
+looked up only from a prior Capture receipt and a loose target/external-ID
+comparison. Production composition now injects a bounded canonical
+`PendingVideoProposalLookup` backed by `WpdbProposalRepository`.
+
+MATCHING LAW: Retry lookup binds the exact Capture child idempotency key,
+`entity_type=video`, `operation=ingest`, immutable Video UUID in both
+`Proposal.subject_id` and payload `canonical_id`, and CREATE expected-revision
+semantics (`null`/persisted `0`). Only DRAFT/SUBMITTED proposals are eligible;
+target UUID may remain null because it is not the immutable Video identity.
+More than one candidate fails closed with `AMBIGUOUS_PENDING_VIDEO_PROPOSAL`.
+Approved/applied/rejected proposals and another Capture child cannot be reused.
+
+RESULT: A canonical pending proposal is re-entered by exact Proposal UUID;
+Governance review/read-back supplies `proposal_ids`, `proposal_state`,
+`content_fingerprint` and `dependency_fingerprint`, while staging scope is not
+reissued. The old receipt scan remains only as a compatibility fallback when
+the canonical lookup boundary is unavailable; production wiring always uses
+the canonical repository.
+
+VERIFICATION: Targeted Capture/Governance tests pass 68 tests / 315
+assertions. Full PHPUnit reached all 2,075 tests but remains non-green because
+the local integration WordPress/MySQL bootstrap is unavailable and existing
+environment-gated/contract baseline failures remain; no live retry, Proposal,
+Capture, Video or database mutation was performed.
+
+STATUS: `CANONICAL_PENDING_LOOKUP_IMPLEMENTED / FAIL_CLOSED_AMBIGUITY / NO_LIVE_MUTATION`
+
 # Checkpoint — 2026-09-18 — Performance Phase 3.8 governed Video source refresh (LOCAL / NO LIVE MUTATION)
 
 SCOPE: Implemented the bounded internal/admin `nhk.video.source.refresh`

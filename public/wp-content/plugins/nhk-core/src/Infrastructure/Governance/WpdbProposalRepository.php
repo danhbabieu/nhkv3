@@ -3,12 +3,12 @@ declare(strict_types=1);
 
 namespace NHK\Core\Infrastructure\Governance;
 
-use NHK\Core\Contracts\Governance\{ApprovedRelationProposalRepository,ProposalRepository};
+use NHK\Core\Contracts\Governance\{ApprovedRelationProposalRepository,PendingVideoProposalLookup,ProposalRepository};
 use NHK\Core\Domain\Governance\{Proposal, ProposalState, ProposalSubjectBindingValidator};
 use NHK\Core\Governance\Exception\ProposalIdempotencyStaleBinding;
 use NHK\Core\Shared\Uuid\UuidCodec;
 
-final class WpdbProposalRepository implements ProposalRepository, ApprovedRelationProposalRepository
+final class WpdbProposalRepository implements ProposalRepository, ApprovedRelationProposalRepository, PendingVideoProposalLookup
 {
     public function __construct(private ?object $database = null) {}
     private function db(): object { global $wpdb; return $this->database ?? $wpdb; }
@@ -174,6 +174,30 @@ final class WpdbProposalRepository implements ProposalRepository, ApprovedRelati
             if ($proposal !== null && (string) ($proposal->payload['canonical_id'] ?? '') === $videoId) return $proposal;
         }
         return null;
+    }
+
+    public function findPendingVideoProposals(array $binding): array
+    {
+        $db = $this->db();
+        $key = trim((string) ($binding['idempotency_key'] ?? ''));
+        $videoId = trim((string) ($binding['video_id'] ?? ''));
+        if ($key === '' || !UuidCodec::isValid($videoId)) return [];
+        $rows = $db->get_results($db->prepare(
+            'SELECT * FROM '.$this->table().' WHERE idempotency_key=%s AND entity_type=%s AND operation=%s AND state IN (%d,%d) LIMIT 2',
+            $key, 'video', 'ingest', $this->state(ProposalState::DRAFT), $this->state(ProposalState::SUBMITTED)
+        ), ARRAY_A) ?: [];
+        $matches = [];
+        foreach ($rows as $row) {
+            $proposal = $this->hydrate($row);
+            if ($proposal === null || $proposal->entityType !== 'video' || $proposal->operation !== 'ingest') continue;
+            if ($proposal->subjectId !== $videoId || (string) ($proposal->payload['canonical_id'] ?? '') !== $videoId) continue;
+            $expected = array_key_exists('expected_revision', $binding) ? $binding['expected_revision'] : null;
+            if ($proposal->expectedRevision !== $expected && !($expected === 0 && $proposal->expectedRevision === null)) continue;
+            if (($binding['content_fingerprint'] ?? '') !== '' && strtolower($proposal->contentFingerprint) !== strtolower((string) $binding['content_fingerprint'])) continue;
+            if (($binding['dependency_fingerprint'] ?? '') !== '' && strtolower($proposal->dependencyFingerprint) !== strtolower((string) $binding['dependency_fingerprint'])) continue;
+            $matches[] = $proposal;
+        }
+        return $matches;
     }
 
     public function findApprovedFingerprintBoundRelations(string $sourceType, string $sourceUuid, string $sourceFingerprint): array

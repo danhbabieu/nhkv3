@@ -7,6 +7,7 @@ use NHK\Core\Application\Completion\CompletionCoordinator;
 use NHK\Core\Application\Governance\GovernanceAutomationPolicyResolver;
 use NHK\Core\Application\Semantic\ClaimReusePolicy;
 use NHK\Core\Contracts\Governance\GovernedLifecycle;
+use NHK\Core\Contracts\Governance\PendingVideoProposalLookup;
 use NHK\Core\Contracts\Governance\VideoProposalReconciliationPort;
 use NHK\Core\Domain\Governance\{CommandCanonicalizer, Proposal, ProposalState};
 use NHK\Core\Domain\Governance\ProposalSubjectBindingValidator;
@@ -51,6 +52,7 @@ final class GovernedCaptureContinuationService
         private $relationState = null,
         /** @var callable(string,array<string,mixed>):array<string,mixed>|null */
         private $videoScopeIssuer = null,
+        private ?PendingVideoProposalLookup $pendingVideoProposals = null,
     ) {
         $this->completion = $completion ?? new CompletionCoordinator();
     }
@@ -66,7 +68,13 @@ final class GovernedCaptureContinuationService
         $videoOnlyResume = $proposalIds === []
             && ($context['existing_capture_continuation'] ?? false) === true
             && in_array('video', $resumeChildren, true);
-        $plans = $proposalIds !== [] ? array_map(static fn (string $id): array => ['proposal_id' => $id], $proposalIds) : $this->plans($captureId, $continuationKey, $context, !$videoOnlyResume);
+        try {
+            $plans = $proposalIds !== [] ? array_map(static fn (string $id): array => ['proposal_id' => $id], $proposalIds) : $this->plans($captureId, $continuationKey, $context, !$videoOnlyResume);
+        } catch (\Throwable $error) {
+            $failure = $this->classifiedFailure([], $error);
+            $status = (string) ($failure['status'] ?? 'SYSTEM_BLOCKED');
+            return ['status' => $status, 'writes' => [$failure], 'reused_claims' => $reusedClaims, 'video_children' => [], 'blockers' => (array) ($failure['blockers'] ?? ['CAPTURE_PLAN_FAILED']), 'governance' => $this->governanceReadback([$failure], [], $status, []), 'completion' => $this->completion->aggregateCapture($this->currentCaptureId, [], ['canonical_state' => 'COMPLETE', 'blockers' => (array) ($failure['blockers'] ?? [])])];
+        }
         $skippedVideoChildren = [];
         $videoChildren = [];
         if ($proposalIds === [] && ($context['existing_capture_continuation'] ?? false) === true) {
@@ -386,7 +394,7 @@ final class GovernedCaptureContinuationService
             // do not reconstruct a fresh pre-proposal staging packet from the
             // Capture-derived asset (which may be a stale derived projection).
             if (($context['existing_capture_continuation'] ?? false) === true && $entityType === 'video' && $operation === 'ingest') {
-                $pending = $this->pendingVideoProposal($context, $payload, $subjectId);
+                $pending = $this->pendingVideoProposal($context, $video, $payload, $subjectId);
                 if ($pending !== null) {
                     $plans[] = [
                         'proposal_id' => $pending['proposal_id'],
@@ -444,8 +452,30 @@ final class GovernedCaptureContinuationService
      *
      * @return array{proposal_id:string,target_uuid:string,platform:string,external_video_id:string}|null
      */
-    private function pendingVideoProposal(array $context, array $payload, string $subjectId): ?array
+    private function pendingVideoProposal(array $context, array $video, array $payload, string $subjectId): ?array
     {
+        $videoId = trim((string) ($payload['canonical_id'] ?? $subjectId));
+        $key = trim((string) ($video['idempotency_key'] ?? '')) ?: $this->currentCaptureId . ':video';
+        if ($this->pendingVideoProposals !== null && $key !== '' && UuidCodec::isValid($videoId)) {
+            $expectedValue = array_key_exists('expected_revision', $video) ? $video['expected_revision'] : ($payload['expected_revision'] ?? null);
+            $expected = $expectedValue !== null ? (int) $expectedValue : null;
+            $candidates = $this->pendingVideoProposals->findPendingVideoProposals([
+                'capture_id' => $this->currentCaptureId,
+                'idempotency_key' => $key,
+                'video_id' => $videoId,
+                'entity_type' => 'video',
+                'operation' => 'ingest',
+                'expected_revision' => $expected,
+            ]);
+            if (count($candidates) > 1) throw new \RuntimeException('AMBIGUOUS_PENDING_VIDEO_PROPOSAL');
+            if (count($candidates) === 1) {
+                $proposal = $candidates[0];
+                $metadata = is_array($proposal->payload['metadata'] ?? null) ? $proposal->payload['metadata'] : [];
+                $source = is_array($metadata['source'] ?? null) ? $metadata['source'] : (is_array($metadata['source_snapshot'] ?? null) ? $metadata['source_snapshot'] : []);
+                return ['proposal_id' => $proposal->id, 'target_uuid' => $proposal->targetUuid, 'platform' => (string) ($source['platform'] ?? ''), 'external_video_id' => (string) ($source['external_video_id'] ?? '')];
+            }
+            return null;
+        }
         $diagnostics = is_array($context['prior_diagnostics'] ?? null) ? $context['prior_diagnostics'] : [];
         $writeBack = is_array($diagnostics['semantic_write_back'] ?? null) ? $diagnostics['semantic_write_back'] : [];
         $rows = is_array($writeBack['writes'] ?? null) ? $writeBack['writes'] : [];
@@ -892,7 +922,7 @@ final class GovernedCaptureContinuationService
             $message = $rawMessage;
             $code = preg_match('/(?:^|:)([A-Z][A-Z0-9_]{2,63})$/', $message, $match) === 1 ? $match[1] : 'CAPTURE_GOVERNANCE_FAILED';
         }
-        $blocked = preg_match('/(?:SUBJECT_BINDING|IDENTITY_CONFLICT|IDEMPOTENCY_STALE|IDEMPOTENCY_CONFLICT|BINDING_CONFLICT|REPAIR_REQUIRED|APPLIED_PROPOSAL_FORBIDDEN|INVARIANT|SCHEMA|CONTRACT|CAPABILITY|NOT_FOUND)/', $code) === 1;
+        $blocked = preg_match('/(?:SUBJECT_BINDING|IDENTITY_CONFLICT|IDEMPOTENCY_STALE|IDEMPOTENCY_CONFLICT|BINDING_CONFLICT|REPAIR_REQUIRED|AMBIGUOUS|APPLIED_PROPOSAL_FORBIDDEN|INVARIANT|SCHEMA|CONTRACT|CAPABILITY|NOT_FOUND)/', $code) === 1;
         $review = preg_match('/(?:EVIDENCE_REQUIRED|CANONICAL_EVIDENCE_REQUIRED|SUBJECT_UNRESOLVED|SOURCE_UNAVAILABLE|APPROVAL_REQUIRED|GOVERNANCE_APPROVAL_REQUIRED|DEPENDENCY_REQUIRED|REVIEW_REQUIRED)/', $code) === 1;
         $status = $blocked ? 'SYSTEM_BLOCKED' : ($review ? 'REVIEW_REQUIRED' : 'FAILED_RETRYABLE');
         return ['proposal_id' => (string) ($plan['proposal_id'] ?? ''), 'status' => $status, 'blockers' => [$code], 'error' => $error->getMessage()];
