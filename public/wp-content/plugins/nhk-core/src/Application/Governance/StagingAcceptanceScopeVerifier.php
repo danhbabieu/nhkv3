@@ -16,12 +16,13 @@ use NHK\Core\Shared\Uuid\UuidCodec;
  */
 final class StagingAcceptanceScopeVerifier
 {
-    /** @param callable():string $environment @param callable(array<string,mixed>,CaptureRecord,array<string,mixed>,array<int,array<string,mixed>>):bool|null $admission */
+    /** @param callable():string $environment @param callable(array<string,mixed>,CaptureRecord,array<string,mixed>,array<int,array<string,mixed>>):bool|null $admission @param callable(string):bool|null $can */
     public function __construct(
         private $environment,
         private ?string $signingSecret = null,
         private $admission = null,
         private int $ttlSeconds = 900,
+        private $can = null,
     ) {}
 
     /** @param list<array<string,mixed>> $assets @return array<string,mixed> */
@@ -31,6 +32,7 @@ final class StagingAcceptanceScopeVerifier
         if (in_array($environment, ['production', 'prod'], true)) throw new \RuntimeException('STAGING_PRODUCTION_FORBIDDEN');
         if ($environment !== 'staging') throw new \RuntimeException('STAGING_SCOPE_ENVIRONMENT_REQUIRED');
         if ($this->secret() === '') throw new \RuntimeException('STAGING_SCOPE_SIGNING_KEY_REQUIRED');
+        $this->requireCapability();
         if (!is_callable($this->admission)) throw new \RuntimeException('STAGING_SCOPE_ADMISSION_REQUIRED');
         if (strtoupper(trim((string) ($input['intent'] ?? ''))) !== 'MEDIA_ENRICHMENT') throw new \RuntimeException('STAGING_SCOPE_INTENT_INVALID');
 
@@ -51,6 +53,9 @@ final class StagingAcceptanceScopeVerifier
             'media_ids' => $mediaIds,
             'target' => $bindings[0]['target'],
             'bindings' => $bindings,
+            'required_capabilities' => ['nhk_internal_content_operations'],
+            'request_fingerprint' => $capture->requestFingerprint,
+            'payload_fingerprint' => $this->payloadFingerprint($input),
             'issued_at' => gmdate('c'),
             'expires_at' => gmdate('c', time() + max(1, $this->ttlSeconds)),
         ];
@@ -66,6 +71,7 @@ final class StagingAcceptanceScopeVerifier
         if (in_array($environment, ['production', 'prod'], true)) throw new \RuntimeException('STAGING_PRODUCTION_FORBIDDEN');
         if ($environment !== 'staging') throw new \RuntimeException('STAGING_SCOPE_ENVIRONMENT_REQUIRED');
         if ($this->secret() === '') throw new \RuntimeException('STAGING_SCOPE_SIGNING_KEY_REQUIRED');
+        $this->requireCapability();
         if (!is_callable($this->admission)) throw new \RuntimeException('STAGING_SCOPE_ADMISSION_REQUIRED');
         $planFingerprint = trim((string) ($plan['plan_fingerprint'] ?? ''));
         if (!preg_match('/^[a-f0-9]{64}$/i', $planFingerprint)) throw new \RuntimeException('STAGING_PLAN_FINGERPRINT_REQUIRED');
@@ -131,6 +137,7 @@ final class StagingAcceptanceScopeVerifier
         if (in_array($environment, ['production', 'prod'], true)) throw new \RuntimeException('STAGING_PRODUCTION_FORBIDDEN');
         if ($environment !== 'staging') throw new \RuntimeException('STAGING_SCOPE_ENVIRONMENT_REQUIRED');
         if ($this->secret() === '') throw new \RuntimeException('STAGING_SCOPE_SIGNING_KEY_REQUIRED');
+        $this->requireCapability();
         if (!is_callable($this->admission)) throw new \RuntimeException('STAGING_SCOPE_ADMISSION_REQUIRED');
         $operation = strtolower(trim((string) ($plan['operation'] ?? '')));
         $entityType = strtolower(trim((string) ($plan['entity_type'] ?? '')));
@@ -173,6 +180,8 @@ final class StagingAcceptanceScopeVerifier
     {
         if (!$this->verifyPacket($scope) || ($scope['writer'] ?? '') !== 'canonical_media_binding') return false;
         if (!hash_equals((string) $scope['capture_id'], trim((string) ($request['capture_id'] ?? '')))) return false;
+        if (!hash_equals((string) ($scope['capture_fingerprint'] ?? ''), trim((string) ($request['capture_fingerprint'] ?? $scope['capture_fingerprint'] ?? '')))) return false;
+        if (!isset($scope['payload_fingerprint'], $request['payload_fingerprint']) || !hash_equals((string) $scope['payload_fingerprint'], trim((string) $request['payload_fingerprint']))) return false;
         if (!in_array((string) ($request['operation'] ?? 'representative_bind'), ['representative_bind'], true)) return false;
         $mediaId = trim((string) ($request['media']['id'] ?? ''));
         $target = is_array($request['target'] ?? null) ? $request['target'] : [];
@@ -182,7 +191,8 @@ final class StagingAcceptanceScopeVerifier
                 && $this->sameTarget($target, (array) ($binding['target'] ?? []))
                 && strtoupper((string) ($request['role'] ?? '')) === strtoupper((string) ($binding['role'] ?? ''))
                 && strtoupper((string) ($request['selection_source'] ?? '')) === (string) ($binding['selection_source'] ?? '')
-                && strtoupper((string) ($request['selection_policy'] ?? '')) === (string) ($binding['selection_policy'] ?? '')) return true;
+                && strtoupper((string) ($request['selection_policy'] ?? '')) === (string) ($binding['selection_policy'] ?? '')
+                && $this->bindingFingerprintMatches($request, $binding)) return true;
         }
         return false;
     }
@@ -216,7 +226,7 @@ final class StagingAcceptanceScopeVerifier
         $mediaId = $this->mediaId($binding, $assets);
         $target = is_array($binding['target'] ?? null) ? $binding['target'] : [];
         $scoped = is_array($scope['bindings'][$index] ?? null) ? $scope['bindings'][$index] : [];
-        return ['capture_id' => $capture->captureId, 'operation' => 'representative_bind', 'media' => ['id' => $mediaId], 'target' => $target, 'role' => (string) ($binding['role'] ?? 'representative'), 'selection_source' => (string) ($binding['selection_source'] ?? 'USER_EXPLICIT'), 'selection_policy' => (string) ($binding['selection_policy'] ?? 'PINNED'), 'scope_binding' => $scoped];
+        return ['capture_id' => $capture->captureId, 'capture_fingerprint' => $capture->requestFingerprint, 'payload_fingerprint' => (string) ($scope['payload_fingerprint'] ?? ''), 'operation' => 'representative_bind', 'media' => ['id' => $mediaId], 'target' => $target, 'role' => (string) ($binding['role'] ?? 'representative'), 'selection_source' => (string) ($binding['selection_source'] ?? 'USER_EXPLICIT'), 'selection_policy' => (string) ($binding['selection_policy'] ?? 'PINNED'), 'scope_binding' => $scoped];
     }
 
     /** @param list<array<string,mixed>> $assets @return list<array<string,mixed>> */
@@ -232,7 +242,10 @@ final class StagingAcceptanceScopeVerifier
             $mediaId = $this->mediaId($binding, $assets);
             $target = is_array($binding['target'] ?? null) ? $binding['target'] : [];
             if (!UuidCodec::isValid($mediaId) || !UuidCodec::isValid((string) ($target['id'] ?? '')) || trim((string) ($target['type'] ?? '')) === '') throw new \RuntimeException('STAGING_SCOPE_EXACT_REFERENCE_REQUIRED');
-            $entries[] = ['media_id' => $mediaId, 'target' => ['type' => strtolower(trim((string) $target['type'])), 'id' => (string) $target['id']], 'role' => 'representative', 'selection_source' => 'USER_EXPLICIT', 'selection_policy' => 'PINNED'];
+            $entry = ['media_id' => $mediaId, 'target' => ['type' => strtolower(trim((string) $target['type'])), 'id' => (string) $target['id']], 'role' => 'representative', 'selection_source' => 'USER_EXPLICIT', 'selection_policy' => 'PINNED'];
+            foreach (['stable_key', 'revision'] as $key) if (array_key_exists($key, $target)) $entry['target'][$key] = $key === 'revision' ? max(1, (int) $target[$key]) : trim((string) $target[$key]);
+            $entry['binding_fingerprint'] = hash('sha256', CommandCanonicalizer::canonicalize($entry));
+            $entries[] = $entry;
         }
         return $entries;
     }
@@ -249,12 +262,46 @@ final class StagingAcceptanceScopeVerifier
     /** @param array<string,mixed> $left @param array<string,mixed> $right */
     private function sameTarget(array $left, array $right): bool
     {
+        foreach (['stable_key', 'revision'] as $key) {
+            if (array_key_exists($key, $right) && (string) ($left[$key] ?? '') !== (string) $right[$key]) return false;
+        }
         return strtolower(trim((string) ($left['type'] ?? ''))) === strtolower(trim((string) ($right['type'] ?? '')))
             && trim((string) ($left['id'] ?? '')) === trim((string) ($right['id'] ?? ''))
             && array_intersect(['name', 'filename', 'url', 'match', 'similarity', 'fuzzy', 'locator'], array_keys($left)) === [];
     }
 
+    /** @param array<string,mixed> $request @param array<string,mixed> $binding */
+    private function bindingFingerprintMatches(array $request, array $binding): bool
+    {
+        $expected = (string) ($binding['binding_fingerprint'] ?? '');
+        if (!preg_match('/^[a-f0-9]{64}$/i', $expected)) return false;
+        $actual = [
+            'media_id' => trim((string) ($request['media']['id'] ?? '')),
+            'target' => is_array($request['target'] ?? null) ? $request['target'] : [],
+            'role' => strtolower(trim((string) ($request['role'] ?? ''))),
+            'selection_source' => strtoupper(trim((string) ($request['selection_source'] ?? ''))),
+            'selection_policy' => strtoupper(trim((string) ($request['selection_policy'] ?? ''))),
+        ];
+        return hash_equals($expected, hash('sha256', CommandCanonicalizer::canonicalize($actual)))
+            || hash_equals($expected, hash('sha256', CommandCanonicalizer::canonicalize([
+                'media_id' => $actual['media_id'], 'target' => $actual['target'], 'role' => 'representative',
+                'selection_source' => 'USER_EXPLICIT', 'selection_policy' => 'PINNED',
+            ])));
+    }
+
+    /** @param array<string,mixed> $input */
+    private function payloadFingerprint(array $input): string
+    {
+        unset($input['staging_acceptance']);
+        return hash('sha256', CommandCanonicalizer::canonicalize($input));
+    }
+
     private function environmentName(): string { return strtolower(trim((string) ($this->environment)())); }
 
     private function secret(): string { return trim((string) ($this->signingSecret ?? '')); }
+
+    private function requireCapability(): void
+    {
+        if (is_callable($this->can) && !(bool) ($this->can)('nhk_internal_content_operations')) throw new \RuntimeException('STAGING_CAPABILITY_REQUIRED:nhk_internal_content_operations');
+    }
 }

@@ -80,12 +80,7 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
             'subject_resolution' => ['primary' => ['id' => $subject, 'type' => 'classification'], 'resolved' => [['id' => $subject, 'type' => 'classification']]],
         ], true);
 
-        self::assertCount(1, $planned);
-        self::assertSame('relation', $planned[0]['entity_type']);
-        self::assertSame('relation_create', $planned[0]['operation']);
-        self::assertSame('1:485', $planned[0]['payload']['source_uuid']);
-        self::assertSame($subject, $planned[0]['payload']['target_uuid']);
-        self::assertSame('about', $planned[0]['payload']['predicate']);
+        self::assertSame([], $planned);
     }
 
     public function test_capture_provenance_packets_plan_source_and_resolved_evidence_without_reparsing_claim_text(): void
@@ -747,6 +742,24 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
 
         self::assertCount(2, $plans);
         self::assertSame('brand', $plans[0]['payload']['provenance']['metadata']['scope']);
+    }
+
+    public function test_image_article_without_explicit_semantic_delta_does_not_plan_governance_or_wp_post_relation(): void
+    {
+        $service = new GovernedCaptureContinuationService($this->createMock(GovernedLifecycle::class), static fn (): array => [], $this->policies(['relation']), static fn (): bool => true);
+        $method = new \ReflectionMethod($service, 'plans');
+        $method->setAccessible(true);
+        $variant = UuidCodec::newV7();
+
+        $plans = $method->invoke($service, 'capture-image-article', 'retry', [
+            'content_intent' => ['intent' => 'IMAGE_ARTICLE', 'semantic_delta' => ['status' => 'NONE']],
+            'article_id' => 575,
+            'article_endpoint_key' => '1:575',
+            'subject_resolution' => ['primary' => ['id' => $variant, 'type' => 'variant'], 'resolved' => [['id' => $variant, 'type' => 'variant']]],
+            'interpretation' => ['user_claim_candidates' => [['text' => 'candidate from old retry', 'scope' => 'variant']]],
+        ]);
+
+        self::assertSame([], $plans);
     }
 
     public function test_knowledge_plan_emits_governed_about_relation_to_locked_subject(): void

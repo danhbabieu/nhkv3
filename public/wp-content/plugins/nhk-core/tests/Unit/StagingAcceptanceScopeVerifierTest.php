@@ -25,6 +25,33 @@ final class StagingAcceptanceScopeVerifierTest extends TestCase
         self::assertTrue($verifier->verifyBindingRequest($packet, $this->bindingRequest($capture, $input, $packet)));
     }
 
+    public function test_dynamic_scope_binds_target_stable_key_and_revision(): void
+    {
+        [$capture, $input, $assets] = $this->fixture();
+        $input['media_bindings'][0]['target']['stable_key'] = 'nhk:classification:clock-type.random-a';
+        $input['media_bindings'][0]['target']['revision'] = 7;
+        $packet = $this->verifier()->issueForCapture($capture, $input, $assets);
+
+        self::assertSame('nhk:classification:clock-type.random-a', $packet['target']['stable_key']);
+        self::assertSame(7, $packet['target']['revision']);
+
+        $request = $this->bindingRequest($capture, $input, $packet);
+        $request['target']['stable_key'] = 'nhk:classification:clock-type.tampered';
+        self::assertFalse($this->verifier()->verifyBindingRequest($packet, $request));
+    }
+
+    public function test_dynamic_scope_rejects_changed_payload_fingerprint(): void
+    {
+        [$capture, $input, $assets] = $this->fixture();
+        $packet = $this->verifier()->issueForCapture($capture, $input, $assets);
+        self::assertArrayHasKey('request_fingerprint', $packet);
+        self::assertArrayHasKey('payload_fingerprint', $packet);
+
+        $request = $this->bindingRequest($capture, $input, $packet);
+        $request['selection_policy'] = 'AUTO';
+        self::assertFalse($this->verifier()->verifyBindingRequest($packet, $request));
+    }
+
     public function test_client_supplied_approved_scope_without_server_signature_is_rejected(): void
     {
         [$capture, $input] = $this->fixture();
@@ -36,6 +63,20 @@ final class StagingAcceptanceScopeVerifierTest extends TestCase
         ]);
 
         self::assertFalse($this->verifier()->verifyBindingRequest($request['staging_acceptance'], $request));
+    }
+
+    public function test_scope_issuance_requires_authenticated_internal_capability(): void
+    {
+        [$capture, $input, $assets] = $this->fixture();
+        $verifier = new StagingAcceptanceScopeVerifier(
+            static fn (): string => 'staging',
+            'test-secret',
+            static fn (): bool => true,
+            can: static fn (string $capability): bool => false,
+        );
+
+        $this->expectExceptionMessage('STAGING_CAPABILITY_REQUIRED:nhk_internal_content_operations');
+        $verifier->issueForCapture($capture, $input, $assets);
     }
 
     public function test_scope_fingerprint_is_immutable_and_wrong_media_target_operation_capture_are_blocked(): void
@@ -143,7 +184,7 @@ final class StagingAcceptanceScopeVerifierTest extends TestCase
         $targetId = UuidCodec::newV7();
         $input = ['intent' => 'MEDIA_ENRICHMENT', 'media_bindings' => [[
             'media_ref' => ['media_id' => $mediaId],
-            'target' => ['type' => 'classification', 'id' => $targetId],
+            'target' => ['type' => 'classification', 'id' => $targetId, 'stable_key' => 'nhk:classification:clock-type'],
             'role' => 'representative',
             'selection_source' => 'USER_EXPLICIT',
             'selection_policy' => 'PINNED',
@@ -160,6 +201,6 @@ final class StagingAcceptanceScopeVerifierTest extends TestCase
     private function bindingRequest(CaptureRecord $capture, array $input, array $packet): array
     {
         $binding = $input['media_bindings'][0];
-        return ['capture_id' => $capture->captureId, 'operation' => 'representative_bind', 'media' => ['id' => $binding['media_ref']['media_id']], 'target' => $binding['target'], 'role' => $binding['role'], 'selection_source' => $binding['selection_source'], 'selection_policy' => $binding['selection_policy'], 'staging_acceptance' => $packet];
+        return ['capture_id' => $capture->captureId, 'capture_fingerprint' => $capture->requestFingerprint, 'payload_fingerprint' => $packet['payload_fingerprint'] ?? '', 'operation' => 'representative_bind', 'media' => ['id' => $binding['media_ref']['media_id']], 'target' => $binding['target'], 'role' => $binding['role'], 'selection_source' => $binding['selection_source'], 'selection_policy' => $binding['selection_policy'], 'staging_acceptance' => $packet];
     }
 }

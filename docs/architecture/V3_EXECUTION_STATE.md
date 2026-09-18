@@ -1,5 +1,67 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-18 — Remaining live-acceptance defects locally repaired (LOCAL READY / DEPLOY PENDING)
+
+SCOPE: Repaired local implementation gaps evidenced by the latest @v-4 live
+acceptance report. No deploy, push, SSH, live read, staging/production
+mutation or semantic data change was performed.
+
+ROOT_CAUSES: The WordPress Ability read composition root supplied no attachment
+reader to `McpReadHandler`; attachment reads therefore fell through to null.
+Existing `media_ids` followups were re-entering attachment adoption despite an
+already verified canonical Media/Attachment mapping. Ordinary Article retries
+still converted candidate claims and the unconditional `wp_post` subject edge
+into Governance plans because the continuation planner used a single-variant
+shortcut. Publication compliance evaluated the full scoped Knowledge inventory
+instead of the Article claim trace/directly asserted copy.
+
+FIX: Ability bootstrap now wires the canonical attachment ingestor/bridge, and
+attachment readback includes mapped Media identity plus typed mapping status.
+Verified existing Media/Attachment assets bypass physical re-adoption while
+the MediaService storage-key/checksum collision guard remains unchanged.
+Semantic planning is now gated by `content_intent.semantic_delta`; ordinary
+`IMAGE_ARTICLE`/`TEXT_ARTICLE` retries return `NOT_REQUIRED`/`SKIPPED` with no
+Governance or `wp_post` Graph plan, while explicit Knowledge/legacy semantic
+paths remain governed. Compliance evaluates selected claim IDs/traces and
+exactly asserted claim text, not unrelated neighborhood claims.
+
+VERIFICATION: Focused MCP/Media/Capture/Article suite passes 138 tests / 1,021
+assertions with existing deprecations. PHP lint and `git diff --check` pass.
+Deployment and live acceptance remain pending; no external state was changed.
+
+STATUS: `LIVE_ACCEPTANCE_DEFECTS_LOCAL_READY / DEPLOYMENT_PENDING / SEMANTIC_MUTATION_NONE`
+
+# Checkpoint — 2026-09-18 — Generic Capture/Media staging admission (LOCAL READY / DEPLOY PENDING)
+
+SCOPE: Replaced object-specific staging admission policy for Capture-owned
+MediaUsage representative binding and the legacy Video admission provider with
+server-issued exact packet validation. No staging/production object, semantic
+record, Capture or Post was mutated; no remote source or deployment was used.
+
+ROOT_CAUSE: Media admission had a generic provider but the signed packet did
+not preserve all exact target identity fields and its request verifier compared
+selected fields instead of one canonical binding fingerprint. Direct Media
+binding also lacked an explicit staging internal-capability gate, while the
+Video provider still contained case-specific Capture/video/subject constants.
+
+FIX: Media packets now bind target stable key/revision, request/payload
+fingerprints and required capability metadata; binding verification rejects
+tampered identity, selection or operation fields. Direct staging Media binding
+requires `nhk_internal_content_operations` after packet verification. Video
+admission validates the server packet and exact Capture-owned video payload
+without object constants. Repository policy now describes the generic,
+fail-closed packet law rather than enumerating acceptance IDs.
+
+VERIFICATION: Focused staging/verifier/Media/Governance/Video/Capture/MCP suite
+passes 57 tests / 277 assertions. Full Unit suite reaches 1,868 tests / 9,275
+assertions but currently has 10 broader baseline failures, including the
+existing DemoCutover environment contract and unrelated Capture/knowledge
+continuation expectations; 18 warnings and 21 deprecations remain. Changed
+PHP lint, Composer lint, secret scan and diff checks pass; deployment and live
+acceptance remain pending.
+
+STATUS: `GENERIC_CAPTURE_MEDIA_STAGING_ADMISSION_LOCAL_READY / DEPLOY_PENDING / SEMANTIC_MUTATION_NONE`
+
 # Checkpoint — 2026-09-18 — Deployment release tuple ownership corrected (LOCAL READY / DEPLOY PENDING)
 
 SCOPE: Corrected the canonical remote MCP deployment verifier's release tuple

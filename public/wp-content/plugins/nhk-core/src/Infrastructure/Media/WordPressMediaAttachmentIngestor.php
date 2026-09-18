@@ -197,6 +197,12 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
             'filesize' => (int) filesize($pathReal),
             'derivatives' => [],
         ];
+        if ($this->semanticMedia !== null && method_exists($this->semanticMedia, 'attachmentMapping')) {
+            $mapping = $this->semanticMedia->attachmentMapping($attachmentId);
+            $result['mapping_status'] = (string) ($mapping['status'] ?? 'INCONSISTENT');
+            $result['media_id'] = $mapping['media_id'] ?? null;
+            if ($result['mapping_status'] === 'INCONSISTENT') $result['mapping_error'] = 'MEDIA_ATTACHMENT_MAPPING_INCONSISTENT';
+        }
         foreach ((array) ($metadata['sizes'] ?? []) as $sizeName => $derivative) {
             if (!is_array($derivative) || !isset($derivative['file'])) continue;
             $derivativeFile = (string) $derivative['file'];

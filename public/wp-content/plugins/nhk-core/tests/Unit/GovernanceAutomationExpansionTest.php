@@ -108,6 +108,32 @@ final class GovernanceAutomationExpansionTest extends TestCase
         }
     }
 
+    public function test_direct_media_binding_path_requires_internal_capability_after_scope_verification(): void
+    {
+        $guard = new MediaBindingStagingGuard(
+            static fn (): string => 'staging',
+            static fn (array $scope, array $request): bool => true,
+            static fn (string $capability): bool => false,
+        );
+
+        $this->expectExceptionMessage('STAGING_CAPABILITY_REQUIRED:nhk_internal_content_operations');
+        $guard([
+            'capture_id' => UuidCodec::newV7(),
+            'media' => ['id' => UuidCodec::newV7()],
+            'target' => ['type' => 'classification', 'id' => UuidCodec::newV7()],
+            'staging_acceptance' => [
+                'approved' => true,
+                'capture_id' => UuidCodec::newV7(),
+                'operation_family' => 'media_usage_reconciliation',
+                'entity_type' => 'media',
+                'operation' => 'representative_bind',
+                'writer' => 'canonical_media_binding',
+                'media_ids' => [],
+                'target' => [],
+            ],
+        ]);
+    }
+
     private function stagingGuard(): OperationScopedStagingGuard
     {
         return new OperationScopedStagingGuard(

@@ -591,6 +591,16 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
         return is_string($value) && strlen($value) === 16 ? UuidCodec::fromBinary($value) : null;
     }
 
+    /** @return array{status:string,media_id:?string} */
+    public function attachmentMapping(int $attachmentId): array
+    {
+        $mediaId = $this->mediaIdForAttachment($attachmentId);
+        if ($mediaId === null) return ['status' => 'UNMAPPED', 'media_id' => null];
+        $media = $this->media->findByCanonicalId($mediaId);
+        if (!$media instanceof Media || !$media->active) return ['status' => 'INCONSISTENT', 'media_id' => $mediaId];
+        return ['status' => 'MAPPED', 'media_id' => $mediaId];
+    }
+
     private function attachmentIdForMedia(string $mediaId): int
     {
         return (int) $this->database->get_var($this->database->prepare("SELECT attachment_id FROM {$this->table} WHERE media_uuid=%s LIMIT 1", UuidCodec::toBinary($mediaId)));

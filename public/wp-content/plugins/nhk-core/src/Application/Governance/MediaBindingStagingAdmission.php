@@ -60,6 +60,8 @@ final class MediaBindingStagingAdmission
             if ($media === null || !$media->active || $media->isSystemPlaceholder()
                 || $targetEntity === null || !$targetEntity->active()
                 || $targetEntity->entityType !== $type
+                || (isset($target['stable_key']) && (string) $target['stable_key'] !== $targetEntity->stableKey)
+                || (isset($target['revision']) && (int) $target['revision'] !== $targetEntity->revision)
                 || !$this->eligibility->isEligible($type, [
                     'scope' => 'representative',
                     'scope_justified' => true,
@@ -84,6 +86,8 @@ final class MediaBindingStagingAdmission
             && $mediaId === (string) ($entry['media_id'] ?? '')
             && strtolower(trim((string) ($target['type'] ?? ''))) === (string) ($entryTarget['type'] ?? '')
             && trim((string) ($target['id'] ?? '')) === (string) ($entryTarget['id'] ?? '')
+            && (!array_key_exists('stable_key', $entryTarget) || trim((string) ($target['stable_key'] ?? '')) === trim((string) $entryTarget['stable_key']))
+            && (!array_key_exists('revision', $entryTarget) || (int) ($target['revision'] ?? 0) === (int) $entryTarget['revision'])
             && strtolower(trim((string) ($binding['role'] ?? 'representative'))) === (string) ($entry['role'] ?? '')
             && strtoupper(trim((string) ($binding['selection_source'] ?? 'USER_EXPLICIT'))) === (string) ($entry['selection_source'] ?? '')
             && strtoupper(trim((string) ($binding['selection_policy'] ?? 'PINNED'))) === (string) ($entry['selection_policy'] ?? '');

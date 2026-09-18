@@ -186,10 +186,11 @@ representative.
 
 Một Capture `MEDIA_ENRICHMENT` ở staging chỉ được phép tiếp tục khi
 `StagingAcceptanceScopeVerifier` phát hành packet từ chính Capture fingerprint,
-exact Media UUID, exact target type/UUID và binding intent. Packet có
-`operation_family`, canonical writer/entrypoint, thời hạn, fingerprint và chữ ký
+exact Media UUID, exact target type/UUID/stable key/revision và binding intent.
+Packet còn bind capability, request/plan/payload/dependency fingerprints,
+idempotency, `operation_family`, canonical writer/entrypoint, thời hạn và chữ ký
 HMAC của server; client không thể hợp thức hóa `approved=true`, thay Media,
-target, Capture hoặc operation bằng cách sửa payload.
+target, Capture, revision, capability hoặc operation bằng cách sửa payload.
 
 `MediaBindingStagingGuard` và `OperationScopedStagingGuard` dùng cùng một
 verifier owner. Direct `USER_EXPLICIT/PINNED` đi qua `MediaBindingService`;

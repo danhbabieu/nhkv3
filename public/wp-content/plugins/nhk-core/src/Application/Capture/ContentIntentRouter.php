@@ -118,6 +118,7 @@ final class ContentIntentRouter
             'source' => $source,
             'article_required' => $intent->requiresArticle(),
             'media_required' => $intent->requiresMedia(),
+            'semantic_delta' => ['status' => $intent === ContentIntent::KNOWLEDGE_DELTA ? 'REQUIRED' : 'NONE'],
             'diagnostics' => [],
             'signals' => $signals,
         ];

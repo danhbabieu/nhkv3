@@ -268,6 +268,27 @@ final class ArticleResearchPreflightTest extends TestCase
         self::assertSame(['graph-claim'], array_column($result->knowledgeInventory['claims'], 'id'));
     }
 
+    public function test_unselected_neighborhood_claim_does_not_block_public_claim_compliance(): void
+    {
+        $service = new ArticleResearchPreflight(
+            static fn (array $subject): array => ['status' => 'resolved', 'primary' => ['id' => 'variant-1', 'type' => 'variant', 'name' => 'Variant A']],
+            static fn (array $context): array => [
+                'status' => 'available', 'posts' => [], 'categories' => [['slug' => 'tri-thuc']], 'sources' => [], 'evidence' => [], 'media' => [], 'videos' => [], 'relations' => [],
+                'knowledge' => [['id' => 'unselected-claim', 'text' => 'Claim unrelated to this article', 'subject_id' => 'variant-1', 'evidence_status' => 'NO_EVIDENCE']],
+            ],
+            static fn (array $candidate): array => ['eligible' => false],
+        );
+
+        $result = $service->research('Variant A overview', ['type' => 'variant'], [
+            'claim_trace' => [],
+            'body' => 'Bài viết chỉ mô tả tổng quan, không sử dụng claim không có bằng chứng.',
+        ]);
+
+        self::assertSame([], $result->compliance['diagnostics']);
+        self::assertSame('PASS', $result->compliance['status']);
+        self::assertNotContains('PUBLIC_CLAIM_EVIDENCE_REQUIRED', $result->blockers);
+    }
+
     public function test_planned_title_is_preserved_in_seo_blueprint(): void
     {
         $service = new ArticleResearchPreflight(

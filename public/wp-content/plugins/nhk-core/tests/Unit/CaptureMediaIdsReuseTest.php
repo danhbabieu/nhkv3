@@ -21,6 +21,7 @@ final class CaptureMediaIdsReuseTest extends TestCase
         $captures->create($capture);
         $mediaId = UuidCodec::newV7();
         $received = null;
+        $adoptionCalls = 0;
         $coordinator = new EditorialCaptureCoordinator(
             $captures,
             static fn (array $input): array => ['items' => []],
@@ -34,7 +35,7 @@ final class CaptureMediaIdsReuseTest extends TestCase
             static fn (array $context): array => ['eligible' => false, 'blockers' => ['OWNER_PUBLICATION_REQUIRED']],
             static fn (array $context): array => ['status' => 'verified'],
             null,
-            static fn (array $context): array => ['status' => 'verified', 'media_id' => (string) (($context['asset']['media_id'] ?? ''))],
+            static function (array $context) use (&$adoptionCalls): array { ++$adoptionCalls; return ['status' => 'verified', 'media_id' => (string) (($context['asset']['media_id'] ?? ''))]; },
         );
         $service = new EditorialCaptureContinuationService($captures, $addenda, $coordinator, static function (array $input) use (&$received, $mediaId): array {
             $received = $input['media_ids'] ?? null;
@@ -46,6 +47,7 @@ final class CaptureMediaIdsReuseTest extends TestCase
         self::assertSame('COMPLETED', $result['addendum']['status'], json_encode($result, JSON_UNESCAPED_UNICODE));
         self::assertSame([$mediaId], $received);
         self::assertSame($mediaId, $result['capture']['assets'][0]['media_id']);
+        self::assertSame(0, $adoptionCalls);
         self::assertSame('KNOWLEDGE_DELTA', $result['capture']['content_intent']['intent']);
         self::assertSame('PERSISTED_CAPTURE', $result['capture']['diagnostics']['content_intent']['source']);
     }

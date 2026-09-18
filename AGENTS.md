@@ -69,37 +69,11 @@ after the Constitution.
   authorization contract for an explicitly approved staging run. It is scoped
   by exact existing IDs and operation families; it never grants unrestricted
   semantic writes or direct-writer access.
-- Current approved staging acceptance scope for this run supersedes the prior
-  Video-only package:
-  - environment: `staging`
-  - allowed_capture_ids:
-    - `01a09aa3-59a2-74c0-9c6a-1a6867eb7f59`
-    - `01a09aa4-9ecc-758b-854d-5d44bb176267`
-  - allowed_owner_ids:
-    - `01a09e44-539a-7f1a-938a-d7d91bb689a3`
-    - `01a09f73-0aad-79b3-9aaf-5f02cb33a9d1`
-  - allowed_post_ids: `[485, 487]`
-  - allowed_media_ids: `[01a0a36c-3332-7083-85fd-43dbc2a80810]`
-  - allowed_attachment_ids: `[489]`
-  - allowed_asset_ids: `[01a0a36c-3338-7ac0-ba72-a7c87c4e6b5e]`
-  - allowed_relation_ids:
-    - `01a0a344-da4d-7653-b7e8-75ffdd80ac38`
-  - allowed_operation_families:
-    - capture_continuation
-    - knowledge_delta
-    - source_evidence_reconciliation
-    - semantic_subject_binding
-    - governed_relation_reconciliation
-    - article_reconciliation
-    - article_body_correction
-    - category_slug_seo_reconciliation
-    - article_publication
-    - media_usage_reconciliation
-    - presentation_readiness
-    - frontend_projection_readback
-    - governed_proposal_lifecycle
-    - canonical_readback
-  - fail_closed_outside_scope: `true`
+- No object-specific staging allowlist is part of repository policy. Every
+  staging acceptance must use a server-issued, signed exact packet bound to the
+  current Capture/request, registered operation family, canonical IDs, stable
+  keys/revisions, dependency closure, capability, expiry and idempotency.
+  Missing or stale runtime state remains fail-closed.
 
 - Staging Conversational Authority acceptance is permitted only through the
   canonical Capture → exact server-owned Plan → explicit owner confirmation →
@@ -109,98 +83,13 @@ after the Constitution.
   revisions, registered predicates, expiry and HMAC. No object-specific
   Capture, name, request, plan or candidate allowlist belongs in repository
   policy; production remains fail-closed.
-- The previously approved Video Capture `01a096c0-97cc-7192-acf2-4735f9bf6582`
-  package remains historical evidence and is not part of this Public Clock
-  run. Future content families require a newly authorized bounded package.
+- Historical acceptance identifiers may remain in dated execution evidence or
+  fixtures only; they are never repository authorization.
 
-- Additional bounded staging acceptance scope for the existing 400-day Clock
-  Capture continuation:
-  - environment: `staging`
-  - allowed_capture_ids:
-    - `01a0ae4c-0fe7-72b1-8222-ece526ce0faa`
-  - allowed_owner_ids:
-    - `01a0a868-2918-7dac-81dc-bfc25e710068`
-  - allowed_post_ids: `[575]`
-  - allowed_media_ids: `[01a0ae48-1008-7213-a91f-dde21d36e66b]`
-  - allowed_attachment_ids: `[574]`
-  - allowed_operation_families:
-    - capture_continuation
-    - governed_relation_reconciliation
-    - media_usage_reconciliation
-    - article_reconciliation
-    - article_body_correction
-    - article_publication
-    - presentation_readiness
-    - frontend_projection_readback
-    - canonical_readback
-  - fail_closed_outside_scope: `true`
-
-- Additional bounded staging acceptance scope for Media binding case 567:
-  - environment: `staging`
-  - host: `https://demo.1945.vn`
-  - allowed_media_ids: `[01a0ab0c-fde0-7c01-a89d-fc5eef832c89]`
-  - allowed_attachment_ids: `[567]`
-  - allowed_target_ids: `[01a07614-832d-7f27-959c-74eb0cd63f3e]`
-  - allowed_target_types: `[classification]`
-  - allowed_target_stable_keys: `[nhk:classification:clock-type.cuckoo-clock]`
-  - allowed_target_names: `[Đồng hồ chim cúc cu]`
-  - allowed_binding:
-    - operation: `nhk.media.bind`
-    - receipt_operation: `nhk.media.binding.get`
-    - role: `representative`
-    - selection_source: `USER_EXPLICIT`
-    - selection_policy: `PINNED`
-  - allowed_operation_families:
-    - media_usage_reconciliation
-    - presentation_readiness
-    - frontend_projection_readback
-    - canonical_readback
-  - restrictions:
-    - exact IDs only; no fuzzy resolution
-    - no Media, attachment or Classification creation
-    - no duplicate binary, entity mutation, Graph relation or Knowledge mutation
-    - no `media_ingest`, manual SQL, direct table writer or unrelated staging mutation
-  - fail_closed_outside_scope: `true`
-
-- Additional bounded staging acceptance scope for Media binding case 576:
-  - environment: `staging`
-  - host: `https://demo.1945.vn`
-  - allowed_media_ids: `[01a0aefd-7e93-772c-98df-33f7abbc11e8]`
-  - allowed_attachment_ids: `[576]`
-  - allowed_asset_ids: `[01a0aefd-7e9c-757a-a728-4ca3e968b60f]`
-  - allowed_target_ids: `[01a09e44-539a-7f1a-938a-d7d91bb689a3]`
-  - allowed_target_types: `[classification]`
-  - allowed_target_stable_keys: `[nhk:classification:clock-type.dong-ho-cong-cong]`
-  - allowed_target_names: `[Đồng hồ công cộng]`
-  - allowed_binding:
-    - operation: `representative_bind`
-    - entrypoint: `nhk.capture.ingest`
-    - receipt_operation: `nhk.media.binding.get`
-    - role: `representative`
-    - selection_source: `USER_EXPLICIT`
-    - selection_policy: `PINNED`
-  - allowed_presentation:
-    - title: `Đồng hồ công cộng`
-    - alt_text: `Đồng hồ công cộng cổ với bộ máy cơ khí và hai chuông lớn`
-    - caption: `Đồng hồ công cộng – bộ máy cơ khí với hai chuông lớn, gợi lại kỹ nghệ đo và báo giờ trong không gian cộng đồng.`
-  - allowed_operation_families:
-    - `media_usage_reconciliation`
-    - `presentation_readiness`
-    - `frontend_projection_readback`
-    - `canonical_readback`
-  - dynamic_scope_requirements:
-    - server-issued Capture `capture_id` and exact `capture_fingerprint`
-    - server-issued scope `fingerprint`, HMAC `signature`, `issued_at` and `expires_at`
-    - exact binding packet matching the IDs, target, operation, role and selection fields above
-    - runtime staging environment, signing secret, canonical `nhk_ingest_articles` capability and final readback
-    - direct compatibility `nhk.media.bind` remains internal-only and is not an alternate entrypoint
-  - restrictions:
-    - exact IDs and exact stable key only; no wildcard or fuzzy target resolution
-    - no new Media, attachment, MediaAsset or Classification
-    - no duplicate binary, Graph mutation, Knowledge mutation or Source/Evidence mutation
-    - no generic WordPress writer, direct SQL/DB, Governance bypass, Proposal Apply or second approval queue
-    - no hard delete; replacement/removal semantics remain logical and out of this acceptance
-  - fail_closed_outside_scope: `true`
+- Capture continuation, Media binding, Authority and Video acceptance use the
+  same bounded packet law. Direct compatibility operations remain internal-only;
+  no generic WordPress writer, direct SQL/DB, Governance bypass, duplicate
+  binary, new semantic owner or hard delete is authorized by this policy.
 
 
 

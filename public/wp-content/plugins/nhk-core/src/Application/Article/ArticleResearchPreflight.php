@@ -67,7 +67,8 @@ final class ArticleResearchPreflight
             is_array($inventory['categories'] ?? null) ? $inventory['categories'] : [],
         );
         if ($category['status'] === 'CATEGORY_MISSING') $warnings[] = 'CATEGORY_MISSING';
-        $this->claimEvidencePolicy(is_array($inventory['knowledge'] ?? null) ? $inventory['knowledge'] : [], $blockers, $warnings);
+        $publicationClaims = $this->publicationClaims(is_array($inventory['knowledge'] ?? null) ? $inventory['knowledge'] : [], $articleContext);
+        $this->claimEvidencePolicy($publicationClaims, $blockers, $warnings);
 
         $parts = [$topic];
         foreach (['title', 'excerpt', 'body'] as $field) if (is_string($articleContext[$field] ?? null) && trim((string) $articleContext[$field]) !== '') $parts[] = (string) $articleContext[$field];
@@ -83,8 +84,10 @@ final class ArticleResearchPreflight
         foreach ((array) ($dictionaryPlan['warnings'] ?? []) as $warning) if (is_string($warning) && trim($warning) !== '') $warnings[] = $warning;
         $timings['planning_ms'] = $this->elapsed($started);
 
-        $claimDiagnostics = $this->claimComplianceDiagnostics(is_array($inventory['knowledge'] ?? null) ? $inventory['knowledge'] : [], is_array($resolution['primary'] ?? null) ? $resolution['primary'] : []);
-        $compliance = ['status' => 'HUMAN_REVIEW_REQUIRED', 'code' => 'PUBLIC_CLAIM_COMPLIANCE_BLOCKED', 'warnings' => ['PUBLIC_CLAIMS_REQUIRE_EVIDENCE_SCOPE'], 'diagnostics' => $claimDiagnostics, 'review_required' => true];
+        $claimDiagnostics = $this->claimComplianceDiagnostics($publicationClaims, is_array($resolution['primary'] ?? null) ? $resolution['primary'] : []);
+        $compliance = $claimDiagnostics === []
+            ? ['status' => 'PASS', 'code' => null, 'warnings' => [], 'diagnostics' => [], 'review_required' => false]
+            : ['status' => 'HUMAN_REVIEW_REQUIRED', 'code' => 'PUBLIC_CLAIM_COMPLIANCE_BLOCKED', 'warnings' => ['PUBLIC_CLAIMS_REQUIRE_EVIDENCE_SCOPE'], 'diagnostics' => $claimDiagnostics, 'review_required' => true];
         $plannedTitle = trim((string) ($articleContext['planned_title'] ?? $articleContext['title'] ?? $topic));
         $blueprint = ['primary_subject' => $resolution['primary'] ?? null, 'intent' => trim($topic), 'title_intent' => $plannedTitle, 'h1_intent' => $plannedTitle, 'slug_intent' => $this->slug($plannedTitle), 'meta_description_intent' => $plannedTitle, 'outline' => [], 'media_complete' => $mediaComplete, 'structured_data_applicable' => true, 'canonical_expectation' => 'PUBLIC_CANONICAL_ROUTE', 'indexability_expectation' => 'INDEXABLE_IF_PUBLISHED'];
         $mediaPlan = ['candidates' => $media, 'media_complete' => $mediaComplete];
@@ -149,6 +152,25 @@ final class ArticleResearchPreflight
             if ($isNewOrModified && $status !== 'SUPPORTED_WITHIN_SCOPE') $blockers[] = 'PUBLIC_CLAIM_EVIDENCE_REQUIRED';
             elseif (($claim['legacy'] ?? false) === true && $status !== 'SUPPORTED_WITHIN_SCOPE') $warnings[] = 'LEGACY_EVIDENCE_DEBT';
         }
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function publicationClaims(array $claims, array $articleContext): array
+    {
+        if (!array_key_exists('claim_trace', $articleContext) && !array_key_exists('selected_claim_ids', $articleContext)) return $claims;
+        $ids = array_values(array_unique(array_filter(array_map('strval', (array) ($articleContext['selected_claim_ids'] ?? [])), static fn (string $id): bool => trim($id) !== '')));
+        foreach ((array) ($articleContext['claim_trace'] ?? []) as $trace) if (is_array($trace)) {
+            $id = trim((string) ($trace['claim_id'] ?? $trace['id'] ?? ''));
+            if ($id !== '') $ids[] = $id;
+        }
+        $ids = array_fill_keys(array_values(array_unique($ids)), true);
+        $copy = implode("\n", array_filter(array_map(static fn (string $field): string => trim((string) ($articleContext[$field] ?? '')), ['title', 'excerpt', 'body'])));
+        return array_values(array_filter($claims, static function (array $claim) use ($ids, $copy): bool {
+            $id = (string) ($claim['claim_id'] ?? $claim['id'] ?? '');
+            if (isset($ids[$id])) return true;
+            $text = trim((string) ($claim['claim_text'] ?? $claim['text'] ?? ''));
+            return $text !== '' && $copy !== '' && (function_exists('mb_stripos') ? mb_stripos($copy, $text) : stripos($copy, $text)) !== false;
+        }));
     }
 
     /** @param list<array<string,mixed>> $claims @param array<string,mixed> $subject @return list<array<string,mixed>> */

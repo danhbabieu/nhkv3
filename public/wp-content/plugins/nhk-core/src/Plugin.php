@@ -22,7 +22,7 @@ use NHK\Core\Infrastructure\Migration\ClaimProjectionMigration016;
 use NHK\Core\Infrastructure\Migration\{EditorialCaptureAddendumMigration018, EditorialCaptureMigration017, GovernanceSubjectBindingMigration020, MediaBindingOperationMigration022, MediaUsageMetadataMigration021, VisualSupportRequirementMigration019};
 use NHK\Core\Infrastructure\Migration\MigrationDatabaseGuard;
 use NHK\Core\Application\Governance\GovernanceCapabilities;
-use NHK\Core\Application\Governance\{AuthorityStagingAdmission, MediaBindingStagingAdmission, VideoW64StagingAdmission};
+use NHK\Core\Application\Governance\{AuthorityStagingAdmission, MediaBindingStagingAdmission, VideoStagingAdmission};
 use NHK\Core\Application\Runtime\SemanticWritePolicyResolver;
 use NHK\Core\Application\Mcp\{McpAbilityRegistration, McpArticleIngestHandler, McpGovernanceHandler, McpReadHandler, McpSemanticContextResolver, McpToolCatalog, McpTransport, McpDocumentationRegistry};
 use NHK\Core\Application\Media\{ImageIngestEntrypoint, MediaBatchUploadService, MediaBindingService};
@@ -148,6 +148,8 @@ final class Plugin {
             $claims = new WpdbKnowledgeRepository($wpdb);
             $sources = new WpdbSourceRepository($wpdb);
             $evidence = new WpdbEvidenceRepository($wpdb);
+            $attachmentBridge = new WordPressMediaAttachmentBridge($wpdb, new MediaService($media, $assets, $usages), $media, $assets);
+            $wordpressAttachments = new WordPressMediaAttachmentIngestor($attachmentBridge);
             $graphEndpoints = new EndpointTypeRegistry();
             CoreEndpointResolverRegistrar::register($graphEndpoints, $types, $authority, $media, $videos, $claims, $sources, $evidence);
             $graphRead = new GraphService(new WpdbGraphRepository($wpdb), $graphEndpoints, new PredicateRegistry(), new WpdbAuditSink());
@@ -157,7 +159,7 @@ final class Plugin {
             $canonicalInventory = self::canonicalInventory($types, $authority, $media, $videos, $claims, $sources, $evidence);
             $graphInventory = new GraphInventoryService($graphRepository, $graphEndpoints, $predicates);
             $relationBackfill = self::relationBackfill($canonicalInventory, $graphInventory);
-            McpAbilityRegistration::registerReadAbilities(new McpReadHandler($authority, $types, $media, $assets, $usages, $videos, $claims, $evidence, new MigrationStatus(), $sources, null, new McpSemanticContextResolver($authority, $types), null, $neighborhood, $canonicalInventory, $graphInventory, $relationBackfill, new WpdbMediaBindingOperationRepository($wpdb)));
+            McpAbilityRegistration::registerReadAbilities(new McpReadHandler($authority, $types, $media, $assets, $usages, $videos, $claims, $evidence, new MigrationStatus(), $sources, null, new McpSemanticContextResolver($authority, $types), $wordpressAttachments, $neighborhood, $canonicalInventory, $graphInventory, $relationBackfill, new WpdbMediaBindingOperationRepository($wpdb)));
             McpAbilityRegistration::registerCapabilityGatedReadAbilities();
             McpAbilityRegistration::registerGovernedAbilities();
         });
@@ -169,7 +171,7 @@ final class Plugin {
             $stagingAdmission = new MediaBindingStagingAdmission(new WpdbMediaRepository($wpdb), new WpdbAuthorityRepository($wpdb));
             add_filter('nhk_v3_staging_acceptance_admission', new AuthorityStagingAdmission(), 10, 5);
             add_filter('nhk_v3_staging_acceptance_admission', $stagingAdmission, 20, 5);
-            add_filter('nhk_v3_staging_acceptance_admission', new VideoW64StagingAdmission(), 30, 5);
+            add_filter('nhk_v3_staging_acceptance_admission', new VideoStagingAdmission(), 30, 5);
         }
         $sharedAttachmentBridge = null;
         $claimOwnerUrl = static fn (\NHK\Core\Domain\Knowledge\KnowledgeClaim $claim): ?string => null;
@@ -275,6 +277,7 @@ final class Plugin {
                 static function (): string { return defined('WP_ENVIRONMENT_TYPE') ? strtolower((string) constant('WP_ENVIRONMENT_TYPE')) : (function_exists('wp_get_environment_type') ? strtolower((string) wp_get_environment_type()) : strtolower((string) (getenv('WP_ENVIRONMENT_TYPE') ?: 'unknown'))); },
                 defined('NHK_STAGING_ACCEPTANCE_SCOPE_SECRET') ? (string) constant('NHK_STAGING_ACCEPTANCE_SCOPE_SECRET') : (string) (getenv('NHK_STAGING_ACCEPTANCE_SCOPE_SECRET') ?: ''),
                 static function (array $scope, \NHK\Core\Domain\Capture\CaptureRecord $capture, array $input, array $assets): bool { return function_exists('apply_filters') && (bool) apply_filters('nhk_v3_staging_acceptance_admission', false, $scope, $capture, $input, $assets); },
+                can: static fn (string $capability): bool => function_exists('current_user_can') && current_user_can($capability),
             );
             $proposalRepository = $governanceRuntime->proposals;
             $governance = $governanceRuntime->governance;
@@ -282,7 +285,7 @@ final class Plugin {
             (new AdminWorkbenchReadApi($media, $videos, $claims, $authority, $sources, $evidence, $graphService, $proposalRepository, $eligibility, $assets, $usages, new EntityProfileAdminProjection()))->register();
             $authorityService = new \NHK\Core\Application\Authority\AuthorityService($authority, $types, new \NHK\Core\Infrastructure\Authority\WpdbAuditSink(new \NHK\Core\Infrastructure\Governance\WpdbAuditSink($wpdb)));
             $mediaService = new MediaService($media, $assets, $usages);
-            $mediaBindingService = $governanceRuntime->mediaBinding ?? new MediaBindingService($media, $assets, $usages, $authority, $types, new WpdbMediaBindingOperationRepository($wpdb), stagingGuard: new \NHK\Core\Application\Governance\MediaBindingStagingGuard(static function (): string { return defined('WP_ENVIRONMENT_TYPE') ? strtolower((string) constant('WP_ENVIRONMENT_TYPE')) : (function_exists('wp_get_environment_type') ? strtolower((string) wp_get_environment_type()) : strtolower((string) (getenv('WP_ENVIRONMENT_TYPE') ?: 'unknown'))); }, [$stagingScopeVerifier, 'verifyBindingRequest']));
+            $mediaBindingService = $governanceRuntime->mediaBinding ?? new MediaBindingService($media, $assets, $usages, $authority, $types, new WpdbMediaBindingOperationRepository($wpdb), stagingGuard: new \NHK\Core\Application\Governance\MediaBindingStagingGuard(static function (): string { return defined('WP_ENVIRONMENT_TYPE') ? strtolower((string) constant('WP_ENVIRONMENT_TYPE')) : (function_exists('wp_get_environment_type') ? strtolower((string) wp_get_environment_type()) : strtolower((string) (getenv('WP_ENVIRONMENT_TYPE') ?: 'unknown'))); }, [$stagingScopeVerifier, 'verifyBindingRequest'], static fn (string $capability): bool => function_exists('current_user_can') && current_user_can($capability)));
             $attachmentBridge = $sharedAttachmentBridge ?? new WordPressMediaAttachmentBridge($wpdb, $mediaService, $media, $assets);
             $sharedAttachmentBridge = $attachmentBridge;
             $knowledgeService = new KnowledgeService($claims, $sources, $evidence);

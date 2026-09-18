@@ -8,8 +8,8 @@ use NHK\Core\Shared\Uuid\UuidCodec;
 /** Fail-closed staging scope for direct canonical MediaBindingService calls. */
 final class MediaBindingStagingGuard
 {
-    /** @param callable():string $environment @param callable(array<string,mixed>,array<string,mixed>):bool|null $scopeVerifier */
-    public function __construct(private $environment, private $scopeVerifier = null) {}
+    /** @param callable():string $environment @param callable(array<string,mixed>,array<string,mixed>):bool|null $scopeVerifier @param callable(string):bool|null $can */
+    public function __construct(private $environment, private $scopeVerifier = null, private $can = null) {}
 
     /** @param array<string,mixed> $request */
     public function __invoke(array $request): void
@@ -21,6 +21,7 @@ final class MediaBindingStagingGuard
         if (!is_array($scope)) throw new \RuntimeException('STAGING_SCOPE_REQUIRED');
         if (!is_callable($this->scopeVerifier)) throw new \RuntimeException('STAGING_SCOPE_VERIFIER_REQUIRED');
         if (!(bool) ($this->scopeVerifier)($scope, $request)) throw new \RuntimeException('STAGING_SCOPE_NOT_APPROVED');
+        if (is_callable($this->can) && !(bool) ($this->can)('nhk_internal_content_operations')) throw new \RuntimeException('STAGING_CAPABILITY_REQUIRED:nhk_internal_content_operations');
         if (($scope['approved'] ?? false) !== true) throw new \RuntimeException('STAGING_SCOPE_NOT_APPROVED');
         $captureId = trim((string) ($scope['capture_id'] ?? ''));
         if (!UuidCodec::isValid($captureId) || !hash_equals(strtolower($captureId), strtolower(trim((string) ($request['capture_id'] ?? ''))))) throw new \RuntimeException('STAGING_CAPTURE_SCOPE_MISMATCH');

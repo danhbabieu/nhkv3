@@ -90,8 +90,10 @@ final class GovernedCaptureContinuationService
             }));
         }
         if ($plans === []) {
-            $blockers = $skippedVideoChildren !== [] ? ['VIDEO_CHILD_UNCHANGED_ON_TEXT_ADDENDUM'] : ($reusedClaims === [] ? ['SEMANTIC_SUBJECT_OR_DELTA_REQUIRED'] : []);
-            return ['status' => 'REVIEW_REQUIRED', 'writes' => $skippedVideoChildren, 'reused_claims' => $reusedClaims, 'video_children' => $videoChildren, 'blockers' => $blockers, 'governance' => ['lifecycle' => [], 'status' => 'REVIEW_REQUIRED', 'skipped_video_children' => count($skippedVideoChildren)], 'completion' => $this->completion->aggregateCapture($this->currentCaptureId, [], ['canonical_state' => 'COMPLETE', 'blockers' => $blockers])];
+            $semanticNotRequired = !$this->semanticDeltaRequested($context) && in_array(strtoupper(trim((string) ($context['content_intent']['intent'] ?? ''))), ['IMAGE_ARTICLE', 'TEXT_ARTICLE'], true);
+            $blockers = $skippedVideoChildren !== [] ? ['VIDEO_CHILD_UNCHANGED_ON_TEXT_ADDENDUM'] : ($semanticNotRequired || $reusedClaims !== [] ? [] : ['SEMANTIC_SUBJECT_OR_DELTA_REQUIRED']);
+            $status = $semanticNotRequired ? 'SKIPPED' : 'REVIEW_REQUIRED';
+            return ['status' => $status, 'writes' => $skippedVideoChildren, 'reused_claims' => $reusedClaims, 'video_children' => $videoChildren, 'blockers' => $blockers, 'requirements' => ['semantic_delta' => ['applicability' => $semanticNotRequired ? 'NOT_REQUIRED' : 'REQUIRED', 'policy' => 'VERIFY', 'state' => $semanticNotRequired ? 'SKIPPED' : 'PENDING', 'evidence' => ['intent' => strtoupper(trim((string) ($context['content_intent']['intent'] ?? ''))), 'status' => strtoupper(trim((string) ($context['content_intent']['semantic_delta']['status'] ?? 'NONE')))]]], 'governance' => ['lifecycle' => [], 'status' => $status, 'skipped_video_children' => count($skippedVideoChildren)], 'completion' => $this->completion->aggregateCapture($this->currentCaptureId, [], ['canonical_state' => 'COMPLETE', 'blockers' => $blockers])];
         }
 
         $writes = [];
@@ -268,7 +270,7 @@ final class GovernedCaptureContinuationService
             ];
             $plans[] = $this->arguments('evidence', 'ingest', $claimId, $payload, 'capture:' . $captureId . ':evidence:' . hash('sha256', CommandCanonicalizer::canonicalize($payload)));
         }
-        if ($includeSemanticChildren && $articleId > 0 && $articleEndpoint !== '' && in_array($intent, ['TEXT_ARTICLE', 'IMAGE_ARTICLE'], true) && UuidCodec::isValid((string) ($primary['id'] ?? '')) && trim((string) ($primary['type'] ?? '')) !== '') {
+        if ($includeSemanticChildren && $this->semanticDeltaRequested($context) && $articleId > 0 && $articleEndpoint !== '' && in_array($intent, ['TEXT_ARTICLE', 'IMAGE_ARTICLE'], true) && UuidCodec::isValid((string) ($primary['id'] ?? '')) && trim((string) ($primary['type'] ?? '')) !== '') {
             // Article subject binding is a normal governed Graph child. The
             // stable idempotency key is owner/subject based so a later
             // continuation reuses the same edge/proposal instead of opening a
@@ -282,7 +284,7 @@ final class GovernedCaptureContinuationService
                 'origin' => 'CAPTURE_ARTICLE_SUBJECT_BINDING',
             ], 'capture:article-about:' . $articleEndpoint . ':' . (string) $primary['type'] . ':' . (string) $primary['id']);
         }
-        if ($includeSemanticChildren && ($intent === 'KNOWLEDGE_DELTA' || count($variants) === 1) && ($subject = $this->knowledgeSubject($subjects, $variants, $intent, $primary)) !== null) {
+        if ($includeSemanticChildren && $this->semanticDeltaRequested($context) && ($intent === 'KNOWLEDGE_DELTA' || count($variants) === 1) && ($subject = $this->knowledgeSubject($subjects, $variants, $intent, $primary)) !== null) {
             $deltaText = trim((string) ($context['continuation_delta_text'] ?? ''));
             $candidates = $deltaText !== ''
                 ? [['text' => $deltaText, 'provenance' => 'EXPLICIT_USER_KNOWLEDGE']]
@@ -402,6 +404,14 @@ final class GovernedCaptureContinuationService
         if ($intent === 'KNOWLEDGE_DELTA' && UuidCodec::isValid((string) ($primary['id'] ?? '')) && trim((string) ($primary['type'] ?? '')) !== '') return $primary;
         if ($intent === 'KNOWLEDGE_DELTA') return $subjects[0] ?? null;
         return count($variants) === 1 ? $variants[0] : null;
+    }
+
+    private function semanticDeltaRequested(array $context): bool
+    {
+        $intent = strtoupper(trim((string) ($context['content_intent']['intent'] ?? '')));
+        $status = strtoupper(trim((string) ($context['content_intent']['semantic_delta']['status'] ?? 'NONE')));
+        if ($intent === 'KNOWLEDGE_DELTA' || $intent === '') return true;
+        return $status === 'REQUIRED' && in_array($intent, ['KNOWLEDGE_DELTA', 'AUTHORITY', 'MIXED'], true);
     }
 
     private function knowledgeScope(string $subjectType, string $candidateScope, array $candidate = []): ?string

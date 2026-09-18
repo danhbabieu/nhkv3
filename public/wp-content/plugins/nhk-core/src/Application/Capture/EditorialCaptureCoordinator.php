@@ -258,7 +258,10 @@ final class EditorialCaptureCoordinator
                     if (!is_array($asset)) continue;
                     $adoptedAsset = $asset;
                     $isFollowupAsset = $followupItems !== [] && isset($followupKeys[$this->assetIdentity($asset)]);
-                    if (is_callable($this->mediaAdoption) && isset($asset['attachment_id']) && (!$hasPriorAdoption || $isFollowupAsset)) {
+                    $reusedCanonicalAsset = trim((string) ($asset['media_id'] ?? '')) !== ''
+                        && (int) ($asset['attachment_id'] ?? 0) > 0
+                        && ($asset['attachment_readback_status'] ?? '') === 'verified';
+                    if (is_callable($this->mediaAdoption) && isset($asset['attachment_id']) && (!$hasPriorAdoption || $isFollowupAsset) && !$reusedCanonicalAsset) {
                         $adoption = ($this->mediaAdoption)([
                             'capture_id' => $record->captureId,
                             'attachment_id' => (int) $asset['attachment_id'],
@@ -597,7 +600,9 @@ final class EditorialCaptureCoordinator
         $receipts = $record->phaseReceipts;
         $this->beginPhase('MEDIA_RECONCILED');
         $record = $this->startReceipt($record, $assets, $diagnostics, $receipts, 'MEDIA_RECONCILED');
-        $media = $this->mediaBindingService?->bindMany((array) ($input['media_bindings'] ?? []), $record->captureId . ':media-binding', $assets, ['capture_id' => $record->captureId, 'staging_acceptance' => $input['staging_acceptance'] ?? null]) ?? ['status' => 'PARTIAL', 'bindings' => [], 'media_ids' => []];
+        $mediaContext = ['capture_id' => $record->captureId, 'capture_fingerprint' => $record->requestFingerprint, 'staging_acceptance' => $input['staging_acceptance'] ?? null];
+        if (is_array($input['staging_acceptance'] ?? null) && isset($input['staging_acceptance']['payload_fingerprint'])) $mediaContext['payload_fingerprint'] = $input['staging_acceptance']['payload_fingerprint'];
+        $media = $this->mediaBindingService?->bindMany((array) ($input['media_bindings'] ?? []), $record->captureId . ':media-binding', $assets, $mediaContext) ?? ['status' => 'PARTIAL', 'bindings' => [], 'media_ids' => []];
         $this->assertTypedMediaBindingReceipt($media);
         $diagnostics = array_replace($record->diagnostics, ['media_enrichment' => $this->withoutBody($media)]);
         $record = $this->save($record, 'MEDIA_RECONCILED', $assets, $diagnostics, $record->phaseReceipts, 'MEDIA_RECONCILED', null, null, ($media['status'] ?? '') === 'COMPLETE' ? 'COMPLETED' : 'PARTIAL');

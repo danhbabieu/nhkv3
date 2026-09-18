@@ -112,8 +112,9 @@ final class GovernanceRuntimeFactory
             static function (array $scope, \NHK\Core\Domain\Capture\CaptureRecord $capture, array $input, array $assets): bool {
                 return function_exists('apply_filters') && (bool) apply_filters('nhk_v3_staging_acceptance_admission', false, $scope, $capture, $input, $assets);
             },
+            can: static fn (string $capability): bool => function_exists('current_user_can') && current_user_can($capability),
         );
-        $mediaBinding = new MediaBindingService($media, $assets, $usages, $authority, $types, new \NHK\Core\Infrastructure\Media\WpdbMediaBindingOperationRepository($wpdb), stagingGuard: new MediaBindingStagingGuard($environment, [$stagingScopeVerifier, 'verifyBindingRequest']));
+        $mediaBinding = new MediaBindingService($media, $assets, $usages, $authority, $types, new \NHK\Core\Infrastructure\Media\WpdbMediaBindingOperationRepository($wpdb), stagingGuard: new MediaBindingStagingGuard($environment, [$stagingScopeVerifier, 'verifyBindingRequest'], static fn (string $capability): bool => function_exists('current_user_can') && current_user_can($capability)));
         $stagingGuard = new OperationScopedStagingGuard(
             $environment,
             static fn (string $capability): bool => function_exists('current_user_can') && current_user_can($capability),

@@ -5,14 +5,9 @@ namespace NHK\Core\Application\Governance;
 
 use NHK\Core\Domain\Capture\CaptureRecord;
 
-/** Bounded admission for the explicitly approved W64 Video correction. */
-final class VideoW64StagingAdmission
+/** Generic bounded admission for a server-issued Capture-owned Video plan. */
+final class VideoStagingAdmission
 {
-    private const CAPTURE_ID = '01a0b230-1f3a-7b9f-b569-fb67834ab579';
-    private const REQUEST_FINGERPRINT = 'f66ae6b07e139655ef1b50fe0c876297c4c1873c151d6511ea84695c6916ec02';
-    private const VIDEO_UUID = '01a0aaf8-2a84-7287-bbd8-70af4d5485e4';
-    private const VARIANT_UUID = '24eaeba5-b5f9-420f-a2fe-50b1f2a6130f';
-
     /** @param array<string,mixed> $scope @param array<string,mixed> $input @param list<array<string,mixed>> $assets */
     public function __invoke(bool $admitted, array $scope, CaptureRecord $capture, array $input, array $assets): bool
     {
@@ -21,15 +16,13 @@ final class VideoW64StagingAdmission
             || ($scope['environment'] ?? '') !== 'staging'
             || ($scope['operation_family'] ?? '') !== 'governed_video_plan'
             || ($scope['entity_type'] ?? '') !== 'video'
-            || ($scope['operation'] ?? '') !== 'update'
+            || !in_array((string) ($scope['operation'] ?? ''), ['update', 'retire', 'reactivate'], true)
             || ($scope['writer'] ?? '') !== 'canonical_governed'
             || ($scope['entrypoint'] ?? '') !== 'nhk.capture.ingest'
-            || ($scope['capture_id'] ?? '') !== self::CAPTURE_ID
-            || ($scope['capture_fingerprint'] ?? '') !== self::REQUEST_FINGERPRINT
-            || ($scope['target_uuid'] ?? '') !== self::VIDEO_UUID
-            || (int) ($scope['expected_revision'] ?? 0) !== 5
-            || $capture->captureId !== self::CAPTURE_ID
-            || $capture->requestFingerprint !== self::REQUEST_FINGERPRINT) return false;
+            || ($scope['capture_id'] ?? '') !== $capture->captureId
+            || ($scope['capture_fingerprint'] ?? '') !== $capture->requestFingerprint
+            || !\NHK\Core\Shared\Uuid\UuidCodec::isValid((string) ($scope['target_uuid'] ?? ''))
+            || (int) ($scope['expected_revision'] ?? 0) < 1) return false;
 
         $videoAssets = array_values(array_filter($capture->assets, static fn (mixed $asset): bool => is_array($asset) && ($asset['kind'] ?? '') === 'video'));
         if (count($videoAssets) !== 1) return false;
@@ -38,8 +31,11 @@ final class VideoW64StagingAdmission
         $metadata = is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [];
         $subject = is_array($metadata['subject_resolution_packet'] ?? null) ? $metadata['subject_resolution_packet'] : [];
 
-        return ($payload['canonical_id'] ?? $video['target_uuid'] ?? $video['subject_id'] ?? '') === self::VIDEO_UUID
-            && ($subject['id'] ?? '') === self::VARIANT_UUID
-            && ($subject['type'] ?? '') === 'variant';
+        $targetUuid = (string) ($scope['target_uuid'] ?? '');
+        return ($payload['canonical_id'] ?? $video['target_uuid'] ?? $video['subject_id'] ?? '') === $targetUuid
+            && (!isset($payload['expected_revision']) || (int) $payload['expected_revision'] === (int) ($scope['expected_revision'] ?? 0))
+            && \NHK\Core\Shared\Uuid\UuidCodec::isValid((string) ($subject['id'] ?? ''))
+            && trim((string) ($subject['type'] ?? '')) !== ''
+            && (!isset($scope['subject_id']) || (string) $scope['subject_id'] === (string) $subject['id']);
     }
 }
