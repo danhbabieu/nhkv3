@@ -36,14 +36,14 @@ get_header();
 
   <?php $latestFeed = is_array($home['latest_feed'] ?? null) ? $home['latest_feed'] : []; if ($latestFeed !== []): ?>
   <section class="home-latest-feed" aria-labelledby="home-latest-title">
-    <div class="section-head"><div><p class="eyebrow">Mới đăng</p><h2 id="home-latest-title">Mới nhất trong kho</h2><p class="section-deck">Những nội dung và hồ sơ công khai vừa được cập nhật.</p></div><a class="text-link" href="<?php echo esc_url(home_url('/tri-thuc/')); ?>">Mở kho tri thức →</a></div>
+    <div class="section-head"><div><p class="eyebrow">Dòng hoạt động</p><h2 id="home-latest-title">Mới nhất trong kho</h2><p class="section-deck">Bài viết, tri thức, video, hình ảnh và hồ sơ công khai được sắp theo thời điểm mới nhất.</p></div><a class="text-link" href="<?php echo esc_url(home_url('/')); ?>#home-latest-title">Xem toàn bộ dòng mới →</a></div>
     <div class="latest-feed-grid">
-      <?php foreach ($latestFeed as $item): $url = nhk_v3_public_url($item['url'] ?? null); if ($url === '') continue; $image = trim((string) ($item['image_url'] ?? '')); $width = max(1, (int) ($item['width'] ?? 0)); $height = max(1, (int) ($item['height'] ?? 0)); ?>
-        <article class="latest-feed-card<?php echo $image === '' ? ' has-no-image' : ''; ?>">
+      <?php foreach ($latestFeed as $item): $url = nhk_v3_public_url($item['url'] ?? null); if ($url === '') continue; $image = trim((string) ($item['image_url'] ?? '')); $width = max(1, (int) ($item['width'] ?? 0)); $height = max(1, (int) ($item['height'] ?? 0)); $displayTimestamp = trim((string) ($item['timestamp'] ?? '')) ?: trim((string) ($item['created_at'] ?? '')); $orientation = trim((string) ($item['orientation'] ?? 'unknown')) ?: 'unknown'; ?>
+        <article class="latest-feed-card latest-feed-card--<?php echo esc_attr($orientation); ?><?php echo $image === '' ? ' has-no-image' : ''; ?>">
           <a class="latest-feed-visual" href="<?php echo esc_url($url); ?>" aria-label="<?php echo esc_attr((string) ($item['title'] ?? '')); ?>">
             <?php if ($image !== ''): ?><img src="<?php echo esc_url($image); ?>" alt="<?php echo esc_attr((string) ($item['title'] ?? '')); ?>" width="<?php echo esc_attr((string) $width); ?>" height="<?php echo esc_attr((string) $height); ?>" loading="lazy"><?php else: ?><span class="latest-feed-placeholder" aria-hidden="true"><?php echo esc_html(mb_strtoupper(mb_substr((string) ($item['label'] ?? 'NHK'), 0, 1))); ?></span><?php endif; ?>
           </a>
-          <div class="latest-feed-body"><p class="eyebrow"><?php echo esc_html((string) ($item['label'] ?? 'Nội dung')); ?></p><h3><a href="<?php echo esc_url($url); ?>"><?php echo esc_html((string) ($item['title'] ?? '')); ?></a></h3><?php if (trim((string) ($item['summary'] ?? '')) !== ''): ?><p><?php echo esc_html((string) $item['summary']); ?></p><?php endif; ?><time datetime="<?php echo esc_attr((string) ($item['timestamp'] ?? '')); ?>"><?php echo esc_html(nhk_v3_public_date(strtotime((string) ($item['timestamp'] ?? '')) ?: null)); ?></time></div>
+          <div class="latest-feed-body"><p class="eyebrow"><?php echo esc_html((string) ($item['label'] ?? 'Nội dung')); ?></p><h3><a href="<?php echo esc_url($url); ?>"><?php echo esc_html((string) ($item['title'] ?? '')); ?></a></h3><?php if (trim((string) ($item['summary'] ?? '')) !== ''): ?><p><?php echo esc_html((string) $item['summary']); ?></p><?php endif; ?><time datetime="<?php echo esc_attr($displayTimestamp); ?>"><?php echo esc_html(nhk_v3_public_date(strtotime($displayTimestamp) ?: null)); ?></time></div>
         </article>
       <?php endforeach; ?>
     </div>
@@ -52,7 +52,7 @@ get_header();
 
   <?php if (!empty($home['featured'])): $featured = $home['featured']; global $post; $post = $featured[0]; setup_postdata($post); ?>
   <section class="featured-section" aria-labelledby="featured-title">
-    <div class="section-head"><div><p class="eyebrow">Tuyển chọn</p><h2 id="featured-title">Câu chuyện đáng đọc</h2></div></div>
+    <div class="section-head"><div><p class="eyebrow">Đáng đọc</p><h2 id="featured-title">Tuyển chọn từ ban biên tập</h2><p class="section-deck">Những bài viết được chọn để đọc sâu hơn sau khi bạn đã lướt qua dòng mới.</p></div></div>
     <div class="featured-layout">
       <article class="featured-lead">
         <a class="featured-image" href="<?php the_permalink(); ?>">

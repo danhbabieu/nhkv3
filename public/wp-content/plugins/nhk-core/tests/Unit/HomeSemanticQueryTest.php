@@ -123,6 +123,24 @@ final class HomeSemanticQueryTest extends TestCase
         self::assertSame('Video 0', $modules['videos'][0]['title']);
     }
 
+    public function test_home_latest_feed_uses_owner_created_at_and_fails_closed_without_canonical_video_route(): void
+    {
+        $video = Video::fromUrl(
+            'https://www.youtube.com/watch?v=abcde123456',
+            'Video công khai',
+            ['source_snapshot' => ['availability' => 'available', 'published_at' => '2026-02-01 00:00:00']],
+            null,
+            '11111111-1111-4111-8111-111111111111',
+        );
+        $media = new Media('22222222-2222-4222-8222-222222222222', 'latest-photo', 'Ảnh công khai', 'ready', [], true, 1, '2026-03-01 00:00:00');
+        $modules = (new HomeSemanticQuery(new InMemoryAuthorityRepository(), $this->media([$media]), $this->videos([$video]), new EntityTypeRegistry()))
+            ->extend(['entities' => [], 'media' => [], 'videos' => []]);
+
+        self::assertSame(['media'], array_column($modules['latest_feed'], 'type'));
+        self::assertSame('2026-03-01 00:00:00', $modules['latest_feed'][0]['created_at']);
+        self::assertArrayHasKey('tie_breaker', $modules['latest_feed'][0]);
+    }
+
     private function media(array $items): MediaRepository
     {
         return new class($items) implements MediaRepository {

@@ -145,13 +145,13 @@ final class HomeSemanticQuery
             $url = (new PublicSeoProjection())->project((new VideoUrlPolicy())->project($video, new VideoPublicContextSelector()), ['type' => 'VideoObject'])['internal_link'] ?? null;
             if (!is_string($url) || $url === '' || (($source['availability'] ?? 'unknown') !== 'available')) continue;
             $thumbnail = (new \NHK\Core\Application\Video\VideoThumbnailSelector())->fromSource($source);
-            $items[] = $this->feedItem('video', 'Video', (string) (($editorial['title'] ?? '') ?: $video->title ?: 'Video'), $url, (string) ($this->videoPublishedAt($video) ?: $video->createdAt), (string) ($editorial['summary'] ?? ''), $thumbnail['url'] ?? null, $thumbnail['width'] ?? null, $thumbnail['height'] ?? null, $video->canonicalId);
+            $items[] = $this->feedItem('video', 'Video', (string) (($editorial['title'] ?? '') ?: $video->title ?: 'Video'), $url, $this->videoPublishedAt($video), $video->createdAt, (string) ($editorial['summary'] ?? ''), $thumbnail['url'] ?? null, $thumbnail['width'] ?? null, $thumbnail['height'] ?? null, $video->canonicalId);
         }
         foreach ($this->media->list() as $media) {
             if (!$this->ready('media') || !$media->active || $media->readiness !== 'ready' || $media->isSystemPlaceholder()) continue;
-            $visual = null;
-            foreach ((array) ($modules['media'] ?? []) as $candidate) if (is_array($candidate) && ($candidate['title'] ?? '') === $media->canonicalName) { $visual = $candidate; break; }
-            $items[] = $this->feedItem('media', 'Ảnh', $media->canonicalName, $visual['article_url'] ?? (function_exists('home_url') ? \home_url('/thu-vien/') : '/thu-vien/'), (string) ($media->createdAt ?? ''), (string) ($visual['summary'] ?? 'Ảnh tư liệu trong kho hình ảnh NHK.'), $visual['image_url'] ?? null, $visual['width'] ?? null, $visual['height'] ?? null, $media->canonicalId);
+            $visual = $this->gallery?->forMedia($media->canonicalId);
+            $visual = is_array($visual) ? $visual : [];
+            $items[] = $this->feedItem('media', 'Ảnh', $media->canonicalName, $visual['article_url'] ?? (function_exists('home_url') ? \home_url('/thu-vien/') : '/thu-vien/'), null, $media->createdAt, (string) ($visual['summary'] ?? 'Ảnh tư liệu trong kho hình ảnh NHK.'), $visual['image_url'] ?? null, $visual['width'] ?? null, $visual['height'] ?? null, $media->canonicalId);
         }
         if ($this->claims !== null && $this->ready('knowledge')) foreach ($this->claims->list() as $claim) {
             if (!$claim->active || !$claim->isPublic()) continue;
@@ -159,18 +159,17 @@ final class HomeSemanticQuery
             $subjectId = trim((string) ($metadata['subject_uuid'] ?? $metadata['subject_id'] ?? $metadata['canonical_subject_uuid'] ?? ''));
             $url = $subjectId !== '' ? $this->publicEntityUrl($subjectId) : null;
             if ($url === null) continue;
-            $items[] = $this->feedItem('knowledge', 'Tri thức', $this->shorten($claim->claimText, 16), $url, (string) ($claim->createdAt ?? ''), $claim->claimText, null, null, null, $claim->canonicalId);
+            $items[] = $this->feedItem('knowledge', 'Tri thức', $this->shorten($claim->claimText, 16), $url, null, $claim->createdAt, $claim->claimText, null, null, null, $claim->canonicalId);
         }
         if ($this->ready('authority')) foreach ($this->types->all() as $definition) foreach ($this->authority->listByType($definition->type, true) as $entity) {
             if (!$entity->active() || $entity->createdAt === null) continue;
             $detail = $this->collection()->detailForEntity($entity);
             if (!is_array($detail) || trim((string) ($detail['url'] ?? '')) === '') continue;
             $representative = $detail['media']['representative'] ?? [];
-            $labels = ['brand' => 'Thương hiệu', 'model' => 'Mẫu', 'variant' => 'Mẫu', 'movement' => 'Bộ máy', 'music' => 'Bản nhạc', 'classification' => 'Nhóm đồng hồ', 'component' => 'Linh kiện', 'specimen' => 'Hiện vật', 'product' => 'Sản phẩm'];
-            $items[] = $this->feedItem($entity->entityType, $labels[$entity->entityType] ?? 'Hồ sơ', $entity->canonicalName, (string) $detail['url'], $entity->createdAt, (string) ($detail['description'] ?? ''), $representative['url'] ?? null, $representative['width'] ?? null, $representative['height'] ?? null, $entity->canonicalId);
+            $labels = ['brand' => 'Thương hiệu', 'model' => 'Mẫu', 'variant' => 'Mẫu', 'movement' => 'Bộ máy', 'music' => 'Bản nhạc', 'classification' => 'Phân loại', 'component' => 'Linh kiện', 'specimen' => 'Hiện vật', 'product' => 'Sản phẩm'];
+            $items[] = $this->feedItem($entity->entityType, $labels[$entity->entityType] ?? 'Hồ sơ', $entity->canonicalName, (string) $detail['url'], null, $entity->createdAt, (string) ($detail['description'] ?? ''), $representative['url'] ?? null, $representative['width'] ?? null, $representative['height'] ?? null, $entity->canonicalId);
         }
-        $items = LatestFirstOrder::sort($items, static fn (array $item): ?string => (string) ($item['timestamp'] ?? ''), static fn (array $item): ?string => null, static fn (array $item): string => (string) ($item['tie_breaker'] ?? ''));
-        foreach ($items as &$item) unset($item['tie_breaker']);
+        $items = LatestFirstOrder::sort($items, static fn (array $item): ?string => (string) ($item['timestamp'] ?? ''), static fn (array $item): ?string => (string) ($item['created_at'] ?? ''), static fn (array $item): string => (string) ($item['tie_breaker'] ?? ''));
         return array_slice($items, 0, 12);
     }
 
@@ -183,7 +182,7 @@ final class HomeSemanticQuery
         return $url !== '' ? $url : null;
     }
 
-    private function feedItem(string $type, string $label, string $title, string $url, string $timestamp, string $summary, mixed $image, mixed $width, mixed $height, string $tieBreaker): array
+    private function feedItem(string $type, string $label, string $title, string $url, ?string $publishedAt, ?string $createdAt, string $summary, mixed $image, mixed $width, mixed $height, string $tieBreaker): array
     {
         $plainSummary = function_exists('wp_strip_all_tags') ? \wp_strip_all_tags($summary) : strip_tags($summary);
         $normalizedWidth = is_numeric($width) ? (int) $width : null;
@@ -191,7 +190,7 @@ final class HomeSemanticQuery
         $orientation = $normalizedWidth !== null && $normalizedHeight !== null && $normalizedWidth > 0 && $normalizedHeight > 0
             ? ($normalizedHeight > $normalizedWidth ? 'portrait' : ($normalizedWidth === $normalizedHeight ? 'square' : 'landscape'))
             : 'unknown';
-        return ['type' => $type, 'label' => $label, 'title' => trim($title), 'url' => $url, 'timestamp' => $timestamp, 'summary' => $this->shorten($plainSummary, 24), 'image_url' => is_string($image) && $image !== '' ? $image : null, 'orientation' => $orientation, 'width' => $normalizedWidth, 'height' => $normalizedHeight, 'tie_breaker' => $tieBreaker];
+        return ['type' => $type, 'label' => $label, 'title' => trim($title), 'url' => $url, 'timestamp' => $publishedAt, 'created_at' => $createdAt, 'summary' => $this->shorten($plainSummary, 24), 'image_url' => is_string($image) && $image !== '' ? $image : null, 'orientation' => $orientation, 'width' => $normalizedWidth, 'height' => $normalizedHeight, 'tie_breaker' => $tieBreaker];
     }
 
     private function shorten(string $value, int $words): string
