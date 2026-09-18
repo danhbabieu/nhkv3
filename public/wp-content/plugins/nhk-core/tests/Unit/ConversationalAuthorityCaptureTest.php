@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Capture\CapturePurposePolicy;
-use NHK\Core\Application\Capture\AuthorityCaptureService;
+use NHK\Core\Application\Capture\{AuthorityCaptureService, PlanReapprovalRequired};
 use NHK\Core\Contracts\Capture\CaptureRepository;
 use NHK\Core\Domain\Capture\CaptureRecord;
 use NHK\Core\Domain\Capture\CapturePurpose;
@@ -129,8 +129,18 @@ final class ConversationalAuthorityCaptureTest extends TestCase
         );
         $first = $service->execute(['idempotency_key' => 'pending-policy-change', 'purpose' => 'AUTHORITY', 'text' => 'Tạo thương hiệu Hermle.', 'authority_intent' => ['mode' => 'PLAN']]);
 
-        $this->expectExceptionMessage('PLAN_REAPPROVAL_REQUIRED');
-        $service->continueWithApproval($first->captureId, ['authority_intent' => ['mode' => 'APPLY_APPROVED_PLAN', 'approved_plan_fingerprint' => str_repeat('a', 64), 'approved_candidate_ids' => ['candidate-hermle']]]);
+        try {
+            $service->continueWithApproval($first->captureId, ['authority_intent' => ['mode' => 'APPLY_APPROVED_PLAN', 'approved_plan_fingerprint' => str_repeat('a', 64), 'approved_candidate_ids' => ['candidate-hermle']]]);
+            self::fail('Expected a fresh reapproval packet.');
+        } catch (PlanReapprovalRequired $error) {
+            self::assertSame('PLAN_REAPPROVAL_REQUIRED', $error->getMessage());
+            self::assertSame($first->captureId, $error->packet['capture_id']);
+            self::assertSame(str_repeat('b', 64), $error->packet['plan_fingerprint']);
+            self::assertSame(['candidate-hermle'], $error->packet['candidate_ids']);
+            self::assertArrayHasKey('candidates', $error->packet);
+            self::assertArrayHasKey('dependencies', $error->packet);
+            self::assertSame([], $error->packet['blockers']);
+        }
     }
 
     public function test_mixed_approval_invokes_same_capture_reconciliation_after_apply(): void

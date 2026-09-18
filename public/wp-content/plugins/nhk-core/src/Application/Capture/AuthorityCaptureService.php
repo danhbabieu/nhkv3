@@ -98,7 +98,9 @@ final class AuthorityCaptureService
         $planningInput['authority_intent'] = $planningIntent;
         $plan = ($this->planner)($planningInput, $record);
         $currentFingerprint = (string) ($plan['plan_fingerprint'] ?? '');
-        if ($currentFingerprint === '' || !hash_equals($approvedFingerprint, $currentFingerprint)) throw new \InvalidArgumentException('PLAN_REAPPROVAL_REQUIRED');
+        if ($currentFingerprint === '' || !hash_equals($approvedFingerprint, $currentFingerprint)) {
+            throw new PlanReapprovalRequired($this->reapprovalPacket($record, $plan));
+        }
         if (!is_callable($this->applyPlan)) throw new \RuntimeException('AUTHORITY_PLAN_EXECUTOR_UNAVAILABLE');
         $scope = is_callable($this->scopeIssuer) ? ($this->scopeIssuer)($record, $plan, $approvedIds) : null;
         $result = $scope === null ? ($this->applyPlan)($record, $plan, $approvedIds) : ($this->applyPlan)($record, $plan, $approvedIds, $scope);
@@ -135,6 +137,31 @@ final class AuthorityCaptureService
     {
         $left = array_values(array_unique(array_map('strval', $left))); $right = array_values(array_unique(array_map('strval', $right)));
         sort($left, SORT_STRING); sort($right, SORT_STRING); return $left === $right;
+    }
+
+    /** @return array<string,mixed> */
+    private function reapprovalPacket(CaptureRecord $record, array $plan): array
+    {
+        $candidates = [];
+        foreach (['reuse', 'create_candidates', 'update_candidates', 'relation_candidates', 'relation_reuse'] as $bucket) {
+            foreach ((array) ($plan[$bucket] ?? []) as $candidate) {
+                if (!is_array($candidate) || trim((string) ($candidate['candidate_id'] ?? '')) === '') continue;
+                $candidates[] = $candidate;
+            }
+        }
+        $ids = array_values(array_unique(array_map(static fn (array $candidate): string => (string) $candidate['candidate_id'], $candidates)));
+        sort($ids, SORT_STRING);
+        return [
+            'capture_id' => $record->captureId,
+            'plan_fingerprint' => (string) ($plan['plan_fingerprint'] ?? ''),
+            'candidate_ids' => $ids,
+            'candidates' => $candidates,
+            'dependencies' => array_values(array_filter(array_map(static fn (array $candidate): array => [
+                'candidate_id' => (string) ($candidate['candidate_id'] ?? ''),
+                'dependencies' => array_values(array_map('strval', (array) ($candidate['dependencies'] ?? []))),
+            ], $candidates), static fn (array $dependency): bool => $dependency['candidate_id'] !== '')),
+            'blockers' => (array) ($plan['blockers'] ?? []),
+        ];
     }
 
     /** @return list<array<string,mixed>> */

@@ -82,7 +82,8 @@ final class StagingAcceptanceScopeVerifier
             $entityType = $isRelation ? 'relation' : (string) ($candidate['entity_type'] ?? '');
             $subjectId = $isRelation ? (string) ($candidate['source_uuid'] ?? $candidate['source_id'] ?? '') : ($operation === 'create' ? $entityType : (string) ($candidate['canonical_uuid'] ?? $candidate['target_uuid'] ?? ''));
             $targetUuid = !$isRelation && !in_array($operation, ['create', 'ingest'], true) ? trim((string) ($candidate['canonical_uuid'] ?? $candidate['target_uuid'] ?? '')) : '';
-            $all[] = $isRelation
+            $dependencies = array_values(array_unique(array_filter(array_map('strval', (array) ($candidate['dependencies'] ?? [])))));
+            $binding = $isRelation
                 ? [
                     'candidate_id' => (string) $candidate['candidate_id'],
                     'entity_type' => 'relation',
@@ -98,9 +99,25 @@ final class StagingAcceptanceScopeVerifier
                     'expected_revision' => null,
                 ]
                 : ['candidate_id' => (string) $candidate['candidate_id'], 'entity_type' => $entityType, 'operation' => $operation, 'subject_id' => $subjectId, 'target_uuid' => $targetUuid, 'expected_revision' => !in_array($operation, ['create', 'ingest'], true) ? max(1, (int) ($candidate['expected_revision'] ?? $candidate['canonical_revision'] ?? 1)) : null];
+            $binding['dependencies'] = $dependencies;
+            $binding['dependency_fingerprint'] = hash('sha256', CommandCanonicalizer::canonicalize($dependencies));
+            $binding['candidate_payload_fingerprint'] = hash('sha256', CommandCanonicalizer::canonicalize($candidate));
+            $binding['binding_fingerprint'] = hash('sha256', CommandCanonicalizer::canonicalize($binding));
+            $all[] = $binding;
         }
         if ($all === []) throw new \RuntimeException('STAGING_CANDIDATE_SCOPE_REQUIRED');
-        $base = ['approved' => true, 'environment' => 'staging', 'capture_id' => $capture->captureId, 'capture_fingerprint' => $capture->requestFingerprint, 'operation_family' => 'governed_authority_plan', 'writer' => 'canonical_governed', 'entrypoint' => 'nhk.capture.ingest', 'intent' => (string) ($capture->context['purpose'] ?? 'AUTHORITY'), 'plan_fingerprint' => $planFingerprint, 'candidate_bindings' => $all, 'issued_at' => gmdate('c'), 'expires_at' => gmdate('c', time() + max(1, $this->ttlSeconds))];
+        $selectedIds = array_values(array_map('strval', $candidateIds));
+        sort($selectedIds, SORT_STRING);
+        $base = [
+            'approved' => true, 'environment' => 'staging', 'capture_id' => $capture->captureId,
+            'capture_fingerprint' => $capture->requestFingerprint, 'request_fingerprint' => $capture->requestFingerprint,
+            'operation_family' => 'governed_authority_plan', 'writer' => 'canonical_governed',
+            'entrypoint' => 'nhk.capture.ingest', 'intent' => (string) ($capture->context['purpose'] ?? 'AUTHORITY'),
+            'plan_fingerprint' => $planFingerprint, 'approved_candidate_ids' => $selectedIds,
+            'candidate_bindings' => $all,
+            'dependency_fingerprint' => hash('sha256', CommandCanonicalizer::canonicalize(array_map(static fn (array $binding): array => [$binding['candidate_id'] ?? '', $binding['dependencies'] ?? []], $all))),
+            'issued_at' => gmdate('c'), 'expires_at' => gmdate('c', time() + max(1, $this->ttlSeconds)),
+        ];
         $input = is_array($capture->context['planning_input'] ?? null) ? $capture->context['planning_input'] : [];
         if (!(bool) ($this->admission)($base, $capture, $input, [])) throw new \RuntimeException('STAGING_SCOPE_NOT_ADMITTED');
         $fingerprint = hash('sha256', CommandCanonicalizer::canonicalize($base));

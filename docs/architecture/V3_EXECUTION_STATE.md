@@ -1,5 +1,60 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-18 — Generic Conversational Authority staging workflow (LOCAL READY / DEPLOY PENDING)
+
+SCOPE: Removed the Atherton-specific repository authorization ledger and made
+Authority staging admission registry-driven. No Capture, Proposal, Authority,
+Graph, staging or production record was mutated; existing unrelated frontend
+changes were preserved.
+
+ROOT_CAUSE: Authority staging admission had become a static object-specific
+authorization boundary. Reapproval also returned only a code, leaving the
+operator without the fresh plan packet needed to continue on the same Capture.
+
+FIX: `AuthorityStagingAdmission` now admits only staging, canonical Capture,
+server-issued exact plan bindings, registered Authority entity types and
+registered Graph predicate endpoint pairs. The signed scope now carries the
+request fingerprint, selected candidate IDs, candidate payload fingerprints,
+dependency closure/fingerprint, endpoint UUIDs/revisions, expiry and HMAC
+binding. A changed plan raises `PLAN_REAPPROVAL_REQUIRED` with a fresh,
+machine-readable plan/candidate/dependency packet while preserving Capture ID;
+the next APPLY uses that packet's exact fingerprint and candidate IDs.
+
+ATHERTON: No Atherton/name/Capture/request/candidate constants remain in
+production runtime or repository policy. Atherton may remain only in regression
+fixtures or historical evidence.
+
+VERIFICATION: Focused Authority admission, signed scope, Capture reapproval and
+MCP transport tests pass: 36 tests / 110 assertions, with one existing PHPUnit
+deprecation. Changed-file PHP lint and `git diff --check` pass. Full plugin lint,
+broader Authority/Governance/Graph/MCP suites and secret review remain before
+checkpoint commit. Deployment, live bootstrap and live acceptance are pending.
+
+STATUS: `AUTHORITY_WORKFLOW_GENERIC_LOCAL_READY / DEPLOY_PENDING / SEMANTIC_MUTATION_NONE`
+
+# Checkpoint — 2026-09-18 — Live hero empty-state diagnosis (LOCAL FIX / DEPLOY PENDING)
+
+LIVE FINDING: Staging served the new hero copy and slider assets, but the
+homepage rendered `Kho ảnh đang được bổ sung.` with zero slides and no
+controls. `/thu-vien/` had eligible public images. The runtime composition
+root constructed `HomeSemanticQuery` without a gallery; the gallery was wired
+later by `FrontendSemanticBootstrap`, so the original hero selection stage had
+no candidates.
+
+FIX: `FrontendSemanticBootstrap` now builds the presentation-only hero
+candidate list from the existing read-only Media repository plus public gallery
+projection, then applies the exact manual option/filter and deterministic
+selector. No Media, MediaUsage, semantic identity, relation or database state
+was changed. The stale homepage contract test was updated to the approved new
+hero copy.
+
+VERIFICATION: Focused Home/Frontend suite passes 91 tests / 839 assertions
+with existing warning/deprecations; changed PHP lint, JS syntax, diff check and
+changed-scope secret scan pass. The live site cannot show this local fix until
+the owner deploys/pulls it; no push/pull was performed.
+
+STATUS: `HERO_EMPTY_RUNTIME_ROOT_CAUSE_FIXED_LOCAL / LIVE_DEPLOYMENT_PENDING / SEMANTIC_MUTATION_NONE`
+
 # Checkpoint — 2026-09-18 — Homepage hero slider presentation slice (LOCAL READY / DEPLOY PENDING)
 
 SCOPE: Added a presentation-only homepage hero slider with Vietnamese-first

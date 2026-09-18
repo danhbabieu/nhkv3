@@ -15,7 +15,7 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString('NHK_V3_Home_Page_Query', $frontPage);
         self::assertStringNotContainsString('new WP_Query', $frontPage);
         self::assertStringContainsString('nhk_v3_home_semantic_modules', $query);
-        self::assertStringContainsString('<br> <em>mang một câu chuyện.</em>', $frontPage);
+        self::assertStringContainsString('<br> <em>dành cho người chơi và sưu tầm.</em>', $frontPage);
     }
 
     public function test_public_discovery_links_use_vietnamese_hubs_and_not_technical_archives(): void

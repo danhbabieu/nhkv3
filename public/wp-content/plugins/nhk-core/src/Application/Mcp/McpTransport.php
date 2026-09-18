@@ -10,7 +10,7 @@ use NHK\Core\Application\Media\{ImageIngestEntrypoint, MediaBatchUploadService, 
 use NHK\Core\Application\WordPress\{CategoryGateway, EditorialDraftGateway};
 use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
 use NHK\Core\Application\PublicIdentity\PublicUrlMaintenanceService;
-use NHK\Core\Application\Capture\{AuthorityCaptureService, EditorialCaptureContinuationService, EditorialCaptureCoordinator};
+use NHK\Core\Application\Capture\{AuthorityCaptureService, EditorialCaptureContinuationService, EditorialCaptureCoordinator, PlanReapprovalRequired};
 use NHK\Core\Application\Runtime\{SemanticWritePolicyResolver, SemanticWritePolicyViolation};
 use NHK\Core\Domain\Knowledge\DependencyValidationException;
 use NHK\Core\Infrastructure\Mcp\ChatGptMcpGatewayException;
@@ -96,6 +96,12 @@ final class McpTransport
                 'isError' => true,
                 'structuredContent' => ['error' => $error->toArray()],
                 'content' => [['type' => 'text', 'text' => $error->reasonCode]],
+            ]]];
+        } catch (PlanReapprovalRequired $error) {
+            return ['status' => 200, 'body' => ['jsonrpc' => '2.0', 'id' => $id, 'result' => [
+                'isError' => true,
+                'structuredContent' => ['error' => ['code' => 'PLAN_REAPPROVAL_REQUIRED', 'reapproval' => $error->packet]],
+                'content' => [['type' => 'text', 'text' => 'PLAN_REAPPROVAL_REQUIRED']],
             ]]];
         } catch (\InvalidArgumentException $error) {
             if (in_array($error->getMessage(), ['PLAN_REAPPROVAL_REQUIRED', 'APPROVED_CANDIDATE_UNKNOWN', 'APPROVED_DEPENDENCY_MISSING', 'AUTHORITY_PURPOSE_REQUIRED', 'AUTHORITY_PURPOSE_CONFLICT', 'AUTHORITY_APPROVAL_PACKET_REQUIRED', 'AUTHORITY_APPROVAL_PACKET_INVALID'], true)) return ['status' => 200, 'body' => ['jsonrpc' => '2.0', 'id' => $id, 'result' => ['isError' => true, 'structuredContent' => ['error' => ['code' => $error->getMessage()]], 'content' => [['type' => 'text', 'text' => $error->getMessage()]]]]];

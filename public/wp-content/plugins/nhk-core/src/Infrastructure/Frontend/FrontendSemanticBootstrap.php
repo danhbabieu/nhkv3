@@ -7,6 +7,7 @@ use NHK\Core\Application\Collector\{CollectorCoverageAudit, CollectorProfileQuer
 use NHK\Core\Application\Entity\{EntityMediaProjection, PublicEntityEligibilityPolicy, PublicIdentityContract, PublicRouteResolver, SemanticDossierCoverageAudit, SemanticDossierQuery};
 use NHK\Core\Application\Graph\{GraphService, PredicateTraversalPolicy, RelatedSemanticQuery, StructuralContextQuery};
 use NHK\Core\Application\Knowledge\{EntityKnowledgeProjection, KnowledgePageQuery};
+use NHK\Core\Application\Home\HomeHeroMediaSelector;
 use NHK\Core\Application\Projection\{ClaimProjectionService, ClaimScopeResolver, GraphProjectionPolicy, LiveLedgerProjectionBuilder, ProjectionEventSubscriber, ProjectionInvalidationService};
 use NHK\Core\Application\Media\{PublicMediaAssetDelivery, PublicMediaArticleLinkResolver, PublicMediaGalleryQuery};
 use NHK\Core\Domain\Authority\{AuthorityEntity, CanonicalEntityTypeCatalog, EntityTypeRegistry};
@@ -112,11 +113,21 @@ final class FrontendSemanticBootstrap
         $coverageAudit = new SemanticDossierCoverageAudit($types, $authority, static fn(AuthorityEntity $entity): array => $dossier->forEntity($entity));
         (new SemanticDossierCoverageAdminPage($coverageAudit, new CollectorCoverageAudit($authority, $collectorProfile), new \NHK\Core\Application\Collector\CollectorAuthoritySeedReconciler($authority)))->register();
 
-        add_filter('nhk_v3_home_semantic_modules', static function(array $modules) use ($status, $gallery, $knowledgeArchive): array {
+        add_filter('nhk_v3_home_semantic_modules', static function(array $modules) use ($status, $gallery, $knowledgeArchive, $media): array {
             if ($status->mediaStorageReady()) {
                 $mediaArchive = $gallery->archive(1, 8);
                 $modules['media'] = $mediaArchive['items'];
                 $modules['media_total'] = (int) ($mediaArchive['total'] ?? count($modules['media']));
+                $heroCandidates = [];
+                foreach ($media->list() as $mediaItem) {
+                    $visual = $gallery->forMedia($mediaItem->canonicalId);
+                    if (!is_array($visual) || ($visual['has_real_image'] ?? false) !== true) continue;
+                    $visual['_canonical_id'] = $mediaItem->canonicalId;
+                    $heroCandidates[] = $visual;
+                }
+                $manualIds = function_exists('get_option') ? (array) get_option('nhk_v3_home_hero_media_ids', []) : [];
+                if (function_exists('apply_filters')) $manualIds = apply_filters('nhk_v3_home_hero_media_ids', $manualIds);
+                $modules['hero_media'] = (new HomeHeroMediaSelector())->select((array) $manualIds, $heroCandidates);
             }
             if ($status->knowledgeStorageReady()) {
                 $modules['knowledge'] = [];
