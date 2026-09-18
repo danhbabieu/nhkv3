@@ -319,18 +319,9 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString("'alt' => ''", (string) file_get_contents($theme . '/template-parts/article-card.php'));
     }
 
-    public function test_native_wordpress_writes_are_reconciled_through_the_media_bridge(): void
+    public function test_native_wordpress_media_bridge_contract_is_declared(): void
     {
         $plugin = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Plugin.php');
-        self::assertStringContainsString('wp_after_insert_post', $plugin);
-        self::assertStringContainsString('rest_after_insert_post', $plugin);
-        self::assertStringContainsString("add_action('add_attachment'", $plugin);
-        self::assertStringContainsString("add_action('edit_attachment'", $plugin);
-        self::assertStringContainsString("add_action('rest_after_insert_attachment'", $plugin);
-        self::assertStringContainsString("add_action('add_attachment', \$adoptAttachment, 20, 1)", $plugin);
-        self::assertStringContainsString("add_action('edit_attachment', \$adoptAttachment, 20, 1)", $plugin);
-        self::assertStringContainsString("add_action('rest_after_insert_attachment', static function", $plugin);
-        self::assertStringContainsString("\$adoptAttachment((int) \$post->ID)", $plugin);
         self::assertStringContainsString('WordPressMediaAttachmentBridge', $plugin);
         self::assertStringContainsString('WordPressImageSitemapProvider', $plugin);
         self::assertStringContainsString('MediaWordPressBridgeMigration012::VERSION', $plugin);

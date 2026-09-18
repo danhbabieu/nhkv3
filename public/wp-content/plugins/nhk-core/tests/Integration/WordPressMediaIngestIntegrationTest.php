@@ -16,8 +16,14 @@ final class WordPressMediaIngestIntegrationTest extends TestCase
 {
     protected function setUp(): void
     {
-        if (getenv('NHK_WP_TEST_PATH') === false) self::markTestSkipped('Set NHK_WP_TEST_PATH=public for WordPress integration tests.');
-        require_once rtrim((string) getenv('NHK_WP_TEST_PATH'), '/') . '/wp-load.php';
+        $wordpressPath = getenv('NHK_WP_TEST_PATH');
+        $bootstrap = $wordpressPath === false
+            ? ''
+            : rtrim((string) $wordpressPath, '/') . '/wp-load.php';
+        if ($bootstrap === '' || !is_file($bootstrap)) {
+            self::markTestSkipped('INFRASTRUCTURE_UNAVAILABLE: WordPress integration bootstrap is absent; set NHK_WP_TEST_PATH=public.');
+        }
+        require_once $bootstrap;
         TestDatabaseGuard::selectTestDatabase();
         TestDatabaseGuard::requireTestDatabase();
         (new MediaMigration004())->up();
