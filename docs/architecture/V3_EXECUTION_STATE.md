@@ -12037,6 +12037,52 @@ attempted.
 
 STATUS: `SLICE_2_ARTICLE_MEDIA_ORDERING_LOCAL_READY / LIVE_ACCEPTANCE_BLOCKED`.
 
+# Checkpoint — 2026-09-18 — Slice 4 Task 2 canonical attachment readback fix (LOCAL ONLY)
+
+SCOPE: Closed the review findings without adding a writer or changing the
+Media/MediaAsset/MediaUsage boundaries. `WpdbMediaAssetRepository::update()`
+now persists checksum together with storage, dimensions, visibility and
+metadata through the existing repository update path. Attachment readback now
+computes current physical checksum, byte size, dimensions and MIME, then
+requires active ready Media, matching mapping/asset storage and matching
+physical facts before returning `VERIFIED`; edited or stale bytes return typed
+`INCONSISTENT`. A missing canonical bridge is no longer reported as verified.
+
+VERIFICATION: RED tests were 5 tests / 7 assertions with 2 expected failures.
+GREEN focused/Contract/guarded integration suites are 85 tests / 777
+assertions, with 8 honest infrastructure skips, 2 warnings and 1
+deprecation. `composer lint`, changed-file PHP lint, `git diff --check` and
+changed-scope secret review pass. No staging/live acceptance, database write,
+upload, Video, Graph mutation, deploy or push was performed.
+
+COMMITS: tests `d27a7e34` and `8bef687b`; production fix `deb42a19`.
+
+STATUS: `SLICE_4_TASK_2_LOCAL_READY / LIVE_ACCEPTANCE_BLOCKED`.
+
+# Checkpoint — 2026-09-18 — Slice 4 Task 2 canonical attachment reconciliation (LOCAL ONLY)
+
+SCOPE: Implemented edited WordPress attachment re-adoption through the existing
+attachment mapping boundary. `MediaService::reconcileAsset()` updates the
+mapped asset in place while preserving MediaAsset UUID, Media ownership,
+visibility and all MediaUsage rows. `WordPressMediaAttachmentIngestor::read()`
+now joins physical readback with canonical mapping and distinguishes
+`VERIFIED`, `UNAVAILABLE`, `INCONSISTENT` and `NOT_FOUND`. MCP continues to
+return the typed readback without converting inconsistency to null.
+
+VERIFICATION: Focused Unit/guarded Integration/Frontend/MCP plus Contract suites
+PASS — 82 tests / 797 assertions, with 8 guarded integration skips, 2 warnings
+and 1 PHPUnit deprecation. PHP lint, `composer lint`, `git diff --check` and
+changed-scope secret review pass. Full Unit is 1,821 tests / 8,932 assertions
+with four unrelated baseline failures: remote deployment reason expectation and
+three missing public-media fixture assertions. Guarded WordPress integration is
+`INFRASTRUCTURE_UNAVAILABLE` because the required WordPress integration
+environment is not configured. No staging/live acceptance, database write,
+upload, Video, Graph mutation, deploy or push was performed.
+
+COMMIT: `e9a7c571 fix: reconcile edited wordpress attachments with canonical media`.
+
+STATUS: `SLICE_4_TASK_2_LOCAL_READY / LIVE_ACCEPTANCE_BLOCKED`.
+
 # Checkpoint — 2026-09-18 — Slice 3 Task 2 final identity/wiring review fix (LOCAL ONLY)
 
 SCOPE: Closed the final review findings without broadening the projection
@@ -12065,6 +12111,46 @@ COMMITS: `d2b5a8aa` (RED regressions), `2dea903c` (ruling-aligned test
 expectations), `4351e00d` (production fix).
 
 STATUS: `SLICE_3_TASK_2_FINAL_REVIEW_FIX_LOCAL_READY / FORMAL_ACCEPTANCE_PENDING`.
+
+# Checkpoint — 2026-09-18 — Slice 3 Task 2 formal acceptance (LOCAL ONLY)
+
+SCOPE: Independent final review accepted the complete Slice 3 Task 2 range.
+Contextual Media metadata projections preserve Usage/subject/neutral/Attachment
+precedence where identity is proven, fail closed with `MISSING` when required,
+and do not invent public URLs, roles, relations or mutation paths. Article
+cross-subject representative selection is intentionally unavailable without an
+explicit subject identity. VisualSupport has no valid current runtime consumer;
+the `NO_RUNTIME_CONSUMER` ruling remains in force.
+
+VERIFICATION: Focused projection and Contract suites pass; PHP lint,
+`composer lint`, `git diff --check` and changed-scope secret review pass. No
+staging/live acceptance, deployment, database write, upload, Video or Graph
+mutation was performed.
+
+REVIEW: Independent reviewer `01a0b250-a950-7170-b668-3a10376d6807` returned
+`ACCEPTED` for the full Task 2 range through `730b64a7`.
+
+STATUS: `SLICE_3_TASK_2_ACCEPTED_LOCAL / LIVE_ACCEPTANCE_BLOCKED`.
+
+# Checkpoint — 2026-09-18 — Slice 3 complete (LOCAL ONLY)
+
+SCOPE: Completed Slice 3 Task 3 public contract and non-regression coverage.
+Tests cover contextual metadata precedence, explicit `MISSING`, private-source
+exclusion, Dictionary lexical-definition separation and delegated-concept
+non-indexability, plus VisualSupport/public asset visibility and reverse
+reconciliation invariants. No production code or semantic vocabulary changed
+in Task 3.
+
+VERIFICATION: Task 3 focused/Contract suites pass at 32 tests / 169
+assertions. Full Unit is 1,818 tests with four documented unrelated baseline
+failures. `composer lint`, changed-file PHP lint, `git diff --check` and
+changed-scope secret review pass. No staging/live acceptance, deployment,
+database write, upload, Video or Graph mutation was performed.
+
+REVIEW: Task 3 independent reviewer `01a0b256-e014-7911-8320-a519cf9b00f1`
+returned `ACCEPTED` for commit `65d156d9`.
+
+STATUS: `SLICE_3_COMPLETE_LOCAL / LIVE_ACCEPTANCE_BLOCKED`.
 
 # Checkpoint — 2026-09-18 — Slice 3 Task 2 contextual media metadata fix round (LOCAL ONLY)
 
