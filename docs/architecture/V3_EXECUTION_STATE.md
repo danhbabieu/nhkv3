@@ -13332,11 +13332,12 @@ truth store was added. No migration was required because the existing JSON
 receipt/context boundary supports append-only attempts and derived current
 state.
 
-VERIFICATION: Focused implementation selection passes 345 tests / 1,319
+VERIFICATION: Focused changed-path selection passes 48 tests / 205
 assertions. Contract suite passes 6 tests / 48 assertions. Full Unit suite
-passes 1,889 tests / 9,384 assertions with one unrelated pre-existing
+executes 1,889 tests / 9,384 assertions with two unrelated pre-existing
 `DemoCutoverCliContractTest` diagnostic mismatch
-(`REMOTE_DEPLOYMENT_FAILED` versus `REMOTE_DEPLOYMENT_CONFIG_REQUIRED`).
+(`REMOTE_DEPLOYMENT_FAILED` versus `REMOTE_DEPLOYMENT_CONFIG_REQUIRED`) and
+`NhkDeployVerifyCliContractTest` fail-closed mismatch.
 Changed-file PHP lint, Composer lint, `git diff --check` and secret review
 pass. Integration remains environment-blocked by missing WordPress test
 bootstrap/`NHK_WP_TEST_PATH` prerequisites and undefined WP test functions;
