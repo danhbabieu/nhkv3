@@ -11,6 +11,7 @@ use NHK\Core\Application\Video\{VideoPublicContextSelector, VideoUrlPolicy};
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Contracts\Media\MediaRepository;
 use NHK\Core\Contracts\Video\VideoRepository;
+use NHK\Core\Contracts\Knowledge\KnowledgeRepository;
 use NHK\Core\Domain\Authority\EntityTypeRegistry;
 use NHK\Core\Domain\Seo\SeoReadinessResult;
 use NHK\Core\Shared\Migration\MigrationStatus;
@@ -28,11 +29,12 @@ final class HomeSemanticQuery
         private ?PublicEntityCollectionQuery $collection = null,
         private ?PublicMediaGalleryQuery $gallery = null,
         private ?KnowledgePageQuery $knowledge = null,
+        private ?KnowledgeRepository $claims = null,
     ) {}
 
     public function extend(array $modules): array
     {
-        foreach (['entities','media','videos','knowledge','hubs','clock_groups','explore_next'] as $key) if (!isset($modules[$key]) || !is_array($modules[$key])) $modules[$key] = [];
+        foreach (['entities','media','videos','knowledge','hubs','clock_groups','explore_next','latest_feed'] as $key) if (!isset($modules[$key]) || !is_array($modules[$key])) $modules[$key] = [];
         foreach (['clock_groups_total', 'media_total', 'videos_total'] as $key) if (!isset($modules[$key])) $modules[$key] = 0;
 
         if ($this->ready('authority')) {
@@ -126,8 +128,77 @@ final class HomeSemanticQuery
                 $modules['knowledge'][] = ['text' => (string) $item['text'], 'type' => (string) ($item['type'] ?? '')];
             }
         }
+        $modules['latest_feed'] = $this->latestFeed($modules);
         $modules['hubs'] = PublicNavigationDefinition::sortHubItems($modules['hubs']);
         return $modules;
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function latestFeed(array $modules): array
+    {
+        $items = [];
+        foreach ($this->videos->list() as $video) {
+            if (!$this->ready('video') || !$video->active || !$video->hasValidPublicReference()) continue;
+            $metadata = is_array($video->metadata) ? $video->metadata : [];
+            $source = is_array($metadata['source_snapshot'] ?? null) ? $metadata['source_snapshot'] : (is_array($metadata['source'] ?? null) ? $metadata['source'] : []);
+            $editorial = is_array($metadata['editorial'] ?? null) ? $metadata['editorial'] : [];
+            $url = (new PublicSeoProjection())->project((new VideoUrlPolicy())->project($video, new VideoPublicContextSelector()), ['type' => 'VideoObject'])['internal_link'] ?? null;
+            if (!is_string($url) || $url === '' || (($source['availability'] ?? 'unknown') !== 'available')) continue;
+            $thumbnail = (new \NHK\Core\Application\Video\VideoThumbnailSelector())->fromSource($source);
+            $items[] = $this->feedItem('video', 'Video', (string) (($editorial['title'] ?? '') ?: $video->title ?: 'Video'), $url, (string) ($this->videoPublishedAt($video) ?: $video->createdAt), (string) ($editorial['summary'] ?? ''), $thumbnail['url'] ?? null, $thumbnail['width'] ?? null, $thumbnail['height'] ?? null, $video->canonicalId);
+        }
+        foreach ($this->media->list() as $media) {
+            if (!$this->ready('media') || !$media->active || $media->readiness !== 'ready' || $media->isSystemPlaceholder()) continue;
+            $visual = null;
+            foreach ((array) ($modules['media'] ?? []) as $candidate) if (is_array($candidate) && ($candidate['title'] ?? '') === $media->canonicalName) { $visual = $candidate; break; }
+            $items[] = $this->feedItem('media', 'Ảnh', $media->canonicalName, $visual['article_url'] ?? (function_exists('home_url') ? \home_url('/thu-vien/') : '/thu-vien/'), (string) ($media->createdAt ?? ''), (string) ($visual['summary'] ?? 'Ảnh tư liệu trong kho hình ảnh NHK.'), $visual['image_url'] ?? null, $visual['width'] ?? null, $visual['height'] ?? null, $media->canonicalId);
+        }
+        if ($this->claims !== null && $this->ready('knowledge')) foreach ($this->claims->list() as $claim) {
+            if (!$claim->active || !$claim->isPublic()) continue;
+            $metadata = is_array($claim->provenance['metadata'] ?? null) ? $claim->provenance['metadata'] : [];
+            $subjectId = trim((string) ($metadata['subject_uuid'] ?? $metadata['subject_id'] ?? $metadata['canonical_subject_uuid'] ?? ''));
+            $url = $subjectId !== '' ? $this->publicEntityUrl($subjectId) : null;
+            if ($url === null) continue;
+            $items[] = $this->feedItem('knowledge', 'Tri thức', $this->shorten($claim->claimText, 16), $url, (string) ($claim->createdAt ?? ''), $claim->claimText, null, null, null, $claim->canonicalId);
+        }
+        if ($this->ready('authority')) foreach ($this->types->all() as $definition) foreach ($this->authority->listByType($definition->type, true) as $entity) {
+            if (!$entity->active() || $entity->createdAt === null) continue;
+            $detail = $this->collection()->detailForEntity($entity);
+            if (!is_array($detail) || trim((string) ($detail['url'] ?? '')) === '') continue;
+            $representative = $detail['media']['representative'] ?? [];
+            $labels = ['brand' => 'Thương hiệu', 'model' => 'Mẫu', 'variant' => 'Mẫu', 'movement' => 'Bộ máy', 'music' => 'Bản nhạc', 'classification' => 'Nhóm đồng hồ', 'component' => 'Linh kiện', 'specimen' => 'Hiện vật', 'product' => 'Sản phẩm'];
+            $items[] = $this->feedItem($entity->entityType, $labels[$entity->entityType] ?? 'Hồ sơ', $entity->canonicalName, (string) $detail['url'], $entity->createdAt, (string) ($detail['description'] ?? ''), $representative['url'] ?? null, $representative['width'] ?? null, $representative['height'] ?? null, $entity->canonicalId);
+        }
+        $items = LatestFirstOrder::sort($items, static fn (array $item): ?string => (string) ($item['timestamp'] ?? ''), static fn (array $item): ?string => null, static fn (array $item): string => (string) ($item['tie_breaker'] ?? ''));
+        foreach ($items as &$item) unset($item['tie_breaker']);
+        return array_slice($items, 0, 12);
+    }
+
+    private function publicEntityUrl(string $id): ?string
+    {
+        $entity = $this->authority->findByCanonicalId($id);
+        if ($entity === null || !$entity->active()) return null;
+        $detail = $this->collection()->detailForEntity($entity);
+        $url = is_array($detail) ? trim((string) ($detail['url'] ?? '')) : '';
+        return $url !== '' ? $url : null;
+    }
+
+    private function feedItem(string $type, string $label, string $title, string $url, string $timestamp, string $summary, mixed $image, mixed $width, mixed $height, string $tieBreaker): array
+    {
+        $plainSummary = function_exists('wp_strip_all_tags') ? \wp_strip_all_tags($summary) : strip_tags($summary);
+        $normalizedWidth = is_numeric($width) ? (int) $width : null;
+        $normalizedHeight = is_numeric($height) ? (int) $height : null;
+        $orientation = $normalizedWidth !== null && $normalizedHeight !== null && $normalizedWidth > 0 && $normalizedHeight > 0
+            ? ($normalizedHeight > $normalizedWidth ? 'portrait' : ($normalizedWidth === $normalizedHeight ? 'square' : 'landscape'))
+            : 'unknown';
+        return ['type' => $type, 'label' => $label, 'title' => trim($title), 'url' => $url, 'timestamp' => $timestamp, 'summary' => $this->shorten($plainSummary, 24), 'image_url' => is_string($image) && $image !== '' ? $image : null, 'orientation' => $orientation, 'width' => $normalizedWidth, 'height' => $normalizedHeight, 'tie_breaker' => $tieBreaker];
+    }
+
+    private function shorten(string $value, int $words): string
+    {
+        if (function_exists('wp_trim_words')) return (string) \wp_trim_words($value, $words);
+        $parts = preg_split('/\s+/u', trim($value), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        return count($parts) > $words ? implode(' ', array_slice($parts, 0, $words)) . '…' : trim($value);
     }
 
     private function ready(string $domain): bool

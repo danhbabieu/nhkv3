@@ -33,14 +33,14 @@ final class FrontendPresentationContractTest extends TestCase
         self::assertStringContainsString('$hubLabel', $source);
     }
 
-    public function test_homepage_places_compact_latest_module_in_hero_and_curated_block_after_hero(): void
+    public function test_homepage_places_unified_latest_feed_before_curated_block(): void
     {
         $source = $this->read('front-page.php');
-        self::assertStringContainsString('class="home-latest-hero"', $source);
-        self::assertStringContainsString('array_slice($home[\'latest\'], 0, 4)', $source);
+        self::assertStringContainsString('class="home-latest-feed"', $source);
+        self::assertStringContainsString('$home[\'latest_feed\']', $source);
+        self::assertStringContainsString('latest-feed-card', $source);
         self::assertStringContainsString('id="featured-title"', $source);
-        self::assertLessThan(strpos($source, 'class="home-semantic-section home-hubs"'), strpos($source, 'class="featured-section"'));
-        self::assertLessThan(strpos($source, 'class="hero-media-column"'), strpos($source, 'class="home-latest-hero"'));
+        self::assertLessThan(strpos($source, 'class="featured-section"'), strpos($source, 'class="home-latest-feed"'));
     }
 
     public function test_entity_detail_renders_dossier_knowledge_gallery_and_path_aware_related_content(): void
