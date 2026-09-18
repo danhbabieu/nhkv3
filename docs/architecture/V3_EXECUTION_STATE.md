@@ -1,5 +1,57 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-18 — Performance Phase 3.6 deployed runtime parity audit (READ-ONLY / LEGACY METADATA BLOCKER CONFIRMED)
+
+SCOPE: Read-only staging audit through the canonical WordPress bootstrap,
+allowlisted maintenance health surface, SSH file hashes/markers, runtime
+selector trace and homepage GET. No deployment, restart/reload, source sync,
+database write, semantic mutation or generic WordPress update was performed.
+
+RUNTIME IDENTITY: Staging bootstrap returned `source_revision` and
+`build_revision` `c236e537f230b849d297e6b881415ad1e442fbe7`, a descendant of the
+requested Phase 3 commit `e6e26e89e72a52964fe9d4748220ed9e4a494654`. Runtime
+identity was internally populated with runtime `0.1.0`, build identity
+`4b1a26315401ad594530ab7cc3f379a07b6a4d6ecfe529cf235b8205d2cbe654`, a valid
+documentation version, manifest hash, catalog/resource versions and release
+identity. Health passed with schema 22/22 and all storage/application/REST
+layers ready. The exact brief revision is not the deployed revision, but the
+deployed revision contains the Phase 3 commit.
+
+LIVE FILE PARITY: SHA-256 hashes for `VideoThumbnailSelector.php`,
+`YouTubeDataApiClient.php`, `YouTubeSourceSnapshot.php`, `HomeSemanticQuery.php`
+and `front-page.php` matched the local checkout. Live markers include
+`thumbnail_candidates`, `thumbnail_presentation`, compact priority
+`mqdefault → hqdefault → sddefault`, and `presentationFromSource`; the Home
+query calls the selector. Composer autoload exists and the live file/class
+path is present.
+
+TRACE: For homepage-rendered Video IDs `wcTQ0OmRSPQ` and `cl5SdBfm5uo`, the
+canonical source metadata contains `thumbnail_selection` and `thumbnail_urls`
+but no `thumbnail_candidates` or `thumbnail_presentation`. The live selector
+therefore falls back to the persisted canonical selection and returns
+`maxresdefault.jpg`, 1280×720, for both. The final HTML GET from staging
+contains the same `maxresdefault.jpg` URLs. Final assignment owner is
+`HomeSemanticQuery::presentationFromSource()` →
+`VideoThumbnailSelector::fromSource()` compatibility fallback; no alternate
+legacy helper or template overwrite was found.
+
+OPCACHE/PROCESS: Web workers are `/opt/alt/php84/usr/bin/lsphp` (LSAPI,
+PHP 8.4.11) with two observable generations. Web-level OPcache flags and
+reload requirement were not exposed by the available read-only surface;
+`PHP_PROCESS_RELOAD_NEEDED=UNVERIFIED`. No process was killed or reloaded.
+
+ROOT_CAUSE: `LEGACY_METADATA`. `LEGACY_SYNC_REQUIRED=UNDETERMINED` remains
+because this phase does not authorize source sync; `SYNC_OWNER` and exact
+governed scope remain unassigned. No application fix is justified.
+
+LOCAL VERIFICATION: Focused selector/home/frontend tests pass 44 tests / 195
+assertions with one existing warning and 25 PHPUnit deprecations. Changed-file
+PHP lint and `git diff --check` pass. Status:
+`PERFORMANCE_PHASE3_6_RUNTIME_PARITY_COMPLETE=YES` for code-path parity and
+root-cause classification; compact live acceptance remains pending governed
+metadata reconciliation/deployment policy, so no oversized-count reduction is
+claimed.
+
 # Checkpoint — 2026-09-18 — Performance Phase 3 live recheck (READ-ONLY / DEPLOYMENT BLOCKER CONFIRMED)
 
 SCOPE: Rechecked the staging homepage and required public routes without any
