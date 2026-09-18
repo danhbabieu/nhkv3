@@ -6,9 +6,11 @@ namespace NHK\Core\Tests\Unit;
 use NHK\Core\Application\Governance\GovernanceService;
 use NHK\Core\Application\Video\VideoSourceRefreshCommand;
 use NHK\Core\Application\Video\VideoService;
+use NHK\Core\Application\Governance\StagingAcceptanceScopeVerifier;
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Video\{Video, VideoException};
-use NHK\Core\Domain\Governance\Proposal;
+use NHK\Core\Domain\Governance\{Proposal, ProposalState};
+use NHK\Core\Domain\Capture\CaptureRecord;
 use NHK\Core\Shared\Uuid\UuidCodec;
 use PHPUnit\Framework\TestCase;
 
@@ -54,12 +56,64 @@ final class VideoSourceRefreshCommandTest extends TestCase
     public function testSourceFailureDoesNotCreateProposal(): void
     {
         $id = UuidCodec::newV7();
-        $repo = new RefreshVideoRepository(new Video($id, 'youtube', 'abc12345678', 'https://www.youtube.com/watch?v=abc12345678', '', ['source' => ['source_revision' => 1]]));
+        $repo = new RefreshVideoRepository(new Video($id, 'youtube', '2EMuIG2RfTg', 'https://www.youtube.com/watch?v=2EMuIG2RfTg', '', ['source' => ['source_revision' => 1]]));
         $proposals = new RefreshProposalRepository();
         $command = new VideoSourceRefreshCommand($repo, new GovernanceService($proposals), static function (): array { throw new VideoException('SOURCE_TIMEOUT'); });
         $result = $command->prepare($id, 1, 1, 'failure-1');
         self::assertSame('SOURCE_UNAVAILABLE', $result['status']);
         self::assertCount(0, $proposals->items);
+    }
+
+    public function testStagingRequiresServerIssuedAcceptanceAndRejectsTamperingBeforeProposalCreation(): void
+    {
+        $id = UuidCodec::newV7();
+        $repo = new RefreshVideoRepository(new Video($id, 'youtube', 'abc12345678', 'https://www.youtube.com/watch?v=abc12345678', '', ['source' => ['source_revision' => 1]]));
+        $proposals = new RefreshProposalRepository();
+        $capture = new CaptureRecord(UuidCodec::newV7(), 'capture-refresh', hash('sha256', 'capture-refresh'), 'SEMANTICS_RECONCILED', 'IN_PROGRESS', null, null, [], [], [], []);
+        $verifier = new StagingAcceptanceScopeVerifier(static fn (): string => 'staging', 'test-secret', static fn (): bool => true, can: static fn (): bool => true);
+        $request = ['video_id' => $id, 'expected_revision' => 1, 'expected_source_revision' => 1, 'idempotency_key' => 'refresh-scope-1'];
+        $scope = $verifier->issueForVideoSourceRefresh($capture, $request);
+        $command = new VideoSourceRefreshCommand($repo, new GovernanceService($proposals), static fn (): array => ['availability' => 'available', 'source_title' => 'Fresh source'], $verifier);
+
+        $this->expectExceptionMessage('STAGING_SCOPE_NOT_APPROVED');
+        $tampered = $scope;
+        $tampered['target_uuid'] = UuidCodec::newV7();
+        $command->prepare($id, 1, 1, 'refresh-scope-1', $tampered);
+        self::assertCount(0, $proposals->items);
+    }
+
+    public function testMissingStagingAcceptanceFailsClosedBeforeFetch(): void
+    {
+        $id = UuidCodec::newV7();
+        $repo = new RefreshVideoRepository(new Video($id, 'youtube', '2EMuIG2RfTg', 'https://www.youtube.com/watch?v=2EMuIG2RfTg', '', ['source' => ['source_revision' => 1]]));
+        $proposals = new RefreshProposalRepository();
+        $verifier = new StagingAcceptanceScopeVerifier(static fn (): string => 'staging', 'test-secret', static fn (): bool => true, can: static fn (): bool => true);
+        $fetchCalled = false;
+        $command = new VideoSourceRefreshCommand($repo, new GovernanceService($proposals), static function () use (&$fetchCalled): array { $fetchCalled = true; return []; }, $verifier);
+        $this->expectExceptionMessage('STAGING_SCOPE_REQUIRED');
+        $command->prepare($id, 1, 1, 'missing-scope');
+        self::assertFalse($fetchCalled);
+        self::assertCount(0, $proposals->items);
+    }
+
+    public function testValidServerIssuedAcceptanceIsBoundToTheRequest(): void
+    {
+        $id = UuidCodec::newV7();
+        $repo = new RefreshVideoRepository(new Video($id, 'youtube', '2EMuIG2RfTg', 'https://www.youtube.com/watch?v=2EMuIG2RfTg', '', ['source' => ['source_revision' => 1]]));
+        $proposals = new RefreshProposalRepository();
+        $capture = new CaptureRecord(UuidCodec::newV7(), 'capture-refresh-valid', hash('sha256', 'capture-refresh-valid'), 'SEMANTICS_RECONCILED', 'IN_PROGRESS', null, null, [], [], [], []);
+        $verifier = new StagingAcceptanceScopeVerifier(static fn (): string => 'staging', 'test-secret', static fn (): bool => true, can: static fn (): bool => true);
+        $scope = $verifier->issueForVideoSourceRefresh($capture, ['video_id' => $id, 'expected_revision' => 1, 'expected_source_revision' => 1, 'idempotency_key' => 'refresh-valid']);
+        self::assertTrue($verifier->verifyVideoSourceRefresh($scope, $id, 1, 1, 'refresh-valid'));
+        $command = new VideoSourceRefreshCommand($repo, new GovernanceService($proposals), static fn (): array => throw new VideoException('SOURCE_TIMEOUT'), $verifier);
+        $result = $command->prepare($id, 1, 1, 'refresh-valid', $scope);
+        self::assertSame('SOURCE_UNAVAILABLE', $result['status']);
+        self::assertCount(0, $proposals->items);
+        $proposal = new Proposal(UuidCodec::newV7(), $id, 'source_refresh', [
+            'capture_id' => $scope['capture_id'], 'capture_fingerprint' => $scope['capture_fingerprint'],
+            'request_fingerprint' => $scope['request_fingerprint'], 'staging_acceptance' => $scope,
+        ], 'content', 1, 'dependency', ProposalState::APPROVED, idempotencyKey: 'refresh-valid', entityType: 'video');
+        self::assertTrue($verifier->verifyProposal($scope, $proposal));
     }
 
     public function testApplyChangesOnlySourceMetadataAndKeepsIdentityAndEditorialState(): void

@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Video;
 
 use NHK\Core\Application\Governance\GovernanceService;
+use NHK\Core\Application\Governance\StagingAcceptanceScopeVerifier;
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Governance\{CommandCanonicalizer, Proposal};
 use NHK\Core\Domain\Video\{VideoException, YouTubeSourceSnapshot, YouTubeVideoIdentity};
@@ -16,16 +17,20 @@ use NHK\Core\Shared\Uuid\UuidCodec;
 final class VideoSourceRefreshCommand
 {
     /** @param callable(YouTubeVideoIdentity):array<string,mixed> $fetch */
-    public function __construct(private VideoRepository $videos, private GovernanceService $governance, private $fetch)
+    public function __construct(private VideoRepository $videos, private GovernanceService $governance, private $fetch, private ?StagingAcceptanceScopeVerifier $stagingScopeVerifier = null)
     {
     }
 
     /** @return array<string,mixed> */
-    public function prepare(string $videoId, int $expectedRevision, ?int $expectedSourceRevision, string $idempotencyKey): array
+    public function prepare(string $videoId, int $expectedRevision, ?int $expectedSourceRevision, string $idempotencyKey, ?array $stagingAcceptance = null): array
     {
         if (!UuidCodec::isValid($videoId)) throw new VideoException('VIDEO_ID_INVALID');
         if ($expectedRevision < 1) throw new VideoException('VIDEO_REVISION_REQUIRED');
         if (trim($idempotencyKey) === '') throw new VideoException('IDEMPOTENCY_KEY_REQUIRED');
+        if ($this->stagingScopeVerifier !== null) {
+            if (!is_array($stagingAcceptance)) throw new VideoException('STAGING_SCOPE_REQUIRED');
+            if (!$this->stagingScopeVerifier->verifyVideoSourceRefresh($stagingAcceptance, $videoId, $expectedRevision, $expectedSourceRevision, $idempotencyKey)) throw new VideoException('STAGING_SCOPE_NOT_APPROVED');
+        }
 
         $existing = $this->governance->findByIdempotencyKey($idempotencyKey);
         if ($existing !== null) {
@@ -70,6 +75,7 @@ final class VideoSourceRefreshCommand
         $binding = ['video_id' => $videoId, 'expected_revision' => $expectedRevision, 'expected_source_revision' => $expectedSourceRevision];
         $payload = [
             'request_binding' => $binding,
+            'request_fingerprint' => hash('sha256', CommandCanonicalizer::canonicalize(['video_id' => $videoId, 'expected_revision' => $expectedRevision, 'expected_source_revision' => $expectedSourceRevision, 'idempotency_key' => $idempotencyKey])),
             'source_key' => $sourceKey,
             'expected_source_revision' => $expectedSourceRevision,
             'source_snapshot' => $source,
@@ -77,6 +83,11 @@ final class VideoSourceRefreshCommand
             'changed_fields' => $comparison->changedFields,
             'no_op' => $comparison->status === 'NO_CHANGE',
         ];
+        if ($stagingAcceptance !== null) {
+            $payload['staging_acceptance'] = $stagingAcceptance;
+            $payload['capture_id'] = (string) ($stagingAcceptance['capture_id'] ?? '');
+            $payload['capture_fingerprint'] = (string) ($stagingAcceptance['capture_fingerprint'] ?? '');
+        }
         $fingerprint = hash('sha256', CommandCanonicalizer::canonicalize($payload));
         $proposal = new Proposal(
             UuidCodec::newV7(), $videoId, 'source_refresh', $payload, $fingerprint,

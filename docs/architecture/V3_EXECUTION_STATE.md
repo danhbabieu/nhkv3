@@ -14164,3 +14164,18 @@ continuation/verifier/admission/publication slice passes 55 tests / 253
 assertions with existing deprecations. PHP lint and `git diff --check` pass.
 
 STATUS: `EXISTING_VIDEO_RETRY_PROPOSAL_REUSE_LOCAL_READY / DEPLOYMENT_PENDING / NO_LIVE_ACCEPTANCE`.
+# Checkpoint — 2026-09-18 — Performance Phase 3.10 Video source-refresh staging acceptance (LOCAL READY / NO LIVE MUTATION)
+
+SCOPE: Wired the existing server-issued staging acceptance mechanism into the
+internal/admin Video `source_refresh` Proposal path. Added the generic
+`video:source_refresh` operation-family binding, signed packet issuance and
+verification for exact target/revision/idempotency request identity, plus the
+normal Controlled Apply capability gate. MCP does not expose packet input or a
+public packet issuer.
+
+VERIFICATION: Focused Video source-refresh, staging verifier and Video staging
+admission selection passes 23 tests / 79 assertions with existing PHPUnit
+deprecations. Changed-file PHP lint and `git diff --check` pass. No WordPress
+integration acceptance was run; no staging/production runtime was mutated.
+
+STATUS: `VIDEO_SOURCE_REFRESH_STAGING_ACCEPTANCE_LOCAL_READY / NO_LIVE_MUTATION / DEPLOYMENT_PENDING`.

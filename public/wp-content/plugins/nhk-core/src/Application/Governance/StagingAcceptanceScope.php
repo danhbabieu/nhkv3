@@ -36,6 +36,7 @@ final class StagingAcceptanceScope
         'evidence:ingest' => 'source_evidence_reconciliation',
         'video:update' => 'governed_video_plan',
         'video:ingest' => 'governed_video_plan',
+        'video:source_refresh' => 'video_source_refresh',
         'video:retire' => 'governed_video_plan',
         'video:reactivate' => 'governed_video_plan',
     ];
@@ -62,6 +63,18 @@ final class StagingAcceptanceScope
             return;
         }
         if ((string) ($scope['entity_type'] ?? '') !== $proposal->entityType || (string) ($scope['operation'] ?? '') !== $proposal->operation) throw new \RuntimeException('STAGING_OPERATION_SCOPE_MISMATCH');
+
+        if ($expectedFamily === 'video_source_refresh') {
+            if ((string) ($scope['writer'] ?? '') !== 'canonical_governed'
+                || (string) ($scope['entity_type'] ?? '') !== 'video'
+                || (string) ($scope['operation'] ?? '') !== 'source_refresh'
+                || (string) ($scope['target_uuid'] ?? '') !== (string) ($proposal->targetUuid ?? $proposal->subjectId)
+                || (int) ($scope['expected_revision'] ?? -1) !== (int) $proposal->expectedRevision
+                || !hash_equals((string) ($scope['request_fingerprint'] ?? ''), (string) ($proposal->payload['request_fingerprint'] ?? ''))) {
+                throw new \RuntimeException('STAGING_VIDEO_SOURCE_REFRESH_SCOPE_MISMATCH');
+            }
+            return;
+        }
 
         if ($expectedFamily === 'governed_video_plan') {
             $proposalCaptureId = trim((string) ($proposal->payload['capture_id'] ?? ''));

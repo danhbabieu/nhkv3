@@ -68,6 +68,47 @@ final class StagingAcceptanceScopeVerifier
         return $base + ['fingerprint' => $fingerprint, 'signature' => hash_hmac('sha256', $fingerprint, $this->secret())];
     }
 
+    /** @param array{video_id:string,expected_revision:int,expected_source_revision:?int,idempotency_key:string} $request @return array<string,mixed> */
+    public function issueForVideoSourceRefresh(CaptureRecord $capture, array $request): array
+    {
+        $environment = $this->environmentName();
+        if (in_array($environment, ['production', 'prod'], true)) throw new \RuntimeException('STAGING_PRODUCTION_FORBIDDEN');
+        if ($environment !== 'staging') throw new \RuntimeException('STAGING_SCOPE_ENVIRONMENT_REQUIRED');
+        if ($this->secret() === '') throw new \RuntimeException('STAGING_SCOPE_SIGNING_KEY_REQUIRED');
+        $this->requireCapability();
+        if (!is_callable($this->admission)) throw new \RuntimeException('STAGING_SCOPE_ADMISSION_REQUIRED');
+        $videoId = trim((string) ($request['video_id'] ?? ''));
+        $expectedRevision = (int) ($request['expected_revision'] ?? 0);
+        $expectedSourceRevision = !array_key_exists('expected_source_revision', $request) || $request['expected_source_revision'] === null ? null : (int) $request['expected_source_revision'];
+        $idempotencyKey = trim((string) ($request['idempotency_key'] ?? ''));
+        if (!UuidCodec::isValid($videoId) || $expectedRevision < 1 || $idempotencyKey === '') throw new \RuntimeException('STAGING_VIDEO_SOURCE_REFRESH_BINDING_REQUIRED');
+        $requestFingerprint = hash('sha256', CommandCanonicalizer::canonicalize(['video_id' => $videoId, 'expected_revision' => $expectedRevision, 'expected_source_revision' => $expectedSourceRevision, 'idempotency_key' => $idempotencyKey]));
+        $base = [
+            'approved' => true, 'environment' => 'staging', 'capture_id' => $capture->captureId,
+            'capture_fingerprint' => $capture->requestFingerprint, 'request_fingerprint' => $requestFingerprint,
+            'operation_family' => 'video_source_refresh', 'entity_type' => 'video', 'operation' => 'source_refresh',
+            'writer' => 'canonical_governed', 'entrypoint' => 'nhk.video.source.refresh', 'target_uuid' => $videoId,
+            'expected_revision' => $expectedRevision, 'expected_source_revision' => $expectedSourceRevision,
+            'idempotency_key' => $idempotencyKey, 'issued_at' => gmdate('c'), 'expires_at' => gmdate('c', time() + max(1, $this->ttlSeconds)),
+        ];
+        if (!(bool) ($this->admission)($base, $capture, $request, [])) throw new \RuntimeException('STAGING_SCOPE_NOT_ADMITTED');
+        $fingerprint = hash('sha256', CommandCanonicalizer::canonicalize($base));
+        return $base + ['fingerprint' => $fingerprint, 'signature' => hash_hmac('sha256', $fingerprint, $this->secret())];
+    }
+
+    /** @param array<string,mixed> $scope */
+    public function verifyVideoSourceRefresh(array $scope, string $videoId, int $expectedRevision, ?int $expectedSourceRevision, string $idempotencyKey): bool
+    {
+        if (!$this->verifyPacket($scope) || ($scope['writer'] ?? '') !== 'canonical_governed') return false;
+        $requestFingerprint = hash('sha256', CommandCanonicalizer::canonicalize(['video_id' => $videoId, 'expected_revision' => $expectedRevision, 'expected_source_revision' => $expectedSourceRevision, 'idempotency_key' => $idempotencyKey]));
+        return ($scope['operation_family'] ?? '') === 'video_source_refresh'
+            && ($scope['entity_type'] ?? '') === 'video' && ($scope['operation'] ?? '') === 'source_refresh'
+            && ($scope['target_uuid'] ?? '') === $videoId && (int) ($scope['expected_revision'] ?? -1) === $expectedRevision
+            && ($scope['expected_source_revision'] ?? null) === $expectedSourceRevision
+            && hash_equals((string) ($scope['idempotency_key'] ?? ''), $idempotencyKey)
+            && hash_equals((string) ($scope['request_fingerprint'] ?? ''), $requestFingerprint);
+    }
+
     /** @param array<string,mixed> $plan @param list<string> $candidateIds @return array<string,mixed> */
     public function issueForAuthorityPlan(CaptureRecord $capture, array $plan, array $candidateIds): array
     {

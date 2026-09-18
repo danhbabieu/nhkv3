@@ -17,6 +17,24 @@ The current `VideoSyncService` is a read-only comparison boundary. Applying a
 new snapshot or reconciliation proposal remains subject to the existing
 Proposal → human approval → eligibility → Controlled Apply lifecycle.
 
+## Staging acceptance — Performance Phase 3.10
+
+On staging, `nhk.video.source.refresh` additionally requires the existing
+server-issued `staging_acceptance` packet. The packet is signed by the
+`StagingAcceptanceScopeVerifier` and is bound to `environment=staging`,
+`operation_family=video_source_refresh`, `entity_type=video`,
+`operation=source_refresh`, the exact Video UUID, expected Video/source
+revisions, idempotency key and request fingerprint, with `issued_at` and
+`expires_at` validity. The packet is carried only on the internal governed
+Proposal path; MCP input does not expose a client-supplied acceptance field.
+
+The generic `OperationScopedStagingGuard` still requires proposal-apply
+capability plus the source-refresh proposal capability. Missing, forged,
+expired, retargeted, wrong-operation, wrong-environment or tampered packets
+fail closed before Proposal creation/apply. Production rejects staging
+acceptance. CAS, idempotency, source-only mutation and canonical read-back
+remain unchanged.
+
 ## Governed source refresh — Performance Phase 3.8
 
 The registered internal/admin command `nhk.video.source.refresh` creates a
