@@ -259,7 +259,7 @@ final class WordPressMediaIngestIntegrationTest extends TestCase
                 $attachmentId,
             )));
             $countBefore = count($media->list());
-            $read = (new WordPressMediaAttachmentIngestor())->read($attachmentId);
+            $read = (new WordPressMediaAttachmentIngestor($bridge))->read($attachmentId);
             self::assertIsArray($read);
             self::assertSame('INCONSISTENT', $read['readback_state']);
             self::assertSame('ATTACHMENT_MAPPING_CONFLICT', $read['error_code']);
