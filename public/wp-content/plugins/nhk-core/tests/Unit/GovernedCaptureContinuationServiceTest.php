@@ -278,7 +278,9 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
             'subject_resolution' => ['primary' => ['id' => $subject, 'type' => 'classification'], 'resolved' => [['id' => $subject, 'type' => 'classification']]],
         ], true);
 
-        self::assertSame([], $planned);
+        self::assertCount(1, $planned);
+        self::assertSame('relation_create', $planned[0]['operation']);
+        self::assertSame($subject, $planned[0]['payload']['target_uuid']);
     }
 
     public function test_capture_provenance_packets_plan_source_and_resolved_evidence_without_reparsing_claim_text(): void
@@ -958,7 +960,9 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
             'interpretation' => ['user_claim_candidates' => [['text' => 'candidate from old retry', 'scope' => 'variant']]],
         ]);
 
-        self::assertSame([], $plans);
+        self::assertCount(1, $plans);
+        self::assertSame('relation_create', $plans[0]['operation']);
+        self::assertSame($variant, $plans[0]['payload']['target_uuid']);
     }
 
     public function test_knowledge_plan_emits_governed_about_relation_to_locked_subject(): void

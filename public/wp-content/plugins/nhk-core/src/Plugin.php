@@ -822,10 +822,17 @@ final class Plugin {
                         if ($claimSubject === '' || !in_array($claimSubject, $allowed, true)) continue;
                         $support = false;
                         foreach ($evidence->listByClaim($claim->canonicalId) as $citation) if ($citation->active && $citation->relation === 'supports') { $support = true; break; }
-                        $rows[] = ['id' => $claim->canonicalId, 'revision' => $claim->revision, 'text' => $claim->claimText, 'subject_id' => $claimSubject, 'scope' => (string) ($metadata['scope'] ?? $claim->claimType), 'provenance' => (string) ($metadata['provenance'] ?? 'CATALOG_SUPPORTED'), 'evidence_status' => $support ? 'SUPPORTED_WITHIN_SCOPE' : 'INSUFFICIENT_EVIDENCE', 'relevance' => $claimSubject === (string) ($subject['id'] ?? '') ? 1.0 : 0.7];
+                        $claimSubjectType = strtolower(trim((string) ($metadata['subject_type'] ?? '')));
+                        $claimPath = [];
+                        if ($claimSubject !== (string) ($subject['id'] ?? '')) foreach ((array) ($neighborhood['items'] ?? []) as $item) {
+                            if (!is_array($item) || (string) ($item['target_entity_id'] ?? '') !== $claimSubject) continue;
+                            if (is_array($item['best_path'] ?? null)) { $claimPath = $item['best_path']; break; }
+                        }
+                        $rows[] = ['id' => $claim->canonicalId, 'revision' => $claim->revision, 'text' => $claim->claimText, 'subject_id' => $claimSubject, 'subject_type' => $claimSubjectType, 'relation_path' => $claimPath, 'scope' => (string) ($metadata['scope'] ?? $claim->claimType), 'provenance' => (string) ($metadata['provenance'] ?? 'CATALOG_SUPPORTED'), 'evidence_status' => $support ? 'SUPPORTED_WITHIN_SCOPE' : 'INSUFFICIENT_EVIDENCE', 'relevance' => $claimSubject === (string) ($subject['id'] ?? '') ? 1.0 : 0.7];
                     }
                     return $rows;
                 },
+                predicates: $predicates,
             );
             $youtubeConfiguration = new \NHK\Core\Application\Video\YouTubeApiConfiguration();
             $youtubeClient = static fn (object $identity): array => (new YouTubeDataApiClient(null, null, $youtubeConfiguration))->fetch($identity);
@@ -985,7 +992,7 @@ final class Plugin {
                     return $governanceResult + ['candidate_writes' => array_merge($candidates, $videoCandidates), 'reused_claims' => $reusedClaims, 'relation_hints' => (array) ($interpretation['relation_hints'] ?? []), 'subject_resolution' => $context['subject_resolution'] ?? [], 'governance_available' => $mcpGovernance instanceof McpGovernanceHandler];
                 },
                 new ArticleComposer(),
-                static function (array $context) use ($articleMedia, $mediaService, $usages, $mediaBindingService, $mcpGovernance, $wordpressAttachments): array {
+                static function (array $context) use ($articleMedia, $mediaService, $usages, $mediaBindingService, $mcpGovernance, $wordpressAttachments, $stagingScopeVerifier): array {
                     $trace = static function (string $stage, string $status, array $details = []): void {
                         $payload = array_merge(['stage' => $stage, 'status' => $status, 'at' => gmdate('c')], $details);
                         if (function_exists('do_action')) { try { do_action('nhk_v3_capture_stage_trace', $payload); } catch (\Throwable) { } }

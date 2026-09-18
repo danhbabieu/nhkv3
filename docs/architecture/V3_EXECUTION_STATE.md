@@ -1,5 +1,60 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-19 — Multi-image metadata and existing Media repair boundary fixed (LOCAL / NO LIVE MUTATION)
+
+SCOPE: Fixed ordered multi-image metadata transport, per-item widget metadata,
+server-issued staging scope for existing Media metadata updates, metadata-only
+Capture reconciliation and exact multi-owner final read-back. No live Media,
+MediaAsset, MediaUsage, Capture or staging data was mutated; no re-upload or
+deployment was attempted.
+
+ROOT_CAUSE: Batch context could fall through to the public placeholder title
+`Ảnh tải lên N`; the widget did not send per-item metadata; and the canonical
+Capture Media operation path created an update Proposal without a signed exact
+staging scope. The generic MEDIA_ENRICHMENT reconciler then inferred
+`featured_primary` from resolved subject text even when the requested operation
+was Media metadata-only, while final read-back had no exact Media-owner branch.
+
+FIXED_BOUNDARY: Stable ordinal `files[]`/`items[]` mapping now preserves title,
+alt, caption and description per item; numbered ordered text is accepted only
+with complete cardinality; ambiguous items retain an original filename stem and
+an explicit pending-title marker. Metadata-only Media updates receive a scope
+bound to Capture, UUID, revision and payload fingerprint, and their read-back
+does not touch MediaUsage. Explicit bindings/placement operations retain the
+MediaUsage path.
+
+VERIFICATION: Focused Media batch, staging scope/admission, MCP contract and
+Media binding tests pass 79 tests / 722 assertions with existing deprecations.
+Changed-file PHP lint and `git diff --check` pass. Live repair of attachments
+605/606 and verification of the unexpected usage row remain deployment/runtime
+gates; no live acceptance was run.
+
+STATUS: `MEDIA_METADATA_REPAIR_BOUNDARY_FIXED_LOCAL / NO_LIVE_MUTATION / DEPLOYMENT_PENDING`.
+
+# Checkpoint — 2026-09-19 — Article semantic reconciliation scope/persistence fixed (LOCAL / NO LIVE MUTATION)
+
+SCOPE: Fixed the generic Article semantic selection and subject persistence
+boundaries. Claim reuse now preserves canonical claim identity and original
+subject, requires a subject-scoped explainable path, validates each path step
+against the registered predicate registry, and rejects generic `about`/lexical
+overlap as applicability. Article Capture now always plans the governed
+WordPress-post `about` binding for a resolved canonical subject, including
+TEXT_ARTICLE/IMAGE_ARTICLE submissions without a semantic delta. Managed
+section stale removal and manual prose preservation remain deterministic and
+idempotent. No live Article, Capture, Post, Knowledge, Graph or Media data was
+mutated; #596/#607 were not restored and no new Article was created.
+
+VERIFICATION: Added regression coverage for unrelated reachable Westminster-
+shaped claims, direct subject claims, registered multi-hop relationships,
+generic-word overlap, and subject-binding planning. Focused semantic,
+composer, publication, continuation, Governance and wiring tests pass 132
+tests / 564 assertions. PHP lint and git diff --check pass. The full local
+suite reached 2,085 tests but remains non-green because the current environment
+lacks the WordPress/MySQL integration bootstrap and has unrelated existing
+environment-gated failures; no deployment or live acceptance was run.
+
+STATUS: `ARTICLE_SEMANTIC_SCOPE_AND_SUBJECT_PERSISTENCE_FIXED_LOCAL / NO_LIVE_MUTATION`
+
 # Checkpoint — 2026-09-18 — MediaUsage replace CAS/readback fixed (LOCAL / NO LIVE MUTATION)
 
 SCOPE: Traced MediaUsage revision ownership from MediaUsage/WPDB persistence
@@ -14392,3 +14447,39 @@ fails only the five WordPress bootstrap-dependent checks. No staging or
 production mutation was performed.
 
 STATUS: `VIDEO_CAPTURE_PROVENANCE_SCOPE_LOCAL_VERIFIED / DEPLOYMENT_PENDING / NO_LIVE_ACCEPTANCE`.
+
+# Checkpoint — 2026-09-19 — Capture Video staging operation identity normalization (LOCAL / DEPLOYMENT PENDING)
+
+LIVE_FAILURE=`STAGING_SCOPE_NOT_ADMITTED` on the fresh staging-shaped Video
+Capture path before the first durable Source Proposal.
+
+PROVEN_OLD_STATE: d58e6180 added dependency scope issuance/admission, but the
+issuer, dependency admission, Video admission and scope verifier each rebuilt
+operation family, create semantics, expected revision and payload identity from
+different intermediate shapes. The repository fixture suite did not exercise a
+final dependency Proposal reconstructed through the same identity object as the
+issuer, nor did it combine a Classification subject with null source
+description and unavailable transcript.
+
+EXACT_ROOT_CAUSE: operation normalization was duplicated across the
+CaptureDependency scope issuer, Video scope issuer and StagingAcceptanceScope
+dependency assertion. Fresh dependency create semantics were represented as
+`null` at Proposal level but `0` in the staging packet, and payload identity
+was independently rebuilt around authorization fields. This is the proven
+local architectural drift; live runtime confirmation remains deployment-gated.
+
+FIXED_BOUNDARY: added `StagingOperationDescriptor`, built from the final
+Capture-owned command shape, and reused it for dependency/video scope
+issuance and dependency Proposal verification. It centralizes operation-family
+selection, ingest create semantics, fresh-create revision normalization and
+authorization-free payload fingerprinting. Added internal dependency admission
+reason codes without exposing HMAC/signature material.
+
+VERIFICATION: focused staging descriptor/Capture continuation/Scope verifier/
+Video admission suites pass 56 tests / 260 assertions. Full PHPUnit executed
+2,123 tests with 36 environment/bootstrap errors, 15 pre-existing/configuration
+failures and 114 skips; WordPress/MySQL integration prerequisites are absent.
+PHP lint and `git diff --check` pass. No staging or production mutation,
+deployment, pull, fetch or push was performed.
+
+STATUS=`LOCAL_READY / DEPLOYMENT_PENDING / LIVE_ACCEPTANCE_PENDING`.

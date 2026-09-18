@@ -53,7 +53,12 @@ final class StagingAcceptanceScope
         if ($proposalCaptureId === '' || !hash_equals(strtolower($captureId), strtolower($proposalCaptureId))) throw new \RuntimeException('STAGING_CAPTURE_SCOPE_MISMATCH');
 
         $operationKey = $proposal->entityType . ':' . $proposal->operation;
-        $expectedFamily = self::OPERATION_FAMILIES[$operationKey] ?? (self::isAuthorityEntity($proposal->entityType) && in_array($proposal->operation, ['create', 'ingest', 'update', 'rename', 'rekey', 'merge', 'retire', 'reactivate'], true) ? 'governed_authority_plan' : null);
+        // Keep the executable operation vocabulary in one place. The legacy
+        // table remains for non-Capture operations, while Capture-owned
+        // Source/Knowledge/Evidence/Video commands use the same descriptor
+        // as issuance and admission.
+        $expectedFamily = StagingOperationDescriptor::family($proposal->entityType, $proposal->operation)
+            ?: (self::OPERATION_FAMILIES[$operationKey] ?? (self::isAuthorityEntity($proposal->entityType) && in_array($proposal->operation, ['create', 'ingest', 'update', 'rename', 'rekey', 'merge', 'retire', 'reactivate'], true) ? 'governed_authority_plan' : null));
         $authorityPlanPacket = (string) ($scope['operation_family'] ?? '') === 'governed_authority_plan' && is_array($scope['candidate_bindings'] ?? null);
         if ($expectedFamily === null || ((string) ($scope['operation_family'] ?? '') !== $expectedFamily && !$authorityPlanPacket)) throw new \RuntimeException('STAGING_OPERATION_SCOPE_MISMATCH');
         if ((string) ($scope['writer'] ?? '') !== 'canonical_governed') throw new \RuntimeException('STAGING_DIRECT_WRITER_BLOCKED');
@@ -110,9 +115,8 @@ final class StagingAcceptanceScope
                 || (int) ($scope['expected_revision'] ?? 0) !== (int) ($proposal->expectedRevision ?? 0)) {
                 throw new \RuntimeException('STAGING_DEPENDENCY_SCOPE_MISMATCH');
             }
-            $payload = $proposal->payload;
-            unset($payload['staging_acceptance'], $payload['proposal_command_fingerprint']);
-            $payloadFingerprint = hash('sha256', CommandCanonicalizer::canonicalize($payload));
+            $descriptor = StagingOperationDescriptor::fromProposal($proposal, $scope);
+            $payloadFingerprint = $descriptor->payloadFingerprint;
             if (!hash_equals((string) ($scope['payload_fingerprint'] ?? ''), $payloadFingerprint)
                 || !hash_equals((string) ($scope['proposal_command_fingerprint'] ?? ''), $payloadFingerprint)) {
                 throw new \RuntimeException('STAGING_DEPENDENCY_PAYLOAD_MISMATCH');

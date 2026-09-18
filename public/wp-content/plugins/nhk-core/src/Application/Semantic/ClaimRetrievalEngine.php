@@ -3,11 +3,13 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Semantic;
 
+use NHK\Core\Domain\Graph\PredicateRegistry;
+
 /** Bounded, deterministic Claim discovery and selection over owner read ports. */
 final class ClaimRetrievalEngine
 {
     /** @param callable(array<string,mixed>):array $neighborhood @param callable(array<string,mixed>,array<string,mixed>):array $claims */
-    public function __construct(private $neighborhood, private $claims, private int $maxHops = 2, private int $limit = 50) {}
+    public function __construct(private $neighborhood, private $claims, private int $maxHops = 2, private int $limit = 50, private ?PredicateRegistry $predicates = null) {}
 
     /** @param array<string,mixed> $context @return array<string,mixed> */
     public function retrieve(array $context): array
@@ -49,6 +51,7 @@ final class ClaimRetrievalEngine
         $id = trim((string) ($row['id'] ?? $row['claim_id'] ?? ''));
         $revision = max(1, (int) ($row['revision'] ?? $row['claim_revision'] ?? 1));
         $claimSubject = (string) ($row['subject_id'] ?? '');
+        $claimSubjectType = strtolower(trim((string) ($row['subject_type'] ?? '')));
         $subjectId = (string) ($subject['id'] ?? '');
         $path = is_array($row['relation_path'] ?? null) ? $row['relation_path'] : (is_array($row['path'] ?? null) ? $row['path'] : (is_array($row['best_path'] ?? null) ? $row['best_path'] : $this->pathForClaim($claimSubject, $neighborhood)));
         $hop = max(0, count($path));
@@ -62,18 +65,52 @@ final class ClaimRetrievalEngine
         $score += $evidence === 'SUPPORTED_WITHIN_SCOPE' ? 3.0 : ($evidence === 'INSUFFICIENT_EVIDENCE' ? -1.0 : -2.0);
         $score += $intent !== '' ? $this->overlap($intent, strtolower($text)) : 0.0;
         $decision = 'include';
-        $reason = 'subject, scope and evidence are usable within the bounded retrieval policy';
+        $reason = 'subject, scope, provenance, evidence and registered applicability path passed the bounded retrieval policy';
         $warnings = [];
         if ($id === '' || $text === '') { $decision = 'exclude'; $reason = 'claim identity or text is missing'; }
+        elseif (!$this->applicableToSubject($claimSubject, $claimSubjectType, $subject, $path)) { $decision = 'exclude'; $reason = 'Claim has no explainable subject-scoped applicability path'; $warnings[] = 'SEMANTIC_SCOPE_NOT_APPLICABLE'; }
         elseif ($scope === 'specimen-only' && ($subject['type'] ?? '') !== 'specimen') { $decision = 'exclude'; $reason = 'specimen-scoped Claim cannot generalize to this subject'; $warnings[] = 'SPECIMEN_SCOPE_LIMIT'; }
         elseif ($evidence !== 'SUPPORTED_WITHIN_SCOPE') { $decision = 'review'; $reason = 'evidence is absent or insufficient for direct prose'; $warnings[] = 'EVIDENCE_SCOPE_REVIEW'; }
         elseif ($provenance === '') { $decision = 'review'; $reason = 'provenance is unavailable'; $warnings[] = 'PROVENANCE_UNAVAILABLE'; }
         return [
-            'claim_id' => $id, 'claim_revision' => $revision, 'text' => $text, 'subject_id' => $claimSubject,
+            'claim_id' => $id, 'claim_revision' => $revision, 'text' => $text, 'subject_id' => $claimSubject, 'subject_type' => $claimSubjectType,
             'scope' => $scope, 'provenance' => $provenance, 'evidence_status' => $evidence,
             'relation_path' => $path, 'hop_count' => $hop, 'score' => round($score, 6),
             'decision' => $decision, 'reason' => $reason, 'warnings' => $warnings,
         ];
+    }
+
+    /**
+     * Reachability only discovers a candidate. Reuse additionally requires a
+     * path whose endpoints preserve the original semantic subject and whose
+     * predicates are registered structural relationships. Generic `about`
+     * attachment edges and lexical overlap are never applicability evidence.
+     */
+    private function applicableToSubject(string $claimSubject, string $claimSubjectType, array $subject, array $path): bool
+    {
+        $subjectId = trim((string) ($subject['id'] ?? ''));
+        if ($subjectId === '' || $claimSubject === '') return false;
+        if ($claimSubject === $subjectId) return true;
+        if ($path === []) return false;
+        $first = $path[0] ?? [];
+        $last = $path[array_key_last($path)] ?? [];
+        if (!is_array($first) || !is_array($last)) return false;
+        if ((string) ($first['source'] ?? '') !== (string) ($subject['type'] ?? '') . ':' . $subjectId) return false;
+        $lastTarget = (string) ($last['target'] ?? '');
+        if ($claimSubjectType !== '' ? $lastTarget !== $claimSubjectType . ':' . $claimSubject : !str_ends_with($lastTarget, ':' . $claimSubject)) return false;
+        $predicates = $this->predicates ?? new PredicateRegistry();
+        foreach ($path as $step) {
+            if (!is_array($step)) return false;
+            $predicate = trim((string) ($step['predicate'] ?? ''));
+            if ($predicate === '' || $predicate === 'about' || $predicate === 'depicts') return false;
+            $sourceType = explode(':', (string) ($step['source'] ?? ''), 2)[0] ?? '';
+            $targetType = explode(':', (string) ($step['target'] ?? ''), 2)[0] ?? '';
+            try {
+                $definition = $predicates->get($predicate);
+                if (!$definition->allows($sourceType, $targetType) && !$definition->allows($targetType, $sourceType)) return false;
+            } catch (\Throwable) { return false; }
+        }
+        return true;
     }
 
     private function overlap(string $left, string $right): float

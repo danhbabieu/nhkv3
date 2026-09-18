@@ -146,25 +146,18 @@ final class StagingAcceptanceScopeVerifier
         if ($this->secret() === '') throw new \RuntimeException('STAGING_SCOPE_SIGNING_KEY_REQUIRED');
         $this->requireCapability();
         if (!is_callable($this->admission)) throw new \RuntimeException('STAGING_SCOPE_ADMISSION_REQUIRED');
-        $entityType = strtolower(trim((string) ($plan['entity_type'] ?? '')));
-        $operation = strtolower(trim((string) ($plan['operation'] ?? '')));
-        $family = match ($entityType) {
-            'source', 'evidence' => 'source_evidence_reconciliation',
-            'knowledge' => 'knowledge_delta',
-            default => null,
-        };
-        if ($family === null || !in_array($operation, ['ingest', 'create'], true)) throw new \RuntimeException('STAGING_DEPENDENCY_OPERATION_INVALID');
-        $payload = is_array($plan['payload'] ?? null) ? $plan['payload'] : [];
-        $payload['capture_fingerprint'] = $capture->requestFingerprint;
-        $payloadFingerprint = hash('sha256', CommandCanonicalizer::canonicalize($this->withoutAuthorization($payload)));
-        $planFingerprint = hash('sha256', CommandCanonicalizer::canonicalize($this->withoutAuthorization($plan)));
+        $descriptor = StagingOperationDescriptor::fromPlan($plan, $capture->captureId, $capture->requestFingerprint);
+        if (!in_array($descriptor->entityType, ['source', 'knowledge', 'evidence'], true) || !in_array($descriptor->operation, ['ingest', 'create'], true)) throw new \RuntimeException('STAGING_DEPENDENCY_OPERATION_INVALID');
+        $family = $descriptor->operationFamily;
+        $payloadFingerprint = $descriptor->payloadFingerprint;
+        $planFingerprint = hash('sha256', CommandCanonicalizer::canonicalize(StagingOperationDescriptor::withoutAuthorization($plan)));
         $base = [
             'approved' => true, 'environment' => 'staging', 'capture_id' => $capture->captureId,
             'capture_fingerprint' => $capture->requestFingerprint, 'request_fingerprint' => $capture->requestFingerprint,
             'semantic_write_policy' => 'PROJECT_BUILD', 'operation_family' => $family,
-            'entity_type' => $entityType, 'operation' => $operation, 'writer' => 'canonical_governed',
+            'entity_type' => $descriptor->entityType, 'operation' => $descriptor->operation, 'writer' => 'canonical_governed',
             'entrypoint' => 'nhk.capture.ingest', 'canonical_entrypoint' => 'nhk.capture.ingest',
-            'subject_id' => (string) ($plan['subject_id'] ?? ''), 'expected_revision' => (int) ($plan['expected_revision'] ?? 0),
+            'subject_id' => $descriptor->subjectId, 'expected_revision' => $descriptor->expectedRevision ?? 0,
             'plan_fingerprint' => $planFingerprint, 'proposal_command_fingerprint' => $payloadFingerprint,
             'payload_fingerprint' => $payloadFingerprint,
             'issued_at' => gmdate('c'), 'expires_at' => gmdate('c', time() + max(1, $this->ttlSeconds)),
@@ -249,13 +242,14 @@ final class StagingAcceptanceScopeVerifier
         if ($this->secret() === '') throw new \RuntimeException('STAGING_SCOPE_SIGNING_KEY_REQUIRED');
         $this->requireCapability();
         if (!is_callable($this->admission)) throw new \RuntimeException('STAGING_SCOPE_ADMISSION_REQUIRED');
-        $operation = strtolower(trim((string) ($plan['operation'] ?? '')));
-        $entityType = strtolower(trim((string) ($plan['entity_type'] ?? '')));
+        $descriptor = StagingOperationDescriptor::fromPlan($plan, $capture->captureId, $capture->requestFingerprint);
+        $operation = $descriptor->operation;
+        $entityType = $descriptor->entityType;
         // Video owner identity and resolved semantic subject are separate
         // bindings. `subject_id` is the Proposal owner UUID; it must never be
         // reused as the Authority/semantic subject locator.
         $targetUuid = trim((string) ($plan['target_uuid'] ?? ''));
-        $expectedRevision = (int) ($plan['expected_revision'] ?? 0);
+        $expectedRevision = $descriptor->expectedRevision ?? 0;
         $planFingerprint = trim((string) ($plan['plan_fingerprint'] ?? $plan['fingerprint'] ?? ''));
         if ($entityType !== 'video' || !in_array($operation, ['ingest', 'update'], true)) throw new \RuntimeException('STAGING_VIDEO_OPERATION_INVALID');
         if (!preg_match('/^[a-f0-9]{64}$/i', $planFingerprint)) throw new \RuntimeException('STAGING_VIDEO_BINDING_REQUIRED');
@@ -296,7 +290,7 @@ final class StagingAcceptanceScopeVerifier
             'entity_type' => 'video', 'operation' => $operation, 'writer' => 'canonical_governed',
             'entrypoint' => 'nhk.capture.ingest', 'canonical_entrypoint' => 'nhk.capture.ingest',
             'target_uuid' => $operation === 'update' ? $targetUuid : null, 'proposed_uuid' => $proposedUuid,
-            'create_semantics' => $operation === 'ingest' ? 'ingest' : null, 'expected_revision' => $expectedRevision,
+            'create_semantics' => $descriptor->createSemantics, 'expected_revision' => $expectedRevision,
             'platform' => $platform, 'external_video_id' => $externalId, 'canonical_source_url' => $sourceUrl,
             'subject' => ['type' => $subjectType, 'uuid' => $subjectId, 'revision' => max(0, (int) ($subjectPacket['revision'] ?? $plan['subject_revision'] ?? 0))],
             'plan_fingerprint' => $planFingerprint, 'proposal_command_fingerprint' => $proposalCommandFingerprint,

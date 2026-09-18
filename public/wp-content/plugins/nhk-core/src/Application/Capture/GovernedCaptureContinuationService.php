@@ -316,7 +316,7 @@ final class GovernedCaptureContinuationService
             ];
             $plans[] = $this->arguments('evidence', 'ingest', $claimId, $payload, 'capture:' . $captureId . ':evidence:' . hash('sha256', CommandCanonicalizer::canonicalize($payload)));
         }
-        if ($includeSemanticChildren && $this->semanticDeltaRequested($context) && $articleId > 0 && $articleEndpoint !== '' && in_array($intent, ['TEXT_ARTICLE', 'IMAGE_ARTICLE'], true) && UuidCodec::isValid((string) ($primary['id'] ?? '')) && trim((string) ($primary['type'] ?? '')) !== '') {
+        if ($includeSemanticChildren && $articleId > 0 && $articleEndpoint !== '' && in_array($intent, ['TEXT_ARTICLE', 'IMAGE_ARTICLE'], true) && UuidCodec::isValid((string) ($primary['id'] ?? '')) && trim((string) ($primary['type'] ?? '')) !== '') {
             // Article subject binding is a normal governed Graph child. The
             // stable idempotency key is owner/subject based so a later
             // continuation reuses the same edge/proposal instead of opening a
