@@ -19,6 +19,16 @@ use NHK\Core\Application\Presentation\{LatestFirstOrder, PublicNavigationDefinit
 
 final class HomeSemanticQuery
 {
+    /** Request-scope read memoization only; no persistent/public cache is introduced here. */
+    private ?array $mediaItemsMemo = null;
+    private ?array $videoItemsMemo = null;
+    /** @var array<string,list<\NHK\Core\Domain\Authority\AuthorityEntity>> */
+    private array $authorityItemsMemo = [];
+    /** @var array<string,array<string,mixed>|null> */
+    private array $mediaVisualMemo = [];
+    /** @var array<string,array<string,mixed>|null> */
+    private array $entityDetailMemo = [];
+
     public function __construct(
         private AuthorityRepository $authority,
         private MediaRepository $media,
@@ -74,10 +84,10 @@ final class HomeSemanticQuery
         if ($this->ready('media') && $this->gallery !== null) {
             $modules['media'] = [];
             $modules['media_total'] = 0;
-            $mediaItems = LatestFirstOrder::sort($this->media->list(), static fn (\NHK\Core\Domain\Media\Media $item): ?string => null, static fn (\NHK\Core\Domain\Media\Media $item): ?string => $item->createdAt, static fn (\NHK\Core\Domain\Media\Media $item): string => $item->canonicalId);
+            $mediaItems = $this->mediaItems();
             foreach ($mediaItems as $item) {
                 if (!$item->active || $item->readiness !== 'ready' || $item->isSystemPlaceholder()) continue;
-                $visual = $this->gallery->forMedia($item->canonicalId);
+                $visual = $this->mediaVisual($item->canonicalId);
                 if (!is_array($visual) || trim((string) ($visual['image_url'] ?? '')) === '' || ($visual['has_real_image'] ?? false) !== true) continue;
                 $modules['media_total']++;
                 if (count($modules['media']) < 8) $modules['media'][] = $visual;
@@ -86,7 +96,7 @@ final class HomeSemanticQuery
             if (function_exists('apply_filters')) $manualIds = apply_filters('nhk_v3_home_hero_media_ids', $manualIds);
             $heroCandidates = [];
             foreach ($mediaItems as $item) {
-                $visual = $this->gallery->forMedia($item->canonicalId);
+                $visual = $this->mediaVisual($item->canonicalId);
                 if (!is_array($visual) || trim((string) ($visual['image_url'] ?? '')) === '' || ($visual['has_real_image'] ?? false) !== true) continue;
                 $visual['_canonical_id'] = $item->canonicalId;
                 $heroCandidates[] = $visual;
@@ -97,7 +107,7 @@ final class HomeSemanticQuery
         if ($this->ready('video')) {
             $modules['videos'] = [];
             $modules['videos_total'] = 0;
-            $videoItems = LatestFirstOrder::sort($this->videos->list(), fn (\NHK\Core\Domain\Video\Video $item): ?string => $this->videoPublishedAt($item), fn (\NHK\Core\Domain\Video\Video $item): ?string => $item->createdAt, fn (\NHK\Core\Domain\Video\Video $item): string => $item->canonicalId);
+            $videoItems = $this->videoItems();
             foreach ($videoItems as $item) {
                 if (!$item->active || !$item->hasValidPublicReference()) continue;
                 $metadata = is_array($item->metadata) ? $item->metadata : [];
@@ -137,7 +147,7 @@ final class HomeSemanticQuery
     private function latestFeed(array $modules): array
     {
         $items = [];
-        foreach ($this->videos->list() as $video) {
+        foreach ($this->videoItems() as $video) {
             if (!$this->ready('video') || !$video->active || !$video->hasValidPublicReference()) continue;
             $metadata = is_array($video->metadata) ? $video->metadata : [];
             $source = is_array($metadata['source_snapshot'] ?? null) ? $metadata['source_snapshot'] : (is_array($metadata['source'] ?? null) ? $metadata['source'] : []);
@@ -147,9 +157,9 @@ final class HomeSemanticQuery
             $thumbnail = (new \NHK\Core\Application\Video\VideoThumbnailSelector())->fromSource($source);
             $items[] = $this->feedItem('video', 'Video', (string) (($editorial['title'] ?? '') ?: $video->title ?: 'Video'), $url, $this->videoPublishedAt($video), $video->createdAt, (string) ($editorial['summary'] ?? ''), $thumbnail['url'] ?? null, $thumbnail['width'] ?? null, $thumbnail['height'] ?? null, $video->canonicalId);
         }
-        foreach ($this->media->list() as $media) {
+        foreach ($this->mediaItems() as $media) {
             if (!$this->ready('media') || !$media->active || $media->readiness !== 'ready' || $media->isSystemPlaceholder()) continue;
-            $visual = $this->gallery?->forMedia($media->canonicalId);
+            $visual = $this->mediaVisual($media->canonicalId);
             $visual = is_array($visual) ? $visual : [];
             $items[] = $this->feedItem('media', 'Ảnh', $media->canonicalName, $visual['article_url'] ?? (function_exists('home_url') ? \home_url('/thu-vien/') : '/thu-vien/'), null, $media->createdAt, (string) ($visual['summary'] ?? 'Ảnh tư liệu trong kho hình ảnh NHK.'), $visual['image_url'] ?? null, $visual['width'] ?? null, $visual['height'] ?? null, $media->canonicalId);
         }
@@ -161,9 +171,9 @@ final class HomeSemanticQuery
             if ($url === null) continue;
             $items[] = $this->feedItem('knowledge', 'Tri thức', $this->shorten($claim->claimText, 16), $url, null, $claim->createdAt, $claim->claimText, null, null, null, $claim->canonicalId);
         }
-        if ($this->ready('authority')) foreach ($this->types->all() as $definition) foreach ($this->authority->listByType($definition->type, true) as $entity) {
+        if ($this->ready('authority')) foreach ($this->types->all() as $definition) foreach ($this->authorityItems($definition->type) as $entity) {
             if (!$entity->active() || $entity->createdAt === null) continue;
-            $detail = $this->collection()->detailForEntity($entity);
+            $detail = $this->entityDetail($entity);
             if (!is_array($detail) || trim((string) ($detail['url'] ?? '')) === '') continue;
             $representative = $detail['media']['representative'] ?? [];
             $labels = ['brand' => 'Thương hiệu', 'model' => 'Mẫu', 'variant' => 'Mẫu', 'movement' => 'Bộ máy', 'music' => 'Bản nhạc', 'classification' => 'Phân loại', 'component' => 'Linh kiện', 'specimen' => 'Hiện vật', 'product' => 'Sản phẩm'];
@@ -177,9 +187,47 @@ final class HomeSemanticQuery
     {
         $entity = $this->authority->findByCanonicalId($id);
         if ($entity === null || !$entity->active()) return null;
-        $detail = $this->collection()->detailForEntity($entity);
+        $detail = $this->entityDetail($entity);
         $url = is_array($detail) ? trim((string) ($detail['url'] ?? '')) : '';
         return $url !== '' ? $url : null;
+    }
+
+    /** @return list<\NHK\Core\Domain\Media\Media> */
+    private function mediaItems(): array
+    {
+        if ($this->mediaItemsMemo === null) {
+            $this->mediaItemsMemo = LatestFirstOrder::sort($this->media->list(), static fn (\NHK\Core\Domain\Media\Media $item): ?string => null, static fn (\NHK\Core\Domain\Media\Media $item): ?string => $item->createdAt, static fn (\NHK\Core\Domain\Media\Media $item): string => $item->canonicalId);
+        }
+        return $this->mediaItemsMemo;
+    }
+
+    /** @return list<\NHK\Core\Domain\Video\Video> */
+    private function videoItems(): array
+    {
+        if ($this->videoItemsMemo === null) {
+            $this->videoItemsMemo = LatestFirstOrder::sort($this->videos->list(), fn (\NHK\Core\Domain\Video\Video $item): ?string => $this->videoPublishedAt($item), fn (\NHK\Core\Domain\Video\Video $item): ?string => $item->createdAt, fn (\NHK\Core\Domain\Video\Video $item): string => $item->canonicalId);
+        }
+        return $this->videoItemsMemo;
+    }
+
+    /** @return list<\NHK\Core\Domain\Authority\AuthorityEntity> */
+    private function authorityItems(string $type): array
+    {
+        return $this->authorityItemsMemo[$type] ??= $this->authority->listByType($type, true);
+    }
+
+    /** @return array<string,mixed>|null */
+    private function mediaVisual(string $id): ?array
+    {
+        if (array_key_exists($id, $this->mediaVisualMemo)) return $this->mediaVisualMemo[$id];
+        return $this->mediaVisualMemo[$id] = $this->gallery?->forMedia($id);
+    }
+
+    /** @return array<string,mixed>|null */
+    private function entityDetail(\NHK\Core\Domain\Authority\AuthorityEntity $entity): ?array
+    {
+        if (array_key_exists($entity->canonicalId, $this->entityDetailMemo)) return $this->entityDetailMemo[$entity->canonicalId];
+        return $this->entityDetailMemo[$entity->canonicalId] = $this->collection()->detailForEntity($entity);
     }
 
     private function feedItem(string $type, string $label, string $title, string $url, ?string $publishedAt, ?string $createdAt, string $summary, mixed $image, mixed $width, mixed $height, string $tieBreaker): array

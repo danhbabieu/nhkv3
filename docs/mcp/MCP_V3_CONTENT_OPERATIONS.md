@@ -344,9 +344,6 @@ the idempotent binding receipt and re-enters final read-back without creating a
 second MediaUsage. For Article intents the native Post is required, and `IMAGE_ARTICLE` also
 requires the canonical Media branch. This is a completion/read-back boundary,
 not a new semantic owner or mutation path.
-for Article intents the native Post is required, and `IMAGE_ARTICLE` also
-requires the canonical Media branch. This is a completion/read-back boundary,
-not a new semantic owner or mutation path.
 
 An explicit child resume is available only for the registered Video child:
 `resume_children: ["video"]`. It requires an existing `capture_id`, carries no

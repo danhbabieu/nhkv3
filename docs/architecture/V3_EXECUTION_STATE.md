@@ -1,5 +1,32 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-18 — Media Capture completion owner resolution (LOCAL FIX / DEPLOYMENT PENDING)
+
+SCOPE: Repaired the canonical Capture completion boundary for `MEDIA_ENRICHMENT`.
+After Media reconciliation and verified representative binding read-back, the
+completion receipt now resolves every reconciled canonical Media UUID as a
+required owner. Empty required owner IDs remain missing and fail closed, while
+multiple Media IDs are deterministic and deduplicated. Existing binding
+idempotency, replacement behavior and canonical final read-back remain intact.
+
+ROOT_CAUSE: `finishNonArticleIntent()` discarded the reconciled `$media` result
+when constructing `required_owners`; the completion matcher also treated an
+empty required owner ID as a wildcard. Together these allowed a Media branch to
+lose its canonical owner identity or remain unverifiable after a committed
+binding.
+
+FIX: Pass the Media reconciliation packet through owner resolution, derive
+owners from canonical `media_ids`/binding read-backs, and require a non-empty
+exact owner-ID match in `CompletionCoordinator`. No representative admission,
+live Media, Vedette 37, Article or Knowledge data was changed.
+
+VERIFICATION: Focused Capture/Completion/Media binding/documentation suites
+pass 72 tests / 681 assertions; canonical documentation snapshot regenerated;
+`git diff --check` and PHP lint pass. No staging/production mutation,
+deployment or push occurred.
+
+STATUS: `MEDIA_CAPTURE_OWNER_RESOLUTION_LOCAL_READY / DEPLOYMENT_PENDING / SEMANTIC_MUTATION_NONE`
+
 # Checkpoint — 2026-09-18 — Homepage compact latest feed in Hero (LOCAL FIX / DEPLOY PENDING)
 
 SCOPE: Moved the existing read-only unified homepage latest-feed projection from
