@@ -84,6 +84,23 @@ final class ContextualMediaSeoProjectionTest extends TestCase
         self::assertSame('Caption chủ thể', $result['caption']);
     }
 
+    public function test_article_does_not_leak_an_unproven_representative_usage_from_another_subject(): void
+    {
+        [$media, $assets, $usages, $service] = $this->stores();
+        $item = $service->create('article-no-cross-subject-leak', 'Tên Media trung tính', 'ready');
+        $service->addAsset($item->canonicalId, 'original', 'uploads/article-no-cross-subject-leak.webp', hash('sha256', 'article-no-cross-subject-leak'), 'image/webp', 10, 1200, 800, 'PUBLIC', ['canonical_filename' => 'article-no-cross-subject-leak.webp']);
+        $service->addUsage($item->canonicalId, 'wp_post', '1:69', 'featured_primary', 0, '', '', [], '', 'article:1:69:featured_primary');
+        $service->addUsage($item->canonicalId, 'variant', 'unrelated-subject-a', 'representative', 0, 'Alt chủ thể A', 'Caption chủ thể A', [], 'Tiêu đề chủ thể A');
+        $service->addUsage($item->canonicalId, 'classification', 'unrelated-subject-b', 'representative', 1, 'Alt chủ thể B', 'Caption chủ thể B', [], 'Tiêu đề chủ thể B');
+
+        $result = (new ArticleMediaSeoProjection($media, $assets, $usages))->forPost('1:69');
+
+        self::assertSame('MEDIA_NEUTRAL', $result['metadata_source']);
+        self::assertSame('Tên Media trung tính', $result['title']);
+        self::assertSame('Tên Media trung tính', $result['alt']);
+        self::assertSame('Tên Media trung tính', $result['caption']);
+    }
+
     public function test_preferred_image_metadata_source_uses_explicit_field_sources_not_top_level_labels(): void
     {
         $result = (new PreferredImageSeoProjection())->project([
@@ -373,6 +390,26 @@ final class ContextualMediaSeoProjectionTest extends TestCase
         self::assertSame('', $missingResult['title']);
         self::assertSame('', $missingResult['alt']);
         self::assertSame('', $missingResult['caption']);
+    }
+
+    public function test_visual_support_without_usage_repository_emits_no_uninitialized_candidates_warning(): void
+    {
+        $media = new Media('018f5b74-5f0a-7d2e-9a93-c0e7d6dc3391', 'visual-support-no-repository', 'Visual support', 'ready');
+        $asset = new MediaAsset('018f5b74-5f0a-7d2e-9a93-c0e7d6dc3392', $media->canonicalId, 'original', 'visual-support-no-repository.webp', str_repeat('c', 64), 'image/webp', 1000, 800, 600, 'PUBLIC', ['canonical_filename' => 'visual-support-no-repository.webp']);
+        $requirement = VisualSupportRequirement::create('018f5b74-5f0a-7d2e-9a93-c0e7d6dc3393', 'variant', 'configuration', 'COMPONENT_DETAIL', 'technical_detail')->withResolution($media->canonicalId, $media->revision);
+        $warnings = [];
+        set_error_handler(static function (int $severity, string $message) use (&$warnings): bool {
+            if (($severity & E_WARNING) !== 0) $warnings[] = $message;
+            return true;
+        }, E_WARNING);
+        try {
+            $result = (new VisualSupportPublicProjection())->resolve($requirement, $media, [$asset]);
+        } finally {
+            restore_error_handler();
+        }
+
+        self::assertNotNull($result);
+        self::assertSame([], $warnings);
     }
 
     public function test_dictionary_definition_never_becomes_image_metadata(): void
