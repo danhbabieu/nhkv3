@@ -1,5 +1,33 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-18 — Capture Video canonical owner binding (LOCAL FIX / DEPLOY PENDING)
+
+SCOPE: Repaired the generic Capture Video provenance planner so a supplied
+Video owner UUID is preserved identically in Proposal `subject_id` and
+`payload.canonical_id`; conflicting identities now fail closed before governed
+dependency/apply. No live Capture, Video, Proposal, staging/production record,
+deployment or push was changed.
+
+ROOT_CAUSE: The planner passed the incoming Video proposal through dependency
+materialization without enforcing the owner binding. That left a gap where a
+Proposal subject and payload canonical owner could diverge, allowing the
+executor/readback chain to operate on a different identity or stop before
+Controlled Apply with an uncorrelatable owner.
+
+FIX: Added a generic UUID binding invariant in
+`CaptureVideoProvenancePlanner`; when one side is present the other is
+normalized to the same UUID, and invalid/conflicting values are rejected.
+Standalone preview packets with no owner UUID remain planning-only and may
+defer UUID allocation to the governed writer.
+
+VERIFICATION: Focused Video/Capture suite passes 69 tests / 315 assertions.
+Full Unit passes 1,896 tests / 9,407 assertions with one pre-existing
+`DemoCutoverCliContractTest` diagnostic mismatch. Targeted PHP syntax checks
+and `git diff --check` remain to be recorded. Integration/live acceptance,
+deployment and resume remain pending; no external state changed.
+
+STATUS: `VIDEO_CANONICAL_OWNER_BINDING_LOCAL_READY / DEPLOYMENT_PENDING / SEMANTIC_MUTATION_NONE`
+
 # Checkpoint — 2026-09-18 — Video canonical owner propagation/readback (LOCAL FIX / DEPLOY PENDING)
 
 SCOPE: Repaired generic Capture-owned Video owner propagation after governed
@@ -13432,3 +13460,26 @@ WordPress/MySQL bootstrap errors and existing acceptance/configuration gates.
 Canonical documentation snapshot regeneration completed successfully.
 
 STATUS: `PUBLIC_IMAGE_1920_LOCAL_READY / INTEGRATION_BOOTSTRAP_BLOCKED / NO_DEPLOYMENT`.
+
+# Checkpoint — 2026-09-18 — Homepage latest-in-hero presentation (LOCAL READY / DEPLOY PENDING)
+
+SCOPE: Reworked the homepage presentation-only flow so the existing native
+WordPress latest-post read model renders a compact four-item “Bài viết mới
+nhất” module directly below the hero search, while “Câu chuyện đáng đọc” is
+rendered immediately after the hero as a separate curated block. Added
+responsive styling for desktop/tablet/mobile without changing the hero slider,
+quick navigation, semantic modules or shared media presentation behavior.
+
+BOUNDARY: No semantic mutation, direct database write, post-ID hard-coding,
+production change or deployment was performed. Latest ordering remains the
+existing deterministic date-descending/ID-descending WordPress query.
+
+VERIFICATION: Focused frontend contract selection passes 82 tests / 826
+assertions with one existing warning and PHPUnit deprecations. Changed-file PHP
+lint and `git diff --check` pass. Read-only live inspection confirms the
+deployed demo still serves the previous build: its slider and navigation are
+healthy, but the new latest-in-hero module is not yet deployed. Responsive
+visual verification of the new local template remains pending deployment/local
+render harness.
+
+STATUS: `HOME_LATEST_HERO_LOCAL_READY / LIVE_OLD_BUILD / DEPLOYMENT_PENDING / SEMANTIC_MUTATION_NONE`.

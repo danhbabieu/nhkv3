@@ -24,6 +24,8 @@ final class CaptureVideoProvenancePlanner
     {
         $video = is_array($videoProposal['payload'] ?? null) ? $videoProposal : ['payload' => $videoProposal];
         $payload = is_array($video['payload'] ?? null) ? $video['payload'] : [];
+        $video = $this->preserveCanonicalOwnerBinding($video);
+        $payload = is_array($video['payload'] ?? null) ? $video['payload'] : [];
         $metadata = is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [];
         // A resumed child is rehydrated from the immutable Capture asset. The
         // adapter/source snapshot is therefore authoritative when present,
@@ -182,6 +184,35 @@ final class CaptureVideoProvenancePlanner
             ],
             'diagnostics' => $diagnostics,
         ];
+    }
+
+    /**
+     * Capture owns one Video identity handoff. Keep the Proposal subject and
+     * payload owner bound to that same canonical UUID before dependencies are
+     * materialized; a missing or conflicting binding must never be repaired by
+     * generating a second Video identity in the executor.
+     *
+     * @param array<string,mixed> $video
+     * @return array<string,mixed>
+     */
+    private function preserveCanonicalOwnerBinding(array $video): array
+    {
+        if (($video['entity_type'] ?? 'video') !== 'video' || ($video['operation'] ?? 'ingest') !== 'ingest') return $video;
+        $payload = is_array($video['payload'] ?? null) ? $video['payload'] : [];
+        $payloadId = trim((string) ($payload['canonical_id'] ?? ''));
+        $subjectId = trim((string) ($video['subject_id'] ?? ''));
+        if ($payloadId !== '' && !UuidCodec::isValid($payloadId)) throw new \RuntimeException('VIDEO_CANONICAL_IDENTITY_INVALID');
+        if ($subjectId !== '' && !UuidCodec::isValid($subjectId)) throw new \RuntimeException('VIDEO_CANONICAL_IDENTITY_INVALID');
+        if ($payloadId !== '' && $subjectId !== '' && strtolower($payloadId) !== strtolower($subjectId)) throw new \RuntimeException('VIDEO_CANONICAL_IDENTITY_CONFLICT');
+        $canonicalId = $payloadId !== '' ? $payloadId : $subjectId;
+        // Standalone preview packets may intentionally defer UUID allocation
+        // until the governed writer. Capture-owned packets with either side
+        // present are normalized here; they must never carry two identities.
+        if ($canonicalId === '') return $video;
+        $payload['canonical_id'] = $canonicalId;
+        $video['payload'] = $payload;
+        $video['subject_id'] = $canonicalId;
+        return $video;
     }
 
     /** @return array{status:string,explicit:bool,subject:array<string,mixed>,reason:string} */

@@ -19,6 +19,38 @@ final class CaptureVideoProvenancePlannerTest extends TestCase
 {
     private const VARIANT = '11111111-1111-4111-8111-111111111111';
 
+    public function test_capture_video_keeps_proposal_subject_and_payload_canonical_owner_identical(): void
+    {
+        $videoId = UuidCodec::newV7();
+        $plan = (new CaptureVideoProvenancePlanner())->plan(
+            'capture-owner-binding',
+            ['operation' => 'ingest', 'entity_type' => 'video', 'subject_id' => $videoId, 'payload' => [
+                'canonical_id' => $videoId,
+                'url' => 'https://www.youtube.com/watch?v=abcdefghijk',
+                'metadata' => ['source' => ['platform' => 'youtube', 'external_video_id' => 'abcdefghijk', 'source_title' => 'Video source']],
+            ]],
+            ['platform' => 'youtube', 'external_video_id' => 'abcdefghijk', 'canonical_source_url' => 'https://www.youtube.com/watch?v=abcdefghijk', 'source_title' => 'Video source'],
+            ['id' => self::VARIANT, 'type' => 'variant', 'name' => 'Variant A'],
+        );
+
+        self::assertSame($videoId, $plan['video_proposal']['subject_id']);
+        self::assertSame($videoId, $plan['video_proposal']['payload']['canonical_id']);
+    }
+
+    public function test_capture_video_rejects_conflicting_proposal_and_payload_identity(): void
+    {
+        $this->expectExceptionMessage('VIDEO_CANONICAL_IDENTITY_CONFLICT');
+        (new CaptureVideoProvenancePlanner())->plan(
+            'capture-owner-conflict',
+            ['operation' => 'ingest', 'entity_type' => 'video', 'subject_id' => UuidCodec::newV7(), 'payload' => [
+                'canonical_id' => UuidCodec::newV7(), 'url' => 'https://www.youtube.com/watch?v=abcdefghijk',
+                'metadata' => ['source' => ['platform' => 'youtube', 'external_video_id' => 'abcdefghijk', 'source_title' => 'Video source']],
+            ]],
+            ['platform' => 'youtube', 'external_video_id' => 'abcdefghijk', 'canonical_source_url' => 'https://www.youtube.com/watch?v=abcdefghijk', 'source_title' => 'Video source'],
+            ['id' => self::VARIANT, 'type' => 'variant', 'name' => 'Variant A'],
+        );
+    }
+
     public function test_new_video_gets_governed_source_claim_evidence_chain_before_about_attachment(): void
     {
         $planner = new CaptureVideoProvenancePlanner();
