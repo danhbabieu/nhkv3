@@ -1,5 +1,36 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-18 — Homepage bounded latest-feed read model (LOCAL / NO LIVE MUTATION)
+
+SCOPE: Replaced the homepage latest-feed merge inputs with bounded candidate
+readers for the actual feed owners: Video, Media/Image, Knowledge and all
+registered Authority types. The visible limit is 12 and the deterministic
+per-owner candidate cap is 24. No persistent cache, remote probe, database
+write, deployment, semantic mutation or staging read was performed.
+
+ORDERING: The existing Shared Feed Ordering contract remains authoritative:
+published_at descending, then created_at descending, then canonical identity
+descending. Video SQL orders by the persisted source publication timestamp;
+other owners order by created_at. The application still performs the shared
+global sort before slicing, with canonical identity/URL dedupe before final
+render.
+
+BOUNDARY: Production WPDB repositories now expose a read-only bounded latest
+candidate boundary with active-state filtering and SQL LIMIT. Legacy adapters
+without that optional boundary retain a compatibility fallback capped after
+their existing list call; production composition uses the bounded readers.
+The existing presentation-safe visual policy and request-scope memoization are
+unchanged. `LATEST_FEED_TYPES=Video,Media/Image,Knowledge,registered Authority`
+`LATEST_VISIBLE_LIMIT=12` `LATEST_CANDIDATE_CAP=24`.
+
+VERIFICATION: Focused HomeSemanticQuery tests pass 10 tests / 26 assertions;
+changed PHP files lint clean and git diff --check passes. Full-suite and
+database-backed verification remain pending. `MEDIA_LOOKUPS_BEFORE/AFTER` are
+not runtime-measured in this local checkpoint; no claim of live query-count or
+wall-time improvement is made.
+
+STATUS: `HOMEPAGE_BOUNDED_LATEST_FEED_LOCAL_READY / NO_LIVE_MUTATION`
+
 # Checkpoint — 2026-09-18 — Homepage server performance audit (READ-ONLY / INSTRUMENTATION BLOCKED)
 
 SCOPE: Audited the real staging homepage through the connected browser and

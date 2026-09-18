@@ -4,11 +4,12 @@ declare(strict_types=1);
 namespace NHK\Core\Infrastructure\Video;
 
 use NHK\Core\Contracts\Video\VideoRepository;
+use NHK\Core\Contracts\Home\BoundedLatestFeedReader;
 use NHK\Core\Application\Video\YouTubeUrlNormalizer;
 use NHK\Core\Domain\Video\{Video, VideoException};
 use NHK\Core\Shared\Uuid\UuidCodec;
 
-final class WpdbVideoRepository implements VideoRepository
+final class WpdbVideoRepository implements VideoRepository, BoundedLatestFeedReader
 {
     private string $table;
 
@@ -69,6 +70,14 @@ final class WpdbVideoRepository implements VideoRepository
     {
         $state = $includeRetired ? '' : ' WHERE state=1';
         $rows = $this->database->get_results("SELECT * FROM {$this->table}{$state} ORDER BY id", ARRAY_A);
+        return array_values(array_filter(array_map(fn (array $row): ?Video => $this->hydrate($row), $rows ?: []), static fn (?Video $video): bool => $video !== null));
+    }
+
+    public function latestFeedCandidates(int $limit): array
+    {
+        $limit = max(1, min(100, $limit));
+        $published = "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.source_snapshot.published_at')), JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.source.published_at')), '')";
+        $rows = $this->database->get_results($this->database->prepare("SELECT * FROM {$this->table} WHERE state=1 ORDER BY {$published} DESC, created_at DESC, id DESC LIMIT %d", $limit), ARRAY_A);
         return array_values(array_filter(array_map(fn (array $row): ?Video => $this->hydrate($row), $rows ?: []), static fn (?Video $video): bool => $video !== null));
     }
 

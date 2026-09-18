@@ -16,9 +16,12 @@ use NHK\Core\Domain\Authority\EntityTypeRegistry;
 use NHK\Core\Domain\Seo\SeoReadinessResult;
 use NHK\Core\Shared\Migration\MigrationStatus;
 use NHK\Core\Application\Presentation\{HomepageVisualPolicy, LatestFirstOrder, PublicNavigationDefinition};
+use NHK\Core\Contracts\Home\BoundedLatestFeedReader;
 
 final class HomeSemanticQuery
 {
+    public const LATEST_VISIBLE_LIMIT = 12;
+    public const LATEST_CANDIDATE_CAP = 24;
     /** Request-scope read memoization only; no persistent/public cache is introduced here. */
     private ?array $mediaItemsMemo = null;
     private ?array $videoItemsMemo = null;
@@ -150,7 +153,7 @@ final class HomeSemanticQuery
     private function latestFeed(array $modules): array
     {
         $items = [];
-        foreach ($this->videoItems() as $video) {
+        foreach ($this->latestCandidates($this->videos, fn (): array => $this->videoItems()) as $video) {
             if (!$this->ready('video') || !$video->active || !$video->hasValidPublicReference()) continue;
             $metadata = is_array($video->metadata) ? $video->metadata : [];
             $source = is_array($metadata['source_snapshot'] ?? null) ? $metadata['source_snapshot'] : (is_array($metadata['source'] ?? null) ? $metadata['source'] : []);
@@ -160,13 +163,13 @@ final class HomeSemanticQuery
             $thumbnail = (new \NHK\Core\Application\Video\VideoThumbnailSelector())->presentationFromSource($source);
             $items[] = $this->feedItem('video', 'Video', (string) (($editorial['title'] ?? '') ?: $video->title ?: 'Video'), $url, $this->videoPublishedAt($video), $video->createdAt, (string) ($editorial['summary'] ?? ''), $thumbnail['url'] ?? null, $thumbnail['width'] ?? null, $thumbnail['height'] ?? null, $video->canonicalId);
         }
-        foreach ($this->mediaItems() as $media) {
+        foreach ($this->latestCandidates($this->media, fn (): array => $this->mediaItems()) as $media) {
             if (!$this->ready('media') || !$media->active || $media->readiness !== 'ready' || $media->isSystemPlaceholder()) continue;
             $visual = $this->mediaVisual($media->canonicalId);
             $visual = is_array($visual) ? $visual : [];
             $items[] = $this->feedItem('media', 'Ảnh', $media->canonicalName, $visual['article_url'] ?? (function_exists('home_url') ? \home_url('/thu-vien/') : '/thu-vien/'), null, $media->createdAt, (string) ($visual['summary'] ?? 'Ảnh tư liệu trong kho hình ảnh NHK.'), $visual['image_url'] ?? null, $visual['width'] ?? null, $visual['height'] ?? null, $media->canonicalId, $visual);
         }
-        if ($this->claims !== null && $this->ready('knowledge')) foreach ($this->claims->list() as $claim) {
+        if ($this->claims !== null && $this->ready('knowledge')) foreach ($this->latestCandidates($this->claims, fn (): array => $this->claims?->list() ?? []) as $claim) {
             if (!$claim->active || !$claim->isPublic()) continue;
             $metadata = is_array($claim->provenance['metadata'] ?? null) ? $claim->provenance['metadata'] : [];
             $subjectId = trim((string) ($metadata['subject_uuid'] ?? $metadata['subject_id'] ?? $metadata['canonical_subject_uuid'] ?? ''));
@@ -174,16 +177,38 @@ final class HomeSemanticQuery
             if ($url === null) continue;
             $items[] = $this->feedItem('knowledge', 'Tri thức', $this->shorten($claim->claimText, 16), $url, null, $claim->createdAt, $claim->claimText, null, null, null, $claim->canonicalId);
         }
-        if ($this->ready('authority')) foreach ($this->types->all() as $definition) foreach ($this->authorityItems($definition->type) as $entity) {
+        if ($this->ready('authority')) {
+            $authorityCandidates = $this->authority instanceof BoundedLatestFeedReader
+                ? $this->authority->latestFeedCandidates(self::LATEST_CANDIDATE_CAP)
+                : array_merge([], ...array_map(fn ($definition): array => $this->authorityItems($definition->type), $this->types->all()));
+            foreach ($authorityCandidates as $entity) {
             if (!$entity->active() || $entity->createdAt === null) continue;
             $detail = $this->entityDetail($entity);
             if (!is_array($detail) || trim((string) ($detail['url'] ?? '')) === '') continue;
             $representative = $detail['media']['representative'] ?? [];
             $labels = ['brand' => 'Thương hiệu', 'model' => 'Mẫu', 'variant' => 'Mẫu', 'movement' => 'Bộ máy', 'music' => 'Bản nhạc', 'classification' => 'Phân loại', 'component' => 'Linh kiện', 'specimen' => 'Hiện vật', 'product' => 'Sản phẩm'];
-            $items[] = $this->feedItem($entity->entityType, $labels[$entity->entityType] ?? 'Hồ sơ', $entity->canonicalName, (string) $detail['url'], null, $entity->createdAt, (string) ($detail['description'] ?? ''), $representative['url'] ?? null, $representative['width'] ?? null, $representative['height'] ?? null, $entity->canonicalId, $representative);
+                $items[] = $this->feedItem($entity->entityType, $labels[$entity->entityType] ?? 'Hồ sơ', $entity->canonicalName, (string) $detail['url'], null, $entity->createdAt, (string) ($detail['description'] ?? ''), $representative['url'] ?? null, $representative['width'] ?? null, $representative['height'] ?? null, $entity->canonicalId, $representative);
+            }
         }
         $items = LatestFirstOrder::sort($items, static fn (array $item): ?string => (string) ($item['timestamp'] ?? ''), static fn (array $item): ?string => (string) ($item['created_at'] ?? ''), static fn (array $item): string => (string) ($item['tie_breaker'] ?? ''));
-        return array_slice($items, 0, 12);
+        $deduped = [];
+        $seen = [];
+        foreach ($items as $item) {
+            $identity = trim((string) ($item['tie_breaker'] ?? ''));
+            $url = trim((string) ($item['url'] ?? ''));
+            if (($identity === '' && $url === '') || ($identity !== '' && isset($seen['id:' . $identity])) || ($identity === '' && $url !== '' && isset($seen['url:' . $url]))) continue;
+            if ($identity !== '') $seen['id:' . $identity] = true;
+            if ($identity === '' && $url !== '') $seen['url:' . $url] = true;
+            $deduped[] = $item;
+        }
+        return array_slice($deduped, 0, self::LATEST_VISIBLE_LIMIT);
+    }
+
+    /** @return list<object> */
+    private function latestCandidates(object $repository, callable $fallback): array
+    {
+        if ($repository instanceof BoundedLatestFeedReader) return $repository->latestFeedCandidates(self::LATEST_CANDIDATE_CAP);
+        return array_slice($fallback(), 0, self::LATEST_CANDIDATE_CAP);
     }
 
     private function publicEntityUrl(string $id): ?string

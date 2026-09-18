@@ -9,6 +9,7 @@ use NHK\Core\Application\Entity\{PublicEntityCollectionQuery, PublicEntityEligib
 use NHK\Core\Application\Media\PublicMediaGalleryQuery;
 use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository};
 use NHK\Core\Contracts\Video\VideoRepository;
+use NHK\Core\Contracts\Home\BoundedLatestFeedReader;
 use NHK\Core\Domain\Authority\{AuthorityEntity, AuthorityState, CanonicalEntityTypeCatalog, EntityTypeRegistry};
 use NHK\Core\Domain\Media\{Media, MediaAsset};
 use NHK\Core\Domain\Video\Video;
@@ -171,6 +172,32 @@ final class HomeSemanticQueryTest extends TestCase
         self::assertSame(1, $mediaRepo->listCalls);
         self::assertSame(1, $mediaRepo->findCalls);
         self::assertSame(1, $videoRepo->listCalls);
+    }
+
+    public function test_latest_feed_reads_a_bounded_large_media_dataset_and_returns_global_top_twelve(): void
+    {
+        $items = [];
+        for ($index = 0; $index < 100; $index++) {
+            $items[] = new Media(UuidCodec::newV7(), 'latest-' . $index, 'Ảnh ' . $index, 'ready', [], true, 1, sprintf('2026-01-%03d 00:00:00', $index + 1));
+        }
+        $repository = new class($items) implements MediaRepository, BoundedLatestFeedReader {
+            public int $boundedCalls = 0;
+            public function __construct(private array $items) {}
+            public function latestFeedCandidates(int $limit): array { $this->boundedCalls++; return array_slice(array_reverse($this->items), 0, $limit); }
+            public function findByCanonicalId(string $id): ?Media { return null; }
+            public function findByStableKey(string $key): ?Media { return null; }
+            public function create(Media $media): Media { return $media; }
+            public function update(Media $media, int $expectedRevision): Media { return $media; }
+            public function list(bool $includeRetired = false): array { throw new \LogicException('latest feed must not use the unbounded list reader'); }
+        };
+        $query = new HomeSemanticQuery(new InMemoryAuthorityRepository(), $repository, $this->videos([]), new EntityTypeRegistry());
+        $method = new \ReflectionMethod($query, 'latestFeed');
+        $feed = $method->invoke($query, []);
+
+        self::assertSame(1, $repository->boundedCalls);
+        self::assertCount(HomeSemanticQuery::LATEST_VISIBLE_LIMIT, $feed);
+        self::assertSame('Ảnh 99', $feed[0]['title']);
+        self::assertSame('Ảnh 88', $feed[11]['title']);
     }
 
     private function media(array $items): MediaRepository

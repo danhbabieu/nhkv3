@@ -4,10 +4,11 @@ declare(strict_types=1);
 namespace NHK\Core\Infrastructure\Media;
 
 use NHK\Core\Contracts\Media\MediaRepository;
+use NHK\Core\Contracts\Home\BoundedLatestFeedReader;
 use NHK\Core\Domain\Media\{Media, MediaException};
 use NHK\Core\Shared\Uuid\UuidCodec;
 
-final class WpdbMediaRepository implements MediaRepository
+final class WpdbMediaRepository implements MediaRepository, BoundedLatestFeedReader
 {
     private string $table;
 
@@ -60,6 +61,13 @@ final class WpdbMediaRepository implements MediaRepository
     {
         $state = $includeRetired ? '' : ' WHERE state=1';
         $rows = $this->database->get_results("SELECT * FROM {$this->table}{$state} ORDER BY id", ARRAY_A);
+        return array_values(array_filter(array_map(fn (array $row): ?Media => $this->hydrate($row), $rows ?: []), static fn (?Media $media): bool => $media !== null));
+    }
+
+    public function latestFeedCandidates(int $limit): array
+    {
+        $limit = max(1, min(100, $limit));
+        $rows = $this->database->get_results($this->database->prepare("SELECT * FROM {$this->table} WHERE state=1 ORDER BY created_at DESC, id DESC LIMIT %d", $limit), ARRAY_A);
         return array_values(array_filter(array_map(fn (array $row): ?Media => $this->hydrate($row), $rows ?: []), static fn (?Media $media): bool => $media !== null));
     }
 
