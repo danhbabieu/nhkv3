@@ -1,5 +1,26 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-18 — Homepage presentation-safe visual policy (LOCAL / NO LIVE MUTATION)
+
+SCOPE: Added a read-only compact-card visual policy for the homepage latest
+feed and homepage Video cards. Persisted compact candidates render as images;
+oversized remote-only candidates, including legacy 1280px YouTube thumbnails,
+render type-specific lightweight fallback tiles. No URL rewriting, remote
+thumbnail probe, source mutation, Governance apply, deployment or live data
+mutation was performed.
+
+BOUNDARY: Attachment-backed Article visuals remain responsive when a valid
+srcset exists. Hero rendering and Video detail projection remain unchanged.
+The policy is metadata-based and fail-closed when dimensions or delivery
+metadata are missing; it does not create a new semantic owner or persisted
+visual state.
+
+VERIFICATION: Focused homepage/video/frontend tests pass after updating the
+compact-candidate fixture; changed PHP files lint clean and git diff --check
+passes. Full-suite verification remains to be run separately.
+
+STATUS: `HOMEPAGE_VISUAL_PERFORMANCE_POLICY_LOCAL_READY / LEGACY_FALLBACK_NO_MUTATION`
+
 # Checkpoint — 2026-09-18 — Existing-Capture Video Proposal canonical reuse regression (LOCAL / NO LIVE MUTATION)
 
 SCOPE: Fixed the continuation regression where a pending Video Proposal was

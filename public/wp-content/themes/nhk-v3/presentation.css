@@ -54,5 +54,6 @@
 .visual-frame.nhk-media--square{aspect-ratio:1}
 .visual-frame.nhk-media--landscape{aspect-ratio:4/3}
 .video-play{position:absolute;inset:auto auto 14px 14px;display:grid;place-items:center;width:42px;height:42px;border-radius:50%;background:rgba(255,253,249,.94);color:var(--nhk-accent);box-shadow:0 5px 18px rgba(57,41,28,.15)}
+.homepage-visual-fallback{display:grid;place-items:center;align-content:center;gap:8px;width:100%;height:100%;min-height:78px;background:linear-gradient(135deg,#f2ece3,#e4d8c9);color:var(--nhk-text);text-align:center}.homepage-visual-icon{display:grid;place-items:center;width:42px;height:42px;border:1px solid rgba(57,41,28,.22);border-radius:50%;font-size:1.1rem}.homepage-visual-fallback small{font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase}.latest-feed-thumb .homepage-visual-fallback{min-height:78px}.video-poster .homepage-visual-fallback{aspect-ratio:16/9}.video-poster .video-play{z-index:1}
 @media(max-width:48rem){.local-section-nav{margin-inline:calc(-1 * var(--nhk-gutter, 14px));padding-inline:var(--nhk-gutter, 14px)}.local-section-nav ul{overflow-x:auto;padding-bottom:2px}.entity-card-body{padding:15px}.visual-rail{gap:14px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important}}

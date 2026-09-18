@@ -15,7 +15,7 @@ use NHK\Core\Contracts\Knowledge\KnowledgeRepository;
 use NHK\Core\Domain\Authority\EntityTypeRegistry;
 use NHK\Core\Domain\Seo\SeoReadinessResult;
 use NHK\Core\Shared\Migration\MigrationStatus;
-use NHK\Core\Application\Presentation\{LatestFirstOrder, PublicNavigationDefinition};
+use NHK\Core\Application\Presentation\{HomepageVisualPolicy, LatestFirstOrder, PublicNavigationDefinition};
 
 final class HomeSemanticQuery
 {
@@ -28,6 +28,7 @@ final class HomeSemanticQuery
     private array $mediaVisualMemo = [];
     /** @var array<string,array<string,mixed>|null> */
     private array $entityDetailMemo = [];
+    private ?HomepageVisualPolicy $visualPolicy = null;
 
     public function __construct(
         private AuthorityRepository $authority,
@@ -118,14 +119,16 @@ final class HomeSemanticQuery
                 $editorial = is_array($metadata['editorial'] ?? null) ? $metadata['editorial'] : [];
                 $title = trim((string) ($editorial['title'] ?? '')) ?: ($item->title ?: 'Video');
                 $thumbnail = (new \NHK\Core\Application\Video\VideoThumbnailSelector())->presentationFromSource($source);
+                $visual = $this->visualPolicy()->resolve(['type' => 'video', 'image_url' => $thumbnail['url'] ?? null, 'width' => $thumbnail['width'] ?? null, 'height' => $thumbnail['height'] ?? null]);
                 $modules['videos_total']++;
                 if (count($modules['videos']) >= 6) continue;
                 $modules['videos'][] = [
                     'title' => $title,
                     'platform' => $item->platform,
                     'url' => (new PublicSeoProjection())->project((new VideoUrlPolicy())->project($item, new VideoPublicContextSelector()), ['type' => 'VideoObject'])['internal_link'] ?? null,
-                    'thumbnail_url' => $thumbnail['url'] ?? null,
-                    'thumbnail' => $thumbnail,
+                    'thumbnail_url' => $visual['image_url'] ?? null,
+                    'thumbnail' => $visual['visual_kind'] === 'image' ? $thumbnail : [],
+                    'visual_kind' => $visual['visual_kind'],
                     'published_at' => $this->videoPublishedAt($item),
                     'subject_context' => trim((string) ($editorial['subject_context'] ?? $editorial['summary'] ?? '')),
                 ];
@@ -161,7 +164,7 @@ final class HomeSemanticQuery
             if (!$this->ready('media') || !$media->active || $media->readiness !== 'ready' || $media->isSystemPlaceholder()) continue;
             $visual = $this->mediaVisual($media->canonicalId);
             $visual = is_array($visual) ? $visual : [];
-            $items[] = $this->feedItem('media', 'Ảnh', $media->canonicalName, $visual['article_url'] ?? (function_exists('home_url') ? \home_url('/thu-vien/') : '/thu-vien/'), null, $media->createdAt, (string) ($visual['summary'] ?? 'Ảnh tư liệu trong kho hình ảnh NHK.'), $visual['image_url'] ?? null, $visual['width'] ?? null, $visual['height'] ?? null, $media->canonicalId);
+            $items[] = $this->feedItem('media', 'Ảnh', $media->canonicalName, $visual['article_url'] ?? (function_exists('home_url') ? \home_url('/thu-vien/') : '/thu-vien/'), null, $media->createdAt, (string) ($visual['summary'] ?? 'Ảnh tư liệu trong kho hình ảnh NHK.'), $visual['image_url'] ?? null, $visual['width'] ?? null, $visual['height'] ?? null, $media->canonicalId, $visual);
         }
         if ($this->claims !== null && $this->ready('knowledge')) foreach ($this->claims->list() as $claim) {
             if (!$claim->active || !$claim->isPublic()) continue;
@@ -177,7 +180,7 @@ final class HomeSemanticQuery
             if (!is_array($detail) || trim((string) ($detail['url'] ?? '')) === '') continue;
             $representative = $detail['media']['representative'] ?? [];
             $labels = ['brand' => 'Thương hiệu', 'model' => 'Mẫu', 'variant' => 'Mẫu', 'movement' => 'Bộ máy', 'music' => 'Bản nhạc', 'classification' => 'Phân loại', 'component' => 'Linh kiện', 'specimen' => 'Hiện vật', 'product' => 'Sản phẩm'];
-            $items[] = $this->feedItem($entity->entityType, $labels[$entity->entityType] ?? 'Hồ sơ', $entity->canonicalName, (string) $detail['url'], null, $entity->createdAt, (string) ($detail['description'] ?? ''), $representative['url'] ?? null, $representative['width'] ?? null, $representative['height'] ?? null, $entity->canonicalId);
+            $items[] = $this->feedItem($entity->entityType, $labels[$entity->entityType] ?? 'Hồ sơ', $entity->canonicalName, (string) $detail['url'], null, $entity->createdAt, (string) ($detail['description'] ?? ''), $representative['url'] ?? null, $representative['width'] ?? null, $representative['height'] ?? null, $entity->canonicalId, $representative);
         }
         $items = LatestFirstOrder::sort($items, static fn (array $item): ?string => (string) ($item['timestamp'] ?? ''), static fn (array $item): ?string => (string) ($item['created_at'] ?? ''), static fn (array $item): string => (string) ($item['tie_breaker'] ?? ''));
         return array_slice($items, 0, 12);
@@ -230,7 +233,7 @@ final class HomeSemanticQuery
         return $this->entityDetailMemo[$entity->canonicalId] = $this->collection()->detailForEntity($entity);
     }
 
-    private function feedItem(string $type, string $label, string $title, string $url, ?string $publishedAt, ?string $createdAt, string $summary, mixed $image, mixed $width, mixed $height, string $tieBreaker): array
+    private function feedItem(string $type, string $label, string $title, string $url, ?string $publishedAt, ?string $createdAt, string $summary, mixed $image, mixed $width, mixed $height, string $tieBreaker, array $visual = []): array
     {
         $plainSummary = function_exists('wp_strip_all_tags') ? \wp_strip_all_tags($summary) : strip_tags($summary);
         $normalizedWidth = is_numeric($width) ? (int) $width : null;
@@ -238,7 +241,10 @@ final class HomeSemanticQuery
         $orientation = $normalizedWidth !== null && $normalizedHeight !== null && $normalizedWidth > 0 && $normalizedHeight > 0
             ? ($normalizedHeight > $normalizedWidth ? 'portrait' : ($normalizedWidth === $normalizedHeight ? 'square' : 'landscape'))
             : 'unknown';
-        return ['type' => $type, 'label' => $label, 'title' => trim($title), 'url' => $url, 'timestamp' => $publishedAt, 'created_at' => $createdAt, 'summary' => $this->shorten($plainSummary, 24), 'image_url' => is_string($image) && $image !== '' ? $image : null, 'orientation' => $orientation, 'width' => $normalizedWidth, 'height' => $normalizedHeight, 'tie_breaker' => $tieBreaker];
+        $item = ['type' => $type, 'label' => $label, 'title' => trim($title), 'url' => $url, 'timestamp' => $publishedAt, 'created_at' => $createdAt, 'summary' => $this->shorten($plainSummary, 24), 'image_url' => is_string($image) && $image !== '' ? $image : null, 'orientation' => $orientation, 'width' => $normalizedWidth, 'height' => $normalizedHeight, 'tie_breaker' => $tieBreaker];
+        $item = array_merge($item, $visual);
+        if (!isset($item['visual_kind'])) $item = $this->visualPolicy()->resolve($item);
+        return $item;
     }
 
     private function shorten(string $value, int $words): string
@@ -261,6 +267,7 @@ final class HomeSemanticQuery
     }
 
     private function routes(): PublicRouteResolver { return $this->routes ??= new PublicRouteResolver($this->authority, $this->types); }
+    private function visualPolicy(): HomepageVisualPolicy { return $this->visualPolicy ??= new HomepageVisualPolicy(); }
     private function collection(): PublicEntityCollectionQuery
     {
         return $this->collection ??= new PublicEntityCollectionQuery($this->authority, $this->types, new PublicIdentityContract($this->types), new PublicEntityEligibilityPolicy($this->authority, $this->types, $this->routes()), $this->routes());

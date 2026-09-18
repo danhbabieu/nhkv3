@@ -42,7 +42,7 @@ final class HomeSemanticQueryTest extends TestCase
     {
         $media = new Media($mediaId = UuidCodec::newV7(), 'front', 'Ảnh mặt trước', 'ready');
         $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'derivative', 'front.jpg', hash('sha256', 'x'), 'image/jpeg', 1, 1200, 800, 'PUBLIC', ['canonical_filename' => 'front.jpg']);
-        $video = new Video(UuidCodec::newV7(), 'youtube', 'dQw4w9WgXcQ', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'Video kỹ thuật', ['source_snapshot' => ['availability' => 'available', 'thumbnail_urls' => ['https://img.example.test/video.jpg']]]);
+        $video = new Video(UuidCodec::newV7(), 'youtube', 'dQw4w9WgXcQ', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'Video kỹ thuật', ['source_snapshot' => ['availability' => 'available', 'thumbnail_selection' => ['url' => 'https://img.example.test/video.jpg', 'variant' => 'mqdefault', 'width' => 320, 'height' => 180]]]);
         $mediaRepo = $this->media([$media]);
         $gallery = new PublicMediaGalleryQuery($mediaRepo, $this->assets([$asset]));
 
