@@ -1,5 +1,29 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-18 — Homepage hero slider presentation slice (LOCAL READY / DEPLOY PENDING)
+
+SCOPE: Added a presentation-only homepage hero slider with Vietnamese-first
+editorial copy, manual-first Media selection and deterministic auto fallback.
+No Media, MediaAsset, MediaUsage, Authority, Knowledge, Graph, Article or
+staging/production record was mutated.
+
+IMPLEMENTATION: Manual selection reads the presentation option
+`nhk_v3_home_hero_media_ids` and filter of exact canonical Media UUIDs, keeps
+owner order and ignores ineligible/missing items. Auto fill reuses the existing
+public Media gallery read model, excludes duplicate Media/visual URLs, prefers
+available intrinsic dimensions and keeps deterministic canonical-ID ties. The
+template classifies portrait/landscape/square/unknown from width/height,
+renders with `object-fit: contain`, emits width/height, eager/high-priority
+first image and lazy later images. Vanilla JS provides next/previous,
+indicators, keyboard controls, hover/focus pause and reduced-motion handling.
+
+VERIFICATION: Focused Home/Frontend unit suite passes 28 tests / 128
+assertions with existing warning/deprecations; PHP lint, JS syntax check and
+`git diff --check` pass. Staging homepage remains the previous deployed build
+and does not yet show this local slice; no push/pull/deploy was performed.
+
+STATUS: `HOMEPAGE_HERO_SLIDER_LOCAL_READY / DEPLOY_PENDING / SEMANTIC_MUTATION_NONE`
+
 # Checkpoint — 2026-09-18 — Authority staging admission was an Atherton allowlist (LOCAL READY / DEPLOY PENDING)
 
 SCOPE: Repaired the repository-owned Authority staging admission provider. No

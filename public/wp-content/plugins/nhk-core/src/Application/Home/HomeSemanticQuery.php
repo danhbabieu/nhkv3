@@ -80,6 +80,16 @@ final class HomeSemanticQuery
                 $modules['media_total']++;
                 if (count($modules['media']) < 8) $modules['media'][] = $visual;
             }
+            $manualIds = function_exists('get_option') ? (array) get_option('nhk_v3_home_hero_media_ids', []) : [];
+            if (function_exists('apply_filters')) $manualIds = apply_filters('nhk_v3_home_hero_media_ids', $manualIds);
+            $heroCandidates = [];
+            foreach ($mediaItems as $item) {
+                $visual = $this->gallery->forMedia($item->canonicalId);
+                if (!is_array($visual) || trim((string) ($visual['image_url'] ?? '')) === '' || ($visual['has_real_image'] ?? false) !== true) continue;
+                $visual['_canonical_id'] = $item->canonicalId;
+                $heroCandidates[] = $visual;
+            }
+            $modules['hero_media'] = (new HomeHeroMediaSelector())->select((array) $manualIds, $heroCandidates);
         }
 
         if ($this->ready('video')) {

@@ -2,16 +2,28 @@
 $home = (new NHK_V3_Home_Page_Query())->read();
 $GLOBALS['nhk_v3_home_data'] = $home;
 $semantic = is_array($home['semantic'] ?? null) ? $home['semantic'] : [];
+$heroMedia = is_array($semantic['hero_media'] ?? null) ? array_slice($semantic['hero_media'], 0, 5) : [];
 $fallback = get_theme_file_uri('/assets/default-archive.svg');
 get_header();
 ?>
 <main id="main-content" class="site-main home-page-v2">
-  <section class="hero home-hero-v2">
+  <section class="hero home-hero-v2 home-hero-with-slider">
     <div class="hero-copy-block">
-      <p class="eyebrow">Kho tri thức · hình ảnh · video · hiện vật</p>
-      <h1>Mỗi chiếc đồng hồ cổ<br> <em>mang một câu chuyện.</em></h1>
-      <p class="hero-copy">Một cửa vào chung cho bài nghiên cứu, thương hiệu, mẫu, biến thể, bộ máy, bản nhạc, linh kiện, hiện vật, hình ảnh, video và từ điển đang được lưu trữ trong hệ thống.</p>
+      <p class="eyebrow">Kho tri thức · hiện vật thật · nghiên cứu thật</p>
+      <h1>Kho tri thức đồng hồ cổ<br> <em>dành cho người chơi và sưu tầm.</em></h1>
+      <p class="hero-tagline">Mỗi chiếc đồng hồ cổ mang một câu chuyện.</p>
+      <p class="hero-copy">Khám phá thương hiệu, mẫu máy, bộ máy, bản nhạc, hình ảnh, video và những chi tiết giúp nhận diện từng hiện vật trong cùng một hệ thống tra cứu.</p>
+      <ul class="hero-values"><li>Tra cứu thương hiệu và mẫu đồng hồ</li><li>Xem ảnh thực tế và video</li><li>Tìm hiểu bộ máy, bản nhạc, linh kiện</li><li>Kết nối tri thức với hiện vật sưu tầm</li></ul>
       <?php get_search_form(); ?>
+    </div>
+    <div class="hero-media-column">
+    <div class="hero-visual-slider" data-nhk-hero-slider aria-label="Ảnh nổi bật từ kho NHK">
+      <?php if ($heroMedia !== []): ?><div class="hero-slides">
+        <?php foreach ($heroMedia as $index => $item): $dimensions = nhk_v3_media_dimensions($item); $orientation = nhk_v3_media_orientation_class($dimensions['width'], $dimensions['height']); $alt = trim((string) ($item['alt'] ?? $item['title'] ?? 'Ảnh tư liệu NHK')); ?>
+          <figure class="hero-slide <?php echo esc_attr($orientation); ?><?php echo $index === 0 ? ' is-active' : ''; ?>" data-hero-slide="<?php echo esc_attr((string) $index); ?>"<?php echo $index === 0 ? '' : ' hidden'; ?>><img src="<?php echo esc_url((string) $item['image_url']); ?>" alt="<?php echo esc_attr($alt); ?>" width="<?php echo esc_attr((string) max(1, $dimensions['width'])); ?>" height="<?php echo esc_attr((string) max(1, $dimensions['height'])); ?>" <?php echo $index === 0 ? 'loading="eager" fetchpriority="high"' : 'loading="lazy"'; ?>><figcaption><?php echo esc_html((string) ($item['title'] ?? 'Ảnh tư liệu NHK')); ?></figcaption></figure>
+        <?php endforeach; ?>
+      </div><div class="hero-slider-controls"><button type="button" data-hero-prev aria-label="Ảnh trước">←</button><span data-hero-status aria-live="polite">1 / <?php echo esc_html((string) count($heroMedia)); ?></span><button type="button" data-hero-next aria-label="Ảnh tiếp theo">→</button></div><div class="hero-slider-dots" role="tablist" aria-label="Chọn ảnh nổi bật"><?php foreach ($heroMedia as $index => $_item): ?><button type="button" role="tab" data-hero-dot="<?php echo esc_attr((string) $index); ?>" aria-label="Ảnh <?php echo esc_attr((string) ($index + 1)); ?>" aria-selected="<?php echo $index === 0 ? 'true' : 'false'; ?>"></button><?php endforeach; ?></div>
+      <?php else: ?><div class="hero-slider-empty" role="status">Kho ảnh đang được bổ sung.</div><?php endif; ?>
     </div>
     <aside class="hero-index" aria-label="Lối vào nhanh">
       <?php /* Canonical discovery paths remain /thuong-hieu/, /loai-dong-ho/, /mau/, /bo-may/, /ban-nhac/, /so-sanh/, /linh-kien/, /hien-vat/ and /video/ (including home_url('/so-sanh/')); labels and rendering come from the shared navigation definition. */ ?>
@@ -19,6 +31,7 @@ get_header();
       <a href="<?php echo esc_url(home_url($quickPath)); ?>"><span><?php echo esc_html(str_pad((string) $quickIndex, 2, '0', STR_PAD_LEFT)); ?></span><strong><?php echo esc_html($quickLabel); ?></strong></a>
       <?php endforeach; ?>
     </aside>
+    </div>
   </section>
 
   <?php $hubs = is_array($semantic['hubs'] ?? null) ? $semantic['hubs'] : []; if ($hubs !== []): ?>

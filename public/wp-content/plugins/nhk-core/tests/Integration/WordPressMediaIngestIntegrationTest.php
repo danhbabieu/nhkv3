@@ -242,6 +242,9 @@ final class WordPressMediaIngestIntegrationTest extends TestCase
             $mediaAssets = (new WpdbMediaAssetRepository($wpdb))->listByMediaId($mediaId);
             $publicAssets = array_values(array_filter($mediaAssets, static fn ($asset): bool => $asset->kind === 'derivative' && $asset->visibility === 'PUBLIC'));
             self::assertCount(1, $publicAssets);
+            $mappingAsset = (string) $wpdb->get_var($wpdb->prepare("SELECT asset_uuid FROM {$wpdb->prefix}nhk_media_wordpress_attachments WHERE attachment_id=%d", $attachmentId));
+            self::assertSame($publicAssets[0]->assetId, UuidCodec::fromBinary($mappingAsset));
+            self::assertNotSame($sourceAsset?->assetId, UuidCodec::fromBinary($mappingAsset));
             self::assertSame(900, $publicAssets[0]->width);
             self::assertSame(1200, $publicAssets[0]->height);
             self::assertNotNull((new WordPressMediaAttachmentIngestor())->read($attachmentId));
