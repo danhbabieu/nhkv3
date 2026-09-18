@@ -323,6 +323,58 @@ final class ContextualMediaSeoProjectionTest extends TestCase
         self::assertSame('Tên Media trung tính', $mediaRepo->findByCanonicalId($media->canonicalId)?->canonicalName);
     }
 
+    public function test_visual_support_labels_non_representative_usage_as_media_usage_and_reads_attachment_fallback(): void
+    {
+        [$mediaRepo, $assets, $usages, $service] = $this->stores();
+        $media = $service->create('visual-support-technical', 'Tên Media trung tính', 'ready');
+        $service->addAsset($media->canonicalId, 'original', 'uploads/visual-support-technical.webp', hash('sha256', 'visual-support-technical'), 'image/webp', 10, 1200, 800, 'PUBLIC', [
+            'canonical_filename' => 'visual-support-technical.webp',
+            'wordpress_attachment_id' => 991,
+        ]);
+        $subjectId = '018f5b74-5f0a-7d2e-9a93-c0e7d6dc3371';
+        $service->addUsage($media->canonicalId, 'variant', $subjectId, 'technical_detail', 0, 'Alt kỹ thuật', '', [], '');
+        $requirement = VisualSupportRequirement::create($subjectId, 'variant', 'configuration', 'COMPONENT_DETAIL', 'technical_detail', [], 'variant')->withResolution($media->canonicalId, $media->revision);
+
+        $result = (new VisualSupportPublicProjection($usages, static fn (int $id): array => [
+            'attachment_id' => $id,
+            'title' => 'Tiêu đề Attachment',
+            'alt' => 'Alt Attachment',
+            'caption' => 'Caption Attachment',
+        ]))->resolve($requirement, $media, [$assets->listByMediaId($media->canonicalId)[0]]);
+
+        self::assertSame('MEDIA_USAGE', $result['metadata_source']);
+        self::assertSame('Tên Media trung tính', $result['title']);
+        self::assertSame('Alt kỹ thuật', $result['alt']);
+        self::assertSame('Caption Attachment', $result['caption']);
+        self::assertSame('Tên Media trung tính', $mediaRepo->findByCanonicalId($media->canonicalId)?->canonicalName);
+    }
+
+    public function test_visual_support_uses_verified_attachment_then_explicit_missing(): void
+    {
+        [$media, $assets, $usages, $service] = $this->stores();
+        $subjectId = '018f5b74-5f0a-7d2e-9a93-c0e7d6dc3381';
+        $ready = $service->create('visual-support-attachment', ' ', 'ready');
+        $service->addAsset($ready->canonicalId, 'original', 'uploads/visual-support-attachment.webp', hash('sha256', 'visual-support-attachment'), 'image/webp', 10, 1200, 800, 'PUBLIC', [
+            'canonical_filename' => 'visual-support-attachment.webp',
+            'wordpress_attachment_id' => 992,
+        ]);
+        $requirement = VisualSupportRequirement::create($subjectId, 'variant', 'configuration', 'COMPONENT_DETAIL', 'technical_detail', [], 'variant')->withResolution($ready->canonicalId, $ready->revision);
+        $result = (new VisualSupportPublicProjection(null, static fn (int $id): array => ['attachment_id' => $id, 'title' => 'Attachment title', 'alt' => 'Attachment alt', 'caption' => 'Attachment caption']))->resolve($requirement, $ready, [$assets->listByMediaId($ready->canonicalId)[0]]);
+        self::assertSame('WORDPRESS_ATTACHMENT', $result['metadata_source']);
+        self::assertSame('Attachment title', $result['title']);
+        self::assertSame('Attachment alt', $result['alt']);
+        self::assertSame('Attachment caption', $result['caption']);
+
+        $missing = $service->create('visual-support-missing', ' ', 'ready');
+        $service->addAsset($missing->canonicalId, 'original', 'uploads/visual-support-missing.webp', hash('sha256', 'visual-support-missing'), 'image/webp', 10, 1200, 800, 'PUBLIC', ['canonical_filename' => 'visual-support-missing.webp']);
+        $missingRequirement = VisualSupportRequirement::create($subjectId, 'variant', 'configuration', 'COMPONENT_DETAIL', 'technical_detail', [], 'variant')->withResolution($missing->canonicalId, $missing->revision);
+        $missingResult = (new VisualSupportPublicProjection())->resolve($missingRequirement, $missing, [$assets->listByMediaId($missing->canonicalId)[0]]);
+        self::assertSame('MISSING', $missingResult['metadata_source']);
+        self::assertSame('', $missingResult['title']);
+        self::assertSame('', $missingResult['alt']);
+        self::assertSame('', $missingResult['caption']);
+    }
+
     public function test_dictionary_definition_never_becomes_image_metadata(): void
     {
         $concept = new DictionaryConcept('concept-1', 'Đồng hồ cúc cu', 'ĐỊNH NGHĨA NỘI BỘ KHÔNG PHẢI ALT', DictionaryConcept::APPROVED, null, null, null, ['public_slug' => 'dong-ho-cuc-cu']);

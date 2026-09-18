@@ -71,6 +71,14 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString('PublicEntityCollectionQuery', $entityApi);
     }
 
+    public function test_frontend_gallery_receives_the_read_only_wordpress_attachment_reader(): void
+    {
+        $source = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Frontend/FrontendSemanticBootstrap.php');
+        self::assertStringContainsString('WordPressMediaAttachmentBridge', $source);
+        self::assertStringContainsString('readAttachmentMetadata', $source);
+        self::assertStringContainsString('attachmentReader:', $source);
+    }
+
     public function test_technical_archives_are_redirect_inputs_and_comparison_is_so_sanh(): void
     {
         $routes = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/PublicEntityRoutes.php');

@@ -93,6 +93,14 @@ final class FrontendPresentationContractTest extends TestCase
         self::assertStringContainsString('clockTypeDossier->forEntity($entity, $baseDossier)', $source);
     }
 
+    public function test_entity_dossier_gallery_receives_the_read_only_wordpress_attachment_reader(): void
+    {
+        $source = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Frontend/EntityDossierBootstrap.php');
+        self::assertStringContainsString('WordPressMediaAttachmentBridge', $source);
+        self::assertStringContainsString('readAttachmentMetadata', $source);
+        self::assertStringContainsString('attachmentReader:', $source);
+    }
+
     public function test_entity_relation_sections_are_not_rendered_when_all_items_lack_public_urls(): void
     {
         $source = $this->read('entity.php');
