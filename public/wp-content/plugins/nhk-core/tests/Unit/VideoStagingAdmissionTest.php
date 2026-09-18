@@ -49,6 +49,35 @@ final class VideoStagingAdmissionTest extends TestCase
         $verifier->issueForVideoPlan($capture, ['entity_type' => 'video', 'operation' => 'update', 'target_uuid' => $scope['target_uuid'], 'expected_revision' => 5, 'fingerprint' => hash('sha256', 'plan')]);
     }
 
+    public function test_generic_ingest_scope_is_admitted_for_a_video_capture(): void
+    {
+        $captureId = \NHK\Core\Shared\Uuid\UuidCodec::newV7();
+        $videoId = \NHK\Core\Shared\Uuid\UuidCodec::newV7();
+        $subjectId = \NHK\Core\Shared\Uuid\UuidCodec::newV7();
+        $fingerprint = hash('sha256', 'generic-ingest');
+        $capture = new CaptureRecord($captureId, 'generic-ingest', $fingerprint, 'SEMANTICS_RECONCILED', 'IN_PROGRESS', null, null, [[
+            'kind' => 'video',
+            'video_proposal' => ['payload' => [
+                'canonical_id' => $videoId,
+                'metadata' => [
+                    'source' => ['platform' => 'youtube', 'external_video_id' => '2EMuIG2RfTg', 'canonical_source_url' => 'https://www.youtube.com/watch?v=2EMuIG2RfTg'],
+                    'subject_resolution_packet' => ['status' => 'RESOLVED', 'type' => 'classification', 'id' => $subjectId, 'revision' => 1],
+                ],
+            ]],
+        ]], ['purpose' => 'VIDEO'], [], []);
+        $scope = [
+            'approved' => true, 'environment' => 'staging', 'semantic_write_policy' => 'PROJECT_BUILD',
+            'operation_family' => 'governed_video_plan', 'entity_type' => 'video', 'operation' => 'ingest',
+            'create_semantics' => 'ingest', 'writer' => 'canonical_governed', 'entrypoint' => 'nhk.capture.ingest',
+            'capture_id' => $captureId, 'capture_fingerprint' => $fingerprint, 'plan_fingerprint' => hash('sha256', 'plan'),
+            'proposal_command_fingerprint' => hash('sha256', 'command'), 'platform' => 'youtube',
+            'external_video_id' => '2EMuIG2RfTg', 'canonical_source_url' => 'https://www.youtube.com/watch?v=2EMuIG2RfTg',
+            'proposed_uuid' => $videoId, 'subject' => ['type' => 'classification', 'uuid' => $subjectId, 'revision' => 1],
+        ];
+
+        self::assertTrue((new VideoStagingAdmission())(false, $scope, $capture, [], []));
+    }
+
     /** @return array{0:CaptureRecord,1:array<string,mixed>} */
     private function fixture(): array
     {

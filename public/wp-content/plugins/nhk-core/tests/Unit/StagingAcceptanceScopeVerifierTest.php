@@ -176,6 +176,46 @@ final class StagingAcceptanceScopeVerifierTest extends TestCase
         self::assertFalse($verifier->verifyProposal($scope, $wrong));
     }
 
+    public function test_video_ingest_scope_binds_exact_source_subject_and_create_semantics(): void
+    {
+        $captureId = UuidCodec::newV7();
+        $videoId = UuidCodec::newV7();
+        $subjectId = UuidCodec::newV7();
+        $capture = new CaptureRecord($captureId, 'video-ingest', hash('sha256', 'video-ingest'), 'SEMANTICS_RECONCILED', 'IN_PROGRESS', null, null, [[
+            'kind' => 'video',
+            'video_proposal' => ['payload' => [
+                'canonical_id' => $videoId,
+                'metadata' => [
+                    'source' => [
+                        'platform' => 'youtube',
+                        'external_video_id' => '2EMuIG2RfTg',
+                        'canonical_source_url' => 'https://www.youtube.com/watch?v=2EMuIG2RfTg',
+                    ],
+                    'subject_resolution_packet' => ['status' => 'RESOLVED', 'type' => 'classification', 'id' => $subjectId, 'revision' => 1],
+                ],
+            ]],
+        ]], ['purpose' => 'VIDEO'], [], []);
+        $plan = [
+            'entity_type' => 'video',
+            'operation' => 'ingest',
+            'subject_id' => $videoId,
+            'fingerprint' => hash('sha256', 'video-ingest-plan'),
+            'proposal_command_fingerprint' => hash('sha256', 'video-ingest-command'),
+        ];
+
+        $scope = $this->verifier()->issueForVideoPlan($capture, $plan);
+
+        self::assertSame('nhk.capture.ingest', $scope['canonical_entrypoint']);
+        self::assertSame('ingest', $scope['operation']);
+        self::assertSame('ingest', $scope['create_semantics']);
+        self::assertSame('youtube', $scope['platform']);
+        self::assertSame('2EMuIG2RfTg', $scope['external_video_id']);
+        self::assertSame($videoId, $scope['proposed_uuid']);
+        self::assertSame($subjectId, $scope['subject']['uuid']);
+        self::assertArrayHasKey('proposal_command_fingerprint', $scope);
+        self::assertArrayHasKey('signature', $scope);
+    }
+
     /** @return array{0:CaptureRecord,1:array<string,mixed>,2:list<array<string,mixed>>} */
     private function fixture(): array
     {
