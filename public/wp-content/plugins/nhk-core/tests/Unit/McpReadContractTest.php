@@ -30,6 +30,7 @@ final class McpReadContractTest extends TestCase
             {
                 return match ($attachmentId) {
                     572 => ['attachment_id' => 572, 'media_id' => 'media-a', 'readback_state' => 'INCONSISTENT', 'error_code' => 'ATTACHMENT_CANONICAL_ASSET_MISSING'],
+                    573 => ['attachment_id' => 573, 'media_id' => 'media-a', 'readback_state' => 'UNAVAILABLE', 'error_code' => 'ATTACHMENT_PHYSICAL_FILE_UNAVAILABLE'],
                     default => null,
                 };
             }
@@ -82,6 +83,8 @@ final class McpReadContractTest extends TestCase
 
         self::assertSame('INCONSISTENT', $handler->mediaAttachmentGet(572)['readback_state']);
         self::assertSame('ATTACHMENT_CANONICAL_ASSET_MISSING', $handler->mediaAttachmentGet(572)['error_code']);
+        self::assertSame('UNAVAILABLE', $handler->mediaAttachmentGet(573)['readback_state']);
+        self::assertSame('ATTACHMENT_PHYSICAL_FILE_UNAVAILABLE', $handler->mediaAttachmentGet(573)['error_code']);
         self::assertNull($handler->mediaAttachmentGet(999));
     }
 

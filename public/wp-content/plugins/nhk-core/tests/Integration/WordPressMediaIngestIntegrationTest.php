@@ -155,8 +155,10 @@ final class WordPressMediaIngestIntegrationTest extends TestCase
 
             $mediaId = (string) $bridge->adoptAttachment($attachmentId, ['canonical_name' => 'Edited readback', 'seo_slug' => 'edited-readback']);
             self::assertNotSame('', $mediaId);
+            $representativeUsage = $usages->create(new MediaUsage(UuidCodec::newV7(), $mediaId, 'classification', 'clock-type.cuckoo-clock', 'representative', 0, 'Representative alt', 'Representative caption'));
             $articleUsage = $usages->create(new MediaUsage(UuidCodec::newV7(), $mediaId, 'wp_post', '1:572', 'featured', 0, 'Article alt', 'Article caption'));
             $dictionaryUsage = $usages->create(new MediaUsage(UuidCodec::newV7(), $mediaId, 'dictionary', 'clock-face', 'illustration', 0, 'Dictionary alt', 'Dictionary caption'));
+            $technicalUsage = $usages->create(new MediaUsage(UuidCodec::newV7(), $mediaId, 'media', $mediaId, 'technical_detail', 0, 'Technical alt', 'Technical caption'));
             $beforeUsageIds = $this->usageSnapshot($usages, $mediaId);
             $beforeAssets = $assets->listByMediaId($mediaId);
             $beforeMediaIds = array_map(static fn ($asset): string => $asset->assetId, $beforeAssets);
@@ -184,10 +186,32 @@ final class WordPressMediaIngestIntegrationTest extends TestCase
             self::assertSame($beforeSource->assetId, UuidCodec::fromBinary((string) ($mapping['asset_uuid'] ?? '')));
             self::assertSame($afterSource->storageKey, (string) ($mapping['storage_key'] ?? ''));
             self::assertSame($beforeUsageIds, $afterUsageIds);
+            self::assertSame(4, $beforeUsageIds['count']);
             self::assertSame($beforeUsageIds['count'], $afterUsageIds['count']);
-            self::assertCount(2, $afterUsageIds['ids']);
+            self::assertCount(4, $afterUsageIds['ids']);
+            self::assertContains($representativeUsage->usageId, $afterUsageIds['ids']);
             self::assertContains($articleUsage->usageId, $afterUsageIds['ids']);
             self::assertContains($dictionaryUsage->usageId, $afterUsageIds['ids']);
+            self::assertContains($technicalUsage->usageId, $afterUsageIds['ids']);
+            $roles = array_map(static fn (MediaUsage $usage): string => $usage->role, $usages->listByMediaId($mediaId));
+            self::assertContains('representative', $roles);
+            self::assertContains('featured', $roles);
+            self::assertContains('illustration', $roles);
+            self::assertContains('technical_detail', $roles);
+            self::assertNotFalse(has_action('add_attachment'));
+            self::assertNotFalse(has_action('edit_attachment'));
+            self::assertNotFalse(has_action('rest_after_insert_attachment'));
+            do_action('add_attachment', $attachmentId);
+            self::assertSame($mediaId, $this->mappedMediaId($wpdb, $attachmentId));
+            do_action('edit_attachment', $attachmentId);
+            self::assertSame($mediaId, $this->mappedMediaId($wpdb, $attachmentId));
+            $restPost = get_post($attachmentId);
+            self::assertInstanceOf(\WP_Post::class, $restPost);
+            do_action('rest_after_insert_attachment', $restPost, new \WP_REST_Request('POST', '/wp/v2/media/' . $attachmentId), false);
+            self::assertSame($mediaId, $this->mappedMediaId($wpdb, $attachmentId));
+            $storedMedia = $media->findByCanonicalId($mediaId);
+            self::assertNotNull($storedMedia);
+            self::assertSame($attachmentId, $bridge->attachmentForMedia($storedMedia, $afterSource)['attachment_id'] ?? null);
             self::assertSame('VERIFIED', $ingestor->read($attachmentId)['readback_state']);
         } finally {
             if ($attachmentId > 0 && function_exists('wp_delete_attachment')) wp_delete_attachment($attachmentId, true);
@@ -443,6 +467,15 @@ final class WordPressMediaIngestIntegrationTest extends TestCase
         $ids = array_map(static fn (MediaUsage $usage): string => $usage->usageId, $usages->listByMediaId($mediaId));
         sort($ids);
         return ['count' => count($ids), 'ids' => array_values($ids)];
+    }
+
+    private function mappedMediaId(object $wpdb, int $attachmentId): ?string
+    {
+        $binary = $wpdb->get_var($wpdb->prepare(
+            "SELECT media_uuid FROM {$wpdb->prefix}nhk_media_wordpress_attachments WHERE attachment_id=%d",
+            $attachmentId,
+        ));
+        return is_string($binary) && strlen($binary) === 16 ? UuidCodec::fromBinary($binary) : null;
     }
 
     public function test_structured_reference_uses_gateway_materialization_then_native_attachment_adoption(): void

@@ -327,6 +327,10 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString("add_action('add_attachment'", $plugin);
         self::assertStringContainsString("add_action('edit_attachment'", $plugin);
         self::assertStringContainsString("add_action('rest_after_insert_attachment'", $plugin);
+        self::assertStringContainsString("add_action('add_attachment', \$adoptAttachment, 20, 1)", $plugin);
+        self::assertStringContainsString("add_action('edit_attachment', \$adoptAttachment, 20, 1)", $plugin);
+        self::assertStringContainsString("add_action('rest_after_insert_attachment', static function", $plugin);
+        self::assertStringContainsString("\$adoptAttachment((int) \$post->ID)", $plugin);
         self::assertStringContainsString('WordPressMediaAttachmentBridge', $plugin);
         self::assertStringContainsString('WordPressImageSitemapProvider', $plugin);
         self::assertStringContainsString('MediaWordPressBridgeMigration012::VERSION', $plugin);
