@@ -15,6 +15,16 @@ get_header();
       <p class="hero-copy">Khám phá thương hiệu, mẫu máy, bộ máy, bản nhạc, hình ảnh, video và những chi tiết giúp nhận diện từng hiện vật trong cùng một hệ thống tra cứu.</p>
       <ul class="hero-values"><li>Tra cứu thương hiệu và mẫu đồng hồ</li><li>Xem ảnh thực tế và video</li><li>Tìm hiểu bộ máy, bản nhạc, linh kiện</li><li>Kết nối tri thức với hiện vật sưu tầm</li></ul>
       <?php get_search_form(); ?>
+      <?php if (!empty($home['latest'])): ?>
+      <section class="home-latest-hero" aria-labelledby="home-latest-title">
+        <div class="home-latest-head"><div><p class="eyebrow">Mới đăng</p><h2 id="home-latest-title">Bài viết mới nhất</h2></div><a class="text-link" href="<?php echo esc_url(home_url('/tri-thuc/')); ?>">Xem tất cả →</a></div>
+        <ol class="home-latest-list">
+          <?php foreach (array_slice($home['latest'], 0, 4) as $post): setup_postdata($post); ?>
+            <li><article><div><p class="eyebrow"><?php $cats = get_the_category(); echo esc_html(nhk_v3_public_category_name((string) ($cats[0]->name ?? 'Bài viết'))); ?></p><h3><a href="<?php the_permalink(); ?>"><?php the_title(); ?></a></h3></div><time datetime="<?php echo esc_attr(get_the_date('c')); ?>"><?php echo esc_html(nhk_v3_public_date()); ?></time></article></li>
+          <?php endforeach; wp_reset_postdata(); ?>
+        </ol>
+      </section>
+      <?php endif; ?>
     </div>
     <div class="hero-media-column">
     <div class="hero-visual-slider" data-nhk-hero-slider aria-label="Ảnh nổi bật từ kho NHK">
@@ -33,6 +43,25 @@ get_header();
     </aside>
     </div>
   </section>
+
+  <?php if (!empty($home['featured'])): $featured = $home['featured']; global $post; $post = $featured[0]; setup_postdata($post); ?>
+  <section class="featured-section" aria-labelledby="featured-title">
+    <div class="section-head"><div><p class="eyebrow">Tuyển chọn</p><h2 id="featured-title">Câu chuyện đáng đọc</h2></div></div>
+    <div class="featured-layout">
+      <article class="featured-lead">
+        <a class="featured-image" href="<?php the_permalink(); ?>">
+          <?php if (has_post_thumbnail()): the_post_thumbnail('large', ['loading' => 'eager', 'fetchpriority' => 'high', 'alt' => get_the_title()]); else: ?><img class="fallback-visual" src="<?php echo esc_url($fallback); ?>" alt="" width="1200" height="750"><?php endif; ?>
+        </a>
+        <div class="featured-body"><p class="eyebrow"><?php $cats = get_the_category(); echo esc_html(nhk_v3_public_category_name((string) ($cats[0]->name ?? 'Bài viết'))); ?></p><h3><a href="<?php the_permalink(); ?>"><?php the_title(); ?></a></h3><p><?php echo esc_html(nhk_v3_excerpt()); ?></p><div class="meta"><span><?php echo esc_html(get_the_author()); ?></span><time datetime="<?php echo esc_attr(get_the_date('c')); ?>"><?php echo esc_html(nhk_v3_public_date()); ?></time></div></div>
+      </article>
+      <div class="featured-support">
+        <?php foreach (array_slice($featured, 1) as $post): setup_postdata($post); ?>
+          <article class="support-card"><p class="eyebrow"><?php $cats = get_the_category(); echo esc_html(nhk_v3_public_category_name((string) ($cats[0]->name ?? 'Bài viết'))); ?></p><h3><a href="<?php the_permalink(); ?>"><?php the_title(); ?></a></h3><p><?php echo esc_html(nhk_v3_excerpt()); ?></p><time datetime="<?php echo esc_attr(get_the_date('c')); ?>"><?php echo esc_html(nhk_v3_public_date()); ?></time></article>
+        <?php endforeach; ?>
+      </div>
+    </div>
+  </section>
+  <?php wp_reset_postdata(); endif; ?>
 
   <?php $hubs = is_array($semantic['hubs'] ?? null) ? $semantic['hubs'] : []; if ($hubs !== []): ?>
   <section class="home-semantic-section home-hubs">
@@ -57,29 +86,8 @@ get_header();
   </section>
   <?php endif; ?>
 
-  <?php if (!empty($home['featured'])): $featured = $home['featured']; global $post; $post = $featured[0]; setup_postdata($post); ?>
-  <section class="featured-section">
-    <div class="section-head"><div><p class="eyebrow">Tuyển chọn</p><h2>Câu chuyện đáng đọc</h2></div></div>
-    <div class="featured-layout">
-      <article class="featured-lead">
-        <a class="featured-image" href="<?php the_permalink(); ?>">
-          <?php if (has_post_thumbnail()): the_post_thumbnail('large', ['loading' => 'eager', 'fetchpriority' => 'high', 'alt' => get_the_title()]); else: ?><img class="fallback-visual" src="<?php echo esc_url($fallback); ?>" alt="" width="1200" height="750"><?php endif; ?>
-        </a>
-        <div class="featured-body"><p class="eyebrow"><?php $cats = get_the_category(); echo esc_html(nhk_v3_public_category_name((string) ($cats[0]->name ?? 'Bài viết'))); ?></p><h3><a href="<?php the_permalink(); ?>"><?php the_title(); ?></a></h3><p><?php echo esc_html(nhk_v3_excerpt()); ?></p><div class="meta"><span><?php echo esc_html(get_the_author()); ?></span><time datetime="<?php echo esc_attr(get_the_date('c')); ?>"><?php echo esc_html(nhk_v3_public_date()); ?></time></div></div>
-      </article>
-      <div class="featured-support">
-        <?php foreach (array_slice($featured, 1) as $post): setup_postdata($post); ?>
-          <article class="support-card"><p class="eyebrow"><?php $cats = get_the_category(); echo esc_html(nhk_v3_public_category_name((string) ($cats[0]->name ?? 'Bài viết'))); ?></p><h3><a href="<?php the_permalink(); ?>"><?php the_title(); ?></a></h3><p><?php echo esc_html(nhk_v3_excerpt()); ?></p><time datetime="<?php echo esc_attr(get_the_date('c')); ?>"><?php echo esc_html(nhk_v3_public_date()); ?></time></article>
-        <?php endforeach; ?>
-      </div>
-    </div>
-  </section>
-  <?php wp_reset_postdata(); endif; ?>
-
   <div class="content-layout home-layout">
     <section class="home-feed">
-      <div class="section-head"><div><p class="eyebrow">Mới nhất</p><h2>Những câu chuyện mới</h2></div></div>
-      <?php if (!empty($home['latest'])): ?><div class="post-grid"><?php foreach ($home['latest'] as $post): setup_postdata($post); get_template_part('template-parts/article-card'); endforeach; wp_reset_postdata(); ?></div><?php else: ?><div class="empty"><p>Chưa có bài viết công khai.</p></div><?php endif; ?>
       <?php foreach (($home['sections'] ?? []) as $section): $sectionUrl = nhk_v3_public_url($section['url'] ?? null); if ($sectionUrl === '' || empty($section['posts'])) continue; ?>
         <section class="home-section"><div class="section-head"><div><p class="eyebrow"><?php echo esc_html($section['label']); ?></p><h2><?php echo esc_html($section['label']); ?> mới</h2></div><a class="text-link" href="<?php echo esc_url($sectionUrl); ?>">Xem thêm →</a></div><div class="post-grid compact"><?php foreach ($section['posts'] as $post): setup_postdata($post); get_template_part('template-parts/article-card'); endforeach; wp_reset_postdata(); ?></div></section>
       <?php endforeach; ?>
