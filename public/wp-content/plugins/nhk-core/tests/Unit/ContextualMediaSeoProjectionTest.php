@@ -68,6 +68,22 @@ final class ContextualMediaSeoProjectionTest extends TestCase
         self::assertSame($item->canonicalId, $asset->mediaId);
     }
 
+    public function test_article_uses_same_media_subject_representative_before_neutral_and_attachment_per_field(): void
+    {
+        [$media, $assets, $usages, $service] = $this->stores();
+        $item = $service->create('article-subject-precedence', 'Tên Media trung tính', 'ready');
+        $service->addAsset($item->canonicalId, 'original', 'uploads/article-subject-precedence.webp', hash('sha256', 'article-subject-precedence'), 'image/webp', 10, 1200, 800, 'PUBLIC', ['canonical_filename' => 'article-subject-precedence.webp']);
+        $service->addUsage($item->canonicalId, 'wp_post', '1:68', 'featured_primary', 0, '', '', [], '', 'article:1:68:featured_primary');
+        $service->addUsage($item->canonicalId, 'variant', 'subject-68', 'representative', 0, 'Alt chủ thể', 'Caption chủ thể', [], 'Tiêu đề chủ thể');
+
+        $result = (new ArticleMediaSeoProjection($media, $assets, $usages))->forPost('1:68');
+
+        self::assertSame('SUBJECT_REPRESENTATIVE', $result['metadata_source']);
+        self::assertSame('Tiêu đề chủ thể', $result['title']);
+        self::assertSame('Alt chủ thể', $result['alt']);
+        self::assertSame('Caption chủ thể', $result['caption']);
+    }
+
     public function test_preferred_image_metadata_source_uses_explicit_field_sources_not_top_level_labels(): void
     {
         $result = (new PreferredImageSeoProjection())->project([
@@ -246,6 +262,31 @@ final class ContextualMediaSeoProjectionTest extends TestCase
         self::assertSame('Ảnh tư liệu trong kho hình ảnh NHK.', $result['summary']);
     }
 
+    public function test_gallery_uses_verified_attachment_after_neutral_metadata_and_reports_missing_source_when_empty(): void
+    {
+        [$media, $assets, $usages, $service] = $this->stores();
+        $item = $service->create('gallery-attachment-fallback', ' ', 'ready');
+        $service->addAsset($item->canonicalId, 'original', 'uploads/gallery-attachment-fallback.webp', hash('sha256', 'gallery-attachment-fallback'), 'image/webp', 10, 1200, 800, 'PUBLIC', ['canonical_filename' => 'gallery-attachment-fallback.webp', 'wordpress_attachment_id' => 904]);
+        $service->addUsage($item->canonicalId, 'classification', 'subject-attachment', 'representative', 0, '', '', [], '');
+
+        $result = (new PublicMediaGalleryQuery($media, $assets, null, $usages, null, static fn (int $attachmentId): array => [
+            'attachment_id' => $attachmentId,
+            'title' => 'Tiêu đề Attachment',
+            'alt' => 'Alt Attachment',
+            'caption' => 'Caption Attachment',
+        ]))->forMedia($item->canonicalId);
+
+        self::assertSame('WORDPRESS_ATTACHMENT', $result['metadata_source']);
+        self::assertSame('Tiêu đề Attachment', $result['title']);
+        self::assertSame('Alt Attachment', $result['alt']);
+        self::assertSame('Caption Attachment', $result['caption']);
+
+        $empty = $service->create('gallery-empty-metadata', ' ', 'ready');
+        $service->addAsset($empty->canonicalId, 'original', 'uploads/gallery-empty-metadata.webp', hash('sha256', 'gallery-empty-metadata'), 'image/webp', 10, 1200, 800, 'PUBLIC', ['canonical_filename' => 'gallery-empty-metadata.webp']);
+        $emptyResult = (new PublicMediaGalleryQuery($media, $assets, null, $usages))->forMedia($empty->canonicalId);
+        self::assertSame('MISSING', $emptyResult['metadata_source']);
+    }
+
     public function test_visual_support_uses_neutral_media_metadata_and_private_asset_remains_missing(): void
     {
         $media = new Media('018f5b74-5f0a-7d2e-9a93-c0e7d6dc3341', 'visual-support-media', 'Visual support media', 'ready');
@@ -261,6 +302,25 @@ final class ContextualMediaSeoProjectionTest extends TestCase
         self::assertSame('', $result['caption']);
         self::assertSame('/anh/visual-support.webp', $result['url']);
         self::assertNull((new VisualSupportPublicProjection())->resolve($requirement, $media, [$private]));
+    }
+
+    public function test_visual_support_uses_subject_usage_metadata_without_mutating_media(): void
+    {
+        [$mediaRepo, $assets, $usages, $service] = $this->stores();
+        $media = $service->create('visual-support-contextual', 'Tên Media trung tính', 'ready');
+        $service->addAsset($media->canonicalId, 'original', 'uploads/visual-support-contextual.webp', hash('sha256', 'visual-support-contextual'), 'image/webp', 10, 1200, 800, 'PUBLIC', ['canonical_filename' => 'visual-support-contextual.webp']);
+        $subjectId = '018f5b74-5f0a-7d2e-9a93-c0e7d6dc3361';
+        $service->addUsage($media->canonicalId, 'variant', $subjectId, 'representative', 0, 'Alt hỗ trợ', 'Caption hỗ trợ', [], 'Tiêu đề hỗ trợ');
+        $requirement = VisualSupportRequirement::create($subjectId, 'variant', 'configuration', 'COMPONENT_DETAIL', 'technical_detail', [], 'variant')->withResolution($media->canonicalId, $media->revision);
+        $asset = $assets->listByMediaId($media->canonicalId)[0];
+
+        $result = (new VisualSupportPublicProjection($usages))->resolve($requirement, $media, [$asset]);
+
+        self::assertSame('SUBJECT_REPRESENTATIVE', $result['metadata_source']);
+        self::assertSame('Tiêu đề hỗ trợ', $result['title']);
+        self::assertSame('Alt hỗ trợ', $result['alt']);
+        self::assertSame('Caption hỗ trợ', $result['caption']);
+        self::assertSame('Tên Media trung tính', $mediaRepo->findByCanonicalId($media->canonicalId)?->canonicalName);
     }
 
     public function test_dictionary_definition_never_becomes_image_metadata(): void
