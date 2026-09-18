@@ -26,7 +26,7 @@ use NHK\Core\Application\Governance\{AuthorityStagingAdmission, MediaBindingStag
 use NHK\Core\Application\Runtime\SemanticWritePolicyResolver;
 use NHK\Core\Application\Mcp\{McpAbilityRegistration, McpArticleIngestHandler, McpGovernanceHandler, McpReadHandler, McpSemanticContextResolver, McpToolCatalog, McpTransport, McpDocumentationRegistry};
 use NHK\Core\Application\Media\{ImageIngestEntrypoint, MediaBatchUploadService, MediaBindingService};
-use NHK\Core\Application\Capture\{CaptureArticlePreflightHandoff, CaptureEditorialWriteGuard, CaptureVideoProvenancePlanner, CaptureVideoPublicationVerifier, ClockTypeShadowClassifier, EditorialCaptureContinuationService, EditorialCaptureCoordinator, GovernedCaptureContinuationService, RelationProposalReconciliationService};
+use NHK\Core\Application\Capture\{CaptureArticlePreflightHandoff, CaptureEditorialWriteGuard, CapturePhaseReceiptReducer, CaptureVideoProvenancePlanner, CaptureVideoPublicationVerifier, ClockTypeShadowClassifier, EditorialCaptureContinuationService, EditorialCaptureCoordinator, GovernedCaptureContinuationService, RelationProposalReconciliationService};
 use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, ClaimReusePolicy, SubjectResolutionService, TextInputInterpreter};
 use NHK\Core\Application\Article\{ArticleIngestCoordinator, ArticleIngestPreflight, ArticleResearchPreflight, ArticleVerificationReader, SemanticProposalPlanner, OwnerPublicationApplicationService};
 use NHK\Core\Infrastructure\Http\ReadApi;
@@ -707,8 +707,7 @@ final class Plugin {
                     if ($captureId === '') return;
                     $record = $captureRepository->findById($captureId);
                     if (!$record instanceof CaptureRecord) return;
-                    $receipts = $record->phaseReceipts;
-                    $receipts[$phase] = $receipt;
+                    $receipts = CapturePhaseReceiptReducer::append($record->phaseReceipts, $phase, $receipt);
                     $captureRepository->save(new CaptureRecord($record->captureId, $record->idempotencyKey, $record->requestFingerprint, $record->stage, $record->status, $record->articleId, $record->articleStateToken, $record->assets, $record->context, $record->diagnostics, $receipts, $record->revision + 1, $record->createdAt, gmdate('Y-m-d H:i:s.u')));
                 },
                 videoRelations: $videoRelationCandidates,
@@ -1141,6 +1140,7 @@ final class Plugin {
                         'excerpt' => (string) ($current?->excerpt ?? ''),
                         'body' => (string) ($current?->content ?? ''),
                         'planned_title' => $topic,
+                        'claim_trace' => is_array($composition['claim_trace'] ?? null) ? $composition['claim_trace'] : [],
                     ]);
                     $evidence = $articlePreflightHandoff->build(
                         // The handoff supplies the gate's locked

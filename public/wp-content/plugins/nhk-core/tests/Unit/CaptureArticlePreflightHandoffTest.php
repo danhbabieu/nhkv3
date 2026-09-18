@@ -60,4 +60,58 @@ final class CaptureArticlePreflightHandoffTest extends TestCase
         self::assertTrue($evidence['media_usage_complete']);
         self::assertTrue($evidence['real_image_requirements_met']);
     }
+
+    public function test_current_target_scoped_article_media_readback_beats_stale_capture_media_plan(): void
+    {
+        $research = new ArticleResearchResult(
+            ['status' => 'resolved', 'primary' => ['id' => 'classification-1', 'type' => 'classification']],
+            [
+                'status' => 'available',
+                'article_media' => [
+                    'media_complete' => true,
+                    'featured_primary' => ['media_id' => 'media-current', 'placeholder' => false],
+                    'inline_primary' => ['media_id' => 'media-current', 'placeholder' => false],
+                    'slots' => [
+                        'featured_primary' => ['media_id' => 'media-current', 'placeholder' => false],
+                        'inline_primary' => ['media_id' => 'media-current', 'placeholder' => false],
+                    ],
+                ],
+            ],
+            ['classification' => 'NO_OVERLAP'],
+            ['claims' => [], 'sources' => [], 'evidence' => []], [], [],
+            ['status' => 'EXISTING', 'category' => ['id' => 4]], [], [], ['slug_intent' => 'clock'], ['status' => 'PASS'], [], [], true,
+        );
+
+        $evidence = (new CaptureArticlePreflightHandoff())->build($research, ['media_complete' => false, 'slots' => [
+            'featured_primary' => ['placeholder' => true],
+            'inline_primary' => ['placeholder' => true],
+        ]], ['status' => 'APPLIED'], ['slug' => 'clock', 'permalink' => '/clock/']);
+
+        self::assertTrue($evidence['media_usage_complete']);
+        self::assertFalse($evidence['media_snapshot']['featured_primary']['placeholder']);
+        self::assertFalse($evidence['media_snapshot']['inline_primary']['placeholder']);
+    }
+
+    public function test_semantic_delta_not_required_is_verified_from_current_subject_readback(): void
+    {
+        $research = new ArticleResearchResult(
+            [
+                'status' => 'resolved',
+                'primary' => ['id' => 'subject-1', 'type' => 'model'],
+                'persistence' => ['status' => 'attached', 'subject_id' => 'subject-1', 'post_id' => 123],
+            ],
+            ['status' => 'available', 'posts' => [['id' => '123', 'subject_ids' => ['subject-1']]], 'article_media' => [
+                'media_complete' => true,
+                'featured_primary' => ['placeholder' => false],
+                'inline_primary' => ['placeholder' => false],
+            ]],
+            ['classification' => 'NO_OVERLAP'],
+            ['claims' => [], 'sources' => [], 'evidence' => []], [], [],
+            ['status' => 'EXISTING', 'category' => ['id' => 4]], [], [], ['slug_intent' => 'clock'], ['status' => 'PASS'], [], [], true,
+        );
+
+        $evidence = (new CaptureArticlePreflightHandoff())->build($research, ['media_complete' => false], ['status' => 'SKIPPED', 'blockers' => []], ['post_id' => 123, 'slug' => 'clock', 'permalink' => '/clock/']);
+
+        self::assertTrue($evidence['semantic_readback_verified']);
+    }
 }

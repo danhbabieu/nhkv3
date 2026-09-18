@@ -95,7 +95,9 @@ final class ArticleResearchPreflightTest extends TestCase
             static fn (array $candidate): array => ['eligible' => false],
         );
 
-        $result = $service->research('Phương pháp Odo', ['type' => 'brand', 'name' => 'Odo']);
+        $result = $service->research('Phương pháp Odo', ['type' => 'brand', 'name' => 'Odo'], [
+            'claim_trace' => [['claim_id' => 'claim-1', 'claim_revision' => 1]],
+        ]);
 
         self::assertContains('PUBLIC_CLAIM_EVIDENCE_REQUIRED', $result->blockers);
         self::assertFalse($result->readyForDraft);
@@ -121,7 +123,9 @@ final class ArticleResearchPreflightTest extends TestCase
             static fn (array $candidate): array => ['eligible' => false],
         );
 
-        $result = $service->research('Variant A', ['type' => 'variant', 'name' => 'Variant A']);
+        $result = $service->research('Variant A', ['type' => 'variant', 'name' => 'Variant A'], [
+            'claim_trace' => [['claim_id' => 'claim-a', 'claim_revision' => 1]],
+        ]);
 
         self::assertSame('HUMAN_REVIEW_REQUIRED', $result->compliance['status']);
         self::assertSame('Variant A là mẫu hiếm nhất và tốt nhất.', $result->compliance['diagnostics'][0]['claim_text']);
@@ -287,6 +291,56 @@ final class ArticleResearchPreflightTest extends TestCase
         self::assertSame([], $result->compliance['diagnostics']);
         self::assertSame('PASS', $result->compliance['status']);
         self::assertNotContains('PUBLIC_CLAIM_EVIDENCE_REQUIRED', $result->blockers);
+    }
+
+    public function test_discovery_only_neighborhood_claim_without_article_selection_is_not_publication_claim(): void
+    {
+        $service = new ArticleResearchPreflight(
+            static fn (array $subject): array => ['status' => 'resolved', 'primary' => ['id' => 'subject-1', 'type' => 'model', 'name' => 'Model A']],
+            static fn (array $context): array => [
+                'status' => 'available', 'posts' => [], 'categories' => [['slug' => 'tri-thuc']], 'sources' => [], 'evidence' => [], 'media' => [], 'videos' => [], 'relations' => [],
+                'knowledge' => [['id' => 'neighbor-unsupported', 'text' => 'Claim discovered nearby but not used publicly', 'subject_id' => 'subject-1', 'evidence_status' => 'NO_EVIDENCE']],
+            ],
+            static fn (array $candidate): array => ['eligible' => false],
+        );
+
+        $result = $service->research('Model A overview', ['type' => 'model'], [
+            'body' => 'Bài viết chỉ trình bày thông tin biên tập tổng quan và không sử dụng claim lân cận.',
+        ]);
+
+        self::assertSame([], $result->compliance['diagnostics']);
+        self::assertSame('PASS', $result->compliance['status']);
+        self::assertNotContains('PUBLIC_CLAIM_EVIDENCE_REQUIRED', $result->blockers);
+    }
+
+    public function test_only_selected_claims_from_editorial_trace_enter_compliance_scope(): void
+    {
+        $service = new ArticleResearchPreflight(
+            static fn (array $subject): array => ['status' => 'resolved', 'primary' => ['id' => 'subject-1', 'type' => 'model', 'name' => 'Model A']],
+            static fn (array $context): array => [
+                'status' => 'available', 'posts' => [], 'categories' => [['slug' => 'tri-thuc']], 'sources' => [], 'evidence' => [], 'media' => [], 'videos' => [], 'relations' => [],
+                'knowledge' => [
+                    ['id' => 'selected-supported', 'text' => 'Một mô tả được hỗ trợ', 'subject_id' => 'subject-1', 'evidence_status' => 'SUPPORTED_WITHIN_SCOPE'],
+                    ['id' => 'selected-unsupported', 'text' => 'Một khẳng định chưa có bằng chứng', 'subject_id' => 'subject-1', 'evidence_status' => 'NO_EVIDENCE'],
+                    ['id' => 'neighbor-unsupported-1', 'text' => 'Lân cận chưa dùng một', 'subject_id' => 'subject-1', 'evidence_status' => 'NO_EVIDENCE'],
+                    ['id' => 'neighbor-unsupported-2', 'text' => 'Lân cận chưa dùng hai', 'subject_id' => 'subject-1', 'evidence_status' => 'NO_EVIDENCE'],
+                ],
+            ],
+            static fn (array $candidate): array => ['eligible' => false],
+        );
+
+        $result = $service->research('Model A overview', ['type' => 'model'], [
+            'claim_trace' => [
+                ['claim_id' => 'selected-supported', 'claim_revision' => 1],
+                ['claim_id' => 'selected-unsupported', 'claim_revision' => 1],
+            ],
+            'body' => 'Bài viết dùng một mô tả được hỗ trợ và một khẳng định chưa có bằng chứng.',
+        ]);
+
+        self::assertSame(['selected-supported', 'selected-unsupported'], array_column($result->compliance['diagnostics'], 'claim_id'));
+        self::assertSame('HUMAN_REVIEW_REQUIRED', $result->compliance['status']);
+        self::assertNotContains('neighbor-unsupported-1', array_column($result->compliance['diagnostics'], 'claim_id'));
+        self::assertNotContains('neighbor-unsupported-2', array_column($result->compliance['diagnostics'], 'claim_id'));
     }
 
     public function test_planned_title_is_preserved_in_seo_blueprint(): void

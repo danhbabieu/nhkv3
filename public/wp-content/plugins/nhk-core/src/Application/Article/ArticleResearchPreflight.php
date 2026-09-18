@@ -157,7 +157,6 @@ final class ArticleResearchPreflight
     /** @return list<array<string,mixed>> */
     private function publicationClaims(array $claims, array $articleContext): array
     {
-        if (!array_key_exists('claim_trace', $articleContext) && !array_key_exists('selected_claim_ids', $articleContext)) return $claims;
         $ids = array_values(array_unique(array_filter(array_map('strval', (array) ($articleContext['selected_claim_ids'] ?? [])), static fn (string $id): bool => trim($id) !== '')));
         foreach ((array) ($articleContext['claim_trace'] ?? []) as $trace) if (is_array($trace)) {
             $id = trim((string) ($trace['claim_id'] ?? $trace['id'] ?? ''));

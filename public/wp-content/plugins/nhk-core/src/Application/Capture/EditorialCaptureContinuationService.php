@@ -39,7 +39,7 @@ final class EditorialCaptureContinuationService
         $retryInput = $this->rehydrateRetryInput($capture, $input);
         try {
             $continued = $this->coordinator->retry($capture, $retryInput);
-            return ['capture' => $continued->toArray(), 'retry' => ['mode' => 'RETRY', 'status' => $continued->status, 'code' => $continued->diagnostics['failure']['code'] ?? null]];
+            return ['capture' => $continued->toArray(), 'retry' => ['mode' => 'RETRY', 'status' => $continued->status, 'code' => CaptureCurrentOutcomeReducer::failureCode($continued)]];
         } catch (\Throwable $error) {
             return $this->retryFailure($captureId, $this->code($error), $this->captures->findById($captureId));
         }

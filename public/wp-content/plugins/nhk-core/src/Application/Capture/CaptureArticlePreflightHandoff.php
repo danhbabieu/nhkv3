@@ -15,10 +15,17 @@ final class CaptureArticlePreflightHandoff
         $primary = is_array($resolution['primary'] ?? null) ? $resolution['primary'] : [];
         $overlap = (string) ($research->overlap['classification'] ?? 'UNCERTAIN');
         $category = (string) ($research->categoryPlan['status'] ?? 'UNKNOWN');
-        $mediaComplete = ($media['media_complete'] ?? false) === true
-            || (($media['slots']['featured_primary']['placeholder'] ?? true) === false);
+        $currentArticleMedia = is_array($research->inventory['article_media'] ?? null) && $research->inventory['article_media'] !== []
+            ? $research->inventory['article_media']
+            : $media;
+        $mediaComplete = ($currentArticleMedia['media_complete'] ?? false) === true
+            || (($currentArticleMedia['slots']['featured_primary']['placeholder'] ?? $currentArticleMedia['featured_primary']['placeholder'] ?? true) === false);
         $compliance = (string) ($research->compliance['status'] ?? '');
-        $semanticApplied = (string) ($semanticWriteBack['status'] ?? '') === 'APPLIED';
+        $semanticStatus = strtoupper(trim((string) ($semanticWriteBack['status'] ?? '')));
+        $semanticApplied = in_array($semanticStatus, ['APPLIED', 'REUSED_VERIFIED'], true);
+        $semanticNotRequired = in_array($semanticStatus, ['SKIPPED', 'NOT_REQUIRED', 'SKIPPED_UNCHANGED'], true)
+            && (array) ($semanticWriteBack['blockers'] ?? []) === []
+            && (string) ($resolution['persistence']['status'] ?? '') === 'attached';
         $slug = trim((string) ($articleState['slug'] ?? ''));
         $permalink = trim((string) ($articleState['permalink'] ?? ''));
 
@@ -34,10 +41,10 @@ final class CaptureArticlePreflightHandoff
             'duplicate_intent_handled' => in_array($overlap, ['NO_OVERLAP', 'COMPLEMENTARY_CONTENT'], true),
             'category_resolved' => $category === 'EXISTING',
             'semantic_plan_complete' => $research->readyForDraft,
-            'semantic_readback_verified' => $semanticApplied,
+            'semantic_readback_verified' => $semanticApplied || $semanticNotRequired,
             'media_usage_complete' => $mediaComplete,
-            'media_snapshot' => $media,
-            'media_guidance' => is_array($research->mediaPlan['guidance'] ?? null) ? $research->mediaPlan['guidance'] : (is_array($media['guidance'] ?? null) ? $media['guidance'] : []),
+            'media_snapshot' => $currentArticleMedia,
+            'media_guidance' => is_array($research->mediaPlan['guidance'] ?? null) ? $research->mediaPlan['guidance'] : (is_array($currentArticleMedia['guidance'] ?? null) ? $currentArticleMedia['guidance'] : []),
             'real_image_requirements_met' => $mediaComplete,
             'claim_compliance_acceptable' => in_array($compliance, ['PASS', 'APPROVED', 'SAFE'], true),
             'claim_compliance' => $research->compliance,

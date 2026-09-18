@@ -545,12 +545,14 @@ final class EditorialCaptureCoordinator
                 'required_owners' => $this->requiredOwners($intent, $record, $assets, $media, $videoPublication),
             ]);
             $diagnostics['completion'] = $completion;
-            $record = $this->save($record, $record->stage, $assets, $diagnostics, $receipts, 'FINAL_READBACK', $record->articleId, $record->articleStateToken, $record->status, 'VERIFIED');
+            $diagnostics = $this->settleHistoricalFailure($diagnostics, $receipts);
+            $currentStatus = ($completion['complete'] ?? false) === true ? 'COMPLETE' : 'PARTIAL';
+            $record = $this->save($record, $record->stage, $assets, $diagnostics, $receipts, 'FINAL_READBACK', $record->articleId, $record->articleStateToken, $currentStatus, 'VERIFIED');
             $assets = $record->assets;
             $diagnostics = $record->diagnostics;
             $receipts = $record->phaseReceipts;
             $stage = $published ? CaptureStage::PUBLISHED->value : CaptureStage::READY_FOR_PUBLICATION->value;
-            $status = $published ? 'PUBLISHED' : (($resolution['status'] ?? '') === 'ambiguous' ? 'REVIEW_REQUIRED' : 'PARTIAL');
+            $status = $published ? 'PUBLISHED' : (($resolution['status'] ?? '') === 'ambiguous' ? 'REVIEW_REQUIRED' : (($completion['complete'] ?? false) === true ? 'COMPLETE' : 'PARTIAL'));
             return $this->save($record, $stage, $assets, $diagnostics, $receipts, $stage, $record->articleId, $record->articleStateToken, $completion['complete'] === true ? $status : 'PARTIAL');
         } catch (\Throwable $error) {
             $latest = $this->captures->findById($record->captureId);
@@ -796,7 +798,7 @@ final class EditorialCaptureCoordinator
             'PARTIAL' => $receiptStage === 'SEMANTICS_RECONCILED' && is_array($diagnostics['semantic_write_back']['blockers'] ?? null) && $diagnostics['semantic_write_back']['blockers'] !== [] ? 'BLOCKED' : 'COMPLETED',
             default => 'COMPLETED',
         };
-        $receipts[$receiptStage] = [
+        $attempt = [
             'status' => $receiptStatus,
             'result' => $receiptResult ?? $status,
             'started_at' => (string) ($prior['started_at'] ?? $startedAt),
@@ -806,7 +808,8 @@ final class EditorialCaptureCoordinator
         ];
         $semanticDiagnostics = is_array($diagnostics['semantic_write_back'] ?? null) ? $diagnostics['semantic_write_back'] : [];
         $failureCode = trim((string) ($diagnostics['failure']['code'] ?? ($semanticDiagnostics['blockers'][0] ?? '')));
-        if ($failureCode !== '' && $receiptStatus !== 'COMPLETED') $receipts[$receiptStage]['failure_code'] = $failureCode;
+        if ($failureCode !== '' && $receiptStatus !== 'COMPLETED') $attempt['failure_code'] = $failureCode;
+        $receipts = CapturePhaseReceiptReducer::append($receipts, $receiptStage, $attempt);
         return $this->captures->save(new CaptureRecord($record->captureId, $record->idempotencyKey, $record->requestFingerprint, $stage, $status, $articleId ?? $record->articleId, $token ?? $record->articleStateToken, $assets, $context ?? $record->context, $diagnostics, $receipts, $record->revision + 1, $record->createdAt, gmdate('Y-m-d H:i:s.u')));
     }
 
@@ -820,7 +823,7 @@ final class EditorialCaptureCoordinator
     {
         $now = gmdate('c');
         $this->activeReceiptPhase = $phase;
-        $receipts[$phase] = ['status' => 'STARTED', 'result' => 'IN_PROGRESS', 'started_at' => $now, 'completed_at' => null, 'elapsed_ms' => null];
+        $receipts = CapturePhaseReceiptReducer::append($receipts, $phase, ['status' => 'STARTED', 'result' => 'IN_PROGRESS', 'started_at' => $now, 'completed_at' => null, 'elapsed_ms' => null]);
         return $this->captures->save(new CaptureRecord($record->captureId, $record->idempotencyKey, $record->requestFingerprint, $record->stage, $record->status, $record->articleId, $record->articleStateToken, $assets, $record->context, $diagnostics, $receipts, $record->revision + 1, $record->createdAt, gmdate('Y-m-d H:i:s.u')));
     }
 
@@ -829,6 +832,25 @@ final class EditorialCaptureCoordinator
     {
         foreach (['body', 'content', 'post_content'] as $key) unset($value[$key]);
         return $value;
+    }
+
+    /** @param array<string,mixed> $diagnostics @param array<string,mixed> $receipts @return array<string,mixed> */
+    private function settleHistoricalFailure(array $diagnostics, array $receipts): array
+    {
+        $failure = is_array($diagnostics['failure'] ?? null) ? $diagnostics['failure'] : null;
+        if ($failure === null) return $diagnostics;
+        foreach ($receipts as $receipt) {
+            if (!is_array($receipt)) continue;
+            $latest = is_array($receipt['latest'] ?? null) ? $receipt['latest'] : $receipt;
+            $status = strtoupper(trim((string) ($latest['status'] ?? '')));
+            $result = strtoupper(trim((string) ($latest['result'] ?? '')));
+            if (in_array($status, ['FAILED', 'BLOCKED', 'REVIEW_REQUIRED'], true) || str_contains($result, 'FAILED')) return $diagnostics;
+        }
+        $history = is_array($diagnostics['failure_history'] ?? null) ? $diagnostics['failure_history'] : [];
+        $history[] = $failure + ['resolved_at' => gmdate('c'), 'resolution' => 'LATEST_REQUIRED_PHASES_CONVERGED'];
+        $diagnostics['failure_history'] = $history;
+        unset($diagnostics['failure']);
+        return $diagnostics;
     }
 
     private function failureCode(\Throwable $error): string
