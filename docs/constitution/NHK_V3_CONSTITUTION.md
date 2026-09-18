@@ -95,10 +95,10 @@ gallery and standalone image viewing; selecting a small derivative such as
 canonical asset.
 
 **WHAT:** The canonical public `/anh/<slug>.webp` projection must be generated
-from the retained source-original with `MAX_LONG_EDGE = 1200px`. If the source
-long edge is at most 1200px, its original dimensions are retained; if it is
+from the retained source-original with `MAX_LONG_EDGE = 1920px`. If the source
+long edge is at most 1920px, its original dimensions are retained; if it is
 larger, both dimensions are rounded after proportional downscale so the long
-edge is 1200px. The rule never upscales, crops or changes aspect ratio. Smaller
+edge is 1920px. The rule never upscales, crops or changes aspect ratio. Smaller
 listing thumbnails may remain separate, but they are never the canonical
 full-size asset. WebP encoding targets quality 82–88, with the current default
 at 86, without sharpening or color changes beyond the active encoder's normal
@@ -1431,9 +1431,9 @@ với `srcset`, `sizes`, width, height và meaningful contextual alt; loading po
 phù hợp vị trí editorial.
 
 Public canonical image resolution is a separate projection invariant. The
-canonical source-derived asset must have a long edge no greater than 1200px.
-For a source long edge at most 1200px, dimensions remain unchanged; for a
-larger source, dimensions are `round(dimension × 1200 / source_long_edge)`.
+canonical source-derived asset must have a long edge no greater than 1920px.
+For a source long edge at most 1920px, dimensions remain unchanged; for a
+larger source, dimensions are `round(dimension × 1920 / source_long_edge)`.
 The operation never upscales, crops, stretches or forces a square canvas. A
 240×340 or other thumbnail derivative may be used for listings but must not
 replace the canonical full-size asset. The current WebP quality target is

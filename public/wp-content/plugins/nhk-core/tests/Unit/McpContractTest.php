@@ -376,8 +376,8 @@ final class McpContractTest extends TestCase
         self::assertStringContainsString('base64', $schema['file']['description']);
         self::assertArrayNotHasKey('data', $schema['file']['properties']);
         self::assertSame(1, $schema['max_width']['minimum']);
-        self::assertSame(1200, $schema['max_width']['maximum']);
-        self::assertSame(1200, $schema['max_height']['maximum']);
+        self::assertSame(1920, $schema['max_width']['maximum']);
+        self::assertSame(1920, $schema['max_height']['maximum']);
         self::assertSame(1, $schema['quality']['minimum']);
         self::assertSame(100, $schema['quality']['maximum']);
         self::assertSame(1, $schema['assets']['items']['properties']['wordpress_attachment_id']['minimum']);
@@ -385,10 +385,10 @@ final class McpContractTest extends TestCase
         self::assertFalse($tools['nhk.media.attachment.get']['governed']);
     }
 
-    public function test_managed_image_policy_caps_long_edge_at_1200_without_upscale_or_crop(): void
+    public function test_managed_image_policy_caps_long_edge_at_1920_without_upscale_or_crop(): void
     {
-        self::assertSame(1200, ConcreteWordPressMediaAttachmentIngestor::MAX_LONG_EDGE);
-        self::assertSame(['width' => 1200, 'height' => 800], ConcreteWordPressMediaAttachmentIngestor::constrainDimensions(6000, 4000));
+        self::assertSame(1920, ConcreteWordPressMediaAttachmentIngestor::MAX_LONG_EDGE);
+        self::assertSame(['width' => 1920, 'height' => 1280], ConcreteWordPressMediaAttachmentIngestor::constrainDimensions(6000, 4000));
         self::assertSame(['width' => 1200, 'height' => 800], ConcreteWordPressMediaAttachmentIngestor::constrainDimensions(1200, 800));
     }
 

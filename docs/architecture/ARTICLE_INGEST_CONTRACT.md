@@ -181,7 +181,7 @@ truth.
 Article media must reuse canonical `Media` where available. A new upload enters
 the governed Media boundary, retains the source-original as a private/protected
 MediaAsset and projects normalized WebP/responsive/WordPress attachment outputs
-under the same Media identity. The normalized public image uses a 1200px
+under the same Media identity. The normalized public image uses a 1920px
 maximum long edge: dimensions at or below that bound are retained, larger
 images are proportionally downscaled, and no upscale/crop/stretch is allowed.
 Featured/inline selection remains WordPress editorial state; `MediaUsage`

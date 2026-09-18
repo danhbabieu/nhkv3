@@ -86,9 +86,9 @@ Derivative không được tạo Media identity mới.
 ## Public canonical image resolution — 2026-09-09
 
 Public projection phải chọn source-derived image phù hợp làm canonical
-`/anh/<slug>.webp` với **PUBLIC IMAGE MAX LONG EDGE = 1200 PX**. Nếu cạnh dài
-nguồn `<= 1200`, giữ nguyên kích thước gốc; nếu `> 1200`, dùng
-`scale = 1200 / max(width, height)` rồi tính từng cạnh bằng `round(dimension ×
+`/anh/<slug>.webp` với **PUBLIC IMAGE MAX LONG EDGE = 1920 PX**. Nếu cạnh dài
+nguồn `<= 1920`, giữ nguyên kích thước gốc; nếu `> 1920`, dùng
+`scale = 1920 / max(width, height)` rồi tính từng cạnh bằng `round(dimension ×
 scale)`. Không upscale, không crop, không kéo méo, không ép canvas vuông và
 luôn giữ aspect ratio. Derivative phải được tạo trực tiếp từ source/original;
 thumbnail 240×340 chỉ dành cho listing, không được làm canonical full-size.

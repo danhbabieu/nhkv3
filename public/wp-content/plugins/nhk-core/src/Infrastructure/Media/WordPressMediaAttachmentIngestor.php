@@ -38,7 +38,7 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
         if ($source === '' || !is_file($source) || !is_readable($source)) throw new \InvalidArgumentException('File attachment is unavailable.');
         if ($maxWidth < 1 || $maxHeight < 1) throw new \InvalidArgumentException('max_width and max_height must be positive.');
         if ($quality < 1 || $quality > 100) throw new \InvalidArgumentException('quality must be between 1 and 100.');
-        // The managed public profile is fixed: at most 1200px on the long edge.
+        // The managed public profile is fixed: at most 1920px on the long edge.
         // Caller-supplied limits cannot turn the primary into a thumbnail.
         $maxWidth = self::MAX_LONG_EDGE;
         $maxHeight = self::MAX_LONG_EDGE;

@@ -161,7 +161,7 @@ final class WordPressMediaIngestIntegrationTest extends TestCase
             self::assertNotSame('source-original.png', (string) $result['filename']);
             self::assertSame($expectedDimensions['width'], (int) $result['width']);
             self::assertSame($expectedDimensions['height'], (int) $result['height']);
-            self::assertLessThanOrEqual(1200, max((int) $result['width'], (int) $result['height']));
+            self::assertLessThanOrEqual(1920, max((int) $result['width'], (int) $result['height']));
             self::assertSame($mediaId, $bridge->adoptAttachment($attachmentId));
             self::assertSame($mediaId, $bridge->adoptAttachment($attachmentId));
             self::assertSame(1, (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$wpdb->prefix}nhk_media WHERE canonical_uuid=%s", \NHK\Core\Shared\Uuid\UuidCodec::toBinary($mediaId))));
@@ -219,7 +219,7 @@ final class WordPressMediaIngestIntegrationTest extends TestCase
             );
             $attachmentId = (int) $result['attachment_id'];
             $mediaId = (string) ($result['media_id'] ?? '');
-            self::assertSame(['width' => 900, 'height' => 1200], ['width' => (int) $result['width'], 'height' => (int) $result['height']]);
+            self::assertSame(['width' => 1152, 'height' => 1536], ['width' => (int) $result['width'], 'height' => (int) $result['height']]);
             self::assertSame('image/webp', $result['mime']);
 
             $attachedRelative = (string) get_post_meta($attachmentId, '_wp_attached_file', true);
@@ -227,8 +227,8 @@ final class WordPressMediaIngestIntegrationTest extends TestCase
             self::assertFileExists($publicPath);
             $publicInfo = getimagesize($publicPath);
             self::assertIsArray($publicInfo);
-            self::assertSame(900, (int) $publicInfo[0]);
-            self::assertSame(1200, (int) $publicInfo[1]);
+            self::assertSame(1152, (int) $publicInfo[0]);
+            self::assertSame(1536, (int) $publicInfo[1]);
             self::assertSame('image/webp', (string) ($publicInfo['mime'] ?? ''));
             $image = imagecreatefromwebp($publicPath);
             self::assertInstanceOf(\GdImage::class, $image);
@@ -245,8 +245,8 @@ final class WordPressMediaIngestIntegrationTest extends TestCase
             $mappingAsset = (string) $wpdb->get_var($wpdb->prepare("SELECT asset_uuid FROM {$wpdb->prefix}nhk_media_wordpress_attachments WHERE attachment_id=%d", $attachmentId));
             self::assertSame($publicAssets[0]->assetId, UuidCodec::fromBinary($mappingAsset));
             self::assertNotSame($sourceAsset?->assetId, UuidCodec::fromBinary($mappingAsset));
-            self::assertSame(900, $publicAssets[0]->width);
-            self::assertSame(1200, $publicAssets[0]->height);
+            self::assertSame(1152, $publicAssets[0]->width);
+            self::assertSame(1536, $publicAssets[0]->height);
             self::assertNotNull((new WordPressMediaAttachmentIngestor())->read($attachmentId));
         } finally {
             if ($attachmentId > 0 && function_exists('wp_delete_attachment')) wp_delete_attachment($attachmentId, true);

@@ -110,7 +110,7 @@ final class WordPressImageOrientationTest extends TestCase
     {
         $result = $this->process(1152, 1536, 1, 'portrait');
 
-        self::assertSame(['width' => 900, 'height' => 1200], $result['dimensions']);
+        self::assertSame(['width' => 1152, 'height' => 1536], $result['dimensions']);
         $this->assertDominantColor($result['image'], 450, 300, 'red');
         $this->assertDominantColor($result['image'], 450, 900, 'blue');
     }
@@ -119,7 +119,7 @@ final class WordPressImageOrientationTest extends TestCase
     {
         $result = $this->process(1536, 1152, 1, 'landscape');
 
-        self::assertSame(['width' => 1200, 'height' => 900], $result['dimensions']);
+        self::assertSame(['width' => 1536, 'height' => 1152], $result['dimensions']);
         $this->assertDominantColor($result['image'], 300, 450, 'red');
         $this->assertDominantColor($result['image'], 900, 450, 'blue');
     }
@@ -128,7 +128,7 @@ final class WordPressImageOrientationTest extends TestCase
     {
         $result = $this->process(1536, 1152, 6, 'landscape');
 
-        self::assertSame(['width' => 900, 'height' => 1200], $result['dimensions']);
+        self::assertSame(['width' => 1152, 'height' => 1536], $result['dimensions']);
         $this->assertDominantColor($result['image'], 450, 300, 'red');
         $this->assertDominantColor($result['image'], 450, 900, 'blue');
         self::assertFalse($result['has_orientation_metadata']);
@@ -138,7 +138,7 @@ final class WordPressImageOrientationTest extends TestCase
     {
         $result = $this->process(1536, 1152, 8, 'landscape');
 
-        self::assertSame(['width' => 900, 'height' => 1200], $result['dimensions']);
+        self::assertSame(['width' => 1152, 'height' => 1536], $result['dimensions']);
         $this->assertDominantColor($result['image'], 450, 300, 'blue');
         $this->assertDominantColor($result['image'], 450, 900, 'red');
         self::assertFalse($result['has_orientation_metadata']);
@@ -148,7 +148,7 @@ final class WordPressImageOrientationTest extends TestCase
     {
         $result = $this->process(1536, 1152, null, 'landscape');
 
-        self::assertSame(['width' => 1200, 'height' => 900], $result['dimensions']);
+        self::assertSame(['width' => 1536, 'height' => 1152], $result['dimensions']);
         $this->assertDominantColor($result['image'], 300, 450, 'red');
         $this->assertDominantColor($result['image'], 900, 450, 'blue');
         self::assertFalse($result['has_orientation_metadata']);

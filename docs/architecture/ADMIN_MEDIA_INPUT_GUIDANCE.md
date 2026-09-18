@@ -150,10 +150,10 @@ ambiguous metadata, traversal paths and non-image attachments fail closed.
 
 ### Public image sizing
 
-The governed image adapter applies `PUBLIC IMAGE MAX LONG EDGE = 1200 PX` to
-the normalized public output. Images whose long edge is `<= 1200px` keep their
+The governed image adapter applies `PUBLIC IMAGE MAX LONG EDGE = 1920 PX` to
+the normalized public output. Images whose long edge is `<= 1920px` keep their
 original dimensions. Larger images use proportional downscale with
-`scale = 1200 / max(width, height)` and rounded dimensions. The adapter never
+`scale = 1920 / max(width, height)` and rounded dimensions. The adapter never
 upscales, crops, stretches or forces a square canvas. This changes only the
 binary derivative dimensions; it does not create a Media, alter MediaUsage,
 representative relations or Article relations.

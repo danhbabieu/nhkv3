@@ -58,9 +58,11 @@ final class MediaRuntimeDependencyClosureTest extends TestCase
     public static function canonicalDimensions(): array
     {
         return [
-            'portrait source' => [1920, 2560, 900, 1200],
-            'small landscape source' => [800, 600, 800, 600],
-            'large landscape source' => [2400, 1600, 1200, 800],
+            'small portrait source is not upscaled' => [1000, 1500, 1000, 1500],
+            'landscape at the limit is retained' => [1920, 1080, 1920, 1080],
+            'portrait at the limit is retained' => [1080, 1920, 1080, 1920],
+            'large landscape source is proportionally downscaled' => [4000, 3000, 1920, 1440],
+            'large portrait source is proportionally downscaled' => [3000, 4000, 1440, 1920],
         ];
     }
 

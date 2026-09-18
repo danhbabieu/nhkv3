@@ -70,7 +70,7 @@ sections are:
 - blockers, warnings and `ready_for_draft`.
 
 When the Media plan includes a public image, its normalized derivative follows
-the canonical 1200px maximum-long-edge rule: dimensions at or below 1200px are
+the canonical 1920px maximum-long-edge rule: dimensions at or below 1920px are
 retained, larger images are proportionally downscaled, and no upscale, crop or
 aspect-ratio change is permitted. This is a projection/readiness constraint,
 not a new Media identity or an Article semantic mutation.

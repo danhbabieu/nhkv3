@@ -6,7 +6,7 @@ namespace NHK\Core\Application\Media;
 /** Canonical public image sizing: bounded, proportional downscale only. */
 final class PublicImageSizingPolicy
 {
-    public const MAX_LONG_EDGE = 1200;
+    public const MAX_LONG_EDGE = 1920;
 
     /** @return array{width:int,height:int} */
     public static function constrain(int $width, int $height): array

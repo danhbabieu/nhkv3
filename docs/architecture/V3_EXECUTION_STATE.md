@@ -13381,3 +13381,21 @@ bootstrap/`NHK_WP_TEST_PATH` prerequisites and undefined WP test functions;
 no live acceptance was run.
 
 STATUS: `CANONICAL_PUBLICATION_TRUTH_LOCAL_READY / FULL_UNIT_ONE_UNRELATED_FAILURE / INTEGRATION_ENVIRONMENT_BLOCKED / LIVE_ACCEPTANCE_NOT_RUN`.
+
+# Checkpoint — 2026-09-18 — Public canonical image 1920px long-edge policy (LOCAL ONLY)
+
+SCOPE: Changed the canonical source-derived public image policy from 1200px to
+1920px for `/anh/<slug>.webp`. The executable owner is
+`PublicImageSizingPolicy::MAX_LONG_EDGE`; the WordPress attachment ingestor,
+Media batch upload and public asset selector continue to consume that shared
+policy. No thumbnail/listing dimensions, Media identity, source-original
+storage, WebP quality (86), deployment or live data were changed.
+
+VERIFICATION: Focused Media/MCP unit selection passes 57 tests / 813 assertions.
+The Media integration file is discovered but skipped in this environment because
+the WordPress test bootstrap is unavailable (5 skipped, 0 assertions). Full
+Composer tests were attempted and remain environment-blocked by unrelated
+WordPress/MySQL bootstrap errors and existing acceptance/configuration gates.
+Canonical documentation snapshot regeneration completed successfully.
+
+STATUS: `PUBLIC_IMAGE_1920_LOCAL_READY / INTEGRATION_BOOTSTRAP_BLOCKED / NO_DEPLOYMENT`.
