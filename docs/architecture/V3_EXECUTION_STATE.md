@@ -1,5 +1,33 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-18 — Remaining live-acceptance boundary repairs (LOCAL READY / DEPLOY PENDING)
+
+SCOPE: Repaired local-only attachment mapping/readback, exact existing-Media
+reuse validation, and old-Capture Article media-slot recovery. No deploy, push,
+SSH, live read, staging/production mutation or semantic data change was
+performed.
+
+ROOT_CAUSES: Attachment readback could lose an exact canonical mapping when the
+bridge row was stored in an alternate UUID representation or when canonical
+asset metadata was the surviving mapping. Existing Media resolution did not
+verify that attachment readback named the requested Media. Old Capture Article
+retries selected Media only from the persisted asset field and could therefore
+reach composition without the canonical Media slot.
+
+FIX: Attachment mapping now has deterministic binary/hex and canonical-asset
+fallback resolution, typed mapped/inconsistent readback, and exact Media
+identity verification on reuse. Retry Article media reconciliation can recover
+Media IDs from exact attachment readback before composing slots. Storage-key
+collision protection remains unchanged; candidate discovery remains diagnostic
+when no semantic delta is requested.
+
+VERIFICATION: Focused Capture/Article/Media/Governance suite passes 55 tests /
+221 assertions; PHP lint and `git diff --check` pass. The guarded WordPress
+integration suite was not run because no integration environment was supplied;
+this is not reported as PASS. No external state was changed.
+
+STATUS: `LIVE_ACCEPTANCE_BOUNDARY_REPAIRS_LOCAL_READY / DEPLOYMENT_PENDING / SEMANTIC_MUTATION_NONE`
+
 # Checkpoint — 2026-09-18 — Generic staging admission checkpoint completed (LOCAL READY / DEPLOY PENDING)
 
 SCOPE: Completed the current generic staging-admission slice and reconciled the
