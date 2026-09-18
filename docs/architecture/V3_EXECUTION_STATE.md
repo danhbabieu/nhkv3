@@ -13300,3 +13300,46 @@ ingest repair. W64 behavior remains covered by the existing generic admission
 tests.
 
 STATUS: `VIDEO_SCOPE_OWNER_SUBJECT_LOCAL_READY / LEGACY_RETRY_SEPARATE / NO_LIVE_ACCEPTANCE / READY_FOR_USER_PUSH_PULL`.
+
+# Checkpoint — 2026-09-18 — Canonical publication truth convergence (LOCAL ONLY)
+
+SCOPE: Implemented the approved general solution for publication compliance,
+fresh canonical publication truth and retry-current outcome semantics. No
+staging/production mutation, deployment, SSH or push was performed.
+
+ROOT_CAUSE_A: `ArticleResearchPreflight::publicationClaims()` implicitly
+promoted Graph-neighborhood knowledge into publication scope whenever an
+editorial claim trace was absent. The editorial claim trace/public-copy
+assertion boundary is the owner; neighborhood discovery is inventory only.
+
+ROOT_CAUSE_B: The publication handoff preferred stale Capture media planning
+data over fresh target-scoped `MediaUsage` readback. The canonical Article
+research/readback path now supplies current Article media evidence, while
+semantic `SKIPPED`/`NOT_REQUIRED` is verified only against current persisted
+subject state. No `wp_post` Graph semantic owner was created.
+
+ROOT_CAUSE_C: Per-phase receipt maps and stale diagnostics failure state let a
+historical failure continue to control retry output after a later successful
+phase. Phase receipts now append attempts and expose the latest authoritative
+outcome; current retry code derives from latest required-phase outcomes while
+historical failures are retained in audit history.
+
+FIX: Added generic RED/GREEN coverage for unsupported neighboring claims,
+selected unsupported claims, current target-scoped media, semantic delta
+readback, historical retry recovery and unresolved current failures. Existing
+editorial claim trace ownership is reused; no second `selected_claim_ids`
+truth store was added. No migration was required because the existing JSON
+receipt/context boundary supports append-only attempts and derived current
+state.
+
+VERIFICATION: Focused implementation selection passes 345 tests / 1,319
+assertions. Contract suite passes 6 tests / 48 assertions. Full Unit suite
+passes 1,889 tests / 9,384 assertions with one unrelated pre-existing
+`DemoCutoverCliContractTest` diagnostic mismatch
+(`REMOTE_DEPLOYMENT_FAILED` versus `REMOTE_DEPLOYMENT_CONFIG_REQUIRED`).
+Changed-file PHP lint, Composer lint, `git diff --check` and secret review
+pass. Integration remains environment-blocked by missing WordPress test
+bootstrap/`NHK_WP_TEST_PATH` prerequisites and undefined WP test functions;
+no live acceptance was run.
+
+STATUS: `CANONICAL_PUBLICATION_TRUTH_LOCAL_READY / FULL_UNIT_ONE_UNRELATED_FAILURE / INTEGRATION_ENVIRONMENT_BLOCKED / LIVE_ACCEPTANCE_NOT_RUN`.
