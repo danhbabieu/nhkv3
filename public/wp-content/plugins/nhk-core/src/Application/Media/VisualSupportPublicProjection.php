@@ -26,6 +26,7 @@ final class VisualSupportPublicProjection
     private function metadata(VisualSupportRequirement $requirement, Media $media, MediaAsset $asset): array
     {
         $usage = null;
+        $candidates = [];
         if ($this->usages !== null) {
             $candidates = array_values(array_filter($this->usages->listByMediaId($media->canonicalId), static fn (mixed $candidate): bool => $candidate instanceof \NHK\Core\Domain\Media\MediaUsage
                 && $candidate->endpointType === $requirement->subjectType
