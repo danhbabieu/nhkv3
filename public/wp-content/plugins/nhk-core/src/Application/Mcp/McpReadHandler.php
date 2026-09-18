@@ -5,7 +5,7 @@ namespace NHK\Core\Application\Mcp;
 
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
-use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository, MediaUsageRepository};
+use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaBindingOperationRepository, MediaRepository, MediaUsageRepository};
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Authority\{AuthorityEntity, EntityTypeRegistry};
 use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim};
@@ -42,6 +42,7 @@ final class McpReadHandler
         private ?CanonicalInventoryService $canonicalInventory = null,
         private ?GraphInventoryService $graphInventory = null,
         private ?RelationBackfillService $relationBackfill = null,
+        private ?MediaBindingOperationRepository $mediaBindingOperations = null,
     ) { $this->delivery ??= PublicMediaAssetDelivery::fromEnvironment($assets, $media); }
 
     public function entityGet(string $type, string $id): ?array
@@ -63,6 +64,14 @@ final class McpReadHandler
     public function mediaAttachmentGet(int $attachmentId): ?array
     {
         return $this->wordpressAttachments?->read($attachmentId);
+    }
+
+    public function mediaBindingGet(string $operationId = '', string $idempotencyKey = ''): ?array
+    {
+        $operation = $operationId !== ''
+            ? $this->mediaBindingOperations?->findByOperationId($operationId)
+            : $this->mediaBindingOperations?->findByIdempotencyKey($idempotencyKey);
+        return $operation?->toArray();
     }
 
     public function videoGet(string $id): ?array

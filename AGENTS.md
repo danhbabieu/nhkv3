@@ -178,6 +178,45 @@ after the Constitution.
     - no `media_ingest`, manual SQL, direct table writer or unrelated staging mutation
   - fail_closed_outside_scope: `true`
 
+- Additional bounded staging acceptance scope for Media binding case 576:
+  - environment: `staging`
+  - host: `https://demo.1945.vn`
+  - allowed_media_ids: `[01a0aefd-7e93-772c-98df-33f7abbc11e8]`
+  - allowed_attachment_ids: `[576]`
+  - allowed_asset_ids: `[01a0aefd-7e9c-757a-a728-4ca3e968b60f]`
+  - allowed_target_ids: `[01a09e44-539a-7f1a-938a-d7d91bb689a3]`
+  - allowed_target_types: `[classification]`
+  - allowed_target_stable_keys: `[nhk:classification:clock-type.dong-ho-cong-cong]`
+  - allowed_target_names: `[Đồng hồ công cộng]`
+  - allowed_binding:
+    - operation: `representative_bind`
+    - entrypoint: `nhk.capture.ingest`
+    - receipt_operation: `nhk.media.binding.get`
+    - role: `representative`
+    - selection_source: `USER_EXPLICIT`
+    - selection_policy: `PINNED`
+  - allowed_presentation:
+    - title: `Đồng hồ công cộng`
+    - alt_text: `Đồng hồ công cộng cổ với bộ máy cơ khí và hai chuông lớn`
+    - caption: `Đồng hồ công cộng – bộ máy cơ khí với hai chuông lớn, gợi lại kỹ nghệ đo và báo giờ trong không gian cộng đồng.`
+  - allowed_operation_families:
+    - `media_usage_reconciliation`
+    - `presentation_readiness`
+    - `frontend_projection_readback`
+    - `canonical_readback`
+  - dynamic_scope_requirements:
+    - server-issued Capture `capture_id` and exact `capture_fingerprint`
+    - server-issued scope `fingerprint`, HMAC `signature`, `issued_at` and `expires_at`
+    - exact binding packet matching the IDs, target, operation, role and selection fields above
+    - runtime staging environment, signing secret, capability context and canonical final readback
+  - restrictions:
+    - exact IDs and exact stable key only; no wildcard or fuzzy target resolution
+    - no new Media, attachment, MediaAsset or Classification
+    - no duplicate binary, Graph mutation, Knowledge mutation or Source/Evidence mutation
+    - no generic WordPress writer, direct SQL/DB, Governance bypass, Proposal Apply or second approval queue
+    - no hard delete; replacement/removal semantics remain logical and out of this acceptance
+  - fail_closed_outside_scope: `true`
+
 
 
 - Development database is nhk_v3; integration database is nhk_v3_test.

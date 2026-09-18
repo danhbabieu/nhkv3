@@ -1,5 +1,59 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-18 — Bounded W64 Video staging admission (LOCAL READY / DEPLOY PENDING)
+
+SCOPE: Added the smallest repository-owned staging admission package for the
+explicit W64 Video correction. No verifier, signing secret, database,
+semantic record, staging runtime or server source was changed.
+
+ROOT_CAUSE: `issueForVideoPlan()` already emitted the required
+`governed_video_plan` packet, but the live admission chain only had Authority
+and Media providers. Both correctly returned false for Video, leaving the
+issuer to fail closed with `STAGING_VIDEO_BINDING_REQUIRED`.
+
+FIX: Added `VideoW64StagingAdmission` at hook priority 30. It admits only the
+exact staging Capture/request fingerprint, one exact Video owner, its exact
+Variant subject, `update`, and expected revision 5. Any other Capture, Video,
+Variant, operation, revision, fingerprint, environment or unrelated package
+remains rejected.
+
+VERIFICATION: W64 admission/scope/plugin focused suite passes 18 tests / 55
+assertions with 12 warnings and 3 deprecations. No live acceptance was run.
+
+STATUS: `W64_VIDEO_STAGING_ADMISSION_LOCAL_READY / DEPLOY_PENDING`
+
+# Checkpoint — 2026-09-18 — Media 576 bounded staging scope (LOCAL READY / DEPLOY PENDING)
+
+SCOPE: Added one additive, exact-ID staging acceptance package for the existing
+Media `01a0aefd-7e93-772c-98df-33f7abbc11e8`, attachment `576`, asset
+`01a0aefd-7e9c-757a-a728-4ca3e968b60f` and Classification
+`01a09e44-539a-7f1a-938a-d7d91bb689a3` (`nhk:classification:clock-type.dong-ho-cong-cong`).
+The package permits only the canonical `nhk.capture.ingest` typed
+`representative_bind` path with `USER_EXPLICIT`/`PINNED`, MediaUsage
+reconciliation, presentation readiness, projection readback and canonical
+readback. No code path, Proposal, Media binding, Graph/Knowledge/Source/Evidence
+record or staging/production data was changed.
+
+GUARDRAILS: The package does not replace or weaken Public Clock, 400-day,
+cuckoo or Atherton scopes. The shared `StagingAcceptanceScopeVerifier` still
+issues the Capture ID/fingerprint, scope fingerprint, HMAC signature, expiry
+and capability-bound packet at runtime. No target revision is invented: the
+typed Media binding contract resolves the exact existing Classification and
+does not require Proposal/relation/video optimistic-revision fields.
+
+PRESENTATION: The exact requested title, alt text and caption are recorded as
+the bounded presentation payload. The scope remains fail-closed outside the
+listed IDs, operation family, selection policy, role, entrypoint and readback
+gates; no wildcard, fuzzy locator, creation, duplicate binary, direct writer,
+direct DB, hard delete, Governance bypass or second approval queue is allowed.
+
+VERIFICATION: Documentation and acceptance contract tests, PHP lint,
+`git diff --check` and canonical documentation generation are required before
+commit. This is local policy readiness only; no deployment or semantic staging
+mutation is claimed.
+
+STATUS: `MEDIA_576_SCOPE_LOCAL_READY / STAGING_DEPLOY_PENDING / SEMANTIC_MUTATION_NONE`
+
 # Checkpoint — 2026-09-18 — Canonical Atherton staging scope (LOCAL READY / DEPLOY PENDING)
 
 SCOPE: Added the explicitly authorized Atherton Authority acceptance case to

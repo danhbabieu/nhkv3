@@ -676,6 +676,7 @@ final class McpAbilityRegistration
                 'nhk.media.upload-widget.open' => self::executeMcp($tool, $input),
                 'nhk.entity.get' => $read->entityGet((string) ($input['type'] ?? ''), (string) ($input['id'] ?? '')),
                 'nhk.media.get' => $read->mediaGet((string) ($input['id'] ?? '')),
+                'nhk.media.binding.get' => $read->mediaBindingGet((string) ($input['operation_id'] ?? ''), (string) ($input['idempotency_key'] ?? '')),
                 'nhk.video.get' => $read->videoGet((string) ($input['id'] ?? '')),
                 'nhk.knowledge.get' => $read->knowledgeGet((string) ($input['id'] ?? '')),
                 'nhk.source.get' => $read->sourceGet((string) ($input['id'] ?? '')),

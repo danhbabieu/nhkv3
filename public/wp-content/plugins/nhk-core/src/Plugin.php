@@ -69,7 +69,7 @@ use NHK\Core\Infrastructure\Graph\{CoreEndpointResolverRegistrar, GraphClockType
 use NHK\Core\Infrastructure\Governance\WpdbDependencyRepository;
 use NHK\Core\Infrastructure\Governance\GovernanceRuntimeFactory;
 use NHK\Core\Application\Entity\{ComparisonPageQuery, EntityMediaProjection, EntityPageQuery, EntityProfileAdminProjection, PublicEndpointEligibilityResolver, PublicEntityCollectionQuery, PublicEntityEligibilityPolicy, PublicIdentityContract, PublicRouteResolver, RelatedContentQuery};
-use NHK\Core\Application\Media\{ArticleMediaCoordinator, ArticleMediaSeoProjection, MediaIngestGateway, MediaService, MediaVideoPageQuery, VisualOpportunityDetector, VisualSupportRequirementService};
+use NHK\Core\Application\Media\{ArticleMediaCoordinator, ArticleMediaSeoProjection, MediaEnrichmentFrontendReadbackVerifier, MediaIngestGateway, MediaService, MediaVideoPageQuery, VisualOpportunityDetector, VisualSupportRequirementService};
 use NHK\Core\Application\Video\{VideoCompletenessPolicy, VideoEditorialGenerator, VideoHubClassifier, VideoIntakeService, VideoInternalSemanticResearcher, VideoKnowledgeEnrichmentPlanner, VideoRelationCandidatePlanner, VideoSeoProjection, VideoService, YouTubeDataApiClient, YouTubeSourceAdapter};
 use NHK\Core\Application\Home\HomeSemanticQuery;
 use NHK\Core\Application\Search\SearchSemanticQuery;
@@ -157,7 +157,7 @@ final class Plugin {
             $canonicalInventory = self::canonicalInventory($types, $authority, $media, $videos, $claims, $sources, $evidence);
             $graphInventory = new GraphInventoryService($graphRepository, $graphEndpoints, $predicates);
             $relationBackfill = self::relationBackfill($canonicalInventory, $graphInventory);
-            McpAbilityRegistration::registerReadAbilities(new McpReadHandler($authority, $types, $media, $assets, $usages, $videos, $claims, $evidence, new MigrationStatus(), $sources, null, new McpSemanticContextResolver($authority, $types), null, $neighborhood, $canonicalInventory, $graphInventory, $relationBackfill));
+            McpAbilityRegistration::registerReadAbilities(new McpReadHandler($authority, $types, $media, $assets, $usages, $videos, $claims, $evidence, new MigrationStatus(), $sources, null, new McpSemanticContextResolver($authority, $types), null, $neighborhood, $canonicalInventory, $graphInventory, $relationBackfill, new WpdbMediaBindingOperationRepository($wpdb)));
             McpAbilityRegistration::registerCapabilityGatedReadAbilities();
             McpAbilityRegistration::registerGovernedAbilities();
         });
@@ -169,6 +169,7 @@ final class Plugin {
             $stagingAdmission = new MediaBindingStagingAdmission(new WpdbMediaRepository($wpdb), new WpdbAuthorityRepository($wpdb));
             add_filter('nhk_v3_staging_acceptance_admission', new AuthorityStagingAdmission(), 10, 5);
             add_filter('nhk_v3_staging_acceptance_admission', $stagingAdmission, 20, 5);
+            add_filter('nhk_v3_staging_acceptance_admission', new VideoW64StagingAdmission(), 30, 5);
         }
         $sharedAttachmentBridge = null;
         $claimOwnerUrl = static fn (\NHK\Core\Domain\Knowledge\KnowledgeClaim $claim): ?string => null;
@@ -266,7 +267,9 @@ final class Plugin {
             $publicIdentityService = new \NHK\Core\Application\PublicIdentity\PublicIdentityService($publicIdentityRepository, static fn (string $slug): bool => false);
             $publicRoutes = new PublicRouteResolver($authority, $types, $publicContexts);
             $publicEligibility = new PublicEntityEligibilityPolicy($authority, $types, $publicRoutes, $publicContexts);
-            $publicCollection = new PublicEntityCollectionQuery($authority, $types, new PublicIdentityContract($types), $publicEligibility, $publicRoutes, new BrandAggregationQuery($graphService, $authority, $types, $publicRoutes, $publicEligibility), static fn (): bool => $publicStatus->authorityStorageReady(), new EntityMediaProjection($media, $assets, $usages), new EntityKnowledgeProjection($claims, $evidence, $sources, $publicStatus));
+            $entityMediaProjection = new EntityMediaProjection($media, $assets, $usages);
+            $frontendReadback = new MediaEnrichmentFrontendReadbackVerifier($authority, $types, $publicEligibility, $entityMediaProjection, $usages);
+            $publicCollection = new PublicEntityCollectionQuery($authority, $types, new PublicIdentityContract($types), $publicEligibility, $publicRoutes, new BrandAggregationQuery($graphService, $authority, $types, $publicRoutes, $publicEligibility), static fn (): bool => $publicStatus->authorityStorageReady(), $entityMediaProjection, new EntityKnowledgeProjection($claims, $evidence, $sources, $publicStatus));
             $governanceRuntime = GovernanceRuntimeFactory::fromWordPress($wpdb, $sharedAttachmentBridge);
             $stagingScopeVerifier = $governanceRuntime->stagingScopeVerifier ?? new \NHK\Core\Application\Governance\StagingAcceptanceScopeVerifier(
                 static function (): string { return defined('WP_ENVIRONMENT_TYPE') ? strtolower((string) constant('WP_ENVIRONMENT_TYPE')) : (function_exists('wp_get_environment_type') ? strtolower((string) wp_get_environment_type()) : strtolower((string) (getenv('WP_ENVIRONMENT_TYPE') ?: 'unknown'))); },
@@ -1136,7 +1139,7 @@ final class Plugin {
                     $blockers = (array) ($review['blockers'] ?? $review['diagnostics'] ?? []);
                     return ['eligible' => (($review['outcome'] ?? '') === 'PASS' || ($review['eligible'] ?? false) === true) && $blockers === [], 'blockers' => $blockers, 'review' => $review, 'fresh_preflight' => $freshResearch->toArray(), 'state_token' => $review['state_token'] ?? $expectedToken];
                 },
-                static function (array $context) use ($articleEditorial): array {
+                static function (array $context) use ($articleEditorial, $frontendReadback): array {
                     $articleId = (int) ($context['article_id'] ?? 0);
                     $media = is_array($context['media'] ?? null) ? $context['media'] : [];
                     $bindingResults = array_values(array_filter((array) ($media['bindings'] ?? []), 'is_array'));
@@ -1145,6 +1148,16 @@ final class Plugin {
                         if (!$bindingVerified) return ['status' => 'unavailable', 'reason' => 'MEDIA_BINDING_FINAL_READBACK_UNAVAILABLE', 'media_binding_count' => count($bindingResults)];
                     }
                     if ($articleId < 1) {
+                        $intent = strtoupper(trim((string) (($context['content_intent']['intent'] ?? ''))));
+                        if ($intent === 'MEDIA_ENRICHMENT') {
+                            $verified = [];
+                            foreach ($bindingResults as $binding) {
+                                $readback = is_array($binding['readback'] ?? null) ? $binding['readback'] : [];
+                                $verified[] = $frontendReadback->verify((string) ($readback['target_type'] ?? ''), (string) ($readback['target_id'] ?? ''), (string) ($readback['media_id'] ?? ''));
+                            }
+                            if ($verified === [] || count(array_filter($verified, static fn (array $item): bool => ($item['status'] ?? '') === 'verified')) !== count($verified)) return ['status' => 'unavailable', 'reason' => 'FRONTEND_READBACK_NOT_VERIFIED', 'frontend_verified' => false, 'media_bindings' => $verified];
+                            return ['status' => 'verified', 'frontend_verified' => true, 'media_bindings' => $verified, 'article_owner' => 'NOT_REQUIRED'];
+                        }
                         $payload = ['stage' => 'CAPTURE_FINAL_CANONICAL_READBACK', 'status' => 'VERIFIED', 'capture_id' => (string) ($context['capture']['capture_id'] ?? ''), 'article_owner' => 'NOT_REQUIRED', 'media_binding_count' => count($bindingResults), 'at' => gmdate('c')];
                         if (function_exists('do_action')) { try { do_action('nhk_v3_capture_stage_trace', $payload); } catch (\Throwable) { } }
                         if (function_exists('error_log')) {
