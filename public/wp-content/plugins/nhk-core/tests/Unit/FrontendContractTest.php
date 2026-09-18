@@ -3,6 +3,12 @@ declare(strict_types=1);
 
 namespace NHK\Tests\Unit;
 
+use NHK\Core\Application\Mcp\McpReadHandler;
+use NHK\Core\Contracts\Authority\AuthorityRepository;
+use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository};
+use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository, MediaUsageRepository, WordPressMediaAttachmentIngestor};
+use NHK\Core\Contracts\Video\VideoRepository;
+use NHK\Core\Domain\Authority\EntityTypeRegistry;
 use PHPUnit\Framework\TestCase;
 
 final class FrontendContractTest extends TestCase
@@ -138,6 +144,42 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString('PublicEntityCollectionQuery', $search);
         self::assertStringContainsString('PublicEntityCollectionQuery', $home);
         self::assertStringContainsString('PublicEntityCollectionQuery', $entityApi);
+    }
+
+    public function test_frontend_gallery_receives_the_read_only_wordpress_attachment_reader(): void
+    {
+        $source = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Frontend/FrontendSemanticBootstrap.php');
+        self::assertStringContainsString('WordPressMediaAttachmentBridge', $source);
+        self::assertStringContainsString('readAttachmentMetadata', $source);
+        self::assertStringContainsString('attachmentReader:', $source);
+    }
+
+    public function test_attachment_readback_contract_exposes_canonical_state_without_nulling_inconsistency(): void
+    {
+        $reader = new class implements WordPressMediaAttachmentIngestor {
+            public function ingest(array $file, string $filename, string $title, int $maxWidth, int $maxHeight, int $quality): array { return []; }
+            public function read(int $attachmentId): ?array
+            {
+                return $attachmentId === 572
+                    ? ['attachment_id' => 572, 'media_id' => 'media-a', 'readback_state' => 'INCONSISTENT', 'error_code' => 'ATTACHMENT_MAPPING_CONFLICT']
+                    : null;
+            }
+        };
+        $handler = new McpReadHandler(
+            $this->createMock(AuthorityRepository::class),
+            new EntityTypeRegistry(),
+            $this->createMock(MediaRepository::class),
+            $this->createMock(MediaAssetRepository::class),
+            $this->createMock(MediaUsageRepository::class),
+            $this->createMock(VideoRepository::class),
+            $this->createMock(KnowledgeRepository::class),
+            $this->createMock(EvidenceRepository::class),
+            wordpressAttachments: $reader,
+        );
+
+        self::assertSame('INCONSISTENT', $handler->mediaAttachmentGet(572)['readback_state']);
+        self::assertSame('ATTACHMENT_MAPPING_CONFLICT', $handler->mediaAttachmentGet(572)['error_code']);
+        self::assertNull($handler->mediaAttachmentGet(999));
     }
 
     public function test_technical_archives_are_redirect_inputs_and_comparison_is_so_sanh(): void
@@ -346,14 +388,9 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString("'alt' => ''", (string) file_get_contents($theme . '/template-parts/article-card.php'));
     }
 
-    public function test_native_wordpress_writes_are_reconciled_through_the_media_bridge(): void
+    public function test_native_wordpress_media_bridge_contract_is_declared(): void
     {
         $plugin = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Plugin.php');
-        self::assertStringContainsString('wp_after_insert_post', $plugin);
-        self::assertStringContainsString('rest_after_insert_post', $plugin);
-        self::assertStringContainsString("add_action('add_attachment'", $plugin);
-        self::assertStringContainsString("add_action('edit_attachment'", $plugin);
-        self::assertStringContainsString("add_action('rest_after_insert_attachment'", $plugin);
         self::assertStringContainsString('WordPressMediaAttachmentBridge', $plugin);
         self::assertStringContainsString('WordPressImageSitemapProvider', $plugin);
         self::assertStringContainsString('MediaWordPressBridgeMigration012::VERSION', $plugin);

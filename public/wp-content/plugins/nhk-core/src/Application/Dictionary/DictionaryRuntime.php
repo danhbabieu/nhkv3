@@ -94,12 +94,20 @@ final class DictionaryRuntime
         );
 
         $this->planning = new DictionaryPlanningService(new DictionaryTermDetector($this->normalizer), $resolver, $this->candidates, $this->mentions, new DictionaryLinkPlanner());
-        $this->curation = new DictionaryCurationService($this->candidates, $this->concepts, null, $this->normalizer);
-        $mediaProjection = new EntityMediaProjection(new WpdbMediaRepository($database), new WpdbMediaAssetRepository($database), new WpdbMediaUsageRepository($database));
+        $media = new WpdbMediaRepository($database);
+        $assets = new WpdbMediaAssetRepository($database);
+        $usages = new WpdbMediaUsageRepository($database);
+        $this->curation = new DictionaryCurationService($this->candidates, $this->concepts, null, $this->normalizer, new \NHK\Core\Application\Media\MediaService($media, $assets, $usages), $media, $assets, $usages);
+        $mediaProjection = new EntityMediaProjection($media, $assets, $usages);
         $this->publicQuery = new DictionaryPublicQuery(
             $this->concepts,
-            static function (string $conceptId) use ($mediaProjection): ?array {
+            static function (string $conceptId, string $placement = '') use ($mediaProjection): ?array {
                 $projection = $mediaProjection->forEntity('dictionary_concept', $conceptId);
+                if ($placement !== '') {
+                    foreach ((array) ($projection['gallery'] ?? []) as $item) {
+                        if (is_array($item) && ($item['placement'] ?? '') === $placement) return $item;
+                    }
+                }
                 return is_array($projection['representative'] ?? null) ? $projection['representative'] : null;
             },
             fn (?string $type, ?string $id, ?string $url): ?string => $this->revalidateDelegatedDestination($type, $id, $url),

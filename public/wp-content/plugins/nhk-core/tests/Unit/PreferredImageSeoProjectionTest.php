@@ -4,11 +4,28 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Media\PreferredImageSeoProjection;
+use NHK\Core\Domain\Media\MediaSeoStateRegistry;
 use PHPUnit\Framework\TestCase;
 
 final class PreferredImageSeoProjectionTest extends TestCase
 {
     protected function setUp(): void { self::assertTrue(class_exists(PreferredImageSeoProjection::class), 'Preferred image projection is not implemented.'); }
+
+    public function test_missing_state_is_registered_in_media_seo_registry(): void
+    {
+        self::assertContains(MediaSeoStateRegistry::MISSING, MediaSeoStateRegistry::all());
+        MediaSeoStateRegistry::assertKnown(MediaSeoStateRegistry::MISSING);
+    }
+
+    public function test_complete_state_uses_the_registered_media_seo_state(): void
+    {
+        $result = (new PreferredImageSeoProjection())->project([
+            ['role' => 'representative', 'url' => '/front.webp'],
+        ]);
+
+        self::assertSame(MediaSeoStateRegistry::COMPLETE, $result['state']);
+        MediaSeoStateRegistry::assertKnown((string) $result['state']);
+    }
 
     public function test_representative_precedence_is_not_replaced_by_newer_evidence(): void
     {
@@ -28,5 +45,66 @@ final class PreferredImageSeoProjectionTest extends TestCase
         ]);
         self::assertFalse($result['eligible']);
         self::assertContains('REPRESENTATIVE_IMAGE_MISSING', $result['reasons']);
+    }
+
+    public function test_ineligible_missing_or_unready_candidates_are_rejected(): void
+    {
+        $result = (new PreferredImageSeoProjection())->project([
+            ['role' => 'representative', 'url' => '/ineligible.webp', 'eligible' => false],
+            ['role' => 'representative', 'url' => '/missing.webp', 'state' => MediaSeoStateRegistry::MISSING],
+            ['role' => 'representative', 'url' => '/draft.webp', 'readiness' => 'draft'],
+        ]);
+
+        self::assertSame(MediaSeoStateRegistry::MISSING, $result['state']);
+        self::assertFalse($result['eligible']);
+        self::assertNull($result['url']);
+    }
+
+    public function test_incomplete_representative_is_rejected_when_a_complete_candidate_is_available(): void
+    {
+        $result = (new PreferredImageSeoProjection())->project([
+            ['role' => 'representative', 'url' => '/incomplete.webp', 'state' => MediaSeoStateRegistry::INCOMPLETE_FEATURED, 'precedence' => 0],
+            ['role' => 'representative', 'url' => '/complete.webp', 'state' => MediaSeoStateRegistry::COMPLETE, 'precedence' => 1],
+        ]);
+
+        self::assertSame('/complete.webp', $result['url']);
+        self::assertSame(MediaSeoStateRegistry::COMPLETE, $result['state']);
+        self::assertTrue($result['eligible']);
+    }
+
+    public function test_incomplete_only_representatives_return_registered_missing_state(): void
+    {
+        $result = (new PreferredImageSeoProjection())->project([
+            ['role' => 'representative', 'url' => '/incomplete.webp', 'state' => MediaSeoStateRegistry::INCOMPLETE_FEATURED],
+            ['role' => 'representative', 'url' => '/placeholder.webp', 'state' => MediaSeoStateRegistry::PLACEHOLDER],
+        ]);
+
+        self::assertSame(MediaSeoStateRegistry::MISSING, $result['state']);
+        self::assertFalse($result['eligible']);
+        self::assertNull($result['url']);
+    }
+
+    public function test_metadata_source_is_derived_from_actual_fields_not_candidate_label(): void
+    {
+        $result = (new PreferredImageSeoProjection())->project([
+            [
+                'role' => 'representative',
+                'url' => '/front.webp',
+                'metadata_source' => 'UNTRUSTED_LABEL',
+                'title' => '',
+                'alt' => '',
+                'caption' => '',
+                'usage_title' => 'Tiêu đề Usage',
+                'usage_alt' => 'Alt Usage',
+                'subject_caption' => 'Chú thích chủ thể',
+                'media_name' => 'Tên Media',
+                'attachment_caption' => 'Chú thích Attachment',
+            ],
+        ]);
+
+        self::assertSame('MEDIA_USAGE', $result['metadata_source']);
+        self::assertSame('Tiêu đề Usage', $result['title']);
+        self::assertSame('Alt Usage', $result['alt']);
+        self::assertSame('Chú thích chủ thể', $result['caption']);
     }
 }

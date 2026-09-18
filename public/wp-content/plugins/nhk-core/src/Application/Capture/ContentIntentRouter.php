@@ -49,6 +49,9 @@ final class ContentIntentRouter
         if ($requested !== '' && $requested !== $intent->value) throw new \InvalidArgumentException('CAPTURE_CONTENT_INTENT_CHANGE_NOT_ALLOWED');
         $signals = is_array($persisted['signals'] ?? null) ? $persisted['signals'] : [];
         $result = $this->result($intent, 'PERSISTED_CAPTURE', $signals);
+        foreach (['purpose', 'semantic_delta'] as $handoffField) {
+            if (array_key_exists($handoffField, $persisted)) $result[$handoffField] = $persisted[$handoffField];
+        }
         $result['intent_reused'] = true;
         return $result;
     }

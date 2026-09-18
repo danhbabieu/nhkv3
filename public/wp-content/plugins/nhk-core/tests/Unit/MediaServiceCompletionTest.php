@@ -160,6 +160,42 @@ final class MediaServiceCompletionTest extends TestCase
         self::assertSame(0, $assets->updates);
     }
 
+    public function test_reconcile_asset_preserves_the_mapped_asset_identity_and_visibility(): void
+    {
+        [$media, $assets, $service] = $this->stores();
+        $item = $service->ingest('wp-attachment:1:572', 'Edited attachment', 'draft', [], [[
+            'kind' => 'original',
+            'storage_key' => 'private/572-source.png',
+            'checksum' => hash('sha256', 'before'),
+            'mime_type' => 'image/png',
+            'byte_size' => 6,
+            'width' => 900,
+            'height' => 1200,
+            'visibility' => 'PRIVATE',
+            'metadata' => ['source_original' => true, 'wordpress_attachment_id' => 572],
+        ]]);
+        $asset = $assets->listByMediaId($item->canonicalId)[0];
+        $assetId = $asset->assetId;
+
+        self::assertTrue(method_exists($service, 'reconcileAsset'));
+        if (!method_exists($service, 'reconcileAsset')) return;
+
+        $reconciled = $service->reconcileAsset($item->canonicalId, $assetId, [
+            'storage_key' => 'private/572-edited.png',
+            'checksum' => hash('sha256', 'after'),
+            'byte_size' => 7,
+            'width' => 1200,
+            'height' => 900,
+            'visibility' => 'PRIVATE',
+            'metadata' => ['source_original' => true, 'wordpress_attachment_id' => 572],
+        ]);
+
+        self::assertSame($assetId, $reconciled->assetId);
+        self::assertSame($item->canonicalId, $reconciled->mediaId);
+        self::assertSame('PRIVATE', $reconciled->visibility);
+        self::assertSame('private/572-edited.png', $reconciled->storageKey);
+    }
+
     /** @return array{0:object,1:object,2:MediaService} */
     private function stores(): array
     {

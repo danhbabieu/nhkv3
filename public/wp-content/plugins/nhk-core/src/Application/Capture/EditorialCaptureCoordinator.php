@@ -500,7 +500,7 @@ final class EditorialCaptureCoordinator
             $assets = $record->assets;
             $diagnostics = $record->diagnostics;
             $receipts = $record->phaseReceipts;
-            $publicationContext = ['capture' => $record->toArray(), 'article_id' => $record->articleId, 'composition' => $this->withoutBody($composition), 'media' => $media, 'semantic' => $retrieved, 'semantic_write_back' => $writes, 'subject_resolution' => $resolution];
+            $publicationContext = ['capture' => $record->toArray(), 'article_id' => $record->articleId, 'composition' => $this->withoutBody($composition), 'media' => $media, 'semantic' => $retrieved, 'semantic_write_back' => $writes, 'requirements' => is_array($writes['requirements'] ?? null) ? $writes['requirements'] : [], 'subject_resolution' => $resolution];
             $publication = ($this->publicationGate)($publicationContext);
             // A native media/editorial write may rotate the token between the
             // first gate read and review. Refresh once, then continue with the

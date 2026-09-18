@@ -25,7 +25,7 @@ final class MediaLibraryFrontendContractTest extends TestCase
 
         self::assertSame('/anh/example.webp', $item['image_url']);
         self::assertTrue($item['has_real_image']);
-        self::assertSame('Tư liệu ảnh mặt trước của hiện vật.', $item['summary']);
+        self::assertSame('Ảnh tư liệu trong kho hình ảnh NHK.', $item['summary']);
         self::assertSame('/bai-viet/anh-mat-truoc/', $item['article_url']);
         self::assertStringStartsWith('/anh/', parse_url((string) $item['image_url'], PHP_URL_PATH) ?: '');
         self::assertStringNotContainsString('/wp-content/uploads/', (string) $item['image_url']);
