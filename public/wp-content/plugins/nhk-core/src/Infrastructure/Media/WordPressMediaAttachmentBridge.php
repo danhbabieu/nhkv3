@@ -637,7 +637,8 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
     }
 
     /** @return array<string,mixed>|null */
-    public function bindingForAttachment(int $attachmentId): ?array
+    /** @param array<string,mixed> $physicalFacts */
+    public function bindingForAttachment(int $attachmentId, array $physicalFacts = []): ?array
     {
         if ($attachmentId < 1) return null;
         $row = $this->database->get_row($this->database->prepare("SELECT media_uuid,asset_uuid,attachment_id,storage_key FROM {$this->table} WHERE attachment_id=%d LIMIT 1", $attachmentId), defined('ARRAY_A') ? ARRAY_A : 1);
@@ -647,9 +648,24 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
         $mediaId = strlen($mediaUuid) === 16 ? UuidCodec::fromBinary($mediaUuid) : null;
         $media = $mediaId !== null ? $this->media->findByCanonicalId($mediaId) : null;
         if (!$media instanceof Media) return ['attachment_id' => $attachmentId, 'media_id' => $mediaId, 'readback_state' => 'INCONSISTENT', 'error_code' => 'ATTACHMENT_MAPPING_CONFLICT'];
+        if (!$media->active || $media->readiness !== 'ready') return ['attachment_id' => $attachmentId, 'media_id' => $media->canonicalId, 'readback_state' => 'INCONSISTENT', 'error_code' => 'ATTACHMENT_MEDIA_NOT_READY'];
         $assetId = strlen($assetUuid) === 16 ? UuidCodec::fromBinary($assetUuid) : null;
         $asset = $assetId !== null ? $this->assets->findByAssetId($assetId) : null;
         if (!$asset instanceof MediaAsset || $asset->mediaId !== $media->canonicalId) return ['attachment_id' => $attachmentId, 'media_id' => $media->canonicalId, 'readback_state' => 'INCONSISTENT', 'error_code' => 'ATTACHMENT_CANONICAL_ASSET_MISSING'];
+        if ((string) ($row['storage_key'] ?? '') !== $asset->storageKey) return ['attachment_id' => $attachmentId, 'media_id' => $media->canonicalId, 'asset_id' => $asset->assetId, 'readback_state' => 'INCONSISTENT', 'error_code' => 'ATTACHMENT_STORAGE_MAPPING_MISMATCH'];
+        if ($physicalFacts === []) return ['attachment_id' => $attachmentId, 'media_id' => $media->canonicalId, 'asset_id' => $asset->assetId, 'readback_state' => 'INCONSISTENT', 'error_code' => 'ATTACHMENT_PHYSICAL_READBACK_REQUIRED'];
+        foreach ([
+            'checksum' => $asset->checksum,
+            'byte_size' => $asset->byteSize,
+            'width' => $asset->width,
+            'height' => $asset->height,
+            'mime_type' => $asset->mimeType,
+        ] as $fact => $expected) {
+            if (array_key_exists($fact, $physicalFacts) && $physicalFacts[$fact] !== $expected) {
+                $errorCode = $fact === 'checksum' ? 'ATTACHMENT_PHYSICAL_CHECKSUM_MISMATCH' : 'ATTACHMENT_PHYSICAL_FACT_MISMATCH';
+                return ['attachment_id' => $attachmentId, 'media_id' => $media->canonicalId, 'asset_id' => $asset->assetId, 'readback_state' => 'INCONSISTENT', 'error_code' => $errorCode];
+            }
+        }
         $canonicalAssetIds = array_map(static fn (MediaAsset $candidate): string => $candidate->assetId, $this->assets->listByMediaId($media->canonicalId));
         return ['attachment_id' => $attachmentId, 'media_id' => $media->canonicalId, 'asset_id' => $asset->assetId, 'source_asset_id' => $asset->kind === 'original' ? $asset->assetId : null, 'canonical_asset_ids' => $canonicalAssetIds, 'storage_key' => (string) ($row['storage_key'] ?? $asset->storageKey), 'readback_state' => 'VERIFIED'];
     }

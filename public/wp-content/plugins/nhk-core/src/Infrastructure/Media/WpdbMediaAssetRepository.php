@@ -50,10 +50,10 @@ final class WpdbMediaAssetRepository implements MediaAssetRepository
     {
         $widthSql = $asset->width === null ? 'NULL' : '%d';
         $heightSql = $asset->height === null ? 'NULL' : '%d';
-        $args = [$asset->storageKey, $asset->mimeType, $asset->byteSize];
+        $args = [$asset->checksum, $asset->storageKey, $asset->mimeType, $asset->byteSize];
         foreach ([$asset->width, $asset->height] as $dimension) if ($dimension !== null) $args[] = $dimension;
         array_push($args, $asset->visibility, wp_json_encode($asset->metadata, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), UuidCodec::toBinary($asset->assetId));
-        $ok = $this->database->query($this->database->prepare("UPDATE {$this->table} SET storage_key=%s,mime_type=%s,byte_size=%d,width={$widthSql},height={$heightSql},visibility=%s,metadata_json=%s WHERE asset_uuid=%s", ...$args));
+        $ok = $this->database->query($this->database->prepare("UPDATE {$this->table} SET checksum=UNHEX(%s),storage_key=%s,mime_type=%s,byte_size=%d,width={$widthSql},height={$heightSql},visibility=%s,metadata_json=%s WHERE asset_uuid=%s", ...$args));
         if ($ok !== 1) throw new MediaException('Media asset update conflict.');
         return $this->findByAssetId($asset->assetId) ?? $asset;
     }

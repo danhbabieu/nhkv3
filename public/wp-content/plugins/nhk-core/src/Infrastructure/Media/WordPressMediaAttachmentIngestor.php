@@ -184,6 +184,12 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
         $metadata = is_array($metadata) ? $metadata : [];
         $filename = basename($relative);
         if ($filename === '') return null;
+        $physicalInfo = @getimagesize($pathReal);
+        $physicalChecksum = hash_file('sha256', $pathReal);
+        $physicalSize = filesize($pathReal);
+        if (!is_array($physicalInfo) || !is_string($physicalChecksum) || $physicalChecksum === '' || $physicalSize === false || $physicalSize < 1) {
+            return ['attachment_id' => $attachmentId, 'readback_state' => 'UNAVAILABLE', 'error_code' => 'ATTACHMENT_PHYSICAL_READBACK_FAILED'];
+        }
         $canonicalPath = (new \NHK\Core\Application\Media\PublicMediaAssetUrlResolver())->path($filename);
         $canonicalUrl = function_exists('home_url') ? (string) home_url($canonicalPath) : $canonicalPath;
         $result = [
@@ -215,7 +221,13 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
             ];
         }
         if ($this->semanticMedia instanceof WordPressMediaAttachmentBridge) {
-            $binding = $this->semanticMedia->bindingForAttachment($attachmentId);
+            $binding = $this->semanticMedia->bindingForAttachment($attachmentId, [
+                'checksum' => $physicalChecksum,
+                'byte_size' => (int) $physicalSize,
+                'width' => (int) ($physicalInfo[0] ?? 0),
+                'height' => (int) ($physicalInfo[1] ?? 0),
+                'mime_type' => strtolower((string) ($physicalInfo['mime'] ?? $mime)),
+            ]);
             if ($binding === null) {
                 $result['readback_state'] = 'INCONSISTENT';
                 $result['error_code'] = 'ATTACHMENT_MAPPING_MISSING';
@@ -223,7 +235,8 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
                 $result = array_merge($result, $binding);
             }
         } else {
-            $result['readback_state'] = 'VERIFIED';
+            $result['readback_state'] = 'INCONSISTENT';
+            $result['error_code'] = 'ATTACHMENT_CANONICAL_READBACK_UNAVAILABLE';
         }
         return $result;
     }
