@@ -21,6 +21,7 @@ final class PublicMediaGalleryQuery
         private ?PublicMediaAssetDelivery $delivery = null,
         private ?MediaUsageRepository $usages = null,
         private ?PublicMediaArticleLinkResolver $articleLinks = null,
+        private ?\Closure $attachmentReader = null,
     ) {}
 
     /** @return array{page:int,per_page:int,total:int,items:list<array<string,mixed>>} */
@@ -55,7 +56,7 @@ final class PublicMediaGalleryQuery
         if (!$media->active || $media->readiness !== 'ready' || $media->isSystemPlaceholder()) return null;
         $image = $this->firstImage($media);
         $usages = $this->usagesForMedia($media);
-        $metadata = $this->metadataFor($media, $usages);
+        $metadata = $this->metadataFor($media, $image, $usages);
         $articleUrl = $this->articleLinks?->firstPublished($usages);
         return array_merge($metadata, [
             'image_url' => $image['image_url'] ?? null,
@@ -84,6 +85,7 @@ final class PublicMediaGalleryQuery
         $path = (new PublicMediaAssetUrlResolver())->path($filename);
         return [
             'image_url' => function_exists('home_url') ? (string) home_url($path) : $path,
+            'attachment_id' => (int) ($asset->metadata['wordpress_attachment_id'] ?? 0),
             'width' => $asset->width,
             'height' => $asset->height,
         ];
@@ -103,7 +105,7 @@ final class PublicMediaGalleryQuery
 
     /** @return array{title:string,alt:string,caption:string,metadata_source:string} */
     /** @param list<MediaUsage> $usages */
-    private function metadataFor(Media $media, array $usages): array
+    private function metadataFor(Media $media, ?array $image, array $usages): array
     {
         $permitted = array_values(array_filter($usages, static fn (MediaUsage $usage): bool => $usage->endpointType !== 'wp_post' && in_array($usage->role, [MediaUsageRoleRegistry::REPRESENTATIVE, MediaUsageRoleRegistry::EVIDENCE, MediaUsageRoleRegistry::TECHNICAL_DETAIL, 'gallery'], true)));
         usort($permitted, static fn (MediaUsage $left, MediaUsage $right): int => [$left->role === MediaUsageRoleRegistry::REPRESENTATIVE ? 0 : 1, $left->sortOrder, $left->usageId] <=> [$right->role === MediaUsageRoleRegistry::REPRESENTATIVE ? 0 : 1, $right->sortOrder, $right->usageId]);
@@ -118,13 +120,34 @@ final class PublicMediaGalleryQuery
                 break;
             }
             if (!array_key_exists($field, $values)) {
-                $values[$field] = $media->canonicalName;
-                $sources[] = 'MEDIA_NEUTRAL';
+                $neutral = trim($media->canonicalName);
+                if ($neutral !== '') {
+                    $values[$field] = $neutral;
+                    $sources[] = 'MEDIA_NEUTRAL';
+                }
             }
+            if (!array_key_exists($field, $values)) {
+                $attachment = $this->attachmentMetadata($image);
+                $attachmentValue = trim((string) ($attachment[$field] ?? ''));
+                if ($attachmentValue !== '') {
+                    $values[$field] = $attachmentValue;
+                    $sources[] = 'WORDPRESS_ATTACHMENT';
+                }
+            }
+            $values[$field] ??= '';
         }
-        $rank = ['SUBJECT_REPRESENTATIVE' => 0, 'MEDIA_USAGE' => 1, 'MEDIA_NEUTRAL' => 2];
+        $rank = ['SUBJECT_REPRESENTATIVE' => 0, 'MEDIA_USAGE' => 1, 'MEDIA_NEUTRAL' => 2, 'WORDPRESS_ATTACHMENT' => 3];
         usort($sources, static fn (string $left, string $right): int => ($rank[$left] ?? 99) <=> ($rank[$right] ?? 99));
         return array_merge($values, ['metadata_source' => $sources[0] ?? 'MISSING']);
+    }
+
+    /** @param array<string,mixed>|null $image @return array<string,mixed> */
+    private function attachmentMetadata(?array $image): array
+    {
+        $attachmentId = (int) ($image['attachment_id'] ?? 0);
+        if ($attachmentId < 1 || $this->attachmentReader === null) return [];
+        $metadata = ($this->attachmentReader)($attachmentId);
+        return is_array($metadata) && (int) ($metadata['attachment_id'] ?? 0) === $attachmentId ? $metadata : [];
     }
 
     private function shorten(string $value): string

@@ -31,11 +31,12 @@ final class ArticleMediaSeoProjection
         if (!$asset instanceof MediaAsset) {
             return $this->missing(MediaSeoStateRegistry::MISSING, $usage, $media);
         }
+        $subjectUsage = $this->subjectRepresentativeUsage($media->canonicalId, $usage->usageId);
         $representation = [];
         if ($this->wordpress !== null) {
             try { $representation = $this->wordpress->attachmentForMedia($media, $asset, (string) ($usage->altText ?? '')); } catch (\Throwable) { $representation = []; }
         }
-        $metadata = $this->metadataFor($usage, $media, $representation);
+        $metadata = $this->metadataFor($usage, $subjectUsage, $media, $representation);
         $canonical = (new PublicMediaAssetUrlResolver())->path(is_string($asset->metadata['canonical_filename'] ?? null) ? $asset->metadata['canonical_filename'] : basename($asset->storageKey));
         $url = function_exists('home_url') ? home_url($canonical) : $canonical;
         return array_merge($metadata, ['state' => MediaSeoStateRegistry::COMPLETE, 'eligible' => true, 'media_id' => $media->canonicalId, 'asset_id' => $asset->assetId, 'storage_key' => $asset->storageKey, 'url' => $url, 'image_url' => $url, 'src' => $url, 'srcset' => function_exists('home_url') ? home_url($canonical) . ' ' . (int) ($asset->width ?? 0) . 'w' : $canonical, 'sizes' => (string) ($representation['sizes'] ?? ''), 'width' => (int) ($asset->width ?? ($representation['width'] ?? 0)), 'height' => (int) ($asset->height ?? ($representation['height'] ?? 0))]);
@@ -47,7 +48,7 @@ final class ArticleMediaSeoProjection
     }
 
     /** @return array<string,mixed> */
-    private function metadataFor(\NHK\Core\Domain\Media\MediaUsage $usage, \NHK\Core\Domain\Media\Media $media, array $attachment): array
+    private function metadataFor(\NHK\Core\Domain\Media\MediaUsage $usage, ?\NHK\Core\Domain\Media\MediaUsage $subjectUsage, \NHK\Core\Domain\Media\Media $media, array $attachment): array
     {
         $fields = ['title', 'alt', 'caption'];
         $values = [];
@@ -56,11 +57,13 @@ final class ArticleMediaSeoProjection
             $candidates = $field === 'caption'
                 ? [
                     ['value' => $usage->caption, 'source' => 'MEDIA_USAGE'],
+                    ['value' => $subjectUsage?->caption ?? '', 'source' => 'SUBJECT_REPRESENTATIVE'],
                     ['value' => $media->canonicalName, 'source' => 'MEDIA_NEUTRAL'],
                     ['value' => $attachment['caption'] ?? '', 'source' => 'WORDPRESS_ATTACHMENT'],
                 ]
                 : [
                     ['value' => $field === 'alt' ? $usage->altText : $usage->title, 'source' => 'MEDIA_USAGE'],
+                    ['value' => $field === 'alt' ? ($subjectUsage?->altText ?? '') : ($subjectUsage?->title ?? ''), 'source' => 'SUBJECT_REPRESENTATIVE'],
                     ['value' => $media->canonicalName, 'source' => 'MEDIA_NEUTRAL'],
                     ['value' => $attachment[$field] ?? '', 'source' => 'WORDPRESS_ATTACHMENT'],
                 ];
@@ -75,8 +78,21 @@ final class ArticleMediaSeoProjection
         }
         $values['metadata_source'] = in_array('MEDIA_USAGE', $usedSources, true)
             ? 'MEDIA_USAGE'
-            : (in_array('WORDPRESS_ATTACHMENT', $usedSources, true) ? 'WORDPRESS_ATTACHMENT' : (in_array('MEDIA_NEUTRAL', $usedSources, true) ? 'MEDIA_NEUTRAL' : 'MISSING'));
+            : (in_array('SUBJECT_REPRESENTATIVE', $usedSources, true) ? 'SUBJECT_REPRESENTATIVE' : (in_array('WORDPRESS_ATTACHMENT', $usedSources, true) ? 'WORDPRESS_ATTACHMENT' : (in_array('MEDIA_NEUTRAL', $usedSources, true) ? 'MEDIA_NEUTRAL' : 'MISSING')));
         return $values;
+    }
+
+    private function subjectRepresentativeUsage(string $mediaId, string $articleUsageId): ?\NHK\Core\Domain\Media\MediaUsage
+    {
+        $candidates = array_values(array_filter(
+            $this->usages->listByMediaId($mediaId, MediaUsageRoleRegistry::REPRESENTATIVE),
+            static fn (mixed $candidate): bool => $candidate instanceof \NHK\Core\Domain\Media\MediaUsage
+                && $candidate->usageId !== $articleUsageId
+                && $candidate->endpointType !== 'wp_post'
+                && $candidate->role === MediaUsageRoleRegistry::REPRESENTATIVE
+        ));
+        usort($candidates, static fn (\NHK\Core\Domain\Media\MediaUsage $left, \NHK\Core\Domain\Media\MediaUsage $right): int => [$left->sortOrder, $left->endpointType, $left->endpointKey, $left->usageId] <=> [$right->sortOrder, $right->endpointType, $right->endpointKey, $right->usageId]);
+        return $candidates[0] ?? null;
     }
 
     /** @return array<string,mixed> */
