@@ -14292,3 +14292,49 @@ deprecations. Changed-file PHP lint and `git diff --check` pass. No WordPress
 integration acceptance was run; no staging/production runtime was mutated.
 
 STATUS: `VIDEO_SOURCE_REFRESH_STAGING_ACCEPTANCE_LOCAL_READY / NO_LIVE_MUTATION / DEPLOYMENT_PENDING`.
+
+# Checkpoint — 2026-09-18 — Homepage performance application acceptance (LOCAL COMPLETE / NO OPTIMIZATION PATCH)
+
+SCOPE: Closed application-side homepage performance acceptance. Bounded latest
+feed readers for Media, Video, Knowledge and Authority push deterministic
+public-state filtering/order and `LIMIT` into their WPDB repository queries;
+the Home projection merges only the bounded per-source candidates, applies
+canonical dedupe and the visible limit of 12. No cache, source sync, semantic
+mutation or broad refactor was introduced.
+
+VERIFICATION: Focused homepage/visual/hero/order regression passes 24 tests /
+56 assertions. Mixed-source acceptance covers 100 Media, bounded Media and
+Video readers, public-only filtering, deterministic ordering, top-12 selection
+and canonical dedupe. Relevant Media/Video/Knowledge/Entity/frontend unit
+regressions pass 114 tests / 931 assertions with one existing warning.
+Relevant WPDB integration suites remain environment-gated (26 skips, no
+assertions); no environment or database baseline was changed. PHP lint,
+`git diff --check` and changed-line secret review pass.
+
+MARKER: `APPLICATION_HOMEPAGE_PERFORMANCE_LOCAL_COMPLETE=YES`
+STATUS: `HOMEPAGE_PERFORMANCE_APPLICATION_LOCAL_COMPLETE / DEPLOY_AND_MEASURE_SERVER_NEXT / NO_FURTHER_APPLICATION_OPTIMIZATION`.
+
+# Checkpoint — 2026-09-18 — Video Capture provenance scope boundary verified (LOCAL / DEPLOYMENT PENDING)
+
+SCOPE: Verified the existing generic fix for the `capture_video_provenance`
+branch. After Source/Claim/Evidence canonical read-back and final Video plan
+composition, Capture calls the shared `scopeVideoPlan()` boundary exactly once
+before `runGovernedChild()`. The server-issued packet remains the only
+`staging_acceptance` source; no client scope, object-specific allowlist,
+OperationScopedStagingGuard relaxation, direct writer or SQL path was added.
+
+INVARIANTS: Fresh Video keeps its immutable proposed UUID, uses
+`video:ingest`, `create_semantics=ingest` and expected revision `0`; existing
+Video resume/update keeps `video:update` and exact canonical CAS revision.
+Pending canonical Video Proposals are reused by exact eligible Proposal UUID
+without reissuing scope. Knowledge-enrichment recovery behavior is unchanged.
+
+VERIFICATION: Focused Video/Capture/Governance/admission suite passes 122 tests
+/ 552 assertions. Full PHPUnit reaches 2,114 tests but is not green because
+local WordPress/MySQL bootstrap is unavailable (`stdClass::query`, missing
+`update_option`) and existing environment-gated/deployment-config baseline
+failures remain. Deployment preflight passes code/docs/autoload checks and
+fails only the five WordPress bootstrap-dependent checks. No staging or
+production mutation was performed.
+
+STATUS: `VIDEO_CAPTURE_PROVENANCE_SCOPE_LOCAL_VERIFIED / DEPLOYMENT_PENDING / NO_LIVE_ACCEPTANCE`.

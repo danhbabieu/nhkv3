@@ -200,6 +200,73 @@ final class HomeSemanticQueryTest extends TestCase
         self::assertSame('Ảnh 88', $feed[11]['title']);
     }
 
+    public function test_latest_feed_merges_bounded_sources_public_only_with_deterministic_order_and_canonical_dedupe(): void
+    {
+        $sharedId = '33333333-3333-4333-8333-333333333333';
+        $mediaItems = [];
+        for ($index = 0; $index < 100; $index++) {
+            $mediaItems[] = new Media(
+                $index === 99 ? $sharedId : UuidCodec::newV7(),
+                'mixed-media-' . $index,
+                'Ảnh ' . $index,
+                'ready',
+                [],
+                true,
+                1,
+                sprintf('2026-02-%02d 00:00:00', min(28, $index + 1)),
+            );
+        }
+        $mediaItems[] = new Media(UuidCodec::newV7(), 'mixed-private-media', 'Ảnh private', 'draft', [], true, 1, '2026-12-31 00:00:00');
+
+        $videoItems = [];
+        for ($index = 0; $index < 30; $index++) {
+            $videoItems[] = Video::fromUrl(
+                'https://www.youtube.com/watch?v=' . str_pad((string) $index, 11, 'v', STR_PAD_LEFT),
+                'Video ' . $index,
+                ['source_snapshot' => [
+                    'availability' => $index === 29 ? 'removed' : 'available',
+                    'embeddable' => true,
+                    'published_at' => sprintf('2026-02-%02d 00:00:00', min(28, $index + 1)),
+                ], 'editorial' => ['title' => 'Video ' . $index, 'summary' => 'Tóm tắt'], 'hub' => ['primary' => ['key' => 'video']], 'provenance' => ['kind' => 'external'], 'semantic_attachments' => [['type' => 'authority']], 'public_identity' => ['current_slug' => 'video-' . $index]],
+                null,
+                $index === 28 ? $sharedId : null,
+            );
+        }
+
+        $mediaRepository = new class($mediaItems) implements MediaRepository, BoundedLatestFeedReader {
+            public int $boundedCalls = 0;
+            public function __construct(private array $items) {}
+            public function latestFeedCandidates(int $limit): array { $this->boundedCalls++; return array_slice($this->items, -$limit); }
+            public function findByCanonicalId(string $id): ?Media { return null; }
+            public function findByStableKey(string $key): ?Media { return null; }
+            public function create(Media $media): Media { return $media; }
+            public function update(Media $media, int $expectedRevision): Media { return $media; }
+            public function list(bool $includeRetired = false): array { throw new \LogicException('latest feed must not use the unbounded Media reader'); }
+        };
+        $videoRepository = new class($videoItems) implements VideoRepository, BoundedLatestFeedReader {
+            public int $boundedCalls = 0;
+            public function __construct(private array $items) {}
+            public function latestFeedCandidates(int $limit): array { $this->boundedCalls++; return array_slice($this->items, -$limit); }
+            public function findByCanonicalId(string $id): ?Video { return null; }
+            public function findByExternalReference(string $platform, string $id): ?Video { return null; }
+            public function create(Video $video): Video { return $video; }
+            public function update(Video $video, int $expectedRevision): Video { return $video; }
+            public function list(bool $includeRetired = false): array { throw new \LogicException('latest feed must not use the unbounded Video reader'); }
+        };
+
+        $query = new HomeSemanticQuery(new InMemoryAuthorityRepository(), $mediaRepository, $videoRepository, new EntityTypeRegistry());
+        $feed = (new \ReflectionMethod($query, 'latestFeed'))->invoke($query, []);
+
+        self::assertSame(1, $mediaRepository->boundedCalls);
+        self::assertSame(1, $videoRepository->boundedCalls);
+        self::assertCount(HomeSemanticQuery::LATEST_VISIBLE_LIMIT, $feed);
+        self::assertSame('Video 28', $feed[0]['title']);
+        self::assertNotContains('Video 29', array_column($feed, 'title'));
+        self::assertNotContains('Ảnh private', array_column($feed, 'title'));
+        self::assertCount(count(array_unique(array_column($feed, 'tie_breaker'))), $feed);
+        self::assertNotContains($sharedId, array_slice(array_column($feed, 'tie_breaker'), 1));
+    }
+
     private function media(array $items): MediaRepository
     {
         return new class($items) implements MediaRepository {
