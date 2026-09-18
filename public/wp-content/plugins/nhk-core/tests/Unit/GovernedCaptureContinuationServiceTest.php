@@ -18,6 +18,54 @@ use PHPUnit\Framework\TestCase;
 
 final class GovernedCaptureContinuationServiceTest extends TestCase
 {
+    public function test_video_plan_attaches_server_issued_scope_without_replacing_owner_subject_id(): void
+    {
+        $captureId = UuidCodec::newV7();
+        $videoId = UuidCodec::newV7();
+        $semanticSubjectId = UuidCodec::newV7();
+        $scope = [
+            'approved' => true,
+            'operation_family' => 'governed_video_plan',
+            'operation' => 'ingest',
+            'capture_id' => $captureId,
+            'capture_fingerprint' => hash('sha256', 'capture'),
+            'proposed_uuid' => $videoId,
+            'subject' => ['type' => 'classification', 'uuid' => $semanticSubjectId, 'revision' => 1],
+        ];
+        $service = new GovernedCaptureContinuationService(
+            $this->createMock(GovernedLifecycle::class),
+            static fn (): array => [],
+            $this->policies(),
+            static fn (string $capability): bool => true,
+            videoScopeIssuer: static fn (string $issuedCaptureId, array $plan): array => $scope,
+        );
+        $plans = new \ReflectionMethod($service, 'plans');
+        $plans->setAccessible(true);
+
+        $result = $plans->invoke($service, $captureId, 'video-live-shape', [
+            'assets' => [[
+                'kind' => 'video',
+                'video_proposal' => [
+                    'entity_type' => 'video',
+                    'operation' => 'ingest',
+                    'subject_id' => $videoId,
+                    'payload' => [
+                        'canonical_id' => $videoId,
+                        'metadata' => [
+                            'source' => ['platform' => 'youtube', 'external_video_id' => '2EMuIG2RfTg', 'canonical_source_url' => 'https://www.youtube.com/watch?v=2EMuIG2RfTg'],
+                            'subject_resolution_packet' => ['type' => 'classification', 'id' => $semanticSubjectId, 'revision' => 1],
+                        ],
+                    ],
+                ],
+            ]],
+        ], false);
+
+        self::assertCount(1, $result);
+        self::assertSame($videoId, $result[0]['subject_id']);
+        self::assertSame($videoId, $result[0]['payload']['canonical_id']);
+        self::assertSame($scope, $result[0]['payload']['staging_acceptance']);
+    }
+
     public function test_existing_capture_continuation_runs_governance_and_requires_explicit_approval(): void
     {
         $variant = UuidCodec::newV7();

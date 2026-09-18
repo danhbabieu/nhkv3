@@ -1,5 +1,33 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-18 — Generic Authority relation-only staging admission (LOCAL READY / DEPLOY PENDING)
+
+SCOPE: Repaired the canonical Authority staging admission boundary for
+relation-only approved plans. No Capture, Proposal, Authority, Graph or other
+semantic record was mutated; no Atmos apply, remote source edit or deployment
+was performed.
+
+ROOT_CAUSE: `AuthorityStagingAdmission` required a non-empty
+`authority_intent.requests` array after validating the server-issued exact
+candidate bindings. Relation-only Authority plans carry `relation_intents`
+and valid `relation_candidates` without entity requests, so the admission hook
+rejected the already-approved immutable plan with `STAGING_SCOPE_NOT_ADMITTED`.
+
+FIX: Admission now relies only on the signed scope's exact Capture/request and
+plan fingerprint, approved candidate IDs, operation, registry-validated
+entity/relation type, source/target identities and revisions, candidate/dependency
+fingerprints and dependency closure. It no longer uses an input-shape or
+object-specific request allowlist. Governance, HMAC/expiry, CAS, proposal
+eligibility, controlled apply and canonical readback remain unchanged.
+
+VERIFICATION: Relation-only regression covers valid `model_of`, `classified_as`
+and `about` bindings in one approved scope; existing exact relation scope and
+Authority CREATE coverage pass. Focused Authority staging/scope/Capture/MCP/
+Governance tests pass 45 tests / 133 assertions. Lint, diff/secret review,
+commit, push, deployment and live read-only verification remain pending.
+
+STATUS: `AUTHORITY_RELATION_ADMISSION_LOCAL_READY / DEPLOYMENT_PENDING / SEMANTIC_MUTATION_NONE`
+
 # Checkpoint — 2026-09-18 — Capture Article media-binding scope propagation (LOCAL READY / DEPLOY PENDING)
 
 SCOPE: Repaired the generic staging-admission continuation boundary for
@@ -13239,3 +13267,36 @@ Governance command, persists on the Proposal, and increments to 6 only after
 CAS apply.
 
 STATUS: `VIDEO_EXPECTED_REVISION_LOCAL_READY / NO_LIVE_ACCEPTANCE / READY_FOR_USER_PUSH_PULL`.
+
+# Checkpoint — 2026-09-18 — Capture Video staging scope owner/subject separation (LOCAL ONLY)
+
+SCOPE: Repaired the local Capture Video staging-scope issuance path for a
+fresh governed `ingest` whose Proposal `subject_id` is the proposed Video
+owner UUID while `metadata.subject_resolution_packet` identifies the resolved
+semantic Authority subject. No staging/production mutation, deployment, SSH,
+push or server source edit was performed.
+
+ROOT_CAUSE: `StagingAcceptanceScopeVerifier::issueForVideoPlan()` treated the
+Proposal owner `subject_id` as the semantic subject and also used it as the
+ingest target fallback. `VideoStagingAdmission` then correctly rejected the
+scope because its signed subject binding did not match the Capture's resolved
+subject packet. The scope was `NOT_ISSUED` at verifier admission with
+`STAGING_SCOPE_NOT_ADMITTED`; it was not lost after issuance and was never
+attached-but-rejected.
+
+FIX: Video owner/proposed identity remains bound by `proposed_uuid`/
+`canonical_id`; semantic subject identity is read only from the canonical
+`subject_resolution_packet`. Existing operation registration remains aligned:
+`video:ingest`, `governed_video_plan`, Video admission and Controlled Apply
+all recognize `ingest`. Proposal propagation remains server-issued and the
+final command retains `payload.staging_acceptance`.
+
+VERIFICATION: RED exact live-shape regression failed at scope issuance before
+the fix; focused GREEN selection passes 65 tests / 246 assertions, including
+scope issuance, Video admission, Proposal verification and Capture command
+attachment. Changed-file PHP lint, Composer lint, `git diff --check` and
+secret review pass. Legacy retry was not changed or conflated with this fresh
+ingest repair. W64 behavior remains covered by the existing generic admission
+tests.
+
+STATUS: `VIDEO_SCOPE_OWNER_SUBJECT_LOCAL_READY / LEGACY_RETRY_SEPARATE / NO_LIVE_ACCEPTANCE / READY_FOR_USER_PUSH_PULL`.

@@ -145,7 +145,10 @@ final class StagingAcceptanceScopeVerifier
         if (!is_callable($this->admission)) throw new \RuntimeException('STAGING_SCOPE_ADMISSION_REQUIRED');
         $operation = strtolower(trim((string) ($plan['operation'] ?? '')));
         $entityType = strtolower(trim((string) ($plan['entity_type'] ?? '')));
-        $targetUuid = trim((string) ($plan['target_uuid'] ?? $plan['subject_id'] ?? ''));
+        // Video owner identity and resolved semantic subject are separate
+        // bindings. `subject_id` is the Proposal owner UUID; it must never be
+        // reused as the Authority/semantic subject locator.
+        $targetUuid = trim((string) ($plan['target_uuid'] ?? ''));
         $expectedRevision = (int) ($plan['expected_revision'] ?? 0);
         $planFingerprint = trim((string) ($plan['plan_fingerprint'] ?? $plan['fingerprint'] ?? ''));
         if ($entityType !== 'video' || !in_array($operation, ['ingest', 'update'], true)) throw new \RuntimeException('STAGING_VIDEO_OPERATION_INVALID');
@@ -163,8 +166,8 @@ final class StagingAcceptanceScopeVerifier
             $sourceUrl = $sourceSnapshot->canonicalSourceUrl;
         }
         $subjectPacket = is_array($metadata['subject_resolution_packet'] ?? null) ? $metadata['subject_resolution_packet'] : [];
-        $subjectId = trim((string) ($plan['subject_id'] ?? $subjectPacket['id'] ?? ''));
-        $subjectType = strtolower(trim((string) ($plan['subject_type'] ?? $subjectPacket['type'] ?? '')));
+        $subjectId = trim((string) ($subjectPacket['id'] ?? ''));
+        $subjectType = strtolower(trim((string) ($subjectPacket['type'] ?? '')));
         $proposedUuid = trim((string) ($plan['proposed_uuid'] ?? $video['canonical_id'] ?? $targetUuid));
         if (!UuidCodec::isValid($proposedUuid) || !UuidCodec::isValid($subjectId) || $subjectType === '') throw new \RuntimeException('STAGING_VIDEO_BINDING_REQUIRED');
         if ($operation === 'update') {

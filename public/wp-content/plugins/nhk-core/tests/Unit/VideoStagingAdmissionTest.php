@@ -8,6 +8,7 @@ use NHK\Core\Application\Governance\StagingAcceptanceScopeVerifier;
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Capture\CaptureRecord;
 use NHK\Core\Domain\Video\Video;
+use NHK\Core\Domain\Governance\{Proposal, ProposalState};
 use PHPUnit\Framework\TestCase;
 
 final class VideoStagingAdmissionTest extends TestCase
@@ -84,6 +85,91 @@ final class VideoStagingAdmissionTest extends TestCase
             public function update(Video $video, int $expectedRevision): Video { return $video; }
             public function list(bool $includeRetired = false): array { return []; }
         }))(false, $scope, $capture, [], []));
+    }
+
+    public function test_fresh_ingest_keeps_video_owner_subject_id_separate_from_resolved_semantic_subject(): void
+    {
+        $captureId = '01a0b2e0-1888-7038-9811-2dd7e7073a27';
+        $videoId = '01a0b2e0-1ba4-751c-8fe1-98c1401319d9';
+        $semanticSubjectId = '01a0a868-2918-7dac-81dc-bfc25e710068';
+        $captureFingerprint = hash('sha256', 'live-shaped-video-capture');
+        $capture = new CaptureRecord($captureId, 'video-live-shape', $captureFingerprint, 'SEMANTICS_RECONCILED', 'IN_PROGRESS', null, null, [[
+            'kind' => 'video',
+            'video_proposal' => [
+                'entity_type' => 'video',
+                'operation' => 'ingest',
+                'subject_id' => $videoId,
+                'payload' => [
+                    'canonical_id' => $videoId,
+                    'metadata' => [
+                        'source' => [
+                            'platform' => 'youtube',
+                            'external_video_id' => '2EMuIG2RfTg',
+                            'canonical_source_url' => 'https://www.youtube.com/watch?v=2EMuIG2RfTg',
+                        ],
+                        'subject_resolution_packet' => [
+                            'status' => 'RESOLVED',
+                            'type' => 'classification',
+                            'id' => $semanticSubjectId,
+                            'name' => 'Đồng hồ 400 ngày',
+                            'stable_key' => 'nhk:classification:clock-type.dong-ho-400-ngay',
+                            'revision' => 1,
+                        ],
+                    ],
+                ],
+            ],
+        ]], ['purpose' => 'VIDEO'], [], []);
+
+        $videos = new class implements VideoRepository {
+            public function findByCanonicalId(string $id): ?Video { return null; }
+            public function findByExternalReference(string $platform, string $externalId): ?Video { return null; }
+            public function create(Video $video): Video { return $video; }
+            public function update(Video $video, int $expectedRevision): Video { return $video; }
+            public function list(bool $includeRetired = false): array { return []; }
+        };
+        $verifier = new StagingAcceptanceScopeVerifier(
+            static fn (): string => 'staging',
+            'test-secret',
+            static function (array $scope, CaptureRecord $capture, array $input, array $assets) use ($videos): bool {
+                return (new VideoStagingAdmission($videos))(false, $scope, $capture, $input, $assets);
+            },
+            can: static fn (): bool => true,
+            videos: $videos,
+        );
+
+        $scope = $verifier->issueForVideoPlan($capture, [
+            'entity_type' => 'video',
+            'operation' => 'ingest',
+            'subject_id' => $videoId,
+            'proposed_uuid' => $videoId,
+            'fingerprint' => hash('sha256', 'live-shaped-video-plan'),
+            'proposal_command_fingerprint' => hash('sha256', 'live-shaped-video-command'),
+        ]);
+
+        self::assertSame($videoId, $scope['proposed_uuid']);
+        self::assertSame($semanticSubjectId, $scope['subject']['uuid']);
+        self::assertSame('classification', $scope['subject']['type']);
+
+        $proposal = new Proposal(
+            '01a0b2e0-1ba4-751c-8fe1-98c1401319d0',
+            $videoId,
+            'ingest',
+            [
+                'capture_id' => $captureId,
+                'capture_fingerprint' => $captureFingerprint,
+                'canonical_id' => $videoId,
+                'metadata' => $capture->assets[0]['video_proposal']['payload']['metadata'],
+                'staging_acceptance' => $scope,
+            ],
+            'content',
+            null,
+            'dependency',
+            ProposalState::APPROVED,
+            idempotencyKey: 'video-live-shape',
+            entityType: 'video',
+        );
+
+        self::assertTrue($verifier->verifyProposal($scope, $proposal));
     }
 
     /** @return array{0:CaptureRecord,1:array<string,mixed>} */
