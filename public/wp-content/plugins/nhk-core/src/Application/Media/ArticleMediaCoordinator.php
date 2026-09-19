@@ -135,7 +135,7 @@ final class ArticleMediaCoordinator
             'title' => $placement['title'],
         ];
         $usagePlan = (new MediaUsageReconciler())->plan('wp_post', $endpointKey, $this->usages->listByEndpoint('wp_post', $endpointKey), $desiredUsages);
-        $diagnostics[] = ['code' => 'MEDIA_USAGE_RECONCILIATION', 'status' => $usagePlan['status'], 'actions' => $usagePlan['actions']];
+        $diagnostics[] = ['phase' => 'plan', 'code' => 'MEDIA_USAGE_RECONCILIATION', 'status' => $usagePlan['status'], 'actions' => $usagePlan['actions']];
         $state = array_filter($slots, static fn (array $slot): bool => $slot['placeholder'] || ($slot['valid_for_completeness'] ?? false) !== true) !== [] ? MediaSeoStateRegistry::PLACEHOLDER : (in_array('MEDIA_LOW_RESOLUTION', array_column($diagnostics, 'code'), true) ? MediaSeoStateRegistry::LOW_RESOLUTION : MediaSeoStateRegistry::COMPLETE);
         $guidance = $this->guidance($slots, $context);
         $result = new ArticleMediaResult($postId, $endpointKey, $state, $slotMedia, $slots, $diagnostics, is_array($editorial) ? (string) ($editorial['state_token'] ?? '') : '', $guidance);
@@ -172,8 +172,21 @@ final class ArticleMediaCoordinator
                     $diagnostics[] = ['code' => 'ARTICLE_MEDIA_INLINE_MISSING', 'slot' => MediaUsageRoleRegistry::INLINE_PRIMARY, 'reason' => 'STALE_WORDPRESS_USAGE_REJECTED', 'media_id' => $actualInline];
                 }
             }
-            $state = array_filter($slots, static fn (array $slot): bool => $slot['placeholder'] || ($slot['valid_for_completeness'] ?? false) !== true) !== [] ? MediaSeoStateRegistry::PLACEHOLDER : (in_array('MEDIA_LOW_RESOLUTION', array_column($diagnostics, 'code'), true) ? MediaSeoStateRegistry::LOW_RESOLUTION : MediaSeoStateRegistry::COMPLETE);
-            $result = new ArticleMediaResult($postId, $endpointKey, $state, $slotMedia, $slots, $diagnostics, (string) ($readback['state_token'] ?? ''), $this->guidance($slots, $context));
+            // The synchronizer may have changed native editorial placements or
+            // the governed usage rows. Rebuild the public result from the
+            // same suitability policy and persisted usage read-back used by
+            // preflight; never expose the pre-reconciliation plan as final
+            // media truth.
+            $canonical = $subjectIds === [] ? $result : $this->diagnoseForPost($postId, $context);
+            $planSnapshot = ['phase' => 'plan', 'code' => 'MEDIA_USAGE_RECONCILIATION', 'status' => $usagePlan['status'], 'actions' => $usagePlan['actions']];
+            $finalDiagnostics = array_merge([$planSnapshot], $canonical->diagnostics);
+            $finalSlotMedia = $canonical->slotMedia;
+            foreach ($canonical->slots as $slot => $slotState) {
+                if (($slotState['valid_for_completeness'] ?? false) !== true && ($result->slots[$slot]['placeholder'] ?? false) === true) {
+                    $finalSlotMedia[$slot] = (string) ($result->slotMedia[$slot] ?? '');
+                }
+            }
+            $result = new ArticleMediaResult($postId, $endpointKey, $canonical->state, $finalSlotMedia, $canonical->slots, $finalDiagnostics, (string) ($readback['state_token'] ?? $canonical->editorialStateToken), $canonical->guidance);
         }
         return $result;
     }

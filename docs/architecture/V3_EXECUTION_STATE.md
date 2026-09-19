@@ -1,5 +1,40 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-19 — Live continuation defects reproduced and fixed locally (NO LIVE MUTATION)
+
+ROOT_CAUSE: `nhk.article.ingest` public bounded fields (`content`, `slug`,
+`categories`, `featured_media`) were dropped because the coordinator accepted
+only internal native names. With an empty internal field set, verification did
+not compare requested state, so a no-op writer could reach `COMPLETED`.
+`EditorialStateToken` also omitted persisted category IDs and featured
+attachment identity. Article media returned a pre-reconciliation plan beside
+post-readback diagnostics, allowing `KEEP`/`MEDIA_COMPLETE` to contradict a
+semantic mismatch.
+
+FIXED_BOUNDARY: Explicit public-to-native field mapping now reaches the typed
+editorial store and bounded final read-back compares only requested fields.
+Tokens hash the complete canonical editorial state (category set and featured
+attachment included). Media results rebuild from canonical persisted usage and
+the shared suitability policy after WordPress synchronization; plan snapshots
+are phase-labelled and cannot replace final truth.
+
+REGRESSION: Added public-field persistence, ignored-writer/readback mismatch,
+category/featured token, canonical category ordering and plugin production
+admission wiring coverage. Existing MediaUsage ADD/REMOVE/REPLACE and
+representative-bind/staging guard suites remain covered by the governed
+operation tests. No Article 621, live proposal, staging/production data,
+deployment or push was touched.
+
+VERIFICATION: Focused Article/token/media/governance/MCP/publication suites
+pass locally. Unit suite passes 2,011 tests / 9,880 assertions (warnings and
+deprecations remain). The full repository run reaches 2,178 tests / 9,935
+assertions with 34 unavailable-environment errors (`stdClass::query()` from
+missing WordPress/DB wiring and collector `WP_Error`) plus 14 explicit
+acceptance failures requiring `NHK_WP_TEST_PATH=public`; these are not PASS.
+Changed-file PHP lint, full plugin PHP lint, diff check and secret review pass.
+
+STATUS: `LIVE_CONTINUATION_DEFECTS_FIXED_LOCAL / DEPLOYMENT_PENDING / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-19 — Three live regression boundaries repaired locally (NO LIVE MUTATION)
 
 ROOT_CAUSE: Existing Article update receipts normalized requested `update` to

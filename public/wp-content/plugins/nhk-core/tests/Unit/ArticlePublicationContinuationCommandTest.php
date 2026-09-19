@@ -13,7 +13,7 @@ use PHPUnit\Framework\TestCase;
 final class ArticlePublicationContinuationCommandTest extends TestCase
 {
     private const CAPTURE_ID = '01a08663-6d6b-77f0-b05c-b66ced29e606';
-    private const TOKEN = 'c9ee140b1c869fed08fa87f65b11dc2cc59df974980f996fdfada2ab4da09422';
+    private const TOKEN = 'ff1faa92eead251f1a61821c767229fa25151a8165dd45b52e98dd6643fd3f4d';
     private const DOC_VERSION = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
     private const MANIFEST_HASH = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
 

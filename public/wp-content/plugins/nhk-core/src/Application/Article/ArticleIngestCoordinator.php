@@ -271,6 +271,17 @@ final class ArticleIngestCoordinator
     private function editorialFields(array $input): array
     {
         $fields = is_array($input['fields'] ?? null) ? $input['fields'] : $input;
+        $publicToNative = [
+            'title' => 'post_title',
+            'content' => 'post_content',
+            'excerpt' => 'post_excerpt',
+            'slug' => 'post_name',
+            'categories' => 'category_ids',
+            'featured_media' => 'featured_media_id',
+        ];
+        foreach ($publicToNative as $public => $native) {
+            if (array_key_exists($public, $fields) && !array_key_exists($native, $fields)) $fields[$native] = $fields[$public];
+        }
         $allowed = ['post_title', 'post_content', 'post_excerpt', 'post_name', 'category_ids', 'featured_media_id'];
         $result = [];
         foreach ($allowed as $field) if (array_key_exists($field, $fields)) {

@@ -134,4 +134,15 @@ final class PluginBootWiringTest extends TestCase
             $plugin
         );
     }
+
+    public function test_governance_runtime_composes_production_admission_behind_the_shared_apply_guard(): void
+    {
+        $factory = (string) file_get_contents(__DIR__ . '/../../src/Infrastructure/Governance/GovernanceRuntimeFactory.php');
+        $guard = (string) file_get_contents(__DIR__ . '/../../src/Application/Governance/OperationScopedStagingGuard.php');
+
+        self::assertStringContainsString('new OperationScopedStagingGuard(', $factory);
+        self::assertStringContainsString('$stagingGuard,', $factory);
+        self::assertStringContainsString('new ProductionGovernanceAdmission(', $guard);
+        self::assertStringContainsString("in_array(\$environment, ['production', 'prod'], true)", $guard);
+    }
 }

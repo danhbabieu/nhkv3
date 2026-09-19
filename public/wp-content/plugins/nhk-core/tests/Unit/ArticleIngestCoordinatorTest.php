@@ -63,6 +63,58 @@ final class ArticleIngestCoordinatorTest extends TestCase
         self::assertNull($store->state->featuredAttachmentId);
     }
 
+    public function test_public_bounded_fields_are_mapped_and_verified_through_store(): void
+    {
+        $receipts = new class implements ArticleOperationReceiptRepository {
+            public array $items = [];
+            public function findByIdempotencyKey(string $key): ?ArticleOperationReceipt { return $this->items[$key] ?? null; }
+            public function create(ArticleOperationReceipt $receipt): ArticleOperationReceipt { return $this->items[$receipt->idempotencyKey] = $receipt; }
+            public function save(ArticleOperationReceipt $receipt): ArticleOperationReceipt { return $this->items[$receipt->idempotencyKey] = $receipt; }
+        };
+        $store = new class implements EditorialPostStore {
+            public EditorialPostState $state;
+            public function __construct() { $this->state = new EditorialPostState(77, '1:77', 'post', 'draft', 'Old', 'Old body', '', '', 'https://example.test/', 0, 0, '', [1], 489); }
+            public function read(int $postId): ?EditorialPostState { return $this->state; }
+            public function createDraft(array $fields): EditorialPostState { return $this->state; }
+            public function update(int $postId, array $fields): EditorialPostState {
+                $old = $this->state;
+                $this->state = new EditorialPostState(77, '1:77', 'post', 'draft', $old->title, (string) ($fields['post_content'] ?? $old->content), $old->excerpt, (string) ($fields['post_name'] ?? $old->slug), $old->permalink, 1, 1, '', array_key_exists('category_ids', $fields) ? array_values(array_map('intval', $fields['category_ids'])) : $old->categoryIds, array_key_exists('featured_media_id', $fields) ? ((int) $fields['featured_media_id'] ?: null) : $old->featuredAttachmentId);
+                return $this->state;
+            }
+            public function publish(int $postId): EditorialPostState { return $this->state; }
+            public function trash(int $postId): EditorialPostState { return $this->state; }
+            public function restore(int $postId): EditorialPostState { return $this->state; }
+        };
+        $reader = new class($store) implements EditorialStateReader { public function __construct(private EditorialPostStore $store) {} public function read(int $postId): ?EditorialPostState { return $this->store->read($postId); } };
+        $endpoints = new EndpointTypeRegistry(); $endpoints->register('wp_post', new FakeEndpointResolver('wp_post', ['1:77']));
+        $proposals = new InMemoryProposalRepository();
+        $coordinator = new ArticleIngestCoordinator($receipts, new ArticleIngestPreflight($endpoints, new PredicateRegistry(), new EntityTypeRegistry()), new SemanticProposalPlanner(), $reader, new GovernanceService($proposals), null, $proposals, null, new \NHK\Core\Application\Article\ArticleVerificationReader(), null, $store);
+        $base = ['intent' => 'update', 'target_wp_post' => ['endpoint_type' => 'wp_post', 'endpoint_key' => '1:77'], 'semantic_bundle' => ['commands' => []], 'editorial_update' => ['content' => 'New body', 'slug' => 'new-slug', 'categories' => [4], 'featured_media' => 0]];
+        $first = $coordinator->execute($base + ['idempotency_key' => 'public-fields-1']);
+        self::assertSame('EDITORIAL_CAS_REQUIRED', $first->failure['code']);
+        $complete = $coordinator->execute($base + ['idempotency_key' => 'public-fields-2', 'expected_editorial_state' => ['state_token' => $first->wpStateToken]]);
+        self::assertSame(ArticleIngestOutcome::COMPLETED, $complete->outcome);
+        self::assertSame('New body', $store->state->content);
+        self::assertSame('new-slug', $store->state->slug);
+        self::assertSame([4], $store->state->categoryIds);
+        self::assertNull($store->state->featuredAttachmentId);
+    }
+
+    public function test_ignored_store_cannot_return_completed_for_public_bounded_update(): void
+    {
+        $receipts = new class implements ArticleOperationReceiptRepository { public array $items = []; public function findByIdempotencyKey(string $key): ?ArticleOperationReceipt { return $this->items[$key] ?? null; } public function create(ArticleOperationReceipt $r): ArticleOperationReceipt { return $this->items[$r->idempotencyKey] = $r; } public function save(ArticleOperationReceipt $r): ArticleOperationReceipt { return $this->items[$r->idempotencyKey] = $r; } };
+        $state = new EditorialPostState(78, '1:78', 'post', 'draft', 'Old', 'Old body', '', '', 'https://example.test/', 0, 0, '', [1], 489);
+        $store = new class($state) implements EditorialPostStore { public function __construct(public EditorialPostState $state) {} public function read(int $postId): ?EditorialPostState { return $this->state; } public function createDraft(array $fields): EditorialPostState { return $this->state; } public function update(int $postId, array $fields): EditorialPostState { return $this->state; } public function publish(int $postId): EditorialPostState { return $this->state; } public function trash(int $postId): EditorialPostState { return $this->state; } public function restore(int $postId): EditorialPostState { return $this->state; } };
+        $reader = new class($store) implements EditorialStateReader { public function __construct(private EditorialPostStore $store) {} public function read(int $postId): ?EditorialPostState { return $this->store->read($postId); } };
+        $endpoints = new EndpointTypeRegistry(); $endpoints->register('wp_post', new FakeEndpointResolver('wp_post', ['1:78'])); $proposals = new InMemoryProposalRepository();
+        $coordinator = new ArticleIngestCoordinator($receipts, new ArticleIngestPreflight($endpoints, new PredicateRegistry(), new EntityTypeRegistry()), new SemanticProposalPlanner(), $reader, new GovernanceService($proposals), null, $proposals, null, new \NHK\Core\Application\Article\ArticleVerificationReader(), null, $store);
+        $base = ['intent' => 'update', 'target_wp_post' => ['endpoint_key' => '1:78'], 'semantic_bundle' => ['commands' => []], 'editorial_update' => ['slug' => 'must-persist']];
+        $first = $coordinator->execute($base + ['idempotency_key' => 'ignored-write-1']);
+        $result = $coordinator->execute($base + ['idempotency_key' => 'ignored-write-2', 'expected_editorial_state' => ['state_token' => $first->wpStateToken]]);
+        self::assertSame('EDITORIAL_READBACK_MISMATCH', $result->failure['code']);
+        self::assertNotSame(ArticleIngestOutcome::COMPLETED, $result->outcome);
+    }
+
     public function test_create_is_recorded_as_unsupported_without_editorial_side_effect(): void
     {
         $repository = new class implements ArticleOperationReceiptRepository {

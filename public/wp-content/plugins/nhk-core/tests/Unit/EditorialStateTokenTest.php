@@ -25,4 +25,22 @@ final class EditorialStateTokenTest extends TestCase
         self::assertNotSame(EditorialStateToken::fromState($state), EditorialStateToken::fromState($changed));
         self::assertMatchesRegularExpression('/^[a-f0-9]{64}$/', EditorialStateToken::fromState($state));
     }
+
+    public function test_token_changes_when_persisted_category_or_featured_media_changes(): void
+    {
+        $state = ['post_id' => 55, 'category_ids' => [1], 'featured_attachment_id' => 489];
+        $categoryChanged = $state; $categoryChanged['category_ids'] = [4];
+        $featuredCleared = $state; $featuredCleared['featured_attachment_id'] = 0;
+
+        self::assertNotSame(EditorialStateToken::fromState($state), EditorialStateToken::fromState($categoryChanged));
+        self::assertNotSame(EditorialStateToken::fromState($state), EditorialStateToken::fromState($featuredCleared));
+    }
+
+    public function test_category_order_is_canonicalized(): void
+    {
+        self::assertSame(
+            EditorialStateToken::fromState(['post_id' => 55, 'category_ids' => [4, 1], 'featured_attachment_id' => 0]),
+            EditorialStateToken::fromState(['post_id' => 55, 'category_ids' => [1, 4], 'featured_attachment_id' => null]),
+        );
+    }
 }
