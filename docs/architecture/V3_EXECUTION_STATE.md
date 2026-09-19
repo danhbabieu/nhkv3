@@ -1,5 +1,41 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-19 — Three live regression boundaries repaired locally (NO LIVE MUTATION)
+
+ROOT_CAUSE: Existing Article update receipts normalized requested `update` to
+`reconcile`, native category arrays were stringified before the WordPress
+writer, and completion verified orchestration/token state without comparing
+the requested bounded editorial fields against final native read-back. Media
+reconciliation also allowed a readable but semantically invalid persisted usage
+to remain effective, while Controlled Apply and the canonical MediaUsage writer
+had only a staging admission path.
+
+FIXED_BOUNDARY: Preserve requested Article intent, retain typed bounded native
+fields, invoke owned managed-section removal and durable inline-placement
+reconciliation, and require final canonical read-back equality before
+`COMPLETED`; mismatches return `EDITORIAL_READBACK_MISMATCH`. Existing MediaUsage
+is excluded from effective slots/completeness when suitability is invalid, while
+persisted historical rows remain auditable. Staging still requires an exact
+server-issued staging packet. Production now has a separate exact governed
+admission branch; only the internal Controlled Apply executor may continue into
+the production MediaUsage writer, with exact target, usage revision,
+proposal-binding and idempotency checks.
+
+REGRESSION: Added a CAS continuation/native read-back test, production
+governed MediaUsage admission test and updated suitability/media policy
+coverage. No Article 621, live proposals, staging/production data or deployed
+runtime was touched.
+
+VERIFICATION: Focused regression suite passes 50 tests / 172 assertions. Full
+Unit suite passes 2,006 tests / 9,865 assertions (warnings/deprecations remain).
+Full repository run reaches the known unavailable-environment gates: 34
+integration errors from missing WordPress/DB wiring and `NHK_WP_TEST_PATH=public`,
+14 explicit P4/collector acceptance failures for the same missing environment,
+plus the existing collector `WP_Error` harness cases. PHP lint and
+`git diff --check` pass.
+
+STATUS: `THREE_LIVE_REGRESSIONS_FIXED_LOCAL / DEPLOYMENT_PENDING / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-19 — Existing Capture Article bounded native repair (LOCAL / NO LIVE MUTATION)
 
 OWNER_DECISION: Existing Capture-owned Article continuation remains Capture

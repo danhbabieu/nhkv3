@@ -58,7 +58,7 @@ final class ArticleIngestCoordinator
         $target = is_array($input['target_wp_post'] ?? null) ? $input['target_wp_post'] : [];
         $endpoint = (string) ($target['endpoint_key'] ?? '');
         $postId = preg_match('/^[1-9][0-9]*:([1-9][0-9]*)$/', $endpoint, $match) === 1 ? (int) $match[1] : null;
-        $receipt = $this->receipts->create(new ArticleOperationReceipt($operationId, $key, $fingerprint, 'reconcile', $endpoint !== '' ? $endpoint : null, $postId, 'receipt', ArticleIngestOutcome::DEPENDENCY_UNAVAILABLE, true, [], [], ['code' => 'ARTICLE_COORDINATOR_RECEIPT_RESERVED']));
+        $receipt = $this->receipts->create(new ArticleOperationReceipt($operationId, $key, $fingerprint, $intent, $endpoint !== '' ? $endpoint : null, $postId, 'receipt', ArticleIngestOutcome::DEPENDENCY_UNAVAILABLE, true, [], [], ['code' => 'ARTICLE_COORDINATOR_RECEIPT_RESERVED']));
         if (!hash_equals($receipt->requestFingerprint, $fingerprint)) return $this->idempotencyConflict($receipt, $key, $fingerprint, $input);
         return $this->resume($receipt, $input);
     }
@@ -115,6 +115,15 @@ final class ArticleIngestCoordinator
             if (!$alreadyApplied) {
                 if ($expectedToken === '' || !hash_equals($expectedToken, $state->token)) return $this->save($receipt, 'editorial_update', ArticleIngestOutcome::RECONCILIATION_CONFLICT, false, ['code' => 'EDITORIAL_CAS_REQUIRED'], $state->token);
                 $fields = $this->editorialFields($editorialUpdate);
+                $managedExpectations = is_array($editorialUpdate['managed_section_expectations'] ?? null) ? array_values(array_filter($editorialUpdate['managed_section_expectations'], 'is_array')) : [];
+                if ($managedExpectations !== []) {
+                    try {
+                        $managedContent = (new \NHK\Core\Application\Semantic\ManagedArticleSectionParser())->removeOwned($state->content, $managedExpectations);
+                        if (!array_key_exists('post_content', $fields)) $fields['post_content'] = $managedContent;
+                    } catch (\NHK\Core\Application\Semantic\ManagedArticleSectionConflict $error) {
+                        return $this->save($receipt, 'editorial_update', ArticleIngestOutcome::RECONCILIATION_CONFLICT, false, ['code' => 'EDITORIAL_MANAGED_SECTION_CONFLICT', 'error' => $error->getMessage()], $state->token);
+                    }
+                }
                 if ($fields !== []) {
                     try { $state = $this->editorialStore->update($postId, $fields); }
                     catch (\Throwable $error) { return $this->save($receipt, 'editorial_update', ArticleIngestOutcome::DEPENDENCY_UNAVAILABLE, true, ['code' => 'EDITORIAL_UPDATE_FAILED', 'error' => $error->getMessage()], $state->token); }
@@ -125,6 +134,7 @@ final class ArticleIngestCoordinator
         if ($this->articleMedia !== null) {
             try {
                 $mediaContext = is_array($input['media_context'] ?? null) ? $input['media_context'] : ['subject' => $state->title, 'planned_title' => $state->title];
+                if ($editorialUpdate !== []) $mediaContext['force_inline_reconcile'] = true;
                 $selected = is_array($input['article_media']['selected'] ?? null) ? array_map('strval', $input['article_media']['selected']) : [];
                 $supporting = is_array($input['article_media']['supporting_media_ids'] ?? null) ? array_values(array_map('strval', $input['article_media']['supporting_media_ids'])) : [];
                 $mediaResult = $this->articleMedia->ensureForPost($postId, $mediaContext, $selected, $supporting)->toArray();
@@ -160,9 +170,10 @@ final class ArticleIngestCoordinator
                 $current = $this->editorial->read($postId);
                 if ($current === null) return $this->save($receipt, 'verification', ArticleIngestOutcome::DEPENDENCY_UNAVAILABLE, true, ['code' => 'WP_POST_UNAVAILABLE'], $state->token);
                 $verified = $this->verification->verify($state, $current, [], []);
-                return $verified->verified
+                $editorialReasons = $this->editorialReadbackReasons($current, $requestedEditorialFields);
+                return $verified->verified && $editorialReasons === []
                     ? $this->save($receipt, 'complete', ArticleIngestOutcome::COMPLETED, false, [], $state->token)
-                    : $this->save($receipt, 'verification', ArticleIngestOutcome::VERIFICATION_FAILED, true, ['reasons' => $verified->reasons], $state->token);
+                    : $this->save($receipt, 'verification', ArticleIngestOutcome::VERIFICATION_FAILED, true, ['code' => 'EDITORIAL_READBACK_MISMATCH', 'reasons' => array_values(array_unique(array_merge($verified->reasons, $editorialReasons)))], $state->token);
             }
             $idsBySlot = [];
             $dependencyMap = [];
@@ -230,9 +241,10 @@ final class ArticleIngestCoordinator
         if ($current === null) return $this->save($receipt, 'verification', ArticleIngestOutcome::DEPENDENCY_UNAVAILABLE, true, ['code' => 'WP_POST_UNAVAILABLE'], $state->token, $receipt->proposalIds, array_values(array_unique($applied)), null, $proposalStates, $applyAttempts);
         $verified = $this->verification->verify($state, $current, $receipt->proposalIds, array_values(array_unique($applied)));
         $this->timings['verification_ms'] = $this->elapsed($started);
-        return $verified->verified
+        $editorialReasons = $this->editorialReadbackReasons($current, $requestedEditorialFields);
+        return $verified->verified && $editorialReasons === []
             ? $this->save($receipt, 'complete', ArticleIngestOutcome::COMPLETED, false, [], $state->token, $receipt->proposalIds, array_values(array_unique($applied)), null, $proposalStates, $applyAttempts)
-            : $this->save($receipt, 'verification', ArticleIngestOutcome::VERIFICATION_FAILED, true, ['reasons' => $verified->reasons], $state->token, $receipt->proposalIds, array_values(array_unique($applied)), null, $proposalStates, $applyAttempts);
+            : $this->save($receipt, 'verification', ArticleIngestOutcome::VERIFICATION_FAILED, true, ['code' => 'EDITORIAL_READBACK_MISMATCH', 'reasons' => array_values(array_unique(array_merge($verified->reasons, $editorialReasons)))], $state->token, $receipt->proposalIds, array_values(array_unique($applied)), null, $proposalStates, $applyAttempts);
     }
 
     /** @param array<string,mixed> $failure @param list<string> $proposalIds @param list<string> $applied */
@@ -261,8 +273,25 @@ final class ArticleIngestCoordinator
         $fields = is_array($input['fields'] ?? null) ? $input['fields'] : $input;
         $allowed = ['post_title', 'post_content', 'post_excerpt', 'post_name', 'category_ids', 'featured_media_id'];
         $result = [];
-        foreach ($allowed as $field) if (array_key_exists($field, $fields)) $result[$field] = (string) $fields[$field];
+        foreach ($allowed as $field) if (array_key_exists($field, $fields)) {
+            $result[$field] = in_array($field, ['category_ids'], true)
+                ? array_values(array_map('intval', (array) $fields[$field]))
+                : (in_array($field, ['featured_media_id'], true) ? max(0, (int) $fields[$field]) : (string) $fields[$field]);
+        }
         return $result;
+    }
+
+    /** @param array<string,mixed> $fields @return list<string> */
+    private function editorialReadbackReasons(\NHK\Core\Domain\Article\EditorialPostState $state, array $fields): array
+    {
+        $actual = ['post_title' => $state->title, 'post_content' => $state->content, 'post_excerpt' => $state->excerpt, 'post_name' => $state->slug, 'category_ids' => $state->categoryIds, 'featured_media_id' => $state->featuredAttachmentId ?? 0];
+        $reasons = [];
+        foreach ($fields as $field => $expected) {
+            $left = $field === 'category_ids' ? array_values(array_map('intval', (array) ($actual[$field] ?? []))) : (string) ($actual[$field] ?? '');
+            $right = $field === 'category_ids' ? array_values(array_map('intval', (array) $expected)) : (string) $expected;
+            if ($left !== $right) $reasons[] = 'EDITORIAL_FIELD_MISMATCH:' . $field;
+        }
+        return $reasons;
     }
 
     /** @param array<string,mixed> $fields */

@@ -25,7 +25,10 @@ final class OperationScopedStagingGuard implements StagingGuard
     public function assertAllowed(Proposal $proposal): void
     {
         $environment = strtolower(trim((string) ($this->environment)()));
-        if (in_array($environment, ['production', 'prod'], true)) throw new \RuntimeException('STAGING_PRODUCTION_FORBIDDEN');
+        if (in_array($environment, ['production', 'prod'], true)) {
+            (new ProductionGovernanceAdmission($this->environment, $this->can, $this->operations, $this->maxPayloadBytes, $this->maxDependencyCount))->assertAllowed($proposal);
+            return;
+        }
         if ($environment !== 'staging') return;
         if (!$this->operations->supports($proposal->entityType, $proposal->operation)) throw new \RuntimeException('STAGING_OPERATION_UNREGISTERED');
         foreach ($this->capabilities($proposal) as $capability) {

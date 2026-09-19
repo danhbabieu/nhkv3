@@ -92,7 +92,14 @@ final class ArticleMediaCoordinator
             $blueprint = MediaSeoBlueprint::forPost($postId, $slot, $context, $state);
             $this->blueprints->save($blueprint);
             $slotMedia[$slot] = $candidate->canonicalId;
-            $slots[$slot] = ['media_id' => $candidate->canonicalId, 'placeholder' => $candidate->isSystemPlaceholder(), 'state' => $state, 'suitability' => $assessment['suitability'], 'availability' => $assessment['availability'], 'valid_for_completeness' => $assessment['valid_for_completeness'], 'placement_key' => $usage->placementKey, 'placement_anchor' => $usage->placementAnchor(), 'blueprint' => $blueprint->toArray()];
+            $effective = !$candidate->isSystemPlaceholder() && (($assessment['valid_for_completeness'] ?? false) === true || ($subjectIds === [] && ($assessment['suitability'] ?? '') === SemanticSuitabilityPolicy::UNKNOWN));
+            if (!$effective && !$candidate->isSystemPlaceholder()) {
+                // A readable historical usage is retained for audit, but it is
+                // not an effective slot and must never satisfy completeness.
+                $slotMedia[$slot] = '';
+            }
+            $slots[$slot] = ['media_id' => $effective ? $candidate->canonicalId : '', 'persisted_media_id' => $candidate->isSystemPlaceholder() ? null : $candidate->canonicalId, 'placeholder' => !$effective, 'state' => $effective ? MediaSeoStateRegistry::COMPLETE : ($slot === MediaUsageRoleRegistry::FEATURED_PRIMARY ? MediaSeoStateRegistry::INCOMPLETE_FEATURED : MediaSeoStateRegistry::INCOMPLETE_INLINE), 'suitability' => $assessment['suitability'], 'availability' => $assessment['availability'], 'valid_for_completeness' => $effective, 'placement_key' => $usage->placementKey, 'placement_anchor' => $usage->placementAnchor(), 'blueprint' => $blueprint->toArray()];
+            if (!$effective && !$candidate->isSystemPlaceholder()) $diagnostics[] = ['code' => 'MEDIA_USAGE_SEMANTIC_MISMATCH', 'slot' => $slot, 'media_id' => $candidate->canonicalId];
         }
         $supportingPlacements = $this->normalizeSupportingPlacements($supportingMediaIds);
         foreach ($supportingPlacements as $placement) {
@@ -114,7 +121,10 @@ final class ArticleMediaCoordinator
             );
         }
         $desiredUsages = [];
-        foreach ($slotMedia as $role => $mediaId) $desiredUsages[] = ['role' => $role, 'media_id' => $mediaId, 'sort_order' => 0, 'placement_key' => (string) ($slots[$role]['placement_key'] ?? ''), 'alt_text' => (string) ($slots[$role]['blueprint']['planned_alt_intent'] ?? ''), 'title' => (string) ($slots[$role]['blueprint']['planned_title'] ?? ''), 'keyword_groups' => (array) ($slots[$role]['blueprint']['keyword_groups'] ?? [])];
+        foreach ($slotMedia as $role => $mediaId) {
+            if (trim((string) $mediaId) === '') continue;
+            $desiredUsages[] = ['role' => $role, 'media_id' => $mediaId, 'sort_order' => 0, 'placement_key' => (string) ($slots[$role]['placement_key'] ?? ''), 'alt_text' => (string) ($slots[$role]['blueprint']['planned_alt_intent'] ?? ''), 'title' => (string) ($slots[$role]['blueprint']['planned_title'] ?? ''), 'keyword_groups' => (array) ($slots[$role]['blueprint']['keyword_groups'] ?? [])];
+        }
         foreach ($supportingPlacements as $placement) $desiredUsages[] = [
             'role' => MediaUsageRoleRegistry::INLINE_SUPPORTING,
             'media_id' => $placement['media_id'],
@@ -126,7 +136,7 @@ final class ArticleMediaCoordinator
         ];
         $usagePlan = (new MediaUsageReconciler())->plan('wp_post', $endpointKey, $this->usages->listByEndpoint('wp_post', $endpointKey), $desiredUsages);
         $diagnostics[] = ['code' => 'MEDIA_USAGE_RECONCILIATION', 'status' => $usagePlan['status'], 'actions' => $usagePlan['actions']];
-        $state = array_filter($slots, static function (array $slot) use ($subjectScopeLocked, $captureMediaContext): bool { return $slot['placeholder'] || (($subjectScopeLocked || $captureMediaContext) && ($slot['valid_for_completeness'] ?? true) !== true); }) !== [] ? MediaSeoStateRegistry::PLACEHOLDER : (in_array('MEDIA_LOW_RESOLUTION', array_column($diagnostics, 'code'), true) ? MediaSeoStateRegistry::LOW_RESOLUTION : MediaSeoStateRegistry::COMPLETE);
+        $state = array_filter($slots, static fn (array $slot): bool => $slot['placeholder'] || ($slot['valid_for_completeness'] ?? false) !== true) !== [] ? MediaSeoStateRegistry::PLACEHOLDER : (in_array('MEDIA_LOW_RESOLUTION', array_column($diagnostics, 'code'), true) ? MediaSeoStateRegistry::LOW_RESOLUTION : MediaSeoStateRegistry::COMPLETE);
         $guidance = $this->guidance($slots, $context);
         $result = new ArticleMediaResult($postId, $endpointKey, $state, $slotMedia, $slots, $diagnostics, is_array($editorial) ? (string) ($editorial['state_token'] ?? '') : '', $guidance);
         if ($this->wordpress !== null) {
@@ -162,7 +172,7 @@ final class ArticleMediaCoordinator
                     $diagnostics[] = ['code' => 'ARTICLE_MEDIA_INLINE_MISSING', 'slot' => MediaUsageRoleRegistry::INLINE_PRIMARY, 'reason' => 'STALE_WORDPRESS_USAGE_REJECTED', 'media_id' => $actualInline];
                 }
             }
-            $state = array_filter($slots, static function (array $slot) use ($subjectScopeLocked, $captureMediaContext): bool { return $slot['placeholder'] || (($subjectScopeLocked || $captureMediaContext) && ($slot['valid_for_completeness'] ?? true) !== true); }) !== [] ? MediaSeoStateRegistry::PLACEHOLDER : (in_array('MEDIA_LOW_RESOLUTION', array_column($diagnostics, 'code'), true) ? MediaSeoStateRegistry::LOW_RESOLUTION : MediaSeoStateRegistry::COMPLETE);
+            $state = array_filter($slots, static fn (array $slot): bool => $slot['placeholder'] || ($slot['valid_for_completeness'] ?? false) !== true) !== [] ? MediaSeoStateRegistry::PLACEHOLDER : (in_array('MEDIA_LOW_RESOLUTION', array_column($diagnostics, 'code'), true) ? MediaSeoStateRegistry::LOW_RESOLUTION : MediaSeoStateRegistry::COMPLETE);
             $result = new ArticleMediaResult($postId, $endpointKey, $state, $slotMedia, $slots, $diagnostics, (string) ($readback['state_token'] ?? ''), $this->guidance($slots, $context));
         }
         return $result;

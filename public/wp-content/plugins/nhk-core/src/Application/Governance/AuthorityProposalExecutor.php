@@ -72,7 +72,12 @@ final class AuthorityProposalExecutor
         }
         if ($proposal->entityType === 'media' && in_array($proposal->operation, ['add', 'replace', 'remove'], true)) {
             if ($this->mediaBinding === null) throw new \RuntimeException('Media usage executor is not configured.');
-            $mutation = $this->mediaBinding->mutate(array_replace($proposal->payload, ['operation' => $proposal->operation]));
+            $mutation = $this->mediaBinding->mutate(array_replace($proposal->payload, [
+                'operation' => $proposal->operation,
+                'governed_apply' => true,
+                'proposal_id' => $proposal->id,
+                'proposal_fingerprint' => $proposal->contentFingerprint,
+            ]));
             $mediaId = trim((string) ($mutation['media_id'] ?? ($proposal->payload['media']['id'] ?? '')));
             $usageId = trim((string) ($mutation['usage_id'] ?? ($mutation['usage']['id'] ?? '')));
             $readback = is_array($mutation['readback'] ?? null) ? $mutation['readback'] : [];

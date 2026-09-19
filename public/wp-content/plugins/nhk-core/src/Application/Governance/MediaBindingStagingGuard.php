@@ -15,7 +15,11 @@ final class MediaBindingStagingGuard
     public function __invoke(array $request): void
     {
         $environment = strtolower(trim((string) ($this->environment)()));
-        if (in_array($environment, ['production', 'prod'], true)) throw new \RuntimeException('STAGING_PRODUCTION_FORBIDDEN');
+        if (in_array($environment, ['production', 'prod'], true)) {
+            if (($request['governed_apply'] ?? false) !== true) throw new \RuntimeException('STAGING_PRODUCTION_FORBIDDEN');
+            $this->assertProductionGovernedMutation($request);
+            return;
+        }
         if ($environment !== 'staging') return;
         $scope = $request['staging_acceptance'] ?? null;
         if (!is_array($scope)) throw new \RuntimeException('STAGING_SCOPE_REQUIRED');
@@ -43,5 +47,22 @@ final class MediaBindingStagingGuard
         foreach ([$target, is_array($request['media'] ?? null) ? $request['media'] : []] as $locator) {
             if (array_intersect(['name', 'filename', 'url', 'match', 'similarity', 'fuzzy', 'locator'], array_keys($locator)) !== []) throw new \RuntimeException('STAGING_EXACT_TARGET_REQUIRED');
         }
+    }
+
+    /** Production uses the approved Proposal boundary, never a staging packet. */
+    private function assertProductionGovernedMutation(array $request): void
+    {
+        $operation = strtolower(trim((string) ($request['operation'] ?? '')));
+        if (!in_array($operation, ['add', 'replace', 'remove'], true)) throw new \RuntimeException('PRODUCTION_OPERATION_UNREGISTERED');
+        if (!UuidCodec::isValid(trim((string) (($request['media']['id'] ?? ''))))) throw new \RuntimeException('PRODUCTION_EXACT_MEDIA_REQUIRED');
+        $target = is_array($request['target'] ?? null) ? $request['target'] : [];
+        $type = strtolower(trim((string) ($target['type'] ?? '')));
+        $id = trim((string) ($target['id'] ?? ''));
+        if ($type === 'wp_post' ? preg_match('/^[1-9][0-9]*:[1-9][0-9]*$/', $id) !== 1 : !UuidCodec::isValid($id)) throw new \RuntimeException('PRODUCTION_EXACT_TARGET_REQUIRED');
+        if ($operation !== 'add') {
+            if (!UuidCodec::isValid(trim((string) ($request['usage_id'] ?? '')))) throw new \RuntimeException('PRODUCTION_USAGE_ID_REQUIRED');
+            if ((int) ($request['expected_usage_revision'] ?? 0) < 1) throw new \RuntimeException('PRODUCTION_USAGE_REVISION_REQUIRED');
+        }
+        if (trim((string) ($request['proposal_id'] ?? '')) === '' || !preg_match('/^[a-f0-9]{64}$/i', (string) ($request['proposal_fingerprint'] ?? ''))) throw new \RuntimeException('PRODUCTION_PROPOSAL_BINDING_REQUIRED');
     }
 }

@@ -74,7 +74,7 @@ final class GovernanceAutomationExpansionTest extends TestCase
         }
     }
 
-    public function test_staging_guard_blocks_missing_approval_and_production(): void
+    public function test_staging_guard_blocks_missing_approval_but_production_uses_governed_admission(): void
     {
         $unapproved = new OperationScopedStagingGuard(static fn (): string => 'staging', static fn (string $capability): bool => true, scopeVerifier: static fn (array $scope, Proposal $proposal): bool => false);
         try {
@@ -85,12 +85,8 @@ final class GovernanceAutomationExpansionTest extends TestCase
         }
 
         $production = new OperationScopedStagingGuard(static fn (): string => 'production', static fn (string $capability): bool => true, scopeVerifier: static fn (array $scope, Proposal $proposal): bool => true);
-        try {
-            $production->assertAllowed($this->scopedMediaProposal());
-            self::fail('Production semantic apply must be rejected.');
-        } catch (\RuntimeException $error) {
-            self::assertSame('STAGING_PRODUCTION_FORBIDDEN', $error->getMessage());
-        }
+        $production->assertAllowed($this->scopedMediaProposal());
+        self::assertTrue(true, 'Production admission accepts only the exact governed proposal; it does not require a staging packet.');
     }
 
     public function test_direct_media_binding_path_is_fail_closed_without_the_same_capture_scope(): void
@@ -106,6 +102,22 @@ final class GovernanceAutomationExpansionTest extends TestCase
         } catch (\RuntimeException $error) {
             self::assertSame('STAGING_SCOPE_REQUIRED', $error->getMessage());
         }
+    }
+
+    public function test_production_governed_media_usage_remove_has_its_own_exact_admission(): void
+    {
+        $guard = new MediaBindingStagingGuard(static fn (): string => 'production');
+        $guard([
+            'operation' => 'remove',
+            'governed_apply' => true,
+            'proposal_id' => UuidCodec::newV7(),
+            'proposal_fingerprint' => str_repeat('a', 64),
+            'media' => ['id' => UuidCodec::newV7()],
+            'target' => ['type' => 'wp_post', 'id' => '1:617'],
+            'usage_id' => UuidCodec::newV7(),
+            'expected_usage_revision' => 3,
+        ]);
+        self::assertTrue(true);
     }
 
     public function test_direct_media_binding_path_requires_internal_capability_after_scope_verification(): void

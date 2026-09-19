@@ -7,6 +7,18 @@ An apply operation must lock and reload the proposal inside a MySQL transaction.
 
 Retry re-evaluates eligibility and increments `attempt_no`. Revision drift or an unapplied dependency blocks retry fail-closed. Re-applying an `APPLIED` proposal returns its existing result and performs no second authority mutation.
 
+## Governed environment admission
+
+Staging and production use distinct admission boundaries. Staging semantic
+apply requires the server-issued, exact Capture acceptance packet and remains
+fail-closed without `STAGING_SCOPE_REQUIRED` proof. Production never accepts or
+manufactures that packet; it admits only an approved, eligible, exact Proposal
+through the production Governance continuation. MediaUsage add/replace/remove
+then enters the canonical writer only from that Controlled Apply executor and
+must retain exact target, Media UUID, usage UUID/revision, proposal binding,
+idempotency and canonical read-back. Direct production MediaBinding remains
+blocked.
+
 The proposal row is the serialization point. The semantic transaction locks and reloads it with `SELECT ... FOR UPDATE`; the failed-attempt write occurs only after rollback in a separate transaction and locks the same row before allocating the next attempt number. Acceptance still requires two real MySQL connections to prove lock serialization and idempotent concurrent apply.
 
 Conversational Authority multi-candidate apply uses `ControlledApplyService`
