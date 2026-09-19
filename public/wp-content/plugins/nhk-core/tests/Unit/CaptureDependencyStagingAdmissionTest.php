@@ -52,6 +52,33 @@ final class CaptureDependencyStagingAdmissionTest extends TestCase
         self::assertSame('CAPTURE_CONTENT_INTENT_NOT_VIDEO', $admission->reason());
     }
 
+    public function test_knowledge_delta_capture_can_admit_governed_dependency_child(): void
+    {
+        $capture = new CaptureRecord(UuidCodec::newV7(), 'knowledge', hash('sha256', 'knowledge'), 'SEMANTICS_RECONCILED', 'IN_PROGRESS', context: [
+            'purpose' => 'EDITORIAL',
+            'content_intent' => ['intent' => 'KNOWLEDGE_DELTA'],
+        ]);
+        $scope = [
+            'approved' => true,
+            'environment' => 'staging',
+            'semantic_write_policy' => 'PROJECT_BUILD',
+            'entrypoint' => 'nhk.capture.ingest',
+            'capture_id' => $capture->captureId,
+            'capture_fingerprint' => $capture->requestFingerprint,
+            'operation_family' => 'knowledge_delta',
+            'entity_type' => 'knowledge',
+            'operation' => 'ingest',
+            'plan_fingerprint' => str_repeat('a', 64),
+            'proposal_command_fingerprint' => str_repeat('b', 64),
+            'payload_fingerprint' => str_repeat('c', 64),
+            'expected_revision' => 0,
+        ];
+        $admission = new CaptureDependencyStagingAdmission();
+
+        self::assertTrue($admission(false, $scope, $capture, [], []));
+        self::assertSame('ADMITTED', $admission->reason());
+    }
+
     /** @return iterable<string,array{0:string}> */
     public static function subjectTypeProvider(): iterable
     {

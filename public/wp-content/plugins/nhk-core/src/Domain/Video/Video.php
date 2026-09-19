@@ -26,7 +26,7 @@ final readonly class Video
     public static function fromUrl(string $url, string $title = '', array $metadata = [], ?string $thumbnailMediaId = null, ?string $canonicalId = null): self
     {
         $parts = parse_url(trim($url));
-        if (!is_array($parts) || !in_array(strtolower((string) ($parts['scheme'] ?? '')), ['http', 'https'], true) || isset($parts['user'], $parts['pass'], $parts['port'])) throw new InvalidVideoReference('Only a valid YouTube URL is supported.');
+        if (!is_array($parts) || strtolower((string) ($parts['scheme'] ?? '')) !== 'https' || isset($parts['user'], $parts['pass'], $parts['port'])) throw new InvalidVideoReference('Only a valid YouTube URL is supported.');
         $host = strtolower((string) ($parts['host'] ?? ''));
         $path = (string) ($parts['path'] ?? '');
         $id = null;

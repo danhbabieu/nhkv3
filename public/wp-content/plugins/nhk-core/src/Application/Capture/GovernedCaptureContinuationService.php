@@ -530,7 +530,7 @@ final class GovernedCaptureContinuationService
     private function scopeDependencyPlan(string $captureId, array $plan): array
     {
         if (!in_array((string) ($plan['entity_type'] ?? ''), ['source', 'knowledge', 'evidence'], true)
-            || !in_array((string) ($plan['operation'] ?? ''), ['ingest', 'create'], true)
+            || !in_array((string) ($plan['operation'] ?? ''), ['ingest', 'create', 'update'], true)
             || !is_callable($this->dependencyScopeIssuer)) return $plan;
         $payload = is_array($plan['payload'] ?? null) ? $plan['payload'] : [];
         unset($payload['staging_acceptance'], $payload['capture_fingerprint'], $payload['scope_fingerprint'], $payload['proposal_command_fingerprint']);

@@ -116,6 +116,11 @@ final class MediaBatchUploadService
         $used = [];
         foreach (array_values($items) as $packet) {
             if (!is_array($packet)) throw new \InvalidArgumentException('MEDIA_BATCH_ITEM_INVALID');
+            $clientFileId = trim((string) ($packet['client_file_id'] ?? ''));
+            if ($clientFileId !== '') {
+                if (isset($used['client_file_id:' . $clientFileId])) throw new \InvalidArgumentException('MEDIA_BATCH_CLIENT_FILE_ID_DUPLICATE');
+                $used['client_file_id:' . $clientFileId] = true;
+            }
             $ordinal = array_key_exists('ordinal', $packet) ? $packet['ordinal'] : null;
             if ($ordinal !== null && (!is_int($ordinal) || $ordinal < 0 || $ordinal >= $count || isset($used[$ordinal]))) throw new \InvalidArgumentException('MEDIA_BATCH_ITEM_ORDINAL_INVALID');
             $nextOrdinal = 0;
@@ -125,7 +130,9 @@ final class MediaBatchUploadService
             $normalized[$target] = $packet;
             $used[$target] = true;
         }
-        if ($items !== [] && count($used) !== $count) throw new \InvalidArgumentException('MEDIA_BATCH_ITEMS_MUST_MAP_EVERY_FILE');
+        $mappedOrdinals = [];
+        foreach ($used as $key => $value) if (is_int($key) && $value === true) $mappedOrdinals[$key] = true;
+        if ($items !== [] && count($mappedOrdinals) !== $count) throw new \InvalidArgumentException('MEDIA_BATCH_ITEMS_MUST_MAP_EVERY_FILE');
         return $normalized;
     }
 

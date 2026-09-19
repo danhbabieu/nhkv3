@@ -75,4 +75,10 @@ final class MediaVideoCoreTest extends TestCase
         $this->expectException(InvalidVideoReference::class);
         Video::fromUrl('https://example.com/video/123');
     }
+
+    public function test_http_youtube_reference_is_rejected_by_the_shared_identity_boundary(): void
+    {
+        $this->expectException(InvalidVideoReference::class);
+        Video::fromUrl('http://www.youtube.com/watch?v=dQw4w9WgXcQ');
+    }
 }

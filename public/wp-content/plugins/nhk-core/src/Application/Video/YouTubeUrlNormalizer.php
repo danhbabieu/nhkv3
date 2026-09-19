@@ -11,7 +11,7 @@ final class YouTubeUrlNormalizer
     {
         $url = trim($url);
         $parts = parse_url($url);
-        if (!is_array($parts) || !in_array(strtolower((string) ($parts['scheme'] ?? '')), ['http', 'https'], true) || isset($parts['user'], $parts['pass'], $parts['port'])) {
+        if (!is_array($parts) || strtolower((string) ($parts['scheme'] ?? '')) !== 'https' || isset($parts['user'], $parts['pass'], $parts['port'])) {
             throw new InvalidVideoReference('Only a valid YouTube URL is supported.');
         }
         $host = strtolower((string) ($parts['host'] ?? ''));

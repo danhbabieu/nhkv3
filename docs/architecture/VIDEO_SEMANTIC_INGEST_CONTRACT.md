@@ -222,6 +222,34 @@ dependency progression require an internal canonical snapshot matching entity
 type, UUID, active state and revision. Read-back failure is non-success and
 fail-closed. Retries reuse idempotency, content and dependency fingerprints.
 
+## YouTube pipeline hardening checkpoint — 2026-09-19
+
+The canonical happy path is `nhk.capture.ingest`; `VIDEO` defaults to
+`article_required=false`. Capture remains the immutable authorization and
+orchestration parent after the final Video plan is built. The final governed
+Video plan is the only semantic command source for Proposal, staging scope,
+admission, eligibility and Controlled Apply. Required Source → Claim → Evidence
+dependencies are read back before an Evidence-backed relation can enter the
+executable scope. Historical approved proposals are never edited; stale payloads
+re-enter governed reconciliation and receive a fresh scope bound to the final
+command. Successful retries reuse Capture, Video, dependency and Graph
+identities. Public Identity is allocated only after canonical Video read-back.
+
+Regression coverage includes URL identity normalization, VIDEO/no-Article intent,
+explicit subject precedence, Evidence binding/order, final-plan scope and
+tamper checks, stale-proposal resume, governed dependency retry, Graph
+idempotency, public URL ordering and transcript-unavailable warning behavior.
+
+| Failure | Owner | Retryable | Safe retry point | Must not do |
+|---|---|---:|---|---|
+| `INVALID_YOUTUBE_URL` / `SOURCE_IDENTITY_INVALID` | YouTube adapter | No | Correct URL, re-enter Capture | Create Video/source |
+| `SOURCE_UNAVAILABLE` | Source adapter | Yes | Source resolution | Fabricate metadata or Evidence |
+| `SUBJECT_UNRESOLVED` / `SUBJECT_CONFLICT` | Subject resolution | Review | Capture plan after explicit resolution | Substitute heuristic target |
+| `EVIDENCE_REQUIRED` / `NO_SEMANTIC_ATTACHMENT` | Video relation planner / Eligibility | Review | Dependency read-back and reconciliation | Downgrade to unsupported attachment |
+| `STALE_PROPOSAL` / `STALE_SCOPE` / fingerprint mismatch | Governance/Staging | Yes | Governed replacement and fresh scope | Mutate historical proposal or reuse scope |
+| `REVISION_CHANGED` / `APPLY_FAILED` | Controlled Apply | Yes | Current canonical revision through Governance | Direct writer or partial publish |
+| `PUBLIC_URL_OWNER_NOT_FOUND` | Public Identity | Review | Canonical Video read-back, then governed identity step | Create a fake owner |
+
 ## Canonical frontend handoff — 2026-09-07
 
 After canonical read-back, a public-capable Video must resolve Public Identity

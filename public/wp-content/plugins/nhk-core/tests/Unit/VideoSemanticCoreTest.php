@@ -55,6 +55,12 @@ final class VideoSemanticCoreTest extends TestCase
         self::assertSame(['https://www.youtube.com/watch?v=dQw4w9WgXcQ'], array_values(array_unique(array_map(static fn (object $identity): string => $identity->canonicalUrl, $identities))));
     }
 
+    public function test_http_youtube_source_is_rejected_before_source_resolution(): void
+    {
+        $this->expectException(\NHK\Core\Domain\Video\InvalidVideoReference::class);
+        YouTubeUrlNormalizer::normalize('http://youtu.be/dQw4w9WgXcQ');
+    }
+
     public function test_youtube_adapter_returns_bounded_snapshot_without_fabricating_transcript(): void
     {
         $adapter = new YouTubeSourceAdapter(static fn (object $identity): array => [

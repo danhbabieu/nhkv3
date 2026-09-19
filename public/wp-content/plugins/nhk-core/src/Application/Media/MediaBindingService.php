@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Media;
 
+use NHK\Core\Domain\Governance\CommandCanonicalizer;
+
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaBindingOperationRepository, MediaBindingPort, MediaRepository, MediaUsageRepository, MediaUsageUpdater};
 use NHK\Core\Domain\Authority\EntityTypeRegistry;
@@ -300,7 +302,7 @@ final class MediaBindingService implements MediaBindingPort
     private function fingerprint(array $request): string
     {
         unset($request['idempotency_key']);
-        return hash('sha256', json_encode($request, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
+        return hash('sha256', CommandCanonicalizer::canonicalize($request));
     }
 
     /** @param array<string,mixed> $reference */

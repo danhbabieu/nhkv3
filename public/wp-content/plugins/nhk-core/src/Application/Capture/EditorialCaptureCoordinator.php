@@ -8,6 +8,7 @@ use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, Subjec
 use NHK\Core\Contracts\Capture\CaptureRepository;
 use NHK\Core\Contracts\Media\MediaBindingPort;
 use NHK\Core\Domain\Capture\{CaptureRecord, CaptureStage};
+use NHK\Core\Domain\Governance\CommandCanonicalizer;
 use NHK\Core\Domain\Capture\CapturePurpose;
 use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Core\Application\Mcp\McpDocumentationRegistry;
@@ -835,7 +836,7 @@ final class EditorialCaptureCoordinator
                 }, $input['files']);
             }
         }
-        return hash('sha256', json_encode($input, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
+        return hash('sha256', CommandCanonicalizer::canonicalize($input));
     }
 
     private function conflict(CaptureRecord $record, string $fingerprint): CaptureRecord

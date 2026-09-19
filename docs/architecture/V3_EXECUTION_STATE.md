@@ -1,5 +1,60 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-19 — YouTube → Video final hardening audit (LOCAL / NO LIVE MUTATION)
+
+AUDIT_SCOPE: YouTube URL → Capture VIDEO → Source/Claim/Evidence → explicit
+subject → Evidence-backed about relation → final Video plan → staging scope →
+Governance → Controlled Apply → canonical Video/Graph → Public Identity and
+frontend readiness.
+
+BASELINE_REVIEW: `65dafd41` remains fail-closed. Final Video payload binding,
+final-payload admission, command fingerprint verification, Evidence/subject/
+UUID/operation/revision tamper checks and historical Capture authorization
+separation were reviewed and preserved; no verifier weakening was required.
+
+FIXED_BOUNDARY: YouTube source normalization and `Video::fromUrl()` now enforce
+the active HTTPS-only source contract consistently. Added regression coverage
+for supported watch/shorts/youtu.be/embed/query forms and HTTP rejection. The
+existing governed dependency/retry, VIDEO no-Article, explicit-subject,
+Evidence-order, stale-proposal reconciliation, final-plan scope, controlled
+apply, Graph idempotency, public URL ordering and transcript-warning tests were
+re-run. Canonical documentation now records the single entrypoint, final-plan
+authority, historical-proposal immutability and failure ownership matrix.
+
+VERIFICATION: Focused Video/Capture/Governance suite passes 172 tests / 679
+assertions. Full Unit reaches 1,977 tests / 9,724 assertions with one known
+unrelated DemoCutover baseline failure: `REMOTE_DEPLOYMENT_FAILED` versus
+`REMOTE_DEPLOYMENT_CONFIG_REQUIRED`; 16 warnings and existing deprecations are
+non-failing. Changed-file PHP lint and `git diff --check` pass. No commit,
+deployment, staging/production mutation, push or live retry was performed.
+
+STATUS: `VIDEO_PIPELINE_HARDENED_LOCAL / BASELINE_FAILURE_ISOLATED / NO_LIVE_MUTATION`.
+
+# Checkpoint — 2026-09-19 — Local Capture child admission and fingerprint parity closeout (LOCAL / NO MUTATION)
+
+ROOT_CAUSE: Capture dependency admission was hard-coded to Video intent and
+only ingest/create operations, while the executable descriptor and downstream
+continuation could reach Knowledge Delta and update operations. Media binding
+and Capture idempotency also used raw JSON serialization instead of the shared
+CommandCanonicalizer; batch packets did not reject duplicate client IDs.
+
+FIXED_BOUNDARY: Dependency admission now accepts the registered Video and
+Knowledge Delta Capture intents and validates create/ingest/update revision
+semantics. Source/Evidence update families are represented by the same
+descriptor and continuation scope path. Media binding, Capture request and
+batch fingerprints now use the canonical normalization law; duplicate client
+file IDs fail closed. Existing Video final-plan scope changes remain intact.
+
+VERIFICATION: Focused staging/Capture/Media/fingerprint suites pass 68 tests /
+237 assertions, plus batch/canonicalizer regressions pass 19 tests / 49
+assertions. Contract suite passes 6 tests / 48 assertions. Full Unit passes
+1,975 tests / 9,722 assertions except one known DemoCutover baseline failure:
+`REMOTE_DEPLOYMENT_FAILED` versus `REMOTE_DEPLOYMENT_CONFIG_REQUIRED`.
+Changed-file PHP lint and `git diff --check` pass. No commit, deployment,
+staging/live mutation or live acceptance was performed.
+
+STATUS: `LOCAL_PIPELINE_REPAIR_READY_FOR_OPERATOR_REVIEW / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-19 — Historical Video resume final-plan scope binding fixed (LOCAL / NO LIVE MUTATION)
 
 LIVE_FAILURE_REPRODUCED: YES (reported live as `STAGING_SCOPE_NOT_APPROVED` after

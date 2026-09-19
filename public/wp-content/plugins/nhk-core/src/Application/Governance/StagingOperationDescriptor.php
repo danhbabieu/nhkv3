@@ -78,7 +78,7 @@ final readonly class StagingOperationDescriptor
     public static function family(string $entityType, string $operation): string
     {
         return match ($entityType . ':' . $operation) {
-            'source:create', 'source:ingest', 'evidence:create', 'evidence:ingest' => 'source_evidence_reconciliation',
+            'source:create', 'source:ingest', 'source:update', 'evidence:create', 'evidence:ingest', 'evidence:update' => 'source_evidence_reconciliation',
             'knowledge:create', 'knowledge:ingest', 'knowledge:update' => 'knowledge_delta',
             'video:ingest', 'video:update', 'video:retire', 'video:reactivate' => 'governed_video_plan',
             'video:source_refresh' => 'video_source_refresh',
