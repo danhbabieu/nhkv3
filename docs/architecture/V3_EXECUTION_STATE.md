@@ -1,5 +1,34 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-19 — Historical Video Evidence pre-skip hook fixed (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE: Existing Capture Video continuation could turn a persisted child
+directly into a Proposal-ID plan before `executeVideoProvenancePlan()` ran.
+That made a historical `VIDEO_EVIDENCE_GOVERNANCE=COMPLETED/APPLIED` receipt
+effectively authorize reuse even when the final attachment had no canonical
+Evidence, so the stale-receipt validator/recovery seam was unreachable.
+
+FIXED_BOUNDARY: The coordinator now passes phase receipts into the semantic
+continuation context. Before the persisted Proposal-ID shortcut is accepted,
+an existing Video resume checks the historical Evidence receipt and validates
+the attachment's Evidence references through the canonical dependency
+boundary. Missing or invalid Evidence forces the existing governed provenance
+plan, including Source/Claim canonical reuse validation, Evidence recovery,
+canonical read-back and final attachment rebuild. No Proposal, staging scope,
+Public URL or live data was changed.
+
+REGRESSION: Added coverage proving an existing Video resume with historical
+Evidence `COMPLETED/APPLIED` and empty `evidence_refs` cannot become a direct
+Proposal-ID plan; it re-enters the provenance dependency path. Existing
+canonical dependency and continuation tests remain green.
+
+VERIFICATION: Focused continuation/governance suites pass 64 tests / 355
+assertions. Full Unit passes 1,984 tests / 9,790 assertions with existing
+warnings/deprecations. Changed-file PHP lint and `git diff --check` pass. No
+push, deploy or live retry was performed.
+
+STATUS: `VIDEO_EVIDENCE_RESUME_PRE_SKIP_FIXED_LOCAL / NO_LIVE_MUTATION / DEPLOYMENT_PENDING`.
+
 # Checkpoint — 2026-09-19 — Local proof closure for attachment projection and deployment classification (LOCAL / NO LIVE MUTATION)
 
 ROOT_CAUSE: The attachment projection mapping was implemented but depended

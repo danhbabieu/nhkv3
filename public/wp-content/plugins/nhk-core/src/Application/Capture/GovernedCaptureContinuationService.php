@@ -409,7 +409,15 @@ final class GovernedCaptureContinuationService
             // do not reconstruct a fresh pre-proposal staging packet from the
             // Capture-derived asset (which may be a stale derived projection).
             if (($context['existing_capture_continuation'] ?? false) === true && $entityType === 'video' && $operation === 'ingest') {
-                $pending = $this->pendingVideoProposal($context, $video, $payload, $subjectId);
+                // A persisted APPLIED dependency receipt is only a locator.
+                // If its final attachment has no canonical Evidence, do not
+                // convert the child directly into a Proposal-ID plan: that
+                // would skip the provenance dependency validator and make the
+                // historical receipt authoritative. Rebuild the provenance
+                // plan so Source/Claim/Evidence are validated before reuse.
+                $pending = $this->historicalEvidenceRecoveryRequired($context, $payload)
+                    ? null
+                    : $this->pendingVideoProposal($context, $video, $payload, $subjectId);
                 if ($pending !== null) {
                     $plans[] = [
                         'proposal_id' => $pending['proposal_id'],
@@ -458,6 +466,30 @@ final class GovernedCaptureContinuationService
             $plans[array_key_last($plans)] = $this->scopeVideoPlan($captureId, $plans[array_key_last($plans)], $context);
         }
         return $plans;
+    }
+
+    /** @param array<string,mixed> $context @param array<string,mixed> $payload */
+    private function historicalEvidenceRecoveryRequired(array $context, array $payload): bool
+    {
+        $receipts = is_array($context['phase_receipts'] ?? null) ? $context['phase_receipts'] : [];
+        $receipt = is_array($receipts['VIDEO_EVIDENCE_GOVERNANCE'] ?? null) ? $receipts['VIDEO_EVIDENCE_GOVERNANCE'] : [];
+        $latest = is_array($receipt['latest'] ?? null) ? $receipt['latest'] : $receipt;
+        if (strtoupper(trim((string) ($latest['status'] ?? ''))) !== 'COMPLETED'
+            || strtoupper(trim((string) ($latest['result'] ?? ''))) !== 'APPLIED') return false;
+        $attachments = is_array($payload['metadata']['semantic_attachments'] ?? null)
+            ? $payload['metadata']['semantic_attachments']
+            : (is_array($payload['semantic_attachments'] ?? null) ? $payload['semantic_attachments'] : []);
+        foreach ($attachments as $attachment) {
+            if (!is_array($attachment)) continue;
+            $refs = is_array($attachment['evidence_refs'] ?? null) ? $attachment['evidence_refs'] : [];
+            foreach ($refs as $reference) {
+                $evidenceId = is_array($reference) ? trim((string) ($reference['evidence_id'] ?? '')) : trim((string) $reference);
+                if ($evidenceId !== '' && $this->canonicalDependencies !== null) {
+                    try { $this->canonicalDependencies->evidence($evidenceId); return false; } catch (\Throwable) { return true; }
+                }
+            }
+        }
+        return true;
     }
 
     /**

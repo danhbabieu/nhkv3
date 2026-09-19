@@ -24,6 +24,45 @@ use PHPUnit\Framework\TestCase;
 
 final class GovernedCaptureContinuationServiceTest extends TestCase
 {
+    public function test_existing_capture_video_resume_does_not_turn_applied_missing_evidence_receipt_into_a_proposal_skip(): void
+    {
+        $captureId = UuidCodec::newV7();
+        $videoId = UuidCodec::newV7();
+        $proposal = new Proposal(UuidCodec::newV7(), $videoId, 'ingest', ['canonical_id' => $videoId], 'old-content', null, 'old-dependency', ProposalState::APPLIED, idempotencyKey: $captureId . ':video', entityType: 'video');
+        $lookup = new class($proposal) implements PendingVideoProposalLookup {
+            public function __construct(private Proposal $proposal) {}
+            public function findPendingVideoProposals(array $binding): array { return [$this->proposal]; }
+        };
+        $service = new GovernedCaptureContinuationService(
+            $this->createMock(GovernedLifecycle::class),
+            static fn (): array => [],
+            $this->policies(['video']),
+            static fn (): bool => true,
+            videoProvenance: new CaptureVideoProvenancePlanner(),
+            pendingVideoProposals: $lookup,
+        );
+        $plans = new \ReflectionMethod($service, 'plans');
+        $plans->setAccessible(true);
+
+        $result = $plans->invoke($service, $captureId, 'capture:resume:video', [
+            'existing_capture_continuation' => true,
+            'phase_receipts' => ['VIDEO_EVIDENCE_GOVERNANCE' => ['status' => 'COMPLETED', 'result' => 'APPLIED', 'attempt_no' => 2]],
+            'content_intent' => ['intent' => 'VIDEO'],
+            'subject_resolution' => ['primary' => ['id' => UuidCodec::newV7(), 'type' => 'variant', 'revision' => 1], 'resolved' => []],
+            'assets' => [['kind' => 'video', 'video_proposal' => [
+                'entity_type' => 'video', 'operation' => 'ingest', 'subject_id' => $videoId,
+                'payload' => ['canonical_id' => $videoId, 'metadata' => [
+                    'source' => ['platform' => 'youtube', 'external_video_id' => '2EMuIG2RfTg', 'canonical_source_url' => 'https://www.youtube.com/watch?v=2EMuIG2RfTg'],
+                    'semantic_attachments' => [['predicate' => 'about', 'target_type' => 'variant', 'target_uuid' => UuidCodec::newV7(), 'evidence_refs' => []]],
+                ]],
+            ]]],
+        ], false);
+
+        self::assertCount(1, $result);
+        self::assertArrayHasKey('capture_video_provenance', $result[0]);
+        self::assertArrayNotHasKey('proposal_id', $result[0]);
+    }
+
     public function test_applied_evidence_receipt_is_not_reused_when_canonical_owner_is_missing(): void
     {
         $evidenceId = UuidCodec::newV7();
