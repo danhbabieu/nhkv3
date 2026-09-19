@@ -748,6 +748,7 @@ final class Plugin {
                     $scope = $stagingScopeVerifier->issueForCaptureChildRelation($capture, $plan);
                     return $scope;
                 },
+                canonicalDependencies: $canonicalDependencies,
             );
             $articleReceipts = new WpdbArticleOperationReceiptRepository($wpdb);
             $categoryGateway = new CategoryGateway(new WpCategoryStore());

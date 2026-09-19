@@ -14799,6 +14799,21 @@ deployment, pull, fetch or push was performed.
 
 STATUS=`LOCAL_READY / DEPLOYMENT_PENDING / LIVE_ACCEPTANCE_PENDING`.
 
+# Checkpoint — 2026-09-19 — Stale Evidence receipt canonical-owner recovery (LOCAL / DEPLOYMENT PENDING)
+
+SCOPE: Capture Video dependency reuse now validates Source, Claim and Evidence
+against canonical owner read-back before treating an APPLIED phase receipt as
+reusable. Missing or incompatible Evidence re-enters the governed dependency
+flow with a deterministic recovery identity; no empty Evidence-backed Video
+command is executable and no historical Proposal is mutated.
+
+VERIFICATION: Focused stale-receipt, Capture/Video provenance, Governance,
+staging and idempotency suites pass. Unit suite and changed-file lint/diff
+checks are required before commit. No live retry, deployment, external request
+or semantic runtime mutation was performed.
+
+STATUS=`LOCAL_READY / DEPLOYMENT_PENDING / LIVE_ACCEPTANCE_PENDING`.
+
 # Checkpoint — 2026-09-19 — Evidence-backed final Video attachment hydration (LOCAL / DEPLOYMENT PENDING)
 
 SCOPE: After canonical Evidence apply/read-back, the final Capture-owned Video

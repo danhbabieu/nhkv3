@@ -6,6 +6,7 @@ namespace NHK\Core\Application\Capture;
 use NHK\Core\Application\Completion\CompletionCoordinator;
 use NHK\Core\Application\Governance\GovernanceAutomationPolicyResolver;
 use NHK\Core\Application\Semantic\ClaimReusePolicy;
+use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
 use NHK\Core\Contracts\Governance\GovernedLifecycle;
 use NHK\Core\Contracts\Governance\PendingVideoProposalLookup;
 use NHK\Core\Contracts\Governance\VideoProposalReconciliationPort;
@@ -57,6 +58,7 @@ final class GovernedCaptureContinuationService
         private $dependencyScopeIssuer = null,
         /** @var callable(string,array<string,mixed>):array<string,mixed>|null */
         private $relationScopeIssuer = null,
+        private ?CanonicalDependencyValidator $canonicalDependencies = null,
     ) {
         $this->completion = $completion ?? new CompletionCoordinator();
     }
@@ -656,8 +658,14 @@ final class GovernedCaptureContinuationService
             $writes[] = $this->classifiedFailure($evidenceArguments, $error);
             return;
         }
-        $evidenceWrite = $this->reusedDependency($evidenceArguments, $withEvidence, 'evidence', 'VIDEO_EVIDENCE_GOVERNANCE')
-            ?? $this->runGovernedChild($evidenceArguments, $control, $lifecycle, 'VIDEO_EVIDENCE_GOVERNANCE');
+        $evidenceReuse = $this->reusedDependency($evidenceArguments, $withEvidence, 'evidence', 'VIDEO_EVIDENCE_GOVERNANCE');
+        if ($evidenceReuse === null && $this->canonicalDependencies !== null) {
+            // A historical APPLIED receipt is not an owner. If canonical
+            // Evidence is absent/incompatible, re-enter the same governed
+            // dependency flow under a deterministic recovery identity.
+            $evidenceArguments['idempotency_key'] = $this->evidenceRecoveryKey($evidenceArguments);
+        }
+        $evidenceWrite = $evidenceReuse ?? $this->runGovernedChild($evidenceArguments, $control, $lifecycle, 'VIDEO_EVIDENCE_GOVERNANCE');
         $allWrites = array_merge($dependencyWrites, [$evidenceWrite]);
         if (!$this->dependencyWriteCompleted($evidenceWrite)) {
             array_push($writes, ...$allWrites);
@@ -805,6 +813,7 @@ final class GovernedCaptureContinuationService
         if (!$this->canonicalDependencyMatches($record, (array) ($dependency['payload'] ?? []), $kind)) return null;
         [$canonicalId, $revision, $active] = $this->canonicalStateTuple($record);
         if (!UuidCodec::isValid($canonicalId) || !$active) return null;
+        if (!$this->canonicalOwnerMatches($kind, $canonicalId, (array) ($dependency['payload'] ?? []))) return null;
         $this->emitPhaseReceipt($phase, ['status' => 'COMPLETED', 'result' => 'REUSED_VERIFIED', 'canonical_id' => $canonicalId, 'revision' => $revision, 'idempotent' => true]);
         return [
             'canonical_id' => $canonicalId,
@@ -813,6 +822,42 @@ final class GovernedCaptureContinuationService
             'reused' => true,
             'canonical_readback' => ['canonical_id' => $canonicalId, 'entity_type' => $kind === 'claim' ? 'knowledge' : $kind, 'active' => true, 'revision' => $revision],
         ];
+    }
+
+    /** @param array<string,mixed> $payload */
+    private function canonicalOwnerMatches(string $kind, string $canonicalId, array $payload): bool
+    {
+        if ($this->canonicalDependencies === null) return true;
+        try {
+            $owner = match ($kind) {
+                'source' => $this->canonicalDependencies->source($canonicalId),
+                'claim' => $this->canonicalDependencies->claim($canonicalId),
+                'evidence' => $this->canonicalDependencies->evidence($canonicalId),
+                default => null,
+            };
+            if ($owner === null) return false;
+            if ($kind === 'evidence') {
+                return $owner->claimId === (string) ($payload['claim_id'] ?? '')
+                    && $owner->sourceId === (string) ($payload['source_id'] ?? '');
+            }
+            return true;
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /** @param array<string,mixed> $plan */
+    private function evidenceRecoveryKey(array $plan): string
+    {
+        $payload = is_array($plan['payload'] ?? null) ? $plan['payload'] : [];
+        return 'video-provenance:evidence:canonical-recovery:' . hash('sha256', CommandCanonicalizer::canonicalize([
+            'source_id' => (string) ($payload['source_id'] ?? ''),
+            'claim_id' => (string) ($payload['claim_id'] ?? ''),
+            'excerpt' => (string) ($payload['excerpt'] ?? ''),
+            'relation' => (string) ($payload['relation'] ?? ''),
+            'locator' => $payload['locator'] ?? null,
+            'metadata' => is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [],
+        ]));
     }
 
     private function dependencyReadback(array $plan, string $kind, string $expectedId): bool

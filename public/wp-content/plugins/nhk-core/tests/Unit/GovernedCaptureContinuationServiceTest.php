@@ -9,18 +9,72 @@ use NHK\Core\Application\Capture\CaptureOrchestrationBudget;
 use NHK\Core\Application\Governance\StagingAcceptanceScopeVerifier;
 use NHK\Core\Application\Governance\{CaptureDependencyStagingAdmission, OperationScopedStagingGuard, VideoStagingAdmission};
 use NHK\Core\Application\Governance\GovernanceAutomationPolicyResolver;
+use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
 use NHK\Core\Application\Semantic\ClaimReusePolicy;
 use NHK\Core\Application\Video\{VideoEditorialGenerator, VideoEditorialResumePlanner, VideoSearchDocument, VideoSeoProjection, VideoService};
 use NHK\Core\Contracts\Governance\{AutomationPolicyStorage, GovernedLifecycle, PendingVideoProposalLookup, VideoProposalReconciliationPort};
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Governance\{Proposal, ProposalState};
 use NHK\Core\Domain\Video\Video;
+use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim, Source};
+use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
 use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Tests\Support\InMemoryAuthorityRepository;
 use PHPUnit\Framework\TestCase;
 
 final class GovernedCaptureContinuationServiceTest extends TestCase
 {
+    public function test_applied_evidence_receipt_is_not_reused_when_canonical_owner_is_missing(): void
+    {
+        $evidenceId = UuidCodec::newV7();
+        $claimId = UuidCodec::newV7();
+        $sourceId = UuidCodec::newV7();
+        $emptyClaims = new class implements KnowledgeRepository {
+            public function findByCanonicalId(string $id): ?KnowledgeClaim { return null; }
+            public function findByStableKey(string $stableKey): ?KnowledgeClaim { return null; }
+            public function create(KnowledgeClaim $claim): KnowledgeClaim { return $claim; }
+            public function update(KnowledgeClaim $claim, int $expectedRevision): KnowledgeClaim { return $claim; }
+            public function list(bool $includeRetired = false): array { return []; }
+        };
+        $emptySources = new class implements SourceRepository {
+            public function findByCanonicalId(string $id): ?Source { return null; }
+            public function findByStableKey(string $stableKey): ?Source { return null; }
+            public function create(Source $source): Source { return $source; }
+            public function update(Source $source, int $expectedRevision): Source { return $source; }
+            public function list(bool $includeRetired = false): array { return []; }
+        };
+        $emptyEvidence = new class implements EvidenceRepository {
+            public function findByCanonicalId(string $id): ?Evidence { return null; }
+            public function create(Evidence $evidence): Evidence { return $evidence; }
+            public function update(Evidence $evidence, int $expectedRevision): Evidence { return $evidence; }
+            public function listByClaim(string $claimId, bool $includeRetired = false): array { return []; }
+            public function listBySource(string $sourceId, bool $includeRetired = false): array { return []; }
+        };
+        $service = new GovernedCaptureContinuationService(
+            $this->createMock(GovernedLifecycle::class),
+            static fn (): array => [],
+            $this->policies(),
+            static fn (): bool => true,
+            canonicalDependencies: new CanonicalDependencyValidator($emptyClaims, $emptySources, $emptyEvidence),
+            videoDependencyState: static fn (): array => [
+                'evidence' => [['canonical_id' => $evidenceId, 'claim_id' => $claimId, 'source_id' => $sourceId, 'active' => true, 'revision' => 1]],
+            ],
+        );
+        $reuse = new \ReflectionMethod($service, 'reusedDependency');
+        $reuse->setAccessible(true);
+        $result = $reuse->invoke($service, [
+            'payload' => ['claim_id' => $claimId, 'source_id' => $sourceId],
+        ], [], 'evidence', 'VIDEO_EVIDENCE_GOVERNANCE');
+
+        self::assertNull($result);
+        $key = new \ReflectionMethod($service, 'evidenceRecoveryKey');
+        $key->setAccessible(true);
+        self::assertSame(
+            $key->invoke($service, ['payload' => ['claim_id' => $claimId, 'source_id' => $sourceId, 'excerpt' => 'x']]),
+            $key->invoke($service, ['payload' => ['source_id' => $sourceId, 'claim_id' => $claimId, 'excerpt' => 'x']]),
+        );
+    }
+
     public function test_video_plan_attaches_server_issued_scope_without_replacing_owner_subject_id(): void
     {
         $captureId = UuidCodec::newV7();
