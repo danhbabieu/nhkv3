@@ -1,5 +1,27 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-19 — Explicit Media metadata contract and shared attachment projection boundary (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE: Attachment transport, WordPress attachment projection, canonical
+Media metadata and contextual MediaUsage were represented by loosely shaped
+arrays. That made omitted fields indistinguishable from explicit clears and
+left the two attachment adapters at risk of drifting in title/alt/caption/
+description behavior.
+
+FIXED_BOUNDARY: Added `MediaMetadataContract` with explicit ABSENT/EMPTY/
+PROVIDED states and `WordPressAttachmentMetadataProjection` as the shared
+WordPress persistence/read-back boundary. Batch upload keeps transport fields
+outside that contract, applies only explicit application metadata, and verifies
+T/A/C/D read-back. Canonical Media and MediaUsage ownership are unchanged.
+
+REGRESSION: Added unit coverage for optional CREATE metadata, PATCH clear vs
+preserve semantics and fail-closed non-string metadata. The strict provided-
+file materializer boundary remains unchanged.
+
+STATUS: `MEDIA_METADATA_CONTRACT_FIXED_LOCAL / NO_LIVE_MUTATION / DEPLOYMENT_PENDING`.
+
+VERIFICATION: Focused Capture/Media/Governance/Video/Knowledge/Authority/Graph selection passed 1,037 tests / 4,396 assertions; Contract passed 6 tests / 48 assertions; full Unit reached 1,971 tests / 9,714 assertions with one unrelated pre-existing DemoCutover CLI expectation failure (`REMOTE_DEPLOYMENT_FAILED` versus `REMOTE_DEPLOYMENT_CONFIG_REQUIRED`). PHP lint and diff check pass. No staging/production data, deployment or live acceptance was performed.
+
 # Checkpoint — 2026-09-19 — Historical Video resume stale-proposal reconciliation fixed (LOCAL / NO LIVE MUTATION)
 
 ROOT_CAUSE: Capture resume re-entered an existing approved Video Proposal by

@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Media;
 
 use NHK\Core\Contracts\Media\{AtomicMediaBatchUploadRepository, MediaBatchUploadRepository, WordPressMediaAttachmentIngestor};
+use NHK\Core\Domain\Governance\CommandCanonicalizer;
 use NHK\Core\Infrastructure\Media\WpOptionMediaBatchUploadRepository;
 
 final class MediaBatchUploadService
@@ -25,7 +26,14 @@ final class MediaBatchUploadService
         if ($files === []) throw new \InvalidArgumentException('files is required.');
         if (count($files) > self::MAX_FILES) throw new \InvalidArgumentException('Too many files in batch.');
         $normalizedItems = $this->normalizeItems($items, count($files));
-        $fingerprint = hash('sha256', json_encode([$metadata, array_map([$this, 'fileFingerprint'], $files), $normalizedItems], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
+        // The batch idempotency receipt uses the same canonical normalization
+        // law as Governance scopes: associative keys are sorted recursively,
+        // list order remains meaningful, and null is not collapsed into absent.
+        $fingerprint = hash('sha256', CommandCanonicalizer::canonicalize([
+            'metadata' => $metadata,
+            'files' => array_map([$this, 'fileFingerprint'], $files),
+            'items' => $normalizedItems,
+        ]));
         $repository = $this->repository ?? new WpOptionMediaBatchUploadRepository();
         $existing = $repository instanceof AtomicMediaBatchUploadRepository
             ? $repository->claim($idempotencyKey, $fingerprint)
@@ -57,11 +65,14 @@ final class MediaBatchUploadService
                 $extension = strtolower((string) pathinfo($filename, PATHINFO_EXTENSION));
                 if (!in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true)) throw new \InvalidArgumentException('FILE_EXTENSION_INVALID');
                 $result = $this->ingestor->ingest($file, $filename, $title, PublicImageSizingPolicy::MAX_LONG_EDGE, PublicImageSizingPolicy::MAX_LONG_EDGE, PublicMediaAssetSelector::DEFAULT_WEBP_QUALITY);
+                $mediaContext = $this->mediaContext($item);
+                if ($mediaContext !== [] && method_exists($this->ingestor, 'applyMetadata')) {
+                    $result['attachment_metadata'] = $this->ingestor->applyMetadata((int) ($result['attachment_id'] ?? 0), $mediaContext);
+                }
                 $checksum = hash_file('sha256', (string) ($file['tmp_name'] ?? ''));
                 if (!is_string($checksum) || $checksum === '') throw new \RuntimeException('CHECKSUM_FAILED');
                 $manifestItem = array_merge($this->manifestItem($result, $checksum, $clientId), ['ordinal' => $index, 'sort_order' => (int) ($item['sort_order'] ?? $index)]);
                 if (is_array($item['visual_context'] ?? null)) $manifestItem['visual_context'] = $item['visual_context'];
-                $mediaContext = $this->mediaContext($item);
                 if ($mediaContext !== []) $manifestItem['media_context'] = $mediaContext;
                 if (!isset($mediaContext['title']) && trim((string) ($item['filename'] ?? $file['name'] ?? '')) !== '') $manifestItem['metadata_pending_title'] = true;
                 $results[] = $manifestItem;
@@ -101,8 +112,20 @@ final class MediaBatchUploadService
     /** @return list<array<string,mixed>> */
     private function normalizeItems(array $items, int $count): array
     {
-        $normalized = [];
-        for ($index = 0; $index < $count; $index++) $normalized[] = is_array($items[$index] ?? null) ? $items[$index] : [];
+        $normalized = array_fill(0, $count, []);
+        $used = [];
+        foreach (array_values($items) as $packet) {
+            if (!is_array($packet)) throw new \InvalidArgumentException('MEDIA_BATCH_ITEM_INVALID');
+            $ordinal = array_key_exists('ordinal', $packet) ? $packet['ordinal'] : null;
+            if ($ordinal !== null && (!is_int($ordinal) || $ordinal < 0 || $ordinal >= $count || isset($used[$ordinal]))) throw new \InvalidArgumentException('MEDIA_BATCH_ITEM_ORDINAL_INVALID');
+            $nextOrdinal = 0;
+            while (isset($used[$nextOrdinal])) $nextOrdinal++;
+            $target = $ordinal !== null ? $ordinal : $nextOrdinal;
+            if ($target === null || $target >= $count) throw new \InvalidArgumentException('MEDIA_BATCH_ITEM_MAPPING_INVALID');
+            $normalized[$target] = $packet;
+            $used[$target] = true;
+        }
+        if ($items !== [] && count($used) !== $count) throw new \InvalidArgumentException('MEDIA_BATCH_ITEMS_MUST_MAP_EVERY_FILE');
         return $normalized;
     }
 

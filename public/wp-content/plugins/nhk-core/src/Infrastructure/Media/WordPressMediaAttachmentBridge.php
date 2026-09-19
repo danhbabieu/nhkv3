@@ -172,6 +172,11 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
             }
         } finally { $this->controlledWriteDepth--; }
         $this->saveMapping($media, $asset, (int) $attachmentId);
+        if (is_array($context['attachment_metadata'] ?? null) && $context['attachment_metadata'] !== []) {
+            WordPressMediaAttachmentWriteGuard::enter();
+            try { (new WordPressAttachmentMetadataProjection())->apply((int) $attachmentId, $context['attachment_metadata']); }
+            finally { WordPressMediaAttachmentWriteGuard::leave(); }
+        }
         return $this->representation((int) $attachmentId, $asset, $contextualAlt);
     }
 

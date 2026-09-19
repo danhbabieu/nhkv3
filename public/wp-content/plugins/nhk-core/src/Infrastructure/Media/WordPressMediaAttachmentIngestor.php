@@ -205,6 +205,7 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
             'filesize' => (int) filesize($pathReal),
             'derivatives' => [],
         ];
+        $result['attachment_metadata'] = (new WordPressAttachmentMetadataProjection())->read($attachmentId) ?? [];
         if ($mapping !== null) {
             $result['mapping_status'] = (string) ($mapping['status'] ?? 'INCONSISTENT');
             $result['media_id'] = $mapping['media_id'] ?? null;
@@ -228,6 +229,17 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
             ];
         }
         return $result;
+    }
+
+    /** @param array<string,mixed> $metadata @return array<string,string> */
+    public function applyMetadata(int $attachmentId, array $metadata): array
+    {
+        WordPressMediaAttachmentWriteGuard::enter();
+        try {
+            return (new WordPressAttachmentMetadataProjection())->apply($attachmentId, $metadata);
+        } finally {
+            WordPressMediaAttachmentWriteGuard::leave();
+        }
     }
 
     private function safeFilename(string $filename, string $title, string $source): string
