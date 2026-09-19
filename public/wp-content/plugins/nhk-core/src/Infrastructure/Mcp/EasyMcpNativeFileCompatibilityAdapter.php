@@ -91,7 +91,11 @@ final class EasyMcpNativeFileCompatibilityAdapter
             // only the NHK-owned descriptor fields that its serializer omitted.
             $tool['description'] = $canonical['description'];
             $tool['inputSchema'] = $canonical['inputSchema'];
-            $tool['_meta'] = $canonical['connectorMeta'] ?? [];
+            if (is_array($canonical['connectorMeta'] ?? null) && $canonical['connectorMeta'] !== [] && !array_is_list($canonical['connectorMeta'])) {
+                $tool['_meta'] = $canonical['connectorMeta'];
+            } else {
+                unset($tool['_meta']);
+            }
             $tools[$index] = $tool;
         }
 

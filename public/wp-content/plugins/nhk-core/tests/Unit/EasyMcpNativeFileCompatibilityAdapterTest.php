@@ -91,8 +91,7 @@ final class EasyMcpNativeFileCompatibilityAdapterTest extends TestCase
         self::assertSame(['idempotency_key', 'files'], $widget['inputSchema']['required']);
         self::assertArrayNotHasKey('required', $widget['inputSchema']['properties']['metadata']);
         self::assertArrayHasKey('items', $widget['inputSchema']['properties']);
-        self::assertSame([], $widget['_meta']);
-        self::assertArrayNotHasKey('openai/fileParams', $widget['_meta']);
+        self::assertArrayNotHasKey('_meta', $widget);
         self::assertSame(['download_url', 'file_id'], $widget['inputSchema']['properties']['files']['items']['required']);
     }
 

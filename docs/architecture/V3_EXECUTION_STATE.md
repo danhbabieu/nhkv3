@@ -1,5 +1,22 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-19 — Easy MCP canonical projection no longer reintroduces empty metadata (LOCAL / NO LIVE DEPLOY)
+
+ROOT_CAUSE_REFINED: The global empty-metadata normalization still reintroduced
+`_meta: []` for the canonical widget-upload descriptor when its catalog entry
+had no connector metadata. This can produce the exact strict-client failure at
+an arbitrary tool index, including `tools.43._meta`.
+
+FIXED_BOUNDARY: Canonical descriptors now emit `_meta` only when connector
+metadata is a non-empty associative object; otherwise the field is removed.
+No ability, authorization, operation or semantic data boundary changed.
+
+VERIFICATION: Easy MCP adapter unit suite passed 25 tests / 83 assertions;
+`git diff --check` passed. No live deployment, OAuth mutation or production
+data mutation performed.
+
+STATUS: `EASY_MCP_CANONICAL_EMPTY_META_FIXED_LOCAL / DEPLOYMENT_PENDING`.
+
 # Checkpoint — 2026-09-19 — Easy MCP full tools-list normalization fixed locally (NO LIVE DEPLOY)
 
 ROOT_CAUSE_REFINED: The first empty `_meta` repair was gated on the presence
