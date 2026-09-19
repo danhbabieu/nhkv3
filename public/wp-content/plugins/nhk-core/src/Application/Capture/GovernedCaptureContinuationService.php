@@ -300,7 +300,7 @@ final class GovernedCaptureContinuationService
                 'locator' => isset($source['locator']) ? (string) $source['locator'] : null,
                 'metadata' => is_array($source['metadata'] ?? null) ? $source['metadata'] : [],
             ];
-            $plans[] = $this->arguments('source', 'ingest', $stableKey, $payload, 'capture:' . $captureId . ':source:' . hash('sha256', CommandCanonicalizer::canonicalize($payload)));
+            $plans[] = $this->scopeDependencyPlan($captureId, $this->arguments('source', 'ingest', $stableKey, $payload, 'capture:' . $captureId . ':source:' . hash('sha256', CommandCanonicalizer::canonicalize($payload))));
         }
         foreach ((array) ($context['provenance_packets']['evidence'] ?? []) as $evidence) {
             if (!is_array($evidence)) continue;
@@ -316,7 +316,7 @@ final class GovernedCaptureContinuationService
                 'locator' => isset($evidence['locator']) ? (string) $evidence['locator'] : null,
                 'metadata' => is_array($evidence['metadata'] ?? null) ? $evidence['metadata'] : [],
             ];
-            $plans[] = $this->arguments('evidence', 'ingest', $claimId, $payload, 'capture:' . $captureId . ':evidence:' . hash('sha256', CommandCanonicalizer::canonicalize($payload)));
+            $plans[] = $this->scopeDependencyPlan($captureId, $this->arguments('evidence', 'ingest', $claimId, $payload, 'capture:' . $captureId . ':evidence:' . hash('sha256', CommandCanonicalizer::canonicalize($payload))));
         }
         if ($includeSemanticChildren && $articleId > 0 && $articleEndpoint !== '' && in_array($intent, ['TEXT_ARTICLE', 'IMAGE_ARTICLE'], true) && UuidCodec::isValid((string) ($primary['id'] ?? '')) && trim((string) ($primary['type'] ?? '')) !== '') {
             // Article subject binding is a normal governed Graph child. The
@@ -360,6 +360,7 @@ final class GovernedCaptureContinuationService
                 ];
                 $knowledgePlan = $this->arguments('knowledge', 'ingest', (string) $subject['id'], $payload, 'capture:' . $captureId . ':knowledge:' . hash('sha256', (string) $payload['stable_key']));
                 $knowledgePlan['candidate_id'] = 'knowledge-candidate-' . hash('sha256', (string) $payload['stable_key']);
+                $knowledgePlan = $this->scopeDependencyPlan($captureId, $knowledgePlan);
                 $plans[] = $knowledgePlan;
                 // A Knowledge claim is not semantically attached merely by
                 // carrying subject_id. Its canonical about edge is a second,
@@ -539,6 +540,7 @@ final class GovernedCaptureContinuationService
         $scope = ($this->dependencyScopeIssuer)($captureId, $plan);
         if (!is_array($scope)) throw new \RuntimeException('STAGING_SCOPE_REQUIRED');
         $plan['payload']['capture_fingerprint'] = (string) ($scope['capture_fingerprint'] ?? '');
+        $plan['payload']['capture_revision'] = (int) ($scope['capture_revision'] ?? 0);
         $plan['payload']['proposal_command_fingerprint'] = (string) ($scope['proposal_command_fingerprint'] ?? '');
         $plan['payload']['staging_acceptance'] = $scope;
         return $plan;
@@ -697,7 +699,14 @@ final class GovernedCaptureContinuationService
             $writes[] = $this->classifiedFailure((array) ($complete['video_proposal'] ?? []), $error);
             return;
         }
-        $videoProposal = $this->scopeVideoPlan($this->currentCaptureId, (array) ($complete['video_proposal'] ?? []), []);
+        $videoProposal = (array) ($complete['video_proposal'] ?? []);
+        // The dependency-complete command is a new governed semantic
+        // identity. Do not carry the historical/pending child key into a
+        // payload that now contains canonical Evidence-backed attachments.
+        // This remains deterministic so an identical final command reuses
+        // its Proposal, while a legitimate semantic change gets a new key.
+        $videoProposal['idempotency_key'] = $this->finalVideoCommandIdempotencyKey($this->currentCaptureId, $videoProposal);
+        $videoProposal = $this->scopeVideoPlan($this->currentCaptureId, $videoProposal, []);
         $videoWrite = $this->runGovernedChild($videoProposal, $control, $lifecycle, 'VIDEO_GOVERNANCE');
         $videoWrite['evidence_handoff'] = [
             'source_id' => $canonicalIds[0],
@@ -706,6 +715,27 @@ final class GovernedCaptureContinuationService
             'relation_evidence_refs' => [['evidence_id' => $evidenceId]],
         ];
         array_push($writes, ...array_merge($allWrites, [$videoWrite]));
+    }
+
+    /** @param array<string,mixed> $plan */
+    private function finalVideoCommandIdempotencyKey(string $captureId, array $plan): string
+    {
+        $payload = is_array($plan['payload'] ?? null) ? $plan['payload'] : [];
+        foreach (['staging_acceptance', 'capture_fingerprint', 'scope_fingerprint', 'proposal_command_fingerprint'] as $volatile) {
+            unset($payload[$volatile]);
+        }
+        $canonicalId = trim((string) ($payload['canonical_id'] ?? $plan['subject_id'] ?? ''));
+        $binding = [
+            'capture_id' => $captureId,
+            'operation' => (string) ($plan['operation'] ?? 'ingest'),
+            'entity_type' => (string) ($plan['entity_type'] ?? 'video'),
+            'canonical_id' => $canonicalId,
+            'target_uuid' => $plan['target_uuid'] ?? null,
+            'expected_revision' => $plan['expected_revision'] ?? null,
+            'payload' => $payload,
+            'dependency_ids' => array_values(array_map('strval', (array) ($plan['dependency_ids'] ?? []))),
+        ];
+        return 'video-governed:' . hash('sha256', CommandCanonicalizer::canonicalize($binding));
     }
 
     /** @return array<string,mixed> */

@@ -508,6 +508,82 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
         self::assertSame(['canonical_id' => 'claim-1', 'entity_type' => 'knowledge', 'active' => true, 'revision' => 1], $result['writes'][0]['canonical_readback']);
     }
 
+    public function test_production_shaped_knowledge_delta_scopes_two_candidates_from_persisted_capture_and_rejects_tampering(): void
+    {
+        $captureId = UuidCodec::newV7();
+        $subjectId = UuidCodec::newV7();
+        $capture = new \NHK\Core\Domain\Capture\CaptureRecord(
+            $captureId,
+            'live-shaped:knowledge-delta',
+            hash('sha256', 'live-shaped:knowledge-delta'),
+            'SEMANTICS_RECONCILED',
+            'IN_PROGRESS',
+            context: ['purpose' => 'EDITORIAL', 'content_intent' => ['intent' => 'KNOWLEDGE_DELTA']],
+            revision: 3,
+        );
+        $admission = static fn (array $scope, \NHK\Core\Domain\Capture\CaptureRecord $record, array $input, array $assets): bool
+            => (new CaptureDependencyStagingAdmission())(false, $scope, $record, $input, $assets);
+        $verifier = new StagingAcceptanceScopeVerifier(static fn (): string => 'staging', 'test-secret', $admission, can: static fn (): bool => true);
+        $proposals = [];
+        $governance = new class($proposals) implements GovernedLifecycle {
+            public function __construct(private array &$proposals) {}
+            public function createFromArguments(array $arguments): Proposal
+            {
+                $id = UuidCodec::newV7();
+                $proposal = new Proposal($id, (string) $arguments['subject_id'], (string) $arguments['operation'], (array) $arguments['payload'], 'content', $arguments['expected_revision'] ?? null, 'dependency', ProposalState::APPROVED, idempotencyKey: (string) $arguments['idempotency_key'], targetUuid: null, entityType: (string) $arguments['entity_type']);
+                $this->proposals[$id] = $proposal;
+                return $proposal;
+            }
+            public function submit(string $id): Proposal { return $this->proposals[$id]; }
+            public function review(string $id): array { $p = $this->proposals[$id]; return ['state' => 'approved', 'entity_type' => $p->entityType, 'operation' => $p->operation, 'subject_id' => $p->subjectId, 'target_uuid' => $p->targetUuid, 'payload' => $p->payload, 'content_fingerprint' => $p->contentFingerprint, 'dependency_fingerprint' => $p->dependencyFingerprint]; }
+            public function approve(string $id, string $contentFingerprint, string $dependencyFingerprint, string $actor): Proposal { return $this->proposals[$id]; }
+            public function eligibility(string $id): array { return ['ready' => true]; }
+        };
+        $service = new GovernedCaptureContinuationService(
+            $governance,
+            static function (string $proposalId) use (&$proposals, $verifier): array {
+                $proposal = $proposals[$proposalId];
+                if ($proposal->entityType === 'knowledge') (new OperationScopedStagingGuard(static fn (): string => 'staging', static fn (): bool => true, scopeVerifier: [$verifier, 'verifyProposal']))->assertAllowed($proposal);
+                return ['canonical_id' => UuidCodec::newV7(), 'canonical_readback' => ['canonical_id' => UuidCodec::newV7(), 'entity_type' => $proposal->entityType, 'active' => true, 'revision' => 1]];
+            },
+            $this->policies(['knowledge', 'relation'], ['knowledge' => 'AUTO_PUBLISH', 'relation' => 'AUTO_PUBLISH']),
+            static fn (): bool => true,
+            dependencyScopeIssuer: static function (string $id, array $plan) use ($verifier, $capture): array { return $verifier->issueForCaptureDependencyPlan($capture, $plan); },
+        );
+
+        $result = $service->execute($captureId, 'capture:knowledge-delta', [
+            'content_intent' => ['intent' => 'KNOWLEDGE_DELTA'],
+            'subject_resolution' => ['primary' => ['id' => $subjectId, 'type' => 'classification', 'revision' => 3], 'resolved' => [['id' => $subjectId, 'type' => 'classification', 'revision' => 3]]],
+            'interpretation' => ['user_claim_candidates' => [
+                ['text' => 'Mặt số màu xanh.', 'facet' => 'identity', 'provenance' => 'EXPLICIT_USER_KNOWLEDGE'],
+                ['text' => 'Có lịch đánh chuông theo giờ.', 'facet' => 'identity', 'provenance' => 'EXPLICIT_USER_KNOWLEDGE'],
+            ]],
+            'observations' => [],
+        ]);
+
+        self::assertSame('APPLIED', $result['status'], json_encode($result, JSON_UNESCAPED_UNICODE));
+        $knowledge = array_values(array_filter($proposals, static fn (Proposal $proposal): bool => $proposal->entityType === 'knowledge'));
+        self::assertCount(2, $knowledge);
+        foreach ($knowledge as $proposal) {
+            self::assertSame($captureId, $proposal->payload['capture_id']);
+            self::assertSame(3, $proposal->payload['capture_revision']);
+            self::assertArrayHasKey('staging_acceptance', $proposal->payload);
+            self::assertNotSame('MISSING_PARENT_PROVENANCE', $result['blockers'][0] ?? null);
+        }
+
+        $original = $knowledge[0];
+        $mutations = [
+            static function (Proposal $p): Proposal { $payload = $p->payload; $payload['capture_id'] = UuidCodec::newV7(); return new Proposal($p->id, $p->subjectId, $p->operation, $payload, $p->contentFingerprint, $p->expectedRevision, $p->dependencyFingerprint, $p->state, idempotencyKey: $p->idempotencyKey, entityType: $p->entityType, targetUuid: $p->targetUuid); },
+            static function (Proposal $p): Proposal { $payload = $p->payload; $payload['capture_revision'] = 99; return new Proposal($p->id, $p->subjectId, $p->operation, $payload, $p->contentFingerprint, $p->expectedRevision, $p->dependencyFingerprint, $p->state, idempotencyKey: $p->idempotencyKey, entityType: $p->entityType, targetUuid: $p->targetUuid); },
+            static function (Proposal $p): Proposal { $payload = $p->payload; $payload['text'] = 'tampered'; return new Proposal($p->id, $p->subjectId, $p->operation, $payload, $p->contentFingerprint, $p->expectedRevision, $p->dependencyFingerprint, $p->state, idempotencyKey: $p->idempotencyKey, entityType: $p->entityType, targetUuid: $p->targetUuid); },
+            static function (Proposal $p): Proposal { return new Proposal($p->id, UuidCodec::newV7(), $p->operation, $p->payload, $p->contentFingerprint, $p->expectedRevision, $p->dependencyFingerprint, $p->state, idempotencyKey: $p->idempotencyKey, entityType: $p->entityType, targetUuid: $p->targetUuid); },
+        ];
+        foreach ($mutations as $mutate) self::assertFalse($verifier->verifyProposal($original->payload['staging_acceptance'], $mutate($original)));
+        $tamperedScope = $original->payload['staging_acceptance'];
+        $tamperedScope['fingerprint'] = hash('sha256', 'changed-scope');
+        self::assertFalse($verifier->verifyProposal($tamperedScope, $original));
+    }
+
     public function test_auto_publish_submits_video_proposal_from_capture_asset_without_duplicate_writer(): void
     {
         $videoId = UuidCodec::newV7();

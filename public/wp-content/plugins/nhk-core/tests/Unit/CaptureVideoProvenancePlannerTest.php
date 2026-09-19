@@ -656,6 +656,43 @@ final class CaptureVideoProvenancePlannerTest extends TestCase
         self::assertSame([['evidence_id' => $ids[2]]], $created[3]['payload']['metadata']['semantic_attachments'][0]['evidence_refs']);
     }
 
+    public function test_final_video_command_identity_changes_after_evidence_and_reuses_for_same_final_payload(): void
+    {
+        $service = new GovernedCaptureContinuationService(
+            $this->createMock(GovernedLifecycle::class),
+            static fn (): array => [],
+            new GovernanceAutomationPolicyResolver([], new class implements AutomationPolicyStorage {
+                public function read(): array { return []; }
+                public function write(array $policies): void {}
+            }),
+            static fn (): bool => true,
+        );
+        $method = new \ReflectionMethod($service, 'finalVideoCommandIdempotencyKey');
+        $method->setAccessible(true);
+        $stale = [
+            'operation' => 'ingest',
+            'entity_type' => 'video',
+            'subject_id' => self::VARIANT,
+            'idempotency_key' => 'capture:historical:video',
+            'payload' => ['canonical_id' => self::VARIANT, 'metadata' => ['semantic_attachments' => []]],
+        ];
+        $final = $stale;
+        $final['payload']['metadata']['semantic_attachments'] = [[
+            'predicate' => 'about',
+            'target_type' => 'variant',
+            'target_uuid' => self::VARIANT,
+            'evidence_refs' => [['evidence_id' => '33333333-3333-4333-8333-333333333333']],
+        ]];
+
+        $staleKey = (string) $method->invoke($service, '01a0b76f-50e6-7b03-bf12-bf318ea20c7e', $stale);
+        $finalKey = (string) $method->invoke($service, '01a0b76f-50e6-7b03-bf12-bf318ea20c7e', $final);
+        $retryKey = (string) $method->invoke($service, '01a0b76f-50e6-7b03-bf12-bf318ea20c7e', $final);
+
+        self::assertNotSame($stale['idempotency_key'], $finalKey);
+        self::assertNotSame($staleKey, $finalKey);
+        self::assertSame($finalKey, $retryKey);
+    }
+
     public function test_capture_video_governed_dependency_e2e_reuses_source_and_reads_back_one_canonical_chain(): void
     {
         $subjectId = '30515de5-efe5-48e1-aec5-34130509a4dc';

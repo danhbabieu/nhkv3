@@ -29,6 +29,7 @@ final class CaptureDependencyStagingAdmission
             || ($scope['entrypoint'] ?? '') !== 'nhk.capture.ingest'
             || ($scope['capture_id'] ?? '') !== $capture->captureId
             || ($scope['capture_fingerprint'] ?? '') !== $capture->requestFingerprint
+            || (int) ($scope['capture_revision'] ?? 0) !== $capture->revision
             || !in_array((string) ($scope['operation_family'] ?? ''), ['source_evidence_reconciliation', 'knowledge_delta'], true)
             || !in_array((string) ($scope['entity_type'] ?? ''), ['source', 'knowledge', 'evidence'], true)
             || !in_array((string) ($scope['operation'] ?? ''), ['ingest', 'create', 'update'], true)) { $this->lastReason = 'DEPENDENCY_OPERATION_NOT_ALLOWED'; return false; }

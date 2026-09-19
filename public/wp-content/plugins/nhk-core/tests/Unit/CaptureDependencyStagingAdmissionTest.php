@@ -18,7 +18,7 @@ final class CaptureDependencyStagingAdmissionTest extends TestCase
         $capture = new CaptureRecord($captureId, 'video-' . $subjectType, $fingerprint, 'SEMANTICS_RECONCILED', 'IN_PROGRESS', context: [
             'purpose' => 'EDITORIAL',
             'content_intent' => ['intent' => 'VIDEO'],
-        ]);
+        ], revision: 1);
         $scope = [
             'approved' => true,
             'environment' => 'staging',
@@ -32,6 +32,7 @@ final class CaptureDependencyStagingAdmissionTest extends TestCase
             'plan_fingerprint' => hash('sha256', 'plan-' . $subjectType),
             'proposal_command_fingerprint' => hash('sha256', 'command-' . $subjectType),
             'payload_fingerprint' => hash('sha256', 'payload-' . $subjectType),
+            'capture_revision' => 1,
             'expected_revision' => 0,
         ];
 
@@ -57,7 +58,7 @@ final class CaptureDependencyStagingAdmissionTest extends TestCase
         $capture = new CaptureRecord(UuidCodec::newV7(), 'knowledge', hash('sha256', 'knowledge'), 'SEMANTICS_RECONCILED', 'IN_PROGRESS', context: [
             'purpose' => 'EDITORIAL',
             'content_intent' => ['intent' => 'KNOWLEDGE_DELTA'],
-        ]);
+        ], revision: 1);
         $scope = [
             'approved' => true,
             'environment' => 'staging',
@@ -71,6 +72,7 @@ final class CaptureDependencyStagingAdmissionTest extends TestCase
             'plan_fingerprint' => str_repeat('a', 64),
             'proposal_command_fingerprint' => str_repeat('b', 64),
             'payload_fingerprint' => str_repeat('c', 64),
+            'capture_revision' => 1,
             'expected_revision' => 0,
         ];
         $admission = new CaptureDependencyStagingAdmission();

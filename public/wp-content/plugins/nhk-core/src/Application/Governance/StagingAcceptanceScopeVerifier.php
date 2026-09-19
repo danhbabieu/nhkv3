@@ -146,6 +146,11 @@ final class StagingAcceptanceScopeVerifier
         if ($this->secret() === '') throw new \RuntimeException('STAGING_SCOPE_SIGNING_KEY_REQUIRED');
         $this->requireCapability();
         if (!is_callable($this->admission)) throw new \RuntimeException('STAGING_SCOPE_ADMISSION_REQUIRED');
+        // Parent provenance is server-derived from the persisted Capture. The
+        // caller supplies only the child command; Capture revision must be
+        // inside the signed child payload before its fingerprint is computed.
+        $plan['payload'] = is_array($plan['payload'] ?? null) ? $plan['payload'] : [];
+        $plan['payload']['capture_revision'] = $capture->revision;
         $descriptor = StagingOperationDescriptor::fromPlan($plan, $capture->captureId, $capture->requestFingerprint);
         if (!in_array($descriptor->entityType, ['source', 'knowledge', 'evidence'], true) || !in_array($descriptor->operation, ['ingest', 'create', 'update'], true)) throw new \RuntimeException('STAGING_DEPENDENCY_OPERATION_INVALID');
         $family = $descriptor->operationFamily;
@@ -153,7 +158,7 @@ final class StagingAcceptanceScopeVerifier
         $planFingerprint = hash('sha256', CommandCanonicalizer::canonicalize(StagingOperationDescriptor::withoutAuthorization($plan)));
         $base = [
             'approved' => true, 'environment' => 'staging', 'capture_id' => $capture->captureId,
-            'capture_fingerprint' => $capture->requestFingerprint, 'request_fingerprint' => $capture->requestFingerprint,
+            'capture_fingerprint' => $capture->requestFingerprint, 'capture_revision' => $capture->revision, 'request_fingerprint' => $capture->requestFingerprint,
             'semantic_write_policy' => 'PROJECT_BUILD', 'operation_family' => $family,
             'entity_type' => $descriptor->entityType, 'operation' => $descriptor->operation, 'writer' => 'canonical_governed',
             'entrypoint' => 'nhk.capture.ingest', 'canonical_entrypoint' => 'nhk.capture.ingest',

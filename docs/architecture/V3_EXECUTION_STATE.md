@@ -14798,3 +14798,56 @@ PHP lint and `git diff --check` pass. No staging or production mutation,
 deployment, pull, fetch or push was performed.
 
 STATUS=`LOCAL_READY / DEPLOYMENT_PENDING / LIVE_ACCEPTANCE_PENDING`.
+
+# Checkpoint — 2026-09-19 — Video governed command idempotency hardening (LOCAL / DEPLOYMENT PENDING)
+
+SCOPE: Final Capture-owned Video commands now derive a deterministic
+Capture + canonical Video + final payload identity after Evidence-backed
+attachment reconciliation. Historical Video Proposal keys are not reused for
+semantically different replacement commands; approved historical proposals
+remain immutable and are superseded through the existing Governance path.
+
+VERIFICATION: Focused Proposal/Video reconciliation, Capture resume,
+Governance, staging admission and tamper suites pass. Unit suite passes with
+existing warnings/deprecations. Full PHPUnit remains environment-gated by the
+local WordPress/MySQL bootstrap (`NHK_WP_TEST_PATH=public` required); no live
+runtime, staging data or external endpoint was accessed.
+
+STATUS=`LOCAL_READY / DEPLOYMENT_PENDING / LIVE_ACCEPTANCE_PENDING`.
+
+# Checkpoint — 2026-09-19 — Editorial Knowledge Delta child provenance admission fixed (LOCAL / NO LIVE MUTATION)
+
+LIVE_FAILURE_REPRODUCED_LOCALLY=`KNOWLEDGE_DELTA → STAGING_SCOPE_REQUIRED → MISSING_PARENT_PROVENANCE`.
+
+ROOT_CAUSE: Production-shaped Source/Knowledge/Evidence plans created by
+`GovernedCaptureContinuationService::plans()` bypassed the existing
+`scopeDependencyPlan()` seam. That seam was only used by Video provenance
+children, so the Knowledge candidate reached Governance without the
+Capture-bound server-issued staging packet. Local fixtures previously passed
+because they injected already-scoped child commands or bypassed the real
+coordinator continuation seam.
+
+FIXED_BOUNDARY: Every Capture-owned Source, Knowledge and Evidence child now
+enters the shared dependency scope issuer before Proposal creation. The issuer
+binds `capture_id`, request fingerprint and persisted Capture revision into the
+authorization-free command fingerprint; the admission, scope verifier and
+OperationScopedStagingGuard continue to require exact operation/entity,
+payload and Proposal fingerprints. No client-supplied parent provenance is
+accepted.
+
+REGRESSION: Added the exact production-shaped Editorial Capture
+`KNOWLEDGE_DELTA` path with no Article/Media, canonical Classification subject,
+two Knowledge candidates, Proposal creation and Controlled Apply. Added
+fail-closed tamper checks for capture ID, Capture revision, Knowledge payload,
+canonical subject and signed scope fingerprint. Source/Evidence child
+construction is covered through the same dependency seam and the existing
+Video dependency path remains green.
+
+VERIFICATION: Focused Capture/Knowledge/Staging/Governance/Source/Evidence
+suite passes 99 tests / 500 assertions. Full Unit passes 1,981 tests / 9,753
+assertions with existing warnings/deprecations only. Contract passes 6 tests /
+48 assertions. Changed-file PHP lint, `git diff --check` and secret review
+pass. No live/staging data was mutated; no commit, push or deployment was
+performed.
+
+STATUS=`KNOWLEDGE_DELTA_CAPTURE_PROVENANCE_LOCAL_FIXED / DEPLOYMENT_PENDING / OPERATOR_COMMIT_REQUIRED`.

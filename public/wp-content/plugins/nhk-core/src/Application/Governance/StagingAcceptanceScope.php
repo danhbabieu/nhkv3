@@ -138,6 +138,7 @@ final class StagingAcceptanceScope
         if (in_array($expectedFamily, ['source_evidence_reconciliation', 'knowledge_delta'], true)) {
             if (!hash_equals($captureId, (string) ($proposal->payload['capture_id'] ?? ''))
                 || !hash_equals((string) ($scope['capture_fingerprint'] ?? ''), (string) ($proposal->payload['capture_fingerprint'] ?? ''))
+                || (int) ($scope['capture_revision'] ?? 0) !== (int) ($proposal->payload['capture_revision'] ?? 0)
                 || (string) ($scope['entity_type'] ?? '') !== $proposal->entityType
                 || (string) ($scope['operation'] ?? '') !== $proposal->operation
                 || (string) ($scope['subject_id'] ?? '') !== $proposal->subjectId

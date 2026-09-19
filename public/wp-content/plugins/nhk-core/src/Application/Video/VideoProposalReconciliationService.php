@@ -164,10 +164,20 @@ final class VideoProposalReconciliationService implements VideoProposalReconcili
         $payload = is_array($video['payload'] ?? null) ? $video['payload'] : [];
         unset($payload['staging_acceptance'], $payload['capture_fingerprint'], $payload['scope_fingerprint'], $payload['proposal_command_fingerprint']);
         $captureId = trim((string) ($original->payload['capture_id'] ?? ''));
+        $commandFingerprint = hash('sha256', CommandCanonicalizer::canonicalize([
+            'capture_id' => $captureId,
+            'operation' => 'ingest',
+            'entity_type' => 'video',
+            'canonical_id' => $canonicalId,
+            'target_uuid' => $this->videos->findByCanonicalId($canonicalId) ? $canonicalId : null,
+            'expected_revision' => $this->videos->findByCanonicalId($canonicalId)?->revision,
+            'payload' => $payload,
+            'dependency_ids' => $dependencyIds,
+        ]));
         $plan = [
             'operation' => 'ingest', 'entity_type' => 'video', 'subject_id' => $canonicalId, 'target_uuid' => $this->videos->findByCanonicalId($canonicalId) ? $canonicalId : null,
             'expected_revision' => $this->videos->findByCanonicalId($canonicalId)?->revision, 'dependency_ids' => $dependencyIds,
-            'payload' => $payload, 'idempotency_key' => 'video-reconcile:' . $original->id . ':' . hash('sha256', CommandCanonicalizer::canonicalize([$canonicalId, $dependencyIds, $payload])),
+            'payload' => $payload, 'idempotency_key' => 'video-governed:' . $commandFingerprint,
         ];
         // A replacement is a new governed command. If it resumes from
         // Capture, issue a fresh scope only after the Evidence-backed final
