@@ -20,6 +20,9 @@ final readonly class EditorialPostState
         public int $latestRevisionId,
         public int $revisionCount,
         public string $modifiedGmt = '',
+        /** @var list<int> */
+        public array $categoryIds = [],
+        public ?int $featuredAttachmentId = null,
     ) {
         $this->token = EditorialStateToken::fromState($this->snapshot());
     }
@@ -39,6 +42,8 @@ final readonly class EditorialPostState
             'modified_gmt' => $this->modifiedGmt,
             'latest_revision_id' => $this->latestRevisionId,
             'revision_count' => $this->revisionCount,
+            'category_ids' => $this->categoryIds,
+            'featured_attachment_id' => $this->featuredAttachmentId,
         ];
     }
 }

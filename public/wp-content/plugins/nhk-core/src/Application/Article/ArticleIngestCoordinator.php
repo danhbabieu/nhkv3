@@ -54,7 +54,7 @@ final class ArticleIngestCoordinator
         }
         $operationId = (string) ($input['operation_id'] ?? UuidCodec::newV7());
         $intent = (string) ($input['intent'] ?? '');
-        if ($intent !== 'reconcile') return $this->receipts->create(new ArticleOperationReceipt($operationId, $key, $fingerprint, in_array($intent, ['create', 'update'], true) ? $intent : 'update', null, null, 'complete', ArticleIngestOutcome::UNSUPPORTED_OPERATION, false));
+        if (!in_array($intent, ['reconcile', 'update'], true)) return $this->receipts->create(new ArticleOperationReceipt($operationId, $key, $fingerprint, in_array($intent, ['create', 'update'], true) ? $intent : 'update', null, null, 'complete', ArticleIngestOutcome::UNSUPPORTED_OPERATION, false));
         $target = is_array($input['target_wp_post'] ?? null) ? $input['target_wp_post'] : [];
         $endpoint = (string) ($target['endpoint_key'] ?? '');
         $postId = preg_match('/^[1-9][0-9]*:([1-9][0-9]*)$/', $endpoint, $match) === 1 ? (int) $match[1] : null;
@@ -259,7 +259,7 @@ final class ArticleIngestCoordinator
     private function editorialFields(array $input): array
     {
         $fields = is_array($input['fields'] ?? null) ? $input['fields'] : $input;
-        $allowed = ['post_title', 'post_content', 'post_excerpt', 'post_name'];
+        $allowed = ['post_title', 'post_content', 'post_excerpt', 'post_name', 'category_ids', 'featured_media_id'];
         $result = [];
         foreach ($allowed as $field) if (array_key_exists($field, $fields)) $result[$field] = (string) $fields[$field];
         return $result;
@@ -269,8 +269,8 @@ final class ArticleIngestCoordinator
     private function editorialFingerprint(\NHK\Core\Domain\Article\EditorialPostState $state, array $fields): string
     {
         $values = [];
-        foreach (['post_title' => $state->title, 'post_content' => $state->content, 'post_excerpt' => $state->excerpt, 'post_name' => $state->slug] as $field => $current) {
-            if (array_key_exists($field, $fields)) $values[$field] = (string) $fields[$field];
+        foreach (['post_title' => $state->title, 'post_content' => $state->content, 'post_excerpt' => $state->excerpt, 'post_name' => $state->slug, 'category_ids' => $state->categoryIds, 'featured_media_id' => $state->featuredAttachmentId] as $field => $current) {
+            if (array_key_exists($field, $fields)) $values[$field] = is_array($fields[$field]) ? array_values(array_map('intval', $fields[$field])) : (string) $fields[$field];
         }
         return hash('sha256', CommandCanonicalizer::canonicalize($values));
     }

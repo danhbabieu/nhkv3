@@ -156,7 +156,8 @@ The receipt is orchestration/recovery state and never stores the full Article
 body. Semantic writes remain behind Governance and Controlled Apply.
 
 `nhk.article.preflight` is read-only; `nhk.article.ingest` remains the governed
-execute/resume surface for reconciliation. The separate typed editorial gateway
+execute/resume surface for reconciliation and bounded updates of an existing
+Post. The separate typed editorial gateway
 supports draft creation and bounded partial update of an existing draft or
 already-public Post with native state-token CAS; it does not publish, trash,
 apply semantic proposals, ingest

@@ -1065,6 +1065,15 @@ and rendered-public read-back pass.
 
 ## 17. Article Ingest implementation status
 
+`nhk.article.ingest` accepts `reconcile` and bounded `update` for an existing
+`wp_post`. `update` does not create a Post and does not expose arbitrary native
+WordPress fields: title, body, excerpt, slug, category IDs and featured
+attachment identity are allowlisted and protected by the current editorial
+state-token CAS. Category/featured mutations are read back before completion.
+For a Capture-owned Article, the normal operator continuation remains
+`nhk.capture.ingest`/the existing Capture addendum path; this Article surface is
+the internal/admin lifecycle owner used by that orchestration.
+
 The Article coordinator, durable receipt, deterministic child proposal planner,
 read-only editorial token, verification reader and diagnostic reader are
 implemented under the approved operation-level contract. The receipt table is

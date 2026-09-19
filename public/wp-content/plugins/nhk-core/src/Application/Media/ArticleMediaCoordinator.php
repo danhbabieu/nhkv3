@@ -337,7 +337,8 @@ final class ArticleMediaCoordinator
             'preferred_aspect' => $blueprint['preferred_aspect'] ?? null,
             'video_thumbnail_fallback' => $fallback,
             'user_upload_preferred' => $featuredMissing,
-            'user_upload_required' => $featuredMissing && $fallback === null,
+            'user_upload_required' => strtoupper(trim((string) ($context['content_intent']['intent'] ?? 'TEXT_ARTICLE'))) === 'IMAGE_ARTICLE' && $featuredMissing && $fallback === null,
+            'upload_required' => strtoupper(trim((string) ($context['content_intent']['intent'] ?? 'TEXT_ARTICLE'))) === 'IMAGE_ARTICLE' && $featuredMissing && $fallback === null,
         ];
     }
 

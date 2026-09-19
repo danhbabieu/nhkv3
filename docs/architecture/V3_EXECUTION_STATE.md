@@ -1,5 +1,37 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-19 — Existing Capture Article bounded native repair (LOCAL / NO LIVE MUTATION)
+
+OWNER_DECISION: Existing Capture-owned Article continuation remains Capture
+orchestration over WordPress editorial state, Article Media/MediaUsage,
+Governance semantic owners, SEO and publication review. `nhk.article.ingest`
+now accepts `intent=update` only for an existing `wp_post` and routes it through
+the existing reconcile receipt; it is not a generic writer or a new-submission
+entry point.
+
+NATIVE_REPAIR: Editorial state now reads and returns persisted native category
+IDs and featured attachment ID. The bounded editorial allowlist supports title,
+body, excerpt, slug, category IDs and featured attachment identity, all behind
+the current state-token CAS and canonical read-back. Capture's category gateway
+refreshes the token after native category assignment before publication review.
+
+STATE_VOCABULARY: Article preflight keeps persisted native categories distinct
+from the selected/desired category (`persisted_native_categories`,
+`desired_category`, `current_category`). Optional TEXT_ARTICLE image guidance
+now reports `upload_required=false`; IMAGE_ARTICLE remains required and
+fail-closed.
+
+SAFETY: No staging guard was bypassed, no production/staging/live Article was
+mutated, and Article 621 remains a read-only regression fixture.
+
+VERIFICATION: Focused Article/Capture/publication tests pass (54 tests / 225
+assertions). Full Unit run passes; the repository-wide run reaches the known
+environment gates: integration WordPress wiring raises `stdClass::query()` /
+requires `NHK_WP_TEST_PATH=public`, and collector contract cases receive
+`WP_Error` from the unavailable harness. PHP lint and `git diff --check` pass.
+
+STATUS: `EXISTING_CAPTURE_ARTICLE_REPAIR_FIXED_LOCAL / DEPLOYMENT_PENDING / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-19 — Existing Article MediaUsage revalidation closed at read boundaries (LOCAL / NO LIVE MUTATION)
 
 ROOT_CAUSE: The Article research inventory closure read existing featured/inline

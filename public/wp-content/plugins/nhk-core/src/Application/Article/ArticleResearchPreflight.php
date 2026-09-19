@@ -97,7 +97,7 @@ final class ArticleResearchPreflight
             if (($articleMedia['featured_primary']['placeholder'] ?? false) === true) $mediaPlan['diagnostics'][] = ['code' => 'ARTICLE_MEDIA_FEATURED_MISSING'];
             if (($articleMedia['inline_primary']['placeholder'] ?? false) === true) $mediaPlan['diagnostics'][] = ['code' => 'ARTICLE_MEDIA_INLINE_MISSING'];
         }
-        if (!isset($mediaPlan['guidance']) || !is_array($mediaPlan['guidance'])) $mediaPlan['guidance'] = $this->mediaGuidance($articleMedia, $resolution, $mediaComplete);
+        if (!isset($mediaPlan['guidance']) || !is_array($mediaPlan['guidance'])) $mediaPlan['guidance'] = $this->mediaGuidance($articleMedia, $resolution, $mediaComplete, $articleContext);
         $timings['total_ms'] = $this->elapsed($started);
         return new ArticleResearchResult($resolution, $inventory, $overlap, ['claims' => $inventory['knowledge'] ?? [], 'sources' => $inventory['sources'] ?? [], 'evidence' => $inventory['evidence'] ?? []], $relations, $links, $category, $mediaPlan, ['candidates' => $inventory['videos'] ?? []], $blueprint, $compliance, array_values(array_unique($blockers)), array_values(array_unique($warnings)), $blockers === [], $dictionaryPlan, ['timings_ms' => $timings, 'bounds' => ['inventory_limit' => 100, 'relation_limit' => 50, 'evidence_per_claim_limit' => 5]]);
     }
@@ -127,19 +127,19 @@ final class ArticleResearchPreflight
             if ($key !== '') $valid[$key] = $category;
         }
         $valid = array_values($valid);
-        if ($valid === []) return ['status' => 'CATEGORY_MISSING', 'category' => null, 'current_category' => null, 'recommendation' => 'CREATE_CATEGORY_BEFORE_DRAFT'];
+        if ($valid === []) return ['status' => 'CATEGORY_MISSING', 'category' => null, 'current_category' => null, 'persisted_native_categories' => $current, 'desired_category' => null, 'recommendation' => 'CREATE_CATEGORY_BEFORE_DRAFT'];
         $currentUsable = array_values(array_filter($current, fn (array $category): bool => !$this->isDefaultCategory($category)));
         foreach ($currentUsable as $category) {
-            if ($this->isPreferredCategory($category)) return ['status' => 'EXISTING', 'category' => $category, 'current_category' => $category, 'recommendation' => null];
+            if ($this->isPreferredCategory($category)) return ['status' => 'EXISTING', 'category' => $category, 'current_category' => $category, 'persisted_native_categories' => $current, 'desired_category' => $category, 'recommendation' => null];
         }
-        foreach ($currentUsable as $category) return ['status' => 'EXISTING', 'category' => $category, 'current_category' => $category, 'recommendation' => null];
+        foreach ($currentUsable as $category) return ['status' => 'EXISTING', 'category' => $category, 'current_category' => $category, 'persisted_native_categories' => $current, 'desired_category' => $category, 'recommendation' => null];
         foreach ($valid as $category) {
             $slug = strtolower(trim((string) ($category['slug'] ?? '')));
             $name = trim((string) ($category['name'] ?? ''));
-            if ($this->isPreferredCategory($category)) return ['status' => 'EXISTING', 'category' => $category, 'current_category' => $category, 'previous_category' => $current[0] ?? null, 'recommendation' => null];
+            if ($this->isPreferredCategory($category)) return ['status' => 'EXISTING', 'category' => $category, 'current_category' => $current[0] ?? null, 'persisted_native_categories' => $current, 'desired_category' => $category, 'previous_category' => $current[0] ?? null, 'recommendation' => null];
         }
-        foreach ($valid as $category) if (!$this->isDefaultCategory($category)) return ['status' => 'EXISTING', 'category' => $category, 'current_category' => $category, 'previous_category' => $current[0] ?? null, 'recommendation' => null];
-        return ['status' => 'EXISTING', 'category' => $valid[0], 'current_category' => $valid[0], 'recommendation' => null];
+        foreach ($valid as $category) if (!$this->isDefaultCategory($category)) return ['status' => 'EXISTING', 'category' => $category, 'current_category' => $current[0] ?? null, 'persisted_native_categories' => $current, 'desired_category' => $category, 'previous_category' => $current[0] ?? null, 'recommendation' => null];
+        return ['status' => 'EXISTING', 'category' => $valid[0], 'current_category' => $current[0] ?? null, 'persisted_native_categories' => $current, 'desired_category' => $valid[0], 'recommendation' => null];
     }
     private function isPreferredCategory(array $category): bool { return in_array(strtolower(trim((string) ($category['slug'] ?? ''))), ['tri-thuc-dong-ho', 'tri-thuc'], true) || in_array(trim((string) ($category['name'] ?? '')), ['Tri thức đồng hồ', 'Tri thức'], true); }
     private function isDefaultCategory(array $category): bool { return ($category['is_default'] ?? false) === true || in_array(strtolower(trim((string) ($category['slug'] ?? ''))), ['uncategorized', 'chua-phan-loai'], true); }
@@ -208,12 +208,14 @@ final class ArticleResearchPreflight
     }
 
     /** @param array<string,mixed> $articleMedia @param array<string,mixed> $resolution @return array<string,mixed> */
-    private function mediaGuidance(array $articleMedia, array $resolution, bool $complete): array
+    private function mediaGuidance(array $articleMedia, array $resolution, bool $complete, array $articleContext = []): array
     {
         $slots = is_array($articleMedia['slots'] ?? null) ? $articleMedia['slots'] : [];
         $featuredMissing = ($slots['featured_primary']['placeholder'] ?? !$complete) === true;
         $inlineMissing = ($slots['inline_primary']['placeholder'] ?? !$complete) === true;
         $primary = is_array($resolution['primary'] ?? null) ? $resolution['primary'] : [];
+        $intent = is_array($articleContext['content_intent'] ?? null) ? (string) ($articleContext['content_intent']['intent'] ?? 'TEXT_ARTICLE') : (string) ($articleContext['content_intent'] ?? 'TEXT_ARTICLE');
+        $required = strtoupper(trim($intent)) === 'IMAGE_ARTICLE' && $featuredMissing;
         return [
             'user_message' => $featuredMissing ? 'Bài đã đủ nội dung nhưng còn thiếu ảnh đại diện. Bạn có muốn tải ảnh đại diện cho bài này không?' : ($inlineMissing ? 'Bài còn thiếu ảnh minh họa trong nội dung. Bạn có muốn tải ảnh cho bài này không?' : 'Hình ảnh của bài đã sẵn sàng.'),
             'featured_image_missing' => $featuredMissing,
@@ -223,7 +225,8 @@ final class ArticleResearchPreflight
             'preferred_aspect' => '16:9',
             'video_thumbnail_fallback' => null,
             'user_upload_preferred' => $featuredMissing,
-            'user_upload_required' => $featuredMissing,
+            'user_upload_required' => $required,
+            'upload_required' => $required,
         ];
     }
     /** @param list<array<string,mixed>> $items @param list<string> $subjectIds @return list<array<string,mixed>> */

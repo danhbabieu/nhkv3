@@ -20,6 +20,8 @@ final class WpEditorialStateReader implements EditorialStateReader
         $permalink = function_exists('get_permalink') ? get_permalink($post) : '';
         $blogId = function_exists('get_current_blog_id') ? get_current_blog_id() : 0;
         if ($blogId < 1 || !is_string($permalink)) return null;
+        $categoryIds = function_exists('wp_get_post_categories') ? array_values(array_map('intval', (array) wp_get_post_categories($postId, ['fields' => 'ids']))) : [];
+        $featuredAttachmentId = function_exists('get_post_thumbnail_id') ? (int) get_post_thumbnail_id($postId) : 0;
         return new EditorialPostState(
             (int) $post->ID,
             $blogId . ':' . (int) $post->ID,
@@ -33,6 +35,8 @@ final class WpEditorialStateReader implements EditorialStateReader
             (int) ($revision['latest_id'] ?? 0),
             (int) ($revision['count'] ?? 0),
             (string) ($post->post_modified_gmt ?? ''),
+            $categoryIds,
+            $featuredAttachmentId > 0 ? $featuredAttachmentId : null,
         );
     }
 }

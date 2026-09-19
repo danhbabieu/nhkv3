@@ -1371,6 +1371,12 @@ final class Plugin {
                             if ($term instanceof \WP_Term && in_array(strtolower((string) $term->slug), ['uncategorized', 'chua-phan-loai'], true)) $categoryGateway->unassign($postId, $termId);
                         }
                         $categoryGateway->assign($postId, $categoryId);
+                        // Category assignment is a native editorial mutation and
+                        // advances the same state-token boundary as post fields.
+                        $fresh = $articleEditorial->read($postId);
+                        if ($fresh === null) return ['ok' => false, 'reason' => 'CATEGORY_READBACK_UNAVAILABLE', 'post' => $updated['post'] ?? null, 'state_token' => $updated['state_token'] ?? ''];
+                        $updated['post'] = $fresh->snapshot();
+                        $updated['state_token'] = $fresh->token;
                     }
                     return $updated;
                 },

@@ -509,12 +509,13 @@ final class EditorialCaptureCoordinator
                     'article_id' => $record->articleId,
                     'expected_state_token' => $record->articleStateToken,
                     'metadata' => is_array($input['metadata'] ?? null) ? $input['metadata'] : [],
-                    'fields' => [
-                        'post_title' => $composition['title'],
-                        'post_content' => $composition['content'],
-                        'post_excerpt' => $composition['excerpt'],
-                        ...$this->editorialFields($input),
-                    ],
+                'fields' => [
+                    'post_title' => $composition['title'],
+                    'post_content' => $composition['content'],
+                    'post_excerpt' => $composition['excerpt'],
+                    ...(is_array($metadata['editorial_fields'] ?? null) ? $metadata['editorial_fields'] : []),
+                    ...$this->editorialFields($input),
+                ],
                 ]);
                 if (($updatedDraft['ok'] ?? false) !== true) throw new \RuntimeException((string) ($updatedDraft['reason'] ?? 'ARTICLE_DRAFT_UPDATE_FAILED'));
                 $record = $this->save($record, CaptureStage::COMPOSED, $assets, $diagnostics, $receipts, 'COMPOSED', $record->articleId, (string) ($updatedDraft['state_token'] ?? $record->articleStateToken));
@@ -795,7 +796,11 @@ final class EditorialCaptureCoordinator
     {
         $metadata = is_array($input['metadata'] ?? null) ? $input['metadata'] : [];
         $slug = trim((string) ($metadata['desired_slug'] ?? ''));
-        return $slug === '' ? [] : ['post_name' => $slug];
+        $fields = $slug === '' ? [] : ['post_name' => $slug];
+        foreach (['post_title', 'post_content', 'post_excerpt', 'post_name', 'category_ids', 'featured_media_id'] as $field) {
+            if (array_key_exists($field, $metadata['editorial_fields'] ?? [])) $fields[$field] = $metadata['editorial_fields'][$field];
+        }
+        return $fields;
     }
 
     /**
