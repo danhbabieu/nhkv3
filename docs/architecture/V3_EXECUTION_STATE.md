@@ -1,5 +1,32 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-19 — Existing Article MediaUsage revalidation closed at read boundaries (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE: The Article research inventory closure read existing featured/inline
+MediaUsage and used placeholder/readability state to build `article_media`;
+`media_complete` depended only on featured placeholder state. The shared
+SemanticSuitabilityPolicy was therefore bypassed for persisted usages, allowing
+wrong-subject but readable/public Media to reach preflight and SEO/frontend
+projections.
+
+FIXED_BOUNDARY: Article inventory now evaluates each existing slot against the
+resolved canonical subject and availability, exposes suitability/diagnostics,
+and computes completeness only from valid effective slots. Article diagnostic,
+SEO image projection (when its persisted blueprint supplies subject scope) and
+Entity/frontend projection use the same policy; wrong historical usage remains
+auditable but is excluded. No usage is rebound, retired or deleted.
+
+VERIFICATION: Changed-file PHP lint and `git diff --check` pass. Focused media,
+Article, projection, SEO, Knowledge and Video suites pass; the full Unit suite
+passes 2,003 tests / 9,854 assertions with existing warnings/deprecations. The
+full repository run still reaches the known environment gates: integration
+WordPress wiring raises `stdClass::query()` / requires `NHK_WP_TEST_PATH=public`,
+and two collector contract cases receive `WP_Error` from the unavailable
+harness. No deployment, push, staging/production mutation or live retry was
+performed.
+
+STATUS: `ARTICLE_MEDIA_READ_BOUNDARY_FIXED_LOCAL / DEPLOYMENT_PENDING / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-19 — System-wide semantic suitability/recovery hardening fixed locally (NO LIVE MUTATION)
 
 ROOT_CAUSE: MediaUsage reconciliation treated role/placement identity and

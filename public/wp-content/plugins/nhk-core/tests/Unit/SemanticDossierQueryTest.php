@@ -32,7 +32,7 @@ final class SemanticDossierQueryTest extends TestCase
         $movement = $authority->create('movement', 'movement-39', 'Machine 39', ['description' => 'Movement dossier subject.']);
         $music = $authority->create('music', 'music-a', 'Music A');
 
-        $media = new Media($mediaId = UuidCodec::newV7(), 'movement-front', 'Ảnh mặt máy', 'ready');
+        $media = new Media($mediaId = UuidCodec::newV7(), 'movement-front', 'Ảnh mặt máy', 'ready', ['subject_id' => $movement->canonicalId]);
         $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'derivative', 'movement-front.jpg', hash('sha256', 'img'), 'image/jpeg', 3, 1200, 900, 'PUBLIC', ['canonical_filename' => 'movement-front.jpg']);
         $usage = new MediaUsage(UuidCodec::newV7(), $mediaId, 'movement', $movement->canonicalId, 'representative', 0, 'Mặt trước bộ máy');
         $video = new Video($videoId = UuidCodec::newV7(), 'youtube', 'dQw4w9WgXcQ', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'Video âm thanh', [

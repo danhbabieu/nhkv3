@@ -38,7 +38,7 @@ final class ArticleSemanticDossierTest extends TestCase
         $graph->create(new NodeReference('wp_post', '1:55'), 'about', new NodeReference('movement', $movement->canonicalId));
         $graph->create(new NodeReference('movement', $movement->canonicalId), 'supports_music', new NodeReference('music', $music->canonicalId));
 
-        $media = new Media($mediaId = UuidCodec::newV7(), 'article-image', 'Ảnh bài viết', 'ready');
+        $media = new Media($mediaId = UuidCodec::newV7(), 'article-image', 'Ảnh bài viết', 'ready', ['subject_id' => '1:55']);
         $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'derivative', 'article-image.jpg', hash('sha256', 'x'), 'image/jpeg', 1, 1200, 800, 'PUBLIC', ['canonical_filename' => 'article-image.jpg']);
         $usage = new MediaUsage(UuidCodec::newV7(), $mediaId, 'wp_post', '1:55', 'representative', 0, 'Ảnh bài viết');
         $mediaRepo = $this->mediaRepository([$media]);

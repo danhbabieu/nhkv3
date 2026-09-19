@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Entity;
 
-use NHK\Core\Application\Media\PublicMediaAssetUrlResolver;
+use NHK\Core\Application\Media\{PublicMediaAssetUrlResolver, SemanticSuitabilityPolicy};
 use NHK\Core\Application\Media\PublicMediaAssetSelector;
 use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository, MediaUsageRepository};
 use NHK\Core\Domain\Media\{Media, MediaAsset, MediaUsage, MediaUsageRoleRegistry};
@@ -11,7 +11,7 @@ use NHK\Core\Domain\Media\{Media, MediaAsset, MediaUsage, MediaUsageRoleRegistry
 /** Read-only endpoint image projection; it never promotes usage into semantic truth. */
 final class EntityMediaProjection
 {
-    public function __construct(private MediaRepository $media, private MediaAssetRepository $assets, private MediaUsageRepository $usages) {}
+    public function __construct(private MediaRepository $media, private MediaAssetRepository $assets, private MediaUsageRepository $usages, private ?SemanticSuitabilityPolicy $suitabilityPolicy = null) {}
 
     /** @return array{representative:?array<string,mixed>,evidence:list<array<string,mixed>>,gallery:list<array<string,mixed>>} */
     public function forEntity(string $endpointType, string $endpointKey): array
@@ -36,6 +36,14 @@ final class EntityMediaProjection
     {
         $media = $this->media->findByCanonicalId($usage->mediaId);
         if (!$media instanceof Media || !$media->active || $media->readiness !== 'ready' || $media->isSystemPlaceholder()) return null;
+        // wp_post does not carry an Authority subject key at this generic
+        // projection boundary; Article preflight/SEO supplies the canonical
+        // subject-bound read model. Authority endpoints can validate directly
+        // against their endpoint key here.
+        if ($usage->endpointType !== 'wp_post') {
+            $assessment = ($this->suitabilityPolicy ??= new SemanticSuitabilityPolicy())->evaluateMedia($media, $this->assets->listByMediaId($media->canonicalId), ['subject_ids' => [$usage->endpointKey]], 'SYSTEM_AUTO', $usage->role);
+            if (($assessment['valid_for_completeness'] ?? false) !== true) return null;
+        }
         $asset = (new PublicMediaAssetSelector())->canonical($this->assets->listByMediaId($media->canonicalId));
         if (!$asset instanceof MediaAsset) return null;
         $filename = is_string($asset->metadata['canonical_filename'] ?? null) && trim((string) $asset->metadata['canonical_filename']) !== '' ? (string) $asset->metadata['canonical_filename'] : basename(str_replace('\\', '/', $asset->storageKey));

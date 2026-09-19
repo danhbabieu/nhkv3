@@ -222,7 +222,7 @@ final class Plugin {
             $sharedAttachmentBridge = new WordPressMediaAttachmentBridge($wpdb, $publicMediaService, $publicMedia, $publicAssets);
             $attachmentBridge = $sharedAttachmentBridge;
             $articleMedia = new ArticleMediaCoordinator($publicMediaService, $publicMedia, $publicAssets, $publicUsages, new \NHK\Core\Infrastructure\Media\WpdbArticleMediaBlueprintRepository($wpdb), null, $attachmentBridge);
-            $articleSeo = new ArticleMediaSeoProjection($publicMedia, $publicAssets, $publicUsages, $attachmentBridge);
+            $articleSeo = new ArticleMediaSeoProjection($publicMedia, $publicAssets, $publicUsages, $attachmentBridge, null, new \NHK\Core\Infrastructure\Media\WpdbArticleMediaBlueprintRepository($wpdb));
             add_filter('nhk_v3_article_media_seo', static function (array $value, int $postId) use ($articleSeo): array { return $articleSeo->forPost((string) get_current_blog_id() . ':' . $postId); }, 10, 2);
             add_action('wp_sitemaps_init', static function (object $sitemaps) use ($articleSeo): void {
                 if (isset($sitemaps->registry) && is_object($sitemaps->registry) && method_exists($sitemaps->registry, 'add_provider')) $sitemaps->registry->add_provider('images', new WordPressImageSitemapProvider($articleSeo));
@@ -396,13 +396,29 @@ final class Plugin {
                     $articleMedia = [];
                     if ($articlePostId > 0) {
                         $articleEndpoint = (function_exists('get_current_blog_id') ? max(1, (int) get_current_blog_id()) : 1) . ':' . $articlePostId;
+                        $suitabilityPolicy = new \NHK\Core\Application\Media\SemanticSuitabilityPolicy();
+                        $primarySubjectId = trim((string) (($resolution['primary']['id'] ?? '')));
+                        $subjectIdsForMedia = $primarySubjectId !== '' ? [$primarySubjectId] : $subjectIds;
                         foreach (['featured_primary', 'inline_primary'] as $role) {
                             $usage = $usages->listByEndpoint('wp_post', $articleEndpoint, $role)[0] ?? null;
                             $mediaItem = $usage !== null ? $media->findByCanonicalId($usage->mediaId) : null;
-                            $articleMedia[$role] = ['media_id' => $mediaItem?->canonicalId, 'placeholder' => $mediaItem?->isSystemPlaceholder() ?? true];
+                            $assessment = $mediaItem instanceof \NHK\Core\Domain\Media\Media
+                                ? $suitabilityPolicy->evaluateMedia($mediaItem, $assets->listByMediaId($mediaItem->canonicalId), ['subject_ids' => $subjectIdsForMedia], 'SYSTEM_AUTO', $role)
+                                : ['requirement' => \NHK\Core\Application\Media\SemanticSuitabilityPolicy::OPTIONAL, 'availability' => \NHK\Core\Application\Media\SemanticSuitabilityPolicy::MISSING, 'suitability' => \NHK\Core\Application\Media\SemanticSuitabilityPolicy::UNKNOWN, 'valid_for_completeness' => false, 'diagnostic' => 'MEDIA_USAGE_INCOMPLETE'];
+                            $effective = ($assessment['valid_for_completeness'] ?? false) === true && $mediaItem instanceof \NHK\Core\Domain\Media\Media && !$mediaItem->isSystemPlaceholder();
+                            $articleMedia[$role] = [
+                                'media_id' => $effective ? $mediaItem->canonicalId : null,
+                                'persisted_media_id' => $mediaItem?->canonicalId,
+                                'placeholder' => !$effective,
+                                'suitability' => $assessment['suitability'],
+                                'availability' => $assessment['availability'],
+                                'valid_for_completeness' => $effective,
+                            ];
+                            if (!$effective) $articleMedia['diagnostics'][] = ['code' => $assessment['diagnostic'] ?? 'MEDIA_USAGE_SEMANTIC_MISMATCH', 'slot' => $role, 'media_id' => $mediaItem?->canonicalId];
                         }
-                        $articleMedia['media_complete'] = !($articleMedia['featured_primary']['placeholder'] ?? true);
-                        $articleMedia['diagnostics'] = [];
+                        $articleMedia['diagnostics'] = array_values(array_filter((array) ($articleMedia['diagnostics'] ?? []), 'is_array'));
+                        $articleMedia['media_complete'] = ($articleMedia['featured_primary']['valid_for_completeness'] ?? false) === true
+                            && ($articleMedia['inline_primary']['valid_for_completeness'] ?? false) === true;
                         if (($articleMedia['featured_primary']['placeholder'] ?? true) === true) $articleMedia['diagnostics'][] = ['code' => 'ARTICLE_MEDIA_FEATURED_MISSING'];
                         if (($articleMedia['inline_primary']['placeholder'] ?? true) === true) $articleMedia['diagnostics'][] = ['code' => 'ARTICLE_MEDIA_INLINE_MISSING'];
                     }

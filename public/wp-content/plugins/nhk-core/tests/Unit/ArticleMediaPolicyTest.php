@@ -124,6 +124,21 @@ final class ArticleMediaPolicyTest extends TestCase
         self::assertSame($result->slotMedia['inline_primary'], $adapter->syncs[0]['slot_media']['inline_primary']);
     }
 
+    public function test_diagnose_revalidates_existing_wrong_subject_usage_without_deleting_history(): void
+    {
+        [$media, $assets, $usages, $blueprints, $service] = $this->stores();
+        $wrong = $service->create('sibling-image', 'Sibling image', 'ready', ['subject_id' => 'sibling-subject']);
+        $service->addAsset($wrong->canonicalId, 'original', 'uploads/sibling.jpg', hash('sha256', 'sibling'), 'image/jpeg', 10, 1200, 800, 'PUBLIC');
+        $service->addUsage($wrong->canonicalId, 'wp_post', '1:777', 'featured_primary');
+        $result = (new ArticleMediaCoordinator($service, $media, $assets, $usages, $blueprints, 1))->diagnoseForPost(777, ['subject_ids' => ['canonical-article-subject']]);
+
+        self::assertTrue($result->slots['featured_primary']['placeholder']);
+        self::assertSame($wrong->canonicalId, $result->slots['featured_primary']['persisted_media_id']);
+        self::assertFalse($result->slots['featured_primary']['valid_for_completeness']);
+        self::assertContains('MEDIA_CANDIDATE_INELIGIBLE', array_column($result->diagnostics, 'code'));
+        self::assertCount(1, $usages->listByEndpoint('wp_post', '1:777', 'featured_primary'));
+    }
+
     public function test_generic_sibling_fixture_is_rejected_before_ranking_even_when_it_has_more_history(): void
     {
         [$media, $assets, $usages, $blueprints, $service] = $this->stores();

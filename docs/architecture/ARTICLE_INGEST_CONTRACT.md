@@ -383,6 +383,14 @@ ineligible or unknown scope becomes an explicit diagnostic and cannot satisfy a
 required slot. Optional enrichment may remain deferred, while required
 IMAGE_ARTICLE media remains a publication blocker.
 
+The same rule applies when building `inventory.article_media`, publication
+evidence, SEO image output or frontend/gallery projections. A persisted usage
+is historical/auditable state, not automatically effective Media. The effective
+plan contains only usages that pass the shared suitability policy for the
+current canonical subject and availability checks; wrong-subject usage is
+excluded without silent rebinding or deletion. `TEXT_ARTICLE` may remain
+`PUBLICATION_READY` with `ENRICHMENT_INCOMPLETE` when Media is optional.
+
 Resume recovery distinguishes an expected prior self-mutation from a concurrent
 editorial edit. A receipt may refresh the continuation token only when its
 durable media/editorial read-back carries the exact current token. Any other

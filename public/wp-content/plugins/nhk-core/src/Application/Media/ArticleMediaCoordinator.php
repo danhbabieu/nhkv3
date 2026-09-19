@@ -194,14 +194,19 @@ final class ArticleMediaCoordinator
     public function diagnoseForPost(int $postId, array $context = []): ArticleMediaResult
     {
         $endpointKey = $this->endpointKey($postId);
+        $context = $this->normalizeSubjectContext($context);
+        $subjectIds = array_values(array_filter(array_map('strval', (array) ($context['subject_ids'] ?? [])), static fn (string $id): bool => trim($id) !== ''));
         $slots = []; $slotMedia = []; $diagnostics = [];
         foreach (MediaUsageRoleRegistry::mandatoryArticleRoles() as $slot) {
             $existing = $this->existingSlotMedia($endpointKey, $slot);
-            $placeholder = $existing?->isSystemPlaceholder() ?? true;
-            $id = $existing?->canonicalId ?? '';
+            $assessment = $existing instanceof Media ? ($this->suitabilityPolicy ??= new SemanticSuitabilityPolicy())->evaluateMedia($existing, $this->assets->listByMediaId($existing->canonicalId), ['subject_ids' => $subjectIds], 'SYSTEM_AUTO', $slot) : ['valid_for_completeness' => false, 'suitability' => SemanticSuitabilityPolicy::UNKNOWN, 'availability' => SemanticSuitabilityPolicy::MISSING, 'diagnostic' => 'MEDIA_USAGE_INCOMPLETE'];
+            $valid = ($assessment['valid_for_completeness'] ?? false) === true && $existing instanceof Media && !$existing->isSystemPlaceholder();
+            $placeholder = !$valid;
+            $id = $valid ? $existing->canonicalId : '';
             $slotMedia[$slot] = $id;
-            $slots[$slot] = ['media_id' => $id, 'placeholder' => $placeholder, 'state' => $placeholder ? ($slot === MediaUsageRoleRegistry::FEATURED_PRIMARY ? MediaSeoStateRegistry::INCOMPLETE_FEATURED : MediaSeoStateRegistry::INCOMPLETE_INLINE) : MediaSeoStateRegistry::COMPLETE, 'blueprint' => ($this->blueprints->findByPostAndSlot($postId, $slot) ?? MediaSeoBlueprint::forPost($postId, $slot, $context))->toArray()];
+            $slots[$slot] = ['media_id' => $id, 'persisted_media_id' => $existing?->canonicalId, 'placeholder' => $placeholder, 'suitability' => $assessment['suitability'], 'availability' => $assessment['availability'], 'valid_for_completeness' => $valid, 'state' => $placeholder ? ($slot === MediaUsageRoleRegistry::FEATURED_PRIMARY ? MediaSeoStateRegistry::INCOMPLETE_FEATURED : MediaSeoStateRegistry::INCOMPLETE_INLINE) : MediaSeoStateRegistry::COMPLETE, 'blueprint' => ($this->blueprints->findByPostAndSlot($postId, $slot) ?? MediaSeoBlueprint::forPost($postId, $slot, $context))->toArray()];
             if ($placeholder) $diagnostics[] = ['code' => $slot === MediaUsageRoleRegistry::FEATURED_PRIMARY ? 'ARTICLE_MEDIA_FEATURED_MISSING' : 'ARTICLE_MEDIA_INLINE_MISSING', 'slot' => $slot];
+            if (!$valid && $existing instanceof Media && $assessment['diagnostic'] !== null) $diagnostics[] = ['code' => $assessment['diagnostic'], 'slot' => $slot, 'media_id' => $existing->canonicalId];
         }
         return new ArticleMediaResult($postId, $endpointKey, $diagnostics === [] ? MediaSeoStateRegistry::COMPLETE : MediaSeoStateRegistry::PLACEHOLDER, $slotMedia, $slots, $diagnostics, '', $this->guidance($slots, $context));
     }

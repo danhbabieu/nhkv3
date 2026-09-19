@@ -35,7 +35,7 @@ final class BrandPublicDossierAcceptanceTest extends TestCase
         $music = $authority->create('music', 'music-a', 'Music A');
 
         $mediaId = UuidCodec::newV7();
-        $media = new Media($mediaId, 'maker-a-front', 'Ảnh đại diện thương hiệu', 'ready');
+        $media = new Media($mediaId, 'maker-a-front', 'Ảnh đại diện thương hiệu', 'ready', ['subject_id' => $brand->canonicalId]);
         $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'derivative', 'maker-a-front.jpg', hash('sha256', 'brand-img'), 'image/jpeg', 3, 1200, 900, 'PUBLIC', ['canonical_filename' => 'maker-a-front.jpg']);
         $usage = new MediaUsage(UuidCodec::newV7(), $mediaId, 'brand', $brand->canonicalId, 'representative', 0, 'Ảnh đại diện thương hiệu');
 

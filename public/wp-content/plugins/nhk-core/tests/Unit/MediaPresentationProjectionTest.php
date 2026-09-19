@@ -13,8 +13,8 @@ final class MediaPresentationProjectionTest extends TestCase
     public function test_entity_projection_returns_representative_and_evidence_separately(): void
     {
         [$media, $assets, $usages, $service] = $this->stores();
-        $representative = $service->create('entity-front', 'Entity front', 'ready');
-        $evidence = $service->create('entity-serial', 'Entity serial', 'ready');
+        $representative = $service->create('entity-front', 'Entity front', 'ready', ['subject_id' => 'variant-36-10']);
+        $evidence = $service->create('entity-serial', 'Entity serial', 'ready', ['subject_id' => 'variant-36-10']);
         $service->addAsset($representative->canonicalId, 'original', 'uploads/entity-front.webp', hash('sha256', 'front'), 'image/webp', 10, 1200, 675, 'PUBLIC', ['canonical_filename' => 'entity-front.webp']);
         $service->addAsset($evidence->canonicalId, 'original', 'uploads/entity-serial.webp', hash('sha256', 'serial'), 'image/webp', 10, 1200, 800, 'PUBLIC', ['canonical_filename' => 'entity-serial.webp']);
         $service->addUsage($representative->canonicalId, 'variant', 'variant-36-10', 'representative', 0, 'Ảnh đại diện 36/10');

@@ -221,6 +221,13 @@ và cùng diagnostic family. Optional enrichment được phép `DEFERRED` hoặ
 phải fail closed. Policy không tự tạo Claim, Graph relation, Media identity hay
 staging authorization.
 
+Mọi effective read model cũng thuộc boundary này: Article preflight phải
+revalidate persisted `MediaUsage` theo subject canonical hiện tại trước khi
+đặt `media_complete`; Entity/Knowledge/Video presentation, SEO và frontend
+không được đọc raw usage rồi render. Usage sai vẫn giữ để audit/history nhưng
+bị loại khỏi effective projection cho tới khi có governed repair. `placement`,
+độ đọc được của attachment và public URL không phải semantic evidence.
+
 ## Canonical Media binding service — 2026-09-17
 
 `MediaBindingService` là application owner duy nhất của workflow
