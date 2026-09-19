@@ -14986,3 +14986,26 @@ PHP lint and `git diff --check` pass. No integration/live data was mutated; no
 commit, push or deployment was performed.
 
 STATUS=`IMAGE_FLOW_LOCAL_PROOF_READY / DEPLOYMENT_PENDING / NO_LIVE_MUTATION`.
+
+# Checkpoint — 2026-09-19 — Deferred Article reference after ASSETS_STORED (LOCAL / NO LIVE MUTATION)
+
+SCOPE: IMAGE_ARTICLE only. The Capture coordinator now defers Article-targeted
+Media bindings until the native Article draft has been created exactly once and
+read back. The server derives the exact `wp_post:<blog_id>:<post_id>` reference,
+issues the signed exact staging scope, and routes Article bindings through the
+Article MediaUsage reconciliation path. The exact-reference guard remains
+fail-closed; client input never supplies an Article ID before creation.
+
+REGRESSION: Added one-image, three-image B→A→C album, contextual title/alt/caption,
+and retry-after-Article-creation production-shaped tests. Existing Media is reused;
+the retry reuses the persisted Article and does not duplicate MediaUsage.
+
+VERIFICATION: Focused image/Capture/MediaUsage suite passes 36 tests / 131
+assertions. Full Unit passes 1,987 tests / 9,809 assertions with existing
+warnings/deprecations only. Contract passes 240 tests / 1,915 assertions with
+existing warnings/deprecations only. Changed PHP lint and `git diff --check`
+pass. No live data was mutated; this session issued no commit, push or deployment
+command. Repository HEAD already contains `cda89d96` (`d`) with the source/test
+changes; its creation was not performed by this session.
+
+STATUS=`IMAGE_FLOW_DEFERRED_ARTICLE_REFERENCE_FIXED_LOCALLY / DEPLOYMENT_PENDING / OPERATOR_COMMIT_REQUIRED`.
