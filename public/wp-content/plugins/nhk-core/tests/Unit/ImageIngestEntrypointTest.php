@@ -101,6 +101,46 @@ final class ImageIngestEntrypointTest extends TestCase
         self::assertFileDoesNotExist((string) ($upload[2]['files']['tmp_name'][0] ?? ''));
     }
 
+    public function test_widget_metadata_is_not_forwarded_into_the_trusted_file_materializer(): void
+    {
+        $fixture = __DIR__ . '/../../../../../wp-admin/images/post-formats-vs.png';
+        $materializerInput = null;
+        $entrypoint = new ImageIngestEntrypoint(
+            static function (string $key, array $metadata, array $files, array $items): array {
+                return ['items' => [['attachment_id' => 13]]];
+            },
+            static function (mixed $references) use (&$materializerInput, $fixture): array {
+                $materializerInput = $references;
+                return ChatGptMcpGateway::materializeReferences(
+                    $references,
+                    static function (string $url, string $path, int $remaining) use ($fixture): array {
+                        self::assertLessThanOrEqual($remaining, filesize($fixture));
+                        self::assertTrue(copy($fixture, $path));
+                        return ['status' => 200];
+                    },
+                    null,
+                    static fn (string $host): array => ['93.184.216.34'],
+                );
+            },
+        );
+
+        $entrypoint->ingest('widget-shape', [], [[
+            'download_url' => 'https://files.example.test/image',
+            'file_id' => 'file-13',
+            'mime_type' => 'image/png',
+            'file_name' => 'camera-original.png',
+            'ordinal' => 0,
+            'media' => ['title' => 'Mặt trước'],
+        ]], [['client_file_id' => 'file-13', 'ordinal' => 0, 'media' => ['title' => 'Mặt trước']]]);
+
+        self::assertSame([[
+            'download_url' => 'https://files.example.test/image',
+            'file_id' => 'file-13',
+            'mime_type' => 'image/png',
+            'file_name' => 'camera-original.png',
+        ]], $materializerInput);
+    }
+
     /** @dataProvider providedReferenceShapeProvider */
     public function test_widget_transport_materializes_only_complete_structured_references(array $reference, bool $shouldMaterialize): void
     {

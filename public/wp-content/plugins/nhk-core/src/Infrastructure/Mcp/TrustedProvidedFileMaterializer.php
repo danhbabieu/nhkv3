@@ -44,7 +44,7 @@ final class TrustedProvidedFileMaterializer
         try {
             foreach ($provided as $reference) {
                 if (!is_array($reference) || array_diff(array_keys($reference), self::REFERENCE_FIELDS) !== []) {
-                    throw new ChatGptMcpGatewayException('PROVIDED_FILE_REFERENCE_UNRESOLVABLE', 'The uploaded file reference is not a supported OpenAI file object.');
+                    throw new ChatGptMcpGatewayException('PROVIDED_FILE_REFERENCE_UNRESOLVABLE', 'The uploaded file reference is not a supported OpenAI file object.', null, ['typed_code' => 'PROVIDED_FILE_REFERENCE_FIELDS_INVALID', 'stage' => 'validate']);
                 }
                 foreach (['download_url', 'file_id'] as $required) {
                     if (!is_string($reference[$required] ?? null) || self::boundedTrim((string) $reference[$required], self::MAX_FILE_ID_LENGTH) === '') {

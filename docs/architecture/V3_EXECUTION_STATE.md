@@ -1,5 +1,45 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-19 — Widget metadata/materializer shape mismatch fixed (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE: The widget's structured `files[]` references intentionally carried
+transport metadata (`ordinal` and `media`) alongside the trusted file fields.
+`ImageIngestEntrypoint` accepted those fields and passed the references
+unchanged to the production `TrustedProvidedFileMaterializer`, whose exact
+provided-file allowlist accepts only `download_url`, `file_id`, optional
+`mime_type` and `file_name`. The materializer therefore rejected every live
+widget item before its downloader ran. The failure was surfaced through the
+typed `PROVIDED_FILE_REFERENCE_UNRESOLVABLE` →
+`PROVIDED_FILE_MATERIALIZATION_FAILED` mapping. Existing widget tests missed
+this because they injected a stub materializer instead of the real allowlist.
+
+FIXED_BOUNDARY: `ImageIngestEntrypoint` now validates the complete application
+reference, then projects only the four transport fields into the trusted file
+materializer. Ordered/per-item metadata remains in the separate `items[]`
+packet and is still passed to `MediaBatchUploadService`; no validation was
+removed and no alternate transport was introduced.
+
+TRACE EVIDENCE: `uploadFile()` returns `{fileId}` and
+`getFileDownloadUrl()` returns `{downloadUrl}`; the widget constructs
+`{download_url,file_id,mime_type,file_name,ordinal,media}` and sends that exact
+shape in `files[]`. The server reaches `McpTransport::widgetUpload()` and
+`ImageIngestEntrypoint::ingest()`, then fails in
+`TrustedProvidedFileMaterializer::materialize()` at extra-field validation.
+The downloader/HTTP GET, ImageIngestEntrypoint upload callback,
+MediaBatchUploadService, WordPress attachment and Media writer are not
+reached. `SERVER_TOOL_CALL_RESULT / DONE` records promise/result-envelope
+receipt in the widget and does not mean the tool payload was successful.
+
+VERIFICATION: Focused materializer, entrypoint, widget, gateway tests pass 70
+tests / 243 assertions. The new production-shaped entrypoint regression uses
+the real materializer and proves the normalized input reaches the downloader.
+MCP Apps tests pass 32 tests; TypeScript typecheck and production widget build
+pass. PHP lint and `git diff --check` pass. No Media, Article, MediaUsage,
+staging or production data was mutated; deployment and live acceptance remain
+pending.
+
+STATUS: `WIDGET_PROVIDED_FILE_SHAPE_FIXED_LOCAL / NO_LIVE_MUTATION / DEPLOYMENT_PENDING`.
+
 # Checkpoint — 2026-09-19 — Video final-payload staging binding fixed (LOCAL / NO LIVE MUTATION)
 
 ROOT_CAUSE: `StagingAcceptanceScopeVerifier::issueForVideoPlan()` signed
