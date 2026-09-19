@@ -83,6 +83,38 @@ final class StagingAcceptanceScopeVerifierTest extends TestCase
         self::assertTrue($verifier->verifyBindingRequest($packet, $this->bindingRequest($capture, $input, $packet)));
     }
 
+    public function test_capture_owned_article_media_replace_gets_exact_wp_post_scope(): void
+    {
+        $capture = new CaptureRecord(UuidCodec::newV7(), 'article-media-capture', hash('sha256', 'article-media-capture'), 'MEDIA_RECONCILED', 'IN_PROGRESS', 617, null, [], ['purpose' => 'EDITORIAL', 'content_intent' => ['intent' => 'IMAGE_ARTICLE']], [], [], 7);
+        $mediaId = UuidCodec::newV7();
+        $operation = [
+            'operation' => 'replace',
+            'idempotency_key' => 'capture:617:featured-replace',
+            'media' => ['id' => $mediaId],
+            'target' => ['type' => 'wp_post', 'blog_id' => 1, 'post_id' => 617],
+            'usage_id' => UuidCodec::newV7(),
+            'expected_usage_revision' => 3,
+            'role' => 'featured_primary',
+            'placement_key' => 'featured_primary',
+            'selection_source' => 'USER_EXPLICIT',
+            'selection_policy' => 'PINNED',
+        ];
+        $verifier = new StagingAcceptanceScopeVerifier(static fn (): string => 'staging', 'test-secret', static fn (): bool => true, can: static fn (): bool => true);
+        $scope = $verifier->issueForMediaUsageOperation($capture, $operation);
+        $payload = array_replace($operation, [
+            'media' => ['id' => $mediaId],
+            'target' => ['type' => 'wp_post', 'id' => '1:617'],
+            'capture_id' => $capture->captureId,
+            'capture_fingerprint' => $capture->requestFingerprint,
+            'staging_acceptance' => $scope,
+        ]);
+        $proposal = new Proposal(UuidCodec::newV7(), $mediaId, 'replace', $payload, 'content', null, 'dependency', ProposalState::APPROVED, idempotencyKey: $operation['idempotency_key'], targetUuid: null, entityType: 'media');
+
+        self::assertSame('wp_post', $scope['target']['type']);
+        self::assertSame('1:617', $scope['target']['id']);
+        self::assertTrue($verifier->verifyProposal($scope, $proposal));
+    }
+
     public function test_media_metadata_scope_binds_exact_capture_media_revision_and_payload(): void
     {
         $capture = new CaptureRecord(UuidCodec::newV7(), 'media-metadata-scope', hash('sha256', 'media-metadata-scope'), 'RECEIVED', 'IN_PROGRESS');

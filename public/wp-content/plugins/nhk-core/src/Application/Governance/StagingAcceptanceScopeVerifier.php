@@ -68,6 +68,59 @@ final class StagingAcceptanceScopeVerifier
         return $base + ['fingerprint' => $fingerprint, 'signature' => hash_hmac('sha256', $fingerprint, $this->secret())];
     }
 
+    /** Issue the exact Capture-owned packet for an Article MediaUsage mutation. */
+    public function issueForMediaUsageOperation(CaptureRecord $capture, array $operation): array
+    {
+        $environment = $this->environmentName();
+        if (in_array($environment, ['production', 'prod'], true)) throw new \RuntimeException('STAGING_PRODUCTION_FORBIDDEN');
+        if ($environment !== 'staging') throw new \RuntimeException('STAGING_SCOPE_ENVIRONMENT_REQUIRED');
+        if ($this->secret() === '') throw new \RuntimeException('STAGING_SCOPE_SIGNING_KEY_REQUIRED');
+        $this->requireCapability();
+        if (!is_callable($this->admission)) throw new \RuntimeException('STAGING_SCOPE_ADMISSION_REQUIRED');
+
+        $op = strtolower(trim((string) ($operation['operation'] ?? '')));
+        if (!in_array($op, ['add', 'replace', 'remove'], true)) throw new \RuntimeException('STAGING_MEDIA_USAGE_OPERATION_INVALID');
+        $media = is_array($operation['media'] ?? null) ? $operation['media'] : (is_array($operation['media_ref'] ?? null) ? $operation['media_ref'] : []);
+        $mediaId = trim((string) ($media['id'] ?? $media['media_id'] ?? ''));
+        $target = is_array($operation['target'] ?? null) ? $operation['target'] : [];
+        $targetType = strtolower(trim((string) ($target['type'] ?? '')));
+        $targetId = trim((string) ($target['id'] ?? ''));
+        if (!UuidCodec::isValid($mediaId) || $targetType === '') throw new \RuntimeException('STAGING_EXACT_MEDIA_USAGE_REFERENCE_REQUIRED');
+        if ($targetType === 'wp_post') {
+            $blog = (int) ($target['blog_id'] ?? 1);
+            $post = (int) ($target['post_id'] ?? $targetId);
+            if ($blog < 1 || $post < 1) throw new \RuntimeException('STAGING_EXACT_MEDIA_USAGE_REFERENCE_REQUIRED');
+            $target = ['type' => 'wp_post', 'id' => $blog . ':' . $post];
+        } elseif (!UuidCodec::isValid($targetId)) {
+            throw new \RuntimeException('STAGING_EXACT_MEDIA_USAGE_REFERENCE_REQUIRED');
+        } else {
+            $target = ['type' => $targetType, 'id' => $targetId];
+        }
+        $payload = StagingAcceptanceScope::withoutAuthorization(array_replace($operation, [
+            'operation' => $op,
+            'media' => ['id' => $mediaId],
+            'target' => $target,
+            'capture_id' => $capture->captureId,
+            'capture_fingerprint' => $capture->requestFingerprint,
+        ]));
+        $base = [
+            'approved' => true, 'environment' => 'staging', 'capture_id' => $capture->captureId,
+            'capture_fingerprint' => $capture->requestFingerprint, 'capture_revision' => $capture->revision,
+            'operation_family' => 'media_usage_reconciliation', 'entity_type' => 'media', 'operation' => $op,
+            'writer' => 'canonical_governed', 'entrypoint' => 'nhk.capture.ingest',
+            'subject_id' => $mediaId, 'media_ids' => [$mediaId], 'target' => $target,
+            'target_uuid' => $targetType === 'wp_post' ? null : $targetId,
+            'usage_id' => (string) ($payload['usage_id'] ?? ''),
+            'expected_usage_revision' => (int) ($payload['expected_usage_revision'] ?? 0),
+            'idempotency_key' => (string) ($payload['idempotency_key'] ?? ''),
+            'payload_fingerprint' => hash('sha256', CommandCanonicalizer::canonicalize($payload)),
+            'issued_at' => gmdate('c'), 'expires_at' => gmdate('c', time() + max(1, $this->ttlSeconds)),
+        ];
+        if (!(bool) ($this->admission)($base, $capture, ['intent' => 'IMAGE_ARTICLE', 'media_operations' => [$payload]], [])) throw new \RuntimeException('STAGING_SCOPE_NOT_ADMITTED');
+        $fingerprint = hash('sha256', CommandCanonicalizer::canonicalize($base));
+        return $base + ['fingerprint' => $fingerprint, 'signature' => hash_hmac('sha256', $fingerprint, $this->secret())];
+    }
+
     /** Issue one exact scope for an existing Media metadata update. */
     public function issueForMediaMetadataUpdate(CaptureRecord $capture, array $operation, string $mediaId, int $expectedRevision): array
     {

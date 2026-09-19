@@ -1,5 +1,30 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-19 — Capture-owned Article MediaUsage staging scope fixed locally (NO LIVE MUTATION)
+
+ROOT_CAUSE: Capture staging scope issuance covered only `representative_bind`
+and the verification branch assumed Authority UUID targets. Article
+`media:add/replace/remove` proposals for exact `wp_post` endpoints such as
+`1:617` therefore entered Governance without a matching server-issued packet
+or were rejected before Controlled Apply.
+
+FIXED_BOUNDARY: Added Capture-bound, signed MediaUsage packets for Article
+add/replace/remove operations; normalized exact WordPress endpoint keys;
+validated Media UUID, operation, usage revision, idempotency and payload
+fingerprints; and preserved the original UUID-only representative binding
+contract. The Media selector already remains fail-closed on persisted exact
+subject scope, with regression coverage for sibling/parent/global fallback
+rejection and canonical Media reuse.
+
+VERIFICATION: Focused Media/Capture/Governance/compliance suite passes 103
+tests / 354 assertions; targeted Governance continuation suite passes 10 tests
+/ 35 assertions; changed-file PHP lint and `git diff --check` pass. Full Unit
+has the existing Demo/WordPress integration gates; local `wp` read-back cannot
+connect to the configured database. No staging or production mutation,
+deployment, publication or live retry performed.
+
+STATUS: `ARTICLE_MEDIA_USAGE_SCOPE_FIXED_LOCAL / LIVE_RUNTIME_BLOCKED / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-19 — Easy MCP canonical projection no longer reintroduces empty metadata (LOCAL / NO LIVE DEPLOY)
 
 ROOT_CAUSE_REFINED: The global empty-metadata normalization still reintroduced

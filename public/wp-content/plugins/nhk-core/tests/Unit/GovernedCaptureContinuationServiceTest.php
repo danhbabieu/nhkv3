@@ -24,6 +24,69 @@ use PHPUnit\Framework\TestCase;
 
 final class GovernedCaptureContinuationServiceTest extends TestCase
 {
+    public function test_video_retry_does_not_reuse_pending_proposal_when_final_dependency_binding_changed(): void
+    {
+        $captureId = UuidCodec::newV7();
+        $videoId = UuidCodec::newV7();
+        $evidenceId = UuidCodec::newV7();
+        $old = new Proposal(
+            UuidCodec::newV7(), $videoId, 'ingest', ['canonical_id' => $videoId],
+            'old-content', null, 'old-dependency', ProposalState::SUBMITTED,
+            idempotencyKey: $captureId . ':video', entityType: 'video',
+        );
+        $lookup = new class($old) implements PendingVideoProposalLookup {
+            public function __construct(private Proposal $proposal) {}
+            public function findPendingVideoProposals(array $binding): array { return [$this->proposal]; }
+        };
+        $service = new GovernedCaptureContinuationService(
+            $this->createMock(GovernedLifecycle::class),
+            static fn (): array => [],
+            $this->policies(['video']),
+            static fn (): bool => true,
+            pendingVideoProposals: $lookup,
+        );
+        $method = new \ReflectionMethod($service, 'pendingVideoProposal');
+        $method->setAccessible(true);
+        $payload = [
+            'canonical_id' => $videoId,
+            'metadata' => [
+                'semantic_attachments' => [[
+                    'predicate' => 'about',
+                    'target_type' => 'variant',
+                    'target_uuid' => UuidCodec::newV7(),
+                    'evidence_refs' => [['evidence_id' => $evidenceId]],
+                ]],
+            ],
+        ];
+        self::assertNull($method->invoke($service, ['idempotency_key' => $captureId . ':video'], $payload, $payload, $videoId));
+    }
+
+    public function test_video_retry_scope_is_derived_from_final_plan_and_dependency_closure(): void
+    {
+        $captureId = UuidCodec::newV7();
+        $videoId = UuidCodec::newV7();
+        $captured = null;
+        $service = new GovernedCaptureContinuationService(
+            $this->createMock(GovernedLifecycle::class), static fn (): array => [],
+            $this->policies(['video']), static fn (): bool => true,
+            videoScopeIssuer: static function (string $id, array $plan) use (&$captured): array {
+                $captured = $plan;
+                return ['approved' => true, 'capture_fingerprint' => hash('sha256', 'capture')];
+            },
+        );
+        $method = new \ReflectionMethod($service, 'scopeVideoPlan');
+        $method->setAccessible(true);
+        $plan = $method->invoke($service, UuidCodec::newV7(), [
+            'entity_type' => 'video', 'operation' => 'ingest', 'subject_id' => $videoId,
+            'dependency_ids' => [UuidCodec::newV7(), UuidCodec::newV7()],
+            'payload' => ['canonical_id' => $videoId, 'metadata' => ['source' => ['platform' => 'youtube', 'external_video_id' => 'TA2haJAn3EM']]],
+        ], []);
+        self::assertIsArray($captured);
+        self::assertMatchesRegularExpression('/^[a-f0-9]{64}$/', (string) ($captured['plan_fingerprint'] ?? ''));
+        self::assertTrue((bool) ($plan['payload']['staging_acceptance']['approved'] ?? false));
+        self::assertSame((string) $captured['plan_fingerprint'], (string) ($plan['plan_fingerprint'] ?? ''));
+    }
+
     public function test_existing_capture_video_resume_does_not_turn_applied_missing_evidence_receipt_into_a_proposal_skip(): void
     {
         $captureId = UuidCodec::newV7();

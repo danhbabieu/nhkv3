@@ -179,14 +179,37 @@ final class StagingAcceptanceScope
         $mediaIds = array_values(array_map('strval', $mediaIds));
         foreach ($mediaIds as $mediaId) if (!UuidCodec::isValid($mediaId)) throw new \RuntimeException('STAGING_MEDIA_SCOPE_INVALID');
         if (count(array_unique($mediaIds)) !== count($mediaIds) || !in_array($proposal->subjectId, $mediaIds, true)) throw new \RuntimeException('STAGING_MEDIA_SCOPE_MISMATCH');
-        $bindingMediaId = trim((string) (($proposal->payload['binding']['media']['id'] ?? $proposal->payload['media_id'] ?? $proposal->subjectId)));
+        $bindingMediaId = trim((string) (($proposal->payload['binding']['media']['id'] ?? $proposal->payload['media']['id'] ?? $proposal->payload['media_id'] ?? $proposal->subjectId)));
         if ($bindingMediaId !== $proposal->subjectId || !in_array($bindingMediaId, $mediaIds, true)) throw new \RuntimeException('STAGING_MEDIA_SCOPE_MISMATCH');
 
+        // Existing Authority representative bindings retain their original
+        // UUID-only target contract. Article MediaUsage mutations below use
+        // the exact WordPress endpoint key (for example 1:617).
+        if ($proposal->operation === 'representative_bind') {
+            $target = $scope['target'] ?? null;
+            if (!is_array($target) || !UuidCodec::isValid((string) ($target['id'] ?? '')) || (string) ($target['type'] ?? '') === '') throw new \RuntimeException('STAGING_TARGET_SCOPE_INVALID');
+            if ((string) $target['id'] !== (string) ($proposal->targetUuid ?? '') || (string) $target['type'] !== (string) ($proposal->payload['binding']['target']['type'] ?? $target['type'])) throw new \RuntimeException('STAGING_TARGET_SCOPE_MISMATCH');
+            if (isset($proposal->payload['binding']['target']['id']) && (string) $proposal->payload['binding']['target']['id'] !== (string) $target['id']) throw new \RuntimeException('STAGING_TARGET_SCOPE_MISMATCH');
+            if (isset($target['stable_key'], $proposal->payload['binding']['target']['stable_key']) && (string) $target['stable_key'] !== (string) $proposal->payload['binding']['target']['stable_key']) throw new \RuntimeException('STAGING_TARGET_SCOPE_MISMATCH');
+            if (isset($target['stable_key']) && trim((string) $target['stable_key']) === '') throw new \RuntimeException('STAGING_TARGET_SCOPE_INVALID');
+            self::assertNoFuzzyLocator($scope);
+            return;
+        }
+
         $target = $scope['target'] ?? null;
-        if (!is_array($target) || !UuidCodec::isValid((string) ($target['id'] ?? '')) || (string) ($target['type'] ?? '') === '') throw new \RuntimeException('STAGING_TARGET_SCOPE_INVALID');
-        if ((string) $target['id'] !== (string) ($proposal->targetUuid ?? '') || (string) $target['type'] !== (string) ($proposal->payload['binding']['target']['type'] ?? $target['type'])) throw new \RuntimeException('STAGING_TARGET_SCOPE_MISMATCH');
-        if (isset($proposal->payload['binding']['target']['id']) && (string) $proposal->payload['binding']['target']['id'] !== (string) $target['id']) throw new \RuntimeException('STAGING_TARGET_SCOPE_MISMATCH');
-        if (isset($target['stable_key'], $proposal->payload['binding']['target']['stable_key']) && (string) $target['stable_key'] !== (string) $proposal->payload['binding']['target']['stable_key']) throw new \RuntimeException('STAGING_TARGET_SCOPE_MISMATCH');
+        $proposalTarget = is_array($proposal->payload['target'] ?? null) ? $proposal->payload['target'] : (array) ($proposal->payload['binding']['target'] ?? []);
+        if (!is_array($target) || (string) ($target['type'] ?? '') === '') throw new \RuntimeException('STAGING_TARGET_SCOPE_INVALID');
+        $targetType = (string) ($target['type'] ?? '');
+        $targetId = (string) ($target['id'] ?? '');
+        if ($targetType === 'wp_post') {
+            if (preg_match('/^[1-9][0-9]*:[1-9][0-9]*$/', $targetId) !== 1) throw new \RuntimeException('STAGING_TARGET_SCOPE_INVALID');
+        } elseif (!UuidCodec::isValid($targetId)) throw new \RuntimeException('STAGING_TARGET_SCOPE_INVALID');
+        if ($targetId !== (string) ($proposal->targetUuid ?? ($proposalTarget['id'] ?? '')) || $targetType !== (string) ($proposalTarget['type'] ?? $targetType)) throw new \RuntimeException('STAGING_TARGET_SCOPE_MISMATCH');
+        if (in_array($proposal->operation, ['replace', 'remove'], true)) {
+            if ((string) ($scope['usage_id'] ?? '') !== (string) ($proposal->payload['usage_id'] ?? '') || (int) ($scope['expected_usage_revision'] ?? 0) !== (int) ($proposal->payload['expected_usage_revision'] ?? 0)) throw new \RuntimeException('STAGING_MEDIA_USAGE_REVISION_SCOPE_MISMATCH');
+        }
+        $payload = self::withoutAuthorization($proposal->payload);
+        if (!hash_equals((string) ($scope['payload_fingerprint'] ?? ''), hash('sha256', CommandCanonicalizer::canonicalize($payload)))) throw new \RuntimeException('STAGING_MEDIA_USAGE_PAYLOAD_MISMATCH');
         if (isset($target['stable_key']) && trim((string) $target['stable_key']) === '') throw new \RuntimeException('STAGING_TARGET_SCOPE_INVALID');
 
         self::assertNoFuzzyLocator($scope);

@@ -1104,6 +1104,15 @@ final class Plugin {
                             $targetUuid = $resolvedTarget->canonicalId;
                         }
                         $payload = array_replace($mediaOperation, ['operation' => $operation, 'media' => ['id' => $media->canonicalId], 'target' => $target]);
+                        $environment = defined('WP_ENVIRONMENT_TYPE') ? strtolower((string) constant('WP_ENVIRONMENT_TYPE')) : (function_exists('wp_get_environment_type') ? strtolower((string) wp_get_environment_type()) : strtolower((string) (getenv('WP_ENVIRONMENT_TYPE') ?: 'unknown')));
+                        if (in_array($operation, ['add', 'replace', 'remove'], true) && $environment === 'staging' && $stagingScopeVerifier !== null) {
+                            $captureRecord = $context['capture_record'] ?? null;
+                            if (!$captureRecord instanceof \NHK\Core\Domain\Capture\CaptureRecord) throw new \RuntimeException('CAPTURE_SCOPE_BINDING_UNAVAILABLE');
+                            $scope = $stagingScopeVerifier->issueForMediaUsageOperation($captureRecord, $payload);
+                            $payload['capture_id'] = $captureRecord->captureId;
+                            $payload['capture_fingerprint'] = $captureRecord->requestFingerprint;
+                            $payload['staging_acceptance'] = $scope;
+                        }
                         $governedMediaOperations[] = $mcpGovernance->ingestFromArguments([
                             'operation' => $operation, 'entity_type' => 'media', 'subject_id' => $media->canonicalId, 'target_uuid' => $targetUuid,
                             'expected_revision' => null, 'idempotency_key' => (string) ($mediaOperation['idempotency_key'] ?? ($context['capture']['capture_id'] ?? '') . ':media-operation:' . $index),

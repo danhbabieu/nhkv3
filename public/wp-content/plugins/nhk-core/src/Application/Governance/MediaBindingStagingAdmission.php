@@ -28,6 +28,10 @@ final class MediaBindingStagingAdmission
     public function __invoke(bool $admitted, array $scope, CaptureRecord $capture, array $input, array $assets): bool
     {
         if ($admitted) return true;
+        if (($scope['operation_family'] ?? '') === 'media_usage_reconciliation'
+            && in_array((string) ($scope['operation'] ?? ''), ['add', 'replace', 'remove'], true)) {
+            return $this->usageOperationAdmission($scope, $capture, $input);
+        }
         if (($scope['approved'] ?? false) !== true
             || ($scope['environment'] ?? '') !== 'staging'
             || ($scope['operation_family'] ?? '') !== 'media_usage_reconciliation'
@@ -72,6 +76,23 @@ final class MediaBindingStagingAdmission
                 ])) return false;
         }
         return true;
+    }
+
+    private function usageOperationAdmission(array $scope, CaptureRecord $capture, array $input): bool
+    {
+        if (($scope['capture_id'] ?? '') !== $capture->captureId || ($scope['capture_fingerprint'] ?? '') !== $capture->requestFingerprint) return false;
+        $operation = array_values(array_filter((array) ($input['media_operations'] ?? []), 'is_array'))[0] ?? null;
+        if (!is_array($operation) || strtolower((string) ($operation['operation'] ?? '')) !== (string) $scope['operation']) return false;
+        $media = is_array($operation['media'] ?? null) ? $operation['media'] : (array) ($operation['media_ref'] ?? []);
+        if ((string) ($media['id'] ?? '') !== (string) ($scope['subject_id'] ?? '')) return false;
+        $target = is_array($operation['target'] ?? null) ? $operation['target'] : [];
+        $targetId = strtolower((string) ($target['type'] ?? '')) === 'wp_post'
+            ? ((int) ($target['blog_id'] ?? 1) . ':' . (int) ($target['post_id'] ?? $target['id'] ?? 0))
+            : (string) ($target['id'] ?? '');
+        $scopedTarget = (array) ($scope['target'] ?? []);
+        return $targetId === (string) ($scopedTarget['id'] ?? '')
+            && strtolower((string) ($target['type'] ?? '')) === (string) ($scopedTarget['type'] ?? '')
+            && $this->media->findByCanonicalId((string) ($scope['subject_id'] ?? ''))?->active === true;
     }
 
     /** @param array<string,mixed> $binding @param array<string,mixed> $entry @param list<array<string,mixed>> $assets */

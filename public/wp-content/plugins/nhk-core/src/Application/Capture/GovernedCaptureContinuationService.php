@@ -416,6 +416,7 @@ final class GovernedCaptureContinuationService
                 // historical receipt authoritative. Rebuild the provenance
                 // plan so Source/Claim/Evidence are validated before reuse.
                 $pending = $this->historicalEvidenceRecoveryRequired($context, $payload)
+                    || $this->finalVideoPlanRebuildRequired($payload)
                     ? null
                     : $this->pendingVideoProposal($context, $video, $payload, $subjectId);
                 if ($pending !== null) {
@@ -506,14 +507,25 @@ final class GovernedCaptureContinuationService
         if ($this->pendingVideoProposals !== null && $key !== '' && UuidCodec::isValid($videoId)) {
             $expectedValue = array_key_exists('expected_revision', $video) ? $video['expected_revision'] : ($payload['expected_revision'] ?? null);
             $expected = $expectedValue !== null ? (int) $expectedValue : null;
-            $candidates = $this->pendingVideoProposals->findPendingVideoProposals([
+            $binding = [
                 'capture_id' => $this->currentCaptureId,
                 'idempotency_key' => $key,
                 'video_id' => $videoId,
                 'entity_type' => 'video',
                 'operation' => 'ingest',
                 'expected_revision' => $expected,
-            ]);
+            ];
+            $fingerprints = $this->pendingVideoFingerprints($video, $payload, $videoId, $expected);
+            if ($fingerprints !== null) $binding += $fingerprints;
+            $candidates = $this->pendingVideoProposals->findPendingVideoProposals($binding);
+            // Adapters may implement only the identity portion of the lookup;
+            // enforce the content/dependency binding again at this owner
+            // boundary before treating a Proposal as reusable.
+            if ($fingerprints !== null) {
+                $candidates = array_values(array_filter($candidates, static fn (Proposal $proposal): bool =>
+                    strtolower($proposal->contentFingerprint) === strtolower($fingerprints['content_fingerprint'])
+                    && strtolower($proposal->dependencyFingerprint) === strtolower($fingerprints['dependency_fingerprint'])));
+            }
             if (count($candidates) > 1) throw new \RuntimeException('AMBIGUOUS_PENDING_VIDEO_PROPOSAL');
             if (count($candidates) === 1) {
                 $proposal = $candidates[0];
@@ -550,12 +562,63 @@ final class GovernedCaptureContinuationService
         return null;
     }
 
+    /** @return array{content_fingerprint:string,dependency_fingerprint:string}|null */
+    private function pendingVideoFingerprints(array $video, array $payload, string $videoId, ?int $expectedRevision): ?array
+    {
+        $metadata = is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [];
+        $attachments = is_array($metadata['semantic_attachments'] ?? null)
+            ? $metadata['semantic_attachments']
+            : (is_array($payload['semantic_attachments'] ?? null) ? $payload['semantic_attachments'] : []);
+        $dependencyIds = array_values(array_filter(array_map('strval', (array) ($video['dependency_ids'] ?? $payload['dependency_ids'] ?? [])), static fn (string $id): bool => UuidCodec::isValid($id)));
+        foreach ($attachments as $attachment) {
+            if (!is_array($attachment)) continue;
+            foreach ((array) ($attachment['evidence_refs'] ?? []) as $reference) {
+                $id = is_array($reference) ? (string) ($reference['evidence_id'] ?? '') : (string) $reference;
+                if (UuidCodec::isValid($id)) $dependencyIds[] = $id;
+            }
+        }
+        $dependencyIds = array_values(array_unique($dependencyIds));
+        // A pre-provenance child has no final dependency closure to compare;
+        // leave that legacy pending lookup available for ordinary approval
+        // continuation. Final Evidence-backed commands always bind here.
+        if ($dependencyIds === []) return null;
+        sort($dependencyIds, SORT_STRING);
+        $binding = [
+            'operation' => (string) ($video['operation'] ?? 'ingest'),
+            'entity_type' => (string) ($video['entity_type'] ?? 'video'),
+            'subject_id' => $videoId,
+            'target_uuid' => $video['target_uuid'] ?? null,
+            'expected_revision' => $expectedRevision,
+            'payload' => $payload,
+            'dependency_ids' => $dependencyIds,
+        ];
+        return [
+            'content_fingerprint' => hash('sha256', CommandCanonicalizer::canonicalize($binding)),
+            'dependency_fingerprint' => hash('sha256', CommandCanonicalizer::canonicalize($dependencyIds)),
+        ];
+    }
+
     /** @param array<string,mixed> $plan @param array<string,mixed> $context @return array<string,mixed> */
     private function scopeVideoPlan(string $captureId, array $plan, array $context): array
     {
         if (($plan['entity_type'] ?? '') !== 'video' || !in_array((string) ($plan['operation'] ?? ''), ['ingest', 'update'], true) || !is_callable($this->videoScopeIssuer)) return $plan;
         if (!is_array($plan['payload'] ?? null)) $plan['payload'] = [];
         unset($plan['payload']['staging_acceptance'], $plan['payload']['capture_fingerprint'], $plan['payload']['scope_fingerprint']);
+        // A resumed Video may have been reconstructed after Source/Claim/
+        // Evidence read-back. The staging packet must be derived from this
+        // exact final command, never from the historical child scope.
+        if (!preg_match('/^[a-f0-9]{64}$/i', (string) ($plan['plan_fingerprint'] ?? ''))) {
+            $plan['plan_fingerprint'] = hash('sha256', CommandCanonicalizer::canonicalize([
+                'capture_id' => $captureId,
+                'entity_type' => $plan['entity_type'],
+                'operation' => $plan['operation'],
+                'subject_id' => $plan['subject_id'] ?? null,
+                'target_uuid' => $plan['target_uuid'] ?? null,
+                'expected_revision' => $plan['expected_revision'] ?? null,
+                'dependency_ids' => array_values(array_map('strval', (array) ($plan['dependency_ids'] ?? []))),
+                'payload' => $plan['payload'],
+            ]));
+        }
         $scope = ($this->videoScopeIssuer)($captureId, $plan);
         if (!is_array($scope)) throw new \RuntimeException('STAGING_SCOPE_REQUIRED');
         $plan['payload']['capture_id'] = $captureId;
@@ -564,6 +627,36 @@ final class GovernedCaptureContinuationService
         $plan['payload']['capture_fingerprint'] = (string) ($scope['capture_fingerprint'] ?? '');
         $plan['payload']['staging_acceptance'] = $scope;
         return $plan;
+    }
+
+    /**
+     * A persisted pending child is only a locator. Once its final payload
+     * carries canonical Evidence references, retry must rebuild the governed
+     * Video command so a stale scope/key cannot be reused.
+     */
+    private function finalVideoPlanRebuildRequired(array $payload): bool
+    {
+        if ($this->canonicalDependencies === null) return false;
+        $metadata = is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [];
+        $attachments = is_array($metadata['semantic_attachments'] ?? null)
+            ? $metadata['semantic_attachments']
+            : (is_array($payload['semantic_attachments'] ?? null) ? $payload['semantic_attachments'] : []);
+        foreach ($attachments as $attachment) {
+            if (!is_array($attachment) || strtolower(trim((string) ($attachment['predicate'] ?? ''))) !== 'about') continue;
+            foreach ((array) ($attachment['evidence_refs'] ?? []) as $reference) {
+                $evidenceId = is_array($reference)
+                    ? trim((string) ($reference['evidence_id'] ?? ''))
+                    : trim((string) $reference);
+                if (!UuidCodec::isValid($evidenceId)) continue;
+                try {
+                    $this->canonicalDependencies->evidence($evidenceId);
+                    return true;
+                } catch (\Throwable) {
+                    return false;
+                }
+            }
+        }
+        return false;
     }
 
     /** @param array<string,mixed> $plan @return array<string,mixed> */
@@ -751,6 +844,18 @@ final class GovernedCaptureContinuationService
         // payload that now contains canonical Evidence-backed attachments.
         // This remains deterministic so an identical final command reuses
         // its Proposal, while a legitimate semantic change gets a new key.
+        $videoPayload = is_array($videoProposal['payload'] ?? null) ? $videoProposal['payload'] : [];
+        $videoId = trim((string) ($videoPayload['canonical_id'] ?? $videoProposal['subject_id'] ?? ''));
+        $videoProposal['entity_type'] = 'video';
+        $videoProposal['operation'] = 'ingest';
+        $videoProposal['subject_id'] = $videoId;
+        // Bind the final command to the exact canonical Source/Claim/Evidence
+        // closure just read back. These are server-derived identities.
+        $videoProposal['dependency_ids'] = array_values(array_filter($canonicalIds, static fn (string $id): bool => UuidCodec::isValid($id)));
+        // Leave create expected_revision null; the staging descriptor
+        // normalizes Video ingest to revision zero without violating the
+        // Proposal domain's positive-revision invariant.
+        unset($videoProposal['expected_revision']);
         $videoProposal['idempotency_key'] = $this->finalVideoCommandIdempotencyKey($this->currentCaptureId, $videoProposal);
         $videoProposal = $this->scopeVideoPlan($this->currentCaptureId, $videoProposal, []);
         $videoWrite = $this->runGovernedChild($videoProposal, $control, $lifecycle, 'VIDEO_GOVERNANCE');
