@@ -40,6 +40,7 @@ final readonly class StagingOperationDescriptor
         $payload['capture_id'] = $captureId;
         $payload['capture_fingerprint'] = $captureFingerprint;
         $payload = self::withoutAuthorization($payload);
+        if ($entity === 'video') unset($payload['capture_revision']);
         $dependencies = array_values(array_unique(array_map('strval', (array) ($payload['dependency_ids'] ?? $plan['dependency_ids'] ?? []))));
         sort($dependencies, SORT_STRING);
         $family = self::family($entity, $operation);

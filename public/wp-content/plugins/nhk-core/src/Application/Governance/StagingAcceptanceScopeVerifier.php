@@ -362,8 +362,17 @@ final class StagingAcceptanceScopeVerifier
         // Video bindings must be derived from that exact final plan rather
         // than from the historical Capture asset payload.
         $finalPayload = is_array($plan['payload'] ?? null) ? $plan['payload'] : [];
+        // Bind the child command to the exact persisted Capture snapshot used
+        // to issue this scope. Receipt/reconciliation saves must not be able
+        // to move the parent revision between issue and verification.
         $videoPayload = $finalPayload !== [] ? $finalPayload : $this->videoPayload($capture);
         if ($videoPayload === []) throw new \RuntimeException('STAGING_VIDEO_PLAN_REQUIRED');
+        $videoPayload['capture_revision'] = $capture->revision;
+        $plan['payload'] = $videoPayload;
+        // Rebuild the descriptor after the server-owned Capture revision has
+        // been inserted; the signed command and verifier must hash the same
+        // final payload.
+        $descriptor = StagingOperationDescriptor::fromPlan($plan, $capture->captureId, $capture->requestFingerprint);
         $metadata = is_array($videoPayload['metadata'] ?? null) ? $videoPayload['metadata'] : [];
         $source = is_array($metadata['source'] ?? null) ? $metadata['source'] : (is_array($metadata['source_snapshot'] ?? null) ? $metadata['source_snapshot'] : []);
         $platform = strtolower(trim((string) ($plan['platform'] ?? $source['platform'] ?? '')));
@@ -398,7 +407,7 @@ final class StagingAcceptanceScopeVerifier
         $proposalCommandFingerprint = $descriptor->payloadFingerprint;
         $base = [
             'approved' => true, 'environment' => 'staging', 'capture_id' => $capture->captureId,
-            'capture_fingerprint' => $capture->requestFingerprint, 'request_fingerprint' => $capture->requestFingerprint,
+            'capture_fingerprint' => $capture->requestFingerprint, 'capture_revision' => $capture->revision, 'request_fingerprint' => $capture->requestFingerprint,
             'semantic_write_policy' => 'PROJECT_BUILD', 'operation_family' => 'governed_video_plan',
             'entity_type' => 'video', 'operation' => $operation, 'writer' => 'canonical_governed',
             'entrypoint' => 'nhk.capture.ingest', 'canonical_entrypoint' => 'nhk.capture.ingest',
@@ -407,6 +416,8 @@ final class StagingAcceptanceScopeVerifier
             'platform' => $platform, 'external_video_id' => $externalId, 'canonical_source_url' => $sourceUrl,
             'subject' => ['type' => $subjectType, 'uuid' => $subjectId, 'revision' => max(0, (int) ($subjectPacket['revision'] ?? $plan['subject_revision'] ?? 0))],
             'plan_fingerprint' => $planFingerprint, 'proposal_command_fingerprint' => $proposalCommandFingerprint,
+            'dependency_ids' => array_values(array_map('strval', (array) ($descriptor->payload['dependency_ids'] ?? []))),
+            'dependency_fingerprint' => $descriptor->dependencyFingerprint,
             'issued_at' => gmdate('c'), 'expires_at' => gmdate('c', time() + max(1, $this->ttlSeconds)),
         ];
         $input = is_array($capture->context['planning_input'] ?? null) ? $capture->context['planning_input'] : [];

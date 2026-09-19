@@ -101,6 +101,17 @@ final class StagingAcceptanceScope
             if (!hash_equals((string) ($scope['proposal_command_fingerprint'] ?? ''), $descriptor->payloadFingerprint)) {
                 throw new \RuntimeException('STAGING_VIDEO_PAYLOAD_MISMATCH');
             }
+            if (array_key_exists('capture_revision', $scope) && array_key_exists('capture_revision', $proposal->payload) && (int) $scope['capture_revision'] !== (int) $proposal->payload['capture_revision']) {
+                throw new \RuntimeException('STAGING_CAPTURE_REVISION_MISMATCH');
+            }
+            $scopeDependencies = array_values(array_map('strval', (array) ($scope['dependency_ids'] ?? [])));
+            $descriptorDependencies = array_values(array_map('strval', (array) ($descriptor->payload['dependency_ids'] ?? [])));
+            sort($scopeDependencies, SORT_STRING);
+            sort($descriptorDependencies, SORT_STRING);
+            if ($scopeDependencies !== $descriptorDependencies
+                || !hash_equals((string) ($scope['dependency_fingerprint'] ?? ''), $descriptor->dependencyFingerprint)) {
+                throw new \RuntimeException('STAGING_VIDEO_DEPENDENCY_MISMATCH');
+            }
             if (is_array($scope['subject'] ?? null)) {
                 $subject = is_array($proposal->payload['metadata']['subject_resolution_packet'] ?? null) ? $proposal->payload['metadata']['subject_resolution_packet'] : [];
                 if (($subject['id'] ?? null) !== null && (string) ($scope['subject']['uuid'] ?? '') !== (string) $subject['id']) throw new \RuntimeException('STAGING_SUBJECT_SCOPE_MISMATCH');

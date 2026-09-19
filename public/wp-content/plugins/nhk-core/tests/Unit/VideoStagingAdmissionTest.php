@@ -206,6 +206,48 @@ final class VideoStagingAdmissionTest extends TestCase
         self::assertTrue($verifier->verifyProposal($scope, $proposal));
     }
 
+    public function test_reused_verified_dependencies_and_explicit_about_relation_pass_final_video_admission(): void
+    {
+        $captureId = '01a0b89f-9fd0-705e-a7bf-865ee7229bff';
+        $videoId = '01a0b2e0-1ba4-751c-8fe1-98c1401319d9';
+        $variantId = '5f6c98ca-869a-4418-a8a4-1a32eb931c5e';
+        $sourceId = '01a0b2e0-1888-7038-9811-2dd7e7073a27';
+        $claimId = '01a0b2e0-1888-7038-9811-2dd7e7073a28';
+        $evidenceId = '01a0b2e0-1888-7038-9811-2dd7e7073a29';
+        $capture = new CaptureRecord($captureId, 'video-reused-verified', hash('sha256', 'video-reused-verified'), 'SEMANTICS_RECONCILED', 'IN_PROGRESS', null, null, [], ['purpose' => 'EDITORIAL', 'content_intent' => ['intent' => 'VIDEO']], [], [], 7);
+        $payload = [
+            'canonical_id' => $videoId,
+            'metadata' => [
+                'source' => ['platform' => 'youtube', 'external_video_id' => 'TA2haJAn3EM', 'canonical_source_url' => 'https://www.youtube.com/watch?v=TA2haJAn3EM'],
+                'subject_resolution_packet' => ['status' => 'RESOLVED', 'type' => 'variant', 'id' => $variantId, 'revision' => 1],
+                'semantic_attachments' => [[
+                    'predicate' => 'about', 'target_type' => 'variant', 'target_uuid' => $variantId,
+                    'origin' => 'EXPLICIT_USER_RELATION', 'evidence_refs' => [['evidence_id' => $evidenceId]],
+                ]],
+            ],
+            'dependency_ids' => [$sourceId, $claimId, $evidenceId],
+        ];
+        $videos = new class implements VideoRepository {
+            public function findByCanonicalId(string $id): ?Video { return null; }
+            public function findByExternalReference(string $platform, string $externalId): ?Video { return null; }
+            public function create(Video $video): Video { return $video; }
+            public function update(Video $video, int $expectedRevision): Video { return $video; }
+            public function list(bool $includeRetired = false): array { return []; }
+        };
+        $verifier = new StagingAcceptanceScopeVerifier(
+            static fn (): string => 'staging', 'test-secret',
+            static fn (array $scope, CaptureRecord $capture, array $input, array $assets): bool => (new VideoStagingAdmission($videos))(false, $scope, $capture, $input, $assets),
+            can: static fn (): bool => true, videos: $videos,
+        );
+        $scope = $verifier->issueForVideoPlan($capture, ['entity_type' => 'video', 'operation' => 'ingest', 'subject_id' => $videoId, 'proposed_uuid' => $videoId, 'dependency_ids' => $payload['dependency_ids'], 'payload' => $payload, 'plan_fingerprint' => hash('sha256', 'final-video-plan')]);
+        $proposalPayload = $payload + ['capture_id' => $captureId, 'capture_fingerprint' => $capture->requestFingerprint, 'capture_revision' => $capture->revision, 'staging_acceptance' => $scope];
+        $proposal = new Proposal('01a0b2e0-1ba4-751c-8fe1-98c1401319d0', $videoId, 'ingest', $proposalPayload, 'content', null, 'dependency', ProposalState::APPROVED, idempotencyKey: 'video-reused-verified', entityType: 'video');
+
+        self::assertSame($capture->revision, $scope['capture_revision']);
+        self::assertSame($payload['dependency_ids'], $scope['dependency_ids']);
+        self::assertTrue($verifier->verifyProposal($scope, $proposal));
+    }
+
     /** @return array{0:CaptureRecord,1:array<string,mixed>} */
     private function fixture(): array
     {

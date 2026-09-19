@@ -1,5 +1,29 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-19 — Video final-plan staging admission parity fixed locally (NO LIVE MUTATION)
+
+ROOT_CAUSE: Video staging scope issuance signed the final payload fingerprint
+before the server-owned Capture revision was attached, while the retry path
+kept Source/Claim/Evidence dependency IDs at plan level. Proposal verification
+recomputed from a different payload shape, so a clean Video Capture with
+`REUSED_VERIFIED` dependencies and an explicit `about` relation could fail
+closed as `STAGING_SCOPE_NOT_APPROVED`.
+
+FIXED_BOUNDARY: Final Video scope issuance now rehydrates and fingerprints the
+same final payload used by Proposal admission, binds the current Capture
+revision, canonical dependency IDs and dependency fingerprint, and verifies
+those values immediately before Governance. The Video proposal reconciliation
+retry path now carries the same dependency closure and Capture revision. No
+staging verification or Governance guard was bypassed.
+
+REGRESSION: Added a production-shaped admission test for YouTube
+`TA2haJAn3EM`, explicit Variant `about` relation, `EXPLICIT_USER_RELATION`,
+Evidence ref and canonical dependency closure. Focused Video/Capture/staging
+suite passes 67 tests / 313 assertions with existing deprecations. No live
+deployment, staging mutation or retry performed.
+
+STATUS: `VIDEO_STAGING_SCOPE_PARITY_FIXED_LOCAL / DEPLOYMENT_PENDING / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-19 — Capture-owned Article MediaUsage staging scope fixed locally (NO LIVE MUTATION)
 
 ROOT_CAUSE: Capture staging scope issuance covered only `representative_bind`

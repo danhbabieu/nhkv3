@@ -29,6 +29,7 @@ final class VideoStagingAdmission
             || !CaptureVideoIntent::matches($capture, $input)
             || !preg_match('/^[a-f0-9]{64}$/i', (string) ($scope['plan_fingerprint'] ?? ''))
             || !preg_match('/^[a-f0-9]{64}$/i', (string) ($scope['proposal_command_fingerprint'] ?? ''))) return false;
+        if (array_key_exists('capture_revision', $scope) && (int) $scope['capture_revision'] !== $capture->revision) return false;
 
         // Scope issuance supplies the exact final plan as an admission asset.
         // Fall back to the persisted Capture asset only for legacy callers
@@ -38,6 +39,7 @@ final class VideoStagingAdmission
         if (count($videoAssets) !== 1) return false;
         $video = is_array($videoAssets[0]['video_proposal'] ?? null) ? $videoAssets[0]['video_proposal'] : [];
         $payload = is_array($video['payload'] ?? null) ? $video['payload'] : [];
+        if (array_key_exists('capture_revision', $scope) && array_key_exists('capture_revision', $payload) && (int) $payload['capture_revision'] !== (int) $scope['capture_revision']) return false;
         $metadata = is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [];
         $subject = is_array($metadata['subject_resolution_packet'] ?? null) ? $metadata['subject_resolution_packet'] : [];
         if (!UuidCodec::isValid((string) ($subject['id'] ?? '')) || trim((string) ($subject['type'] ?? '')) === '' || in_array(strtoupper((string) ($subject['status'] ?? '')), ['AMBIGUOUS', 'CONFLICT', 'MISSING'], true)) return false;

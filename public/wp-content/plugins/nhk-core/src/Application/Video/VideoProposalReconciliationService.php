@@ -163,6 +163,7 @@ final class VideoProposalReconciliationService implements VideoProposalReconcili
     {
         $payload = is_array($video['payload'] ?? null) ? $video['payload'] : [];
         unset($payload['staging_acceptance'], $payload['capture_fingerprint'], $payload['scope_fingerprint'], $payload['proposal_command_fingerprint']);
+        $payload['dependency_ids'] = array_values(array_map('strval', $dependencyIds));
         $captureId = trim((string) ($original->payload['capture_id'] ?? ''));
         $commandFingerprint = hash('sha256', CommandCanonicalizer::canonicalize([
             'capture_id' => $captureId,
@@ -188,6 +189,7 @@ final class VideoProposalReconciliationService implements VideoProposalReconcili
             if (!is_array($scope)) throw new \RuntimeException('STAGING_SCOPE_REQUIRED');
             $plan['payload']['capture_id'] = $captureId;
             $plan['payload']['capture_fingerprint'] = (string) ($scope['capture_fingerprint'] ?? '');
+            $plan['payload']['capture_revision'] = (int) ($scope['capture_revision'] ?? 0);
             $plan['payload']['staging_acceptance'] = $scope;
         }
         return $plan;

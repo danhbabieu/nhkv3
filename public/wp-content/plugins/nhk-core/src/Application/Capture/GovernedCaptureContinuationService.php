@@ -625,6 +625,7 @@ final class GovernedCaptureContinuationService
         // The fingerprint is copied only from the server-issued packet; it is
         // never accepted from connector input.
         $plan['payload']['capture_fingerprint'] = (string) ($scope['capture_fingerprint'] ?? '');
+        $plan['payload']['capture_revision'] = (int) ($scope['capture_revision'] ?? 0);
         $plan['payload']['staging_acceptance'] = $scope;
         return $plan;
     }
@@ -852,6 +853,11 @@ final class GovernedCaptureContinuationService
         // Bind the final command to the exact canonical Source/Claim/Evidence
         // closure just read back. These are server-derived identities.
         $videoProposal['dependency_ids'] = array_values(array_filter($canonicalIds, static fn (string $id): bool => UuidCodec::isValid($id)));
+        // Dependency closure is part of the final Video command as well as
+        // the orchestration plan. This makes issuance and Proposal
+        // verification consume the same canonicalized input.
+        $videoPayload['dependency_ids'] = $videoProposal['dependency_ids'];
+        $videoProposal['payload'] = $videoPayload;
         // Leave create expected_revision null; the staging descriptor
         // normalizes Video ingest to revision zero without violating the
         // Proposal domain's positive-revision invariant.
