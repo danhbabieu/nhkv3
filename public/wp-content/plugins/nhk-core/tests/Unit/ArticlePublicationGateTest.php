@@ -98,6 +98,7 @@ final class ArticlePublicationGateTest extends TestCase
     {
         $evidence = $this->evidence();
         $evidence['media_usage_complete'] = false;
+        $evidence['content_intent'] = 'IMAGE_ARTICLE';
         $evidence['media_snapshot'] = [
             'featured_primary' => ['placeholder' => true],
             'inline_primary' => ['placeholder' => true],
@@ -109,6 +110,31 @@ final class ArticlePublicationGateTest extends TestCase
         self::assertContains('MEDIAUSAGE_INCOMPLETE', $result->blockers);
         self::assertContains('ARTICLE_MEDIA_FEATURED_MISSING', $result->blockers);
         self::assertContains('ARTICLE_MEDIA_INLINE_MISSING', $result->warnings);
+    }
+
+    public function test_text_article_without_media_is_publication_ready_with_enrichment_debt(): void
+    {
+        $evidence = $this->evidence();
+        $evidence['media_usage_complete'] = false;
+        $evidence['media_snapshot'] = [];
+        $result = (new ArticlePublicationGate())->check($this->draft(), $evidence, $this->draft()->token);
+
+        self::assertTrue($result->eligible);
+        self::assertSame('PASS', $result->outcome()->value);
+        self::assertContains('ARTICLE_FEATURED_MEDIA_MISSING', $result->warnings);
+        self::assertContains('FEATURED_MEDIA', $result->missingEnrichments);
+        self::assertFalse($result->toArray()['enrichment_complete']);
+    }
+
+    public function test_image_article_without_required_media_remains_blocked(): void
+    {
+        $evidence = $this->evidence();
+        $evidence['content_intent'] = 'IMAGE_ARTICLE';
+        $evidence['media_snapshot'] = [];
+        $result = (new ArticlePublicationGate())->check($this->draft(), $evidence, $this->draft()->token);
+
+        self::assertFalse($result->eligible);
+        self::assertContains('IMAGE_ARTICLE_MEDIA_REQUIRED', $result->blockers);
     }
 
     /** @return array<string,bool> */

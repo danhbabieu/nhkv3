@@ -54,4 +54,34 @@ final class ExistingMediaReferenceResolverTest extends TestCase
         $this->expectExceptionMessage('MEDIA_ATTACHMENT_MAPPING_INCONSISTENT');
         (new ExistingMediaReferenceResolver($media, $assets, $attachments))->resolve([$mediaId]);
     }
+
+    public function test_stale_asset_projection_is_repaired_from_exact_bridge_mapping_without_new_identity(): void
+    {
+        $mediaId = UuidCodec::newV7();
+        $assetId = UuidCodec::newV7();
+        $asset = new MediaAsset($assetId, $mediaId, 'derivative', 'uploads/existing.webp', str_repeat('8', 64), 'image/webp', 100, 10, 20, 'PUBLIC');
+        $state = (object) ['mapped' => false];
+        $media = $this->createMock(MediaRepository::class);
+        $media->method('findByCanonicalId')->willReturn(new Media($mediaId, 'media-86', 'Existing media'));
+        $assets = $this->createMock(MediaAssetRepository::class);
+        $assets->method('listByMediaId')->willReturnCallback(static function (string $id) use ($state, $asset): array {
+            if ($id !== $asset->mediaId) return [];
+            return [$state->mapped ? new MediaAsset($asset->assetId, $asset->mediaId, $asset->kind, $asset->storageKey, $asset->checksum, $asset->mimeType, $asset->byteSize, $asset->width, $asset->height, $asset->visibility, ['wordpress_attachment_id' => 86]) : $asset];
+        });
+        $attachments = new class($state, $mediaId) implements WordPressMediaAttachmentIngestor {
+            public object $state;
+            public string $mediaId;
+            public function __construct(object $state, string $mediaId) { $this->state = $state; $this->mediaId = $mediaId; }
+            public function ingest(array $file, string $filename, string $title, int $maxWidth, int $maxHeight, int $quality): array { return []; }
+            public function read(int $attachmentId): ?array { return ['attachment_id' => $attachmentId, 'media_id' => $this->state->mapped ? $this->mediaId : null, 'filename' => 'existing.webp']; }
+            public function attachmentIdForMediaReference(string $mediaId): int { return 86; }
+            public function reconcileBinding(string $mediaId, int $attachmentId): bool { $this->state->mapped = true; return true; }
+        };
+
+        $result = (new ExistingMediaReferenceResolver($media, $assets, $attachments))->resolve([$mediaId]);
+
+        self::assertSame($mediaId, $result[0]['media_id']);
+        self::assertSame(86, $result[0]['attachment_id']);
+        self::assertTrue($state->mapped);
+    }
 }

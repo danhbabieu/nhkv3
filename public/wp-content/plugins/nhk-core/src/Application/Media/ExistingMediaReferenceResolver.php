@@ -32,6 +32,23 @@ final class ExistingMediaReferenceResolver
             $media = $this->media->findByCanonicalId($mediaId);
             if (!$media instanceof Media || !$media->active || $media->isSystemPlaceholder()) throw new \InvalidArgumentException('MEDIA_REFERENCE_NOT_FOUND');
             $asset = $this->mappedAsset($mediaId);
+            if (!$asset instanceof MediaAsset) {
+                $candidateAttachmentId = 0;
+                foreach ($this->assets->listByMediaId($mediaId) as $candidate) {
+                    if ($candidate instanceof MediaAsset && isset($candidate->metadata['wordpress_attachment_id'])) {
+                        $candidateAttachmentId = (int) $candidate->metadata['wordpress_attachment_id'];
+                        break;
+                    }
+                }
+                // The canonical bridge may know the exact attachment even
+                // when the asset projection is stale. Read it first, then
+                // repair only that proven mapping; never infer from names.
+                if ($candidateAttachmentId < 1 && method_exists($this->attachments, 'attachmentIdForMediaReference')) $candidateAttachmentId = (int) $this->attachments->attachmentIdForMediaReference($mediaId);
+                if ($candidateAttachmentId > 0 && method_exists($this->attachments, 'reconcileBinding')) {
+                    ($this->attachments->reconcileBinding($mediaId, $candidateAttachmentId));
+                    $asset = $this->mappedAsset($mediaId);
+                }
+            }
             if (!$asset instanceof MediaAsset) throw new \InvalidArgumentException('MEDIA_ATTACHMENT_BINDING_NOT_FOUND');
             $attachmentId = (int) ($asset->metadata['wordpress_attachment_id'] ?? 0);
             if ($attachmentId < 1) throw new \InvalidArgumentException('MEDIA_ATTACHMENT_BINDING_NOT_FOUND');

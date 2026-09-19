@@ -622,6 +622,32 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
         return ['status' => 'MAPPED', 'media_id' => $mediaId];
     }
 
+    /**
+     * Reconciles a durable bridge row back into the canonical MediaAsset
+     * metadata. This is a repair of an existing identity, never an upload or
+     * Media creation path.
+     */
+    public function reconcileAttachmentBinding(string $mediaId, int $attachmentId): bool
+    {
+        if (!UuidCodec::isValid($mediaId) || $attachmentId < 1) return false;
+        $row = $this->database->get_row($this->database->prepare("SELECT media_uuid,asset_uuid,storage_key FROM {$this->table} WHERE attachment_id=%d LIMIT 1", $attachmentId), ARRAY_A);
+        if (!is_array($row) || $this->decodeUuidValue($row['media_uuid'] ?? null) !== $mediaId) return false;
+        $assetId = $this->decodeUuidValue($row['asset_uuid'] ?? null);
+        $asset = $assetId !== null ? $this->assets->findByAssetId($assetId) : null;
+        if (!$asset instanceof MediaAsset || $asset->mediaId !== $mediaId) return false;
+        if ((int) ($asset->metadata['wordpress_attachment_id'] ?? 0) === $attachmentId) return true;
+        $metadata = $asset->metadata;
+        $metadata['wordpress_attachment_id'] = $attachmentId;
+        $updated = new MediaAsset($asset->assetId, $asset->mediaId, $asset->kind, $asset->storageKey, $asset->checksum, $asset->mimeType, $asset->byteSize, $asset->width, $asset->height, $asset->visibility, $metadata);
+        $this->assets->update($updated, 1);
+        return (int) (($this->assets->findByAssetId($asset->assetId)?->metadata['wordpress_attachment_id'] ?? 0)) === $attachmentId;
+    }
+
+    public function attachmentIdForMediaReference(string $mediaId): int
+    {
+        return UuidCodec::isValid($mediaId) ? $this->attachmentIdForMedia($mediaId) : 0;
+    }
+
     private function attachmentIdForMedia(string $mediaId): int
     {
         return (int) $this->database->get_var($this->database->prepare("SELECT attachment_id FROM {$this->table} WHERE media_uuid=%s LIMIT 1", UuidCodec::toBinary($mediaId)));

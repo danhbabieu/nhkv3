@@ -121,6 +121,14 @@ dependencies; `add_evidence` additionally requires canonical `source_id` and
 
 ## Editorial enrichment and content gate — 2026-09-12
 
+Video owner validity is independent from presentation enrichment. A canonical
+Video with a validated provider reference, required subject/relation,
+provenance and Governance/read-back may remain usable without a thumbnail or
+representative Media when no consumer contract marks that image as required.
+Missing thumbnail is optional enrichment/deferred repair; corrupt, private,
+identity-conflicting or explicitly required presentation dependencies still
+fail closed.
+
 Historical Video recovery uses the application-level
 `VideoEditorialEnrichmentService` with one immutable
 `VideoEditorialEnrichmentContext`. The context is assembled from bounded

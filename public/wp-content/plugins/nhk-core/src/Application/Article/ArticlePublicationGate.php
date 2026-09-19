@@ -17,6 +17,10 @@ final class ArticlePublicationGate
     {
         $blockers = [];
         $warnings = [];
+        $missingEnrichments = [];
+        $deferredRepairs = [];
+        $intent = strtoupper(trim((string) ($evidence['content_intent'] ?? 'TEXT_ARTICLE')));
+        if (!in_array($intent, ['TEXT_ARTICLE', 'IMAGE_ARTICLE'], true)) $intent = 'TEXT_ARTICLE';
         if ($draft->status !== 'draft') $blockers[] = 'EDITORIAL_POST_NOT_DRAFT';
         if ($expectedStateToken === '' || !hash_equals($expectedStateToken, $draft->token)) $blockers[] = 'EDITORIAL_CAS_REQUIRED';
         if ($draft->postId < 1 || $draft->endpointKey === '' || $draft->slug === '' || $draft->permalink === '') $blockers[] = 'CANONICAL_PUBLIC_IDENTITY_INVALID';
@@ -31,19 +35,28 @@ final class ArticlePublicationGate
         $this->requireTrue($evidence, 'semantic_readback_verified', 'SEMANTIC_READBACK_UNVERIFIED', $blockers);
         $mediaSnapshot = is_array($evidence['media_snapshot'] ?? null) ? $evidence['media_snapshot'] : [];
         if ($mediaSnapshot === []) {
-            $this->requireTrue($evidence, 'media_usage_complete', 'MEDIAUSAGE_INCOMPLETE', $blockers);
+            $warnings[] = 'ARTICLE_FEATURED_MEDIA_MISSING';
+            $missingEnrichments[] = 'FEATURED_MEDIA';
+            if ($intent === 'IMAGE_ARTICLE') $blockers[] = 'IMAGE_ARTICLE_MEDIA_REQUIRED';
         } else {
             $featuredMissing = ($mediaSnapshot['featured_primary']['placeholder'] ?? true) === true;
             $inlineMissing = ($mediaSnapshot['inline_primary']['placeholder'] ?? true) === true;
             if ($featuredMissing) {
-                if (!in_array('MEDIAUSAGE_INCOMPLETE', $blockers, true)) $blockers[] = 'MEDIAUSAGE_INCOMPLETE';
-                $blockers[] = 'ARTICLE_MEDIA_FEATURED_MISSING';
+                $missingEnrichments[] = 'FEATURED_MEDIA';
+                if ($intent === 'IMAGE_ARTICLE') {
+                    if (!in_array('MEDIAUSAGE_INCOMPLETE', $blockers, true)) $blockers[] = 'MEDIAUSAGE_INCOMPLETE';
+                    $blockers[] = 'ARTICLE_MEDIA_FEATURED_MISSING';
+                } else $warnings[] = 'ARTICLE_MEDIA_FEATURED_MISSING';
             } elseif (($evidence['media_usage_complete'] ?? false) !== true) {
                 $warnings[] = 'MEDIAUSAGE_INCOMPLETE';
+                $missingEnrichments[] = 'MEDIAUSAGE';
             }
-            if ($inlineMissing) $warnings[] = 'ARTICLE_MEDIA_INLINE_MISSING';
+            if ($inlineMissing) { $warnings[] = 'ARTICLE_MEDIA_INLINE_MISSING'; $missingEnrichments[] = 'INLINE_MEDIA'; }
         }
-        $this->optionalTrue($evidence, 'real_image_requirements_met', 'REAL_IMAGE_REQUIREMENTS_UNMET', 'REAL_IMAGE_INCOMPLETE', $blockers, $warnings);
+        if (($evidence['real_image_requirements_met'] ?? false) !== true) {
+            if ($intent === 'IMAGE_ARTICLE' && ($evidence['real_image_requirements_met_status'] ?? '') === 'invalid') $blockers[] = 'REAL_IMAGE_REQUIREMENTS_UNMET';
+            else { $warnings[] = 'REAL_IMAGE_INCOMPLETE'; $missingEnrichments[] = 'REAL_IMAGE_SUPPORT'; }
+        }
         $this->requireTrue($evidence, 'claim_compliance_acceptable', 'PUBLIC_CLAIM_COMPLIANCE_BLOCKED', $blockers);
         $this->requireTrue($evidence, 'seo_projection_valid', 'SEO_PROJECTION_INVALID', $blockers);
         $this->optionalTrue($evidence, 'internal_links_valid', 'INTERNAL_LINKS_INVALID', 'INTERNAL_LINKS_INCOMPLETE', $blockers, $warnings);
@@ -52,7 +65,8 @@ final class ArticlePublicationGate
         $this->requireTrue($evidence, 'public_route_ready', 'PUBLIC_ROUTE_NOT_READY', $blockers);
         if (($evidence['rendered_public_verification_status'] ?? '') === 'unavailable') $warnings[] = 'RENDERED_PUBLIC_VERIFICATION_UNAVAILABLE';
         else $this->requireTrue($evidence, 'rendered_public_verification', 'RENDERED_PUBLIC_VERIFICATION_UNAVAILABLE', $blockers);
-        return new ArticlePublicationGateResult($blockers === [], $blockers, $warnings);
+        if (($evidence['media_repair_status'] ?? '') === 'deferred') $deferredRepairs[] = 'MEDIA_ATTACHMENT_BINDING';
+        return new ArticlePublicationGateResult($blockers === [], $blockers, $warnings, $missingEnrichments, $deferredRepairs);
     }
 
     /** @param array<string,mixed> $evidence @param list<string> $blockers */

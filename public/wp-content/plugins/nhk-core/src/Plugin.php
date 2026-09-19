@@ -1273,7 +1273,7 @@ final class Plugin {
                         $freshResearch,
                         is_array($context['media'] ?? null) ? $context['media'] : [],
                         is_array($context['semantic_write_back'] ?? null) ? $context['semantic_write_back'] : [],
-                        $current?->snapshot() ?? [],
+                        array_replace($current?->snapshot() ?? [], ['content_intent' => strtoupper((string) (($context['capture']['content_intent']['intent'] ?? 'TEXT_ARTICLE')))]),
                     );
                     $evidence['semantic'] = $context['semantic'] ?? [];
                     $evidence['semantic_write_back'] = $context['semantic_write_back'] ?? [];

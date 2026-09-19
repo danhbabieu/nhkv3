@@ -28,9 +28,11 @@ final class CaptureArticlePreflightHandoff
             && (string) ($resolution['persistence']['status'] ?? '') === 'attached';
         $slug = trim((string) ($articleState['slug'] ?? ''));
         $permalink = trim((string) ($articleState['permalink'] ?? ''));
+        $contentIntent = strtoupper(trim((string) ($articleState['content_intent'] ?? 'TEXT_ARTICLE')));
 
         return [
             'fresh_preflight' => true,
+            'content_intent' => $contentIntent,
             'fresh_preflight_blockers' => array_values(array_map('strval', $research->blockers)),
             'fresh_overlap' => $research->overlap,
             'fresh_category_plan' => $research->categoryPlan,

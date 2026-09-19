@@ -144,6 +144,18 @@ Use this precedence when deciding current behavior:
 
 ## 1.1 Universal MCP ingest reconciliation — current canonical route
 
+## 1.1.1 Publication/recovery readiness — 2026-09-19
+
+The executable Article publication policy separates `PUBLICATION_READY` from
+`ENRICHMENT_COMPLETE`. Required dependencies are resolved by Content Intent:
+TEXT_ARTICLE does not require Media, IMAGE_ARTICLE requires its submitted
+image branch, and Video thumbnail/representative Media remain optional unless
+an explicit consumer contract requires them. Optional gaps are surfaced as
+warnings, missing enrichments or deferred repairs. Canonical identity, CAS,
+Governance, provenance, visibility, collision and final public read-back
+failures remain hard blockers. Existing exact Media/attachment bridge mappings
+may be reconciled idempotently without creating a new Media identity.
+
 The sole normative rule is Constitution §20.1. Every MCP ingest of Media,
 Video, Knowledge, Source, Evidence or Authority entity must follow the bounded
 sequence:

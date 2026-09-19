@@ -290,8 +290,10 @@ plan của Capture hiện tại, rồi mới đến historical planning (chỉ d
 Stale inline image hoặc representative không được replay để ghi đè state mới.
 Sau mỗi native write phải đọc lại token; nếu token đổi thì refresh và chạy lại
 bounded preflight/reconcile một lần, không replay vô hạn. Article và Media
-selected được coi là một publication unit; không publish khi còn placeholder,
-inline stale/unrelated hoặc representative sai scope.
+selected được coi là một publication unit; `IMAGE_ARTICLE` không publish khi
+còn placeholder, inline stale/unrelated hoặc representative sai scope.
+`TEXT_ARTICLE` có thể publish khi Media là optional; các thiếu hụt đó được
+ghi nhận như enrichment debt và không được tự bù bằng ảnh gần giống.
 
 ## Runtime acceptance boundary
 
@@ -323,6 +325,22 @@ remains an honest `MISSING`/review dependency and is not infrastructure or
 blueprint corruption when the Article content is otherwise valid. Publication
 policy distinguishes `REQUIRED_FOR_PUBLICATION` from
 `OPTIONAL_VISUAL_SUPPORT` when the owning contract declares both.
+
+Publication readiness is distinct from enrichment completeness. `TEXT_ARTICLE`
+may publish without Media; `IMAGE_ARTICLE` requires its submitted image branch
+and canonical read-back. Featured/inline Media, visual support, SEO image and
+related-content gaps are warnings or deferred enrichment unless the resolved
+intent explicitly requires them. The gate reports `publication_ready`,
+`enrichment_complete`, `warnings`, `missing_enrichments` and
+`deferred_repairs`. Identity, CAS, Governance, compliance, visibility,
+collision and public read-back failures remain fail-closed.
+
+Shared recovery order is `read-back → classify → safe retry → deterministic
+repair → reconcile → degrade optional dependency → continue owner workflow →
+defer enrichment → final read-back`. A Media/MediaAsset/attachment mismatch
+may be repaired only from an existing exact canonical mapping and attachment
+read-back; repair never uploads, duplicates or infers semantic scope from a
+filename/title.
 
 ### Editorial reconciliation and public-copy boundary — 2026-09-13
 

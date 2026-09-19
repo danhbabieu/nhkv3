@@ -36,7 +36,7 @@ final class McpPublicationContinuationTest extends TestCase
             'post_id' => 1,
             'expected_state_token' => $posts->rows[1]->token,
             'idempotency_key' => 'continuation-owner-review',
-            'evidence' => publicationContinuationEvidence(['real_image_requirements_met' => false, 'real_image_requirements_met_status' => 'missing']),
+            'evidence' => publicationContinuationEvidence(['content_intent' => 'IMAGE_ARTICLE', 'real_image_requirements_met' => false, 'real_image_requirements_met_status' => 'missing', 'media_snapshot' => ['featured_primary' => ['placeholder' => true], 'inline_primary' => ['placeholder' => true]]]),
         ]);
         self::assertSame('OWNER_REVIEW_REQUIRED', $review['outcome']);
         self::assertSame('draft', $posts->rows[1]->status);
@@ -48,7 +48,7 @@ final class McpPublicationContinuationTest extends TestCase
             'idempotency_key' => 'continuation-owner-review',
             'decision_id' => $review['decision_id'],
             'affirmation' => 'Đăng',
-            'evidence' => publicationContinuationEvidence(['real_image_requirements_met' => false, 'real_image_requirements_met_status' => 'missing']),
+            'evidence' => publicationContinuationEvidence(['content_intent' => 'IMAGE_ARTICLE', 'real_image_requirements_met' => false, 'real_image_requirements_met_status' => 'missing', 'media_snapshot' => ['featured_primary' => ['placeholder' => true], 'inline_primary' => ['placeholder' => true]]]),
         ]);
         self::assertSame('PASS', $approved['outcome']);
         self::assertSame('publish', $approved['post']['status']);

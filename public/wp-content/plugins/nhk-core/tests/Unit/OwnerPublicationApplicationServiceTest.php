@@ -29,11 +29,11 @@ final class OwnerPublicationApplicationServiceTest extends TestCase
     {
         $posts = new OwnerPublicationFakeStore(); $decisions = new OwnerPublicationFakeDecisionRepository();
         $service = new OwnerPublicationApplicationService($posts, $decisions, static fn (PublicationPrincipal $principal): bool => $principal->id === 'owner-1', static fn (): DateTimeImmutable => new DateTimeImmutable('2026-09-03T10:00:00+00:00'));
-        $evidence = ownerPublicationEvidence(); $evidence['real_image_requirements_met'] = false; $evidence['real_image_requirements_met_status'] = 'missing';
+        $evidence = ownerPublicationEvidence(['content_intent' => 'IMAGE_ARTICLE', 'real_image_requirements_met' => false, 'real_image_requirements_met_status' => 'missing', 'media_snapshot' => ['featured_primary' => ['placeholder' => true], 'inline_primary' => ['placeholder' => true]]]);
         $review = $service->request(1, $posts->rows[1]->token, $evidence, 'publish-1', new PublicationPrincipal('owner-1', 'mcp', 'turn-1'));
         self::assertSame('OWNER_REVIEW_REQUIRED', $review['outcome']);
         $result = $service->approveAndPublish(1, $posts->rows[1]->token, $evidence, 'publish-1', $review['decision_id'], new PublicationPrincipal('owner-1', 'mcp', 'turn-2'), 'Đăng.');
-        self::assertSame('PASS', $result['outcome']); self::assertSame('published_with_exceptions', $result['final_outcome']); self::assertSame('publish', $result['post']['status']); self::assertContains('REAL_IMAGE_INCOMPLETE', $result['diagnostics']);
+        self::assertSame('PASS', $result['outcome']); self::assertSame('published_with_exceptions', $result['final_outcome']); self::assertSame('publish', $result['post']['status']); self::assertContains('REAL_IMAGE_INCOMPLETE', $result['warnings']);
     }
 
     public function test_changed_token_wrong_owner_expiry_and_system_block_are_not_overridable(): void

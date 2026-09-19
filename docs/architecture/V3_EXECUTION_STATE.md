@@ -1,5 +1,27 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-19 — Publication readiness/recovery law fixed locally (NO LIVE MUTATION)
+
+FIXED_BOUNDARY: `ArticlePublicationGate` now distinguishes `PUBLICATION_READY`
+from `ENRICHMENT_COMPLETE` and evaluates Media by Content Intent. TEXT_ARTICLE
+can pass without Media; IMAGE_ARTICLE keeps the required Media gate. Optional
+visual/featured/inline gaps are explicit warnings, missing enrichments or
+deferred repairs. Canonical identity, CAS, Governance, compliance, visibility,
+collision and public-readback blockers remain fail-closed.
+
+MEDIA_RECOVERY: Existing Media/MediaAsset/WordPress attachment mappings can
+reconcile stale asset attachment metadata from an exact durable bridge row and
+verified attachment identity. The repair is idempotent, does not upload or
+create identities, and performs asset read-back. Filename/title similarity is
+not used as semantic proof.
+
+VERIFICATION: Focused publication/resolver tests pass locally. Canonical docs
+updated for Article, MCP publication operations and Video optional thumbnail
+policy. No deployment, staging mutation, Article publication or live read-back
+performed.
+
+STATUS: `PUBLICATION_RECOVERY_FIXED_LOCAL / DEPLOYMENT_PENDING / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-19 — Video final-plan staging admission parity fixed locally (NO LIVE MUTATION)
 
 ROOT_CAUSE: Video staging scope issuance signed the final payload fingerprint

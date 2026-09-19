@@ -229,8 +229,10 @@ editorial intent, observations, candidate provenance and phase receipts; the
 WordPress Post remains the only owner of article title/body/excerpt. A replay
 with the same payload resumes the Capture; a changed payload returns an
 idempotency conflict. Ambiguous subject resolution, unavailable semantic
-Governance, incomplete MediaUsage or missing publication evidence remain
-machine-readable review/blocker states.
+Governance or missing publication evidence remain machine-readable
+review/blocker states. Incomplete optional MediaUsage is an enrichment warning
+for TEXT_ARTICLE, while the resolved intent still blocks when that MediaUsage
+is explicitly required.
 
 ### Cross-domain completion truth — 2026-09-13
 
@@ -479,9 +481,10 @@ ID. Runtime acceptance must prove real file → attachment → one Media identit
 idempotency, revision binding, read-back and fail-closed outcomes. The
 operation-level `ArticlePublicationGate` consumes those verified results and
 requires the exact current draft state token, canonical public identity,
-semantic read-back, MediaUsage completion, SEO/public-route verification and
-claim-compliance acceptance. It returns explicit blocker codes and does not
-publish or replace any bounded-context policy.
+semantic read-back, SEO/public-route verification and claim-compliance
+acceptance. It evaluates Media by Content Intent: TEXT_ARTICLE may pass
+without Media, IMAGE_ARTICLE requires its submitted Media branch, and the
+result separates publication readiness from enrichment completeness.
 
 Video intake may expose `knowledge_enrichment`, but that packet is read-only
 planning output. An explicitly validated Video `about` target is handed through

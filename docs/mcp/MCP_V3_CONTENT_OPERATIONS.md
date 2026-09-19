@@ -569,7 +569,15 @@ separate from system-blocked failures. Trash/restore uses the same CAS/receipt
 boundary and never permanently deletes a Post. Typed Category operations remain
 native taxonomy truth and never Graph truth.
 
-The publication boundary is enforced by `ArticlePublicationGate`; rendered
+The publication boundary is enforced by `ArticlePublicationGate`. Publication
+readiness is separate from enrichment completeness: `TEXT_ARTICLE` may pass
+without Media, while `IMAGE_ARTICLE` requires its submitted Media branch.
+Optional featured/inline Media, visual support, SEO image and related-content
+gaps are returned as `warnings`, `missing_enrichments` or `deferred_repairs`,
+not publication blockers. Video thumbnail and representative Media follow the
+same intent-specific rule. Canonical identity, CAS, Governance, compliance,
+private/corrupt asset, route collision and public read-back failures remain
+hard blockers. Rendered
 public verification and exact integration runtime evidence remain separate
 completion gates. Article body/excerpt stays only in WordPress editorial
 storage; receipts, Knowledge and Graph never become a second Article-body store.

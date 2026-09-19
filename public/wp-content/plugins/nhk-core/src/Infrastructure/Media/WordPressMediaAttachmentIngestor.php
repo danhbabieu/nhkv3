@@ -231,6 +231,20 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
         return $result;
     }
 
+    /** @internal deterministic repair of an existing canonical bridge mapping */
+    public function reconcileBinding(string $mediaId, int $attachmentId): bool
+    {
+        return $this->semanticMedia !== null
+            && method_exists($this->semanticMedia, 'reconcileAttachmentBinding')
+            && $this->semanticMedia->reconcileAttachmentBinding($mediaId, $attachmentId);
+    }
+
+    public function attachmentIdForMediaReference(string $mediaId): int
+    {
+        return $this->semanticMedia !== null && method_exists($this->semanticMedia, 'attachmentIdForMediaReference')
+            ? (int) $this->semanticMedia->attachmentIdForMediaReference($mediaId) : 0;
+    }
+
     /** @param array<string,mixed> $metadata @return array<string,string> */
     public function applyMetadata(int $attachmentId, array $metadata): array
     {
