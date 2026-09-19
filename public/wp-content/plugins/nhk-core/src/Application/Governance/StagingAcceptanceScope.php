@@ -121,12 +121,12 @@ final class StagingAcceptanceScope
                 || (string) ($payload['predicate'] ?? '') !== (string) ($scope['predicate'] ?? '')
                 || $targetType !== (string) ($scope['target_type'] ?? '')
                 || $targetUuid !== (string) ($scope['target_id'] ?? '')
-                || $sourceType !== 'wp_post'
-                || (string) ($payload['predicate'] ?? '') !== 'about'
                 || (int) ($payload['source_revision'] ?? 0) !== (int) ($scope['source_revision'] ?? 0)
                 || (int) ($payload['target_revision'] ?? 0) !== (int) ($scope['target_revision'] ?? 0)) {
                 throw new \RuntimeException('STAGING_CAPTURE_CHILD_BINDING_MISMATCH');
             }
+            if ((int) ($scope['capture_revision'] ?? 0) !== (int) ($proposal->payload['capture_revision'] ?? 0)) throw new \RuntimeException('STAGING_CAPTURE_REVISION_MISMATCH');
+            if (!hash_equals((string) ($scope['idempotency_key'] ?? ''), (string) $proposal->idempotencyKey)) throw new \RuntimeException('STAGING_RELATION_IDEMPOTENCY_MISMATCH');
             $payloadFingerprint = hash('sha256', CommandCanonicalizer::canonicalize(self::withoutAuthorization($payload)));
             if (!hash_equals((string) ($scope['payload_fingerprint'] ?? ''), $payloadFingerprint)
                 || !hash_equals((string) ($scope['proposal_command_fingerprint'] ?? ''), $payloadFingerprint)) {

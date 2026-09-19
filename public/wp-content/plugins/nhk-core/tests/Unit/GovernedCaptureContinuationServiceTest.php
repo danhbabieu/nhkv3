@@ -522,7 +522,8 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
             revision: 3,
         );
         $admission = static fn (array $scope, \NHK\Core\Domain\Capture\CaptureRecord $record, array $input, array $assets): bool
-            => (new CaptureDependencyStagingAdmission())(false, $scope, $record, $input, $assets);
+            => (new CaptureDependencyStagingAdmission())(false, $scope, $record, $input, $assets)
+                || (new \NHK\Core\Application\Governance\CaptureChildRelationStagingAdmission())(false, $scope, $record, $input, $assets);
         $verifier = new StagingAcceptanceScopeVerifier(static fn (): string => 'staging', 'test-secret', $admission, can: static fn (): bool => true);
         $proposals = [];
         $governance = new class($proposals) implements GovernedLifecycle {
@@ -543,12 +544,13 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
             $governance,
             static function (string $proposalId) use (&$proposals, $verifier): array {
                 $proposal = $proposals[$proposalId];
-                if ($proposal->entityType === 'knowledge') (new OperationScopedStagingGuard(static fn (): string => 'staging', static fn (): bool => true, scopeVerifier: [$verifier, 'verifyProposal']))->assertAllowed($proposal);
+                if (in_array($proposal->entityType, ['knowledge', 'relation'], true)) (new OperationScopedStagingGuard(static fn (): string => 'staging', static fn (): bool => true, scopeVerifier: [$verifier, 'verifyProposal']))->assertAllowed($proposal);
                 return ['canonical_id' => UuidCodec::newV7(), 'canonical_readback' => ['canonical_id' => UuidCodec::newV7(), 'entity_type' => $proposal->entityType, 'active' => true, 'revision' => 1]];
             },
             $this->policies(['knowledge', 'relation'], ['knowledge' => 'AUTO_PUBLISH', 'relation' => 'AUTO_PUBLISH']),
             static fn (): bool => true,
             dependencyScopeIssuer: static function (string $id, array $plan) use ($verifier, $capture): array { return $verifier->issueForCaptureDependencyPlan($capture, $plan); },
+            relationScopeIssuer: static function (string $id, array $plan) use ($verifier, $capture): array { return $verifier->issueForCaptureChildRelation($capture, $plan); },
         );
 
         $result = $service->execute($captureId, 'capture:knowledge-delta', [
@@ -570,6 +572,15 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
             self::assertArrayHasKey('staging_acceptance', $proposal->payload);
             self::assertNotSame('MISSING_PARENT_PROVENANCE', $result['blockers'][0] ?? null);
         }
+        $relations = array_values(array_filter($proposals, static fn (Proposal $proposal): bool => $proposal->entityType === 'relation'));
+        self::assertCount(2, $relations);
+        foreach ($relations as $relation) {
+            self::assertSame('knowledge', $relation->payload['source_type']);
+            self::assertSame(1, $relation->payload['source_revision']);
+            self::assertSame(3, $relation->payload['target_revision']);
+            self::assertArrayHasKey('staging_acceptance', $relation->payload);
+            self::assertSame('capture_child_relation', $relation->payload['staging_acceptance']['operation_family']);
+        }
 
         $original = $knowledge[0];
         $mutations = [
@@ -582,6 +593,18 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
         $tamperedScope = $original->payload['staging_acceptance'];
         $tamperedScope['fingerprint'] = hash('sha256', 'changed-scope');
         self::assertFalse($verifier->verifyProposal($tamperedScope, $original));
+
+        $relation = $relations[0];
+        foreach (['capture_id', 'source_uuid', 'target_uuid', 'predicate', 'source_revision', 'target_revision', 'capture_revision'] as $field) {
+            $payload = $relation->payload;
+            $payload[$field] = in_array($field, ['source_revision', 'target_revision', 'capture_revision'], true) ? 99 : ($field === 'predicate' ? 'classified_as' : UuidCodec::newV7());
+            $tampered = new Proposal($relation->id, $relation->subjectId, $relation->operation, $payload, $relation->contentFingerprint, $relation->expectedRevision, $relation->dependencyFingerprint, $relation->state, idempotencyKey: $relation->idempotencyKey, entityType: $relation->entityType, targetUuid: $relation->targetUuid);
+            self::assertFalse($verifier->verifyProposal($relation->payload['staging_acceptance'], $tampered), $field);
+        }
+        $payload = $relation->payload;
+        $payload['provenance']['origin'] = 'TAMPERED';
+        $tampered = new Proposal($relation->id, $relation->subjectId, $relation->operation, $payload, $relation->contentFingerprint, $relation->expectedRevision, $relation->dependencyFingerprint, $relation->state, idempotencyKey: $relation->idempotencyKey, entityType: $relation->entityType, targetUuid: $relation->targetUuid);
+        self::assertFalse($verifier->verifyProposal($relation->payload['staging_acceptance'], $tampered));
     }
 
     public function test_auto_publish_submits_video_proposal_from_capture_asset_without_duplicate_writer(): void

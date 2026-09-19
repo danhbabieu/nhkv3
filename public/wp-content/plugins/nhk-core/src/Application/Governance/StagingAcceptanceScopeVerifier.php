@@ -180,15 +180,14 @@ final class StagingAcceptanceScopeVerifier
         $this->requireCapability();
         if (!is_callable($this->admission)) throw new \RuntimeException('STAGING_SCOPE_ADMISSION_REQUIRED');
         $payload = is_array($plan['payload'] ?? null) ? $plan['payload'] : [];
-        $resolution = is_array($capture->diagnostics['subject_resolution'] ?? null) ? $capture->diagnostics['subject_resolution'] : [];
-        $primary = is_array($resolution['primary'] ?? null) ? $resolution['primary'] : [];
-        $articleId = (int) ($capture->articleId ?? 0);
-        $sourceId = (function_exists('get_current_blog_id') ? (int) get_current_blog_id() : 1) . ':' . $articleId;
-        $sourceRevision = max(1, (int) ($payload['source_revision'] ?? 1));
-        $targetRevision = max(1, (int) ($payload['target_revision'] ?? ($primary['revision'] ?? 0)));
-        if ($articleId < 1 || ($payload['source_type'] ?? '') !== 'wp_post' || ($payload['source_uuid'] ?? '') !== $sourceId
-            || ($payload['predicate'] ?? '') !== 'about' || ($payload['target_type'] ?? '') !== (string) ($primary['type'] ?? '')
-            || ($payload['target_uuid'] ?? '') !== (string) ($primary['id'] ?? '') || $targetRevision < 1) {
+        $sourceType = trim((string) ($payload['source_type'] ?? ''));
+        $sourceId = trim((string) ($payload['source_uuid'] ?? ''));
+        $targetType = trim((string) ($payload['target_type'] ?? ''));
+        $targetId = trim((string) ($payload['target_uuid'] ?? ''));
+        $predicate = trim((string) ($payload['predicate'] ?? ''));
+        $sourceRevision = (int) ($payload['source_revision'] ?? 0);
+        $targetRevision = (int) ($payload['target_revision'] ?? 0);
+        if ($sourceType === '' || $sourceId === '' || $targetType === '' || $targetId === '' || $predicate === '' || $sourceRevision < 1 || $targetRevision < 1) {
             throw new \RuntimeException('STAGING_CAPTURE_CHILD_BINDING_INVALID');
         }
         $payload['capture_id'] = $capture->captureId;
@@ -204,9 +203,8 @@ final class StagingAcceptanceScopeVerifier
             'intent' => (string) ($capture->context['content_intent']['intent'] ?? 'IMAGE_ARTICLE'),
             'operation_family' => 'capture_child_relation', 'entity_type' => 'relation', 'operation' => 'relation_create',
             'writer' => 'canonical_governed', 'entrypoint' => 'nhk.capture.ingest',
-            'owner_type' => 'article', 'owner_id' => (string) $articleId,
-            'source_type' => (string) $payload['source_type'], 'source_id' => $sourceId,
-            'predicate' => 'about', 'target_type' => (string) $payload['target_type'], 'target_id' => (string) $payload['target_uuid'],
+            'source_type' => $sourceType, 'source_id' => $sourceId,
+            'predicate' => $predicate, 'target_type' => $targetType, 'target_id' => $targetId,
             'source_revision' => $sourceRevision, 'target_revision' => $targetRevision,
             'expected_revision' => null, 'payload_fingerprint' => $payloadFingerprint,
             'proposal_command_fingerprint' => $payloadFingerprint,

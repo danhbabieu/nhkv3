@@ -124,6 +124,12 @@ final class GovernedCaptureContinuationService
                 unset($plan['payload']['source_candidate_id']);
             }
             if (($plan['entity_type'] ?? '') === 'relation') {
+                try {
+                    $plan = $this->scopeRelationPlan($this->currentCaptureId, $plan);
+                } catch (\Throwable $error) {
+                    $writes[] = $this->classifiedFailure($plan, $error);
+                    continue;
+                }
                 $payload = is_array($plan['payload'] ?? null) ? $plan['payload'] : [];
                 if (trim((string) ($payload['predicate'] ?? '')) === '' || trim((string) ($payload['provenance']['origin'] ?? $payload['origin'] ?? '')) === '') {
                     $writes[] = ['entity_type' => 'relation', 'status' => 'REVIEW_REQUIRED', 'blockers' => ['RELATION_PROVENANCE_REQUIRED']];
@@ -332,7 +338,6 @@ final class GovernedCaptureContinuationService
                 'origin' => 'CAPTURE_ARTICLE_SUBJECT_BINDING',
             ], 'capture:article-about:' . $articleEndpoint . ':' . (string) $primary['type'] . ':' . (string) $primary['id']);
             $relationPlan['payload']['target_revision'] = max(1, (int) ($primary['revision'] ?? 0));
-            $relationPlan = $this->scopeRelationPlan($captureId, $relationPlan);
             $plans[] = $relationPlan;
         }
         if ($includeSemanticChildren && $this->semanticDeltaRequested($context) && ($intent === 'KNOWLEDGE_DELTA' || count($variants) === 1) && ($subject = $this->knowledgeSubject($subjects, $variants, $intent, $primary)) !== null) {

@@ -14851,3 +14851,48 @@ pass. No live/staging data was mutated; no commit, push or deployment was
 performed.
 
 STATUS=`KNOWLEDGE_DELTA_CAPTURE_PROVENANCE_LOCAL_FIXED / DEPLOYMENT_PENDING / OPERATOR_COMMIT_REQUIRED`.
+
+# Checkpoint — 2026-09-19 — Capture-generated relation child scope fixed (LOCAL / NO LIVE MUTATION)
+
+LIVE_FAILURE_REPRODUCED_LOCALLY=`relation:relation_create → STAGING_SCOPE_REQUIRED → MISSING_PARENT_PROVENANCE`.
+
+ROOT_CAUSE: `scopeRelationPlan()` was wired only for the Article subject edge
+while Knowledge `about` relations were derived after canonical Knowledge
+read-back and then sent to Governance without their own relation scope. The
+existing `capture_child_relation` admission and issuer were also Article/
+`wp_post`/`about`-specific, so they could not admit the final Knowledge source
+identity.
+
+GENERIC_RELATION_SCOPE_BOUNDARY: All Editorial Capture relation children now
+enter `scopeRelationPlan()` immediately before relation validation and
+Proposal creation. Dependency relations are scoped only after their source
+child returns an applied canonical ID and read-back revision. The server-side
+endpoint revision binder remains authoritative for both endpoints.
+
+BINDINGS: The signed relation packet binds persisted Capture ID/revision,
+source type/ID/revision, target type/ID/revision, registered command predicate,
+idempotency key and authorization-free final payload fingerprint. Proposal
+verification and OperationScopedStagingGuard require the same values; client
+scope is never accepted.
+
+AUDIT: Article and Knowledge relations use the generic `capture_child_relation`
+boundary. Video semantic attachments remain inside the final server-issued
+Video scope after Evidence-backed payload assembly. Authority relation
+candidates remain inside their governed authority-plan candidate bindings
+(`subtype_of`, `classified_as`, etc.). Media Capture has no Capture-generated
+Graph relation writer; MediaUsage/representative binding remains its own
+boundary.
+
+REGRESSION: Production-shaped Editorial Knowledge Delta with two Knowledge
+children now creates two separately scoped Knowledge→Classification relation
+Proposals, passes Eligibility and Controlled Apply, and verifies canonical
+Graph read-back. Tamper coverage rejects wrong Capture ID/revision, source or
+target identity/revision, predicate, payload and fingerprint.
+
+VERIFICATION: Focused relation/staging/Capture/Knowledge/Video/Authority/
+Graph/Governance suite passes 183 tests / 733 assertions. Full Unit passes
+1,981 tests / 9,772 assertions with existing warnings/deprecations only.
+Contract passes 6 tests / 48 assertions. PHP lint and `git diff --check` pass.
+No live data was mutated; no commit, push or deployment was performed.
+
+STATUS=`CAPTURE_RELATION_SCOPE_LOCAL_FIXED / DEPLOYMENT_PENDING / OPERATOR_COMMIT_REQUIRED`.
