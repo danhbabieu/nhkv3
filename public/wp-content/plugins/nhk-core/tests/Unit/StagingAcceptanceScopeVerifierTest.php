@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Tests\Unit;
 
-use NHK\Core\Application\Governance\{CaptureChildRelationStagingAdmission, OperationScopedStagingGuard, StagingAcceptanceScopeVerifier};
+use NHK\Core\Application\Governance\{CaptureChildRelationStagingAdmission, OperationScopedStagingGuard, StagingAcceptanceScopeVerifier, VideoStagingAdmission};
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Capture\CaptureRecord;
 use NHK\Core\Domain\Governance\{Proposal, ProposalState};
@@ -13,6 +13,37 @@ use PHPUnit\Framework\TestCase;
 
 final class StagingAcceptanceScopeVerifierTest extends TestCase
 {
+    public function test_video_scope_uses_reconciled_final_plan_not_historical_capture_asset(): void
+    {
+        $captureId = UuidCodec::newV7();
+        $oldSubject = UuidCodec::newV7();
+        $finalSubject = UuidCodec::newV7();
+        $videoId = UuidCodec::newV7();
+        $capturePayload = [
+            'canonical_id' => $videoId,
+            'metadata' => [
+                'source' => ['platform' => 'youtube', 'external_video_id' => 's53MqUypbKE', 'canonical_source_url' => 'https://www.youtube.com/watch?v=s53MqUypbKE'],
+                'subject_resolution_packet' => ['type' => 'classification', 'id' => $oldSubject, 'revision' => 1],
+            ],
+        ];
+        $capture = new CaptureRecord($captureId, 'capture-video', hash('sha256', 'capture-video'), 'SEMANTICS_RECONCILED', 'IN_PROGRESS', null, null, [['kind' => 'video', 'video_proposal' => ['payload' => $capturePayload]]], ['purpose' => 'EDITORIAL', 'content_intent' => ['intent' => 'VIDEO']], [], [], 40);
+        $finalPayload = $capturePayload;
+        $finalPayload['metadata']['subject_resolution_packet'] = ['type' => 'classification', 'id' => $finalSubject, 'revision' => 2];
+        $finalPayload['metadata']['semantic_attachments'] = [['predicate' => 'about', 'target_type' => 'classification', 'target_uuid' => $finalSubject, 'evidence_refs' => [['evidence_id' => UuidCodec::newV7()]], 'confidence' => 1.0]];
+        $plan = ['entity_type' => 'video', 'operation' => 'ingest', 'subject_id' => $videoId, 'payload' => $finalPayload, 'proposed_uuid' => $videoId, 'idempotency_key' => 'video-reconcile-final', 'plan_fingerprint' => hash('sha256', 'final-plan')];
+        $videos = new class implements VideoRepository {
+            public function findByCanonicalId(string $id): ?Video { return null; }
+            public function findByExternalReference(string $platform, string $externalId): ?Video { return null; }
+            public function create(Video $video): Video { return $video; }
+            public function update(Video $video, int $expectedRevision): Video { return $video; }
+            public function list(bool $includeInactive = false): array { return []; }
+        };
+        $verifier = new StagingAcceptanceScopeVerifier(static fn (): string => 'staging', 'test-secret', static function (array $scope, CaptureRecord $capture, array $input, array $assets) use ($videos): bool { return (new VideoStagingAdmission($videos))(false, $scope, $capture, $input, $assets); }, can: static fn (): bool => true, videos: $videos);
+        $scope = $verifier->issueForVideoPlan($capture, $plan);
+        $proposal = new Proposal(UuidCodec::newV7(), $videoId, 'ingest', $finalPayload + ['capture_id' => $captureId, 'capture_fingerprint' => $capture->requestFingerprint, 'staging_acceptance' => $scope], 'content', null, 'dependency', ProposalState::APPROVED, idempotencyKey: 'video-reconcile-final', targetUuid: null, entityType: 'video');
+        self::assertTrue($verifier->verifyProposal($scope, $proposal));
+    }
+
     public function test_capture_child_relation_scope_is_exact_and_non_transferable(): void
     {
         $captureId = UuidCodec::newV7();

@@ -147,7 +147,7 @@ final class StagingAcceptanceScopeVerifier
         $this->requireCapability();
         if (!is_callable($this->admission)) throw new \RuntimeException('STAGING_SCOPE_ADMISSION_REQUIRED');
         $descriptor = StagingOperationDescriptor::fromPlan($plan, $capture->captureId, $capture->requestFingerprint);
-        if (!in_array($descriptor->entityType, ['source', 'knowledge', 'evidence'], true) || !in_array($descriptor->operation, ['ingest', 'create'], true)) throw new \RuntimeException('STAGING_DEPENDENCY_OPERATION_INVALID');
+        if (!in_array($descriptor->entityType, ['source', 'knowledge', 'evidence'], true) || !in_array($descriptor->operation, ['ingest', 'create', 'update'], true)) throw new \RuntimeException('STAGING_DEPENDENCY_OPERATION_INVALID');
         $family = $descriptor->operationFamily;
         $payloadFingerprint = $descriptor->payloadFingerprint;
         $planFingerprint = hash('sha256', CommandCanonicalizer::canonicalize(StagingOperationDescriptor::withoutAuthorization($plan)));
@@ -300,8 +300,15 @@ final class StagingAcceptanceScopeVerifier
         $planFingerprint = trim((string) ($plan['plan_fingerprint'] ?? $plan['fingerprint'] ?? ''));
         if ($entityType !== 'video' || !in_array($operation, ['ingest', 'update'], true)) throw new \RuntimeException('STAGING_VIDEO_OPERATION_INVALID');
         if (!preg_match('/^[a-f0-9]{64}$/i', $planFingerprint)) throw new \RuntimeException('STAGING_VIDEO_BINDING_REQUIRED');
-        $video = $this->videoPayload($capture);
-        $metadata = is_array($video['metadata'] ?? null) ? $video['metadata'] : [];
+        // The Capture snapshot is only the immutable parent authorization
+        // boundary. Reconciliation may have rebuilt the final Video command
+        // after canonical Source/Claim/Evidence read-back, so all executable
+        // Video bindings must be derived from that exact final plan rather
+        // than from the historical Capture asset payload.
+        $finalPayload = is_array($plan['payload'] ?? null) ? $plan['payload'] : [];
+        $videoPayload = $finalPayload !== [] ? $finalPayload : $this->videoPayload($capture);
+        if ($videoPayload === []) throw new \RuntimeException('STAGING_VIDEO_PLAN_REQUIRED');
+        $metadata = is_array($videoPayload['metadata'] ?? null) ? $videoPayload['metadata'] : [];
         $source = is_array($metadata['source'] ?? null) ? $metadata['source'] : (is_array($metadata['source_snapshot'] ?? null) ? $metadata['source_snapshot'] : []);
         $platform = strtolower(trim((string) ($plan['platform'] ?? $source['platform'] ?? '')));
         $externalId = trim((string) ($plan['external_video_id'] ?? $source['external_video_id'] ?? ''));
@@ -315,7 +322,7 @@ final class StagingAcceptanceScopeVerifier
         $subjectPacket = is_array($metadata['subject_resolution_packet'] ?? null) ? $metadata['subject_resolution_packet'] : [];
         $subjectId = trim((string) ($subjectPacket['id'] ?? ''));
         $subjectType = strtolower(trim((string) ($subjectPacket['type'] ?? '')));
-        $proposedUuid = trim((string) ($plan['proposed_uuid'] ?? $video['canonical_id'] ?? $targetUuid));
+        $proposedUuid = trim((string) ($plan['proposed_uuid'] ?? $videoPayload['canonical_id'] ?? $targetUuid));
         if (!UuidCodec::isValid($proposedUuid) || !UuidCodec::isValid($subjectId) || $subjectType === '') throw new \RuntimeException('STAGING_VIDEO_BINDING_REQUIRED');
         if ($operation === 'update') {
             if (!UuidCodec::isValid($targetUuid) || $expectedRevision < 1) throw new \RuntimeException('STAGING_VIDEO_BINDING_REQUIRED');
@@ -347,7 +354,8 @@ final class StagingAcceptanceScopeVerifier
             'issued_at' => gmdate('c'), 'expires_at' => gmdate('c', time() + max(1, $this->ttlSeconds)),
         ];
         $input = is_array($capture->context['planning_input'] ?? null) ? $capture->context['planning_input'] : [];
-        if (!(bool) ($this->admission)($base, $capture, $input, [])) throw new \RuntimeException('STAGING_SCOPE_NOT_ADMITTED');
+        $admissionAssets = [[ 'kind' => 'video', 'video_proposal' => ['payload' => $videoPayload] ]];
+        if (!(bool) ($this->admission)($base, $capture, $input, $admissionAssets)) throw new \RuntimeException('STAGING_SCOPE_NOT_ADMITTED');
         $fingerprint = hash('sha256', CommandCanonicalizer::canonicalize($base));
         return $base + ['fingerprint' => $fingerprint, 'signature' => hash_hmac('sha256', $fingerprint, $this->secret())];
     }

@@ -30,7 +30,11 @@ final class VideoStagingAdmission
             || !preg_match('/^[a-f0-9]{64}$/i', (string) ($scope['plan_fingerprint'] ?? ''))
             || !preg_match('/^[a-f0-9]{64}$/i', (string) ($scope['proposal_command_fingerprint'] ?? ''))) return false;
 
-        $videoAssets = array_values(array_filter($capture->assets, static fn (mixed $asset): bool => is_array($asset) && ($asset['kind'] ?? '') === 'video'));
+        // Scope issuance supplies the exact final plan as an admission asset.
+        // Fall back to the persisted Capture asset only for legacy callers
+        // that do not yet provide a final command packet.
+        $candidateAssets = $assets !== [] ? $assets : $capture->assets;
+        $videoAssets = array_values(array_filter($candidateAssets, static fn (mixed $asset): bool => is_array($asset) && ($asset['kind'] ?? '') === 'video'));
         if (count($videoAssets) !== 1) return false;
         $video = is_array($videoAssets[0]['video_proposal'] ?? null) ? $videoAssets[0]['video_proposal'] : [];
         $payload = is_array($video['payload'] ?? null) ? $video['payload'] : [];

@@ -1,5 +1,36 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-19 — Historical Video resume final-plan scope binding fixed (LOCAL / NO LIVE MUTATION)
+
+LIVE_FAILURE_REPRODUCED: YES (reported live as `STAGING_SCOPE_NOT_APPROVED` after
+Video reconciliation on Capture `01a0b76f-50e6-7b03-bf12-bf318ea20c7e`).
+
+ROOT_CAUSE: `StagingAcceptanceScopeVerifier::issueForVideoPlan()` computed the
+signed command fingerprint from the reconciled final plan but derived Video
+source/subject bindings and staging admission from the historical Capture asset
+payload. This allowed the scope packet and the command under verification to be
+constructed from different payload generations; a reconciled final subject or
+Evidence-backed attachment could therefore fail the exact staging verifier with
+`STAGING_SCOPE_NOT_APPROVED`.
+
+FIXED_BOUNDARY: Video scope issuance now derives all executable Video bindings
+from the exact final plan payload and passes that same payload to
+`VideoStagingAdmission`. The Capture remains the immutable authorization parent;
+legacy callers without a final payload retain the old read-only fallback. No
+validation, signature, Governance or identity rule was weakened.
+
+REGRESSION: Added a production-shaped test where the historical Capture asset
+has one subject while the reconciled final plan changes the subject and adds an
+Evidence-backed attachment. Scope issuance and Proposal verification now pass
+only when both use the final plan. Focused scope/admission/continuation/
+reconciliation/eligibility/relation suites pass 77 tests / 323 assertions.
+
+VERIFICATION: Changed-file PHP lint and `git diff --check` pass. No staging or
+production data was mutated; deployment and live retry remain pending. Commit
+is local only; push is not authorized.
+
+STATUS: `VIDEO_CAPTURE_FINAL_PLAN_SCOPE_BINDING_FIXED_LOCAL / NO_LIVE_MUTATION / DEPLOYMENT_PENDING`.
+
 # Checkpoint — 2026-09-19 — Explicit Media metadata contract and shared attachment projection boundary (LOCAL / NO LIVE MUTATION)
 
 ROOT_CAUSE: Attachment transport, WordPress attachment projection, canonical
