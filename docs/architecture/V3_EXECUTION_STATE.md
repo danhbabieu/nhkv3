@@ -14913,3 +14913,32 @@ Contract passes 6 tests / 48 assertions. PHP lint and `git diff --check` pass.
 No live data was mutated; no commit, push or deployment was performed.
 
 STATUS=`CAPTURE_RELATION_SCOPE_LOCAL_FIXED / DEPLOYMENT_PENDING / OPERATOR_COMMIT_REQUIRED`.
+
+# Checkpoint — 2026-09-19 — Image upload → Media → Capture → Article album contextual metadata and frontend closure (LOCAL / NO LIVE MUTATION)
+
+SCOPE: Only the requested image path was changed: physical image upload output,
+Article MediaUsage reconciliation, Article gallery projection and the related
+image-library/article frontend. Video, Knowledge Delta, Source/Evidence,
+Authority and unrelated frontend pipelines were not expanded.
+
+FIXED_BOUNDARY: Article MediaUsage now preserves per-image title, alt text,
+caption and explicit sort_order for both mandatory and supporting album images.
+The Capture/Plugin adapter passes stable client-file metadata into the Article
+owner without re-uploading or changing canonical Media identity. Public image
+projection exposes usage title, Article album renders that title and caption,
+and the image-library image click opens canonical `/anh/{slug}.webp`; Article
+title remains the separate Article link and is absent as a dead link when no
+Article exists.
+
+REGRESSION: Added production-shaped three-image album proof for B → A → C,
+per-image contextual metadata, canonical Media reuse and distinct MediaUsage
+records. Existing upload batch tests continue to prove strict transport shape,
+stable client IDs/ordinals, no batch-context fan-out and same-key replay.
+
+VERIFICATION: Focused image/Capture/Article/frontend suite passes 80 tests /
+348 assertions. Full Unit passes 1,982 tests / 9,785 assertions with existing
+warnings/deprecations only. Contract passes 6 tests / 48 assertions. Changed
+PHP lint and `git diff --check` pass. No integration/live data was mutated; no
+commit, push or deployment was performed.
+
+STATUS=`IMAGE_FLOW_LOCAL_PROOF_READY / DEPLOYMENT_PENDING / NO_LIVE_MUTATION`.

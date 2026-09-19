@@ -35,7 +35,7 @@ get_header();
       ?>
         <article class="library-item">
           <div class="library-image">
-            <?php if ($hasRealImage && $articleUrl !== ''): ?><a class="library-image-link" href="<?php echo esc_url($articleUrl); ?>"><img src="<?php echo esc_url($image); ?>" alt="<?php echo esc_attr($alt); ?>" loading="lazy"<?php if (!empty($item['width'])): ?> width="<?php echo esc_attr((string) $item['width']); ?>"<?php endif; ?><?php if (!empty($item['height'])): ?> height="<?php echo esc_attr((string) $item['height']); ?>"<?php endif; ?>></a><?php elseif ($hasRealImage): ?><img src="<?php echo esc_url($image); ?>" alt="<?php echo esc_attr($alt); ?>" loading="lazy"<?php if (!empty($item['width'])): ?> width="<?php echo esc_attr((string) $item['width']); ?>"<?php endif; ?><?php if (!empty($item['height'])): ?> height="<?php echo esc_attr((string) $item['height']); ?>"<?php endif; ?>><?php else: ?><img src="<?php echo esc_url($fallback); ?>" alt="" loading="lazy" width="1200" height="750"><?php endif; ?>
+            <?php if ($hasRealImage): ?><a class="library-image-link" href="<?php echo esc_url($image); ?>" aria-label="Mở ảnh <?php echo esc_attr($title); ?>"><img src="<?php echo esc_url($image); ?>" alt="<?php echo esc_attr($alt); ?>" loading="lazy"<?php if (!empty($item['width'])): ?> width="<?php echo esc_attr((string) $item['width']); ?>"<?php endif; ?><?php if (!empty($item['height'])): ?> height="<?php echo esc_attr((string) $item['height']); ?>"<?php endif; ?>></a><?php else: ?><img src="<?php echo esc_url($fallback); ?>" alt="" loading="lazy" width="1200" height="750"><?php endif; ?>
           </div>
           <div class="library-item-body">
             <span class="eyebrow">Hình ảnh</span>

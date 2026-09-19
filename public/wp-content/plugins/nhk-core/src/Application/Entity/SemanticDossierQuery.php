@@ -369,6 +369,7 @@ final class SemanticDossierQuery implements EntityDossierReader
         if ($item === null || trim((string) ($item['url'] ?? '')) === '') return null;
         return [
             'url' => (string) $item['url'],
+            'title' => (string) ($item['title'] ?? ''),
             'alt' => (string) ($item['alt'] ?? ''),
             'caption' => (string) ($item['caption'] ?? ''),
             'width' => isset($item['width']) ? (int) $item['width'] : null,

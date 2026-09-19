@@ -1160,15 +1160,32 @@ final class Plugin {
                     $mediaSubjectIds = $primary !== null && trim((string) ($primary['id'] ?? '')) !== '' && ($resolution['status'] ?? '') === 'resolved' ? [trim((string) $primary['id'])] : [];
                     $subject = (string) ($primary['name'] ?? '');
                     $selected = [];
-                    if (isset($mediaIds[0])) {
-                        $selected['featured_primary'] = $mediaIds[0];
+                    $captureMediaSelection = static function (array $asset): array {
+                        $mediaContext = is_array($asset['media_context'] ?? null) ? $asset['media_context'] : [];
+                        return ['media_id' => (string) ($asset['media_id'] ?? ''), 'title' => (string) ($mediaContext['title'] ?? ''), 'alt_text' => (string) ($mediaContext['alt_text'] ?? ''), 'caption' => (string) ($mediaContext['caption'] ?? ''), 'sort_order' => (int) ($asset['sort_order'] ?? 0)];
+                    };
+                    if (isset($assets[0]) && is_array($assets[0])) {
+                        $selected['featured_primary'] = $captureMediaSelection($assets[0]);
                         // A single Capture image is the current publication
                         // plan for both mandatory editorial slots. Sharing one
                         // canonical Media identity is allowed and avoids
                         // replaying an older inline image from the Post.
-                        if (!isset($mediaIds[1])) $selected['inline_primary'] = $mediaIds[0];
+                        if (!isset($mediaIds[1])) $selected['inline_primary'] = $captureMediaSelection($assets[0]);
                     }
-                    if (isset($mediaIds[1])) $selected['inline_primary'] = $mediaIds[1];
+                    if (isset($assets[1]) && is_array($assets[1])) $selected['inline_primary'] = $captureMediaSelection($assets[1]);
+                    $supportingMedia = [];
+                    foreach (array_slice($assets, 2) as $index => $asset) {
+                        if (!is_array($asset) || trim((string) ($asset['media_id'] ?? '')) === '') continue;
+                        $mediaContext = is_array($asset['media_context'] ?? null) ? $asset['media_context'] : [];
+                        $supportingMedia[] = [
+                            'media_id' => (string) $asset['media_id'],
+                            'sort_order' => (int) ($asset['sort_order'] ?? ($index + 2)),
+                            'placement_key' => 'capture:' . (string) ($asset['client_file_id'] ?? ('ordinal-' . ($index + 2))),
+                            'title' => (string) ($mediaContext['title'] ?? ''),
+                            'alt_text' => (string) ($mediaContext['alt_text'] ?? ''),
+                            'caption' => (string) ($mediaContext['caption'] ?? ''),
+                        ];
+                    }
                     $result = $articleMedia->ensureForPost((int) ($context['article_id'] ?? 0), [
                         'capture_id' => (string) (($context['capture']['capture_id'] ?? '')),
                         'subject' => $subject,
@@ -1183,7 +1200,7 @@ final class Plugin {
                         'allow_unscoped_reuse' => false,
                         'allow_scoped_reuse' => true,
                         'video_thumbnail_fallback' => $context['video_thumbnail_fallback'] ?? null,
-                    ], $selected, array_slice($mediaIds, 2));
+                    ], $selected, $supportingMedia);
                     $payload = $result->toArray();
                     $payload['force_inline_reconcile'] = true;
                     $payload['editorial_state_token'] = $result->editorialStateToken;

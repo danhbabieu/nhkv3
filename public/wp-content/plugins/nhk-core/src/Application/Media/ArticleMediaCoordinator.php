@@ -46,6 +46,17 @@ final class ArticleMediaCoordinator
             ? $allowHistoricalReuse
             : ($subjectScopeLocked && (($context['allow_scoped_reuse'] ?? false) === true || ($context['allow_unscoped_reuse'] ?? false) === true));
         $editorial = $this->wordpress?->read($postId);
+        $selectedContextBySlot = [];
+        foreach ($selectedMediaBySlot as $slot => $selection) {
+            if (!is_array($selection)) continue;
+            $selectedContextBySlot[$slot] = [
+                'title' => (string) ($selection['title'] ?? ''),
+                'alt_text' => (string) ($selection['alt_text'] ?? ''),
+                'caption' => (string) ($selection['caption'] ?? ''),
+                'sort_order' => array_key_exists('sort_order', $selection) ? max(0, (int) $selection['sort_order']) : 0,
+            ];
+            $selectedMediaBySlot[$slot] = (string) ($selection['media_id'] ?? '');
+        }
         if (is_array($editorial) && $allowHistoricalReuse) {
             $editorialFeatured = trim((string) ($editorial['featured_media_id'] ?? ''));
             if (($selectedMediaBySlot[MediaUsageRoleRegistry::FEATURED_PRIMARY] ?? '') === '' && $editorialFeatured !== '') $selectedMediaBySlot[MediaUsageRoleRegistry::FEATURED_PRIMARY] = $editorialFeatured;
@@ -70,7 +81,7 @@ final class ArticleMediaCoordinator
             if ($candidate === null && $allowHistoricalSubjectReuse && $existing !== null && !in_array($existing->canonicalId, array_values($slotMedia), true)) $candidate = $this->usableMedia($existing->canonicalId, $blueprint, $subjectScopeLocked);
             if ($candidate === null && $allowHistoricalSubjectReuse) $candidate = $this->findReusable($blueprint, array_values($slotMedia), $subjectScopeLocked, !$enforceDistinctMandatoryMedia);
             if ($candidate === null) $candidate = $this->placeholder($slot);
-            $usage = $this->reconcileUsage($endpointKey, $slot, $candidate->canonicalId, $blueprint, 'article:' . $endpointKey . ':' . $slot);
+            $usage = $this->reconcileUsage($endpointKey, $slot, $candidate->canonicalId, $blueprint, 'article:' . $endpointKey . ':' . $slot, $selectedContextBySlot[$slot] ?? []);
             $state = $candidate->isSystemPlaceholder() ? ($slot === MediaUsageRoleRegistry::FEATURED_PRIMARY ? MediaSeoStateRegistry::INCOMPLETE_FEATURED : MediaSeoStateRegistry::INCOMPLETE_INLINE) : MediaSeoStateRegistry::COMPLETE;
             if ($candidate->isSystemPlaceholder()) $diagnostics[] = ['code' => $slot === MediaUsageRoleRegistry::FEATURED_PRIMARY ? 'ARTICLE_MEDIA_FEATURED_MISSING' : 'ARTICLE_MEDIA_INLINE_MISSING', 'slot' => $slot, 'media_id' => $candidate->canonicalId];
             $blueprint = MediaSeoBlueprint::forPost($postId, $slot, $context, $state);
@@ -84,11 +95,30 @@ final class ArticleMediaCoordinator
             $supportingId = $placement['media_id'];
             $supportingRequiresScope = $subjectScopeLocked && !($captureMediaContext && in_array($supportingId, $captureOwnedMediaIds, true));
             $candidate = $this->usableMedia($supportingId, MediaSeoBlueprint::forPost($postId, MediaUsageRoleRegistry::INLINE_PRIMARY, $context), $supportingRequiresScope);
-            if ($candidate !== null) $this->mediaService->addUsage($candidate->canonicalId, 'wp_post', $endpointKey, MediaUsageRoleRegistry::INLINE_SUPPORTING, $index, '', '', [], '', $placement['placement_key']);
+            if ($candidate !== null) $this->mediaService->addUsage(
+                $candidate->canonicalId,
+                'wp_post',
+                $endpointKey,
+                MediaUsageRoleRegistry::INLINE_SUPPORTING,
+                $index,
+                $placement['alt_text'],
+                $placement['caption'],
+                [],
+                $placement['title'],
+                $placement['placement_key'],
+            );
         }
         $desiredUsages = [];
         foreach ($slotMedia as $role => $mediaId) $desiredUsages[] = ['role' => $role, 'media_id' => $mediaId, 'sort_order' => 0, 'placement_key' => (string) ($slots[$role]['placement_key'] ?? ''), 'alt_text' => (string) ($slots[$role]['blueprint']['planned_alt_intent'] ?? ''), 'title' => (string) ($slots[$role]['blueprint']['planned_title'] ?? ''), 'keyword_groups' => (array) ($slots[$role]['blueprint']['keyword_groups'] ?? [])];
-        foreach ($supportingPlacements as $placement) $desiredUsages[] = ['role' => MediaUsageRoleRegistry::INLINE_SUPPORTING, 'media_id' => $placement['media_id'], 'sort_order' => $placement['sort_order'], 'placement_key' => $placement['placement_key']];
+        foreach ($supportingPlacements as $placement) $desiredUsages[] = [
+            'role' => MediaUsageRoleRegistry::INLINE_SUPPORTING,
+            'media_id' => $placement['media_id'],
+            'sort_order' => $placement['sort_order'],
+            'placement_key' => $placement['placement_key'],
+            'alt_text' => $placement['alt_text'],
+            'caption' => $placement['caption'],
+            'title' => $placement['title'],
+        ];
         $usagePlan = (new MediaUsageReconciler())->plan('wp_post', $endpointKey, $this->usages->listByEndpoint('wp_post', $endpointKey), $desiredUsages);
         $diagnostics[] = ['code' => 'MEDIA_USAGE_RECONCILIATION', 'status' => $usagePlan['status'], 'actions' => $usagePlan['actions']];
         $state = array_filter($slots, static fn (array $slot): bool => $slot['placeholder']) !== [] ? MediaSeoStateRegistry::PLACEHOLDER : (in_array('MEDIA_LOW_RESOLUTION', array_column($diagnostics, 'code'), true) ? MediaSeoStateRegistry::LOW_RESOLUTION : MediaSeoStateRegistry::COMPLETE);
@@ -286,8 +316,12 @@ final class ArticleMediaCoordinator
         ];
     }
 
-    private function reconcileUsage(string $endpointKey, string $slot, string $mediaId, \NHK\Core\Domain\Media\MediaSeoBlueprint $blueprint, string $placementKey = ''): \NHK\Core\Domain\Media\MediaUsage
+    private function reconcileUsage(string $endpointKey, string $slot, string $mediaId, \NHK\Core\Domain\Media\MediaSeoBlueprint $blueprint, string $placementKey = '', array $metadata = []): \NHK\Core\Domain\Media\MediaUsage
     {
+        $altText = array_key_exists('alt_text', $metadata) ? (string) $metadata['alt_text'] : $blueprint->plannedAltIntent;
+        $title = array_key_exists('title', $metadata) ? (string) $metadata['title'] : $blueprint->plannedTitle;
+        $caption = array_key_exists('caption', $metadata) ? (string) $metadata['caption'] : '';
+        $sortOrder = array_key_exists('sort_order', $metadata) ? max(0, (int) $metadata['sort_order']) : 0;
         $conflictRetries = 0;
         while (true) {
             $existing = $this->usages->listByEndpoint('wp_post', $endpointKey, $slot);
@@ -295,7 +329,7 @@ final class ArticleMediaCoordinator
             foreach ($existing as $usage) {
                 if ($usage->activeSlot === 'retired') continue;
                 if ($usage->mediaId !== $mediaId) continue;
-                $candidate = new \NHK\Core\Domain\Media\MediaUsage($usage->usageId, $mediaId, 'wp_post', $endpointKey, $slot, 0, $blueprint->plannedAltIntent, '', $blueprint->keywordGroups, $blueprint->plannedTitle, $usage->revision, $usage->placementKey !== '' ? $usage->placementKey : $placementKey);
+                $candidate = new \NHK\Core\Domain\Media\MediaUsage($usage->usageId, $mediaId, 'wp_post', $endpointKey, $slot, $sortOrder, $altText, $caption, $blueprint->keywordGroups, $title, $usage->revision, $usage->placementKey !== '' ? $usage->placementKey : $placementKey);
                 if ($usage->sortOrder === $candidate->sortOrder && $usage->altText === $candidate->altText && $usage->caption === $candidate->caption && $usage->keywordGroups === $candidate->keywordGroups && $usage->title === $candidate->title && $usage->placementKey === $candidate->placementKey) return $usage;
                 if (!$this->usages instanceof MediaUsageUpdater) throw new \RuntimeException('ARTICLE_MEDIA_USAGE_UPDATE_UNAVAILABLE');
                 try {
@@ -308,7 +342,7 @@ final class ArticleMediaCoordinator
             }
             if ($existing !== []) {
                 $current = $existing[0];
-                $candidate = new \NHK\Core\Domain\Media\MediaUsage($current->usageId, $mediaId, 'wp_post', $endpointKey, $slot, 0, $blueprint->plannedAltIntent, '', $blueprint->keywordGroups, $blueprint->plannedTitle, $current->revision, $current->placementKey !== '' ? $current->placementKey : $placementKey);
+                $candidate = new \NHK\Core\Domain\Media\MediaUsage($current->usageId, $mediaId, 'wp_post', $endpointKey, $slot, $sortOrder, $altText, $caption, $blueprint->keywordGroups, $title, $current->revision, $current->placementKey !== '' ? $current->placementKey : $placementKey);
                 if ($this->usages instanceof MediaUsageUpdater) {
                     try {
                         return $this->usages->update($candidate);
@@ -320,7 +354,7 @@ final class ArticleMediaCoordinator
                 }
                 if ($this->usages instanceof MutableMediaUsageRepository) throw new \RuntimeException('ARTICLE_MEDIA_USAGE_REPLACEMENT_UNAVAILABLE');
             }
-            return $this->mediaService->addUsage($mediaId, 'wp_post', $endpointKey, $slot, 0, $blueprint->plannedAltIntent, '', $blueprint->keywordGroups, $blueprint->plannedTitle, $placementKey);
+            return $this->mediaService->addUsage($mediaId, 'wp_post', $endpointKey, $slot, $sortOrder, $altText, $caption, $blueprint->keywordGroups, $title, $placementKey);
         }
     }
 
@@ -329,7 +363,7 @@ final class ArticleMediaCoordinator
         return strtolower(trim($error->getMessage())) === 'media usage update conflict.';
     }
 
-    /** @param list<mixed> $placements @return list<array{media_id:string,placement_key:string,sort_order:int}> */
+    /** @param list<mixed> $placements @return list<array{media_id:string,placement_key:string,sort_order:int,alt_text:string,caption:string,title:string}> */
     private function normalizeSupportingPlacements(array $placements): array
     {
         $seen = [];
@@ -344,6 +378,11 @@ final class ArticleMediaCoordinator
             $seen[$mediaId] = true;
             $seen[$mediaId . "\0" . $key] = true;
             $normalized[] = ['media_id' => $mediaId, 'placement_key' => $key, 'sort_order' => is_array($placement) && isset($placement['sort_order']) ? max(0, (int) $placement['sort_order']) : $index];
+            $normalized[array_key_last($normalized)] += [
+                'alt_text' => is_array($placement) ? (string) ($placement['alt_text'] ?? '') : '',
+                'caption' => is_array($placement) ? (string) ($placement['caption'] ?? '') : '',
+                'title' => is_array($placement) ? (string) ($placement['title'] ?? '') : '',
+            ];
         }
         return $normalized;
     }

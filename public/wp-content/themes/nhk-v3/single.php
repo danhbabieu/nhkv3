@@ -66,7 +66,7 @@ $relationLabels = ['brands' => 'Thương hiệu', 'models' => 'Mẫu đồng h�
                 <a href="<?php echo esc_url((string) $item['url']); ?>" data-album-open aria-label="Mở ảnh <?php echo esc_attr((string) ($index + 1)); ?> ở kích thước đầy đủ">
                   <img src="<?php echo esc_url((string) $item['url']); ?>" alt="<?php echo esc_attr($alt); ?>" loading="<?php echo $index === 0 ? 'eager' : 'lazy'; ?>"<?php if (!empty($item['width'])): ?> width="<?php echo esc_attr((string) $item['width']); ?>"<?php endif; ?><?php if (!empty($item['height'])): ?> height="<?php echo esc_attr((string) $item['height']); ?>"<?php endif; ?>>
                 </a>
-                <figcaption><strong>Ảnh <?php echo esc_html((string) ($index + 1)); ?> / <?php echo esc_html((string) count($galleryImages)); ?></strong><?php echo esc_html($caption); ?></figcaption>
+                <figcaption><strong><?php echo esc_html(trim((string) ($item['title'] ?? '')) ?: ('Ảnh ' . ($index + 1))); ?></strong><span> · <?php echo esc_html((string) ($index + 1)); ?> / <?php echo esc_html((string) count($galleryImages)); ?></span><?php echo esc_html($caption); ?></figcaption>
               </figure>
             <?php endforeach; ?>
           </div>

@@ -340,6 +340,32 @@ final class ArticleMediaPolicyTest extends TestCase
         self::assertNotContains('ARTICLE_MEDIA_INLINE_MISSING', array_column($result->diagnostics, 'code'));
     }
 
+    public function test_image_article_album_keeps_each_media_usage_order_and_contextual_metadata(): void
+    {
+        [$media, $assets, $usages, $blueprints, $service] = $this->stores();
+        $items = [];
+        foreach ([['b', 'B', 0], ['a', 'A', 1], ['c', 'C', 2]] as [$key, $title, $order]) {
+            $item = $service->create('album-' . $key, 'Canonical ' . $title, 'ready');
+            $service->addAsset($item->canonicalId, 'original', 'uploads/album-' . $key . '.webp', hash('sha256', $key), 'image/webp', 3, 1200, 800, 'PUBLIC');
+            $items[] = ['media_id' => $item->canonicalId, 'title' => 'Ảnh ' . $title, 'alt_text' => 'Alt ' . $title, 'caption' => 'Caption ' . $title, 'sort_order' => $order, 'client_file_id' => $key];
+        }
+        $coordinator = new ArticleMediaCoordinator($service, $media, $assets, $usages, $blueprints, 1);
+
+        $coordinator->ensureForPost(47, ['content_intent' => ['intent' => 'IMAGE_ARTICLE'], 'single_real_image_exception' => false], [
+            'featured_primary' => $items[0],
+            'inline_primary' => $items[1],
+        ], [$items[2]]);
+        $album = $usages->listByEndpoint('wp_post', '1:47');
+        usort($album, static fn (MediaUsage $left, MediaUsage $right): int => $left->sortOrder <=> $right->sortOrder);
+
+        self::assertCount(3, $album);
+        self::assertSame(['B', 'A', 'C'], array_map(static fn (MediaUsage $usage): string => substr($usage->title, -1), $album));
+        self::assertSame(['Caption B', 'Caption A', 'Caption C'], array_column($album, 'caption'));
+        self::assertSame([0, 1, 2], array_column($album, 'sortOrder'));
+        self::assertSame($items[0]['media_id'], $album[0]->mediaId);
+        self::assertSame($items[1]['media_id'], $album[1]->mediaId);
+    }
+
     public function test_repeated_supporting_media_requires_explicit_unique_placements_and_converges_without_binary_duplication(): void
     {
         [$media, $assets, $usages, $blueprints, $service] = $this->stores();
