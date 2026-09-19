@@ -15230,3 +15230,29 @@ required DB/WP runtime are unavailable. No live data was mutated; no commit,
 push or deployment was performed.
 
 STATUS=`VIDEO_CAPTURE_RETRY_SCOPE_IDEMPOTENCY_FIXED_LOCALLY / DEPLOYMENT_PENDING / OPERATOR_COMMIT_REQUIRED`.
+
+# Checkpoint — 2026-09-19 — Article preflight runtime composition capture fixed (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE: The Article research inventory closure introduced semantic Media
+suitability evaluation but did not capture the required MediaAssetRepository.
+The live path therefore invoked `listByMediaId()` on an undefined/null closure
+variable. The same change also read `$resolution` instead of the callback's
+`$input['subject_resolution']`.
+
+FIXED_BOUNDARY: The canonical Plugin composition now explicitly captures the
+required asset repository and reads subject resolution from the inventory
+input. The Article contract and Governance failure contract now state that
+registered/callable capability is not runtime-ready until its required
+dependency graph is resolved; omitted captures are composition failures, not
+business-data unavailability. No null guard or semantic fallback was added.
+
+REGRESSION: Plugin boot-wiring coverage asserts the production inventory
+closure owns the MediaAssetRepository and does not reference out-of-scope
+resolution state. Article preflight, Media suitability, projection and dossier
+regressions remain green.
+
+VERIFICATION: Focused suite passes 69 tests / 284 assertions with existing
+warnings/deprecations. No staging/production mutation, deployment or live
+retry was performed.
+
+STATUS=`ARTICLE_PREFLIGHT_COMPOSITION_FIXED_LOCALLY / DEPLOYMENT_PENDING / OPERATOR_COMMIT_REQUIRED`.

@@ -22,6 +22,18 @@ final class PluginBootWiringTest extends TestCase
         self::assertLessThan($projection, $usages);
     }
 
+    public function test_article_research_inventory_captures_every_required_media_dependency_and_uses_input_resolution(): void
+    {
+        $plugin = (string) file_get_contents(__DIR__ . '/../../src/Plugin.php');
+        $inventoryStart = strpos($plugin, 'static function (array $input) use ($authority, $types, $claims, $sources, $evidence, $media, $assets, $usages, $videos, $graphService, $predicates)');
+        self::assertNotFalse($inventoryStart, 'Article inventory composition must capture its required MediaAssetRepository.');
+
+        $inventory = substr($plugin, $inventoryStart, strpos($plugin, "                [$articlePublicEligibility, 'evaluate']", $inventoryStart) - $inventoryStart);
+        self::assertStringContainsString('$assets->listByMediaId', $inventory);
+        self::assertStringContainsString('$input[\'subject_resolution\'][\'primary\'][\'id\']', $inventory);
+        self::assertStringNotContainsString('$resolution[\'primary\'][\'id\']', $inventory);
+    }
+
     public function test_plugin_entrypoint_boots_dedicated_entity_dossier_projection(): void
     {
         $entrypoint = (string) file_get_contents(__DIR__ . '/../../nhk-core.php');

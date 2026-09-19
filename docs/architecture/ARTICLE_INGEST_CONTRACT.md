@@ -373,6 +373,22 @@ Knowledge-only and Video-only intents do not acquire an implicit Article
 requirement. This is orchestration and recovery evidence, not a second Article
 or semantic content store.
 
+### Runtime composition integrity — 2026-09-19
+
+An Article research/preflight capability is runtime-ready only when every
+required repository used by its inventory callback is resolved in the
+canonical composition path. A registered or callable MCP ability is not proof
+that this dependency graph is valid. Required dependencies must be captured
+explicitly by the composition closure (or supplied by a typed shared factory);
+an omitted capture is a `RUNTIME_COMPOSITION_INVALID` defect, not
+`DATA_SOURCE_UNAVAILABLE` and not a business-data result.
+
+The production composition test must inspect the canonical Article inventory
+path and exercise the subject/media branch with harmless read-only fakes. This
+prevents a later suitability dependency from silently becoming an undefined
+closure variable and failing deep in execution. Optional enrichment remains
+explicitly degradable and may not be used to justify false completeness.
+
 ### Truth before completeness and bounded recovery — 2026-09-19
 
 Article/media reconciliation evaluates requirement, semantic suitability and

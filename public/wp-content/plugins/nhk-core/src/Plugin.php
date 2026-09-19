@@ -380,7 +380,7 @@ final class Plugin {
                     $subjects = array_values($resolved['resolved']);
                     return ['status' => 'resolved', 'primary' => $subjects[0], 'subjects' => $subjects, 'resolved' => $resolved['resolved']];
                 },
-                static function (array $input) use ($authority, $types, $claims, $sources, $evidence, $media, $usages, $videos, $graphService, $predicates): array {
+                static function (array $input) use ($authority, $types, $claims, $sources, $evidence, $media, $assets, $usages, $videos, $graphService, $predicates): array {
                     $started = microtime(true);
                     $timings = [];
                     $primary = is_array($input['subject_resolution']['primary'] ?? null) ? $input['subject_resolution']['primary'] : [];
@@ -397,7 +397,7 @@ final class Plugin {
                     if ($articlePostId > 0) {
                         $articleEndpoint = (function_exists('get_current_blog_id') ? max(1, (int) get_current_blog_id()) : 1) . ':' . $articlePostId;
                         $suitabilityPolicy = new \NHK\Core\Application\Media\SemanticSuitabilityPolicy();
-                        $primarySubjectId = trim((string) (($resolution['primary']['id'] ?? '')));
+                        $primarySubjectId = trim((string) (($input['subject_resolution']['primary']['id'] ?? '')));
                         $subjectIdsForMedia = $primarySubjectId !== '' ? [$primarySubjectId] : $subjectIds;
                         foreach (['featured_primary', 'inline_primary'] as $role) {
                             $usage = $usages->listByEndpoint('wp_post', $articleEndpoint, $role)[0] ?? null;

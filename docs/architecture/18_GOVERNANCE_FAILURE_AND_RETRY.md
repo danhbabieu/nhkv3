@@ -37,3 +37,14 @@ read-back matches the current native state token. A different token without
 that exact durable proof is concurrent state and must remain a CAS conflict.
 No recovery path creates a new semantic owner, bypasses Governance, uses direct
 WordPress/database writes, or grants a staging scope.
+
+## Runtime composition integrity — 2026-09-19
+
+Registered, exposed or callable capability state does not establish runtime
+readiness. A capability is ready only after every required dependency in its
+execution graph has been resolved by the canonical composition path. A missing
+closure capture or unresolved required repository is a composition failure
+(`RUNTIME_COMPOSITION_INVALID`), not a business-data absence and not a reason
+to return an incomplete success. Optional enrichment dependencies remain
+explicitly degradable only when the owning contract says the core operation is
+still valid without them.
