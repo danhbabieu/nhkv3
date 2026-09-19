@@ -67,7 +67,7 @@ final class VideoStagingAdmissionTest extends TestCase
                     'subject_resolution_packet' => ['status' => 'RESOLVED', 'type' => 'classification', 'id' => $subjectId, 'revision' => 1],
                 ],
             ]],
-        ]], ['purpose' => 'VIDEO'], [], []);
+        ]], ['purpose' => 'EDITORIAL', 'content_intent' => ['intent' => 'VIDEO']], [], []);
         $scope = [
             'approved' => true, 'environment' => 'staging', 'semantic_write_policy' => 'PROJECT_BUILD',
             'operation_family' => 'governed_video_plan', 'entity_type' => 'video', 'operation' => 'ingest',
@@ -85,6 +85,40 @@ final class VideoStagingAdmissionTest extends TestCase
             public function update(Video $video, int $expectedRevision): Video { return $video; }
             public function list(bool $includeRetired = false): array { return []; }
         }))(false, $scope, $capture, [], []));
+    }
+
+    public function test_video_content_intent_is_admitted_when_capture_purpose_is_editorial(): void
+    {
+        $captureId = \NHK\Core\Shared\Uuid\UuidCodec::newV7();
+        $videoId = \NHK\Core\Shared\Uuid\UuidCodec::newV7();
+        $subjectId = \NHK\Core\Shared\Uuid\UuidCodec::newV7();
+        $fingerprint = hash('sha256', 'editorial-video-intent');
+        $capture = new CaptureRecord($captureId, 'editorial-video-intent', $fingerprint, 'SEMANTICS_RECONCILED', 'IN_PROGRESS', null, null, [[
+            'kind' => 'video',
+            'video_proposal' => ['payload' => ['canonical_id' => $videoId, 'metadata' => [
+                'source' => ['platform' => 'youtube', 'external_video_id' => 'kdhFeE9bA6A', 'canonical_source_url' => 'https://www.youtube.com/watch?v=kdhFeE9bA6A'],
+                'subject_resolution_packet' => ['status' => 'RESOLVED', 'type' => 'classification', 'id' => $subjectId, 'revision' => 3],
+            ]]],
+        ]], ['purpose' => 'EDITORIAL', 'content_intent' => ['intent' => 'VIDEO']], [], []);
+        $scope = [
+            'approved' => true, 'environment' => 'staging', 'semantic_write_policy' => 'PROJECT_BUILD',
+            'operation_family' => 'governed_video_plan', 'entity_type' => 'video', 'operation' => 'ingest',
+            'create_semantics' => 'ingest', 'writer' => 'canonical_governed', 'entrypoint' => 'nhk.capture.ingest',
+            'capture_id' => $captureId, 'capture_fingerprint' => $fingerprint,
+            'plan_fingerprint' => hash('sha256', 'plan'), 'proposal_command_fingerprint' => hash('sha256', 'command'),
+            'platform' => 'youtube', 'external_video_id' => 'kdhFeE9bA6A',
+            'canonical_source_url' => 'https://www.youtube.com/watch?v=kdhFeE9bA6A',
+            'proposed_uuid' => $videoId, 'subject' => ['type' => 'classification', 'uuid' => $subjectId, 'revision' => 3],
+        ];
+        $videos = new class implements VideoRepository {
+            public function findByCanonicalId(string $id): ?Video { return null; }
+            public function findByExternalReference(string $platform, string $externalId): ?Video { return null; }
+            public function create(Video $video): Video { return $video; }
+            public function update(Video $video, int $expectedRevision): Video { return $video; }
+            public function list(bool $includeRetired = false): array { return []; }
+        };
+
+        self::assertTrue((new VideoStagingAdmission($videos))(false, $scope, $capture, [], []));
     }
 
     public function test_fresh_ingest_keeps_video_owner_subject_id_separate_from_resolved_semantic_subject(): void
@@ -118,7 +152,7 @@ final class VideoStagingAdmissionTest extends TestCase
                     ],
                 ],
             ],
-        ]], ['purpose' => 'VIDEO'], [], []);
+        ]], ['purpose' => 'EDITORIAL', 'content_intent' => ['intent' => 'VIDEO']], [], []);
 
         $videos = new class implements VideoRepository {
             public function findByCanonicalId(string $id): ?Video { return null; }
@@ -181,7 +215,7 @@ final class VideoStagingAdmissionTest extends TestCase
         $subjectId = \NHK\Core\Shared\Uuid\UuidCodec::newV7();
         $capture = new CaptureRecord($captureId, 'generic-video', $fingerprint, 'SEMANTICS_RECONCILED', 'FAILED_RETRYABLE', null, null, [[
             'kind' => 'video', 'video_proposal' => ['payload' => ['canonical_id' => $videoId, 'expected_revision' => 5, 'metadata' => ['subject_resolution_packet' => ['id' => $subjectId, 'type' => 'variant']]]],
-        ]], ['purpose' => 'VIDEO'], [], []);
+        ]], ['purpose' => 'EDITORIAL', 'content_intent' => ['intent' => 'VIDEO']], [], []);
         return [$capture, [
             'approved' => true, 'environment' => 'staging', 'semantic_write_policy' => 'PROJECT_BUILD', 'operation_family' => 'governed_video_plan',
             'entity_type' => 'video', 'operation' => 'update', 'writer' => 'canonical_governed',

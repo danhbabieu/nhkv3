@@ -22,7 +22,7 @@ use NHK\Core\Infrastructure\Migration\ClaimProjectionMigration016;
 use NHK\Core\Infrastructure\Migration\{EditorialCaptureAddendumMigration018, EditorialCaptureMigration017, GovernanceSubjectBindingMigration020, MediaBindingOperationMigration022, MediaUsageMetadataMigration021, VisualSupportRequirementMigration019};
 use NHK\Core\Infrastructure\Migration\MigrationDatabaseGuard;
 use NHK\Core\Application\Governance\GovernanceCapabilities;
-use NHK\Core\Application\Governance\{AuthorityStagingAdmission, CaptureDependencyStagingAdmission, MediaBindingStagingAdmission, MediaMetadataStagingAdmission, VideoStagingAdmission};
+use NHK\Core\Application\Governance\{AuthorityStagingAdmission, CaptureChildRelationStagingAdmission, CaptureDependencyStagingAdmission, MediaBindingStagingAdmission, MediaMetadataStagingAdmission, VideoStagingAdmission};
 use NHK\Core\Application\Runtime\SemanticWritePolicyResolver;
 use NHK\Core\Application\Mcp\{McpAbilityRegistration, McpArticleIngestHandler, McpGovernanceHandler, McpReadHandler, McpSemanticContextResolver, McpToolCatalog, McpTransport, McpDocumentationRegistry};
 use NHK\Core\Application\Media\{ImageIngestEntrypoint, MediaBatchUploadService, MediaBindingService};
@@ -174,6 +174,7 @@ final class Plugin {
             add_filter('nhk_v3_staging_acceptance_admission', new MediaMetadataStagingAdmission(new WpdbMediaRepository($wpdb)), 22, 5);
             add_filter('nhk_v3_staging_acceptance_admission', new CaptureDependencyStagingAdmission(), 25, 5);
             add_filter('nhk_v3_staging_acceptance_admission', new VideoStagingAdmission(new WpdbVideoRepository($wpdb)), 30, 5);
+            add_filter('nhk_v3_staging_acceptance_admission', new CaptureChildRelationStagingAdmission(), 35, 5);
         }
         $sharedAttachmentBridge = null;
         $claimOwnerUrl = static fn (\NHK\Core\Domain\Knowledge\KnowledgeClaim $claim): ?string => null;
@@ -730,6 +731,15 @@ final class Plugin {
                     $capture = $captureRepository->findById($captureId);
                     if (!$capture instanceof CaptureRecord) throw new \RuntimeException('STAGING_CAPTURE_NOT_FOUND');
                     return $stagingScopeVerifier->issueForCaptureDependencyPlan($capture, $plan);
+                },
+                relationScopeIssuer: static function (string $captureId, array $plan) use ($captureRepository, $stagingScopeVerifier, $endpoints): array {
+                    $capture = $captureRepository->findById($captureId);
+                    if (!$capture instanceof CaptureRecord) throw new \RuntimeException('STAGING_CAPTURE_NOT_FOUND');
+                    $payload = is_array($plan['payload'] ?? null) ? $plan['payload'] : [];
+                    $payload = (new \NHK\Core\Application\Graph\RelationRevisionBinder($endpoints))->bind($payload);
+                    $plan['payload'] = $payload;
+                    $scope = $stagingScopeVerifier->issueForCaptureChildRelation($capture, $plan);
+                    return $scope;
                 },
             );
             $articleReceipts = new WpdbArticleOperationReceiptRepository($wpdb);

@@ -106,6 +106,31 @@ final class StagingAcceptanceScope
             return;
         }
 
+        if ($expectedFamily === 'capture_child_relation') {
+            $payload = $proposal->payload;
+            $sourceType = (string) ($payload['source_type'] ?? '');
+            $sourceUuid = (string) ($payload['source_uuid'] ?? '');
+            $targetType = (string) ($payload['target_type'] ?? '');
+            $targetUuid = (string) ($payload['target_uuid'] ?? '');
+            if ($sourceType !== (string) ($scope['source_type'] ?? '')
+                || $sourceUuid !== (string) ($scope['source_id'] ?? '')
+                || (string) ($payload['predicate'] ?? '') !== (string) ($scope['predicate'] ?? '')
+                || $targetType !== (string) ($scope['target_type'] ?? '')
+                || $targetUuid !== (string) ($scope['target_id'] ?? '')
+                || $sourceType !== 'wp_post'
+                || (string) ($payload['predicate'] ?? '') !== 'about'
+                || (int) ($payload['source_revision'] ?? 0) !== (int) ($scope['source_revision'] ?? 0)
+                || (int) ($payload['target_revision'] ?? 0) !== (int) ($scope['target_revision'] ?? 0)) {
+                throw new \RuntimeException('STAGING_CAPTURE_CHILD_BINDING_MISMATCH');
+            }
+            $payloadFingerprint = hash('sha256', CommandCanonicalizer::canonicalize(self::withoutAuthorization($payload)));
+            if (!hash_equals((string) ($scope['payload_fingerprint'] ?? ''), $payloadFingerprint)
+                || !hash_equals((string) ($scope['proposal_command_fingerprint'] ?? ''), $payloadFingerprint)) {
+                throw new \RuntimeException('STAGING_CAPTURE_CHILD_PAYLOAD_MISMATCH');
+            }
+            return;
+        }
+
         if (in_array($expectedFamily, ['source_evidence_reconciliation', 'knowledge_delta'], true)) {
             if (!hash_equals($captureId, (string) ($proposal->payload['capture_id'] ?? ''))
                 || !hash_equals((string) ($scope['capture_fingerprint'] ?? ''), (string) ($proposal->payload['capture_fingerprint'] ?? ''))
@@ -206,5 +231,12 @@ final class StagingAcceptanceScope
         foreach (['media', 'media_ref'] as $key) {
             if (is_array($scope[$key] ?? null) && array_intersect($forbidden, array_keys($scope[$key])) !== []) throw new \RuntimeException('STAGING_EXACT_MEDIA_REQUIRED');
         }
+    }
+
+    /** @param array<string,mixed> $value @return array<string,mixed> */
+    public static function withoutAuthorization(array $value): array
+    {
+        foreach (['staging_acceptance', 'signature', 'fingerprint', 'approved', 'scope_fingerprint', 'proposal_command_fingerprint'] as $key) unset($value[$key]);
+        return $value;
     }
 }

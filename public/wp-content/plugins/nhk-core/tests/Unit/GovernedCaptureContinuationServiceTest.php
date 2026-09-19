@@ -99,7 +99,7 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
                     ],
                 ],
             ],
-        ]], ['purpose' => 'VIDEO'], revision: 43);
+        ]], ['purpose' => 'EDITORIAL', 'content_intent' => ['intent' => 'VIDEO']], revision: 43);
         $scopeVerifier = new StagingAcceptanceScopeVerifier(
             static fn (): string => 'staging',
             'test-secret',
@@ -168,7 +168,7 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
         $captureId = UuidCodec::newV7();
         $videoId = UuidCodec::newV7();
         $subjectId = UuidCodec::newV7();
-        $capture = new \NHK\Core\Domain\Capture\CaptureRecord($captureId, 'live-shaped', hash('sha256', 'live-shaped'), 'SEMANTICS_RECONCILED', 'IN_PROGRESS', context: ['purpose' => 'VIDEO'], assets: [[
+        $capture = new \NHK\Core\Domain\Capture\CaptureRecord($captureId, 'live-shaped', hash('sha256', 'live-shaped'), 'SEMANTICS_RECONCILED', 'IN_PROGRESS', context: ['purpose' => 'EDITORIAL', 'content_intent' => ['intent' => 'VIDEO']], assets: [[
             'kind' => 'video', 'video_proposal' => ['entity_type' => 'video', 'operation' => 'ingest', 'subject_id' => $videoId, 'idempotency_key' => 'live-shaped:video', 'fingerprint' => hash('sha256', 'video-plan'), 'payload' => [
                 'canonical_id' => $videoId, 'metadata' => ['source' => ['platform' => 'youtube', 'external_video_id' => 'GHvh8-iXPoE', 'canonical_source_url' => 'https://www.youtube.com/watch?v=GHvh8-iXPoE'], 'subject_resolution_packet' => ['status' => 'RESOLVED', 'match' => 'uuid_exact', 'type' => 'variant', 'id' => $subjectId, 'revision' => 1]],
             ]],

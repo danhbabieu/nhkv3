@@ -26,7 +26,7 @@ final class VideoStagingAdmission
             || (($scope['entrypoint'] ?? $scope['canonical_entrypoint'] ?? '') !== 'nhk.capture.ingest')
             || ($scope['capture_id'] ?? '') !== $capture->captureId
             || ($scope['capture_fingerprint'] ?? '') !== $capture->requestFingerprint
-            || strtoupper((string) ($capture->context['purpose'] ?? $input['intent'] ?? '')) !== 'VIDEO'
+            || !CaptureVideoIntent::matches($capture, $input)
             || !preg_match('/^[a-f0-9]{64}$/i', (string) ($scope['plan_fingerprint'] ?? ''))
             || !preg_match('/^[a-f0-9]{64}$/i', (string) ($scope['proposal_command_fingerprint'] ?? ''))) return false;
 

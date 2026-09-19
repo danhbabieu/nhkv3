@@ -196,6 +196,28 @@ wrong-target or wrong-operation scope is rejected, and production is always
 blocked. `USER_EXPLICIT/PINNED` stays in the MediaBinding owner, while
 `SYSTEM_AUTO/AUTO` is routed through Governance `representative_bind`.
 
+### Parent Capture admission and required child admission
+
+Capture is orchestration and never owns Article, Media, MediaUsage or Graph
+truth. A standalone `relation_create` or MediaUsage `replace` still requires
+its own exact staging admission and fails closed without one. When an admitted
+Editorial Capture deterministically generates its required Article subject
+edge, the server may issue a `capture_child_relation` scope for that one child.
+It binds the Capture identity/revision and request fingerprint, Article owner
+and exact `wp_post` endpoint, resolved canonical target and revision, registered
+`about` predicate, idempotency key and proposal payload fingerprint. The scope
+is signed, expiring, non-transferable and non-reusable; it only permits the
+proposal to enter the ordinary Submit → Approval → Eligibility → Controlled
+Apply lifecycle. It never bypasses Governance or transfers Graph ownership.
+
+The child scope is derived from persisted Capture state, not accepted from
+client strings. Wrong Capture, Article, target, predicate, revision, replay
+payload or missing provenance fails closed. After apply, Graph canonical
+read-back remains mandatory before Capture semantic reconciliation can be
+complete. Capture-generated MediaUsage operations follow the same distinction:
+only a registered Capture continuation may receive a derived child admission;
+direct/admin `media:replace` remains explicitly scoped and fail-closed.
+
 The binding receipt stages are `VALIDATE`, `RESOLVE_MEDIA`, `RESOLVE_TARGET`,
 `PLAN`, `APPLY_USAGE`, `RECONCILE_REPRESENTATIVE`, `SEO_INVALIDATE`,
 `PROJECTION_INVALIDATE`, `FINAL_READBACK`, and `COMPLETE`; retries never create a

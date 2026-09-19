@@ -245,11 +245,25 @@ final class McpToolCatalog
                 ]],
                 'metadata' => [
                     'type' => 'object',
-                    'properties' => ['description' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 500]],
-                    'required' => ['description'],
+                    'properties' => ['description' => ['type' => 'string', 'maxLength' => 500]],
                     'additionalProperties' => false,
                 ],
-            ], ['idempotency_key', 'files', 'metadata'], true, ['openai/fileParams' => ['files']]),
+                'items' => ['type' => 'array', 'minItems' => 1, 'maxItems' => 20, 'items' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'ordinal' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 19],
+                        'media' => ['type' => 'object', 'properties' => [
+                            'title' => ['type' => 'string', 'maxLength' => 500],
+                            'alt_text' => ['type' => 'string', 'maxLength' => 1000],
+                            'caption' => ['type' => 'string', 'maxLength' => 2000],
+                            'description' => ['type' => 'string', 'maxLength' => 2000],
+                            'seo_slug' => ['type' => 'string', 'pattern' => '^[a-z0-9]+(?:-[a-z0-9]+)*$'],
+                        ], 'additionalProperties' => false],
+                    ],
+                    'required' => ['ordinal'],
+                    'additionalProperties' => false,
+                ]],
+            ], ['idempotency_key', 'files'], true, ['openai/fileParams' => ['files']]),
             self::tool('nhk.media.upload-widget.open', 'Open the NHK image uploader UI. Upload results remain physical Media records until a canonical Capture flow reuses their Media IDs.', [], [], false, ['ui' => ['resourceUri' => 'ui://nhk/image-upload.html']]),
             self::tool('nhk.media.ingest', 'Ingest governed Media metadata, or bind one already-uploaded WordPress image attachment into the canonical Media lifecycle without semantic inference.', [
                 'stable_key' => ['type' => 'string', 'minLength' => 1, 'pattern' => '^[a-z0-9][a-z0-9._:-]{0,190}$'],

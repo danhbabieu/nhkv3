@@ -14,7 +14,7 @@ final class StagingOperationDescriptorTest extends TestCase
     /** @dataProvider semanticSubjectProvider */
     public function test_final_dependency_and_proposal_use_one_identity_for_optional_source_fields(string $subjectType): void
     {
-        $capture = new CaptureRecord(UuidCodec::newV7(), 'descriptor-' . $subjectType, hash('sha256', 'capture-' . $subjectType), 'SEMANTICS_RECONCILED', 'IN_PROGRESS', context: ['purpose' => 'VIDEO']);
+        $capture = new CaptureRecord(UuidCodec::newV7(), 'descriptor-' . $subjectType, hash('sha256', 'capture-' . $subjectType), 'SEMANTICS_RECONCILED', 'IN_PROGRESS', context: ['purpose' => 'EDITORIAL', 'content_intent' => ['intent' => 'VIDEO']]);
         $subject = UuidCodec::newV7();
         $plan = [
             'entity_type' => 'source', 'operation' => 'ingest', 'subject_id' => 'nhk:source:video:test',

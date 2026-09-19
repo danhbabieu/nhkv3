@@ -19,13 +19,13 @@ final class CaptureDependencyStagingAdmission
     {
         if ($admitted) { $this->lastReason = 'ALREADY_ADMITTED'; return true; }
         $this->lastReason = 'DEPENDENCY_SCOPE_INVALID';
+        if (!CaptureVideoIntent::matches($capture, $input)) { $this->lastReason = 'CAPTURE_CONTENT_INTENT_NOT_VIDEO'; return false; }
         if (($scope['approved'] ?? false) !== true
             || ($scope['environment'] ?? '') !== 'staging'
             || ($scope['semantic_write_policy'] ?? '') !== 'PROJECT_BUILD'
             || ($scope['entrypoint'] ?? '') !== 'nhk.capture.ingest'
             || ($scope['capture_id'] ?? '') !== $capture->captureId
             || ($scope['capture_fingerprint'] ?? '') !== $capture->requestFingerprint
-            || strtoupper((string) ($capture->context['purpose'] ?? $input['intent'] ?? '')) !== 'VIDEO'
             || !in_array((string) ($scope['operation_family'] ?? ''), ['source_evidence_reconciliation', 'knowledge_delta'], true)
             || !in_array((string) ($scope['entity_type'] ?? ''), ['source', 'knowledge', 'evidence'], true)
             || (string) ($scope['operation'] ?? '') !== 'ingest') { $this->lastReason = 'DEPENDENCY_OPERATION_NOT_ALLOWED'; return false; }

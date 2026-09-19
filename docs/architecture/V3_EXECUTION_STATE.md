@@ -1,5 +1,63 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-19 — Capture child admission boundary fixed (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE: `OperationScopedStagingGuard` correctly rejected missing staging
+scope, but Article Capture's required `wp_post → about → subject` Graph child
+was constructed without a scope. The coordinator only issued Capture scope
+for explicit Media bindings, while continuation scoping covered Video and
+Source/Knowledge/Evidence children. Eligibility therefore reached Controlled
+Apply with a generic relation proposal and no parent provenance.
+
+FIXED_BOUNDARY: Added the existing scope verifier's generic server-issued
+`capture_child_relation` family. It binds persisted Capture/revision, Article
+owner and exact endpoint, resolved target/revisions, registered `about`,
+idempotency and payload fingerprint. The proposal still follows Submit,
+Approval, Eligibility, Controlled Apply and canonical Graph read-back. Direct
+relation and standalone MediaUsage replace operations remain independently
+scoped and fail closed. No live Article, Graph, MediaUsage or staging data was
+mutated.
+
+VERIFICATION: Added exact/non-transferable child-scope and standalone
+fail-closed regression tests. The focused child tests pass; unrelated dirty
+Video-intent tests remain separately environment/fixture-gated.
+
+# Checkpoint — 2026-09-19 — Video Capture staging admission intent binding fixed (LOCAL / NO LIVE MUTATION)
+
+LIVE_FAILURE: Fresh valid Video Capture stopped at the first Source dependency
+with `STAGING_SCOPE_NOT_ADMITTED`; no Source Proposal was created.
+
+ROOT_CAUSE: The persisted Capture correctly has `purpose=EDITORIAL`; Video is a
+registered `content_intent`, not a Capture purpose. The dependency and Video
+staging admission providers compared `capture.context.purpose` to `VIDEO`.
+Local fixtures used the impossible production shape `purpose=VIDEO`, masking the
+rejection. The exact rejected field was the Capture intent source:
+`PURPOSE=EDITORIAL` versus the admission expectation `VIDEO`; the persisted
+`content_intent.intent=VIDEO` was ignored. This is an admission-policy mismatch,
+not post-sign payload drift, fingerprint drift, or a Guard bypass.
+
+FIXED_BOUNDARY: Added one shared `CaptureVideoIntent` resolver used by both
+staging admission providers. It admits only persisted `content_intent.intent` (or
+the Capture planning/input intent during the same server-owned flow) equal to
+`VIDEO`; it does not widen operations, scopes, signatures, Guard checks or
+allowlists. Non-Video input returns internal reason
+`CAPTURE_CONTENT_INTENT_NOT_VIDEO` while the public failure remains
+`STAGING_SCOPE_NOT_ADMITTED`.
+
+REGRESSION: Classification and Variant dependency cases pass with
+`purpose=EDITORIAL`, `content_intent=VIDEO`, YouTube identity, no transcript and
+null/absent optional source metadata. The governed provenance path now reaches
+Source/Claim/Evidence/Video in the production-shaped fixture; deterministic
+descriptor, scope, replay and tamper tests remain green.
+
+VERIFICATION: Focused staging/Capture slice passes 68 tests / 292 assertions.
+Full PHPUnit reaches 2,127 tests / 9,720 assertions but remains non-green on
+the known environment/bootstrap baseline (36 WordPress/MySQL errors, 15
+configuration/integration failures, 114 skips); no staging or production
+mutation, deployment, pull, fetch or push was performed.
+
+STATUS: `VIDEO_CAPTURE_STAGING_INTENT_BINDING_FIXED_LOCAL / NO_LIVE_MUTATION / DEPLOYMENT_PENDING`.
+
 # Checkpoint — 2026-09-19 — Multi-image metadata and existing Media repair boundary fixed (LOCAL / NO LIVE MUTATION)
 
 SCOPE: Fixed ordered multi-image metadata transport, per-item widget metadata,

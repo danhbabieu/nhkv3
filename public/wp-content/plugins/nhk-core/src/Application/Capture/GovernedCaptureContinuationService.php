@@ -55,6 +55,8 @@ final class GovernedCaptureContinuationService
         private ?PendingVideoProposalLookup $pendingVideoProposals = null,
         /** @var callable(string,array<string,mixed>):array<string,mixed>|null */
         private $dependencyScopeIssuer = null,
+        /** @var callable(string,array<string,mixed>):array<string,mixed>|null */
+        private $relationScopeIssuer = null,
     ) {
         $this->completion = $completion ?? new CompletionCoordinator();
     }
@@ -321,7 +323,7 @@ final class GovernedCaptureContinuationService
             // stable idempotency key is owner/subject based so a later
             // continuation reuses the same edge/proposal instead of opening a
             // duplicate relation.
-            $plans[] = $this->arguments('relation', 'relation_create', 'relation', [
+            $relationPlan = $this->arguments('relation', 'relation_create', 'relation', [
                 'source_type' => 'wp_post',
                 'source_uuid' => $articleEndpoint,
                 'target_type' => (string) $primary['type'],
@@ -329,6 +331,9 @@ final class GovernedCaptureContinuationService
                 'predicate' => 'about',
                 'origin' => 'CAPTURE_ARTICLE_SUBJECT_BINDING',
             ], 'capture:article-about:' . $articleEndpoint . ':' . (string) $primary['type'] . ':' . (string) $primary['id']);
+            $relationPlan['payload']['target_revision'] = max(1, (int) ($primary['revision'] ?? 0));
+            $relationPlan = $this->scopeRelationPlan($captureId, $relationPlan);
+            $plans[] = $relationPlan;
         }
         if ($includeSemanticChildren && $this->semanticDeltaRequested($context) && ($intent === 'KNOWLEDGE_DELTA' || count($variants) === 1) && ($subject = $this->knowledgeSubject($subjects, $variants, $intent, $primary)) !== null) {
             $deltaText = trim((string) ($context['continuation_delta_text'] ?? ''));
@@ -535,6 +540,18 @@ final class GovernedCaptureContinuationService
         if (!is_array($scope)) throw new \RuntimeException('STAGING_SCOPE_REQUIRED');
         $plan['payload']['capture_fingerprint'] = (string) ($scope['capture_fingerprint'] ?? '');
         $plan['payload']['proposal_command_fingerprint'] = (string) ($scope['proposal_command_fingerprint'] ?? '');
+        $plan['payload']['staging_acceptance'] = $scope;
+        return $plan;
+    }
+
+    /** @param array<string,mixed> $plan @return array<string,mixed> */
+    private function scopeRelationPlan(string $captureId, array $plan): array
+    {
+        if (($plan['entity_type'] ?? '') !== 'relation' || ($plan['operation'] ?? '') !== 'relation_create' || !is_callable($this->relationScopeIssuer)) return $plan;
+        $scope = ($this->relationScopeIssuer)($captureId, $plan);
+        if (!is_array($scope)) throw new \RuntimeException('STAGING_SCOPE_REQUIRED');
+        if (is_array($scope['proposal_payload'] ?? null)) $plan['payload'] = $scope['proposal_payload'];
+        $plan['payload']['capture_id'] = $captureId;
         $plan['payload']['staging_acceptance'] = $scope;
         return $plan;
     }
@@ -947,7 +964,28 @@ final class GovernedCaptureContinuationService
         $blocked = preg_match('/(?:SUBJECT_BINDING|IDENTITY_CONFLICT|IDEMPOTENCY_STALE|IDEMPOTENCY_CONFLICT|BINDING_CONFLICT|REPAIR_REQUIRED|AMBIGUOUS|APPLIED_PROPOSAL_FORBIDDEN|INVARIANT|SCHEMA|CONTRACT|CAPABILITY|NOT_FOUND)/', $code) === 1;
         $review = preg_match('/(?:EVIDENCE_REQUIRED|CANONICAL_EVIDENCE_REQUIRED|SUBJECT_UNRESOLVED|SOURCE_UNAVAILABLE|APPROVAL_REQUIRED|GOVERNANCE_APPROVAL_REQUIRED|DEPENDENCY_REQUIRED|REVIEW_REQUIRED)/', $code) === 1;
         $status = $blocked ? 'SYSTEM_BLOCKED' : ($review ? 'REVIEW_REQUIRED' : 'FAILED_RETRYABLE');
-        return ['proposal_id' => (string) ($plan['proposal_id'] ?? ''), 'status' => $status, 'blockers' => [$code], 'error' => $error->getMessage()];
+        $result = ['proposal_id' => (string) ($plan['proposal_id'] ?? ''), 'status' => $status, 'blockers' => [$code], 'error' => $error->getMessage()];
+        if (str_contains($code, 'STAGING_SCOPE') || str_contains($rawMessage, 'STAGING_SCOPE')) $result['admission'] = $this->admissionDiagnostics($plan, $code);
+        return $result;
+    }
+
+    /** @return array<string,mixed> */
+    private function admissionDiagnostics(array $plan, string $failure): array
+    {
+        $payload = is_array($plan['payload'] ?? null) ? $plan['payload'] : [];
+        return [
+            'admission_owner' => (string) ($plan['entity_type'] ?? 'relation'),
+            'operation' => (string) ($plan['operation'] ?? ''),
+            'source_type' => (string) ($payload['source_type'] ?? ''),
+            'source_id' => (string) ($payload['source_uuid'] ?? ''),
+            'predicate' => (string) ($payload['predicate'] ?? ''),
+            'target_type' => (string) ($payload['target_type'] ?? ''),
+            'target_id' => (string) ($payload['target_uuid'] ?? ''),
+            'parent_capture_id' => $this->currentCaptureId,
+            'required_scope_kind' => (string) ($plan['entity_type'] ?? '') . ':' . (string) ($plan['operation'] ?? ''),
+            'scope_resolution' => is_array($plan['payload']['staging_acceptance'] ?? null) ? 'DERIVED_FROM_CAPTURE' : 'MISSING_PARENT_PROVENANCE',
+            'failure_reason' => $failure,
+        ];
     }
 
     /** @return array<string,array<string,mixed>> */

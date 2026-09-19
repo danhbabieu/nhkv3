@@ -91,6 +91,15 @@ surface; without it they fail closed with `DIRECT_WRITE_BLOCKED` and
    discovery, evidence/provenance validation, governed application of every
    justified useful registered relation and final read-back. This stage must
    not maximize edge count or create weak/speculative relations.
+For staging, the Article `wp_post → about → canonical subject` edge generated
+as a required child of an admitted Capture uses a server-issued,
+Capture-bound child admission. This is distinct from the parent Capture
+admission and from standalone relation admission: it is exact to the Article
+owner, resolved target, registered predicate, endpoint revisions and proposal
+fingerprint, and still passes the complete Governance lifecycle. Missing or
+stale child provenance fails closed; the child admission never makes Capture
+the owner of the Graph relation.
+
 8. Before publication of promotional/commercial copy, run the public-claim
    compliance gate over the rendered Article and its public projections. An
    unsupported objective or superiority/uniqueness/absolute claim must be

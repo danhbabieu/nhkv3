@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Tests\Unit;
 
-use NHK\Core\Application\Governance\StagingAcceptanceScopeVerifier;
+use NHK\Core\Application\Governance\{CaptureChildRelationStagingAdmission, OperationScopedStagingGuard, StagingAcceptanceScopeVerifier};
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Capture\CaptureRecord;
 use NHK\Core\Domain\Governance\{Proposal, ProposalState};
@@ -13,6 +13,31 @@ use PHPUnit\Framework\TestCase;
 
 final class StagingAcceptanceScopeVerifierTest extends TestCase
 {
+    public function test_capture_child_relation_scope_is_exact_and_non_transferable(): void
+    {
+        $captureId = UuidCodec::newV7();
+        $subjectId = UuidCodec::newV7();
+        $capture = new CaptureRecord($captureId, 'article-child', hash('sha256', 'article-child'), 'SEMANTICS_RECONCILED', 'IN_PROGRESS', 611, null, [], ['purpose' => 'EDITORIAL', 'content_intent' => ['intent' => 'IMAGE_ARTICLE']], ['subject_resolution' => ['primary' => ['type' => 'model', 'id' => $subjectId, 'revision' => 3]]], [], 4);
+        $payload = ['source_type' => 'wp_post', 'source_uuid' => '1:611', 'target_type' => 'model', 'target_uuid' => $subjectId, 'target_revision' => 3, 'source_revision' => 2, 'predicate' => 'about', 'origin' => 'CAPTURE_ARTICLE_SUBJECT_BINDING', 'capture_id' => $captureId, 'capture_revision' => 4];
+        $plan = ['entity_type' => 'relation', 'operation' => 'relation_create', 'subject_id' => 'relation', 'payload' => $payload, 'idempotency_key' => 'capture:article-about:1:611:model:' . $subjectId];
+        $verifier = new StagingAcceptanceScopeVerifier(static fn (): string => 'staging', 'test-secret', static fn (array $scope, CaptureRecord $capture, array $input, array $assets): bool => (new CaptureChildRelationStagingAdmission())(false, $scope, $capture, $input, $assets), can: static fn (): bool => true);
+        $scope = $verifier->issueForCaptureChildRelation($capture, $plan);
+        $proposal = new Proposal(UuidCodec::newV7(), '1:611', 'relation_create', $payload + ['staging_acceptance' => $scope], 'content', null, 'dependency', ProposalState::APPROVED, idempotencyKey: $plan['idempotency_key'], targetUuid: null, entityType: 'relation');
+        self::assertTrue($verifier->verifyProposal($scope, $proposal));
+        $wrongPayload = $proposal->payload;
+        $wrongPayload['source_uuid'] = '1:612';
+        $wrong = new Proposal($proposal->id, '1:612', 'relation_create', $wrongPayload, $proposal->contentFingerprint, null, $proposal->dependencyFingerprint, $proposal->state, idempotencyKey: $proposal->idempotencyKey, entityType: 'relation');
+        self::assertFalse($verifier->verifyProposal($scope, $wrong));
+    }
+
+    public function test_standalone_relation_without_scope_remains_fail_closed(): void
+    {
+        $guard = new OperationScopedStagingGuard(static fn (): string => 'staging', static fn (): bool => true);
+        $proposal = new Proposal(UuidCodec::newV7(), '1:611', 'relation_create', ['source_type' => 'wp_post', 'source_uuid' => '1:611', 'target_type' => 'model', 'target_uuid' => UuidCodec::newV7(), 'predicate' => 'about', 'source_revision' => 1, 'target_revision' => 1], 'content', null, 'dependency', ProposalState::APPROVED, idempotencyKey: 'standalone-relation', entityType: 'relation');
+        $this->expectExceptionMessage('STAGING_SCOPE_REQUIRED');
+        $guard->assertAllowed($proposal);
+    }
+
     public function test_dynamic_scope_is_derived_from_the_capture_request_without_static_media_ids(): void
     {
         [$capture, $input, $assets] = $this->fixture();
@@ -250,7 +275,7 @@ final class StagingAcceptanceScopeVerifierTest extends TestCase
                     'subject_resolution_packet' => ['status' => 'RESOLVED', 'type' => 'classification', 'id' => $subjectId, 'revision' => 1],
                 ],
             ]],
-        ]], ['purpose' => 'VIDEO'], [], []);
+        ]], ['purpose' => 'EDITORIAL', 'content_intent' => ['intent' => 'VIDEO']], [], []);
         $plan = [
             'entity_type' => 'video',
             'operation' => 'ingest',

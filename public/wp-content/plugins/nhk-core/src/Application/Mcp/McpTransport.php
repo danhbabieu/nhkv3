@@ -259,6 +259,22 @@ final class McpTransport
         $references = is_array($arguments['files'] ?? null) ? array_values($arguments['files']) : [];
         $metadata = is_array($arguments['metadata'] ?? null) ? $arguments['metadata'] : [];
         $description = trim((string) ($metadata['description'] ?? ''));
+        $itemPackets = is_array($arguments['items'] ?? null) ? array_values($arguments['items']) : [];
+        $itemsByOrdinal = [];
+        foreach ($itemPackets as $packet) {
+            if (!is_array($packet)) throw new \InvalidArgumentException('Widget upload items must be structured objects.');
+            $ordinal = $packet['ordinal'] ?? null;
+            if (!is_int($ordinal) || $ordinal < 0 || $ordinal >= count($references) || array_key_exists($ordinal, $itemsByOrdinal)) {
+                throw new \InvalidArgumentException('Widget upload item ordinal must map exactly once to files[].');
+            }
+            $itemsByOrdinal[$ordinal] = $packet;
+        }
+        if ($itemPackets !== [] && count($itemsByOrdinal) !== count($references)) {
+            throw new \InvalidArgumentException('Widget upload items must map every files[] ordinal.');
+        }
+        if ($description === '' && count($references) === 1 && !isset($itemsByOrdinal[0]['media']['title'])) {
+            throw new \InvalidArgumentException('TRUSTWORTHY_FILENAME_CONTEXT_REQUIRED');
+        }
         if ($description === '') throw new \InvalidArgumentException('TRUSTWORTHY_FILENAME_CONTEXT_REQUIRED');
         $items = [];
         foreach ($references as $index => $reference) {
@@ -267,7 +283,8 @@ final class McpTransport
                 'client_file_id' => (string) ($reference['file_id'] ?? ''),
                 'filename' => (string) ($reference['file_name'] ?? ''),
                 'sort_order' => $index,
-                'media' => is_array($reference['media'] ?? null) ? $reference['media'] : [],
+                'ordinal' => $index,
+                'media' => is_array($itemsByOrdinal[$index]['media'] ?? null) ? $itemsByOrdinal[$index]['media'] : [],
             ];
         }
         try {
@@ -348,6 +365,8 @@ final class McpTransport
                 'canonical_url' => self::modelVisibleWidgetCanonicalUrl((string) ($item['source_url'] ?? '')),
                 'attachment_readback_status' => (string) ($item['attachment_readback_status'] ?? ''),
             ];
+            $mediaContext = is_array($item['media_context'] ?? null) ? $item['media_context'] : [];
+            if ($mediaContext !== []) $upload['metadata'] = array_intersect_key($mediaContext, array_flip(['title', 'alt_text', 'caption', 'description', 'seo_slug']));
             $modelVisibleFileId = self::modelVisibleWidgetFileId((string) ($item['client_file_id'] ?? $fileId));
             if ($modelVisibleFileId !== null) $upload['file_id'] = $modelVisibleFileId;
             $uploads[] = $upload;

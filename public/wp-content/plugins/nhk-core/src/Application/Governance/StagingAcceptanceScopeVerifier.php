@@ -167,6 +167,53 @@ final class StagingAcceptanceScopeVerifier
         return $base + ['fingerprint' => $fingerprint, 'signature' => hash_hmac('sha256', $fingerprint, $this->secret())];
     }
 
+    /** Issue a non-transferable scope for the required Article subject edge. */
+    public function issueForCaptureChildRelation(CaptureRecord $capture, array $plan): array
+    {
+        if ($this->environmentName() !== 'staging') throw new \RuntimeException('STAGING_SCOPE_ENVIRONMENT_REQUIRED');
+        if ($this->secret() === '') throw new \RuntimeException('STAGING_SCOPE_SIGNING_KEY_REQUIRED');
+        $this->requireCapability();
+        if (!is_callable($this->admission)) throw new \RuntimeException('STAGING_SCOPE_ADMISSION_REQUIRED');
+        $payload = is_array($plan['payload'] ?? null) ? $plan['payload'] : [];
+        $resolution = is_array($capture->diagnostics['subject_resolution'] ?? null) ? $capture->diagnostics['subject_resolution'] : [];
+        $primary = is_array($resolution['primary'] ?? null) ? $resolution['primary'] : [];
+        $articleId = (int) ($capture->articleId ?? 0);
+        $sourceId = (function_exists('get_current_blog_id') ? (int) get_current_blog_id() : 1) . ':' . $articleId;
+        $sourceRevision = max(1, (int) ($payload['source_revision'] ?? 1));
+        $targetRevision = max(1, (int) ($payload['target_revision'] ?? ($primary['revision'] ?? 0)));
+        if ($articleId < 1 || ($payload['source_type'] ?? '') !== 'wp_post' || ($payload['source_uuid'] ?? '') !== $sourceId
+            || ($payload['predicate'] ?? '') !== 'about' || ($payload['target_type'] ?? '') !== (string) ($primary['type'] ?? '')
+            || ($payload['target_uuid'] ?? '') !== (string) ($primary['id'] ?? '') || $targetRevision < 1) {
+            throw new \RuntimeException('STAGING_CAPTURE_CHILD_BINDING_INVALID');
+        }
+        $payload['capture_id'] = $capture->captureId;
+        $payload['capture_revision'] = $capture->revision;
+        $payload['source_revision'] = $sourceRevision;
+        $payload['target_revision'] = $targetRevision;
+        $payload = StagingOperationDescriptor::withoutAuthorization($payload);
+        $payloadFingerprint = hash('sha256', CommandCanonicalizer::canonicalize($payload));
+        $base = [
+            'approved' => true, 'environment' => 'staging', 'capture_id' => $capture->captureId,
+            'capture_fingerprint' => $capture->requestFingerprint, 'capture_revision' => $capture->revision,
+            'purpose' => (string) ($capture->context['purpose'] ?? 'EDITORIAL'),
+            'intent' => (string) ($capture->context['content_intent']['intent'] ?? 'IMAGE_ARTICLE'),
+            'operation_family' => 'capture_child_relation', 'entity_type' => 'relation', 'operation' => 'relation_create',
+            'writer' => 'canonical_governed', 'entrypoint' => 'nhk.capture.ingest',
+            'owner_type' => 'article', 'owner_id' => (string) $articleId,
+            'source_type' => (string) $payload['source_type'], 'source_id' => $sourceId,
+            'predicate' => 'about', 'target_type' => (string) $payload['target_type'], 'target_id' => (string) $payload['target_uuid'],
+            'source_revision' => $sourceRevision, 'target_revision' => $targetRevision,
+            'expected_revision' => null, 'payload_fingerprint' => $payloadFingerprint,
+            'proposal_command_fingerprint' => $payloadFingerprint,
+            'idempotency_key' => (string) ($plan['idempotency_key'] ?? ''),
+            'proposal_payload' => $payload,
+            'issued_at' => gmdate('c'), 'expires_at' => gmdate('c', time() + max(1, $this->ttlSeconds)),
+        ];
+        if (!(bool) ($this->admission)($base, $capture, (array) ($capture->context['planning_input'] ?? []), [])) throw new \RuntimeException('STAGING_SCOPE_NOT_ADMITTED');
+        $fingerprint = hash('sha256', CommandCanonicalizer::canonicalize($base));
+        return $base + ['fingerprint' => $fingerprint, 'signature' => hash_hmac('sha256', $fingerprint, $this->secret())];
+    }
+
     /** @param array<string,mixed> $plan @param list<string> $candidateIds @return array<string,mixed> */
     public function issueForAuthorityPlan(CaptureRecord $capture, array $plan, array $candidateIds): array
     {
