@@ -15090,3 +15090,28 @@ command. Repository HEAD already contains `cda89d96` (`d`) with the source/test
 changes; its creation was not performed by this session.
 
 STATUS=`IMAGE_FLOW_DEFERRED_ARTICLE_REFERENCE_FIXED_LOCALLY / DEPLOYMENT_PENDING / OPERATOR_COMMIT_REQUIRED`.
+
+# Checkpoint — 2026-09-19 — Video Capture stale scope/idempotency transition fixed (LOCAL / NO LIVE MUTATION)
+
+SCOPE: Video Capture retry only. The canonical Capture continuation now treats
+persisted pending Video proposals as locators when the final payload contains a
+canonical Evidence-backed semantic attachment. It rebuilds the final Video
+command from the verified Source/Claim/Evidence closure, derives a fresh
+server-issued staging plan fingerprint/scope bound to that command, and keeps
+historical proposal/scope records immutable. Reuse remains limited to matching
+idempotency, content and dependency fingerprints; changed bindings receive a
+new deterministic governed proposal.
+
+REGRESSION: Added coverage for rejecting a stale pending proposal after the
+final dependency binding changes and for deriving a fresh Video staging scope
+from the final dependency closure. Existing Video provenance, Governance,
+staging, completeness and public-readback tests remain green.
+
+VERIFICATION: Focused Video/Capture/Governance suite passes 61 tests / 308
+assertions. Full Unit suite passes 1,992 tests / 9,818 assertions with existing
+warnings/deprecations only. Full combined configuration remains environment
+blocked in Integration/Contract tests when `NHK_WP_TEST_PATH=public` and the
+required DB/WP runtime are unavailable. No live data was mutated; no commit,
+push or deployment was performed.
+
+STATUS=`VIDEO_CAPTURE_RETRY_SCOPE_IDEMPOTENCY_FIXED_LOCALLY / DEPLOYMENT_PENDING / OPERATOR_COMMIT_REQUIRED`.
