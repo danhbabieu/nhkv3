@@ -1,5 +1,34 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-19 — Local proof closure for attachment projection and deployment classification (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE: The attachment projection mapping was implemented but depended
+directly on global WordPress functions, so local tests could not execute an
+exact persistence/read-back proof for ABSENT, EMPTY and PROVIDED metadata.
+Deployment CLI contract tests also inherited the host's deployment config and
+attempted remote transport, making their expected missing-config assertion
+environment-dependent.
+
+FIXED_BOUNDARY: Added the internal `WordPressAttachmentMetadataPort` and the
+native WordPress adapter while preserving the existing default runtime path.
+Added fake-boundary tests proving title → `post_title`, alt_text →
+`_wp_attachment_image_alt`, caption → `post_excerpt`, description →
+`post_content`, explicit empty clears, and absent-field preservation. CLI
+contract subprocesses now explicitly remove deployment configuration so the
+local safety assertion is deterministic; no deploy is invoked by the test.
+
+VERIFICATION: Attachment projection focused tests pass 18 tests / 69
+assertions. Contract suite passes 6 tests / 48 assertions. Full Unit passes
+1,979 tests / 9,735 assertions, with only existing warnings/deprecations.
+The Dictionary integration teardown now preserves the intended skip when
+WordPress is absent. Remaining Integration failures are the explicit
+mandatory-runtime gates for P4 acceptance; local `wp-load.php` cannot
+establish its database connection and the exact `nhk_v3_test` harness is not
+available. No commit, push, deployment, staging/production mutation or live
+read-back was performed.
+
+STATUS: `LOCAL_CODE_PROOF_READY / WORDPRESS_RUNTIME_PENDING / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-19 — YouTube → Video final hardening audit (LOCAL / NO LIVE MUTATION)
 
 AUDIT_SCOPE: YouTube URL → Capture VIDEO → Source/Claim/Evidence → explicit

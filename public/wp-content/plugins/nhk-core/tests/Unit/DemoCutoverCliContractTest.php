@@ -23,7 +23,7 @@ final class DemoCutoverCliContractTest extends TestCase
         $path = dirname(__DIR__, 6) . '/scripts/nhk-demo-cutover';
         $output = [];
         $status = 0;
-        exec(escapeshellarg($path) . ' --target=demo.1945.vn --pack=odo --json 2>&1', $output, $status);
+        exec('env -u NHK_DEMO_DEPLOY_CONFIG ' . escapeshellarg($path) . ' --target=demo.1945.vn --pack=odo --json 2>&1', $output, $status);
 
         self::assertNotSame(0, $status);
         self::assertStringContainsString('REMOTE_DEPLOYMENT_CONFIG_REQUIRED', implode("\n", $output));

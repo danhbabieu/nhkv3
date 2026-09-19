@@ -35,7 +35,7 @@ final class NhkDeployVerifyCliContractTest extends TestCase
         $path = dirname(__DIR__, 6) . '/scripts/nhk-deploy-verify';
         $output = [];
         $status = 0;
-        exec(escapeshellarg($path) . ' --target=demo.1945.vn --json 2>&1', $output, $status);
+        exec('env -u NHK_DEMO_DEPLOY_CONFIG ' . escapeshellarg($path) . ' --target=demo.1945.vn --json 2>&1', $output, $status);
 
         self::assertNotSame(0, $status);
         $receipt = implode("\n", $output);

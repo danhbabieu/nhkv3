@@ -30,6 +30,7 @@ final class DictionaryMigration015IntegrationTest extends TestCase
 
     protected function tearDown(): void
     {
+        if (!function_exists('update_option')) return;
         try { (new DictionaryMigration015())->down(true); } catch (\Throwable) {}
         update_option('nhk_core_migration_current', $this->previousCurrent, false);
         update_option('nhk_core_migration_target', $this->previousTarget, false);
