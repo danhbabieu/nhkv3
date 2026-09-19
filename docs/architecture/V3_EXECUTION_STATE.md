@@ -1,5 +1,26 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-19 — Easy MCP empty `_meta` export fixed locally (NO LIVE DEPLOY)
+
+ROOT_CAUSE: The Easy MCP compatibility projection could preserve an absent
+tool metadata value as an empty PHP list. WordPress serialized that value as
+`_meta: []`, while strict connector validation requires `_meta` to be an
+object when present. The connector therefore rejected `tools/list` at one
+tool entry and displayed no actions.
+
+FIXED_BOUNDARY: `EasyMcpNativeFileCompatibilityAdapter::projectTools()` now
+removes empty/list/scalar `_meta` values from projected descriptors while
+preserving valid object metadata and the existing canonical NHK descriptor
+overrides. Added regression coverage for an unrelated tool carrying
+`_meta: []`. No ability, authorization, operation, or semantic data boundary
+was changed.
+
+VERIFICATION: PHP lint passed for changed files; adapter unit suite passed 24
+tests / 83 assertions with one existing deprecation; `git diff --check` passed.
+No deployment, live endpoint retry, or staging/production mutation performed.
+
+STATUS: `EASY_MCP_TOOLS_LIST_EMPTY_META_FIXED_LOCAL / DEPLOYMENT_PENDING`.
+
 # Checkpoint — 2026-09-19 — Historical Video Evidence pre-skip hook fixed (LOCAL / NO LIVE MUTATION)
 
 ROOT_CAUSE: Existing Capture Video continuation could turn a persisted child

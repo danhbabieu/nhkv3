@@ -41,6 +41,22 @@ final class EasyMcpNativeFileCompatibilityAdapterTest extends TestCase
         self::assertSame([$tool], EasyMcpNativeFileCompatibilityAdapter::projectTools([$tool]));
     }
 
+    public function test_projection_removes_invalid_empty_list_metadata_from_unrelated_tools(): void
+    {
+        $tool = [
+            'name' => 'wp_ability_nhk_v3_media_ingest',
+            'inputSchema' => ['type' => 'object'],
+            '_meta' => [],
+        ];
+
+        $projected = EasyMcpNativeFileCompatibilityAdapter::projectTools([
+            $tool,
+            ['name' => self::TARGET, 'inputSchema' => ['type' => 'object']],
+        ]);
+
+        self::assertArrayNotHasKey('_meta', $projected[0]);
+    }
+
     public function test_open_widget_descriptor_projects_mcp_apps_resource_metadata(): void
     {
         $tools = [[

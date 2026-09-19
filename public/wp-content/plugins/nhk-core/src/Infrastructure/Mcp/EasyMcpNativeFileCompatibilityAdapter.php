@@ -66,6 +66,15 @@ final class EasyMcpNativeFileCompatibilityAdapter
     {
         foreach ($tools as $index => $tool) {
             if (!is_array($tool)) continue;
+
+            // MCP tool metadata is an object when present. Easy MCP can
+            // serialize an absent metadata value as an empty PHP list, which
+            // becomes JSON [] and makes strict clients reject the entire
+            // tools/list response (for example Pydantic: dict_type).
+            if (array_key_exists('_meta', $tool) && (!is_array($tool['_meta']) || $tool['_meta'] === [] || array_is_list($tool['_meta']))) {
+                unset($tool['_meta']);
+            }
+
             $name = (string) ($tool['name'] ?? '');
             $canonical = match ($name) {
                 self::TARGET_TOOL => self::captureDefinition(),
@@ -73,7 +82,10 @@ final class EasyMcpNativeFileCompatibilityAdapter
                 self::WIDGET_UPLOAD_TOOL => self::widgetUploadDefinition(),
                 default => null,
             };
-            if ($canonical === null) continue;
+            if ($canonical === null) {
+                $tools[$index] = $tool;
+                continue;
+            }
 
             // Keep Easy MCP's tool presence, filtering and annotations. Replace
             // only the NHK-owned descriptor fields that its serializer omitted.
