@@ -22,6 +22,9 @@ use NHK\Core\Infrastructure\Admin\VideoRelationAdminContract;
  */
 final class VideoProposalReconciliationService implements VideoProposalReconciliationPort
 {
+    /** @var callable(string,array<string,mixed>):array<string,mixed>|null */
+    private $scopeIssuer = null;
+
     /** @param callable(string):bool $can @param callable():string $actor @param callable(string):array<string,mixed>|null $publicIdentityReadback */
     public function __construct(
         private ProposalRepository $proposals,
@@ -44,6 +47,12 @@ final class VideoProposalReconciliationService implements VideoProposalReconcili
         /** @var callable(string):bool|null */
         private $successfulApplyExists = null,
     ) {
+    }
+
+    /** Configure the Capture-owned server scope seam after runtime bootstrap. */
+    public function setScopeIssuer(callable $scopeIssuer): void
+    {
+        $this->scopeIssuer = $scopeIssuer;
     }
 
     /** @return array<string,mixed> */
@@ -153,11 +162,25 @@ final class VideoProposalReconciliationService implements VideoProposalReconcili
     private function newVideoProposal(Proposal $original, array $video, string $canonicalId, array $dependencyIds): array
     {
         $payload = is_array($video['payload'] ?? null) ? $video['payload'] : [];
-        return [
+        unset($payload['staging_acceptance'], $payload['capture_fingerprint'], $payload['scope_fingerprint'], $payload['proposal_command_fingerprint']);
+        $captureId = trim((string) ($original->payload['capture_id'] ?? ''));
+        $plan = [
             'operation' => 'ingest', 'entity_type' => 'video', 'subject_id' => $canonicalId, 'target_uuid' => $this->videos->findByCanonicalId($canonicalId) ? $canonicalId : null,
             'expected_revision' => $this->videos->findByCanonicalId($canonicalId)?->revision, 'dependency_ids' => $dependencyIds,
             'payload' => $payload, 'idempotency_key' => 'video-reconcile:' . $original->id . ':' . hash('sha256', CommandCanonicalizer::canonicalize([$canonicalId, $dependencyIds, $payload])),
         ];
+        // A replacement is a new governed command. If it resumes from
+        // Capture, issue a fresh scope only after the Evidence-backed final
+        // payload has been assembled; the historical scope is never copied.
+        if ($this->scopeIssuer !== null && UuidCodec::isValid($captureId)) {
+            $plan['plan_fingerprint'] = hash('sha256', CommandCanonicalizer::canonicalize([$captureId, $canonicalId, $dependencyIds, $payload]));
+            $scope = ($this->scopeIssuer)($captureId, $plan);
+            if (!is_array($scope)) throw new \RuntimeException('STAGING_SCOPE_REQUIRED');
+            $plan['payload']['capture_id'] = $captureId;
+            $plan['payload']['capture_fingerprint'] = (string) ($scope['capture_fingerprint'] ?? '');
+            $plan['payload']['staging_acceptance'] = $scope;
+        }
+        return $plan;
     }
 
     private function resolveOrApplySource(array $plan, Proposal $original): string

@@ -889,6 +889,21 @@ final class GovernedCaptureContinuationService
         $lifecycle[] = 'ELIGIBILITY';
         if (($eligibility['ready'] ?? false) !== true) {
             $reasons = array_values(array_map('strval', (array) ($eligibility['reasons'] ?? ['PROPOSAL_NOT_ELIGIBLE'])));
+            // A historical Video Proposal can remain subject-bound and
+            // approved while its payload predates the canonical Evidence
+            // attachment rebuilt during Capture resume. Re-enter the existing
+            // governed reconciliation seam before returning the stale
+            // eligibility blocker; never edit or silently execute that
+            // historical command.
+            if ($this->videoReconciliation !== null
+                && $proposal->entityType === 'video'
+                && $proposal->operation === 'ingest'
+                && $proposal->state === ProposalState::APPROVED
+                && $this->videoProposalNeedsReconciliation($reasons)) {
+                $repaired = $this->repairVideoProposal($proposal);
+                $lifecycle[] = 'VIDEO_RECONCILIATION';
+                return $repaired;
+            }
             $reconciliationOperation = (string) ($proposal->operation ?? '');
             $isRelationProposal = $proposal->entityType === 'relation'
                 && in_array($reconciliationOperation, ['relation_create', 'relation_retire', 'relation_reactivate'], true);
@@ -913,6 +928,18 @@ final class GovernedCaptureContinuationService
             return ['proposal_id' => $replacementId !== '' ? $replacementId : $proposal->id, 'status' => 'APPLIED', 'canonical_id' => $repaired['canonical_id'] ?? null, 'canonical_readback' => $repaired['canonical_readback'] ?? null, 'repair' => $repaired, 'idempotent' => false];
         }
         throw new \RuntimeException((string) ($repaired['reason'] ?? 'VIDEO_PROPOSAL_REPAIR_REQUIRED'));
+    }
+
+    /** @param list<string> $reasons */
+    private function videoProposalNeedsReconciliation(array $reasons): bool
+    {
+        return array_intersect($reasons, [
+            'NO_SEMANTIC_ATTACHMENT',
+            'GOVERNED_RECONCILIATION_REQUIRED',
+            'EVIDENCE_REQUIRED',
+            'CANONICAL_EVIDENCE_REQUIRED',
+            'STAGING_VIDEO_BINDING_REQUIRED',
+        ]) !== [];
     }
 
     /** @return array<string,mixed>|null */

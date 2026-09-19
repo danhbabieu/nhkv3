@@ -649,6 +649,13 @@ final class Plugin {
             );
             add_filter('nhk_v3_clock_type_creation_lifecycle', fn (mixed $current): mixed => $current ?? $clockTypeLifecycle, 10, 1);
             $captureRepository = new WpdbCaptureRepository($wpdb);
+            if ($governanceRuntime->videoReconciliation !== null) {
+                $governanceRuntime->videoReconciliation->setScopeIssuer(static function (string $captureId, array $plan) use ($captureRepository, $stagingScopeVerifier): array {
+                    $capture = $captureRepository->findById($captureId);
+                    if (!$capture instanceof CaptureRecord) throw new \RuntimeException('STAGING_CAPTURE_NOT_FOUND');
+                    return $stagingScopeVerifier->issueForVideoPlan($capture, $plan);
+                });
+            }
             $captureClaimReuse = new ClaimReusePolicy(static function (array $candidate) use ($claims): array {
                 $subjectId = trim((string) ($candidate['subject_id'] ?? ''));
                 $scope = trim((string) ($candidate['scope'] ?? ''));

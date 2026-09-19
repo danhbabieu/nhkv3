@@ -872,6 +872,58 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
         self::assertSame('REBUILT_AND_APPLIED', $result['writes'][0]['repair']['status']);
     }
 
+    public function test_approved_subject_bound_video_with_stale_empty_attachment_reconciles_before_blocking(): void
+    {
+        $videoId = UuidCodec::newV7();
+        $proposalId = UuidCodec::newV7();
+        $proposal = new Proposal($proposalId, $videoId, 'ingest', [
+            'canonical_id' => $videoId,
+            'metadata' => [
+                'source' => ['platform' => 'youtube', 'external_video_id' => 's53MqUypbKE'],
+                'semantic_attachments' => [],
+                'subject_resolution_packet' => ['type' => 'classification', 'id' => UuidCodec::newV7()],
+            ],
+        ], 'historical-content', null, 'historical-dependency', ProposalState::APPROVED, idempotencyKey: 'capture:video', entityType: 'video');
+        $governance = $this->createMock(GovernedLifecycle::class);
+        $governance->expects(self::once())->method('createFromArguments')->willReturn($proposal);
+        $governance->expects(self::once())->method('review')->with($proposalId)->willReturn([
+            'state' => 'approved', 'entity_type' => 'video', 'operation' => 'ingest',
+            'payload' => $proposal->payload, 'content_fingerprint' => $proposal->contentFingerprint,
+            'dependency_fingerprint' => $proposal->dependencyFingerprint,
+        ]);
+        $governance->expects(self::once())->method('eligibility')->with($proposalId)->willReturn([
+            'ready' => false, 'reasons' => ['NO_SEMANTIC_ATTACHMENT'],
+        ]);
+        $replacementId = UuidCodec::newV7();
+        $repair = $this->createMock(VideoProposalReconciliationPort::class);
+        $repair->expects(self::once())->method('reconcile')->with($proposalId)->willReturn([
+            'status' => 'REBUILT_AND_APPLIED', 'replaced_proposal_id' => $replacementId,
+            'canonical_id' => $videoId,
+            'canonical_readback' => ['canonical_id' => $videoId, 'active' => true, 'revision' => 1],
+        ]);
+
+        $service = new GovernedCaptureContinuationService(
+            $governance,
+            static fn (): array => throw new \LogicException('stale proposal must not apply'),
+            $this->policies(['video'], ['video' => 'AUTO_PUBLISH']),
+            static fn (): bool => true,
+            null,
+            null,
+            $repair,
+        );
+
+        $result = $service->execute('capture-stale-video', 'resume', [
+            'assets' => [['kind' => 'video', 'video_proposal' => [
+                'entity_type' => 'video', 'operation' => 'ingest', 'subject_id' => $videoId,
+                'payload' => $proposal->payload,
+            ]]],
+        ]);
+
+        self::assertSame('APPLIED', $result['status']);
+        self::assertSame($replacementId, $result['writes'][0]['proposal_id']);
+        self::assertSame('REBUILT_AND_APPLIED', $result['writes'][0]['repair']['status']);
+    }
+
     public function test_legacy_video_skip_reenters_when_dependency_fingerprint_changes(): void
     {
         $videoId = UuidCodec::newV7();

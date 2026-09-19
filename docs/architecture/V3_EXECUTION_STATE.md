@@ -1,5 +1,35 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-19 — Historical Video resume stale-proposal reconciliation fixed (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE: Capture resume re-entered an existing approved Video Proposal by
+Proposal UUID/idempotency and only invoked Video reconciliation when the
+subject binding itself was invalid. A historical proposal could therefore be
+subject-bound and approved while its payload still contained
+`semantic_attachments=[]`; eligibility returned `NO_SEMANTIC_ATTACHMENT` and
+the Capture stopped before the existing governed rebuild seam.
+
+FIXED_BOUNDARY: Approved Video ingest proposals with stale semantic/evidence
+eligibility now re-enter `VideoProposalReconciliationService` before any
+Controlled Apply. The historical Proposal is never edited. The replacement
+keeps the existing canonical Video UUID, rebuilds dependencies and the final
+Evidence-backed attachment, supersedes the historical command through
+Governance, and receives a fresh Capture server-issued staging scope after
+the final payload is assembled. No random idempotency key, direct SQL,
+Governance bypass or new Video identity was introduced.
+
+REGRESSION: Added a production-shaped Capture continuation test proving a
+subject-bound approved Video with an empty historical attachment is rebuilt
+before apply; the existing stale-proposal, tamper/fingerprint, dependency,
+relation and lifecycle suites remain green.
+
+VERIFICATION: Focused Capture/Video/Governance/Staging/eligibility/Graph-
+relation/completeness suites pass 101 tests / 450 assertions. Changed-file
+PHP lint and `git diff --check` pass. No staging/production data was mutated;
+deployment, live retry and canonical frontend acceptance remain pending.
+
+STATUS: `VIDEO_CAPTURE_STALE_PROPOSAL_RECONCILIATION_FIXED_LOCAL / NO_LIVE_MUTATION / DEPLOYMENT_PENDING`.
+
 # Checkpoint — 2026-09-19 — Widget metadata/materializer shape mismatch fixed (LOCAL / NO LIVE MUTATION)
 
 ROOT_CAUSE: The widget's structured `files[]` references intentionally carried
