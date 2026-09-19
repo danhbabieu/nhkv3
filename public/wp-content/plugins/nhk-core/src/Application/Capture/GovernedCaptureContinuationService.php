@@ -679,6 +679,7 @@ final class GovernedCaptureContinuationService
                 $videoPayload = is_array($videoProposal['payload'] ?? null) ? $videoProposal['payload'] : [];
                 $videoId = trim((string) ($videoPayload['canonical_id'] ?? $videoProposal['subject_id'] ?? ''));
                 $relation = is_array($complete['relation'] ?? null) ? $complete['relation'] : [];
+                $origin = (string) ($relation['origin'] ?? 'EXPLICIT_USER_RELATION');
                 $candidates = $this->videoRelations->plan($videoId, [[
                     'target_id' => (string) ($relation['target_uuid'] ?? ''),
                     'target_type' => (string) ($relation['target_type'] ?? ''),
@@ -686,7 +687,7 @@ final class GovernedCaptureContinuationService
                     'origin' => (string) ($relation['origin'] ?? 'EXPLICIT_USER_RELATION'),
                     'evidence_refs' => [['evidence_id' => $evidenceId]],
                     'reason' => (string) ($relation['reason'] ?? ''),
-                    'confidence' => (float) ($relation['confidence'] ?? 1.0),
+                    'confidence' => $origin === 'EXPLICIT_USER_RELATION' ? 1.0 : (float) ($relation['confidence'] ?? 1.0),
                 ]]);
                 if ($candidates === []) throw new VideoRelationEvidenceRequired();
                 $videoPayload['metadata'] = is_array($videoPayload['metadata'] ?? null) ? $videoPayload['metadata'] : [];

@@ -14799,6 +14799,23 @@ deployment, pull, fetch or push was performed.
 
 STATUS=`LOCAL_READY / DEPLOYMENT_PENDING / LIVE_ACCEPTANCE_PENDING`.
 
+# Checkpoint — 2026-09-19 — Evidence-backed final Video attachment hydration (LOCAL / DEPLOYMENT PENDING)
+
+SCOPE: After canonical Evidence apply/read-back, the final Capture-owned Video
+attachment is rebuilt from the returned Evidence UUID. Explicit relations now
+normalize to confidence `1.0` and carry canonical Video source identity,
+target identity, predicate, origin and Evidence reference before deterministic
+Proposal identity and staging scope issuance. Historical Capture payload and
+approved Proposal remain unchanged.
+
+VERIFICATION: Focused Capture Video provenance, Evidence binding, Proposal
+reconciliation, staging verifier/admission, Governance, Controlled Apply and
+Graph/idempotency tests pass 171 tests / 698 assertions. Unit suite passes
+1,981 tests / 9,777 assertions with existing warnings/deprecations. No live
+retry, deployment, external request or semantic runtime mutation was performed.
+
+STATUS=`LOCAL_READY / DEPLOYMENT_PENDING / LIVE_ACCEPTANCE_PENDING`.
+
 # Checkpoint — 2026-09-19 — Video governed command idempotency hardening (LOCAL / DEPLOYMENT PENDING)
 
 SCOPE: Final Capture-owned Video commands now derive a deterministic

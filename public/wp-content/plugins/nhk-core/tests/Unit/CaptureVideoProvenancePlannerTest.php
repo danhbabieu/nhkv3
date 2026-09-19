@@ -102,7 +102,7 @@ final class CaptureVideoProvenancePlannerTest extends TestCase
         self::assertSame('source-uuid', $completed['dependencies'][2]['payload']['source_id']);
         self::assertSame('claim-uuid', $completed['dependencies'][2]['payload']['claim_id']);
         self::assertSame(
-            [['target_type' => 'variant', 'target_uuid' => self::VARIANT, 'predicate' => 'about', 'origin' => 'EXPLICIT_USER_RELATION', 'reason' => 'Source-specific provenance handoff.', 'confidence' => 1.0, 'evidence_refs' => [['evidence_id' => 'evidence-uuid']]]],
+            [['source_type' => 'video', 'source_uuid' => '', 'target_type' => 'variant', 'target_uuid' => self::VARIANT, 'predicate' => 'about', 'origin' => 'EXPLICIT_USER_RELATION', 'reason' => 'Source-specific provenance handoff.', 'confidence' => 1.0, 'evidence_refs' => [['evidence_id' => 'evidence-uuid']]]],
             $completed['video_proposal']['payload']['metadata']['semantic_attachments'],
         );
 
@@ -646,7 +646,7 @@ final class CaptureVideoProvenancePlannerTest extends TestCase
             'subject_resolution' => ['primary' => ['id' => self::VARIANT, 'type' => 'variant', 'name' => 'Variant A'], 'resolved' => [['id' => self::VARIANT, 'type' => 'variant', 'name' => 'Variant A']]],
             'interpretation' => [],
             'observations' => [],
-            'assets' => [['kind' => 'video', 'video_proposal' => ['operation' => 'ingest', 'entity_type' => 'video', 'subject_id' => $ids[3], 'payload' => ['canonical_id' => $ids[3], 'url' => 'https://www.youtube.com/watch?v=abcdefghijk', 'metadata' => ['source' => ['platform' => 'youtube', 'external_video_id' => 'abcdefghijk', 'canonical_source_url' => 'https://www.youtube.com/watch?v=abcdefghijk', 'source_title' => 'Variant A – source snapshot']]]]]],
+            'assets' => [['kind' => 'video', 'video_proposal' => ['operation' => 'ingest', 'entity_type' => 'video', 'subject_id' => $ids[3], 'payload' => ['canonical_id' => $ids[3], 'url' => 'https://www.youtube.com/watch?v=abcdefghijk', 'metadata' => ['source' => ['platform' => 'youtube', 'external_video_id' => 'abcdefghijk', 'canonical_source_url' => 'https://www.youtube.com/watch?v=abcdefghijk', 'source_title' => 'Variant A – source snapshot'], 'semantic_attachments' => [['target_type' => 'variant', 'target_uuid' => self::VARIANT, 'predicate' => 'about', 'origin' => 'EXPLICIT_USER_RELATION', 'evidence_refs' => [], 'confidence' => 0]]]]]]],
         ], ['approval_confirmed' => true]);
 
         self::assertSame('APPLIED', $result['status']);
@@ -654,6 +654,11 @@ final class CaptureVideoProvenancePlannerTest extends TestCase
         self::assertSame($ids[0], $created[2]['payload']['source_id']);
         self::assertSame($ids[1], $created[2]['payload']['claim_id']);
         self::assertSame([['evidence_id' => $ids[2]]], $created[3]['payload']['metadata']['semantic_attachments'][0]['evidence_refs']);
+        self::assertSame('video', $created[3]['payload']['metadata']['semantic_attachments'][0]['source_type']);
+        self::assertSame($ids[3], $created[3]['payload']['metadata']['semantic_attachments'][0]['source_uuid']);
+        self::assertSame('variant', $created[3]['payload']['metadata']['semantic_attachments'][0]['target_type']);
+        self::assertSame(self::VARIANT, $created[3]['payload']['metadata']['semantic_attachments'][0]['target_uuid']);
+        self::assertSame(1.0, $created[3]['payload']['metadata']['semantic_attachments'][0]['confidence']);
     }
 
     public function test_final_video_command_identity_changes_after_evidence_and_reuses_for_same_final_payload(): void

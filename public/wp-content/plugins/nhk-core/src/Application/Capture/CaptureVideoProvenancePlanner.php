@@ -257,13 +257,21 @@ final class CaptureVideoProvenancePlanner
         $dependencies = (array) ($plan['dependencies'] ?? []);
         $dependencies[] = $this->arguments('evidence', $claimId, $evidence, (string) ($plan['evidence_idempotency_key'] ?? ''));
         $relation = is_array($plan['relation'] ?? null) ? $plan['relation'] : [];
+        $origin = (string) ($relation['origin'] ?? 'EXPLICIT_USER_RELATION');
+        $videoPayload = is_array(($plan['video_proposal'] ?? [])['payload'] ?? null) ? ($plan['video_proposal']['payload'] ?? []) : [];
+        $videoId = trim((string) ($videoPayload['canonical_id'] ?? ($plan['video_proposal']['subject_id'] ?? '')));
         $attachment = [
+            'source_type' => 'video',
+            'source_uuid' => $videoId,
             'target_type' => (string) ($relation['target_type'] ?? ''),
             'target_uuid' => (string) ($relation['target_uuid'] ?? ''),
             'predicate' => (string) ($relation['predicate'] ?? 'about'),
-            'origin' => (string) ($relation['origin'] ?? 'EXPLICIT_USER_RELATION'),
+            'origin' => $origin,
             'reason' => (string) ($relation['reason'] ?? 'Source-specific provenance handoff.'),
-            'confidence' => (float) ($relation['confidence'] ?? 1.0),
+            // A canonical Evidence-backed explicit relation is fully
+            // resolved. Never carry a stale preview confidence (including
+            // zero) into the final governed command.
+            'confidence' => $origin === 'EXPLICIT_USER_RELATION' ? 1.0 : max(0.0, min(1.0, (float) ($relation['confidence'] ?? 1.0))),
             'evidence_refs' => [['evidence_id' => $evidenceId]],
         ];
         $plan['dependencies'] = $dependencies;
