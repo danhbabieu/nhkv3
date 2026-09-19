@@ -72,8 +72,9 @@ final class EasyMcpNativeFileCompatibilityAdapterTest extends TestCase
         $widget = $projected[0];
 
         self::assertSame('wp_ability_nhk_v3_media_widget_upload', $widget['name']);
-        self::assertSame(['idempotency_key', 'files', 'metadata'], $widget['inputSchema']['required']);
-        self::assertSame(['description'], $widget['inputSchema']['properties']['metadata']['required']);
+        self::assertSame(['idempotency_key', 'files'], $widget['inputSchema']['required']);
+        self::assertArrayNotHasKey('required', $widget['inputSchema']['properties']['metadata']);
+        self::assertArrayHasKey('items', $widget['inputSchema']['properties']);
         self::assertSame(['download_url', 'file_id'], $widget['inputSchema']['properties']['files']['items']['required']);
     }
 

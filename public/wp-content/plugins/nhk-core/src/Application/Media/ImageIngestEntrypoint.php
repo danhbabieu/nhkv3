@@ -61,10 +61,12 @@ final class ImageIngestEntrypoint
         if (!is_array($provided) || $provided === []) throw new \InvalidArgumentException('IMAGE_FILE_INPUT_INVALID');
         $references = array_is_list($provided) ? $provided : [$provided];
         foreach ($references as $reference) {
-            if (!is_array($reference) || array_diff(array_keys($reference), ['download_url', 'file_id', 'mime_type', 'file_name']) !== []) throw new \InvalidArgumentException('IMAGE_FILE_INPUT_INVALID');
+            if (!is_array($reference) || array_diff(array_keys($reference), ['download_url', 'file_id', 'mime_type', 'file_name', 'ordinal', 'media']) !== []) throw new \InvalidArgumentException('IMAGE_FILE_INPUT_INVALID');
             if (!is_string($reference['download_url'] ?? null) || trim($reference['download_url']) === '') throw new \InvalidArgumentException('IMAGE_FILE_INPUT_INVALID');
             if (!is_string($reference['file_id'] ?? null) || trim($reference['file_id']) === '') throw new \InvalidArgumentException('IMAGE_FILE_INPUT_INVALID');
             foreach (['mime_type', 'file_name'] as $optional) if (array_key_exists($optional, $reference) && !is_string($reference[$optional])) throw new \InvalidArgumentException('IMAGE_FILE_INPUT_INVALID');
+            if (array_key_exists('ordinal', $reference) && !is_int($reference['ordinal'])) throw new \InvalidArgumentException('IMAGE_FILE_INPUT_INVALID');
+            if (array_key_exists('media', $reference) && !is_array($reference['media'])) throw new \InvalidArgumentException('IMAGE_FILE_INPUT_INVALID');
         }
         return array_values($references);
     }

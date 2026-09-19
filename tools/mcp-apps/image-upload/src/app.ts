@@ -198,7 +198,7 @@ async function start(): Promise<void> {
       .map((_item, index) => index)
       .filter((index) => !retryingPartialBatch || batchManifest?.items[index]?.status !== "SUCCESS");
     if (retryingPartialBatch && sourceOrdinals.length === 0) return batchManifest!;
-    const references: Array<{ download_url: string; file_id: string; mime_type: string; file_name: string }> = [];
+    const references: Array<{ download_url: string; file_id: string; mime_type: string; file_name: string; ordinal: number; media: Record<string, string> }> = [];
     for (const index of sourceOrdinals) {
       const item = selected[index];
       const fileName = item.kind === "local" ? item.file.name : item.fileName;
@@ -211,13 +211,13 @@ async function start(): Promise<void> {
       recordDiagnostic("HOST_FILE_UPLOAD_DONE", "DONE", "HOST_FILE_UPLOAD_VERIFIED");
       const download = await host!.getFileDownloadUrl!({ fileId });
       if (!download.downloadUrl) throw new Error(`Download URL was not returned for ${fileName}.`);
-      references.push({ download_url: download.downloadUrl, file_id: fileId, mime_type: item.kind === "local" ? item.file.type : item.mimeType, file_name: fileName });
+      references.push({ download_url: download.downloadUrl, file_id: fileId, mime_type: item.kind === "local" ? item.file.type : item.mimeType, file_name: fileName, ordinal: index, media: item.metadata ?? {} });
       recordDiagnostic("TRUSTED_FILE_REF_READY", "DONE", "TRUSTED_FILE_REFERENCE_READY");
     }
 
     const result = await app.callServerTool({
       name: SERVER_TOOL_NAME,
-      arguments: { idempotency_key: `${operationKey}${retryingPartialBatch ? `:retry:${attempt}` : ":media"}`, metadata: { description: namingContext }, files: references },
+      arguments: { idempotency_key: `${operationKey}${retryingPartialBatch ? `:retry:${attempt}` : ":media"}`, metadata: { description: namingContext }, items: references.map((item) => ({ client_file_id: item.file_id, filename: item.file_name, sort_order: item.ordinal, ordinal: item.ordinal, media: item.media })), files: references },
     });
     recordDiagnostic("SERVER_TOOL_CALL_RESULT", "DONE", "SERVER_TOOL_RESULT_RECEIVED");
     const manifest = extractUploadManifest(result as ToolResult);

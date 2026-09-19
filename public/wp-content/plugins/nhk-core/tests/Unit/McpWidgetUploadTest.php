@@ -22,11 +22,14 @@ final class McpWidgetUploadTest extends TestCase
         $tool = $this->tool('nhk.media.widget-upload');
 
         self::assertSame('mutation', $tool['kind']);
-        self::assertSame(['idempotency_key', 'files', 'metadata'], $tool['inputSchema']['required']);
-        self::assertSame(['description'], $tool['inputSchema']['properties']['metadata']['required']);
+        self::assertSame(['idempotency_key', 'files'], $tool['inputSchema']['required']);
+        self::assertArrayNotHasKey('required', $tool['inputSchema']['properties']['metadata']);
         self::assertSame(1, $tool['inputSchema']['properties']['files']['minItems']);
         self::assertSame(20, $tool['inputSchema']['properties']['files']['maxItems']);
         self::assertSame(['download_url', 'file_id'], $tool['inputSchema']['properties']['files']['items']['required']);
+        self::assertArrayHasKey('ordinal', $tool['inputSchema']['properties']['files']['items']['properties']);
+        self::assertArrayHasKey('items', $tool['inputSchema']['properties']);
+        self::assertArrayHasKey('ordinal', $tool['inputSchema']['properties']['items']['items']['properties']);
         self::assertFalse($tool['inputSchema']['properties']['files']['items']['additionalProperties']);
         self::assertSame(['files'], $tool['connectorMeta']['openai/fileParams']);
         $open = $this->tool('nhk.media.upload-widget.open');
@@ -81,6 +84,61 @@ final class McpWidgetUploadTest extends TestCase
         self::assertSame(['success', 'success'], array_column($result['items'], 'status'));
         self::assertCount(2, $result['ordered_media_ids']);
         self::assertSame('COMPLETE', $result['media_commit_status']);
+        self::assertSame(1, $materializerCalls);
+    }
+
+    public function test_widget_upload_maps_per_item_metadata_by_stable_ordinal_without_batch_fanout(): void
+    {
+        $calls = [];
+        $materializerCalls = 0;
+        $entrypoint = new ImageIngestEntrypoint(
+            static function (string $key, array $metadata, array $files, array $items) use (&$calls): array {
+                $calls[] = [$metadata, $items];
+                return ['batch_id' => 'batch-ordered-metadata', 'items' => array_map(static function (array $item, int $index): array {
+                    return [
+                        'client_file_id' => $item['client_file_id'],
+                        'ordinal' => $index,
+                        'attachment_id' => 100 + $index,
+                        'media_id' => 'media-' . ($index + 1),
+                        'filename' => 'safe-' . ($index + 1) . '.webp',
+                        'original_filename' => $item['filename'],
+                        'mime_type' => 'image/webp',
+                        'width' => 10,
+                        'height' => 10,
+                        'byte_size' => 100,
+                        'source_url' => '/anh/safe-' . ($index + 1) . '.webp',
+                        'attachment_readback_status' => 'verified',
+                        'media_context' => $item['media'],
+                    ];
+                }, $items, array_keys($items))];
+            },
+            static function () use (&$materializerCalls): array {
+                $materializerCalls++;
+                return ['files' => ['files' => ['name' => ['a.jpg', 'b.jpg'], 'type' => ['image/jpeg', 'image/jpeg'], 'tmp_name' => ['/tmp/a', '/tmp/b'], 'error' => [UPLOAD_ERR_OK, UPLOAD_ERR_OK], 'size' => [100, 100]]], 'temporary_paths' => []];
+            },
+        );
+        $transport = new McpTransport($this->readHandler(), new McpGovernanceHandler(new GovernanceService(new InMemoryProposalRepository())), static fn (string $capability): bool => true, imageIngest: $entrypoint);
+        $result = $this->call($transport, [
+            'idempotency_key' => 'widget-ordered-metadata',
+            'metadata' => ['description' => 'Bộ ảnh của một hiện vật'],
+            'files' => [
+                ['download_url' => 'https://files.openai.test/a', 'file_id' => 'file_a', 'file_name' => 'a.jpg', 'ordinal' => 0],
+                ['download_url' => 'https://files.openai.test/b', 'file_id' => 'file_b', 'file_name' => 'b.jpg', 'ordinal' => 1],
+            ],
+            'items' => [
+                ['client_file_id' => 'file_a', 'ordinal' => 0, 'media' => ['title' => 'Mặt trước', 'alt_text' => 'Alt trước', 'caption' => 'Caption trước', 'description' => 'Mô tả trước']],
+                ['client_file_id' => 'file_b', 'ordinal' => 1, 'media' => ['title' => 'Mặt sau', 'alt_text' => 'Alt sau', 'caption' => 'Caption sau', 'description' => 'Mô tả sau']],
+            ],
+        ]);
+
+        self::assertSame([0, 1], array_column($result['items'], 'ordinal'));
+        self::assertSame(['Mặt trước', 'Mặt sau'], array_column(array_column($result['items'], 'metadata'), 'title'));
+        self::assertSame(['Alt trước', 'Alt sau'], array_column(array_column($result['items'], 'metadata'), 'alt_text'));
+        self::assertSame(['Caption trước', 'Caption sau'], array_column(array_column($result['items'], 'metadata'), 'caption'));
+        self::assertSame(['Mô tả trước', 'Mô tả sau'], array_column(array_column($result['items'], 'metadata'), 'description'));
+        self::assertSame('Bộ ảnh của một hiện vật', $result['user_context']);
+        self::assertSame('Bộ ảnh của một hiện vật', $calls[0][0]['description']);
+        self::assertNotSame($result['user_context'], $result['items'][0]['metadata']['title']);
         self::assertSame(1, $materializerCalls);
     }
 
@@ -266,7 +324,7 @@ final class McpWidgetUploadTest extends TestCase
     private function call(McpTransport $transport, array $arguments): array
     {
         $response = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/call', 'params' => ['name' => 'nhk.media.widget-upload', 'arguments' => $arguments]]);
-        self::assertSame(200, $response['status']);
+        self::assertSame(200, $response['status'], json_encode($response, JSON_UNESCAPED_UNICODE));
         self::assertFalse($response['body']['result']['isError'] ?? true, json_encode($response, JSON_UNESCAPED_UNICODE));
         return $response['body']['result']['structuredContent'];
     }

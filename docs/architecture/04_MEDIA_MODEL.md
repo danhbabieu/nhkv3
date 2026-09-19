@@ -18,7 +18,11 @@ operator path.
 The ChatGPT MCP Apps image widget is a transport/presentation adapter over the
 same physical owner. Its `nhk.media.widget-upload` tool accepts only the
 canonical structured provided-file object (`download_url` and `file_id`, plus
-advisory `mime_type`/`file_name`) through its capability-gated boundary. The
+advisory `mime_type`/`file_name`) through its capability-gated boundary. Each
+`files[]` item may carry its stable zero-based `ordinal` and transport-side
+`media` hints; the optional ordered `items[]` packet is matched by
+`client_file_id`/ordinal and carries the canonical per-item `title`, `alt_text`,
+`caption` and `description`. The
 object shape is trusted input structure, not a trust decision about the remote
 host: the centralized materializer independently enforces HTTPS/443,
 credential-free public-IP resolution, pinned TLS fetches, redirect

@@ -764,7 +764,9 @@ Capture owner. `nhk.media.upload-widget.open` renders
 obtain a temporary `download_url` and `file_id`, then calls the internal
 `nhk.media.widget-upload` transport tool. Each item must be the structured
 provided-file object with `download_url` and `file_id` (plus optional
-`mime_type` and `file_name`). The object shape is trusted only as the
+`mime_type`, `file_name`, stable `ordinal` and per-file `media` hints). The
+optional ordered `items[]` packet is matched to `files[]` by `client_file_id`
+or ordinal and carries the canonical per-item metadata. The object shape is trusted only as the
 capability-gated tool's input contract. The centralized materializer treats
 the URL as an untrusted network destination and independently enforces HTTPS
 port 443, no credentials, hostname normalization, A+AAAA public-IP

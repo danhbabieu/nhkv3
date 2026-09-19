@@ -233,6 +233,7 @@ final class McpToolCatalog
                         'file_id' => ['type' => 'string', 'minLength' => 1],
                         'mime_type' => ['type' => 'string'],
                         'file_name' => ['type' => 'string'],
+                        'ordinal' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 19],
                         'media' => ['type' => 'object', 'properties' => [
                             'title' => ['type' => 'string', 'maxLength' => 255],
                             'alt_text' => ['type' => 'string', 'maxLength' => 1000],
@@ -251,6 +252,9 @@ final class McpToolCatalog
                 'items' => ['type' => 'array', 'minItems' => 1, 'maxItems' => 20, 'items' => [
                     'type' => 'object',
                     'properties' => [
+                        'client_file_id' => ['type' => 'string', 'minLength' => 1],
+                        'filename' => ['type' => 'string', 'maxLength' => 191],
+                        'sort_order' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 19],
                         'ordinal' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 19],
                         'media' => ['type' => 'object', 'properties' => [
                             'title' => ['type' => 'string', 'maxLength' => 500],
@@ -260,7 +264,6 @@ final class McpToolCatalog
                             'seo_slug' => ['type' => 'string', 'pattern' => '^[a-z0-9]+(?:-[a-z0-9]+)*$'],
                         ], 'additionalProperties' => false],
                     ],
-                    'required' => ['ordinal'],
                     'additionalProperties' => false,
                 ]],
             ], ['idempotency_key', 'files'], true, ['openai/fileParams' => ['files']]),

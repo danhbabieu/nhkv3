@@ -46,8 +46,8 @@ export type WidgetDiagnostic = {
 export type WidgetUploadStatus = "idle" | "partial" | "complete" | "error";
 
 export type SelectedImage =
-  | { kind: "local"; file: File }
-  | { kind: "library"; fileId: string; fileName: string; mimeType: string };
+  | { kind: "local"; file: File; metadata?: Record<string, string> }
+  | { kind: "library"; fileId: string; fileName: string; mimeType: string; metadata?: Record<string, string> };
 
 export function normalizeSelectedFiles(value: unknown): SelectedImage[] {
   if (!Array.isArray(value)) return [];

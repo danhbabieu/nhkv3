@@ -261,13 +261,14 @@ final class McpTransport
         $description = trim((string) ($metadata['description'] ?? ''));
         $itemPackets = is_array($arguments['items'] ?? null) ? array_values($arguments['items']) : [];
         $itemsByOrdinal = [];
-        foreach ($itemPackets as $packet) {
+        $itemsByFileId = [];
+        foreach ($itemPackets as $packetIndex => $packet) {
             if (!is_array($packet)) throw new \InvalidArgumentException('Widget upload items must be structured objects.');
-            $ordinal = $packet['ordinal'] ?? null;
-            if (!is_int($ordinal) || $ordinal < 0 || $ordinal >= count($references) || array_key_exists($ordinal, $itemsByOrdinal)) {
-                throw new \InvalidArgumentException('Widget upload item ordinal must map exactly once to files[].');
-            }
+            $ordinal = $packet['ordinal'] ?? ($packet['sort_order'] ?? $packetIndex);
+            if (!is_int($ordinal) || $ordinal < 0 || $ordinal >= count($references) || array_key_exists($ordinal, $itemsByOrdinal)) throw new \InvalidArgumentException('Widget upload item ordinal must map exactly once to files[].');
             $itemsByOrdinal[$ordinal] = $packet;
+            $clientFileId = trim((string) ($packet['client_file_id'] ?? ''));
+            if ($clientFileId !== '') $itemsByFileId[$clientFileId] = $packet;
         }
         if ($itemPackets !== [] && count($itemsByOrdinal) !== count($references)) {
             throw new \InvalidArgumentException('Widget upload items must map every files[] ordinal.');
@@ -275,16 +276,18 @@ final class McpTransport
         if ($description === '' && count($references) === 1 && !isset($itemsByOrdinal[0]['media']['title'])) {
             throw new \InvalidArgumentException('TRUSTWORTHY_FILENAME_CONTEXT_REQUIRED');
         }
-        if ($description === '') throw new \InvalidArgumentException('TRUSTWORTHY_FILENAME_CONTEXT_REQUIRED');
         $items = [];
         foreach ($references as $index => $reference) {
             if (!is_array($reference)) throw new \InvalidArgumentException('Widget upload references must be structured file objects.');
+            if (array_key_exists('ordinal', $reference) && (!is_int($reference['ordinal']) || $reference['ordinal'] !== $index)) throw new \InvalidArgumentException('Widget upload file ordinal must match files[] order.');
+            $fileId = (string) ($reference['file_id'] ?? '');
+            $itemPacket = $itemsByFileId[$fileId] ?? ($itemsByOrdinal[$index] ?? []);
             $items[] = [
-                'client_file_id' => (string) ($reference['file_id'] ?? ''),
+                'client_file_id' => $fileId,
                 'filename' => (string) ($reference['file_name'] ?? ''),
                 'sort_order' => $index,
                 'ordinal' => $index,
-                'media' => is_array($itemsByOrdinal[$index]['media'] ?? null) ? $itemsByOrdinal[$index]['media'] : [],
+                'media' => is_array($itemPacket['media'] ?? null) ? $itemPacket['media'] : (is_array($reference['media'] ?? null) ? $reference['media'] : []),
             ];
         }
         try {
