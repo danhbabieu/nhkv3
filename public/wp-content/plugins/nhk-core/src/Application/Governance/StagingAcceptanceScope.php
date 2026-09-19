@@ -97,6 +97,10 @@ final class StagingAcceptanceScope
                 $proposalValue = $proposal->payload[$field] ?? null;
                 if ($proposalValue !== null && (string) $scope[$field] !== (string) $proposalValue) throw new \RuntimeException('STAGING_VIDEO_BINDING_MISMATCH');
             }
+            $descriptor = StagingOperationDescriptor::fromProposal($proposal, $scope);
+            if (!hash_equals((string) ($scope['proposal_command_fingerprint'] ?? ''), $descriptor->payloadFingerprint)) {
+                throw new \RuntimeException('STAGING_VIDEO_PAYLOAD_MISMATCH');
+            }
             if (is_array($scope['subject'] ?? null)) {
                 $subject = is_array($proposal->payload['metadata']['subject_resolution_packet'] ?? null) ? $proposal->payload['metadata']['subject_resolution_packet'] : [];
                 if (($subject['id'] ?? null) !== null && (string) ($scope['subject']['uuid'] ?? '') !== (string) $subject['id']) throw new \RuntimeException('STAGING_SUBJECT_SCOPE_MISMATCH');

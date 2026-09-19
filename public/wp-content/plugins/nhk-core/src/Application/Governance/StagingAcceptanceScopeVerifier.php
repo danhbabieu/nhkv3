@@ -328,8 +328,11 @@ final class StagingAcceptanceScopeVerifier
             if ($this->videos === null) throw new \RuntimeException('STAGING_VIDEO_DUPLICATE_AUDIT_REQUIRED');
             if ($this->videos->findByExternalReference($platform, $externalId) !== null) throw new \RuntimeException('STAGING_VIDEO_DUPLICATE');
         }
-        $proposalCommandFingerprint = trim((string) ($plan['proposal_command_fingerprint'] ?? ''));
-        if ($proposalCommandFingerprint === '') $proposalCommandFingerprint = hash('sha256', CommandCanonicalizer::canonicalize($this->withoutAuthorization($plan)));
+        // The command fingerprint must cover the final Video payload (after
+        // canonical Evidence read-back and semantic_attachments rebuild), not
+        // the surrounding orchestration plan. This is the value the Proposal
+        // verifier can recompute immediately before Controlled Apply.
+        $proposalCommandFingerprint = $descriptor->payloadFingerprint;
         $base = [
             'approved' => true, 'environment' => 'staging', 'capture_id' => $capture->captureId,
             'capture_fingerprint' => $capture->requestFingerprint, 'request_fingerprint' => $capture->requestFingerprint,

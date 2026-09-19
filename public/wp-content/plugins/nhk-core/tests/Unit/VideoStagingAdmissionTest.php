@@ -176,8 +176,8 @@ final class VideoStagingAdmissionTest extends TestCase
             'operation' => 'ingest',
             'subject_id' => $videoId,
             'proposed_uuid' => $videoId,
+            'payload' => $capture->assets[0]['video_proposal']['payload'],
             'fingerprint' => hash('sha256', 'live-shaped-video-plan'),
-            'proposal_command_fingerprint' => hash('sha256', 'live-shaped-video-command'),
         ]);
 
         self::assertSame($videoId, $scope['proposed_uuid']);

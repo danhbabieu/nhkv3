@@ -1,5 +1,28 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-19 — Video final-payload staging binding fixed (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE: `StagingAcceptanceScopeVerifier::issueForVideoPlan()` signed
+`proposal_command_fingerprint` from the outer orchestration plan, while
+`StagingAcceptanceScope::assertProposal()` did not require that fingerprint to
+match the canonical Proposal payload. A post-Evidence-read-back change to the
+final Video payload, including `metadata.semantic_attachments`, could
+therefore remain outside the signed scope.
+
+FIXED_BOUNDARY: Video scope issuance now uses the shared
+`StagingOperationDescriptor` payload fingerprint after the final
+`semantic_attachments` rebuild. Proposal verification recomputes the same
+fingerprint and fails closed with `STAGING_VIDEO_PAYLOAD_MISMATCH` on drift.
+No Governance, scope, writer or identity boundary was bypassed.
+
+REGRESSION: Production-shaped YouTube Video scope coverage now proves the
+final Evidence-backed attachment is inside the signed payload and that a
+tampered Evidence reference is rejected. Focused staging, Capture provenance,
+Governance continuation and Video admission suites pass 91 tests / 394
+assertions. No staging/production data, deployment or retry was performed.
+
+STATUS: `VIDEO_CAPTURE_FINAL_PAYLOAD_SCOPE_FIXED_LOCAL / NO_LIVE_MUTATION / DEPLOYMENT_PENDING`.
+
 # Checkpoint — 2026-09-19 — Widget provided-file transport/materialization boundary fixed (LOCAL / NO LIVE MUTATION)
 
 ROOT_CAUSE: `nhk.media.widget-upload` accepts structured `files[]` references
