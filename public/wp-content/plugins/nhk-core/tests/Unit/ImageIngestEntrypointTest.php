@@ -101,6 +101,34 @@ final class ImageIngestEntrypointTest extends TestCase
         self::assertFileDoesNotExist((string) ($upload[2]['files']['tmp_name'][0] ?? ''));
     }
 
+    /** @dataProvider providedReferenceShapeProvider */
+    public function test_widget_transport_materializes_only_complete_structured_references(array $reference, bool $shouldMaterialize): void
+    {
+        $materialized = 0;
+        $entrypoint = new ImageIngestEntrypoint(
+            static fn (string $key, array $metadata, array $files, array $items): array => ['items' => []],
+            static function (mixed $references) use (&$materialized): array {
+                $materialized++;
+                return ['files' => ['files' => ['name' => ['one.jpg'], 'type' => ['image/jpeg'], 'tmp_name' => ['/tmp/one'], 'error' => [UPLOAD_ERR_OK], 'size' => [1]]], 'temporary_paths' => []];
+            },
+        );
+
+        if (!$shouldMaterialize) {
+            $this->expectException(\InvalidArgumentException::class);
+            $this->expectExceptionMessage('IMAGE_FILE_INPUT_INVALID');
+        }
+        $entrypoint->ingest('shape-' . $materialized, [], [$reference], [], false);
+        self::assertSame($shouldMaterialize ? 1 : 0, $materialized);
+    }
+
+    public static function providedReferenceShapeProvider(): iterable
+    {
+        yield 'file id only' => [['file_id' => 'file-one'], false];
+        yield 'download url only' => [['download_url' => 'https://files.example.test/one'], false];
+        yield 'complete reference' => [['download_url' => 'https://files.example.test/one', 'file_id' => 'file-one', 'mime_type' => 'image/jpeg', 'file_name' => 'one.jpg'], true];
+        yield 'native file bag accidentally passed as reference' => [['tmp_name' => '/tmp/one', 'name' => 'one.jpg'], false];
+    }
+
     /** @dataProvider invalidReferenceProvider */
     public function test_non_structured_reference_is_rejected(mixed $provided): void
     {

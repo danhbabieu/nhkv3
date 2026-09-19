@@ -34,6 +34,7 @@ final class ImageIngestEntrypoint
             return ($this->upload)($idempotencyKey, $metadata, $provided, $items);
         }
 
+        $this->logProvidedFileShape($provided);
         $references = $this->structuredReferences($provided);
         $materialized = ($this->materialize)($references);
         try {
@@ -53,6 +54,28 @@ final class ImageIngestEntrypoint
         if (array_key_exists('tmp_name', $value)) return true;
         foreach ($value as $nested) if ($this->isNativeFileBag($nested)) return true;
         return false;
+    }
+
+    private function logProvidedFileShape(mixed $provided): void
+    {
+        if (!function_exists('error_log')) return;
+        $references = is_array($provided) && array_is_list($provided) ? $provided : [$provided];
+        $rows = [];
+        foreach ($references as $ordinal => $reference) {
+            $fields = is_array($reference) ? array_values(array_map('strval', array_keys($reference))) : [];
+            $isStructured = is_array($reference) && !array_key_exists('tmp_name', $reference);
+            $rows[] = [
+                'ordinal' => $ordinal,
+                'field_names' => $fields,
+                'file_id_present' => $isStructured && is_string($reference['file_id'] ?? null) && trim($reference['file_id']) !== '',
+                'download_url_present' => $isStructured && is_string($reference['download_url'] ?? null) && trim($reference['download_url']) !== '',
+                'mime_present' => $isStructured && is_string($reference['mime_type'] ?? null) && trim($reference['mime_type']) !== '',
+                'filename_present' => $isStructured && is_string($reference['file_name'] ?? null) && trim($reference['file_name']) !== '',
+                'transport_ref_type' => $isStructured ? 'structured_provided_file_reference' : (is_array($reference) ? 'native_file_bag_or_unknown_array' : get_debug_type($reference)),
+            ];
+        }
+        $encoded = json_encode($rows, JSON_UNESCAPED_SLASHES);
+        error_log('[nhk.media.provided-file-shape] ' . (is_string($encoded) ? $encoded : 'encoding_failed'));
     }
 
     /** @return list<array<string,mixed>> */

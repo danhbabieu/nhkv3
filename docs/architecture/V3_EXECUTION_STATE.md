@@ -1,5 +1,32 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-19 — Widget provided-file transport/materialization boundary fixed (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE: `nhk.media.widget-upload` accepts structured `files[]` references
+(`download_url`, `file_id`, optional MIME/name), but its registered descriptor
+also advertised `_meta.openai/fileParams=["files"]`, which is the native
+multipart transport contract. That made the host/connector eligible to
+normalize the same field as native file parts, losing the structured
+provided-file shape before `ImageIngestEntrypoint` materialization. Commit
+`994b0d2a` expanded ordered `files[]`/`items[]` metadata without removing this
+transport contradiction. The literal `PROVIDED_FILE_MATERIALIZATION_FAILED`
+is the generic outer gateway fallback, not a WordPress Media metadata error.
+
+FIXED_BOUNDARY: Removed `openai/fileParams` from the structured widget-upload
+descriptor; native multipart remains advertised only on the native Capture
+boundary. Added safe pre-materialization shape logging containing only ordinal,
+field names, presence booleans and transport reference type. No URL, token,
+binary, filename value or Media data is logged.
+
+VERIFICATION: Widget, ImageIngest, Gateway and Easy MCP descriptor tests pass
+70 tests / 290 assertions; TypeScript tests, typecheck and widget build pass;
+PHP lint and diff check pass. Full PHPUnit remains non-green on the existing
+local WordPress/bootstrap baseline (36 errors, 15 failures, 114 skips); the
+failures are outside this transport slice. No Media 605/606, Article,
+MediaUsage, re-upload, staging acceptance, deployment or push was performed.
+
+STATUS: `WIDGET_PROVIDED_FILE_TRANSPORT_FIXED_LOCAL / NO_LIVE_MUTATION / DEPLOYMENT_PENDING`.
+
 # Checkpoint — 2026-09-19 — Capture child admission boundary fixed (LOCAL / NO LIVE MUTATION)
 
 ROOT_CAUSE: `OperationScopedStagingGuard` correctly rejected missing staging
