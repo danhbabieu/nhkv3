@@ -6,13 +6,14 @@ namespace NHK\Core\Application\Semantic;
 /** Parses only NHK-owned section markers; user-authored prose is opaque. */
 final class ManagedArticleSectionParser
 {
-    public function wrap(string $sectionId, string $fingerprint, string $dependencyFingerprint, string $content): string
+    /** @param array<string,mixed> $metadata */
+    public function wrap(string $sectionId, string $fingerprint, string $dependencyFingerprint, string $content, array $metadata = []): string
     {
-        $metadata = json_encode([
+        $metadata = json_encode(array_merge([
             'section_id' => $sectionId,
             'fingerprint' => $fingerprint,
             'dependency_fingerprint' => $dependencyFingerprint,
-        ], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+        ], $metadata), JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
         return '<!-- nhk-managed-section ' . $metadata . ' -->' . "\n" . trim($content) . "\n" . '<!-- /nhk-managed-section -->';
     }
 

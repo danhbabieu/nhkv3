@@ -8,7 +8,7 @@ use NHK\Core\Application\Compliance\PublicEditorialCopyGuard;
 /** Deterministic editorial composer. Canonical Claim text is never dumped verbatim. */
 final class ArticleComposer
 {
-    public function __construct(private ?PublicEditorialCopyGuard $publicCopyGuard = null, private ?ManagedArticleSectionParser $sectionParser = null) {}
+    public function __construct(private ?PublicEditorialCopyGuard $publicCopyGuard = null, private ?ManagedArticleSectionParser $sectionParser = null, private ?EditorialProjectionEligibility $projectionEligibility = null) {}
 
     /** @param list<array<string,mixed>> $observations @param list<array<string,mixed>> $selectedClaims @return array<string,mixed> */
     public function compose(string $userInput, array $observations, array $selectedClaims, array $context = []): array
@@ -24,13 +24,15 @@ final class ArticleComposer
         $title = trim((string) ($context['title'] ?? ''));
         if ($title === '') $title = $this->title($userInput);
         $guard = $this->publicCopyGuard ?? new PublicEditorialCopyGuard();
+        $projectionEligibility = $this->projectionEligibility ?? new EditorialProjectionEligibility();
         // Canonical claims remain available to compliance/research, but only
         // reader-safe claims may be projected into public prose. An unsafe
         // legacy claim must not poison an otherwise safe editorial rewrite.
-        $usableClaims = array_values(array_filter($selectedClaims, static function (mixed $claim) use ($guard): bool {
+        $usableClaims = array_values(array_filter($selectedClaims, static function (mixed $claim) use ($guard, $projectionEligibility, $context): bool {
             if (!is_array($claim)) return false;
             $text = trim((string) ($claim['text'] ?? ''));
             if ($text === '') return false;
+            if (($projectionEligibility->evaluate($claim, $context)['eligible'] ?? false) !== true) return false;
             try { $guard->assertSafe($text); return true; } catch (\Throwable) { return false; }
         }));
         $paragraphs = [];
@@ -61,8 +63,9 @@ final class ArticleComposer
                 $semanticKey = $semanticKey !== '' ? $semanticKey : 'claim-context:' . hash('sha256', $content);
                 $fingerprint = hash('sha256', $content);
                 $sectionId = 'nhk-managed-' . hash('sha256', $semanticKey);
-                $paragraphs[] = $sectionParser->wrap($sectionId, $fingerprint, $dependencyFingerprint, $content);
-                $managedSections[] = ['section_id' => $sectionId, 'semantic_key' => $semanticKey, 'origin' => 'CANONICAL_CLAIM', 'fingerprint' => $fingerprint, 'dependency_fingerprint' => $dependencyFingerprint, 'content' => $content];
+                $sectionMetadata = ['origin' => 'CANONICAL_CLAIM', 'semantic_owner' => 'knowledge', 'editorial_purpose' => 'bounded_supporting_fact', 'regeneration_policy' => 'REGENERATE_ON_DEPENDENCY_CHANGE'];
+                $paragraphs[] = $sectionParser->wrap($sectionId, $fingerprint, $dependencyFingerprint, $content, $sectionMetadata);
+                $managedSections[] = ['section_id' => $sectionId, 'semantic_key' => $semanticKey, 'origin' => 'CANONICAL_CLAIM', 'semantic_owner' => 'knowledge', 'editorial_purpose' => 'bounded_supporting_fact', 'regeneration_policy' => 'REGENERATE_ON_DEPENDENCY_CHANGE', 'fingerprint' => $fingerprint, 'dependency_fingerprint' => $dependencyFingerprint, 'content' => $content];
             }
         }
         if ($paragraphs === []) $paragraphs[] = 'Nội dung đang chờ bổ sung dữ liệu biên tập.';

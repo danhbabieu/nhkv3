@@ -16,7 +16,7 @@ final class MediaUsageReconciler
      * @param list<array<string,mixed>> $desired
      * @return array{status:string,actions:list<array<string,mixed>>}
      */
-    public function plan(string $endpointType, string $endpointKey, array $current, array $desired): array
+    public function plan(string $endpointType, string $endpointKey, array $current, array $desired, ?callable $suitability = null): array
     {
         $currentByIdentity = [];
         foreach ($current as $usage) {
@@ -49,6 +49,16 @@ final class MediaUsageReconciler
                 );
                 $identity = $role . "\0" . $desired->placementKey;
                 if (isset($desiredByRole[$identity])) return $this->review('DUPLICATE_DESIRED_USAGE', $role);
+                if ($suitability !== null) {
+                    $assessment = $suitability($desired->mediaId, $desired->role, $spec);
+                    $accepted = is_array($assessment)
+                        ? (($assessment['valid_for_completeness'] ?? $assessment['auto_select'] ?? false) === true)
+                        : $assessment === true;
+                    if (!$accepted) {
+                        $code = is_array($assessment) ? (string) ($assessment['diagnostic'] ?? 'MEDIA_USAGE_SEMANTIC_MISMATCH') : 'MEDIA_USAGE_SEMANTIC_MISMATCH';
+                        return $this->review($code, $role, ['media_id' => $desired->mediaId], 'REVIEW_REQUIRED');
+                    }
+                }
                 $desiredByRole[$identity] = $desired;
             } catch (\Throwable) {
                 return $this->review('INVALID_DESIRED_USAGE', $role);
@@ -78,9 +88,9 @@ final class MediaUsageReconciler
     }
 
     /** @return array{status:string,actions:list<array<string,mixed>>} */
-    private function review(string $code, string $role): array
+    private function review(string $code, string $role, array $extra = [], string $actionName = 'CONFLICT'): array
     {
-        $action = ['action' => 'CONFLICT', 'code' => $code];
+        $action = ['action' => $actionName, 'code' => $code] + $extra;
         if ($role !== '') $action['role'] = $role;
         return ['status' => 'OWNER_REVIEW_REQUIRED', 'actions' => [$action, ['action' => 'OWNER_REVIEW_REQUIRED', 'code' => $code]]];
     }

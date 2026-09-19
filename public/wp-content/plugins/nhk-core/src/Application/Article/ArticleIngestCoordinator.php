@@ -96,7 +96,18 @@ final class ArticleIngestCoordinator
         $resumeMatchesNativeDelta = $requestedEditorialFields !== []
             && (string) ($previousUpdate['fields_fingerprint'] ?? '') !== ''
             && hash_equals((string) $previousUpdate['fields_fingerprint'], $this->editorialFingerprint($state, $requestedEditorialFields));
-        if ($expectedToken !== '' && !hash_equals($expectedToken, $state->token) && !$resumeMatchesNativeDelta) return $this->save($receipt, 'preflight', ArticleIngestOutcome::RECONCILIATION_CONFLICT, false, ['code' => 'EXPECTED_EDITORIAL_STATE_MISMATCH'], $state->token);
+        if ($expectedToken !== '' && !hash_equals($expectedToken, $state->token) && !$resumeMatchesNativeDelta) {
+            if ($this->isExpectedSelfMutation($receipt, $state->token)) {
+                // The immediately preceding bounded Media/editorial phase has
+                // already read back this exact token. Refresh the continuation
+                // boundary once; a token that differs from that read-back is a
+                // genuine concurrent edit and remains a hard CAS conflict.
+                $this->mediaDiagnostics['state_recovery'] = ['code' => 'EXPECTED_STATE_REFRESH_REQUIRED', 'previous_token' => $expectedToken, 'current_token' => $state->token];
+                $expectedToken = $state->token;
+            } else {
+                return $this->save($receipt, 'preflight', ArticleIngestOutcome::RECONCILIATION_CONFLICT, false, ['code' => 'UNEXPECTED_EDITORIAL_STATE_CONFLICT'], $state->token);
+            }
+        }
         if ($editorialUpdate !== []) {
             if ($this->editorialStore === null) return $this->save($receipt, 'editorial_update', ArticleIngestOutcome::DEPENDENCY_UNAVAILABLE, true, ['code' => 'EDITORIAL_STORE_UNAVAILABLE'], $state->token);
             $alreadyApplied = is_array($previousUpdate)
@@ -116,7 +127,9 @@ final class ArticleIngestCoordinator
                 $mediaContext = is_array($input['media_context'] ?? null) ? $input['media_context'] : ['subject' => $state->title, 'planned_title' => $state->title];
                 $selected = is_array($input['article_media']['selected'] ?? null) ? array_map('strval', $input['article_media']['selected']) : [];
                 $supporting = is_array($input['article_media']['supporting_media_ids'] ?? null) ? array_values(array_map('strval', $input['article_media']['supporting_media_ids'])) : [];
-                $this->mediaDiagnostics = $this->articleMedia->ensureForPost($postId, $mediaContext, $selected, $supporting)->toArray();
+                $mediaResult = $this->articleMedia->ensureForPost($postId, $mediaContext, $selected, $supporting)->toArray();
+                if (isset($this->mediaDiagnostics['state_recovery'])) $mediaResult['state_recovery'] = $this->mediaDiagnostics['state_recovery'];
+                $this->mediaDiagnostics = $mediaResult;
                 $this->timings['media_reconciliation_ms'] = $this->elapsed($started);
             } catch (\Throwable $error) {
                 $conflict = str_contains(strtoupper($error->getMessage()), 'EDITORIAL_STATE_CHANGED');
@@ -234,6 +247,13 @@ final class ArticleIngestCoordinator
     }
 
     private function elapsed(float $started): int { return (int) round((microtime(true) - $started) * 1000); }
+
+    private function isExpectedSelfMutation(ArticleOperationReceipt $receipt, string $currentToken): bool
+    {
+        $media = is_array($receipt->diagnostics['media'] ?? null) ? $receipt->diagnostics['media'] : [];
+        $readBackToken = trim((string) ($media['editorialStateToken'] ?? $media['editorial_state_token'] ?? ''));
+        return $readBackToken !== '' && hash_equals($readBackToken, $currentToken);
+    }
 
     /** @param array<string,mixed> $input @return array<string,mixed> */
     private function editorialFields(array $input): array

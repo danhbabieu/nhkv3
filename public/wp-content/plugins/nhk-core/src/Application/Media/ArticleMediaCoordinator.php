@@ -16,6 +16,7 @@ final class ArticleMediaCoordinator
         private ArticleMediaBlueprintRepository $blueprints,
         private ?int $blogId = null,
         private ?WordPressArticleMediaAdapter $wordpress = null,
+        private ?SemanticSuitabilityPolicy $suitabilityPolicy = null,
     ) {}
 
     /** @param array<string,mixed> $context @param array<string,string> $selectedMediaBySlot @param list<string> $supportingMediaIds */
@@ -84,10 +85,14 @@ final class ArticleMediaCoordinator
             $usage = $this->reconcileUsage($endpointKey, $slot, $candidate->canonicalId, $blueprint, 'article:' . $endpointKey . ':' . $slot, $selectedContextBySlot[$slot] ?? []);
             $state = $candidate->isSystemPlaceholder() ? ($slot === MediaUsageRoleRegistry::FEATURED_PRIMARY ? MediaSeoStateRegistry::INCOMPLETE_FEATURED : MediaSeoStateRegistry::INCOMPLETE_INLINE) : MediaSeoStateRegistry::COMPLETE;
             if ($candidate->isSystemPlaceholder()) $diagnostics[] = ['code' => $slot === MediaUsageRoleRegistry::FEATURED_PRIMARY ? 'ARTICLE_MEDIA_FEATURED_MISSING' : 'ARTICLE_MEDIA_INLINE_MISSING', 'slot' => $slot, 'media_id' => $candidate->canonicalId];
+            if ($candidate->isSystemPlaceholder() && $candidateId !== '') $diagnostics[] = ['code' => 'MEDIA_CANDIDATE_INELIGIBLE', 'slot' => $slot, 'media_id' => $candidateId, 'reason' => 'PERSISTED_SUBJECT_SCOPE_MISMATCH'];
+            $assessment = $candidate->isSystemPlaceholder()
+                ? ['requirement' => $contentIntent === 'IMAGE_ARTICLE' ? SemanticSuitabilityPolicy::REQUIRED : SemanticSuitabilityPolicy::OPTIONAL, 'availability' => SemanticSuitabilityPolicy::MISSING, 'suitability' => SemanticSuitabilityPolicy::UNKNOWN, 'basis' => 'no_candidate', 'auto_select' => false, 'valid_for_completeness' => false, 'diagnostic' => 'MEDIA_OPTIONAL_MISSING']
+                : ($this->suitabilityPolicy ??= new SemanticSuitabilityPolicy())->evaluateMedia($candidate, $this->assets->listByMediaId($candidate->canonicalId), ['subject_ids' => $subjectIds], 'SYSTEM_AUTO', $slot);
             $blueprint = MediaSeoBlueprint::forPost($postId, $slot, $context, $state);
             $this->blueprints->save($blueprint);
             $slotMedia[$slot] = $candidate->canonicalId;
-            $slots[$slot] = ['media_id' => $candidate->canonicalId, 'placeholder' => $candidate->isSystemPlaceholder(), 'state' => $state, 'placement_key' => $usage->placementKey, 'placement_anchor' => $usage->placementAnchor(), 'blueprint' => $blueprint->toArray()];
+            $slots[$slot] = ['media_id' => $candidate->canonicalId, 'placeholder' => $candidate->isSystemPlaceholder(), 'state' => $state, 'suitability' => $assessment['suitability'], 'availability' => $assessment['availability'], 'valid_for_completeness' => $assessment['valid_for_completeness'], 'placement_key' => $usage->placementKey, 'placement_anchor' => $usage->placementAnchor(), 'blueprint' => $blueprint->toArray()];
         }
         $supportingPlacements = $this->normalizeSupportingPlacements($supportingMediaIds);
         foreach ($supportingPlacements as $placement) {
@@ -121,7 +126,7 @@ final class ArticleMediaCoordinator
         ];
         $usagePlan = (new MediaUsageReconciler())->plan('wp_post', $endpointKey, $this->usages->listByEndpoint('wp_post', $endpointKey), $desiredUsages);
         $diagnostics[] = ['code' => 'MEDIA_USAGE_RECONCILIATION', 'status' => $usagePlan['status'], 'actions' => $usagePlan['actions']];
-        $state = array_filter($slots, static fn (array $slot): bool => $slot['placeholder']) !== [] ? MediaSeoStateRegistry::PLACEHOLDER : (in_array('MEDIA_LOW_RESOLUTION', array_column($diagnostics, 'code'), true) ? MediaSeoStateRegistry::LOW_RESOLUTION : MediaSeoStateRegistry::COMPLETE);
+        $state = array_filter($slots, static function (array $slot) use ($subjectScopeLocked, $captureMediaContext): bool { return $slot['placeholder'] || (($subjectScopeLocked || $captureMediaContext) && ($slot['valid_for_completeness'] ?? true) !== true); }) !== [] ? MediaSeoStateRegistry::PLACEHOLDER : (in_array('MEDIA_LOW_RESOLUTION', array_column($diagnostics, 'code'), true) ? MediaSeoStateRegistry::LOW_RESOLUTION : MediaSeoStateRegistry::COMPLETE);
         $guidance = $this->guidance($slots, $context);
         $result = new ArticleMediaResult($postId, $endpointKey, $state, $slotMedia, $slots, $diagnostics, is_array($editorial) ? (string) ($editorial['state_token'] ?? '') : '', $guidance);
         if ($this->wordpress !== null) {
@@ -157,7 +162,7 @@ final class ArticleMediaCoordinator
                     $diagnostics[] = ['code' => 'ARTICLE_MEDIA_INLINE_MISSING', 'slot' => MediaUsageRoleRegistry::INLINE_PRIMARY, 'reason' => 'STALE_WORDPRESS_USAGE_REJECTED', 'media_id' => $actualInline];
                 }
             }
-            $state = array_filter($slots, static fn (array $slot): bool => $slot['placeholder']) !== [] ? MediaSeoStateRegistry::PLACEHOLDER : (in_array('MEDIA_LOW_RESOLUTION', array_column($diagnostics, 'code'), true) ? MediaSeoStateRegistry::LOW_RESOLUTION : MediaSeoStateRegistry::COMPLETE);
+            $state = array_filter($slots, static function (array $slot) use ($subjectScopeLocked, $captureMediaContext): bool { return $slot['placeholder'] || (($subjectScopeLocked || $captureMediaContext) && ($slot['valid_for_completeness'] ?? true) !== true); }) !== [] ? MediaSeoStateRegistry::PLACEHOLDER : (in_array('MEDIA_LOW_RESOLUTION', array_column($diagnostics, 'code'), true) ? MediaSeoStateRegistry::LOW_RESOLUTION : MediaSeoStateRegistry::COMPLETE);
             $result = new ArticleMediaResult($postId, $endpointKey, $state, $slotMedia, $slots, $diagnostics, (string) ($readback['state_token'] ?? ''), $this->guidance($slots, $context));
         }
         return $result;
@@ -222,6 +227,10 @@ final class ArticleMediaCoordinator
         $media = $this->media->findByCanonicalId($id);
         if ($media === null || !$media->active || $media->readiness !== 'ready' || $media->isSystemPlaceholder()) return null;
         if ($requireSubjectScope && !$this->matchesSubjectScope($media, $blueprint, true)) return null;
+        if ($requireSubjectScope) {
+            $assessment = ($this->suitabilityPolicy ??= new SemanticSuitabilityPolicy())->evaluateMedia($media, $this->assets->listByMediaId($media->canonicalId), ['subject_ids' => $this->subjectIdsFromBlueprint($blueprint)]);
+            if (($assessment['valid_for_completeness'] ?? false) !== true) return null;
+        }
         return $this->assets->listByMediaId($media->canonicalId) === [] ? null : $media;
     }
 
@@ -276,6 +285,17 @@ final class ArticleMediaCoordinator
             if (in_array($usage->endpointType, ['variant', 'authority_variant'], true)) $actual[trim($usage->endpointKey)] = true;
         }
         return array_intersect_key($expected, $actual) !== [];
+    }
+
+    /** @return list<string> */
+    private function subjectIdsFromBlueprint(MediaSeoBlueprint $blueprint): array
+    {
+        $ids = [];
+        foreach (['subject_ids', 'canonical_subject_ids'] as $key) foreach ((array) ($blueprint->subjectContext[$key] ?? []) as $id) {
+            $id = trim((string) $id);
+            if ($id !== '') $ids[$id] = true;
+        }
+        return array_keys($ids);
     }
 
     private function placeholder(string $slot): Media

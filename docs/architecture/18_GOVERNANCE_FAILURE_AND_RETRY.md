@@ -22,3 +22,18 @@ For semantic merge, source and target revisions are independent bindings. A
 proposal whose subject binding does not carry the canonical source UUID is
 invalid and must be rejected before apply; it must not be diagnosed as merge
 unavailability or allowed to mutate the source or target.
+
+## Reconciliation, suitability and recovery boundary — 2026-09-19
+
+Reconciliation is a bounded read/plan/verify operation, not a generic repair
+writer. A candidate is accepted only when the registered operation policy
+proves requirement, semantic suitability and current availability; an existing
+row is not trusted solely because its placement identity matches. Unknown,
+stale, broken or semantically ineligible state produces explicit review or
+deferred diagnostics and cannot be reported as complete.
+
+Self-recovery is allowed only for a receipt-bound mutation whose canonical
+read-back matches the current native state token. A different token without
+that exact durable proof is concurrent state and must remain a CAS conflict.
+No recovery path creates a new semantic owner, bypasses Governance, uses direct
+WordPress/database writes, or grants a staging scope.

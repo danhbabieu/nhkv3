@@ -41,17 +41,24 @@ final class ArticlePublicationGate
         } else {
             $featuredMissing = ($mediaSnapshot['featured_primary']['placeholder'] ?? true) === true;
             $inlineMissing = ($mediaSnapshot['inline_primary']['placeholder'] ?? true) === true;
+            $featuredInvalid = $this->invalidMediaSlot($mediaSnapshot['featured_primary'] ?? []);
+            $inlineInvalid = $this->invalidMediaSlot($mediaSnapshot['inline_primary'] ?? []);
             if ($featuredMissing) {
                 $missingEnrichments[] = 'FEATURED_MEDIA';
                 if ($intent === 'IMAGE_ARTICLE') {
                     if (!in_array('MEDIAUSAGE_INCOMPLETE', $blockers, true)) $blockers[] = 'MEDIAUSAGE_INCOMPLETE';
                     $blockers[] = 'ARTICLE_MEDIA_FEATURED_MISSING';
                 } else $warnings[] = 'ARTICLE_MEDIA_FEATURED_MISSING';
+            } elseif ($featuredInvalid) {
+                $warnings[] = 'MEDIA_USAGE_SEMANTIC_MISMATCH';
+                $missingEnrichments[] = 'FEATURED_MEDIA';
+                if ($intent === 'IMAGE_ARTICLE') $blockers[] = 'MEDIAUSAGE_INCOMPLETE';
             } elseif (($evidence['media_usage_complete'] ?? false) !== true) {
                 $warnings[] = 'MEDIAUSAGE_INCOMPLETE';
                 $missingEnrichments[] = 'MEDIAUSAGE';
             }
             if ($inlineMissing) { $warnings[] = 'ARTICLE_MEDIA_INLINE_MISSING'; $missingEnrichments[] = 'INLINE_MEDIA'; }
+            elseif ($inlineInvalid) { $warnings[] = 'MEDIA_USAGE_SEMANTIC_MISMATCH'; $missingEnrichments[] = 'INLINE_MEDIA'; }
         }
         if (($evidence['real_image_requirements_met'] ?? false) !== true) {
             if ($intent === 'IMAGE_ARTICLE' && ($evidence['real_image_requirements_met_status'] ?? '') === 'invalid') $blockers[] = 'REAL_IMAGE_REQUIREMENTS_UNMET';
@@ -67,6 +74,15 @@ final class ArticlePublicationGate
         else $this->requireTrue($evidence, 'rendered_public_verification', 'RENDERED_PUBLIC_VERIFICATION_UNAVAILABLE', $blockers);
         if (($evidence['media_repair_status'] ?? '') === 'deferred') $deferredRepairs[] = 'MEDIA_ATTACHMENT_BINDING';
         return new ArticlePublicationGateResult($blockers === [], $blockers, $warnings, $missingEnrichments, $deferredRepairs);
+    }
+
+    /** @param mixed $slot */
+    private function invalidMediaSlot(mixed $slot): bool
+    {
+        if (!is_array($slot)) return true;
+        if (array_key_exists('valid_for_completeness', $slot) && $slot['valid_for_completeness'] !== true) return true;
+        $suitability = strtoupper(trim((string) ($slot['suitability'] ?? '')));
+        return in_array($suitability, ['INELIGIBLE', 'UNKNOWN', 'REVIEW_REQUIRED'], true);
     }
 
     /** @param array<string,mixed> $evidence @param list<string> $blockers */

@@ -112,6 +112,23 @@ final class ArticlePublicationGateTest extends TestCase
         self::assertContains('ARTICLE_MEDIA_INLINE_MISSING', $result->warnings);
     }
 
+    public function test_semantically_mismatched_featured_media_blocks_image_article(): void
+    {
+        $evidence = $this->evidence();
+        $evidence['content_intent'] = 'IMAGE_ARTICLE';
+        $evidence['media_snapshot'] = [
+            'featured_primary' => ['placeholder' => false, 'suitability' => 'INELIGIBLE', 'valid_for_completeness' => false],
+            'inline_primary' => ['placeholder' => true],
+        ];
+
+        $result = (new ArticlePublicationGate())->check($this->draft(), $evidence, $this->draft()->token);
+
+        self::assertFalse($result->eligible);
+        self::assertContains('MEDIAUSAGE_INCOMPLETE', $result->blockers);
+        self::assertContains('MEDIA_USAGE_SEMANTIC_MISMATCH', $result->warnings);
+        self::assertContains('FEATURED_MEDIA', $result->missingEnrichments);
+    }
+
     public function test_text_article_without_media_is_publication_ready_with_enrichment_debt(): void
     {
         $evidence = $this->evidence();

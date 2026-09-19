@@ -372,3 +372,24 @@ resumes at the failed child boundary without duplicating the successful owner.
 Knowledge-only and Video-only intents do not acquire an implicit Article
 requirement. This is orchestration and recovery evidence, not a second Article
 or semantic content store.
+
+### Truth before completeness and bounded recovery — 2026-09-19
+
+Article/media reconciliation evaluates requirement, semantic suitability and
+availability independently. A readable, ready or historically attached Media is
+not sufficient evidence for the current Article subject. Existing
+`MediaUsage` is revalidated on every bounded reconcile; stale, broken,
+ineligible or unknown scope becomes an explicit diagnostic and cannot satisfy a
+required slot. Optional enrichment may remain deferred, while required
+IMAGE_ARTICLE media remains a publication blocker.
+
+Resume recovery distinguishes an expected prior self-mutation from a concurrent
+editorial edit. A receipt may refresh the continuation token only when its
+durable media/editorial read-back carries the exact current token. Any other
+token drift remains a native WordPress CAS conflict. Recovery never guesses,
+replays a generic writer, overwrites user prose, or bypasses Governance.
+
+Managed Article sections carry explicit origin, semantic owner, editorial
+purpose and regeneration policy. Knowledge/Source/Evidence validity alone does
+not grant public-prose eligibility: provenance, internal diagnostics,
+non-applicable claims and unsupported evidence remain trace-only or review-only.

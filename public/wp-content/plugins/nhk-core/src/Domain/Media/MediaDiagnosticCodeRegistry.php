@@ -21,6 +21,12 @@ final class MediaDiagnosticCodeRegistry
             'MEDIA_RELATION_UNVERIFIED',
             'MEDIA_RIGHTS_UNVERIFIED',
             'MEDIA_PLACEHOLDER_NOT_PUBLIC',
+            'MEDIA_OPTIONAL_MISSING',
+            'MEDIA_CANDIDATE_INELIGIBLE',
+            'MEDIA_USAGE_SEMANTIC_MISMATCH',
+            'MEDIA_USAGE_STALE',
+            'MEDIA_BINDING_BROKEN',
+            'STALE_OR_INELIGIBLE_USAGE',
         ];
     }
 

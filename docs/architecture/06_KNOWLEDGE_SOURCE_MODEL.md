@@ -108,6 +108,22 @@ claim lifecycle; generated prose is never Evidence. Published SEO prose stays
 on its prior revision until the separate candidate passes validation and an
 explicit publish transition.
 
+## Public projection suitability — 2026-09-19
+
+Projection treats canonical Knowledge validity and editorial prose suitability
+as separate decisions. A claim must be subject-applicable, editorially
+relevant, evidence-eligible and explicitly safe for public prose before the
+composer may derive a managed section. Source/Evidence provenance, internal
+diagnostics, unsupported status and non-applicable scope remain in
+machine-readable trace/review output; they are never dumped into Article body
+text merely because retrieval found them.
+
+Managed sections preserve the canonical Claim ID/revision and carry explicit
+`origin`, `semantic_owner`, `editorial_purpose` and `regeneration_policy`.
+These markers are orchestration metadata, not a new semantic owner or a copy of
+the Claim. Generated prose remains native WordPress editorial state and never
+becomes Evidence.
+
 ## Universal MCP post-ingest reconciliation — 2026-09-09
 
 Knowledge, Source and Evidence MCP ingest is not complete at proposal/apply or

@@ -47,6 +47,8 @@ final class PublicationDiagnosticRegistry
         foreach ([
             $owner('REAL_IMAGE_INCOMPLETE', 'Ảnh thật chưa hoàn tất.', 'Bổ sung ảnh thật phù hợp.'),
             $owner('MEDIAUSAGE_INCOMPLETE', 'Thông tin sử dụng Media chưa hoàn tất.', 'Hoàn tất MediaUsage.'),
+            $owner('MEDIA_USAGE_SEMANTIC_MISMATCH', 'Media hiện tại không chứng minh đúng phạm vi semantic.', 'Bỏ qua hoặc thay bằng Media có subject scope phù hợp.'),
+            $owner('MEDIA_CANDIDATE_INELIGIBLE', 'Media candidate không phù hợp với subject hiện tại.', 'Giữ trạng thái thiếu enrichment hoặc chọn Media đúng phạm vi.'),
             $owner('ARTICLE_MEDIA_FEATURED_MISSING', 'Ảnh đại diện bắt buộc chưa được gắn.', 'Gắn MediaUsage FEATURED_PRIMARY hợp lệ.'),
             $owner('IMAGE_ARTICLE_MEDIA_REQUIRED', 'Bài dạng ảnh chưa có Media bắt buộc hợp lệ.', 'Bổ sung đúng ảnh đã gửi và hoàn tất read-back.'),
             $owner('ARTICLE_MEDIA_INLINE_MISSING', 'Ảnh inline chưa được gắn.', 'Gắn MediaUsage INLINE_PRIMARY nếu phù hợp.'),

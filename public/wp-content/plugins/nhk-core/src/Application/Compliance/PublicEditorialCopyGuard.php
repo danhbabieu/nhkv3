@@ -10,6 +10,10 @@ final class PublicEditorialCopyGuard
     public function assertSafe(string $copy): string
     {
         $copy = trim($copy);
+        // NHK-managed HTML comments carry machine provenance and regeneration
+        // metadata. They are not reader-visible prose and must not be judged
+        // as if their internal owner labels were public copy.
+        $visibleCopy = trim((string) (preg_replace('/<!--.*?-->/s', '', $copy) ?? $copy));
         $patterns = [
             '/\b(?:SOURCE_FACT|USER_HINT|CANONICAL_CONTEXT)\b/i',
             '/\bsubject_resolution_packet\b/i',
@@ -26,7 +30,7 @@ final class PublicEditorialCopyGuard
             '/\[trong phạm vi đã kiểm chứng\]/ui',
             '/\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/i',
         ];
-        foreach ($patterns as $pattern) if (preg_match($pattern, $copy) === 1) throw new \RuntimeException('PUBLIC_INTERNAL_JARGON_LEAK');
+        foreach ($patterns as $pattern) if (preg_match($pattern, $visibleCopy) === 1) throw new \RuntimeException('PUBLIC_INTERNAL_JARGON_LEAK');
         return $copy;
     }
 

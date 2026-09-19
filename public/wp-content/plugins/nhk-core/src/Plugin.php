@@ -1010,7 +1010,7 @@ final class Plugin {
                     return $governanceResult + ['candidate_writes' => array_merge($candidates, $videoCandidates), 'reused_claims' => $reusedClaims, 'relation_hints' => (array) ($interpretation['relation_hints'] ?? []), 'subject_resolution' => $context['subject_resolution'] ?? [], 'governance_available' => $mcpGovernance instanceof McpGovernanceHandler];
                 },
                 new ArticleComposer(),
-                static function (array $context) use ($articleMedia, $mediaService, $usages, $mediaBindingService, $mcpGovernance, $wordpressAttachments, $stagingScopeVerifier): array {
+                static function (array $context) use ($articleMedia, $mediaService, $usages, $media, $assets, $mediaBindingService, $mcpGovernance, $wordpressAttachments, $stagingScopeVerifier): array {
                     $trace = static function (string $stage, string $status, array $details = []): void {
                         $payload = array_merge(['stage' => $stage, 'status' => $status, 'at' => gmdate('c')], $details);
                         if (function_exists('do_action')) { try { do_action('nhk_v3_capture_stage_trace', $payload); } catch (\Throwable) { } }
@@ -1138,6 +1138,7 @@ final class Plugin {
                     if (strtoupper(trim((string) ($context['content_intent']['intent'] ?? ''))) === 'MEDIA_ENRICHMENT') {
                         $trace('MEDIA_USAGE_RECONCILIATION', 'STARTED', ['capture_id' => (string) ($context['capture']['capture_id'] ?? '')]);
                         $incomplete = [];
+                        $suitabilityPolicy = new \NHK\Core\Application\Media\SemanticSuitabilityPolicy();
                         $primary = is_array($context['subject_resolution']['primary'] ?? null) ? $context['subject_resolution']['primary'] : [];
                         $endpointType = trim((string) ($primary['type'] ?? ''));
                         $endpointKey = trim((string) ($primary['id'] ?? ''));
@@ -1158,8 +1159,23 @@ final class Plugin {
                                     'caption' => (string) ($mediaContext['caption'] ?? ''),
                                     'title' => (string) ($mediaContext['title'] ?? ''),
                                 ]];
-                                $usagePlan = (new \NHK\Core\Application\Media\MediaUsageReconciler())->plan($endpointType, $endpointKey, $usages->listByEndpoint($endpointType, $endpointKey, $role), $desiredUsage);
-                                if (($usagePlan['status'] ?? '') !== 'PLANNED') throw new \NHK\Core\Domain\Media\MediaException('MEDIA_USAGE_RECONCILE_CONFLICT');
+                                $usagePlan = (new \NHK\Core\Application\Media\MediaUsageReconciler())->plan(
+                                    $endpointType,
+                                    $endpointKey,
+                                    $usages->listByEndpoint($endpointType, $endpointKey, $role),
+                                    $desiredUsage,
+                                    static function (string $candidateMediaId, string $candidateRole) use ($media, $assets, $suitabilityPolicy, $endpointKey): array {
+                                        $candidate = $media->findByCanonicalId($candidateMediaId);
+                                        if (!$candidate instanceof \NHK\Core\Domain\Media\Media) return ['valid_for_completeness' => false, 'diagnostic' => 'MEDIA_BINDING_BROKEN'];
+                                        return $suitabilityPolicy->evaluateMedia($candidate, $assets->listByMediaId($candidateMediaId), ['subject_ids' => [$endpointKey]], 'SYSTEM_AUTO', $candidateRole);
+                                    },
+                                );
+                                if (($usagePlan['status'] ?? '') !== 'PLANNED') {
+                                    $action = (array) ($usagePlan['actions'][0] ?? []);
+                                    $incomplete[] = (string) ($action['code'] ?? 'MEDIA_USAGE_SEMANTIC_MISMATCH');
+                                    $trace('MEDIA_USAGE_RECONCILIATION', 'DEFERRED', ['reason' => $incomplete[array_key_last($incomplete)], 'media_id' => $mediaId]);
+                                    continue;
+                                }
                                 $plannedAction = (array) ($usagePlan['actions'][0] ?? []);
                                 $usage = $mediaService->addUsage(
                                     $mediaId,

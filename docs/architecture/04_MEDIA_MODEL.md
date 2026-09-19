@@ -198,6 +198,29 @@ technical usefulness, clarity/resolution, provenance confidence và obstruction;
 MediaAsset hay provenance. Representative không phải Claim và không tự tạo
 Graph edge.
 
+## Semantic suitability and truth before completeness — 2026-09-19
+
+Một Media hoặc MediaUsage chỉ được xem là hợp lệ cho một slot sau khi đánh giá
+đủ ba chiều độc lập: `requirement` (`REQUIRED`, `OPTIONAL`,
+`NOT_APPLICABLE`), `suitability` (`EXACT`, `COMPATIBLE`, `REVIEW_REQUIRED`,
+`INELIGIBLE`, `UNKNOWN`) và `availability` (`AVAILABLE`, `MISSING`, `STALE`,
+`BROKEN`, `DEFERRED`). Readiness, public asset và placement identity chỉ chứng
+minh availability/placement; chúng không chứng minh subject scope.
+
+`EXACT` chỉ được tự chọn khi persisted Media provenance hoặc registered
+compatibility rule chứng minh đúng subject/facet của target. Scope khác hoặc
+scope không giải thích được không được dùng để hoàn thành slot: usage hiện có
+cũng phải revalidate theo cùng policy, không được giữ lại chỉ vì đã tồn tại.
+Candidate không đạt được chuyển sang `OWNER_REVIEW_REQUIRED` hoặc placeholder;
+`MEDIA_COMPLETE` và publication completion không được suy ra từ một ảnh đọc
+được nhưng sai semantic.
+
+Capture, Article, Admin, MCP và reverse reconciliation phải dùng cùng policy
+và cùng diagnostic family. Optional enrichment được phép `DEFERRED` hoặc
+`MISSING` mà không chặn TEXT_ARTICLE, nhưng IMAGE_ARTICLE và mọi required slot
+phải fail closed. Policy không tự tạo Claim, Graph relation, Media identity hay
+staging authorization.
+
 ## Canonical Media binding service — 2026-09-17
 
 `MediaBindingService` là application owner duy nhất của workflow

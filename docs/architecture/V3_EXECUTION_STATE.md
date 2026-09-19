@@ -1,5 +1,47 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-19 — System-wide semantic suitability/recovery hardening fixed locally (NO LIVE MUTATION)
+
+ROOT_CAUSE: MediaUsage reconciliation treated role/placement identity and
+readability as sufficient, so a stale or wrong-subject Media could be retained
+and incorrectly satisfy `MEDIA_COMPLETE`. Article composition also treated
+retrieved Knowledge validity as public-prose eligibility, while resume recovery
+could not distinguish a receipt-owned token advance from concurrent editorial
+mutation.
+
+ARCHITECTURE_DECISION: Enforce a shared three-dimensional policy across the
+bounded Article/Capture Media paths: requirement, semantic suitability and
+availability. Revalidate existing usages before completeness; accept only
+`EXACT`/registered compatible scope; preserve optional-vs-required behavior;
+filter Knowledge/Source/Evidence projection separately from claim validity; and
+allow continuation-token refresh only from exact receipt-bound canonical
+read-back. Concurrent drift remains native CAS conflict.
+
+FIXED_BOUNDARY: Added `SemanticSuitabilityPolicy`, semantic-aware usage-plan
+rejection, subject-scoped Article slot diagnostics, publication blocking for
+invalid required media, `EditorialProjectionEligibility`, managed-section
+origin/owner/purpose/regeneration metadata, and fail-closed self-mutation
+recovery diagnostics. Added regression coverage for wrong-subject readable
+media, unknown scope, usage-plan rejection, provenance-only claims and invalid
+IMAGE_ARTICLE media.
+
+DIAGNOSTICS: `MEDIA_CANDIDATE_INELIGIBLE`,
+`MEDIA_USAGE_SEMANTIC_MISMATCH`, `MEDIA_OPTIONAL_MISSING`,
+`EXPECTED_STATE_REFRESH_REQUIRED` and `UNEXPECTED_EDITORIAL_STATE_CONFLICT`
+remain machine-readable and owner-actionable. No broad catch reports semantic
+success.
+
+VERIFICATION: Changed-file PHP lint, focused Media/Article/Capture/Composer/
+publication suites and the full Unit suite (2,002 tests / 9,849 assertions)
+pass locally. The default all-suite command reaches 2,168 tests but its
+integration/contract environment is unavailable here: required
+`NHK_WP_TEST_PATH=public`/WordPress database wiring is absent, producing
+`stdClass::query()` and explicit acceptance-environment failures; no test
+result was converted to success. No staging/production mutation, deployment,
+external publish or live acceptance was performed.
+
+STATUS: `SEMANTIC_SUITABILITY_RECOVERY_FIXED_LOCAL / DEPLOYMENT_PENDING / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-19 — Publication readiness/recovery law fixed locally (NO LIVE MUTATION)
 
 FIXED_BOUNDARY: `ArticlePublicationGate` now distinguishes `PUBLICATION_READY`

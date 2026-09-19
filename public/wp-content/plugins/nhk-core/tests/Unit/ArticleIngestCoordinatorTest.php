@@ -150,4 +150,26 @@ final class ArticleIngestCoordinatorTest extends TestCase
         $coordinatorWithoutApply = new ArticleIngestCoordinator($receipts, new ArticleIngestPreflight($endpoints, new PredicateRegistry(), $types), new SemanticProposalPlanner(), $reader, new GovernanceService($proposals), null, $proposals, null, new \NHK\Core\Application\Article\ArticleVerificationReader());
         self::assertSame(ArticleIngestOutcome::DEPENDENCY_UNAVAILABLE, $coordinatorWithoutApply->execute($input)->outcome);
     }
+
+    public function test_resume_recovery_accepts_only_receipt_bound_current_token(): void
+    {
+        $currentToken = str_repeat('c', 64);
+        $receipt = new ArticleOperationReceipt(
+            operationId: UuidCodec::newV7(),
+            idempotencyKey: 'recovery-boundary',
+            requestFingerprint: str_repeat('a', 64),
+            intent: 'reconcile',
+            wpEndpointKey: '1:1',
+            wpPostId: 1,
+            stage: 'media',
+            outcome: ArticleIngestOutcome::DEPENDENCY_UNAVAILABLE,
+            retryable: true,
+            diagnostics: ['media' => ['editorialStateToken' => $currentToken]],
+        );
+        $coordinator = new ArticleIngestCoordinator($this->createMock(ArticleOperationReceiptRepository::class));
+        $method = new \ReflectionMethod($coordinator, 'isExpectedSelfMutation');
+
+        self::assertTrue($method->invoke($coordinator, $receipt, $currentToken));
+        self::assertFalse($method->invoke($coordinator, $receipt, str_repeat('d', 64)));
+    }
 }
