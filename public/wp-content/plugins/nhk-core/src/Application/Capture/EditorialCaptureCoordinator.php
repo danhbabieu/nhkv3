@@ -203,7 +203,12 @@ final class EditorialCaptureCoordinator
             $diagnostics['content_intent'] = $intent;
             if (($intent['intent_reused'] ?? false) === true) $diagnostics['capture_intent_reused'] = strtoupper((string) ($intent['intent'] ?? ''));
             $stagingScope = null;
-            if ($this->stagingScopeVerifier !== null && is_array($input['media_bindings'] ?? null) && $input['media_bindings'] !== []) {
+            // An Article target is intentionally deferred until the native
+            // Article owner exists.  The staging guard must remain exact;
+            // only the orchestration point moves to the first canonical
+            // Article read-back.
+            $deferredArticleBindings = $this->hasDeferredArticleBindings($input);
+            if ($this->stagingScopeVerifier !== null && is_array($input['media_bindings'] ?? null) && $input['media_bindings'] !== [] && !$deferredArticleBindings) {
                 $scopeInput = $input;
                 $scopeInput['intent'] = strtoupper(trim((string) ($intent['intent'] ?? '')));
                 $stagingScope = $this->stagingScopeVerifier->forCapture($record, $scopeInput, $assets);
@@ -259,6 +264,36 @@ final class EditorialCaptureCoordinator
                 if ($articleId < 1) throw new \RuntimeException('ARTICLE_DRAFT_READBACK_UNAVAILABLE');
                 $diagnostics['draft'] = $this->withoutBody($draft);
                 $record = $this->save($record, CaptureStage::DRAFT_CREATED, $assets, $diagnostics, $receipts, 'DRAFT_CREATED', $articleId, (string) ($draft['state_token'] ?? ''));
+            }
+            if ($articleRequired && $record->articleId !== null && $deferredArticleBindings) {
+                // Resolve the deferred Article reference from the server-owned
+                // draft/read-back identity.  The client never supplies or
+                // invents this target ID.
+                [$input, $articleBindings] = $this->resolveDeferredArticleBindings($input, $record);
+                foreach ($articleBindings as $binding) {
+                    if (!is_array($binding)) continue;
+                    $index = is_array($binding['media_ref'] ?? null) ? (int) ($binding['media_ref']['item_index'] ?? -1) : -1;
+                    if (!isset($assets[$index]) || !is_array($assets[$index])) continue;
+                    $seo = is_array($binding['seo'] ?? null) ? $binding['seo'] : [];
+                    $assets[$index]['media_context'] = array_replace(is_array($assets[$index]['media_context'] ?? null) ? $assets[$index]['media_context'] : [], array_filter([
+                        'title' => $seo['title'] ?? null,
+                        'alt_text' => $seo['alt_text'] ?? null,
+                        'caption' => $seo['caption'] ?? null,
+                    ], static fn (mixed $value): bool => $value !== null));
+                    if (array_key_exists('sort_order', $binding)) $assets[$index]['sort_order'] = max(0, (int) $binding['sort_order']);
+                }
+                if ($this->stagingScopeVerifier !== null && $articleBindings !== []) {
+                    $scopeInput = $input;
+                    $scopeInput['media_bindings'] = $articleBindings;
+                    $stagingScope = $this->stagingScopeVerifier->forCapture($record, $scopeInput, $assets);
+                    if ($stagingScope !== null) {
+                        $input['staging_acceptance'] = $stagingScope;
+                        $diagnostics['staging_acceptance'] = ['status' => 'verified', 'fingerprint' => (string) ($stagingScope['fingerprint'] ?? ''), 'deferred_article_reference' => true];
+                        $record = $this->save($record, CaptureStage::DRAFT_CREATED, $assets, $diagnostics, $receipts, 'DRAFT_CREATED', $record->articleId, $record->articleStateToken, 'IN_PROGRESS', null, $record->context + ['staging_acceptance' => $stagingScope]);
+                        $diagnostics = $record->diagnostics;
+                        $receipts = $record->phaseReceipts;
+                    }
+                }
             }
             if (!array_key_exists('media_adoption', $diagnostics) || ($followupItems !== [] && ($input['asset_followup_replay'] ?? false) !== true)) {
                 $this->beginPhase('MEDIA_ADOPTED');
@@ -487,7 +522,7 @@ final class EditorialCaptureCoordinator
                 $record = $this->save($record, CaptureStage::COMPOSED, $assets, $diagnostics, $receipts, 'COMPOSED', $record->articleId, $record->articleStateToken);
             }
 
-            $mediaContext = ['capture' => $record->toArray(), 'capture_record' => $record, 'article_id' => $record->articleId, 'assets' => $assets, 'media_bindings' => is_array($input['media_bindings'] ?? null) ? $input['media_bindings'] : [], 'media_operations' => is_array($input['media_operations'] ?? null) ? $input['media_operations'] : [], 'subject_resolution' => $resolution, 'subject_resolution_packet' => $resolution['primary'] ?? null, 'content_intent' => $intent, 'composition' => $this->withoutBody($composition), 'visual_opportunities' => $visualOpportunities, 'visual_support' => $diagnostics['visual_support'], 'capture_fingerprint' => $record->requestFingerprint, 'staging_acceptance' => is_array($input['staging_acceptance'] ?? null) ? $input['staging_acceptance'] : null];
+            $mediaContext = ['capture' => $record->toArray(), 'capture_record' => $record, 'article_id' => $record->articleId, 'assets' => $assets, 'media_bindings' => is_array($input['media_bindings'] ?? null) ? $input['media_bindings'] : [], 'article_media_bindings' => is_array($input['article_media_bindings'] ?? null) ? $input['article_media_bindings'] : [], 'media_operations' => is_array($input['media_operations'] ?? null) ? $input['media_operations'] : [], 'subject_resolution' => $resolution, 'subject_resolution_packet' => $resolution['primary'] ?? null, 'content_intent' => $intent, 'composition' => $this->withoutBody($composition), 'visual_opportunities' => $visualOpportunities, 'visual_support' => $diagnostics['visual_support'], 'capture_fingerprint' => $record->requestFingerprint, 'staging_acceptance' => is_array($input['staging_acceptance'] ?? null) ? $input['staging_acceptance'] : null];
             if (is_array($mediaContext['staging_acceptance']) && isset($mediaContext['staging_acceptance']['payload_fingerprint'])) $mediaContext['payload_fingerprint'] = $mediaContext['staging_acceptance']['payload_fingerprint'];
             if ($videoThumbnailFallback !== null) $mediaContext['video_thumbnail_fallback'] = $videoThumbnailFallback;
             $media = ($this->mediaReconcile)($mediaContext);
@@ -649,6 +684,44 @@ final class EditorialCaptureCoordinator
             if ($value !== '') return $key . ':' . $value;
         }
         return '';
+    }
+
+    private function hasDeferredArticleBindings(array $input): bool
+    {
+        foreach ((array) ($input['media_bindings'] ?? []) as $binding) {
+            if (!is_array($binding)) continue;
+            $target = is_array($binding['target'] ?? null) ? $binding['target'] : [];
+            $type = strtolower(trim((string) ($target['type'] ?? '')));
+            if (in_array($type, ['article', 'wp_post'], true) && trim((string) ($target['id'] ?? '')) === '' && trim((string) ($target['stable_key'] ?? '')) === '') return true;
+        }
+        return false;
+    }
+
+    /** @return array{0:array<string,mixed>,1:list<array<string,mixed>>} */
+    private function resolveDeferredArticleBindings(array $input, CaptureRecord $record): array
+    {
+        $blogId = function_exists('get_current_blog_id') ? (int) get_current_blog_id() : 1;
+        $endpointKey = max(1, $blogId) . ':' . (int) $record->articleId;
+        $resolved = [];
+        foreach ((array) ($input['media_bindings'] ?? []) as $binding) {
+            if (!is_array($binding)) continue;
+            $target = is_array($binding['target'] ?? null) ? $binding['target'] : [];
+            $type = strtolower(trim((string) ($target['type'] ?? '')));
+            if (in_array($type, ['article', 'wp_post'], true)) {
+                $target['type'] = 'wp_post';
+                $target['id'] = $endpointKey;
+                unset($target['stable_key']);
+                $binding['target'] = $target;
+            }
+            $resolved[] = $binding;
+        }
+        $input['article_media_bindings'] = array_values(array_filter($resolved, static function (array $binding): bool {
+            return strtolower(trim((string) (($binding['target']['type'] ?? '')))) === 'wp_post';
+        }));
+        $input['media_bindings'] = array_values(array_filter($resolved, static function (array $binding): bool {
+            return strtolower(trim((string) (($binding['target']['type'] ?? '')))) !== 'wp_post';
+        }));
+        return [$input, $resolved];
     }
 
     /** @return array<string,mixed> */

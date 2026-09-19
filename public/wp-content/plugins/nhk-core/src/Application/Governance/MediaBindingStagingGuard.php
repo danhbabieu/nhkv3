@@ -31,7 +31,11 @@ final class MediaBindingStagingGuard
         $mediaId = trim((string) (($request['media']['id'] ?? '')));
         $target = is_array($request['target'] ?? null) ? $request['target'] : [];
         $targetId = trim((string) ($target['id'] ?? ''));
-        if (!UuidCodec::isValid($mediaId) || !UuidCodec::isValid($targetId) || trim((string) ($target['type'] ?? '')) === '') throw new \RuntimeException('STAGING_EXACT_TARGET_REQUIRED');
+        $targetType = strtolower(trim((string) ($target['type'] ?? '')));
+        $exactTarget = $targetType === 'wp_post'
+            ? preg_match('/^[1-9][0-9]*:[1-9][0-9]*$/', $targetId) === 1
+            : UuidCodec::isValid($targetId);
+        if (!UuidCodec::isValid($mediaId) || !$exactTarget || $targetType === '') throw new \RuntimeException('STAGING_EXACT_TARGET_REQUIRED');
         $mediaIds = is_array($scope['media_ids'] ?? null) ? array_map('strval', $scope['media_ids']) : [];
         $scopedTarget = is_array($scope['target'] ?? null) ? $scope['target'] : [];
         if (!in_array($mediaId, $mediaIds, true)) throw new \RuntimeException('STAGING_MEDIA_SCOPE_MISMATCH');

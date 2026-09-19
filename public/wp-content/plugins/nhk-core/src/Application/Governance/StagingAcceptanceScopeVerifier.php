@@ -489,8 +489,13 @@ final class StagingAcceptanceScopeVerifier
             if ($source !== 'USER_EXPLICIT' || $policy !== 'PINNED') throw new \RuntimeException('STAGING_SCOPE_SELECTION_INVALID');
             $mediaId = $this->mediaId($binding, $assets);
             $target = is_array($binding['target'] ?? null) ? $binding['target'] : [];
-            if (!UuidCodec::isValid($mediaId) || !UuidCodec::isValid((string) ($target['id'] ?? '')) || trim((string) ($target['type'] ?? '')) === '') throw new \RuntimeException('STAGING_SCOPE_EXACT_REFERENCE_REQUIRED');
-            $entry = ['media_id' => $mediaId, 'target' => ['type' => strtolower(trim((string) $target['type'])), 'id' => (string) $target['id']], 'role' => 'representative', 'selection_source' => 'USER_EXPLICIT', 'selection_policy' => 'PINNED'];
+            $targetType = strtolower(trim((string) ($target['type'] ?? '')));
+            $targetId = trim((string) ($target['id'] ?? ''));
+            $exactTarget = $targetType === 'wp_post'
+                ? preg_match('/^[1-9][0-9]*:[1-9][0-9]*$/', $targetId) === 1
+                : UuidCodec::isValid($targetId);
+            if (!UuidCodec::isValid($mediaId) || !$exactTarget || $targetType === '') throw new \RuntimeException('STAGING_SCOPE_EXACT_REFERENCE_REQUIRED');
+            $entry = ['media_id' => $mediaId, 'target' => ['type' => $targetType, 'id' => $targetId], 'role' => 'representative', 'selection_source' => 'USER_EXPLICIT', 'selection_policy' => 'PINNED'];
             foreach (['stable_key', 'revision'] as $key) if (array_key_exists($key, $target)) $entry['target'][$key] = $key === 'revision' ? max(1, (int) $target[$key]) : trim((string) $target[$key]);
             $entry['binding_fingerprint'] = hash('sha256', CommandCanonicalizer::canonicalize($entry));
             $entries[] = $entry;

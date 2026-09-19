@@ -1032,6 +1032,30 @@ final class Plugin {
                         $mediaIds = array_values(array_unique($mediaIds));
                     }
                     $bindingResults = [];
+                    $articleBindings = is_array($context['article_media_bindings'] ?? null) ? $context['article_media_bindings'] : [];
+                    if ($articleBindings !== [] && is_array($context['staging_acceptance'] ?? null)) {
+                        foreach ($articleBindings as $binding) {
+                            if (!is_array($binding)) throw new \RuntimeException('STAGING_SCOPE_BINDING_INVALID');
+                            $mediaRef = is_array($binding['media_ref'] ?? null) ? $binding['media_ref'] : [];
+                            $mediaId = trim((string) ($mediaRef['media_id'] ?? ''));
+                            if ($mediaId === '' && isset($mediaRef['item_index'])) $mediaId = trim((string) (($assets[(int) $mediaRef['item_index']]['media_id'] ?? '')));
+                            $target = is_array($binding['target'] ?? null) ? $binding['target'] : [];
+                            $scopeRequest = [
+                                'capture_id' => (string) ($context['capture']['capture_id'] ?? ''),
+                                'capture_fingerprint' => (string) ($context['capture_fingerprint'] ?? ($context['capture']['request_fingerprint'] ?? '')),
+                                'payload_fingerprint' => (string) (($context['staging_acceptance']['payload_fingerprint'] ?? '')),
+                                'operation' => 'representative_bind',
+                                'media' => ['id' => $mediaId], 'target' => $target,
+                                // The staging packet authorizes the exact
+                                // Media/Article binding family; Article slot
+                                // roles are applied by ArticleMediaCoordinator.
+                                'role' => 'representative',
+                                'selection_source' => (string) ($binding['selection_source'] ?? 'USER_EXPLICIT'),
+                                'selection_policy' => (string) ($binding['selection_policy'] ?? 'PINNED'),
+                            ];
+                            if (!$stagingScopeVerifier->verifyBindingRequest((array) $context['staging_acceptance'], $scopeRequest)) throw new \RuntimeException('STAGING_SCOPE_NOT_APPROVED');
+                        }
+                    }
                     $typedBindings = is_array($context['media_bindings'] ?? null) ? $context['media_bindings'] : [];
                     if ($typedBindings !== []) {
                         $bindingContext = [
