@@ -201,6 +201,31 @@ final class EasyMcpNativeFileCompatibilityAdapterTest extends TestCase
         self::assertSame(['files'], $capture['_meta']['openai/fileParams']);
     }
 
+    public function test_tools_list_normalizes_empty_metadata_without_nhk_projection_target(): void
+    {
+        $request = new class {
+            public function get_route(): string { return '/easy-mcp-ai/v1/mcp'; }
+            public function get_json_params(): array { return ['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/list']; }
+        };
+        $response = new class {
+            /** @var array<string,mixed> */
+            private array $data = ['result' => ['tools' => [[
+                'name' => 'wp_ability_core_posts_list',
+                'inputSchema' => ['type' => 'object'],
+                '_meta' => [],
+            ]]]];
+
+            /** @return array<string,mixed> */
+            public function get_data(): array { return $this->data; }
+
+            /** @param array<string,mixed> $data */
+            public function set_data(array $data): void { $this->data = $data; }
+        };
+
+        $projected = EasyMcpNativeFileCompatibilityAdapter::projectToolsListDescriptor($response, null, $request);
+        self::assertArrayNotHasKey('_meta', $projected->get_data()['result']['tools'][0]);
+    }
+
     public function test_final_easy_mcp_descriptor_links_open_widget_to_registered_resource(): void
     {
         $request = new class {

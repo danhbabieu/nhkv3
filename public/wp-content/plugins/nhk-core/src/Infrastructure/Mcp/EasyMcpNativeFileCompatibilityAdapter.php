@@ -238,10 +238,9 @@ final class EasyMcpNativeFileCompatibilityAdapter
         if (!is_array($data)) return $data;
         $result = is_array($data['result'] ?? null) ? $data['result'] : [];
         if (!is_array($result['tools'] ?? null)) return $data;
-        if (!array_filter($result['tools'], static function (mixed $tool): bool {
-            if (!is_array($tool)) return false;
-            return in_array((string) ($tool['name'] ?? ''), [self::TARGET_TOOL, self::WIDGET_OPEN_TOOL], true);
-        })) return $data;
+        // Normalize the complete list, not only NHK descriptors that need
+        // schema projection. Easy MCP can emit `_meta: []` for any ability;
+        // one invalid entry makes strict clients reject the whole list.
         $data['result']['tools'] = self::projectTools($result['tools']);
         return $data;
     }

@@ -1,5 +1,23 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-19 — Easy MCP full tools-list normalization fixed locally (NO LIVE DEPLOY)
+
+ROOT_CAUSE_REFINED: The first empty `_meta` repair was gated on the presence
+of selected NHK projection targets. Easy MCP can emit `_meta: []` on any
+ability, so a list without those targets could still fail strict connector
+validation and expose no actions.
+
+FIXED_BOUNDARY: The Easy MCP `tools/list` projection now normalizes the full
+descriptor list, removing invalid empty/list/scalar metadata while preserving
+valid object metadata and the existing NHK schema projections. Added coverage
+for a list containing only an unrelated Core ability with `_meta: []`.
+
+VERIFICATION: PHP lint passed; adapter unit suite passed 25 tests / 84
+assertions with one existing deprecation; `git diff --check` passed. No live
+deployment, OAuth mutation, or staging/production data mutation performed.
+
+STATUS: `EASY_MCP_TOOLS_LIST_GLOBAL_EMPTY_META_FIXED_LOCAL / DEPLOYMENT_PENDING`.
+
 # Checkpoint — 2026-09-19 — Easy MCP empty `_meta` export fixed locally (NO LIVE DEPLOY)
 
 ROOT_CAUSE: The Easy MCP compatibility projection could preserve an absent
