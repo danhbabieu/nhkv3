@@ -61,6 +61,20 @@ final class OwnerPublicationApplicationServiceTest extends TestCase
         $replay = $service->request(1, $posts->rows[1]->token, ownerPublicationEvidence(), 'receipt-1', new PublicationPrincipal('owner-1', 'cli', 'publication-1'));
         self::assertSame('COMPLETED', $replay['publication_receipt']['outcome']);
     }
+
+    public function test_already_published_is_terminal_and_does_not_republish(): void
+    {
+        $posts = new OwnerPublicationFakeStore();
+        $posts->publish(1);
+        $service = new OwnerPublicationApplicationService($posts, new OwnerPublicationFakeDecisionRepository(), static fn (PublicationPrincipal $principal): bool => true);
+
+        $result = $service->request(1, str_repeat('0', 64), ownerPublicationEvidence(['media_usage_complete' => false]), 'already-published', new PublicationPrincipal('owner-1', 'mcp', 'turn-1'));
+
+        self::assertSame('PASS', $result['outcome']);
+        self::assertSame('already_published', $result['final_outcome']);
+        self::assertContains('ALREADY_PUBLISHED', $result['diagnostics']);
+        self::assertSame(1, $posts->publishCalls);
+    }
 }
 
 /** @param array<string,bool> $overrides @return array<string,mixed> */

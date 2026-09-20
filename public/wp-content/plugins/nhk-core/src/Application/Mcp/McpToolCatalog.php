@@ -163,6 +163,7 @@ final class McpToolCatalog
                     'additionalProperties' => false,
                 ]],
             ], ['idempotency_key', 'documentation_checkpoint'], true, ['openai/fileParams' => ['files']]),
+            self::tool('nhk.capture.get', 'Read one existing Capture by canonical UUID, including bounded subject, owner, Media, readiness and retry diagnostics without exposing request secrets.', ['id' => self::uuidField()], ['id']),
             self::tool('nhk.category.resolve', 'Resolve a native WordPress Category by ID, exact slug or exact name.', ['selector' => ['type' => 'object']], ['selector']),
             self::tool('nhk.category.create', 'Create or resolve one native WordPress Category idempotently.', ['name' => ['type' => 'string', 'minLength' => 1], 'slug' => ['type' => 'string'], 'parent' => ['type' => 'integer', 'minimum' => 0]], ['name'], true),
             self::tool('nhk.category.update', 'Update one native WordPress Category with optional state fingerprint CAS.', ['id' => ['type' => 'integer', 'minimum' => 1], 'changes' => ['type' => 'object'], 'expected_fingerprint' => ['type' => 'string', 'pattern' => '^[a-fA-F0-9]{64}$']], ['id', 'changes'], true),

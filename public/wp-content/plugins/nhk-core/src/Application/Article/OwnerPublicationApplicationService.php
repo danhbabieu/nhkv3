@@ -19,6 +19,7 @@ final class OwnerPublicationApplicationService implements OwnerPublicationServic
         if ($this->can !== null && !(bool) ($this->can)($principal)) return $this->blocked('PUBLICATION_AUTHORIZATION_FAILED');
         $state = $this->posts->read($postId);
         if ($state === null) return $this->blocked('WP_POST_UNAVAILABLE');
+        if ($state->status === 'publish') return $this->alreadyPublished($state);
         if (!hash_equals($expectedStateToken, $state->token)) return ['outcome' => ArticlePublicationOutcome::OWNER_REVIEW_REQUIRED->value, 'diagnostics' => ['EDITORIAL_CAS_REQUIRED'], 'policy_version' => PublicationDiagnosticRegistry::policyVersion(), 'blocker_fingerprint' => PublicationDiagnosticRegistry::fingerprint(['EDITORIAL_CAS_REQUIRED']), 'confirmation_question' => 'Bài đã thay đổi hoặc cần Owner review mới. Vẫn đăng không?'];
         $evidence = $this->canonicalEvidence($state, $evidence);
         if ($evidence === null) return $this->blocked('PUBLICATION_CONTEXT_UNAVAILABLE');
@@ -42,6 +43,7 @@ final class OwnerPublicationApplicationService implements OwnerPublicationServic
             return ['outcome' => ArticlePublicationOutcome::PASS->value, 'diagnostics' => $completed->diagnostics, 'policy_version' => $completed->policyVersion, 'blocker_fingerprint' => $completed->blockerFingerprint, 'final_outcome' => $completed->finalOutcome, 'decision_id' => $completed->decisionId, 'post' => $completed->readback, 'public_url' => $completed->readback['permalink'] ?? ''] + $this->receiptPayload($idempotencyKey);
         }
         $review = $this->review($postId, $expectedStateToken, $evidence, $idempotencyKey, $principal);
+        if (($review['final_outcome'] ?? '') === 'already_published') return $review;
         if (($review['outcome'] ?? null) !== ArticlePublicationOutcome::PASS->value) return $review;
         $state = $this->posts->read($postId);
         if ($state === null) return $this->blocked('WP_POST_UNAVAILABLE');
@@ -62,6 +64,7 @@ final class OwnerPublicationApplicationService implements OwnerPublicationServic
         $completed = $this->decisions->findByIdempotencyKey($idempotencyKey . ':completed');
         if ($completed !== null && $completed->finalOutcome !== '') return ['outcome' => ArticlePublicationOutcome::PASS->value, 'diagnostics' => $completed->diagnostics, 'policy_version' => $completed->policyVersion, 'blocker_fingerprint' => $completed->blockerFingerprint, 'final_outcome' => $completed->finalOutcome, 'decision_id' => $completed->decisionId, 'post' => $completed->readback, 'public_url' => $completed->readback['permalink'] ?? ''] + $this->receiptPayload($idempotencyKey . ':publish');
         $state = $this->posts->read($postId); if ($state === null) return $this->blocked('WP_POST_UNAVAILABLE');
+        if ($state->status === 'publish') return $this->alreadyPublished($state);
         if (!hash_equals($expectedStateToken, $state->token)) return ['outcome' => ArticlePublicationOutcome::OWNER_REVIEW_REQUIRED->value, 'diagnostics' => ['EDITORIAL_CAS_REQUIRED'], 'policy_version' => PublicationDiagnosticRegistry::policyVersion(), 'blocker_fingerprint' => PublicationDiagnosticRegistry::fingerprint(['EDITORIAL_CAS_REQUIRED']), 'confirmation_question' => 'Bài đã thay đổi hoặc cần Owner review mới. Vẫn đăng không?'];
         $evidence = $this->canonicalEvidence($state, $evidence);
         if ($evidence === null) return $this->blocked('PUBLICATION_CONTEXT_UNAVAILABLE');
@@ -111,6 +114,11 @@ final class OwnerPublicationApplicationService implements OwnerPublicationServic
         return $receipt === null ? [] : ['publication_receipt' => $receipt->toArray()];
     }
     private function blocked(string $code): array { return ['outcome' => ArticlePublicationOutcome::SYSTEM_BLOCKED->value, 'diagnostics' => [$code], 'root_cause' => $code, 'policy_version' => PublicationDiagnosticRegistry::policyVersion(), 'blocker_fingerprint' => PublicationDiagnosticRegistry::fingerprint([$code])]; }
+    /** @return array<string,mixed> */
+    private function alreadyPublished(EditorialPostState $state): array
+    {
+        return ['outcome' => ArticlePublicationOutcome::PASS->value, 'final_outcome' => 'already_published', 'diagnostics' => ['ALREADY_PUBLISHED'], 'warnings' => [], 'policy_version' => PublicationDiagnosticRegistry::policyVersion(), 'blocker_fingerprint' => PublicationDiagnosticRegistry::fingerprint([]), 'post' => $state->snapshot(), 'public_url' => $state->permalink];
+    }
     /** @return array<string,mixed>|null */
     private function canonicalEvidence(EditorialPostState $state, array $callerEvidence): ?array
     {

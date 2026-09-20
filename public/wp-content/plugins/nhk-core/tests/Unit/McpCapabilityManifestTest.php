@@ -14,6 +14,7 @@ final class McpCapabilityManifestTest extends TestCase
 
         self::assertArrayHasKey('article', $manifest);
         self::assertContains('nhk.capture.ingest', $manifest['editorial_capture']['writes']);
+        self::assertContains('nhk.capture.get', $manifest['editorial_capture']['reads']);
         self::assertTrue($manifest['editorial_capture']['media_support']);
         self::assertContains('nhk.media.update', $manifest['media']['writes']);
         self::assertTrue($manifest['media']['expected_revision']);

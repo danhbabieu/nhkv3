@@ -117,4 +117,28 @@ final class McpSemanticContextResolverTest extends TestCase
         self::assertSame('uuid_exact', $report['resolved']['variant']['match']);
         self::assertSame([], $report['missing']);
     }
+
+    public function test_malformed_and_unknown_canonical_locators_fail_closed_without_candidates(): void
+    {
+        $types = new EntityTypeRegistry();
+        CanonicalEntityTypeCatalog::registerInto($types);
+        $repository = new InMemoryAuthorityRepository();
+        $resolver = new McpSemanticContextResolver($repository, $types);
+
+        $malformed = $resolver->resolve([
+            'canonical_uuid' => 'not-a-uuid',
+            'exact' => ['entity_type' => 'variant', 'name' => 'Odo 36'],
+        ]);
+        self::assertSame('invalid_canonical_uuid', $malformed['conflicts']['variant']);
+        self::assertSame([], $malformed['resolved']);
+        self::assertSame([], $malformed['candidates']);
+
+        $unknown = $resolver->resolve([
+            'stable_key' => 'nhk:variant:does-not-exist',
+            'exact' => ['entity_type' => 'variant', 'name' => 'Unknown variant'],
+        ]);
+        self::assertSame([], $unknown['resolved']);
+        self::assertSame([], $unknown['candidates']);
+        self::assertContains('variant', $unknown['missing']);
+    }
 }

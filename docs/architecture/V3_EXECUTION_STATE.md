@@ -1,5 +1,46 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-21 — Capture observability / publication terminal semantics / baseline closure (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE: The existing Capture workflow exposed continuation read-backs but
+had no bounded canonical read-only MCP projection for one existing Capture.
+Article publication also re-entered the draft gate for an already-published
+post, so a retry with a stale token could report `EDITORIAL_POST_NOT_DRAFT`
+instead of the terminal verified outcome. The local semantic resolver and
+Capture convergence fixes required a deployable MCP registration and a
+connector parity check, not a second ad-hoc operation surface.
+
+FIXED_BOUNDARY: Added `nhk.capture.get` as a read-only catalog, transport,
+WordPress ability, capability-manifest and composition-root operation. Its
+projection is bounded to canonical Capture identity, typed subject packet,
+Article/Video/Media ownership, bindings, readiness, blockers, publication and
+retry diagnostics; idempotency keys, request fingerprints and raw input are
+never returned. Both MCP read-handler construction paths receive the Capture
+repository. Owner publication now returns `PASS` / `already_published` with
+canonical post read-back and performs no republish, CAS mutation or timestamp
+mutation. Semantic resolver tests now cover malformed and unknown canonical
+locators in addition to UUID, stable-key, exact-name/alias and ambiguity.
+
+BASELINE_PROOF: A clean shared clone at
+`1e8c8583643a53341d97996f352c3bbb9915a877` reproduced exactly 10 failures:
+the 9 named `ArticleMediaPolicyTest` suitability/scope/reconciliation
+fixtures and `CaptureArticlePreflightHandoffTest::test_current_target_scoped_article_media_readback_beats_stale_capture_media_plan`.
+The current full Unit run is 2,016 tests / 9,901 assertions with exactly the
+same 10 failure names and assertions; therefore all remaining failures are
+`PRE_EXISTING_BASELINE`, not regressions from this checkpoint.
+
+VERIFICATION: Focused MCP/manifest/semantic/publication suites pass 57 tests /
+801 assertions. Capture/Video/provenance/publication/completion/media suites
+run 102 tests / 393 assertions with exactly the proven 10 baseline failures.
+Full Unit is baseline-equivalent. PHP lint passes for all changed PHP files.
+`nhk.capture.get` local catalog/ability/transport parity passes; live deployed
+connector parity remains `LIVE_PARITY_PENDING_DEPLOYMENT` because no deploy or
+live connector mutation is authorized in this checkpoint. No staging,
+production, semantic, MediaUsage, Graph, Article, Video, deployment or push
+mutation was performed.
+
+STATUS: `CAPTURE_READBACK_AND_ALREADY_PUBLISHED_FIXED_LOCAL / FULL_UNIT_BASELINE_RED_EQUIVALENT / LIVE_PARITY_PENDING_DEPLOYMENT / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-21 — Shared canonical locator / Capture Media handoff / completion read-back (LOCAL / NO LIVE MUTATION)
 
 ROOT_CAUSE: `nhk.semantic.resolve` exposed a structured canonical locator

@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Mcp;
 
 use NHK\Core\Contracts\Authority\AuthorityRepository;
+use NHK\Core\Contracts\Capture\CaptureRepository;
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
 use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaBindingOperationRepository, MediaRepository, MediaUsageRepository};
 use NHK\Core\Contracts\Video\VideoRepository;
@@ -43,6 +44,7 @@ final class McpReadHandler
         private ?GraphInventoryService $graphInventory = null,
         private ?RelationBackfillService $relationBackfill = null,
         private ?MediaBindingOperationRepository $mediaBindingOperations = null,
+        private ?CaptureRepository $captures = null,
     ) { $this->delivery ??= PublicMediaAssetDelivery::fromEnvironment($assets, $media); }
 
     public function entityGet(string $type, string $id): ?array
@@ -60,6 +62,57 @@ final class McpReadHandler
         $assets = array_values(array_filter($this->assets->listByMediaId($id), fn (MediaAsset $asset): bool => $asset->visibility === 'PUBLIC' && ($this->delivery === null || $this->delivery->resolve($asset->assetId) !== null)));
         $usages = array_values(array_filter($this->usages->listByMediaId($id), static fn (MediaUsage $usage): bool => $usage->activeSlot !== 'retired'));
         return ['id' => $media->canonicalId, 'stable_key' => $media->stableKey, 'name' => $media->canonicalName, 'assets' => array_map($this->publicAsset(...), $assets), 'usages' => array_map($this->publicUsage(...), $usages)];
+    }
+
+    /** Read-only operator projection of one Capture; request secrets remain private. */
+    public function captureGet(string $id): ?array
+    {
+        if ($this->captures === null || !UuidCodec::isValid($id)) return null;
+        $capture = $this->captures->findById($id);
+        if ($capture === null) return null;
+        $context = $capture->context;
+        $diagnostics = $capture->diagnostics;
+        $packet = is_array($context['subject_resolution_packet'] ?? null)
+            ? $context['subject_resolution_packet']
+            : (is_array($diagnostics['subject_resolution_packet'] ?? null) ? $diagnostics['subject_resolution_packet'] : null);
+        $completion = is_array($diagnostics['completion'] ?? null) ? $diagnostics['completion'] : [];
+        $children = array_values(array_filter((array) ($completion['children'] ?? []), 'is_array'));
+        $owners = array_values(array_map(static fn (array $child): array => [
+            'owner_type' => (string) ($child['owner_type'] ?? ''),
+            'owner_id' => (string) ($child['owner_id'] ?? ''),
+            'status' => (string) ($child['status'] ?? (($child['complete'] ?? false) === true ? 'COMPLETE' : 'INCOMPLETE')),
+        ], $children));
+        $media = [];
+        foreach ($capture->assets as $asset) {
+            if (!is_array($asset)) continue;
+            $mediaId = trim((string) ($asset['media_id'] ?? ''));
+            if ($mediaId !== '') $media[$mediaId] = ['media_id' => $mediaId, 'attachment_id' => (int) ($asset['attachment_id'] ?? 0), 'status' => (string) ($asset['attachment_readback_status'] ?? '')];
+        }
+        $videos = [];
+        foreach ($capture->assets as $asset) {
+            if (!is_array($asset) || ($asset['kind'] ?? '') !== 'video') continue;
+            $videoId = trim((string) ($asset['video_id'] ?? $asset['canonical_id'] ?? $asset['video_proposal']['payload']['canonical_id'] ?? ''));
+            if ($videoId !== '') $videos[] = ['id' => $videoId, 'status' => (string) ($asset['status'] ?? '')];
+        }
+        return [
+            'capture_id' => $capture->captureId,
+            'purpose' => (string) ($context['purpose'] ?? 'EDITORIAL'),
+            'intent' => is_array($context['content_intent'] ?? null) ? $context['content_intent'] : null,
+            'revision' => $capture->revision, 'stage' => $capture->stage, 'status' => $capture->status,
+            'subject_resolution_packet' => $packet,
+            'article' => $capture->articleId === null ? null : ['post_id' => $capture->articleId, 'state' => (string) ($diagnostics['publication']['status'] ?? '')],
+            'video' => array_values(array_unique($videos, SORT_REGULAR)), 'media' => array_values($media),
+            'media_bindings' => is_array($context['media_bindings'] ?? null) ? array_values(array_map(static fn (mixed $binding): array => is_array($binding) ? [
+                'target' => $binding['target'] ?? null, 'role' => $binding['role'] ?? null, 'selection_source' => $binding['selection_source'] ?? null, 'selection_policy' => $binding['selection_policy'] ?? null,
+            ] : [], $context['media_bindings'])) : [],
+            'owners' => $owners,
+            'blockers' => array_values(array_map('strval', (array) ($completion['blockers'] ?? $diagnostics['blockers'] ?? []))),
+            'warnings' => array_values(array_map('strval', (array) ($diagnostics['publication']['warnings'] ?? $diagnostics['warnings'] ?? []))),
+            'required_owners' => $completion['required_owners'] ?? [], 'missing_required_owners' => $completion['missing_required_owners'] ?? [],
+            'publication' => is_array($diagnostics['publication'] ?? null) ? ['eligible' => ($diagnostics['publication']['eligible'] ?? false) === true, 'status' => (string) ($diagnostics['publication']['status'] ?? ''), 'blockers' => array_values(array_map('strval', (array) ($diagnostics['publication']['blockers'] ?? [])))] : null,
+            'enrichment' => ['complete' => ($completion['complete'] ?? false) === true, 'deep_enrichment' => $diagnostics['deep_enrichment']['status'] ?? null, 'missing' => $completion['missing_required_owners'] ?? []],
+            'retry' => ['eligible' => !in_array($capture->status, ['COMPLETE', 'PUBLISHED'], true), 'capture_id' => $capture->captureId],
+        ];
     }
 
     public function mediaAttachmentGet(int $attachmentId): ?array

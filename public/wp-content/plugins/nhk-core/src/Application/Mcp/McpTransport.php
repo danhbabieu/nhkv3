@@ -181,6 +181,7 @@ final class McpTransport
             'nhk.relation.backfill.dry_run' => $this->read->relationBackfillDryRun((array) ($arguments['records'] ?? [])),
             'nhk.relation.backfill.apply' => $this->governance->relationBatchApply((array) ($arguments['candidates'] ?? []), (bool) ($arguments['approval_confirmed'] ?? false)),
             'nhk.semantic.resolve' => $this->read->semanticResolve((array) ($arguments['context'] ?? [])),
+            'nhk.capture.get' => $this->read->captureGet((string) ($arguments['id'] ?? '')),
             'nhk.entity.neighborhood' => $this->read->entityNeighborhood((string) ($arguments['type'] ?? ''), (string) ($arguments['id'] ?? ''), (string) ($arguments['profile'] ?? ''), (int) ($arguments['max_hops'] ?? 2), (int) ($arguments['limit'] ?? 50)),
             'nhk.article.preflight' => $this->article?->preflight($arguments) ?? throw new \RuntimeException('ARTICLE_INGEST_HANDLER_UNAVAILABLE'),
             'nhk.article.ingest' => $this->article?->ingest($arguments) ?? throw new \RuntimeException('ARTICLE_INGEST_HANDLER_UNAVAILABLE'),
