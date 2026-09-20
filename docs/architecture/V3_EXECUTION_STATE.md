@@ -1,5 +1,43 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-21 — Shared canonical locator / Capture Media handoff / completion read-back (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE: `nhk.semantic.resolve` exposed a structured canonical locator
+payload but the application resolver only consumed the legacy typed map, so
+`canonical_uuid`, `stable_key`, `exact`, `subject_hints` and `subjects[]` were
+treated as unknown entity types. Capture Article Media reconciliation likewise
+constructed selections from physical `assets[]` only; persisted explicit
+`media_bindings[]` could be lost before slot planning and stale Article Media
+could remain the effective candidate. Capture aggregation also treated an
+asserted `canonical_state=COMPLETE` as sufficient without a Capture
+canonical read-back.
+
+FIXED_BOUNDARY: The semantic resolver now normalizes both registered input
+shapes while keeping hints locator-only and preserving exact UUID priority.
+The Capture Article Media adapter rehydrates a valid typed subject packet,
+imports exact Article-targeted explicit bindings from current or persisted
+Capture context, marks those Media IDs as current Capture-owned and prevents
+asset-position or historical editorial state from overwriting explicit slot
+selection. `CompletionCoordinator::aggregateCapture()` now requires a
+canonical read-back and emits `CANONICAL_READBACK_UNVERIFIED`/`BLOCKED` when it
+is absent; normal Article and non-Article Capture final-readback paths provide
+the Capture read-back evidence explicitly.
+
+REGRESSION: Added canonical structured `semantic.resolve` coverage and
+Capture completion read-back coverage; updated convergence expectations so a
+Capture with a failed child and no Capture read-back is `BLOCKED`, never
+`COMPLETE` or an optimistic `PARTIAL`. No semantic records, MediaUsage rows,
+Graph edges, Articles, Videos, staging or production data were mutated.
+
+VERIFICATION: Focused Capture/semantic/completion suites pass 47 tests / 190
+assertions. Full Unit suite runs 2,013 tests / 9,872 assertions but remains
+red on 9 pre-existing `ArticleMediaPolicyTest` suitability/scope fixtures and
+1 pre-existing `CaptureArticlePreflightHandoffTest` expectation; changed-file
+PHP lint and `git diff --check` pass. No deployment, live retry or push was
+performed.
+
+STATUS: `SHARED_CONVERGENCE_BOUNDARIES_FIXED_LOCAL / FULL_UNIT_BASELINE_RED / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-21 — Shared Capture subject packet / Video provenance separation (LOCAL / NO LIVE MUTATION)
 
 ROOT_CAUSE: The Capture-owned `SubjectResolutionPacket` was persisted before

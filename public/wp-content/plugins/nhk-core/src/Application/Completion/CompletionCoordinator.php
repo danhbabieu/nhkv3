@@ -143,7 +143,9 @@ final class CompletionCoordinator
             return true;
         }));
         if ($missingRequiredOwners !== []) $blockers[] = 'REQUIRED_OWNER_READBACK_UNVERIFIED';
-        $canonical = ($evidence['canonical_state'] ?? null) === 'BLOCKED' ? 'BLOCKED' : 'COMPLETE';
+        $canonicalReadbackVerified = $this->readBack($evidence['canonical_readback'] ?? null);
+        $canonical = ($evidence['canonical_state'] ?? null) === 'BLOCKED' || !$canonicalReadbackVerified ? 'BLOCKED' : 'COMPLETE';
+        if (!$canonicalReadbackVerified) $blockers[] = 'CANONICAL_READBACK_UNVERIFIED';
         $complete = $canonical === 'COMPLETE' && $packets !== [] && $blockers === [] && array_reduce($packets, static fn (bool $ok, array $packet): bool => $ok && ($packet['complete'] ?? false) === true, true);
         $resumeChildren = [];
         foreach ($missingRequiredOwners as $required) $resumeChildren[] = $this->resumeChild($required['owner_type']);
@@ -156,6 +158,7 @@ final class CompletionCoordinator
             'owner_type' => 'capture',
             'owner_id' => trim($captureId),
             'canonical_state' => $canonical,
+            'canonical_readback_verified' => $canonicalReadbackVerified,
             'required_owners' => $requiredOwners,
             'missing_required_owners' => $missingRequiredOwners,
             'dependency_state' => $complete ? 'COMPLETE' : 'PARTIAL',

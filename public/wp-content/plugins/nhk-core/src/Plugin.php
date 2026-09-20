@@ -1270,23 +1270,49 @@ final class Plugin {
                         ];
                     }
                     $resolution = is_array($context['subject_resolution'] ?? null) ? $context['subject_resolution'] : [];
+                    $packet = is_array($context['subject_resolution_packet'] ?? null) ? $context['subject_resolution_packet'] : [];
+                    $packetId = trim((string) ($packet['canonical_subject_id'] ?? $packet['id'] ?? ''));
+                    $packetType = trim((string) ($packet['entity_type'] ?? $packet['type'] ?? ''));
+                    $packetName = trim((string) ($packet['canonical_name'] ?? $packet['name'] ?? ''));
                     $primary = is_array($resolution['primary'] ?? null) ? $resolution['primary'] : null;
+                    if ($packetId !== '' && $packetType !== '') {
+                        $primary = ['id' => $packetId, 'type' => $packetType, 'name' => $packetName, 'stable_key' => (string) ($packet['stable_key'] ?? ''), 'revision' => (int) ($packet['revision'] ?? 1)];
+                        $resolution['status'] = 'resolved';
+                        $resolution['primary'] = $primary;
+                    }
                     $mediaSubjectIds = $primary !== null && trim((string) ($primary['id'] ?? '')) !== '' && ($resolution['status'] ?? '') === 'resolved' ? [trim((string) $primary['id'])] : [];
                     $subject = (string) ($primary['name'] ?? '');
                     $selected = [];
+                    $captureBindings = is_array($context['media_bindings'] ?? null) ? $context['media_bindings'] : (is_array($context['capture']['context']['media_bindings'] ?? null) ? $context['capture']['context']['media_bindings'] : []);
+                    $captureBindingMediaIds = [];
+                    foreach ($captureBindings as $binding) {
+                        if (!is_array($binding)) continue;
+                        $target = is_array($binding['target'] ?? null) ? $binding['target'] : [];
+                        if (strtolower(trim((string) ($target['type'] ?? ''))) !== 'wp_post') continue;
+                        $mediaRef = is_array($binding['media_ref'] ?? null) ? $binding['media_ref'] : [];
+                        $bindingMediaId = trim((string) ($mediaRef['media_id'] ?? $mediaRef['id'] ?? ''));
+                        if ($bindingMediaId === '' && isset($mediaRef['item_index'])) $bindingMediaId = trim((string) (($assets[(int) $mediaRef['item_index']]['media_id'] ?? '')));
+                        if ($bindingMediaId === '') continue;
+                        $captureBindingMediaIds[] = $bindingMediaId;
+                        $role = strtolower(trim((string) ($binding['role'] ?? '')));
+                        if (!in_array($role, ['featured_primary', 'inline_primary'], true)) continue;
+                        $seo = is_array($binding['seo'] ?? null) ? $binding['seo'] : [];
+                        $selected[$role] = ['media_id' => $bindingMediaId, 'title' => (string) ($seo['title'] ?? ''), 'alt_text' => (string) ($seo['alt_text'] ?? ''), 'caption' => (string) ($seo['caption'] ?? ''), 'sort_order' => (int) ($binding['sort_order'] ?? 0)];
+                    }
+                    $mediaIds = array_values(array_unique(array_merge($mediaIds, $captureBindingMediaIds)));
                     $captureMediaSelection = static function (array $asset): array {
                         $mediaContext = is_array($asset['media_context'] ?? null) ? $asset['media_context'] : [];
                         return ['media_id' => (string) ($asset['media_id'] ?? ''), 'title' => (string) ($mediaContext['title'] ?? ''), 'alt_text' => (string) ($mediaContext['alt_text'] ?? ''), 'caption' => (string) ($mediaContext['caption'] ?? ''), 'sort_order' => (int) ($asset['sort_order'] ?? 0)];
                     };
-                    if (isset($assets[0]) && is_array($assets[0])) {
+                    if (isset($assets[0]) && is_array($assets[0]) && !isset($selected['featured_primary'])) {
                         $selected['featured_primary'] = $captureMediaSelection($assets[0]);
                         // A single Capture image is the current publication
                         // plan for both mandatory editorial slots. Sharing one
                         // canonical Media identity is allowed and avoids
                         // replaying an older inline image from the Post.
-                        if (!isset($mediaIds[1])) $selected['inline_primary'] = $captureMediaSelection($assets[0]);
+                        if (!isset($mediaIds[1]) && !isset($selected['inline_primary'])) $selected['inline_primary'] = $captureMediaSelection($assets[0]);
                     }
-                    if (isset($assets[1]) && is_array($assets[1])) $selected['inline_primary'] = $captureMediaSelection($assets[1]);
+                    if (isset($assets[1]) && is_array($assets[1]) && !isset($selected['inline_primary'])) $selected['inline_primary'] = $captureMediaSelection($assets[1]);
                     $supportingMedia = [];
                     foreach (array_slice($assets, 2) as $index => $asset) {
                         if (!is_array($asset) || trim((string) ($asset['media_id'] ?? '')) === '') continue;

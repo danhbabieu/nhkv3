@@ -121,9 +121,10 @@ final class CompletionConvergenceTest extends TestCase
             ['owner_type' => 'video', 'owner_id' => 'video-1', 'canonical_readback' => ['canonical_id' => 'video-1'], 'blockers' => ['VIDEO_FRONTEND_READBACK_FAILED']],
         ]);
 
-        self::assertSame('PARTIAL', $packet['status']);
+        self::assertSame('BLOCKED', $packet['status']);
         self::assertFalse($packet['complete']);
         self::assertContains('VIDEO_FRONTEND_READBACK_FAILED', $packet['blockers']);
+        self::assertContains('CANONICAL_READBACK_UNVERIFIED', $packet['blockers']);
         self::assertCount(3, $packet['children']);
     }
 
@@ -178,6 +179,17 @@ final class CompletionConvergenceTest extends TestCase
         self::assertSame([['owner_type' => 'video', 'owner_id' => '']], $packet['missing_required_owners']);
         self::assertContains('REQUIRED_OWNER_READBACK_UNVERIFIED', $packet['blockers']);
         self::assertContains('video', $packet['resume_hints']['resume_children']);
+    }
+
+    public function test_capture_cannot_be_complete_without_capture_canonical_readback(): void
+    {
+        $packet = (new CompletionCoordinator())->aggregateCapture('capture-1', [
+            ['owner_type' => 'knowledge', 'owner_id' => 'claim-1', 'canonical_readback' => ['canonical_id' => 'claim-1']],
+        ]);
+
+        self::assertFalse($packet['complete']);
+        self::assertSame('BLOCKED', $packet['canonical_state']);
+        self::assertContains('CANONICAL_READBACK_UNVERIFIED', $packet['blockers']);
     }
 
     public function test_empty_required_owner_id_never_matches_a_verified_child(): void

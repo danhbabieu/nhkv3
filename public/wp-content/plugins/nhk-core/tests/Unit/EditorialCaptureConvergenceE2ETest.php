@@ -118,8 +118,9 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
         $completion = $result->diagnostics['completion'];
         $videoChild = array_values(array_filter($completion['children'], static fn (array $child): bool => ($child['owner_type'] ?? '') === 'video'))[0] ?? [];
         self::assertSame('FAILED_RETRYABLE', $result->status);
-        self::assertSame('PARTIAL', $completion['status']);
+        self::assertSame('BLOCKED', $completion['status']);
         self::assertFalse($completion['complete']);
+        self::assertContains('CANONICAL_READBACK_UNVERIFIED', $completion['blockers']);
         self::assertTrue($videoChild['complete']);
         self::assertContains('article', $completion['resume_hints']['resume_children']);
         self::assertSame('video-pr5-1', $videoChild['owner_id']);

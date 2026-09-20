@@ -96,4 +96,25 @@ final class McpSemanticContextResolverTest extends TestCase
         self::assertSame(2, $report['resolved']['variant']['revision']);
         self::assertSame('exact_name_or_alias', $report['resolved']['variant']['match']);
     }
+
+    public function test_canonical_locator_packet_is_normalized_before_typed_resolution(): void
+    {
+        $types = new EntityTypeRegistry();
+        CanonicalEntityTypeCatalog::registerInto($types);
+        $repository = new InMemoryAuthorityRepository();
+        $variant = new AuthorityEntity('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'variant', 'nhk:model:odo.36', 'Odo 36', 3, []);
+        $repository->create($variant);
+
+        $report = (new McpSemanticContextResolver($repository, $types))->resolve([
+            'canonical_uuid' => $variant->canonicalId,
+            'stable_key' => $variant->stableKey,
+            'exact' => ['name' => 'Odo 36', 'entity_type' => 'variant'],
+            'subject_hints' => ['Odo 36'],
+            'subjects' => [['entity_type' => 'variant', 'name' => 'Odo 36']],
+        ]);
+
+        self::assertSame($variant->canonicalId, $report['resolved']['variant']['id']);
+        self::assertSame('uuid_exact', $report['resolved']['variant']['match']);
+        self::assertSame([], $report['missing']);
+    }
 }

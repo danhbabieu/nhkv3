@@ -601,6 +601,7 @@ final class EditorialCaptureCoordinator
             $children = $this->completionChildren($record, $writes, $media, $videoPublication, $publication, $final, $published);
             $completion = $this->completion->aggregateCapture($record->captureId, $children, [
                 'canonical_state' => 'COMPLETE',
+                'canonical_readback' => ['canonical_id' => $record->captureId],
                 'required_owners' => $this->requiredOwners($intent, $record, $assets, $media, $videoPublication, $writes),
             ]);
             $diagnostics['completion'] = $completion;
@@ -794,6 +795,7 @@ final class EditorialCaptureCoordinator
 
         $completion = $this->completion->aggregateCapture($record->captureId, $this->completionChildren($record, $writes, $media, $videoPublication, [], $final, false), [
             'canonical_state' => 'COMPLETE',
+            'canonical_readback' => ['canonical_id' => $record->captureId],
             'required_owners' => $this->requiredOwners($intent, $record, $assets, $media, $videoPublication, $writes),
         ]);
         $diagnostics['completion'] = $completion;

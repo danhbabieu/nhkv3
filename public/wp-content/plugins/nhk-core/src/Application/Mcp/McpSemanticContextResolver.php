@@ -21,6 +21,7 @@ final class McpSemanticContextResolver
     /** @param array<string,mixed> $context */
     public function resolve(array $context): array
     {
+        $context = $this->normalizeRequest($context);
         $resolved = [];
         $candidates = [];
         $ambiguities = [];
@@ -36,6 +37,49 @@ final class McpSemanticContextResolver
             else $missing[] = (string) $type;
         }
         return ['resolved' => $resolved, 'candidates' => $candidates, 'ambiguities' => $ambiguities, 'missing' => array_values(array_unique($missing)), 'conflicts' => $conflicts, 'relations' => []];
+    }
+
+    /**
+     * Accept both the canonical structured request and the older typed map.
+     * The transport contract describes the former as one locator packet; the
+     * application resolver consumes the latter internally.
+     *
+     * @param array<string,mixed> $context
+     * @return array<string,array<string,mixed>>
+     */
+    private function normalizeRequest(array $context): array
+    {
+        $hasCanonicalFields = array_key_exists('canonical_uuid', $context)
+            || array_key_exists('stable_key', $context)
+            || array_key_exists('exact', $context)
+            || array_key_exists('subject_hints', $context)
+            || array_key_exists('subjects', $context);
+        if (!$hasCanonicalFields) return $context;
+
+        $normalized = [];
+        $subjects = is_array($context['subjects'] ?? null) ? $context['subjects'] : [];
+        foreach ($subjects as $subject) {
+            if (!is_array($subject)) continue;
+            $type = trim((string) ($subject['entity_type'] ?? $subject['type'] ?? ''));
+            if ($type === '') continue;
+            $normalized[$type] = array_replace($normalized[$type] ?? [], $subject);
+        }
+
+        $exact = is_array($context['exact'] ?? null) ? $context['exact'] : [];
+        $type = trim((string) ($exact['entity_type'] ?? $context['entity_type'] ?? ''));
+        if ($type !== '') {
+            $normalized[$type] = array_replace($normalized[$type] ?? [], [
+                'canonical_uuid' => $context['canonical_uuid'] ?? null,
+                'stable_key' => $context['stable_key'] ?? null,
+                'name' => $exact['name'] ?? ($context['name'] ?? null),
+            ], $exact);
+        }
+
+        // Hints are locators only. They may assist an explicitly typed query,
+        // but cannot invent an entity type or candidate on their own.
+        $hints = array_values(array_filter(array_map('strval', (array) ($context['subject_hints'] ?? [])), static fn (string $hint): bool => trim($hint) !== ''));
+        if ($type !== '' && $hints !== []) $normalized[$type]['subject_hints'] = $hints;
+        return $normalized;
     }
 
     /** @param array<string,mixed> $query */
