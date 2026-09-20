@@ -11,8 +11,8 @@ use NHK\Core\Shared\Uuid\UuidCodec;
 
 final class OwnerPublicationApplicationService implements OwnerPublicationService
 {
-    /** @param callable|null $can @param callable|null $clock */
-    public function __construct(private EditorialPostStore $posts, private OwnerPublicationDecisionRepository $decisions, private $can = null, private $clock = null, private ?ArticleOperationReceiptRepository $receipts = null) {}
+    /** @param callable|null $can @param callable|null $clock @param callable|null $canonicalContext */
+    public function __construct(private EditorialPostStore $posts, private OwnerPublicationDecisionRepository $decisions, private $can = null, private $clock = null, private ?ArticleOperationReceiptRepository $receipts = null, private $canonicalContext = null) {}
 
     public function review(int $postId, string $expectedStateToken, array $evidence, string $idempotencyKey, PublicationPrincipal $principal): array
     {
@@ -20,6 +20,8 @@ final class OwnerPublicationApplicationService implements OwnerPublicationServic
         $state = $this->posts->read($postId);
         if ($state === null) return $this->blocked('WP_POST_UNAVAILABLE');
         if (!hash_equals($expectedStateToken, $state->token)) return ['outcome' => ArticlePublicationOutcome::OWNER_REVIEW_REQUIRED->value, 'diagnostics' => ['EDITORIAL_CAS_REQUIRED'], 'policy_version' => PublicationDiagnosticRegistry::policyVersion(), 'blocker_fingerprint' => PublicationDiagnosticRegistry::fingerprint(['EDITORIAL_CAS_REQUIRED']), 'confirmation_question' => 'Bài đã thay đổi hoặc cần Owner review mới. Vẫn đăng không?'];
+        $evidence = $this->canonicalEvidence($state, $evidence);
+        if ($evidence === null) return $this->blocked('PUBLICATION_CONTEXT_UNAVAILABLE');
         $gate = (new ArticlePublicationGate())->check($state, $evidence, $expectedStateToken);
         $base = ['outcome' => $gate->outcome()->value, 'diagnostics' => $gate->blockers, 'warnings' => $gate->warnings, 'policy_version' => PublicationDiagnosticRegistry::policyVersion(), 'blocker_fingerprint' => $gate->blockerFingerprint()];
         if ($gate->outcome() === ArticlePublicationOutcome::SYSTEM_BLOCKED) return $base + ['root_cause' => $gate->blockers[0] ?? 'SYSTEM_BLOCKED'];
@@ -61,6 +63,8 @@ final class OwnerPublicationApplicationService implements OwnerPublicationServic
         if ($completed !== null && $completed->finalOutcome !== '') return ['outcome' => ArticlePublicationOutcome::PASS->value, 'diagnostics' => $completed->diagnostics, 'policy_version' => $completed->policyVersion, 'blocker_fingerprint' => $completed->blockerFingerprint, 'final_outcome' => $completed->finalOutcome, 'decision_id' => $completed->decisionId, 'post' => $completed->readback, 'public_url' => $completed->readback['permalink'] ?? ''] + $this->receiptPayload($idempotencyKey . ':publish');
         $state = $this->posts->read($postId); if ($state === null) return $this->blocked('WP_POST_UNAVAILABLE');
         if (!hash_equals($expectedStateToken, $state->token)) return ['outcome' => ArticlePublicationOutcome::OWNER_REVIEW_REQUIRED->value, 'diagnostics' => ['EDITORIAL_CAS_REQUIRED'], 'policy_version' => PublicationDiagnosticRegistry::policyVersion(), 'blocker_fingerprint' => PublicationDiagnosticRegistry::fingerprint(['EDITORIAL_CAS_REQUIRED']), 'confirmation_question' => 'Bài đã thay đổi hoặc cần Owner review mới. Vẫn đăng không?'];
+        $evidence = $this->canonicalEvidence($state, $evidence);
+        if ($evidence === null) return $this->blocked('PUBLICATION_CONTEXT_UNAVAILABLE');
         $gate = (new ArticlePublicationGate())->check($state, $evidence, $expectedStateToken);
         if ($gate->outcome() !== ArticlePublicationOutcome::OWNER_REVIEW_REQUIRED) return ['outcome' => $gate->outcome()->value, 'diagnostics' => $gate->blockers, 'warnings' => $gate->warnings, 'policy_version' => PublicationDiagnosticRegistry::policyVersion(), 'blocker_fingerprint' => $gate->blockerFingerprint()];
         $decision = $this->decisions->findByIdempotencyKey($idempotencyKey . ':review');
@@ -107,5 +111,16 @@ final class OwnerPublicationApplicationService implements OwnerPublicationServic
         return $receipt === null ? [] : ['publication_receipt' => $receipt->toArray()];
     }
     private function blocked(string $code): array { return ['outcome' => ArticlePublicationOutcome::SYSTEM_BLOCKED->value, 'diagnostics' => [$code], 'root_cause' => $code, 'policy_version' => PublicationDiagnosticRegistry::policyVersion(), 'blocker_fingerprint' => PublicationDiagnosticRegistry::fingerprint([$code])]; }
+    /** @return array<string,mixed>|null */
+    private function canonicalEvidence(EditorialPostState $state, array $callerEvidence): ?array
+    {
+        if ($this->canonicalContext === null) return $callerEvidence;
+        try {
+            $canonical = ($this->canonicalContext)($state, $callerEvidence);
+        } catch (\Throwable) {
+            return null;
+        }
+        return is_array($canonical) ? $canonical : null;
+    }
     private function now(): DateTimeImmutable { return $this->clock ? ($this->clock)() : new DateTimeImmutable('now', new \DateTimeZone('UTC')); }
 }

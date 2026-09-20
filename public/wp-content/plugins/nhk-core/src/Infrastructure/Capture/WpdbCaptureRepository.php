@@ -24,6 +24,16 @@ final class WpdbCaptureRepository implements CaptureRepository
         return is_array($row) ? $this->hydrate($row) : null;
     }
 
+    public function findByArticleId(int $articleId): ?CaptureRecord
+    {
+        if ($articleId < 1) return null;
+        $row = $this->wpdb->get_row($this->wpdb->prepare(
+            'SELECT * FROM ' . $this->table() . ' WHERE wp_post_id=%d ORDER BY revision DESC, updated_at DESC LIMIT 1',
+            $articleId,
+        ), ARRAY_A);
+        return is_array($row) ? $this->hydrate($row) : null;
+    }
+
     public function create(CaptureRecord $record): CaptureRecord
     {
         $now = $record->createdAt ?? gmdate('Y-m-d H:i:s.u');

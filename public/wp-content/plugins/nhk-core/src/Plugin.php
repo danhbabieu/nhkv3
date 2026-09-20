@@ -769,7 +769,42 @@ final class Plugin {
             $articleReceipts = new WpdbArticleOperationReceiptRepository($wpdb);
             $categoryGateway = new CategoryGateway(new WpCategoryStore());
             $editorialPosts = new WpEditorialPostStore($articleEditorial);
-            $ownerPublication = new OwnerPublicationApplicationService($editorialPosts, new WpdbOwnerPublicationDecisionRepository($wpdb), static fn (PublicationPrincipal $principal): bool => current_user_can('nhk_ingest_articles') && current_user_can('publish_posts'), null, $articleReceipts);
+            $canonicalPublicationContext = static function (\NHK\Core\Domain\Article\EditorialPostState $state, array $callerEvidence) use ($captureRepository, $articleResearch, $articlePreflightHandoff): array {
+                $capture = $captureRepository->findByArticleId($state->postId);
+                if ($capture === null || $capture->articleId !== $state->postId) throw new \RuntimeException('CAPTURE_ARTICLE_BINDING_UNAVAILABLE');
+                $persistedSubject = is_array($capture->diagnostics['subjects'] ?? null) ? $capture->diagnostics['subjects'] : [];
+                if ($persistedSubject === []) $persistedSubject = is_array($capture->context['subject_resolution'] ?? null) ? $capture->context['subject_resolution'] : [];
+                $primary = is_array($persistedSubject['primary'] ?? null) ? $persistedSubject['primary'] : [];
+                if (trim((string) ($primary['id'] ?? '')) === '' || trim((string) ($primary['type'] ?? '')) === '') throw new \RuntimeException('CAPTURE_SUBJECT_BINDING_UNAVAILABLE');
+                $contentIntent = is_array($capture->context['content_intent'] ?? null) ? $capture->context['content_intent'] : [];
+                $composition = is_array($capture->diagnostics['composition'] ?? null) ? $capture->diagnostics['composition'] : [];
+                $research = $articleResearch->research($state->title, $primary, [
+                    'post_id' => $state->postId,
+                    'title' => $state->title,
+                    'excerpt' => $state->excerpt,
+                    'body' => $state->content,
+                    'content_intent' => $contentIntent,
+                    'claim_trace' => is_array($composition['claim_trace'] ?? null) ? $composition['claim_trace'] : [],
+                ]);
+                $semanticWriteBack = is_array($capture->diagnostics['semantic_write_back'] ?? null) ? $capture->diagnostics['semantic_write_back'] : [];
+                $canonical = $articlePreflightHandoff->build(
+                    $research,
+                    is_array($capture->diagnostics['media_usage'] ?? null) ? $capture->diagnostics['media_usage'] : [],
+                    $semanticWriteBack,
+                    $state->snapshot() + ['content_intent' => strtoupper(trim((string) ($contentIntent['intent'] ?? 'TEXT_ARTICLE')))],
+                );
+                // Article identity is already durable. Publication checks for a
+                // new public collision; it must not re-run creation-time intent.
+                $canonical['duplicate_intent_handled'] = true;
+                $canonical['canonical_publication_context'] = [
+                    'capture_id' => $capture->captureId,
+                    'capture_revision' => $capture->revision,
+                    'subject_binding' => $primary,
+                    'article_state_token' => $state->token,
+                ];
+                return array_replace($callerEvidence, $canonical);
+            };
+            $ownerPublication = new OwnerPublicationApplicationService($editorialPosts, new WpdbOwnerPublicationDecisionRepository($wpdb), static fn (PublicationPrincipal $principal): bool => current_user_can('nhk_ingest_articles') && current_user_can('publish_posts'), null, $articleReceipts, $canonicalPublicationContext);
             $mcpGovernance->setPublicationBoundary(static function (\NHK\Core\Domain\Governance\Proposal $proposal, array $applied) use ($ownerPublication): array {
                 $payload = $proposal->payload;
                 $postId = (int) ($payload['post_id'] ?? 0);

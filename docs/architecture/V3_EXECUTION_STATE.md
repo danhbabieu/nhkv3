@@ -1,5 +1,39 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-20 — Publication review canonical context repair (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE: The registered `nhk.article.publish.review` path read the native
+Article and then passed caller-supplied evidence directly into
+`ArticlePublicationGate`. It did not deterministically resolve the Article's
+Capture owner or rebuild the review context from current canonical state. A
+stale/incomplete evidence packet therefore produced false cascades such as
+`SUBJECT_UNRESOLVED`, `CATEGORY_UNRESOLVED`, semantic, claim, SEO, route and
+rendered-verification blockers.
+
+FIXED_BOUNDARY: The production Capture repository now supports exact
+`wp_post_id → Capture` lookup. `OwnerPublicationApplicationService` invokes a
+composition-root canonical context provider after the expected Article state
+token check. The provider reads the current native Article, reuses the
+persisted Capture subject binding, reruns the shared Article research/preflight
+against current editorial state, and rebuilds publication evidence through the
+existing Article preflight handoff. Creation-time duplicate intent is not
+rerun for an already-owned Article; publication receives the rebuilt context,
+while caller evidence remains provenance only. If Capture or subject context
+is unavailable, review returns the single actionable
+`PUBLICATION_CONTEXT_UNAVAILABLE` blocker instead of manufacturing downstream
+diagnostics.
+
+LIFECYCLE: Review, approve and publish now share the same canonical context
+reconstruction and state-token boundary. TEXT_ARTICLE optional Media remains
+warning/enrichment debt; rendered public verification remains a post-publish
+continuation concern and was not promoted to a pre-publication blocker.
+
+VERIFICATION: Changed-file PHP lint and `git diff --check` pass. Static call
+path, composition, dependency and invariant review completed. No test suite,
+live retry, staging/production mutation, deployment or push was performed.
+
+STATUS: `PUBLICATION_REVIEW_CANONICAL_CONTEXT_REPAIRED_LOCAL / COMMIT_READY / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-20 — Semantic Media reconciliation final repair (LOCAL / NO LIVE MUTATION)
 
 ROOT_CAUSE: Article Media reconciliation evaluated semantic suitability for the
