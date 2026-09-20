@@ -6,7 +6,7 @@ namespace NHK\Core\Application\Article;
 use DateTimeImmutable;
 use NHK\Core\Contracts\Article\{ArticleOperationReceiptRepository, OwnerPublicationDecisionRepository, OwnerPublicationService, PublicationPrincipal};
 use NHK\Core\Contracts\WordPress\EditorialPostStore;
-use NHK\Core\Domain\Article\{ArticleIngestOutcome, ArticleOperationReceipt, ArticlePublicationOutcome, OwnerPublicationDecision, PublicationDiagnosticRegistry};
+use NHK\Core\Domain\Article\{ArticleIngestOutcome, ArticleOperationReceipt, ArticlePublicationOutcome, EditorialPostState, OwnerPublicationDecision, PublicationDiagnosticRegistry};
 use NHK\Core\Shared\Uuid\UuidCodec;
 
 final class OwnerPublicationApplicationService implements OwnerPublicationService
