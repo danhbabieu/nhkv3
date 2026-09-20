@@ -74,6 +74,7 @@ final class ArticleMediaCoordinator
         foreach (MediaUsageRoleRegistry::mandatoryArticleRoles() as $slot) {
             $blueprint = MediaSeoBlueprint::forPost($postId, $slot, $context, MediaSeoStateRegistry::PLACEHOLDER);
             $existing = $this->existingSlotMedia($endpointKey, $slot);
+            $existingUsage = $this->existingSlotUsage($endpointKey, $slot);
             $candidateId = trim((string) ($selectedMediaBySlot[$slot] ?? ''));
             if ($slot === MediaUsageRoleRegistry::INLINE_PRIMARY && $enforceDistinctMandatoryMedia && $candidateId !== '' && $candidateId === ($slotMedia[MediaUsageRoleRegistry::FEATURED_PRIMARY] ?? '')) $candidateId = '';
             $candidateIsCaptureOwned = $candidateId !== '' && in_array($candidateId, $captureOwnedMediaIds, true);
@@ -82,7 +83,13 @@ final class ArticleMediaCoordinator
             if ($candidate === null && $allowHistoricalSubjectReuse && $existing !== null && !in_array($existing->canonicalId, array_values($slotMedia), true)) $candidate = $this->usableMedia($existing->canonicalId, $blueprint, $subjectScopeLocked);
             if ($candidate === null && $allowHistoricalSubjectReuse) $candidate = $this->findReusable($blueprint, array_values($slotMedia), $subjectScopeLocked, !$enforceDistinctMandatoryMedia);
             if ($candidate === null) $candidate = $this->placeholder($slot);
-            $usage = $this->reconcileUsage($endpointKey, $slot, $candidate->canonicalId, $blueprint, 'article:' . $endpointKey . ':' . $slot, $selectedContextBySlot[$slot] ?? []);
+            // Do not overwrite an existing semantically invalid usage with a
+            // placeholder before the governed reconciliation plan sees it.
+            // The persisted row remains auditable and is retired through the
+            // normal MediaUsage apply boundary when no replacement exists.
+            $usage = $candidate->isSystemPlaceholder() && $existingUsage instanceof \NHK\Core\Domain\Media\MediaUsage
+                ? $existingUsage
+                : $this->reconcileUsage($endpointKey, $slot, $candidate->canonicalId, $blueprint, 'article:' . $endpointKey . ':' . $slot, $selectedContextBySlot[$slot] ?? []);
             $state = $candidate->isSystemPlaceholder() ? ($slot === MediaUsageRoleRegistry::FEATURED_PRIMARY ? MediaSeoStateRegistry::INCOMPLETE_FEATURED : MediaSeoStateRegistry::INCOMPLETE_INLINE) : MediaSeoStateRegistry::COMPLETE;
             if ($candidate->isSystemPlaceholder()) $diagnostics[] = ['code' => $slot === MediaUsageRoleRegistry::FEATURED_PRIMARY ? 'ARTICLE_MEDIA_FEATURED_MISSING' : 'ARTICLE_MEDIA_INLINE_MISSING', 'slot' => $slot, 'media_id' => $candidate->canonicalId];
             if ($candidate->isSystemPlaceholder() && $candidateId !== '') $diagnostics[] = ['code' => 'MEDIA_CANDIDATE_INELIGIBLE', 'slot' => $slot, 'media_id' => $candidateId, 'reason' => 'PERSISTED_SUBJECT_SCOPE_MISMATCH'];
@@ -92,13 +99,13 @@ final class ArticleMediaCoordinator
             $blueprint = MediaSeoBlueprint::forPost($postId, $slot, $context, $state);
             $this->blueprints->save($blueprint);
             $slotMedia[$slot] = $candidate->canonicalId;
-            $effective = !$candidate->isSystemPlaceholder() && (($assessment['valid_for_completeness'] ?? false) === true || ($subjectIds === [] && ($assessment['suitability'] ?? '') === SemanticSuitabilityPolicy::UNKNOWN));
+            $effective = !$candidate->isSystemPlaceholder() && (($assessment['valid_for_completeness'] ?? false) === true);
             if (!$effective && !$candidate->isSystemPlaceholder()) {
                 // A readable historical usage is retained for audit, but it is
                 // not an effective slot and must never satisfy completeness.
                 $slotMedia[$slot] = '';
             }
-            $slots[$slot] = ['media_id' => $effective ? $candidate->canonicalId : '', 'persisted_media_id' => $candidate->isSystemPlaceholder() ? null : $candidate->canonicalId, 'placeholder' => !$effective, 'state' => $effective ? MediaSeoStateRegistry::COMPLETE : ($slot === MediaUsageRoleRegistry::FEATURED_PRIMARY ? MediaSeoStateRegistry::INCOMPLETE_FEATURED : MediaSeoStateRegistry::INCOMPLETE_INLINE), 'suitability' => $assessment['suitability'], 'availability' => $assessment['availability'], 'valid_for_completeness' => $effective, 'placement_key' => $usage->placementKey, 'placement_anchor' => $usage->placementAnchor(), 'blueprint' => $blueprint->toArray()];
+            $slots[$slot] = ['media_id' => $effective ? $candidate->canonicalId : '', 'persisted_media_id' => $candidate->isSystemPlaceholder() ? ($existing?->canonicalId) : $candidate->canonicalId, 'placeholder' => !$effective, 'state' => $effective ? MediaSeoStateRegistry::COMPLETE : ($slot === MediaUsageRoleRegistry::FEATURED_PRIMARY ? MediaSeoStateRegistry::INCOMPLETE_FEATURED : MediaSeoStateRegistry::INCOMPLETE_INLINE), 'suitability' => $assessment['suitability'], 'availability' => $assessment['availability'], 'valid_for_completeness' => $effective, 'placement_key' => $usage->placementKey, 'placement_anchor' => $usage->placementAnchor(), 'blueprint' => $blueprint->toArray()];
             if (!$effective && !$candidate->isSystemPlaceholder()) $diagnostics[] = ['code' => 'MEDIA_USAGE_SEMANTIC_MISMATCH', 'slot' => $slot, 'media_id' => $candidate->canonicalId];
         }
         $supportingPlacements = $this->normalizeSupportingPlacements($supportingMediaIds);
@@ -134,7 +141,23 @@ final class ArticleMediaCoordinator
             'caption' => $placement['caption'],
             'title' => $placement['title'],
         ];
-        $usagePlan = (new MediaUsageReconciler())->plan('wp_post', $endpointKey, $this->usages->listByEndpoint('wp_post', $endpointKey), $desiredUsages);
+        $usagePlan = (new MediaUsageReconciler())->plan(
+            'wp_post',
+            $endpointKey,
+            $this->usages->listByEndpoint('wp_post', $endpointKey),
+            $desiredUsages,
+            function (string $mediaId, string $role, array $spec) use ($subjectIds): array {
+                $media = $this->media->findByCanonicalId($mediaId);
+                if (!$media instanceof Media) return ['valid_for_completeness' => false, 'diagnostic' => 'MEDIA_USAGE_MEDIA_NOT_FOUND'];
+                return ($this->suitabilityPolicy ??= new SemanticSuitabilityPolicy())->evaluateMedia(
+                    $media,
+                    $this->assets->listByMediaId($mediaId),
+                    ['subject_ids' => $subjectIds],
+                    (string) ($spec['selection_source'] ?? 'SYSTEM_AUTO'),
+                    $role,
+                );
+            },
+        );
         $diagnostics[] = ['phase' => 'plan', 'code' => 'MEDIA_USAGE_RECONCILIATION', 'status' => $usagePlan['status'], 'actions' => $usagePlan['actions']];
         $state = array_filter($slots, static fn (array $slot): bool => $slot['placeholder'] || ($slot['valid_for_completeness'] ?? false) !== true) !== [] ? MediaSeoStateRegistry::PLACEHOLDER : (in_array('MEDIA_LOW_RESOLUTION', array_column($diagnostics, 'code'), true) ? MediaSeoStateRegistry::LOW_RESOLUTION : MediaSeoStateRegistry::COMPLETE);
         $guidance = $this->guidance($slots, $context);
@@ -246,6 +269,14 @@ final class ArticleMediaCoordinator
             if ($usage->activeSlot === 'retired') continue;
             $media = $this->media->findByCanonicalId($usage->mediaId);
             if ($media !== null) return $media;
+        }
+        return null;
+    }
+
+    private function existingSlotUsage(string $endpointKey, string $slot): ?\NHK\Core\Domain\Media\MediaUsage
+    {
+        foreach ($this->usages->listByEndpoint('wp_post', $endpointKey, $slot) as $usage) {
+            if ($usage->activeSlot !== 'retired') return $usage;
         }
         return null;
     }

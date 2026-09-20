@@ -73,7 +73,9 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
                 if (!function_exists('set_post_thumbnail')) throw new \RuntimeException('WORDPRESS_FEATURED_SYNC_UNAVAILABLE');
                 if (!set_post_thumbnail($postId, $attachmentId)) throw new \RuntimeException('WORDPRESS_FEATURED_SYNC_FAILED');
             }
-        } elseif (($slots['featured_primary']['placeholder'] ?? false) && (int) ($current['featured_attachment_id'] ?? 0) > 0) {
+        } elseif (($slots['featured_primary']['placeholder'] ?? false)
+            && (int) ($current['featured_attachment_id'] ?? 0) > 0
+            && $this->managedFeaturedMediaMatches($current, $slots['featured_primary'] ?? [])) {
             if (function_exists('delete_post_thumbnail')) {
                 delete_post_thumbnail($postId);
             } elseif (function_exists('set_post_thumbnail')) {
@@ -114,9 +116,10 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
             }
         } elseif (($slots['inline_primary']['placeholder'] ?? false) && ($result['force_inline_reconcile'] ?? false) === true) {
             $managedId = $this->managedInlineAttachmentId($content);
-            $content = $managedId > 0
+            $managedOwned = $managedId > 0 && $this->managedInlineMediaMatches($managedId, $slots['inline_primary'] ?? [], $content);
+            $content = $managedOwned
                 ? $this->removeManagedBlock($content)
-                : $this->removeMappedInlineImages($content, (array) ($current['inline_attachment_ids'] ?? []));
+                : $content;
         }
 
         if ($content !== (string) ($current['content'] ?? '')) {
@@ -581,6 +584,28 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
     {
         if (preg_match('/<!-- wp:image\b[^>]*"id"\s*:\s*([1-9][0-9]*)[^>]*nhk-managed-inline-primary[^>]*-->/i', $content, $match) === 1) return (int) $match[1];
         return 0;
+    }
+
+    /** @param array<string,mixed> $current @param array<string,mixed> $slot */
+    private function managedFeaturedMediaMatches(array $current, array $slot): bool
+    {
+        $persistedMediaId = trim((string) ($slot['persisted_media_id'] ?? ''));
+        return $persistedMediaId !== '' && $persistedMediaId === trim((string) ($current['featured_media_id'] ?? ''));
+    }
+
+    /** @param array<string,mixed> $slot */
+    private function managedInlineMediaMatches(int $attachmentId, array $slot, string $content): bool
+    {
+        $persistedMediaId = trim((string) ($slot['persisted_media_id'] ?? ''));
+        if ($persistedMediaId === '' || $this->mediaIdForAttachment($attachmentId) !== $persistedMediaId) return false;
+        $anchor = trim((string) ($slot['placement_anchor'] ?? ''));
+        return $anchor === '' || $this->managedInlinePlacementAnchor($content) === $anchor;
+    }
+
+    private function managedInlinePlacementAnchor(string $content): string
+    {
+        if (preg_match('/<!-- wp:image\b[^>]*nhk-managed-inline-primary[^>]*"anchor"\s*:\s*"([^"]+)"[^>]*-->/i', $content, $match) === 1) return (string) $match[1];
+        return '';
     }
 
     private function hasMappedInlineMedia(array $inlineIds, string $featuredMediaId): bool

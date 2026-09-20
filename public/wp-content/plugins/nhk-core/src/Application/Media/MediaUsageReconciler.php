@@ -19,11 +19,24 @@ final class MediaUsageReconciler
     public function plan(string $endpointType, string $endpointKey, array $current, array $desired, ?callable $suitability = null): array
     {
         $currentByIdentity = [];
+        $currentAssessmentByIdentity = [];
         foreach ($current as $usage) {
             if (!$usage instanceof MediaUsage || $usage->activeSlot === 'retired' || $usage->endpointType !== $endpointType || $usage->endpointKey !== $endpointKey) continue;
             $identity = $usage->role . "\0" . $usage->placementKey;
             if (isset($currentByIdentity[$identity])) return $this->review('DUPLICATE_CURRENT_USAGE', $usage->role);
             $currentByIdentity[$identity] = $usage;
+            if ($suitability !== null) {
+                $assessment = $suitability($usage->mediaId, $usage->role, [
+                    'media_id' => $usage->mediaId,
+                    'role' => $usage->role,
+                    'placement_key' => $usage->placementKey,
+                    'sort_order' => $usage->sortOrder,
+                    'persisted' => true,
+                ]);
+                $currentAssessmentByIdentity[$identity] = is_array($assessment)
+                    ? $assessment
+                    : ['valid_for_completeness' => $assessment === true];
+            }
         }
 
         $desiredByRole = [];
@@ -78,7 +91,9 @@ final class MediaUsageReconciler
                 && $existing->caption === $wanted->caption
                 && $existing->keywordGroups === $wanted->keywordGroups
                 && $existing->title === $wanted->title;
-            $actions[] = ['action' => $same ? 'KEEP' : 'UPDATE', 'role' => $wanted->role, 'placement_key' => $wanted->placementKey, 'usage_id' => $existing->usageId, 'media_id' => $wanted->mediaId];
+            $currentValid = ($currentAssessmentByIdentity[$identity]['valid_for_completeness'] ?? true) === true;
+            $actions[] = ['action' => $same && $currentValid ? 'KEEP' : 'UPDATE', 'role' => $wanted->role, 'placement_key' => $wanted->placementKey, 'usage_id' => $existing->usageId, 'media_id' => $wanted->mediaId]
+                + ($currentValid ? [] : ['reason' => (string) ($currentAssessmentByIdentity[$identity]['diagnostic'] ?? 'MEDIA_USAGE_SEMANTIC_MISMATCH')]);
         }
         foreach ($currentByIdentity as $identity => $existing) {
             if (!isset($desiredByRole[$identity])) $actions[] = ['action' => 'RETIRE', 'role' => $existing->role, 'placement_key' => $existing->placementKey, 'usage_id' => $existing->usageId, 'media_id' => $existing->mediaId];

@@ -1,5 +1,27 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-20 — Semantic Media reconciliation final repair (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE: Article Media reconciliation evaluated semantic suitability for the
+read/preflight result but the usage planner could still emit `KEEP` for a
+persisted usage whose current subject suitability was
+`MEDIA_USAGE_SEMANTIC_MISMATCH`. The coordinator also allowed `UNKNOWN` scope
+to become effective when no subject ID was present, and native projection
+cleanup did not prove ownership before clearing featured/managed inline media.
+
+FIXED_BOUNDARY: `MediaUsageReconciler` now consumes the shared
+`SemanticSuitabilityPolicy` for both persisted and desired usages; invalid
+persisted rows can only be updated to a suitable replacement or retired, never
+kept. Existing invalid rows remain auditable until governed apply. Article
+Media no longer treats `UNKNOWN` as effective. WordPress featured and managed
+inline cleanup requires the persisted Media identity and, for inline content,
+the managed placement anchor to match the owned projection.
+
+VERIFICATION: Changed-file PHP lint and `git diff --check` pass. No test suite,
+live retry, staging/production mutation, deployment or push was performed.
+
+STATUS: `SEMANTIC_MEDIA_RECONCILIATION_FINAL_REPAIR_FIXED_LOCAL / COMMIT_READY / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-19 — Live continuation defects reproduced and fixed locally (NO LIVE MUTATION)
 
 ROOT_CAUSE: `nhk.article.ingest` public bounded fields (`content`, `slug`,
