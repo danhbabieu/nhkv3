@@ -1283,7 +1283,20 @@ final class Plugin {
                     $mediaSubjectIds = $primary !== null && trim((string) ($primary['id'] ?? '')) !== '' && ($resolution['status'] ?? '') === 'resolved' ? [trim((string) $primary['id'])] : [];
                     $subject = (string) ($primary['name'] ?? '');
                     $selected = [];
-                    $captureBindings = is_array($context['media_bindings'] ?? null) ? $context['media_bindings'] : (is_array($context['capture']['context']['media_bindings'] ?? null) ? $context['capture']['context']['media_bindings'] : []);
+                    // Article-targeted bindings are separated from the
+                    // generic Capture bindings during deferred resolution.
+                    // Reconciliation must consume both projections; using
+                    // only the first present array silently drops the current
+                    // explicit publication-unit Media selection.
+                    $captureBindings = [];
+                    foreach ([
+                        is_array($context['media_bindings'] ?? null) ? $context['media_bindings'] : [],
+                        is_array($context['article_media_bindings'] ?? null) ? $context['article_media_bindings'] : [],
+                        is_array($context['capture']['context']['media_bindings'] ?? null) ? $context['capture']['context']['media_bindings'] : [],
+                        is_array($context['capture']['context']['article_media_bindings'] ?? null) ? $context['capture']['context']['article_media_bindings'] : [],
+                    ] as $bindingSet) {
+                        foreach ($bindingSet as $binding) if (is_array($binding)) $captureBindings[] = $binding;
+                    }
                     $captureBindingMediaIds = [];
                     foreach ($captureBindings as $binding) {
                         if (!is_array($binding)) continue;
@@ -1297,7 +1310,15 @@ final class Plugin {
                         $role = strtolower(trim((string) ($binding['role'] ?? '')));
                         if (!in_array($role, ['featured_primary', 'inline_primary'], true)) continue;
                         $seo = is_array($binding['seo'] ?? null) ? $binding['seo'] : [];
-                        $selected[$role] = ['media_id' => $bindingMediaId, 'title' => (string) ($seo['title'] ?? ''), 'alt_text' => (string) ($seo['alt_text'] ?? ''), 'caption' => (string) ($seo['caption'] ?? ''), 'sort_order' => (int) ($binding['sort_order'] ?? 0)];
+                        $selected[$role] = [
+                            'media_id' => $bindingMediaId,
+                            'title' => (string) ($seo['title'] ?? ''),
+                            'alt_text' => (string) ($seo['alt_text'] ?? ''),
+                            'caption' => (string) ($seo['caption'] ?? ''),
+                            'sort_order' => (int) ($binding['sort_order'] ?? 0),
+                            'selection_source' => strtoupper(trim((string) ($binding['selection_source'] ?? 'USER_EXPLICIT'))),
+                            'selection_policy' => strtoupper(trim((string) ($binding['selection_policy'] ?? 'PINNED'))),
+                        ];
                     }
                     $mediaIds = array_values(array_unique(array_merge($mediaIds, $captureBindingMediaIds)));
                     $captureMediaSelection = static function (array $asset): array {

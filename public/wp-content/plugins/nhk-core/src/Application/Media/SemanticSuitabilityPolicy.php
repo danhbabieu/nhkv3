@@ -63,6 +63,12 @@ final class SemanticSuitabilityPolicy
         } elseif ($expected !== [] && $actual !== []) {
             $suitability = self::INELIGIBLE;
             $basis = 'persisted_subject_scope_mismatch';
+        } elseif ($expected === [] && ($candidate['article_explicit_media'] ?? false) === true) {
+            // An explicit Article slot selection is valid editorial input when
+            // there is no semantic target to validate. This does not grant
+            // representative/entity reuse or create semantic scope proof.
+            $suitability = self::COMPATIBLE;
+            $basis = 'explicit_article_selection_without_semantic_target';
         } elseif (($candidate['selection_source'] ?? 'SYSTEM_AUTO') === 'USER_EXPLICIT' && ($candidate['current_capture_media'] ?? false) === true) {
             // A Media supplied in the current Capture is publication-unit
             // provenance. It may satisfy the Article slot without inventing
@@ -81,7 +87,7 @@ final class SemanticSuitabilityPolicy
 
         $auto = $availability === self::AVAILABLE
             && in_array($suitability, [self::EXACT, self::COMPATIBLE], true)
-            && in_array($basis, ['exact_canonical_subject_binding', 'registered_compatibility_rule', 'current_capture_selection_provenance'], true);
+            && in_array($basis, ['exact_canonical_subject_binding', 'registered_compatibility_rule', 'current_capture_selection_provenance', 'explicit_article_selection_without_semantic_target'], true);
         return [
             'requirement' => $requirement,
             'availability' => $availability,
@@ -103,6 +109,7 @@ final class SemanticSuitabilityPolicy
             'role' => $role,
         ];
         if (($target['current_capture_media'] ?? false) === true) $candidate['current_capture_media'] = true;
+        if (($target['article_explicit_media'] ?? false) === true) $candidate['article_explicit_media'] = true;
         return $this->evaluate($candidate, $target);
     }
 

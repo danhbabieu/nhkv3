@@ -19,9 +19,17 @@ final class CaptureArticlePreflightHandoff
         // current publication-unit truth. Research inventory is historical
         // planning evidence and must not override a current Capture Media
         // handoff with empty or stale candidates.
-        $currentArticleMedia = is_array($media) && $media !== []
-            ? $media
-            : (is_array($research->inventory['article_media'] ?? null) ? $research->inventory['article_media'] : []);
+        $researchArticleMedia = is_array($research->inventory['article_media'] ?? null) ? $research->inventory['article_media'] : [];
+        $currentArticleMedia = is_array($media) && $media !== [] ? $media : $researchArticleMedia;
+        // A stale handoff snapshot may contain only placeholder slots while
+        // the fresh owner research already includes a complete, target-scoped
+        // Article Media read-back. Prefer that canonical scoped read-back;
+        // never let an incomplete stale plan manufacture missing blockers.
+        $handoffComplete = ($currentArticleMedia['media_complete'] ?? false) === true
+            || (($currentArticleMedia['slots']['featured_primary']['placeholder'] ?? $currentArticleMedia['featured_primary']['placeholder'] ?? true) === false);
+        $researchComplete = ($researchArticleMedia['media_complete'] ?? false) === true
+            || (($researchArticleMedia['slots']['featured_primary']['placeholder'] ?? $researchArticleMedia['featured_primary']['placeholder'] ?? true) === false);
+        if (!$handoffComplete && $researchComplete) $currentArticleMedia = $researchArticleMedia;
         $mediaComplete = ($currentArticleMedia['media_complete'] ?? false) === true
             || (($currentArticleMedia['slots']['featured_primary']['placeholder'] ?? $currentArticleMedia['featured_primary']['placeholder'] ?? true) === false);
         $compliance = (string) ($research->compliance['status'] ?? '');

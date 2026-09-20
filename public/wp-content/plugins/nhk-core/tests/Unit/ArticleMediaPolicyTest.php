@@ -91,6 +91,43 @@ final class ArticleMediaPolicyTest extends TestCase
         self::assertSame('MEDIA_COMPLETE', $result->state);
     }
 
+    public function test_current_capture_explicit_media_beats_stale_usage_and_keeps_pinned_provenance(): void
+    {
+        [$media, $assets, $usages, $blueprints, $service] = $this->stores();
+        $stale = $service->create('stale-article-media', 'Historical image', 'ready', ['metadata' => ['subject_id' => 'other-subject']]);
+        $current = $service->create('current-capture-media', 'Current image', 'ready');
+        $service->addAsset($stale->canonicalId, 'original', 'uploads/stale.jpg', hash('sha256', 'stale'), 'image/jpeg', 3, 1200, 800, 'PUBLIC');
+        $service->addAsset($current->canonicalId, 'original', 'uploads/current.jpg', hash('sha256', 'current'), 'image/jpeg', 3, 1200, 800, 'PUBLIC');
+        $service->addUsage($stale->canonicalId, 'wp_post', '1:631', 'featured_primary');
+        $service->addUsage($stale->canonicalId, 'wp_post', '1:631', 'inline_primary');
+
+        $result = (new ArticleMediaCoordinator($service, $media, $assets, $usages, $blueprints, 1))->ensureForPost(631, [
+            'capture_id' => 'capture-current-media',
+            'subject_ids' => ['canonical-subject'],
+            'subject_scope_locked' => true,
+            'capture_has_physical_assets' => true,
+            'capture_owned_media_ids' => [$current->canonicalId],
+            'allow_scoped_reuse' => true,
+        ], [
+            'featured_primary' => [
+                'media_id' => $current->canonicalId,
+                'selection_source' => 'USER_EXPLICIT',
+                'selection_policy' => 'PINNED',
+            ],
+            'inline_primary' => [
+                'media_id' => $current->canonicalId,
+                'selection_source' => 'USER_EXPLICIT',
+                'selection_policy' => 'PINNED',
+            ],
+        ]);
+
+        self::assertSame($current->canonicalId, $result->slotMedia['featured_primary']);
+        self::assertSame($current->canonicalId, $result->slotMedia['inline_primary']);
+        self::assertSame('MEDIA_COMPLETE', $result->state);
+        $currentUsages = $usages->listByEndpoint('wp_post', '1:631');
+        self::assertNotContains($stale->canonicalId, array_map(static fn (MediaUsage $usage): string => $usage->mediaId, $currentUsages));
+    }
+
     public function test_capture_subject_scope_rejects_high_quality_sibling_before_wordpress_sync(): void
     {
         [$media, $assets, $usages, $blueprints, $service] = $this->stores();

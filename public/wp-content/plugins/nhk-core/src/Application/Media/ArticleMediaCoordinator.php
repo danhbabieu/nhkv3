@@ -19,7 +19,7 @@ final class ArticleMediaCoordinator
         private ?SemanticSuitabilityPolicy $suitabilityPolicy = null,
     ) {}
 
-    /** @param array<string,mixed> $context @param array<string,string> $selectedMediaBySlot @param list<string> $supportingMediaIds */
+    /** @param array<string,mixed> $context @param array<string,string|array<string,mixed>> $selectedMediaBySlot @param list<string|array<string,mixed>> $supportingMediaIds */
     public function ensureForPost(int $postId, array $context = [], array $selectedMediaBySlot = [], array $supportingMediaIds = []): ArticleMediaResult
     {
         if ($postId < 1) throw new \InvalidArgumentException('WordPress Post ID must be positive.');
@@ -49,14 +49,18 @@ final class ArticleMediaCoordinator
         $editorial = $this->wordpress?->read($postId);
         $selectedContextBySlot = [];
         foreach ($selectedMediaBySlot as $slot => $selection) {
-            if (!is_array($selection)) continue;
+            // The public Article contract historically accepted a compact
+            // slot => Media ID map. Keep that shape lossless while allowing
+            // the Capture path to carry explicit selection provenance and
+            // contextual metadata in the structured form.
+            if (!is_array($selection)) $selection = ['media_id' => (string) $selection];
             $selectedContextBySlot[$slot] = [
                 'title' => (string) ($selection['title'] ?? ''),
                 'alt_text' => (string) ($selection['alt_text'] ?? ''),
                 'caption' => (string) ($selection['caption'] ?? ''),
                 'sort_order' => array_key_exists('sort_order', $selection) ? max(0, (int) $selection['sort_order']) : 0,
-                'selection_source' => in_array((string) ($selection['media_id'] ?? ''), $captureOwnedMediaIds, true) ? 'USER_EXPLICIT' : 'SYSTEM_AUTO',
-                'selection_policy' => in_array((string) ($selection['media_id'] ?? ''), $captureOwnedMediaIds, true) ? 'PINNED' : 'AUTO',
+                'selection_source' => strtoupper(trim((string) ($selection['selection_source'] ?? ''))) ?: 'USER_EXPLICIT',
+                'selection_policy' => strtoupper(trim((string) ($selection['selection_policy'] ?? ''))) ?: 'PINNED',
             ];
             $selectedMediaBySlot[$slot] = (string) ($selection['media_id'] ?? '');
         }
@@ -72,7 +76,6 @@ final class ArticleMediaCoordinator
             }
             foreach (($editorial['unmapped_attachment_ids'] ?? []) as $attachmentId) $diagnostics[] = ['code' => 'WORDPRESS_ATTACHMENT_UNMAPPED', 'attachment_id' => (int) $attachmentId];
         }
-        if (!$allowHistoricalReuse && $captureMediaContext) $selectedMediaBySlot = [];
         foreach (MediaUsageRoleRegistry::mandatoryArticleRoles() as $slot) {
             $blueprint = MediaSeoBlueprint::forPost($postId, $slot, $context, MediaSeoStateRegistry::PLACEHOLDER);
             $existing = $this->existingSlotMedia($endpointKey, $slot);
@@ -97,7 +100,7 @@ final class ArticleMediaCoordinator
             if ($candidate->isSystemPlaceholder() && $candidateId !== '') $diagnostics[] = ['code' => 'MEDIA_CANDIDATE_INELIGIBLE', 'slot' => $slot, 'media_id' => $candidateId, 'reason' => 'PERSISTED_SUBJECT_SCOPE_MISMATCH'];
             $assessment = $candidate->isSystemPlaceholder()
                 ? ['requirement' => $contentIntent === 'IMAGE_ARTICLE' ? SemanticSuitabilityPolicy::REQUIRED : SemanticSuitabilityPolicy::OPTIONAL, 'availability' => SemanticSuitabilityPolicy::MISSING, 'suitability' => SemanticSuitabilityPolicy::UNKNOWN, 'basis' => 'no_candidate', 'auto_select' => false, 'valid_for_completeness' => false, 'diagnostic' => 'MEDIA_OPTIONAL_MISSING']
-                : ($this->suitabilityPolicy ??= new SemanticSuitabilityPolicy())->evaluateMedia($candidate, $this->assets->listByMediaId($candidate->canonicalId), ['subject_ids' => $subjectIds, 'current_capture_media' => $candidateIsCaptureOwned], (string) ($selectedContextBySlot[$slot]['selection_source'] ?? 'SYSTEM_AUTO'), $slot);
+                : ($this->suitabilityPolicy ??= new SemanticSuitabilityPolicy())->evaluateMedia($candidate, $this->assets->listByMediaId($candidate->canonicalId), ['subject_ids' => $subjectIds, 'current_capture_media' => $candidateIsCaptureOwned, 'article_explicit_media' => (($selectedContextBySlot[$slot]['selection_source'] ?? '') === 'USER_EXPLICIT')], (string) ($selectedContextBySlot[$slot]['selection_source'] ?? 'SYSTEM_AUTO'), $slot);
             $blueprint = MediaSeoBlueprint::forPost($postId, $slot, $context, $state);
             $this->blueprints->save($blueprint);
             $slotMedia[$slot] = $candidate->canonicalId;

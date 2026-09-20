@@ -48,6 +48,16 @@ reconciliation/read-back without an Article owner.
 resolve → Graph discovery → Claim retrieval → governed semantic write-back/apply/read-back → Article composition when
 required → publication gate when applicable → final read-back`.
 
+Article Media reconciliation preserves the current Capture publication-unit
+selection as a typed explicit binding. `USER_EXPLICIT` + `PINNED` selections
+from `media_bindings[]` and `article_media_bindings[]` are merged before slot
+planning and remain authoritative over historical WordPress MediaUsage,
+inferred candidates and stale editorial read-back, subject to the normal hard
+semantic compatibility gate. Compact Article slot maps remain read-compatible
+and are normalized to the same explicit selection boundary. An explicit Media
+that is semantically incompatible is rejected or kept review-required; it is
+never silently replaced by historical Media.
+
 The standalone mutation tools for Media, Video, Knowledge, Source, Evidence,
 Article draft/update/publish, relation and proposal creation are retained only
 for internal/admin compatibility or lifecycle operations. The complete typed

@@ -1,5 +1,40 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-21 — Explicit Capture Media precedence repair (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE: Article Media reconciliation normalized only structured slot
+selections and could therefore drop compact slot→Media-ID inputs. A separate
+Capture projection also read only the first available binding collection, so
+deferred `article_media_bindings[]` could disappear before Article slot
+planning. When historical reuse was disabled, the coordinator then cleared
+the remaining selection map instead of preserving current explicit intent.
+
+FIXED_BOUNDARY: `ArticleMediaCoordinator` now normalizes compact and typed
+selection shapes without loss, preserves explicit selection provenance through
+MediaUsage planning, and leaves current selections intact when historical
+reuse is disallowed. The composition-root Capture Media handoff merges both
+generic and Article-targeted binding projections. `SemanticSuitabilityPolicy`
+recognizes explicit Article selection only when no semantic target exists; a
+targeted selection still requires exact or registered compatibility. Preflight
+handoff prefers a complete current target-scoped Media read-back over an
+incomplete stale plan.
+
+REGRESSION: Added a Capture-equivalent Article Media test proving current
+explicit Media wins over stale endpoint usage and remains effective. No live,
+staging, Article, Video, MediaUsage, Graph, deployment or push mutation was
+performed.
+
+VERIFICATION: Focused explicit Media/preflight/semantic/completion tests pass,
+including the new regression. Full PHPUnit run: 2,184 tests / 9,977
+assertions, with 34 unavailable-environment errors, 18 failures and 114
+skips. The four remaining Unit failures are the same pre-existing
+`ArticleMediaPolicyTest` baseline fixtures recorded at the deployed baseline;
+the remaining integration/contract failures are the documented missing
+WordPress/DB or `NHK_WP_TEST_PATH=public` environment gates. No new
+regression was introduced relative to the known baseline evidence.
+
+STATUS: `EXPLICIT_CAPTURE_MEDIA_PRECEDENCE_FIXED_LOCAL / FULL_UNIT_BASELINE_EQUIVALENT / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-21 — Capture observability / publication terminal semantics / baseline closure (LOCAL / NO LIVE MUTATION)
 
 ROOT_CAUSE: The existing Capture workflow exposed continuation read-backs but
