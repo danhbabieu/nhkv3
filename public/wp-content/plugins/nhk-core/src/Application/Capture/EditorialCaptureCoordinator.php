@@ -7,7 +7,7 @@ use NHK\Core\Application\Completion\CompletionCoordinator;
 use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, SubjectResolutionService, TextInputInterpreter};
 use NHK\Core\Contracts\Capture\CaptureRepository;
 use NHK\Core\Contracts\Media\MediaBindingPort;
-use NHK\Core\Domain\Capture\{CaptureRecord, CaptureStage};
+use NHK\Core\Domain\Capture\{CaptureRecord, CaptureStage, SubjectResolutionPacket};
 use NHK\Core\Domain\Governance\CommandCanonicalizer;
 use NHK\Core\Domain\Capture\CapturePurpose;
 use NHK\Core\Shared\Uuid\UuidCodec;
@@ -238,7 +238,8 @@ final class EditorialCaptureCoordinator
             // Resolve before any draft/media writer. A UUID remains the
             // selected identity, but contradictory explicit text must stop
             // the workflow fail-closed.
-            $preflightResolution = $this->subjects->resolve(array_values(array_unique(array_merge(
+            $persistedPacket = $this->persistedSubjectPacket($record);
+            $preflightResolution = $persistedPacket?->toResolution() ?? $this->subjects->resolve(array_values(array_unique(array_merge(
                 (array) ($interpretation['primary_subject_hints'] ?? []),
                 (array) ($interpretation['secondary_subject_hints'] ?? []),
                 (array) ($interpretation['entity_mentions'] ?? []),
@@ -328,7 +329,7 @@ final class EditorialCaptureCoordinator
                 $record = $this->save($record, CaptureStage::MEDIA_ADOPTED, $assets, $diagnostics, $receipts, 'MEDIA_ADOPTED', $record->articleId, $record->articleStateToken);
             }
             $this->beginPhase('SUBJECTS_RESOLVED');
-            $resolution = $this->subjects->resolve(array_values(array_unique(array_merge(
+            $resolution = $persistedPacket?->toResolution() ?? $this->subjects->resolve(array_values(array_unique(array_merge(
                 (array) ($interpretation['primary_subject_hints'] ?? []),
                 (array) ($interpretation['secondary_subject_hints'] ?? []),
                 (array) ($interpretation['entity_mentions'] ?? []),
@@ -348,7 +349,9 @@ final class EditorialCaptureCoordinator
                 }
             }
             $diagnostics['subjects'] = $resolution;
-            $record = $this->save($record, CaptureStage::SUBJECTS_RESOLVED, $assets, $diagnostics, $receipts, 'SUBJECTS_RESOLVED', $record->articleId, $record->articleStateToken);
+            $subjectPacket = SubjectResolutionPacket::fromResolution($resolution);
+            $diagnostics['subject_resolution_packet'] = $subjectPacket->toArray();
+            $record = $this->save($record, CaptureStage::SUBJECTS_RESOLVED, $assets, $diagnostics, $receipts, 'SUBJECTS_RESOLVED', $record->articleId, $record->articleStateToken, 'IN_PROGRESS', null, $record->context + ['subject_resolution_packet' => $subjectPacket->toArray()]);
 
             $hasVideoAsset = array_filter($assets, static fn (mixed $asset): bool => is_array($asset) && ($asset['kind'] ?? '') === 'video') !== [];
             if (is_callable($this->videoEnrichment) && $videoInput !== [] && !$hasVideoAsset) {
@@ -372,8 +375,27 @@ final class EditorialCaptureCoordinator
                     $resolution = $handoff;
                     $diagnostics['subjects'] = $resolution;
                 }
+                // The adapter may return the server-owned subject handoff.
+                // Rebuild the durable packet after that handoff so semantic,
+                // Media, Video and publication consumers cannot retain the
+                // pre-enrichment ambiguous projection.
+                $subjectPacket = SubjectResolutionPacket::fromResolution($resolution);
+                $diagnostics['subject_resolution_packet'] = $subjectPacket->toArray();
+                foreach ($assets as $assetIndex => $asset) {
+                    if (!is_array($asset) || ($asset['kind'] ?? '') !== 'video' || !is_array($asset['video_proposal'] ?? null)) continue;
+                    $proposal = $asset['video_proposal'];
+                    $payload = is_array($proposal['payload'] ?? null) ? $proposal['payload'] : [];
+                    $metadata = is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [];
+                    $metadata['subject_resolution_packet'] = $subjectPacket->toArray();
+                    $payload['metadata'] = $metadata;
+                    $proposal['payload'] = $payload;
+                    $assets[$assetIndex]['video_proposal'] = $proposal;
+                }
                 $diagnostics['video_enrichment'] = $this->withoutBody($videoManifest);
-                $record = $this->save($record, CaptureStage::SUBJECTS_RESOLVED, $assets, $diagnostics, $receipts, 'VIDEO_ENRICHED', $record->articleId, $record->articleStateToken);
+                $record = $this->save($record, CaptureStage::SUBJECTS_RESOLVED, $assets, $diagnostics, $receipts, 'VIDEO_ENRICHED', $record->articleId, $record->articleStateToken, 'IN_PROGRESS', null, $record->context + ['subject_resolution_packet' => $subjectPacket->toArray()]);
+                $assets = $record->assets;
+                $diagnostics = $record->diagnostics;
+                $receipts = $record->phaseReceipts;
             }
 
             // Clock-Type is a sibling shadow diagnostic of the resolved
@@ -413,7 +435,7 @@ final class EditorialCaptureCoordinator
             $diagnostics['visual_support'] = ['status' => $visualRequirements === [] ? 'not_requested' : 'optional_enrichment', 'requirements' => $visualRequirements];
 
             $inputMetadata = is_array($input['metadata'] ?? null) ? $input['metadata'] : [];
-            $semanticContext = ['capture_id' => $record->captureId, 'article_id' => $record->articleId, 'article_endpoint_key' => $record->articleId !== null ? ((function_exists('get_current_blog_id') ? (int) get_current_blog_id() : 1) . ':' . (int) $record->articleId) : '', 'raw_input' => $text, 'continuation_delta_text' => trim((string) ($input['continuation_delta_text'] ?? '')), 'assets' => $assets, 'media_bindings' => is_array($input['media_bindings'] ?? null) ? $input['media_bindings'] : [], 'media_operations' => is_array($input['media_operations'] ?? null) ? $input['media_operations'] : [], 'interpretation' => $interpretation, 'subject_resolution' => $resolution, 'content_intent' => $intent, 'visual_opportunities' => $visualOpportunities, 'visual_support' => $diagnostics['visual_support'], 'visual_context' => is_array($input['visual_context'] ?? null) ? $input['visual_context'] : [], 'observations' => is_array($input['observations'] ?? null) ? $input['observations'] : [], 'provenance_packets' => is_array($inputMetadata['provenance_packets'] ?? null) ? $inputMetadata['provenance_packets'] : [], 'existing_capture_continuation' => ($input['existing_capture_continuation'] ?? false) === true, 'continuation_idempotency_key' => (string) ($input['continuation_idempotency_key'] ?? ''), 'governance' => is_array($input['governance'] ?? null) ? $input['governance'] : [], 'prior_diagnostics' => $diagnostics, 'phase_receipts' => $receipts];
+            $semanticContext = ['capture_id' => $record->captureId, 'article_id' => $record->articleId, 'article_endpoint_key' => $record->articleId !== null ? ((function_exists('get_current_blog_id') ? (int) get_current_blog_id() : 1) . ':' . (int) $record->articleId) : '', 'raw_input' => $text, 'continuation_delta_text' => trim((string) ($input['continuation_delta_text'] ?? '')), 'assets' => $assets, 'media_bindings' => is_array($input['media_bindings'] ?? null) ? $input['media_bindings'] : [], 'media_operations' => is_array($input['media_operations'] ?? null) ? $input['media_operations'] : [], 'interpretation' => $interpretation, 'subject_resolution' => $resolution, 'subject_resolution_packet' => $subjectPacket->toArray(), 'content_intent' => $intent, 'visual_opportunities' => $visualOpportunities, 'visual_support' => $diagnostics['visual_support'], 'visual_context' => is_array($input['visual_context'] ?? null) ? $input['visual_context'] : [], 'observations' => is_array($input['observations'] ?? null) ? $input['observations'] : [], 'provenance_packets' => is_array($inputMetadata['provenance_packets'] ?? null) ? $inputMetadata['provenance_packets'] : [], 'existing_capture_continuation' => ($input['existing_capture_continuation'] ?? false) === true, 'continuation_idempotency_key' => (string) ($input['continuation_idempotency_key'] ?? ''), 'governance' => is_array($input['governance'] ?? null) ? $input['governance'] : [], 'prior_diagnostics' => $diagnostics, 'phase_receipts' => $receipts];
             $isMediaEnrichment = strtoupper(trim((string) ($intent['intent'] ?? ''))) === 'MEDIA_ENRICHMENT';
             if ($isMediaEnrichment) {
                 // MEDIA_ENRICHMENT owns Media and MediaUsage only. Do not
@@ -523,7 +545,7 @@ final class EditorialCaptureCoordinator
                 $record = $this->save($record, CaptureStage::COMPOSED, $assets, $diagnostics, $receipts, 'COMPOSED', $record->articleId, $record->articleStateToken);
             }
 
-            $mediaContext = ['capture' => $record->toArray(), 'capture_record' => $record, 'article_id' => $record->articleId, 'assets' => $assets, 'media_bindings' => is_array($input['media_bindings'] ?? null) ? $input['media_bindings'] : [], 'article_media_bindings' => is_array($input['article_media_bindings'] ?? null) ? $input['article_media_bindings'] : [], 'media_operations' => is_array($input['media_operations'] ?? null) ? $input['media_operations'] : [], 'subject_resolution' => $resolution, 'subject_resolution_packet' => $resolution['primary'] ?? null, 'content_intent' => $intent, 'composition' => $this->withoutBody($composition), 'visual_opportunities' => $visualOpportunities, 'visual_support' => $diagnostics['visual_support'], 'capture_fingerprint' => $record->requestFingerprint, 'staging_acceptance' => is_array($input['staging_acceptance'] ?? null) ? $input['staging_acceptance'] : null];
+            $mediaContext = ['capture' => $record->toArray(), 'capture_record' => $record, 'article_id' => $record->articleId, 'assets' => $assets, 'media_bindings' => is_array($input['media_bindings'] ?? null) ? $input['media_bindings'] : [], 'article_media_bindings' => is_array($input['article_media_bindings'] ?? null) ? $input['article_media_bindings'] : [], 'media_operations' => is_array($input['media_operations'] ?? null) ? $input['media_operations'] : [], 'subject_resolution' => $resolution, 'subject_resolution_packet' => $subjectPacket->toArray(), 'content_intent' => $intent, 'composition' => $this->withoutBody($composition), 'visual_opportunities' => $visualOpportunities, 'visual_support' => $diagnostics['visual_support'], 'capture_fingerprint' => $record->requestFingerprint, 'staging_acceptance' => is_array($input['staging_acceptance'] ?? null) ? $input['staging_acceptance'] : null];
             if (is_array($mediaContext['staging_acceptance']) && isset($mediaContext['staging_acceptance']['payload_fingerprint'])) $mediaContext['payload_fingerprint'] = $mediaContext['staging_acceptance']['payload_fingerprint'];
             if ($videoThumbnailFallback !== null) $mediaContext['video_thumbnail_fallback'] = $videoThumbnailFallback;
             $media = ($this->mediaReconcile)($mediaContext);
@@ -537,7 +559,7 @@ final class EditorialCaptureCoordinator
             $assets = $record->assets;
             $diagnostics = $record->diagnostics;
             $receipts = $record->phaseReceipts;
-            $publicationContext = ['capture' => $record->toArray(), 'article_id' => $record->articleId, 'content_intent' => $intent, 'composition' => $this->withoutBody($composition), 'media' => $media, 'semantic' => $retrieved, 'semantic_write_back' => $writes, 'subject_resolution' => $resolution];
+            $publicationContext = ['capture' => $record->toArray(), 'article_id' => $record->articleId, 'content_intent' => $intent, 'composition' => $this->withoutBody($composition), 'media' => $media, 'semantic' => $retrieved, 'semantic_write_back' => $writes, 'subject_resolution' => $resolution, 'subject_resolution_packet' => $subjectPacket->toArray()];
             $publication = ($this->publicationGate)($publicationContext);
             // A native media/editorial write may rotate the token between the
             // first gate read and review. Refresh once, then continue with the
@@ -952,6 +974,21 @@ final class EditorialCaptureCoordinator
         if ($failureCode !== '' && $receiptStatus !== 'COMPLETED') $attempt['failure_code'] = $failureCode;
         $receipts = CapturePhaseReceiptReducer::append($receipts, $receiptStage, $attempt);
         return $this->captures->save(new CaptureRecord($record->captureId, $record->idempotencyKey, $record->requestFingerprint, $stage, $status, $articleId ?? $record->articleId, $token ?? $record->articleStateToken, $assets, $context ?? $record->context, $diagnostics, $receipts, $record->revision + 1, $record->createdAt, gmdate('Y-m-d H:i:s.u')));
+    }
+
+    private function persistedSubjectPacket(CaptureRecord $record): ?SubjectResolutionPacket
+    {
+        foreach ([
+            $record->context['subject_resolution_packet'] ?? null,
+            $record->diagnostics['subject_resolution_packet'] ?? null,
+            $record->diagnostics['subjects'] ?? null,
+            $record->context['subject_resolution'] ?? null,
+        ] as $candidate) {
+            if (!is_array($candidate)) continue;
+            $packet = SubjectResolutionPacket::fromArray($candidate);
+            if ($packet !== null) return $packet;
+        }
+        return null;
     }
 
     private function beginPhase(string $phase): void

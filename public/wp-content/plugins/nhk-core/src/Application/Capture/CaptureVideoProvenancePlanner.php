@@ -98,6 +98,21 @@ final class CaptureVideoProvenancePlanner
         // A valid uuid_exact packet is the immutable semantic handoff from
         // Capture. Trusted source text remains provenance/editorial input and
         // may diagnose a conflict, but it cannot veto or replace this packet.
+        if ($handoff['explicit'] && ($sourceTitle === '' || $identityMatches === [])) {
+            return [
+                'status' => 'REVIEW_REQUIRED',
+                // The Capture subject remains locked. The source is merely
+                // insufficient to support the provenance Claim/Evidence and
+                // Graph attachment; it must not be promoted into fake proof.
+                'blockers' => ['SOURCE_DOES_NOT_SUPPORT_CLAIM'],
+                'dependencies' => [],
+                'video_proposal' => $emptyVideo,
+                'evidence_idempotency_key' => $evidenceKey,
+                'reuse_scope' => 'source-specific-external-video',
+                'unsupported_classifications' => $unsupported,
+                'diagnostics' => $diagnostics + ['subject_locked' => true, 'source_support' => 'missing'],
+            ];
+        }
         if (!$handoff['explicit'] && ($sourceTitle === '' || $subjectId === '' || $subjectType === '' || $identityMatches === [])) {
             return [
                 'status' => 'REVIEW_REQUIRED',

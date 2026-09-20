@@ -171,8 +171,10 @@ final class CaptureVideoProvenancePlannerTest extends TestCase
             ],
         );
 
-        self::assertSame('READY', $plan['status']);
-        self::assertSame(self::VARIANT, $plan['relation']['target_uuid']);
+        self::assertSame('REVIEW_REQUIRED', $plan['status']);
+        self::assertContains('SOURCE_DOES_NOT_SUPPORT_CLAIM', $plan['blockers']);
+        self::assertTrue($plan['diagnostics']['subject_locked']);
+        self::assertSame(self::VARIANT, $plan['diagnostics']['subject_id']);
         self::assertSame([], $plan['diagnostics']['identity_matches']);
         self::assertSame('uuid_exact', $plan['diagnostics']['subject_match']);
     }
@@ -193,8 +195,10 @@ final class CaptureVideoProvenancePlannerTest extends TestCase
             ],
         );
 
-        self::assertSame('READY', $plan['status']);
-        self::assertSame(self::VARIANT, $plan['relation']['target_uuid']);
+        self::assertSame('REVIEW_REQUIRED', $plan['status']);
+        self::assertContains('SOURCE_DOES_NOT_SUPPORT_CLAIM', $plan['blockers']);
+        self::assertTrue($plan['diagnostics']['subject_locked']);
+        self::assertSame(self::VARIANT, $plan['diagnostics']['subject_id']);
         self::assertSame('uuid_exact', $plan['diagnostics']['subject_match']);
     }
 
@@ -220,7 +224,9 @@ final class CaptureVideoProvenancePlannerTest extends TestCase
             ['id' => self::VARIANT, 'type' => 'variant', 'name' => 'Variant A', 'match' => 'uuid_exact', 'revision' => 1, 'active' => true],
         );
 
-        self::assertSame('READY', $plan['status']);
+        self::assertSame('REVIEW_REQUIRED', $plan['status']);
+        self::assertContains('SOURCE_DOES_NOT_SUPPORT_CLAIM', $plan['blockers']);
+        self::assertTrue($plan['diagnostics']['subject_locked']);
         self::assertSame('maxresdefault', $plan['video_proposal']['payload']['metadata']['source']['thumbnail_selection']['variant']);
         self::assertSame(1920, $plan['video_proposal']['payload']['metadata']['source']['thumbnail_selection']['width']);
     }

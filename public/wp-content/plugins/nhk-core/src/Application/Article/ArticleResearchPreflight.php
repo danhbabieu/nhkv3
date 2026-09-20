@@ -7,6 +7,7 @@ use NHK\Core\Application\Compliance\PublicClaimCopyPolicy;
 use NHK\Core\Application\Dictionary\DictionaryObservationRegistry;
 use NHK\Core\Application\Seo\PublicSeoProjection;
 use NHK\Core\Domain\Article\ArticleResearchResult;
+use NHK\Core\Domain\Capture\SubjectResolutionPacket;
 
 /** Read-only Article research orchestration; injected callbacks are application/repository boundaries. */
 final class ArticleResearchPreflight
@@ -20,7 +21,8 @@ final class ArticleResearchPreflight
         $timings = [];
         $blockers = [];
         $warnings = [];
-        try { $resolution = ($this->subjectResolver)(['topic' => $topic, 'subject' => $subject]); }
+        $packet = SubjectResolutionPacket::fromArray((array) ($articleContext['subject_resolution_packet'] ?? []));
+        try { $resolution = $packet !== null ? $packet->toResolution() : ($this->subjectResolver)(['topic' => $topic, 'subject' => $subject]); }
         catch (\Throwable $e) { return $this->blocked(['SUBJECT_RESOLUTION_UNAVAILABLE'], ['subject_error' => $e->getMessage()]); }
         $timings['subject_resolution_ms'] = $this->elapsed($started);
         $resolution = is_array($resolution) ? $resolution : ['status' => 'unavailable'];

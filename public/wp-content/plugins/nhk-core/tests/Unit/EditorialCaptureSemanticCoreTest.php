@@ -523,7 +523,8 @@ final class EditorialCaptureSemanticCoreTest extends TestCase
         self::assertSame($variant, $events[0]['subject_resolution']['primary']);
         self::assertSame($variant['id'], $events[0]['subject_resolution']['primary']['id']);
         self::assertSame($variant, $mediaContexts[0]['subject_resolution']['primary']);
-        self::assertSame($variant, $mediaContexts[0]['subject_resolution_packet']);
+        self::assertSame($variant['id'], $mediaContexts[0]['subject_resolution_packet']['canonical_subject_id']);
+        self::assertSame($variant['type'], $mediaContexts[0]['subject_resolution_packet']['entity_type']);
     }
 
     public function test_fresh_video_user_hint_becomes_one_subject_handoff_before_semantic_reconciliation(): void

@@ -163,12 +163,15 @@ Source entity and therefore never invents a Source ID. When Video is a child of
 governed Source, provenance Claim and Evidence proposals from the immutable
 external Video snapshot and the locked exact subject handoff. Those proposals
 are applied and read back before the Video proposal is constructed; they are
-not written by the Video adapter and are not a second semantic writer. If the
-source snapshot does not explicitly identify the locked subject, the
-coordinated path records `SOURCE_SUBJECT_IDENTITY_UNCONFIRMED` and creates no
-dependency or relation. Existing-claim evidence remains `same_claim`/
-review-only unless its canonical source identity matches the current external
-Video.
+not written by the Video adapter and are not a second semantic writer. If
+Capture has not resolved a subject, the coordinated path records
+`SUBJECT_NEVER_RESOLVED`/`SUBJECT_CONFLICT` and creates no dependency or
+relation. If Capture has a valid locked subject but the source snapshot does
+not support a claim about that subject, the path records
+`SOURCE_DOES_NOT_SUPPORT_CLAIM`, preserves the locked packet, and creates no
+provenance Claim, Evidence or Graph relation. A user subject selection is not
+Evidence. Existing-claim evidence remains `same_claim`/review-only unless its
+canonical source identity matches the current external Video.
 
 The Video adapter seam remains planning-only: it does not call
 Knowledge/Evidence repositories, submit or approve proposals, apply mutations,

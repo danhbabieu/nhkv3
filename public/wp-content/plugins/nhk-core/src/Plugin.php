@@ -769,7 +769,7 @@ final class Plugin {
             $articleReceipts = new WpdbArticleOperationReceiptRepository($wpdb);
             $categoryGateway = new CategoryGateway(new WpCategoryStore());
             $editorialPosts = new WpEditorialPostStore($articleEditorial);
-            $canonicalPublicationContext = static function (\NHK\Core\Domain\Article\EditorialPostState $state, array $callerEvidence) use ($captureRepository, $articleResearch, $articlePreflightHandoff): array {
+            $canonicalPublicationContext = static function (\NHK\Core\Domain\Article\EditorialPostState $state, array $callerEvidence) use ($captureRepository, $articleResearch, $articlePreflightHandoff, $articleMedia): array {
                 $capture = $captureRepository->findByArticleId($state->postId);
                 if ($capture === null || $capture->articleId !== $state->postId) throw new \RuntimeException('CAPTURE_ARTICLE_BINDING_UNAVAILABLE');
                 $persistedSubject = is_array($capture->diagnostics['subjects'] ?? null) ? $capture->diagnostics['subjects'] : [];
@@ -778,18 +778,31 @@ final class Plugin {
                 if (trim((string) ($primary['id'] ?? '')) === '' || trim((string) ($primary['type'] ?? '')) === '') throw new \RuntimeException('CAPTURE_SUBJECT_BINDING_UNAVAILABLE');
                 $contentIntent = is_array($capture->context['content_intent'] ?? null) ? $capture->context['content_intent'] : [];
                 $composition = is_array($capture->diagnostics['composition'] ?? null) ? $capture->diagnostics['composition'] : [];
+                $subjectPacket = is_array($capture->context['subject_resolution_packet'] ?? null)
+                    ? $capture->context['subject_resolution_packet']
+                    : (is_array($capture->diagnostics['subject_resolution_packet'] ?? null) ? $capture->diagnostics['subject_resolution_packet'] : []);
+                $captureMediaIds = array_values(array_unique(array_filter(array_map(static fn (mixed $asset): string => is_array($asset) ? trim((string) ($asset['media_id'] ?? '')) : '', $capture->assets))));
+                $mediaReadback = $articleMedia->diagnoseForPost($state->postId, [
+                    'subject_resolution_packet' => $subjectPacket,
+                    'subject_resolution' => $persistedSubject,
+                    'subject_ids' => [$primary['id']],
+                    'capture_id' => $capture->captureId,
+                    'capture_owned_media_ids' => $captureMediaIds,
+                    'content_intent' => $contentIntent,
+                ])->toArray();
                 $research = $articleResearch->research($state->title, $primary, [
                     'post_id' => $state->postId,
                     'title' => $state->title,
                     'excerpt' => $state->excerpt,
                     'body' => $state->content,
                     'content_intent' => $contentIntent,
+                    'subject_resolution_packet' => $subjectPacket,
                     'claim_trace' => is_array($composition['claim_trace'] ?? null) ? $composition['claim_trace'] : [],
                 ]);
                 $semanticWriteBack = is_array($capture->diagnostics['semantic_write_back'] ?? null) ? $capture->diagnostics['semantic_write_back'] : [];
                 $canonical = $articlePreflightHandoff->build(
                     $research,
-                    is_array($capture->diagnostics['media_usage'] ?? null) ? $capture->diagnostics['media_usage'] : [],
+                    $mediaReadback,
                     $semanticWriteBack,
                     $state->snapshot() + ['content_intent' => strtoupper(trim((string) ($contentIntent['intent'] ?? 'TEXT_ARTICLE')))],
                 );
@@ -1309,7 +1322,7 @@ final class Plugin {
                     $payload['governed_media_operations'] = $governedMediaOperations;
                     return $payload;
                 },
-                static function (array $context) use ($draftGateway, $articleEditorial, $articleResearch, $articlePreflightHandoff): array {
+                static function (array $context) use ($draftGateway, $articleEditorial, $articleResearch, $articlePreflightHandoff, $categoryGateway): array {
                     // Media/editorial reconciliation can rotate the native
                     // token after Capture persisted its last receipt. On the
                     // bounded one-time refresh, re-read the Article owner and
@@ -1325,6 +1338,9 @@ final class Plugin {
                     if ($current !== null) $expectedToken = $current->token;
                     $composition = is_array($context['composition'] ?? null) ? $context['composition'] : [];
                     $topic = trim((string) ($composition['title'] ?? $current?->title ?? $context['capture']['context']['raw_input'] ?? ''));
+                    $subjectPacket = is_array($context['subject_resolution_packet'] ?? null)
+                        ? $context['subject_resolution_packet']
+                        : (is_array($context['capture']['context']['subject_resolution_packet'] ?? null) ? $context['capture']['context']['subject_resolution_packet'] : []);
                     $freshResearch = $articleResearch->research($topic, $primary, [
                         'post_id' => (int) ($context['article_id'] ?? 0),
                         'title' => (string) ($current?->title ?? $topic),
@@ -1332,7 +1348,33 @@ final class Plugin {
                         'body' => (string) ($current?->content ?? ''),
                         'planned_title' => $topic,
                         'claim_trace' => is_array($composition['claim_trace'] ?? null) ? $composition['claim_trace'] : [],
+                        'subject_resolution_packet' => $subjectPacket,
                     ]);
+                    $desiredCategory = is_array($freshResearch->categoryPlan['desired_category'] ?? null) ? $freshResearch->categoryPlan['desired_category'] : [];
+                    $currentCategory = is_array($freshResearch->categoryPlan['current_category'] ?? null) ? $freshResearch->categoryPlan['current_category'] : [];
+                    $desiredCategoryId = (int) ($desiredCategory['id'] ?? 0);
+                    $currentCategoryId = (int) ($currentCategory['id'] ?? 0);
+                    if ($desiredCategoryId > 0 && $desiredCategoryId !== $currentCategoryId) {
+                        $assigned = function_exists('wp_get_post_categories') ? array_map('intval', (array) wp_get_post_categories((int) ($context['article_id'] ?? 0), ['fields' => 'ids'])) : [];
+                        foreach ($assigned as $termId) {
+                            if ($termId === $desiredCategoryId) continue;
+                            $term = function_exists('get_term') ? get_term($termId, 'category') : null;
+                            if ($term instanceof \WP_Term && in_array(strtolower((string) $term->slug), ['uncategorized', 'chua-phan-loai'], true)) $categoryGateway->unassign((int) ($context['article_id'] ?? 0), $termId);
+                        }
+                        $categoryGateway->assign((int) ($context['article_id'] ?? 0), $desiredCategoryId);
+                        $current = $articleEditorial->read((int) ($context['article_id'] ?? 0));
+                        if ($current === null) return ['eligible' => false, 'blockers' => ['CATEGORY_PROJECTION_MISMATCH'], 'fresh_preflight' => $freshResearch->toArray()];
+                        $expectedToken = $current->token;
+                        $freshResearch = $articleResearch->research($topic, $primary, [
+                            'post_id' => (int) ($context['article_id'] ?? 0),
+                            'title' => $current->title,
+                            'excerpt' => $current->excerpt,
+                            'body' => $current->content,
+                            'planned_title' => $topic,
+                            'claim_trace' => is_array($composition['claim_trace'] ?? null) ? $composition['claim_trace'] : [],
+                            'subject_resolution_packet' => $subjectPacket,
+                        ]);
+                    }
                     $evidence = $articlePreflightHandoff->build(
                         // The handoff supplies the gate's locked
                         // The resulting evidence contains 'subject_resolved' =>

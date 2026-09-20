@@ -218,6 +218,25 @@ Media/MediaAsset/MediaUsage for image state, Video for external-reference state,
 Knowledge/Source/Evidence for factual state, and Graph only for registered typed
 relations.
 
+### Capture continuation context and current Media precedence — 2026-09-21
+
+An Article Capture persists one typed `SubjectResolutionPacket` containing the
+resolution status, canonical subject identity/type, stable key, canonical name,
+revision, match reason and ambiguity diagnostics. Article, Media, Knowledge,
+Graph/Governance and publication continuation consume that packet; an existing
+Capture retry reconstructs it from Capture → Article ownership and never parses
+the Article title/body to guess a subject. Missing persisted context remains a
+truthful canonical-context-unavailable diagnostic rather than a new generic
+ambiguous resolution.
+
+The ordered current Capture Media manifest is the publication-unit handoff.
+After canonical Media read-back, a valid current explicitly supplied Media may
+be selected with bounded publication provenance and must remain visible in the
+MediaUsage plan. Historical usages are revalidated and may not override it;
+filename, title, keyword or visual similarity is not scope proof. Final Article
+preflight and publication evidence consume the post-reconciliation Media/native
+read-back, not the earlier planning inventory.
+
 ## Existing-Capture continuation addendum
 
 ## Canonical subject handoff — 2026-09-10

@@ -32,6 +32,8 @@ final class MediaUsageReconciler
                     'placement_key' => $usage->placementKey,
                     'sort_order' => $usage->sortOrder,
                     'persisted' => true,
+                    'selection_source' => $usage->selectionSource,
+                    'selection_policy' => $usage->selectionPolicy,
                 ]);
                 $currentAssessmentByIdentity[$identity] = is_array($assessment)
                     ? $assessment
@@ -59,6 +61,8 @@ final class MediaUsageReconciler
                     (string) ($spec['title'] ?? ''),
                     1,
                     (string) ($spec['placement_key'] ?? ''),
+                    (string) ($spec['selection_source'] ?? 'SYSTEM_AUTO'),
+                    (string) ($spec['selection_policy'] ?? 'AUTO'),
                 );
                 $identity = $role . "\0" . $desired->placementKey;
                 if (isset($desiredByRole[$identity])) return $this->review('DUPLICATE_DESIRED_USAGE', $role);

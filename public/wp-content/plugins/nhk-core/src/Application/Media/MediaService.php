@@ -160,10 +160,10 @@ final class MediaService
         }
     }
 
-    public function addUsage(string $mediaId, string $endpointType, string $endpointKey, string $role, int $sortOrder = 0, string $altText = '', string $caption = '', array $keywordGroups = [], string $title = '', string $placementKey = ''): MediaUsage
+    public function addUsage(string $mediaId, string $endpointType, string $endpointKey, string $role, int $sortOrder = 0, string $altText = '', string $caption = '', array $keywordGroups = [], string $title = '', string $placementKey = '', string $selectionSource = 'SYSTEM_AUTO', string $selectionPolicy = 'AUTO'): MediaUsage
     {
         if (!$this->media->findByCanonicalId($mediaId)) throw new MediaException('Media not found.');
-        $candidate = new MediaUsage(UuidCodec::newV7(), $mediaId, $endpointType, $endpointKey, $role, $sortOrder, $altText, $caption, $keywordGroups, $title, 1, $placementKey);
+        $candidate = new MediaUsage(UuidCodec::newV7(), $mediaId, $endpointType, $endpointKey, $role, $sortOrder, $altText, $caption, $keywordGroups, $title, 1, $placementKey, $selectionSource, $selectionPolicy);
         return $this->reconcileUsageCandidate($candidate);
     }
 
@@ -215,7 +215,7 @@ final class MediaService
         if (!$this->usages instanceof MediaUsageUpdater) throw new MediaException('Media usage update capability is unavailable.');
         $attempts = 0;
         while (true) {
-            $updated = new MediaUsage($existing->usageId, $candidate->mediaId, $candidate->endpointType, $candidate->endpointKey, $candidate->role, $candidate->sortOrder, $candidate->altText, $candidate->caption, $candidate->keywordGroups, $candidate->title, $existing->revision, $candidate->placementKey);
+            $updated = new MediaUsage($existing->usageId, $candidate->mediaId, $candidate->endpointType, $candidate->endpointKey, $candidate->role, $candidate->sortOrder, $candidate->altText, $candidate->caption, $candidate->keywordGroups, $candidate->title, $existing->revision, $candidate->placementKey, $candidate->selectionSource, $candidate->selectionPolicy);
             try {
                 return $this->usages->update($updated);
             } catch (MediaException $error) {

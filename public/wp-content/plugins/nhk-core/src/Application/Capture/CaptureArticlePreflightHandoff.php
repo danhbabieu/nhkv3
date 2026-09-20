@@ -15,9 +15,13 @@ final class CaptureArticlePreflightHandoff
         $primary = is_array($resolution['primary'] ?? null) ? $resolution['primary'] : [];
         $overlap = (string) ($research->overlap['classification'] ?? 'UNCERTAIN');
         $category = (string) ($research->categoryPlan['status'] ?? 'UNKNOWN');
-        $currentArticleMedia = is_array($research->inventory['article_media'] ?? null) && $research->inventory['article_media'] !== []
-            ? $research->inventory['article_media']
-            : $media;
+        // The coordinator's post-reconciliation/read-back snapshot is the
+        // current publication-unit truth. Research inventory is historical
+        // planning evidence and must not override a current Capture Media
+        // handoff with empty or stale candidates.
+        $currentArticleMedia = is_array($media) && $media !== []
+            ? $media
+            : (is_array($research->inventory['article_media'] ?? null) ? $research->inventory['article_media'] : []);
         $mediaComplete = ($currentArticleMedia['media_complete'] ?? false) === true
             || (($currentArticleMedia['slots']['featured_primary']['placeholder'] ?? $currentArticleMedia['featured_primary']['placeholder'] ?? true) === false);
         $compliance = (string) ($research->compliance['status'] ?? '');

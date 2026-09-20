@@ -250,8 +250,8 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
                 'payload' => [
                     'canonical_id' => $videoId,
                     'metadata' => [
-                        'source' => ['platform' => 'youtube', 'external_video_id' => '2Fx8Wp4Hzyk', 'canonical_source_url' => 'https://www.youtube.com/watch?v=2Fx8Wp4Hzyk'],
-                        'subject_resolution_packet' => ['status' => 'RESOLVED', 'match' => 'uuid_exact', 'type' => 'classification', 'id' => $subjectId, 'stable_key' => 'nhk:classification:clock-type.dong-ho-cong-cong', 'revision' => 2],
+                        'source' => ['platform' => 'youtube', 'external_video_id' => '2Fx8Wp4Hzyk', 'canonical_source_url' => 'https://www.youtube.com/watch?v=2Fx8Wp4Hzyk', 'source_title' => 'Đồng hồ công cộng'],
+                        'subject_resolution_packet' => ['status' => 'RESOLVED', 'match' => 'uuid_exact', 'type' => 'classification', 'id' => $subjectId, 'name' => 'Đồng hồ công cộng', 'stable_key' => 'nhk:classification:clock-type.dong-ho-cong-cong', 'revision' => 2],
                     ],
                 ],
             ],
@@ -326,7 +326,7 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
         $subjectId = UuidCodec::newV7();
         $capture = new \NHK\Core\Domain\Capture\CaptureRecord($captureId, 'live-shaped', hash('sha256', 'live-shaped'), 'SEMANTICS_RECONCILED', 'IN_PROGRESS', context: ['purpose' => 'EDITORIAL', 'content_intent' => ['intent' => 'VIDEO']], assets: [[
             'kind' => 'video', 'video_proposal' => ['entity_type' => 'video', 'operation' => 'ingest', 'subject_id' => $videoId, 'idempotency_key' => 'live-shaped:video', 'fingerprint' => hash('sha256', 'video-plan'), 'payload' => [
-                'canonical_id' => $videoId, 'metadata' => ['source' => ['platform' => 'youtube', 'external_video_id' => 'GHvh8-iXPoE', 'canonical_source_url' => 'https://www.youtube.com/watch?v=GHvh8-iXPoE'], 'subject_resolution_packet' => ['status' => 'RESOLVED', 'match' => 'uuid_exact', 'type' => 'variant', 'id' => $subjectId, 'revision' => 1]],
+                'canonical_id' => $videoId, 'metadata' => ['source' => ['platform' => 'youtube', 'external_video_id' => 'GHvh8-iXPoE', 'canonical_source_url' => 'https://www.youtube.com/watch?v=GHvh8-iXPoE', 'source_title' => 'Variant A'], 'subject_resolution_packet' => ['status' => 'RESOLVED', 'match' => 'uuid_exact', 'type' => 'variant', 'id' => $subjectId, 'name' => 'Variant A', 'revision' => 1]],
             ]],
         ]]);
         $videos = new class implements VideoRepository {

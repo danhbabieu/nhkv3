@@ -1,5 +1,59 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-21 — Shared Capture subject packet / Video provenance separation (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE: The Capture-owned `SubjectResolutionPacket` was persisted before
+Video enrichment but was not rebuilt after a server-owned Video subject
+handoff. Video assets and downstream Media/publication contexts could therefore
+retain a pre-handoff projection while the Capture diagnostics reported the
+newer subject. The Video provenance planner also treated a valid exact Capture
+subject and source support as one gate, then could mint a provenance
+Claim/Evidence chain from a source that did not actually support the subject.
+
+FIXED_BOUNDARY: After Video handoff, the coordinator rehydrates the typed
+packet, persists it on the Capture, and binds every Video child asset to that
+same packet. The packet exposes typed canonical fields with read-compatible
+aliases for existing consumers. A locked exact subject remains preserved when
+source metadata is insufficient, but the planner returns
+`SOURCE_DOES_NOT_SUPPORT_CLAIM` and creates no Source/Claim/Evidence or Graph
+relation. Subject-unresolved and subject-conflict states remain separate and
+fail closed.
+
+VERIFICATION: Focused Capture/Video/provenance/Governance suites pass 145 tests
+/ 670 assertions. No staging/production mutation, live retry, deployment or
+push was performed. Full Unit, changed-file PHP lint, diff check and secret
+review remain to be run before commit readiness.
+
+STATUS: `SHARED_CAPTURE_SUBJECT_PACKET_REPAIRED_LOCAL / VERIFICATION_IN_PROGRESS / NO_LIVE_MUTATION`.
+
+# Checkpoint — 2026-09-21 — Capture subject/media convergence primitive repair (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE: Capture subject resolution was persisted as loosely-shaped
+diagnostics and downstream Article research/publication could resolve again
+from the Article topic. The current Capture Media handoff was also allowed to
+be displaced by historical Article inventory and did not retain explicit
+publication-unit selection provenance through MediaUsage reconciliation.
+
+FIXED_BOUNDARY: Added the typed durable `SubjectResolutionPacket`, persisted
+on Capture context and diagnostics, rehydrated for retry/continuation and
+consumed by Article research, Media, semantic context and publication review.
+Capture-owned current Media is now explicit/pinned publication-unit input;
+shared suitability accepts that bounded provenance only for the current
+Article handoff, while historical/entity reuse still requires exact or
+registered compatible scope. Article preflight handoff prefers the current
+post-reconciliation canonical Media read-back. Capture publication performs
+one bounded category reconciliation/read-back and fails closed on mismatch.
+
+AUDIT: Existing Capture→Article lookup remains exact `wp_post_id` ownership;
+ATTACH_ASSETS and RETRY keep the same Capture/Article/Media identities;
+standalone Article publication remains Capture-context dependent; Media-only,
+Knowledge-only and Video owner branches retain their existing required-owner
+boundaries. No live data, staging/production records, proposal, publication,
+deployment or push was touched. No test suite was run by user request;
+changed PHP lint and `git diff --check` pass.
+
+STATUS: `CAPTURE_ARTICLE_MEDIA_CONVERGENCE_FIXED_LOCAL / COMMIT_READY / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-20 — Publication review canonical context repair (LOCAL / NO LIVE MUTATION)
 
 ROOT_CAUSE: The registered `nhk.article.publish.review` path read the native

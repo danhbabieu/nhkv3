@@ -63,6 +63,13 @@ final class SemanticSuitabilityPolicy
         } elseif ($expected !== [] && $actual !== []) {
             $suitability = self::INELIGIBLE;
             $basis = 'persisted_subject_scope_mismatch';
+        } elseif (($candidate['selection_source'] ?? 'SYSTEM_AUTO') === 'USER_EXPLICIT' && ($candidate['current_capture_media'] ?? false) === true) {
+            // A Media supplied in the current Capture is publication-unit
+            // provenance. It may satisfy the Article slot without inventing
+            // persisted semantic scope; representative/entity reuse still
+            // requires exact or registered compatible scope.
+            $suitability = self::COMPATIBLE;
+            $basis = 'current_capture_selection_provenance';
         } elseif (($candidate['selection_source'] ?? 'SYSTEM_AUTO') === 'USER_EXPLICIT' && ($candidate['editorial_illustration'] ?? false) === true) {
             // An explicit illustration may be retained for editorial context,
             // but it is not semantic representative coverage.
@@ -74,7 +81,7 @@ final class SemanticSuitabilityPolicy
 
         $auto = $availability === self::AVAILABLE
             && in_array($suitability, [self::EXACT, self::COMPATIBLE], true)
-            && in_array($basis, ['exact_canonical_subject_binding', 'registered_compatibility_rule'], true);
+            && in_array($basis, ['exact_canonical_subject_binding', 'registered_compatibility_rule', 'current_capture_selection_provenance'], true);
         return [
             'requirement' => $requirement,
             'availability' => $availability,
@@ -95,6 +102,7 @@ final class SemanticSuitabilityPolicy
             'selection_source' => $selectionSource,
             'role' => $role,
         ];
+        if (($target['current_capture_media'] ?? false) === true) $candidate['current_capture_media'] = true;
         return $this->evaluate($candidate, $target);
     }
 
