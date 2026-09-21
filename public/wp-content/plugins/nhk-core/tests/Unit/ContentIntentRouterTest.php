@@ -577,6 +577,57 @@ final class ContentIntentRouterTest extends TestCase
         self::assertSame([['kind' => 'video', 'video_id' => 'dQw4w9WgXcQ']], $repository->findById($first->captureId)?->assets);
         self::assertSame(['draft' => 0, 'video' => 1], $calls);
     }
+
+    public function test_applied_video_capture_replay_is_readback_only_and_does_not_regress_status(): void
+    {
+        $repository = new IntentCaptureRepository();
+        $videoId = UuidCodec::newV7();
+        $proposalId = UuidCodec::newV7();
+        $calls = ['semantic' => 0];
+        $coordinator = new EditorialCaptureCoordinator(
+            $repository,
+            static fn (array $input): array => ['items' => []],
+            static fn (array $input): array => throw new \RuntimeException('ARTICLE_DRAFT_MUST_NOT_RUN'),
+            new TextInputInterpreter(),
+            new SubjectResolutionService(static fn (string $hint): array => []),
+            new ClaimRetrievalEngine(static fn (array $subject): array => ['status' => 'available', 'items' => []], static fn (array $subject, array $neighborhood): array => []),
+            static function (array $context) use (&$calls, $videoId, $proposalId): array {
+                ++$calls['semantic'];
+                return [
+                    'status' => 'APPLIED',
+                    'governance' => ['proposal_ids' => [$proposalId], 'applied_count' => 1],
+                    'writes' => [[
+                        'entity_type' => 'video', 'operation' => 'ingest', 'proposal_id' => $proposalId,
+                        'status' => 'APPLIED', 'canonical_id' => $videoId,
+                        'canonical_readback' => ['canonical_id' => $videoId, 'entity_type' => 'video', 'active' => true, 'revision' => 1],
+                    ]],
+                ];
+            },
+            new ArticleComposer(),
+            static fn (array $context): array => ['status' => 'RECONCILED'],
+            static fn (array $context): array => ['eligible' => false, 'blockers' => ['CATEGORY_UNRESOLVED']],
+            static fn (array $context): array => ['status' => 'verified'],
+            null,
+            null,
+            null,
+            null,
+            static function (array $context) use ($videoId): array { return ['items' => [['kind' => 'video', 'video_id' => $videoId]]]; },
+            null,
+            null,
+            null,
+            new ContentIntentRouter(),
+        );
+
+        $input = ['idempotency_key' => 'video-applied-replay-' . bin2hex(random_bytes(4)), 'intent' => 'VIDEO', 'text' => 'Tư liệu đã được áp dụng.', 'video' => ['url' => 'https://youtu.be/dQw4w9WgXcQ']];
+        $first = $coordinator->execute($input);
+        $replay = $coordinator->execute($input);
+
+        self::assertSame($first->captureId, $replay->captureId);
+        self::assertSame($first->status, $replay->status);
+        self::assertSame($videoId, $replay->diagnostics['semantic_write_back']['writes'][0]['canonical_readback']['canonical_id']);
+        self::assertSame($proposalId, $replay->diagnostics['semantic_write_back']['governance']['proposal_ids'][0]);
+        self::assertSame(1, $calls['semantic']);
+    }
 }
 
 final class IntentCaptureRepository implements CaptureRepository

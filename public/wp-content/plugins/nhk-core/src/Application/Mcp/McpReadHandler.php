@@ -81,11 +81,17 @@ final class McpReadHandler
             : (is_array($diagnostics['subject_resolution_packet'] ?? null) ? $diagnostics['subject_resolution_packet'] : null);
         $completion = is_array($diagnostics['completion'] ?? null) ? $diagnostics['completion'] : [];
         $children = array_values(array_filter((array) ($completion['children'] ?? []), 'is_array'));
-        $owners = array_values(array_map(static fn (array $child): array => [
-            'owner_type' => (string) ($child['owner_type'] ?? ''),
-            'owner_id' => (string) ($child['owner_id'] ?? ''),
-            'status' => (string) ($child['status'] ?? (($child['complete'] ?? false) === true ? 'COMPLETE' : 'INCOMPLETE')),
-        ], $children));
+        $ownersByIdentity = [];
+        foreach ($children as $child) {
+            $owner = [
+                'owner_type' => (string) ($child['owner_type'] ?? ''),
+                'owner_id' => (string) ($child['owner_id'] ?? ''),
+                'status' => (string) ($child['status'] ?? (($child['complete'] ?? false) === true ? 'COMPLETE' : 'INCOMPLETE')),
+            ];
+            $identity = strtolower(trim($owner['owner_type'])) . '|' . trim($owner['owner_id']);
+            if (!isset($ownersByIdentity[$identity])) $ownersByIdentity[$identity] = $owner;
+        }
+        $owners = array_values($ownersByIdentity);
         $media = [];
         foreach ($capture->assets as $asset) {
             if (!is_array($asset)) continue;

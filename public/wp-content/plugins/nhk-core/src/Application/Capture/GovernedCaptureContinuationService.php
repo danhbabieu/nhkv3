@@ -1136,7 +1136,7 @@ final class GovernedCaptureContinuationService
             $readback = is_array($review['canonical_readback'] ?? null) ? $review['canonical_readback'] : (is_array($review['apply']['canonical_readback'] ?? null) ? $review['apply']['canonical_readback'] : $this->uncertainApplyReadback($plan, $proposal));
             if (!is_array($readback)) throw new \RuntimeException('CANONICAL_READBACK_REQUIRED_AFTER_APPLIED');
             $applied = ['canonical_id' => $readback['canonical_id'] ?? null, 'canonical_readback' => $readback, 'idempotent' => true];
-            $lifecycle[] = 'CONTROLLED_APPLY';
+            $lifecycle[] = 'REUSED_VERIFIED';
             return $this->applied($proposal, $applied);
         }
         $eligibility = $this->governance->eligibility($proposal->id);

@@ -67,6 +67,7 @@ final class EditorialCaptureCoordinator
         if ($existing !== null) {
             if (!hash_equals($existing->requestFingerprint, $fingerprint)) return $this->conflict($existing, $fingerprint);
             if ($existing->stage === CaptureStage::READY_FOR_PUBLICATION->value || $existing->stage === CaptureStage::PUBLISHED->value) return $existing;
+            if ($this->hasTerminalSemanticReadback($existing)) return $existing;
             return $this->run($existing, $input);
         }
         $record = $this->captures->create(new CaptureRecord(
@@ -979,6 +980,25 @@ final class EditorialCaptureCoordinator
     private function conflict(CaptureRecord $record, string $fingerprint): CaptureRecord
     {
         return new CaptureRecord($record->captureId, $record->idempotencyKey, $record->requestFingerprint, $record->stage, 'IDEMPOTENCY_CONFLICT', $record->articleId, $record->articleStateToken, $record->assets, $record->context, $record->diagnostics + ['failure' => ['code' => 'CAPTURE_IDEMPOTENCY_KEY_REUSED', 'request_fingerprint' => $fingerprint]], $record->phaseReceipts, $record->revision, $record->createdAt, $record->updatedAt);
+    }
+
+    private function hasTerminalSemanticReadback(CaptureRecord $record): bool
+    {
+        $intent = is_array($record->context['content_intent'] ?? null) ? $record->context['content_intent'] : [];
+        if (strtoupper(trim((string) ($intent['intent'] ?? ''))) !== 'VIDEO') return false;
+        $semantic = is_array($record->diagnostics['semantic_write_back'] ?? null)
+            ? $record->diagnostics['semantic_write_back']
+            : [];
+        if (!in_array(strtoupper(trim((string) ($semantic['status'] ?? ''))), ['APPLIED', 'IDEMPOTENT', 'REUSED', 'REUSED_VERIFIED', 'ALREADY_APPLIED'], true)) return false;
+        if ((array) ($record->diagnostics['completion']['missing_required_owners'] ?? []) !== []) return false;
+        $writes = is_array($semantic['writes'] ?? null) ? $semantic['writes'] : [];
+        if (is_array($semantic['canonical_readback'] ?? null) && trim((string) ($semantic['canonical_readback']['canonical_id'] ?? '')) !== '') return true;
+        foreach ($writes as $write) {
+            if (!is_array($write)) continue;
+            $readback = is_array($write['canonical_readback'] ?? null) ? $write['canonical_readback'] : [];
+            if (trim((string) ($readback['canonical_id'] ?? $write['canonical_id'] ?? '')) !== '') return true;
+        }
+        return (int) ($semantic['governance']['applied_count'] ?? 0) > 0;
     }
 
     /** @param list<array<string,mixed>> $assets @param array<string,mixed> $diagnostics @param array<string,mixed> $receipts */

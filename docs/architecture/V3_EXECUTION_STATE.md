@@ -16173,3 +16173,40 @@ and changed-production Odo scan pass. No schema, migration, deployment, push
 or live mutation was performed.
 
 STATUS=`VIDEO_CATEGORY_CANONICAL_APPLY_AND_OWNER_READBACK_FIXED_LOCALLY / NO_LIVE_MUTATION`.
+
+# Checkpoint — 2026-09-21 — Video Capture applied replay/idempotency (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE_CONFIRMED: An exact replay whose Capture remained
+`REVIEW_REQUIRED` because publication was blocked did not satisfy the old
+READY/PUBLISHED short-circuit. It re-entered semantic reconciliation, rebuilt
+staging, encountered the already-owned canonical Video and surfaced
+`STAGING_VIDEO_DUPLICATE`, regressing the Capture to `FAILED_RETRYABLE`.
+Capture readback also projected duplicate owner rows when the same Video was
+present in more than one completion child projection.
+
+FIXED_BOUNDARIES: Video Capture replay now returns the persisted terminal
+semantic result when the immutable request fingerprint, Video intent, applied
+semantic status, canonical readback and required-owner readback are already
+verified. Changed payload/intent still follows the existing idempotency
+conflict path. Applied Proposal reentry remains readback-only and reports
+`REUSED_VERIFIED`; Controlled Apply is not invoked. `capture_get` owners are
+deduplicated by exact normalized `owner_type + owner_id` without changing
+canonical ownership.
+
+RETRY_AUDIT: `VIDEO_FRONTEND_READBACK_FAILED` is emitted only by the existing
+frontend callback when it returns false or throws, so it remains a genuine
+technical retry condition. It is not inferred from `CATEGORY_UNRESOLVED`;
+publication/category review therefore remains separate from retryability.
+
+REGRESSION: Generated-UUID production-shaped Capture replay proves the same
+Capture/Video/Proposal identity and one semantic invocation. Applied Proposal
+reentry proves no second apply. Capture readback proves exact owner
+deduplication. Existing duplicate, staging, tamper, CAS, canonical readback
+and Video idempotency coverage remains green.
+
+VERIFICATION: Full NHK Unit passes 2,078 tests / 11,316 assertions with
+existing warnings/deprecations. Focused replay/read-model/governance suite
+passes 70 tests / 360 assertions. No schema, migration, deployment, push or
+live mutation was performed.
+
+STATUS=`VIDEO_CAPTURE_APPLIED_REPLAY_FIXED_LOCALLY / FULL_UNIT_PASS / NO_LIVE_MUTATION`.
