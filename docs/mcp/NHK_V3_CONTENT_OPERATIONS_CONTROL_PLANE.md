@@ -39,6 +39,15 @@ same-UUID UPDATE candidate only for changed registry fields, emits
 `REUSE/NOOP_VALUES_MATCH` for equal values, and fails closed for malformed
 deltas, UUID/type mismatch or retired targets.
 
+Exact structural Authority relations use the separate optional
+`authority_intent.relations[]` list with `source_uuid`, registered `predicate`
+and `target_uuid`. The server owns endpoint type resolution and current
+revision binding through the canonical registries. `requests[]` is Authority
+entity intent; `relations[]` is exact Graph relation intent. Relation plans
+remain Capture-owned orchestration and use the existing server-issued,
+Capture-bound staging scope and Governance lifecycle; Capture never becomes a
+Graph writer.
+
 The planner is planning-only and reuse-first. It decomposes facets such as
 Table Clock + France instead of minting a combined identity, and treats glass
 dome as vocabulary/evidence review rather than an automatic Model, clock type

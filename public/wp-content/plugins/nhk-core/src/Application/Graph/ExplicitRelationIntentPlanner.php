@@ -41,7 +41,7 @@ final class ExplicitRelationIntentPlanner
             $predicate = strtolower(trim((string) ($intent['predicate'] ?? '')));
             $targetType = strtolower(trim((string) ($intent['target_type'] ?? '')));
             $targetUuid = trim((string) ($intent['target_uuid'] ?? ''));
-            if ($sourceType === '' || $sourceUuid === '' || $predicate === '' || $targetType === '' || $targetUuid === '') {
+            if ($sourceUuid === '' || $predicate === '' || $targetUuid === '') {
                 $result['blockers'][] = ['code' => 'RELATION_INTENT_IDENTITY_REQUIRED'];
                 continue;
             }
@@ -70,21 +70,30 @@ final class ExplicitRelationIntentPlanner
     /** @param array<string,mixed> $intent @param array<string,mixed> $result */
     private function planOne(array $intent, array &$result): void
     {
-        foreach (['source', 'target'] as $side) {
-            $type = (string) $intent[$side . '_type'];
-            $uuid = (string) $intent[$side . '_uuid'];
-            if ($type !== 'wp_post' && !UuidCodec::isValid($uuid)) {
-                $result['blockers'][] = ['code' => 'RELATION_' . strtoupper($side) . '_UUID_INVALID', 'endpoint_type' => $type, 'endpoint_uuid' => $uuid];
-                return;
-            }
-        }
-
         try {
             $definition = $this->predicates->get((string) $intent['predicate']);
         } catch (\Throwable) {
             $result['blockers'][] = ['code' => 'RELATION_PREDICATE_UNSUPPORTED', 'predicate' => $intent['predicate']];
             return;
         }
+        foreach (['source', 'target'] as $side) {
+            $requestedType = strtolower(trim((string) ($intent[$side . '_type'] ?? '')));
+            $allowedTypes = $side === 'source' ? $definition->allowed_source_types : $definition->allowed_target_types;
+            if ($requestedType !== '' && !in_array($requestedType, $allowedTypes, true)) {
+                $result['blockers'][] = ['code' => 'RELATION_ENDPOINT_TYPES_UNSUPPORTED', 'predicate' => $intent['predicate'], 'source_type' => $intent['source_type'] ?? '', 'target_type' => $intent['target_type'] ?? ''];
+                return;
+            }
+        }
+
+        $references = [];
+        foreach (['source', 'target'] as $side) {
+            $reference = $this->resolveEndpoint($side, $intent, $definition, $result);
+            if ($reference === null) return;
+            $references[$side] = $reference;
+        }
+        $intent['source_type'] = $references['source']['reference']->endpoint_type;
+        $intent['target_type'] = $references['target']['reference']->endpoint_type;
+
         if (!$definition->allows((string) $intent['source_type'], (string) $intent['target_type'])) {
             $result['blockers'][] = [
                 'code' => 'RELATION_ENDPOINT_TYPES_UNSUPPORTED',
@@ -94,37 +103,11 @@ final class ExplicitRelationIntentPlanner
             ];
             return;
         }
-
-        $references = [];
-        foreach (['source', 'target'] as $side) {
-            try {
-                $reference = new NodeReference((string) $intent[$side . '_type'], (string) $intent[$side . '_uuid']);
-                $resolver = $this->endpoints->resolver($reference->endpoint_type);
-                $reference = $this->endpoints->assertExists($reference);
-                $state = is_callable($this->endpointState) ? ($this->endpointState)($reference) : null;
-                if (!is_array($state)) {
-                    $result['blockers'][] = ['code' => 'RELATION_' . strtoupper($side) . '_NOT_FOUND', 'endpoint_type' => $reference->endpoint_type, 'endpoint_uuid' => $reference->endpoint_key];
-                    return;
-                }
-                if (($state['active'] ?? false) !== true) {
-                    $result['blockers'][] = ['code' => 'RELATION_' . strtoupper($side) . '_INACTIVE', 'endpoint_type' => $reference->endpoint_type, 'endpoint_uuid' => $reference->endpoint_key];
-                    return;
-                }
-                if (!$resolver instanceof EndpointRevisionReader) throw new \RuntimeException('RELATION_ENDPOINT_REVISION_UNAVAILABLE');
-                $revision = (int) ($state['revision'] ?? $resolver->revision($reference) ?? 0);
-                if ($revision < 1) throw new \RuntimeException('RELATION_ENDPOINT_REVISION_UNAVAILABLE');
-                $references[$side] = ['reference' => $reference, 'revision' => $revision];
-            } catch (\Throwable $error) {
-                $code = strtoupper(trim($error->getMessage()));
-                $result['blockers'][] = [
-                    'code' => $code === 'RELATION_ENDPOINT_REVISION_UNAVAILABLE'
-                        ? 'RELATION_' . strtoupper($side) . '_REVISION_UNAVAILABLE'
-                        : 'RELATION_' . strtoupper($side) . '_UNRESOLVED',
-                    'endpoint_type' => $intent[$side . '_type'],
-                    'endpoint_uuid' => $intent[$side . '_uuid'],
-                ];
-                return;
-            }
+        if (!$definition->allow_self_relation
+            && $intent['source_type'] === $intent['target_type']
+            && strtolower((string) $intent['source_uuid']) === strtolower((string) $intent['target_uuid'])) {
+            $result['blockers'][] = ['code' => 'RELATION_SELF_FORBIDDEN', 'predicate' => $intent['predicate'], 'source_type' => $intent['source_type'], 'target_type' => $intent['target_type'], 'source_uuid' => $intent['source_uuid'], 'target_uuid' => $intent['target_uuid']];
+            return;
         }
 
         $packet = $intent + [
@@ -132,6 +115,10 @@ final class ExplicitRelationIntentPlanner
             'target_revision' => $references['target']['revision'],
         ];
         $existing = is_callable($this->relationState) ? ($this->relationState)($packet) : null;
+        if (is_array($existing) && strtoupper((string) ($existing['status'] ?? '')) === 'CARDINALITY_CONFLICT') {
+            $result['blockers'][] = ['code' => 'RELATION_CARDINALITY_CONFLICT'] + $packet + $existing;
+            return;
+        }
         if (is_array($existing) && strtoupper((string) ($existing['status'] ?? '')) === 'RETIRED') {
             $result['blockers'][] = ['code' => 'RELATION_RETIRED_REQUIRES_EXPLICIT_REACTIVATION'] + $packet;
             return;
@@ -170,6 +157,45 @@ final class ExplicitRelationIntentPlanner
             'dependencies' => [],
             'review_diagnostics' => [],
         ];
+    }
+
+    /** @param array<string,mixed> $intent @param \NHK\Core\Domain\Graph\PredicateDefinition $definition @param array<string,mixed> $result @return array{reference:NodeReference,revision:int}|null */
+    private function resolveEndpoint(string $side, array $intent, \NHK\Core\Domain\Graph\PredicateDefinition $definition, array &$result): ?array
+    {
+        $uuid = trim((string) ($intent[$side . '_uuid'] ?? ''));
+        $requestedType = strtolower(trim((string) ($intent[$side . '_type'] ?? '')));
+        if ($uuid === '' || !UuidCodec::isValid($uuid)) {
+            $result['blockers'][] = ['code' => 'RELATION_' . strtoupper($side) . '_UUID_INVALID', 'endpoint_type' => $requestedType, 'endpoint_uuid' => $uuid];
+            return null;
+        }
+
+        $types = $side === 'source' ? $definition->allowed_source_types : $definition->allowed_target_types;
+        $matches = [];
+        foreach ($types as $type) {
+            if ($requestedType !== '' && $requestedType !== $type) continue;
+            try {
+                $resolver = $this->endpoints->resolver($type);
+                $reference = $this->endpoints->assertExists(new NodeReference($type, $uuid));
+                $state = is_callable($this->endpointState) ? ($this->endpointState)($reference) : null;
+                if (!is_array($state)) continue;
+                if (($state['active'] ?? false) !== true) {
+                    if ($requestedType !== '') $result['blockers'][] = ['code' => 'RELATION_' . strtoupper($side) . '_INACTIVE', 'endpoint_type' => $type, 'endpoint_uuid' => $uuid];
+                    continue;
+                }
+                if (!$resolver instanceof EndpointRevisionReader) continue;
+                $revision = (int) ($state['revision'] ?? $resolver->revision($reference) ?? 0);
+                if ($revision > 0) $matches[] = ['reference' => $reference, 'revision' => $revision];
+            } catch (\Throwable) {
+                continue;
+            }
+        }
+        if (count($matches) === 1) return $matches[0];
+        if (count($matches) > 1) {
+            $result['blockers'][] = ['code' => 'RELATION_' . strtoupper($side) . '_TYPE_AMBIGUOUS', 'endpoint_uuid' => $uuid, 'candidate_types' => array_values(array_map(static fn (array $match): string => $match['reference']->endpoint_type, $matches))];
+            return null;
+        }
+        $result['blockers'][] = ['code' => 'RELATION_' . strtoupper($side) . '_NOT_FOUND', 'endpoint_type' => $requestedType, 'endpoint_uuid' => $uuid];
+        return null;
     }
 
     /** @param array<string,mixed> $packet */

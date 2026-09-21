@@ -200,6 +200,19 @@ resolution may reuse an active canonical entity, while ambiguity, retired
 targets, malformed deltas and UUID/type mismatch fail closed and never create
 an Authority candidate.
 
+Exact Authority Graph relation intent uses the separate optional
+`authority_intent.relations[]` packet. Each item requires only the canonical
+`source_uuid`, registered `predicate` and canonical `target_uuid`; the server
+resolves endpoint types, active state and current revisions through the
+endpoint and Predicate registries. Client-supplied endpoint types/revisions
+are not required or trusted by this path. `requests[]` expresses Authority
+entity create/update intent; `relations[]` expresses exact Graph relation
+intent. Both remain planning input only until the existing Capture-bound
+staging admission and Proposal → Submit → Approval → Eligibility → Controlled
+Apply lifecycle succeeds. Duplicate requests are normalized and ambiguous,
+unknown, inactive, cardinality-conflicting or unsupported endpoints fail
+closed.
+
 ## 1. MCP architecture
 
 The endpoint is `/wp-json/nhk/v1/mcp`, using JSON-RPC 2.0 and Streamable HTTP.

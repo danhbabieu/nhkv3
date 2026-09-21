@@ -25,13 +25,28 @@ final class AuthorityIntentPlanner
         foreach ($requests as $request) $this->resolveRequest($request, $plan);
         $this->resolveSubjectHints((array) ($input['subject_hints'] ?? []), $plan);
         $authorityIntent = is_array($input['authority_intent'] ?? null) ? $input['authority_intent'] : [];
-        if (array_key_exists('relation_intents', $authorityIntent)) {
+        $relationIntents = $authorityIntent['relation_intents'] ?? [];
+        if (array_key_exists('relations', $authorityIntent)) {
+            if (!is_array($authorityIntent['relations']) || !array_is_list($authorityIntent['relations'])) {
+                $plan['blockers'][] = ['code' => 'RELATIONS_MALFORMED'];
+            } else {
+                $relationIntents = array_merge((array) $relationIntents, array_map(static function (mixed $relation): mixed {
+                    if (!is_array($relation)) return $relation;
+                    return [
+                        'source_uuid' => $relation['source_uuid'] ?? null,
+                        'predicate' => $relation['predicate'] ?? null,
+                        'target_uuid' => $relation['target_uuid'] ?? null,
+                    ];
+                }, $authorityIntent['relations']));
+            }
+        }
+        if (array_key_exists('relation_intents', $authorityIntent) || array_key_exists('relations', $authorityIntent)) {
             if ($this->relationIntents === null) {
                 $plan['blockers'][] = ['code' => 'RELATION_INTENT_PLANNER_UNAVAILABLE'];
-            } elseif (!is_array($authorityIntent['relation_intents'])) {
+            } elseif (!is_array($relationIntents) || !array_is_list($relationIntents)) {
                 $plan['blockers'][] = ['code' => 'RELATION_INTENTS_MALFORMED'];
             } else {
-                $relationPlan = $this->relationIntents->plan($authorityIntent['relation_intents']);
+                $relationPlan = $this->relationIntents->plan($relationIntents);
                 $plan['relation_candidates'] = array_merge($plan['relation_candidates'], (array) ($relationPlan['relation_candidates'] ?? []));
                 $plan['relation_reuse'] = array_merge($plan['relation_reuse'], (array) ($relationPlan['relation_reuse'] ?? []));
                 $plan['blockers'] = array_merge($plan['blockers'], (array) ($relationPlan['blockers'] ?? []));
@@ -120,7 +135,7 @@ final class AuthorityIntentPlanner
         foreach (['requests', 'entity_type', 'type', 'canonical_uuid', 'uuid', 'name', 'canonical_name'] as $key) {
             if (array_key_exists($key, $intent) || array_key_exists($key, $input)) return true;
         }
-        return array_key_exists('authority_requests', $input) || array_key_exists('relation_intents', $intent);
+        return array_key_exists('authority_requests', $input) || array_key_exists('relation_intents', $intent) || array_key_exists('relations', $intent);
     }
 
     /**

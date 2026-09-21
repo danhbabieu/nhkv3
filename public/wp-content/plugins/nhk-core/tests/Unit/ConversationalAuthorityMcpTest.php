@@ -28,6 +28,10 @@ final class ConversationalAuthorityMcpTest extends TestCase
         self::assertSame(['PLAN', 'APPLY_APPROVED_PLAN'], $schema['properties']['authority_intent']['properties']['mode']['enum']);
         self::assertSame('array', $schema['properties']['authority_intent']['properties']['requests']['type']);
         self::assertSame('array', $schema['properties']['authority_intent']['properties']['relation_intents']['type']);
+        self::assertSame('array', $schema['properties']['authority_intent']['properties']['relations']['type']);
+        self::assertSame(['source_uuid', 'predicate', 'target_uuid'], array_keys($schema['properties']['authority_intent']['properties']['relations']['items']['properties']));
+        self::assertSame(['source_uuid', 'predicate', 'target_uuid'], $schema['properties']['authority_intent']['properties']['relations']['items']['required']);
+        self::assertTrue($schema['properties']['authority_intent']['properties']['relations']['items']['additionalProperties'] === false);
         self::assertSame([
             'source_type',
             'source_uuid',

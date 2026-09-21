@@ -158,6 +158,89 @@ final class ExplicitRelationIntentPlannerTest extends TestCase
         self::assertSame(self::TARGET, $plan['relation_candidates'][0]['target_uuid']);
     }
 
+    public function test_structured_relation_resolves_model_and_brand_types_from_canonical_endpoints(): void
+    {
+        $planner = $this->planner([
+            'model' => [self::SOURCE => ['active' => true, 'revision' => 3]],
+            'brand' => [self::TARGET => ['active' => true, 'revision' => 2]],
+        ]);
+
+        $result = $planner->plan([['source_uuid' => self::SOURCE, 'predicate' => 'model_of', 'target_uuid' => self::TARGET]]);
+        self::assertCount(1, $result['relation_candidates']);
+        self::assertSame('model', $result['relation_candidates'][0]['source_type']);
+        self::assertSame('brand', $result['relation_candidates'][0]['target_type']);
+        self::assertSame(3, $result['relation_candidates'][0]['source_revision']);
+        self::assertSame(2, $result['relation_candidates'][0]['target_revision']);
+    }
+
+    public function test_structured_relation_resolves_variant_and_model_types_from_canonical_endpoints(): void
+    {
+        $planner = $this->planner([
+            'variant' => [self::SOURCE => ['active' => true, 'revision' => 4]],
+            'model' => [self::TARGET => ['active' => true, 'revision' => 5]],
+        ]);
+
+        $result = $planner->plan([['source_uuid' => self::SOURCE, 'predicate' => 'variant_of', 'target_uuid' => self::TARGET]]);
+        self::assertCount(1, $result['relation_candidates']);
+        self::assertSame('variant', $result['relation_candidates'][0]['source_type']);
+        self::assertSame('model', $result['relation_candidates'][0]['target_type']);
+    }
+
+    public function test_authority_capture_plan_consumes_relations_without_client_endpoint_types(): void
+    {
+        $relationPlanner = $this->planner([
+            'model' => [self::SOURCE => ['active' => true, 'revision' => 1]],
+            'brand' => [self::TARGET => ['active' => true, 'revision' => 1]],
+        ]);
+        $planner = new AuthorityIntentPlanner($this->authorityRepository(), $this->types(), relationIntents: $relationPlanner);
+
+        $plan = $planner->plan([
+            'text' => 'Do not infer this relation from prose.',
+            'authority_intent' => ['mode' => 'PLAN', 'relations' => [[
+                'source_uuid' => self::SOURCE,
+                'predicate' => 'model_of',
+                'target_uuid' => self::TARGET,
+            ]]],
+        ]);
+
+        self::assertCount(1, $plan['relation_candidates']);
+        self::assertSame('model', $plan['relation_candidates'][0]['source_type']);
+        self::assertSame('brand', $plan['relation_candidates'][0]['target_type']);
+    }
+
+    public function test_cardinality_conflict_fails_closed_before_relation_candidate_creation(): void
+    {
+        $endpoints = new \NHK\Core\Domain\Graph\EndpointTypeRegistry();
+        $endpoints->register('model', new PlannerEndpointResolver('model', [self::SOURCE => ['active' => true, 'revision' => 1]]));
+        $endpoints->register('brand', new PlannerEndpointResolver('brand', [self::TARGET => ['active' => true, 'revision' => 1]]));
+        $planner = new ExplicitRelationIntentPlanner(
+            $endpoints,
+            new PredicateRegistry(),
+            static fn (NodeReference $reference): array => ['active' => true, 'revision' => 1],
+            static fn (array $packet): array => ['status' => 'CARDINALITY_CONFLICT', 'reason' => 'INBOUND_CARDINALITY_ONE'],
+        );
+
+        $result = $planner->plan([['source_uuid' => self::SOURCE, 'predicate' => 'model_of', 'target_uuid' => self::TARGET]]);
+        self::assertContains('RELATION_CARDINALITY_CONFLICT', array_column($result['blockers'], 'code'));
+        self::assertSame([], $result['relation_candidates']);
+    }
+
+    public function test_self_relation_fails_closed_for_registered_predicate(): void
+    {
+        $planner = $this->planner([
+            'classification' => [self::SOURCE => ['active' => true, 'revision' => 1]],
+        ]);
+        $result = $planner->plan([[
+            'source_type' => 'classification',
+            'source_uuid' => self::SOURCE,
+            'predicate' => 'subtype_of',
+            'target_type' => 'classification',
+            'target_uuid' => self::SOURCE,
+        ]]);
+
+        self::assertContains('RELATION_SELF_FORBIDDEN', array_column($result['blockers'], 'code'));
+    }
+
     public function test_relation_candidate_identity_changes_when_endpoint_revision_changes(): void
     {
         $first = $this->planner([

@@ -15749,3 +15749,33 @@ warnings/deprecations. No staging/production mutation, deployment or live
 retry was performed.
 
 STATUS=`ARTICLE_PREFLIGHT_COMPOSITION_FIXED_LOCALLY / DEPLOYMENT_PENDING / OPERATOR_COMMIT_REQUIRED`.
+
+# Checkpoint — 2026-09-21 — Structured Authority relation intent for canonical Capture (LOCAL / NO LIVE MUTATION)
+
+SCOPE: Generic `nhk.capture.ingest` Authority relation input only. Added the
+optional `authority_intent.relations[]` contract with bounded entries requiring
+only `source_uuid`, registered `predicate` and `target_uuid`. Existing
+`relation_intents[]` remains compatible. The server resolves endpoint types,
+active state and current revisions through the existing Endpoint and Predicate
+registries; Capture remains orchestration-only.
+
+FIXED_BOUNDARY: `model_of` and `variant_of` structured intents now produce
+typed, revision-bound relation candidates without client-supplied endpoint types
+or revisions. Self-relations, unknown/inactive/ambiguous endpoints and
+cardinality conflicts fail closed. Existing server-issued Authority staging
+scope, OperationScopedStagingGuard, Proposal lifecycle and Graph ownership are
+unchanged; no writer or registry was added.
+
+REGRESSION: MCP catalog schema, Ability/Easy MCP descriptor projection,
+Model→Brand and Variant→Model planning, cardinality/self-relation rejection,
+Governance relation lifecycle and existing direct-scope fail-closed coverage.
+Full Unit passes 2,031 tests / 9,983 assertions with existing warnings and
+deprecations. Integration tests remain environment-gated because
+`NHK_WP_TEST_PATH=public` and the required WordPress/database runtime are not
+available.
+
+DOCUMENTATION: Updated the active MCP Content Operations and Control Plane
+source contracts to distinguish `requests[]` entity intent from `relations[]`
+exact Graph relation intent. Canonical generated documentation was not run.
+
+STATUS=`STRUCTURED_AUTHORITY_RELATION_INTENT_IMPLEMENTED_LOCALLY / DEPLOYMENT_PENDING / SEMANTIC_MUTATION_NONE`.

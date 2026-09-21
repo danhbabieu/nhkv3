@@ -32,6 +32,10 @@ final class EasyMcpNativeFileCompatibilityAdapterTest extends TestCase
         self::assertSame(['source_type', 'source_uuid', 'predicate', 'target_type', 'target_uuid', 'provenance', 'reason'], array_keys($relation['items']['properties']));
         self::assertSame(['source_type', 'source_uuid', 'predicate', 'target_type', 'target_uuid'], $relation['items']['required']);
         self::assertFalse($relation['items']['additionalProperties']);
+        $structured = $capture['inputSchema']['properties']['authority_intent']['properties']['relations'];
+        self::assertSame(['source_uuid', 'predicate', 'target_uuid'], array_keys($structured['items']['properties']));
+        self::assertSame(['source_uuid', 'predicate', 'target_uuid'], $structured['items']['required']);
+        self::assertFalse($structured['items']['additionalProperties']);
     }
 
     public function test_projection_does_not_change_unrelated_tools(): void

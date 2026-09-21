@@ -83,6 +83,21 @@ final class McpToolCatalog
                                 'additionalProperties' => false,
                             ],
                         ],
+                        'relations' => [
+                            'type' => 'array',
+                            'minItems' => 1,
+                            'maxItems' => 50,
+                            'items' => [
+                                'type' => 'object',
+                                'properties' => [
+                                    'source_uuid' => self::uuidField(),
+                                    'predicate' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 64],
+                                    'target_uuid' => self::uuidField(),
+                                ],
+                                'required' => ['source_uuid', 'predicate', 'target_uuid'],
+                                'additionalProperties' => false,
+                            ],
+                        ],
                         'approved_plan_fingerprint' => ['type' => 'string', 'pattern' => '^[a-fA-F0-9]{64}$'],
                         'approved_candidate_ids' => ['type' => 'array', 'minItems' => 1, 'items' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 191]],
                     ],

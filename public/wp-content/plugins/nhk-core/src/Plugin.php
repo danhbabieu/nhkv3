@@ -596,7 +596,7 @@ final class Plugin {
             );
             $mcpGovernance = new McpGovernanceHandler($governance, $eligibility, $controlledApply, $automationResolver, $endpoints, [$publicProjectionVerifier, 'verify']);
             (new AdminMediaUsageApi($mediaBindingService, $mcpGovernance, $mediaBatchUpload))->register();
-            $relationState = static function (array $plan) use ($graphService): array {
+            $relationState = static function (array $plan) use ($graphService, $predicates): array {
                 $payload = is_array($plan['payload'] ?? null) ? $plan['payload'] : [];
                 $sourceType = strtolower(trim((string) ($payload['source_type'] ?? '')));
                 $sourceUuid = trim((string) ($payload['source_uuid'] ?? ''));
@@ -609,6 +609,17 @@ final class Plugin {
                 try {
                     $edge = $graphService->findEdge($source, $predicate, $target);
                     if ($edge !== null && $edge->isActive()) return ['status' => 'ACTIVE', 'canonical_id' => $edge->edge_uuid, 'revision' => $edge->revision, 'active' => true, 'direction' => 'SOURCE_TO_TARGET'];
+                    $definition = $predicates->get($predicate);
+                    if ($definition->outbound_cardinality === 'ONE') {
+                        foreach ((array) ($graphService->findOutgoing($source, $predicate, 0, 200, false, $targetType)['items'] ?? []) as $candidate) {
+                            if ($candidate instanceof \NHK\Core\Domain\Graph\GraphEdge && $candidate->isActive() && $candidate->target->reference->endpoint_key !== $targetUuid) return ['status' => 'CARDINALITY_CONFLICT', 'reason' => 'OUTBOUND_CARDINALITY_ONE'];
+                        }
+                    }
+                    if ($definition->inbound_cardinality === 'ONE') {
+                        foreach ((array) ($graphService->findIncoming($target, $predicate, 0, 200, false, $sourceType)['items'] ?? []) as $candidate) {
+                            if ($candidate instanceof \NHK\Core\Domain\Graph\GraphEdge && $candidate->isActive() && $candidate->source->reference->endpoint_key !== $sourceUuid) return ['status' => 'CARDINALITY_CONFLICT', 'reason' => 'INBOUND_CARDINALITY_ONE'];
+                        }
+                    }
                     // Video's historical compatibility read-back permits the
                     // same logical about relation to be stored target -> Video.
                     // This is a read-only identity normalization; it never
