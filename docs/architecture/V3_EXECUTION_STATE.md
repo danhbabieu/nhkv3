@@ -1,5 +1,54 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-21 — Nested governed Video payload drift proof (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE_CONFIRMED: `CaptureVideoProvenancePlanner::withThumbnailSelection()`
+materialized one selected source thumbnail twice: canonical
+`metadata.source.thumbnail_selection` and a second
+`metadata.thumbnail_selection` copy. The duplicate could appear after the
+command was signed, producing a nested semantic payload fingerprint mismatch.
+Bounded diagnostics prove the residual path is `metadata.thumbnail_selection.*`.
+
+FIELD_CLASSIFICATION: `metadata.source.thumbnail_selection` is canonical
+source-derived semantic provenance and is materialized before signing.
+`metadata.thumbnail_presentation` is derived presentation and is not created
+by the governed command planner. `metadata.seo_projection.open_graph.image`
+and `metadata.seo_projection.video_object.thumbnailUrl` are derived public
+presentation projections. `thumbnail_media_id`, when bound to a canonical
+Media owner, remains command-semantic identity and is not stripped. Existing
+retrieval-only volatility normalization remains unchanged.
+
+FIXED_BOUNDARY: The planner now has one thumbnail-selection owner and removes
+the duplicate metadata-level selection/presentation copy before signing.
+Governance stores bounded signed semantic-payload metadata and reports
+`SIGNED_NORMALIZED_SEMANTIC_PAYLOAD`, `VERIFIED_NORMALIZED_SEMANTIC_PAYLOAD`
+and `PAYLOAD_DIFF` with exact nested paths, types, hashes and presence only.
+Complete private payload values, prose, signatures and secrets are not
+returned. The scope packet remains independently HMAC-verified.
+
+TRACE: `final provenance materialization → semantic attachments → completeness
+recomputation → Video command → shared semantic normalization → fingerprint →
+scope issuance → staging_acceptance attachment → Proposal persistence/reload →
+fromProposal normalization → fingerprint/diagnostic`.
+
+TREE_HASH_PROOF: The production-shaped thumbnail/SEO fixture gives
+`SIGNED_PAYLOAD_TREE_HASH=85c28273b80db8349c2e038ee7d3a6e34ce29684351f6ac74621cc5f8df89c44`
+and the same `RELOADED_PAYLOAD_TREE_HASH`; final `PAYLOAD_DIFF=[]`.
+
+TEST_EVIDENCE: Focused Video/Governance/Capture/non-Video suite passes 116
+tests / 529 assertions. It covers exact thumbnail drift path, bounded nested
+diagnostics, Video→Variant and Video→Model attachments, semantic tamper,
+scope tamper, zero/multiple attachment behavior, deterministic ordering,
+reused dependencies, CAS revisions and non-Video relation/create regression.
+Full `NHK Unit` passes 2,055 tests / 10,508 assertions with warnings and
+deprecations only. No live IDs or Odo-specific branch exists in production
+source. No schema/migration, deployment, push, live read or live mutation
+occurred.
+
+STATUS: `STAGING_VIDEO_NESTED_PAYLOAD_DIAGNOSTICS_FIXED_LOCAL / TREE_HASH_PASS / FULL_UNIT_PASS / NO_LIVE_MUTATION`.
+
+NEXT_EXACT_ACTION: `USER_PUSH_PULL_BUILD; THEN RUN FRESH @v34 VIDEO ACCEPTANCE`.
+
 # Checkpoint — 2026-09-21 — Shared staging execution-envelope fingerprint proof (LOCAL / NO LIVE MUTATION)
 
 ROOT_CAUSE_CONFIRMED: The final semantic command fingerprint and the persisted

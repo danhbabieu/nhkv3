@@ -554,9 +554,29 @@ final class StagingAcceptanceScopeVerifier
     private static function safePayloadDiff(array $scope, StagingOperationDescriptor $verified): array
     {
         $signed = is_array($scope['signed_normalized_semantic_payload'] ?? null) ? $scope['signed_normalized_semantic_payload'] : null;
+        $verifiedFields = is_array($verified->semanticPayloadDiagnostic()['fields'] ?? null) ? $verified->semanticPayloadDiagnostic()['fields'] : [];
         if ($signed === null) return [['path' => 'signed_normalized_semantic_payload', 'signed_type' => 'missing', 'verified_type' => 'object', 'signed_hash' => hash('sha256', 'missing'), 'verified_hash' => hash('sha256', CommandCanonicalizer::canonicalize($verified->semanticPayloadDiagnostic())), 'presence' => ['signed' => false, 'verified' => true]]];
-        if (($signed['tree_hash'] ?? '') === $verified->semanticPayloadDiagnostic()['tree_hash']) return [];
-        return [['path' => 'payload', 'signed_type' => 'normalized_semantic_payload', 'verified_type' => 'normalized_semantic_payload', 'signed_hash' => (string) ($signed['tree_hash'] ?? ''), 'verified_hash' => $verified->semanticPayloadDiagnostic()['tree_hash'], 'presence' => ['signed' => true, 'verified' => true]]];
+        $signedFields = is_array($signed['fields'] ?? null) ? $signed['fields'] : [];
+        $signedByPath = [];
+        foreach ($signedFields as $field) if (is_array($field) && isset($field['path'])) $signedByPath[(string) $field['path']] = $field;
+        $verifiedByPath = [];
+        foreach ($verifiedFields as $field) if (is_array($field) && isset($field['path'])) $verifiedByPath[(string) $field['path']] = $field;
+        $diff = [];
+        foreach (array_unique(array_merge(array_keys($signedByPath), array_keys($verifiedByPath))) as $path) {
+            $left = $signedByPath[$path] ?? null;
+            $right = $verifiedByPath[$path] ?? null;
+            if ($left !== null && $right !== null && ($left['type'] ?? null) === ($right['type'] ?? null) && ($left['hash'] ?? null) === ($right['hash'] ?? null)) continue;
+            $diff[] = [
+                'path' => (string) $path,
+                'signed_type' => (string) ($left['type'] ?? 'missing'),
+                'verified_type' => (string) ($right['type'] ?? 'missing'),
+                'signed_hash' => (string) ($left['hash'] ?? hash('sha256', '<missing>')),
+                'verified_hash' => (string) ($right['hash'] ?? hash('sha256', '<missing>')),
+                'presence' => ['signed' => $left !== null, 'verified' => $right !== null],
+            ];
+            if (count($diff) >= 64) break;
+        }
+        return $diff;
     }
 
     /** @param array<string,mixed> $signed @param array<string,mixed> $verified @return list<array<string,string>> */

@@ -159,7 +159,7 @@ final readonly class StagingOperationDescriptor
      * itself is never returned because it may contain private source prose or
      * dependency material.
      *
-     * @return array{tree_hash:string,top_level_keys:list<string>,byte_length:int}
+     * @return array{tree_hash:string,top_level_keys:list<string>,byte_length:int,fields:list<array{path:string,type:string,hash:string,presence:bool}>}
      */
     public function semanticPayloadDiagnostic(): array
     {
@@ -168,7 +168,27 @@ final readonly class StagingOperationDescriptor
             'tree_hash' => hash('sha256', $canonical),
             'top_level_keys' => array_values(array_map('strval', array_keys($this->payload))),
             'byte_length' => strlen($canonical),
+            'fields' => self::semanticPayloadFields($this->payload),
         ];
+    }
+
+    /** @return list<array{path:string,type:string,hash:string,presence:bool}> */
+    private static function semanticPayloadFields(array $payload): array
+    {
+        $fields = [];
+        $walk = static function (mixed $value, string $path) use (&$walk, &$fields): void {
+            if (count($fields) >= 128) return;
+            if (is_array($value) && $value !== []) {
+                foreach ($value as $key => $child) {
+                    if (count($fields) >= 128) break;
+                    $walk($child, $path === '' ? (string) $key : $path . '.' . $key);
+                }
+                return;
+            }
+            $fields[] = ['path' => substr($path, 0, 180), 'type' => get_debug_type($value), 'hash' => self::semanticValueHash($value, true), 'presence' => true];
+        };
+        $walk($payload, '');
+        return $fields;
     }
 
     /**

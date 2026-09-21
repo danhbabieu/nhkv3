@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Governance\{GovernanceService, StagingAcceptanceScopeVerifier};
+use NHK\Core\Application\Capture\CaptureVideoProvenancePlanner;
 use NHK\Core\Application\Video\{VideoCompletenessPolicy, VideoRelationCandidatePlanner};
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
 use NHK\Core\Contracts\Video\VideoRepository;
@@ -44,6 +45,56 @@ final class VideoGovernanceGenericityTest extends TestCase
             self::assertSame([], $verifier->proposalDescriptorDiagnostic($scope, $proposal)['DESCRIPTOR_DIFF']);
             self::assertSame($payload['metadata']['semantic_attachments'][0]['target_uuid'], $proposal->payload['metadata']['semantic_attachments'][0]['target_uuid']);
         }
+    }
+
+    public function test_nested_semantic_payload_diagnostic_is_bounded_and_round_trips_thumbnail_owner(): void
+    {
+        $videoId = UuidCodec::newV7();
+        $targetId = UuidCodec::newV7();
+        $evidenceId = UuidCodec::newV7();
+        $capture = $this->capture(UuidCodec::newV7());
+        $payload = $this->payload($videoId, 'variant', $targetId, $evidenceId);
+        $payload['metadata']['source']['thumbnail_selection'] = ['variant' => 'maxresdefault', 'url' => 'https://img.youtube.test/maxresdefault.jpg', 'width' => 1920, 'height' => 1080];
+        $payload['metadata']['seo_projection'] = ['open_graph' => ['image' => 'https://img.youtube.test/maxresdefault.jpg'], 'video_object' => ['thumbnailUrl' => ['https://img.youtube.test/maxresdefault.jpg']]];
+        $verifier = $this->verifier();
+        $scope = $verifier->issueForVideoPlan($capture, ['entity_type' => 'video', 'operation' => 'ingest', 'subject_id' => $videoId, 'proposed_uuid' => $videoId, 'payload' => $payload, 'idempotency_key' => 'nested-diagnostic', 'plan_fingerprint' => hash('sha256', 'nested-diagnostic')]);
+        $proposal = new Proposal(UuidCodec::newV7(), $videoId, 'ingest', $payload + ['capture_id' => $capture->captureId, 'capture_fingerprint' => $capture->requestFingerprint, 'staging_acceptance' => $scope], 'content', null, 'dependency', ProposalState::APPROVED, idempotencyKey: 'nested-diagnostic', entityType: 'video');
+        $diagnostic = $verifier->proposalDescriptorDiagnostic($scope, $proposal);
+
+        self::assertTrue($verifier->verifyProposal($scope, $proposal));
+        self::assertSame([], $diagnostic['DESCRIPTOR_DIFF']);
+        self::assertSame([], $diagnostic['PAYLOAD_DIFF']);
+        self::assertSame($diagnostic['SIGNED_NORMALIZED_SEMANTIC_PAYLOAD']['tree_hash'], $diagnostic['VERIFIED_NORMALIZED_SEMANTIC_PAYLOAD']['tree_hash']);
+        self::assertLessThanOrEqual(128, count($diagnostic['SIGNED_NORMALIZED_SEMANTIC_PAYLOAD']['fields']));
+        self::assertArrayNotHasKey('thumbnail_selection', $this->applyThumbnailSelection($payload)['payload']['metadata']);
+
+        $duplicate = $payload;
+        $duplicate['metadata']['thumbnail_selection'] = $payload['metadata']['source']['thumbnail_selection'];
+        $duplicateProposal = new Proposal(UuidCodec::newV7(), $videoId, 'ingest', $duplicate + ['capture_id' => $capture->captureId, 'capture_fingerprint' => $capture->requestFingerprint, 'staging_acceptance' => $scope], 'content', null, 'dependency', ProposalState::APPROVED, idempotencyKey: 'nested-thumbnail-duplicate', entityType: 'video');
+        $duplicateDiagnostic = $verifier->proposalDescriptorDiagnostic($scope, $duplicateProposal);
+        self::assertSame('STAGING_VIDEO_PAYLOAD_MISMATCH', $verifier->proposalFailureReason($scope, $duplicateProposal));
+        self::assertNotEmpty(array_filter(array_column($duplicateDiagnostic['PAYLOAD_DIFF'], 'path'), static fn (string $path): bool => str_starts_with($path, 'metadata.thumbnail_selection')));
+    }
+
+    public function test_nested_semantic_payload_diff_reports_exact_path_without_private_values(): void
+    {
+        $videoId = UuidCodec::newV7();
+        $targetId = UuidCodec::newV7();
+        $evidenceId = UuidCodec::newV7();
+        $capture = $this->capture(UuidCodec::newV7());
+        $payload = $this->payload($videoId, 'variant', $targetId, $evidenceId);
+        $verifier = $this->verifier();
+        $scope = $verifier->issueForVideoPlan($capture, ['entity_type' => 'video', 'operation' => 'ingest', 'subject_id' => $videoId, 'proposed_uuid' => $videoId, 'payload' => $payload, 'idempotency_key' => 'nested-tamper', 'plan_fingerprint' => hash('sha256', 'nested-tamper')]);
+        $tampered = $payload;
+        $tampered['metadata']['semantic_attachments'][0]['target_uuid'] = UuidCodec::newV7();
+        $proposal = new Proposal(UuidCodec::newV7(), $videoId, 'ingest', $tampered + ['capture_id' => $capture->captureId, 'capture_fingerprint' => $capture->requestFingerprint, 'staging_acceptance' => $scope], 'content', null, 'dependency', ProposalState::APPROVED, idempotencyKey: 'nested-tamper', entityType: 'video');
+        $diagnostic = $verifier->proposalDescriptorDiagnostic($scope, $proposal);
+        $paths = array_column($diagnostic['PAYLOAD_DIFF'], 'path');
+
+        self::assertSame('STAGING_VIDEO_PAYLOAD_MISMATCH', $verifier->proposalFailureReason($scope, $proposal));
+        self::assertContains('metadata.semantic_attachments.0.target_uuid', $paths);
+        self::assertArrayNotHasKey('signed', $diagnostic['PAYLOAD_DIFF'][0]);
+        self::assertArrayNotHasKey('verified', $diagnostic['PAYLOAD_DIFF'][0]);
     }
 
     public function test_zero_attachment_does_not_invent_relation_and_keeps_blocker(): void
@@ -190,5 +241,14 @@ final class VideoGovernanceGenericityTest extends TestCase
             public function list(bool $includeRetired = false): array { return []; }
         };
         return new VideoRelationCandidatePlanner(new PredicateRegistry(), $evidence, $claims, $sources);
+    }
+
+    /** @param array<string,mixed> $payload @return array<string,mixed> */
+    private function applyThumbnailSelection(array $payload): array
+    {
+        $planner = new CaptureVideoProvenancePlanner();
+        $method = new \ReflectionMethod($planner, 'withThumbnailSelection');
+        $method->setAccessible(true);
+        return $method->invoke($planner, ['payload' => $payload], $payload['metadata']['source']['thumbnail_selection']);
     }
 }
