@@ -978,9 +978,29 @@ final class Plugin {
                         throw new \RuntimeException('VIDEO_ABOUT_RELATION_READBACK_UNAVAILABLE');
                     }
                 },
-                static function (string $videoId, string $path) use ($videoFrontendReader): bool {
-                    if (!preg_match('#^/video/([^/]+)/$#', $path, $matches)) return false;
-                    return $videoFrontendReader->videoBySlug(rawurldecode((string) $matches[1])) !== null;
+                static function (string $videoId, string $path) use ($videoFrontendReader, $videos): array {
+                    if (!preg_match('#^/video/([^/]+)/$#', $path, $matches)) return ['public_eligible' => false, 'frontend_verified' => false, 'blockers' => ['VIDEO_FRONTEND_READBACK_UNAVAILABLE']];
+                    $route = $videoFrontendReader->videoBySlug(rawurldecode((string) $matches[1]));
+                    $canonical = $videoFrontendReader->videoDetail($videoId);
+                    $owner = $videos->findByCanonicalId($videoId);
+                    $routeOwner = is_array($route) ? $videos->findByExternalReference('youtube', (string) ($route['external_id'] ?? '')) : null;
+                    if (!is_array($route) || !is_array($canonical) || !$owner instanceof \NHK\Core\Domain\Video\Video) {
+                        return ['public_eligible' => false, 'frontend_verified' => false, 'blockers' => ['VIDEO_FRONTEND_READBACK_UNAVAILABLE']];
+                    }
+                    $editorial = is_array($owner->metadata['editorial'] ?? null) ? $owner->metadata['editorial'] : [];
+                    $title = (string) ($editorial['title'] ?? $owner->title);
+                    $externalId = $owner->externalVideoId;
+                    $sameOwner = $routeOwner instanceof \NHK\Core\Domain\Video\Video
+                        && $routeOwner->canonicalId === $videoId
+                        && (string) ($canonical['public_url'] ?? '') === $path
+                        && (string) ($route['public_url'] ?? '') === $path
+                        && (string) ($route['external_id'] ?? '') === $externalId
+                        && (string) ($canonical['external_id'] ?? '') === $externalId
+                        && (string) ($route['title'] ?? '') === $title
+                        && (string) ($canonical['title'] ?? '') === $title;
+                    return $sameOwner
+                        ? ['public_eligible' => true, 'frontend_verified' => true, 'blockers' => []]
+                        : ['public_eligible' => false, 'frontend_verified' => false, 'blockers' => ['VIDEO_FRONTEND_CANONICAL_OWNER_MISMATCH']];
                 },
             );
             $publicUrlMaintenance = (new \NHK\Core\Infrastructure\PublicIdentity\WordPressPublicUrlMaintenanceRuntime($wpdb, $authority, $types, $publicContexts, $videos, $media, $assets, $publicIdentityRepository))->service();

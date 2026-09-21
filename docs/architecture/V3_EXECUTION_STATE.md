@@ -16227,3 +16227,33 @@ passes 70 tests / 360 assertions. No schema, migration, deployment, push or
 live mutation was performed.
 
 STATUS=`VIDEO_CAPTURE_APPLIED_REPLAY_FIXED_LOCALLY / FULL_UNIT_PASS / NO_LIVE_MUTATION`.
+
+# Checkpoint — 2026-09-22 — Video completion/public-readiness convergence (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE_CONFIRMED: Capture Video publication verification re-evaluated
+editorial quality from a possibly stale enrichment context instead of using
+the governed canonical `content_quality` read-back. The same verifier also
+treated public identity plus a slug lookup as sufficient evidence and the
+production frontend callback only checked that a page existed; it did not
+prove canonical owner UUID, external video ID, title and route equality.
+
+FIXED_BOUNDARIES: Canonical persisted `content_quality` is authoritative when
+present, so stale intake/editorial state cannot synthesize
+`CONTENT_NEEDS_REVIEW` after governed read-back. Frontend verification now
+uses the canonical Video page query for both slug and owner reads and returns
+structured public/frontend evidence. The production callback verifies route
+owner UUID, external ID, canonical title and canonical path; exact mismatch or
+unavailable read-back remains an explicit blocker. Transcript absence remains
+warning-only. No Video/Governance/Graph/replay/Public Identity writer was
+changed and no slug was reprojected.
+
+REGRESSION: Focused Video completion/public-readiness suite passes 33 tests /
+118 assertions. Added stale canonical content-quality convergence and precise
+frontend canonical-owner failure tests. Full NHK Unit passes 2,081 tests /
+11,331 assertions with existing warnings/deprecations. PHP lint and
+`git diff --check` pass. No schema, migration, deployment, push or live
+mutation occurred; exact supplied live IDs are absent from production source.
+
+STATUS=`VIDEO_PUBLIC_READINESS_CONVERGENCE_FIXED_LOCALLY / FULL_UNIT_PASS / NO_LIVE_MUTATION`.
+
+NEXT_EXACT_ACTION: `USER_PUSH_PULL_BUILD; THEN RUN @v38 VIDEO PUBLIC-READINESS ACCEPTANCE`.

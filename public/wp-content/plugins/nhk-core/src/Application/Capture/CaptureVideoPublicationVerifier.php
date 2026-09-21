@@ -68,7 +68,17 @@ final class CaptureVideoPublicationVerifier
             }
             $metadata = is_array($video->metadata) ? $video->metadata : [];
             $editorialContext = VideoEditorialEnrichmentContext::fromArray(is_array($metadata['enrichment_context'] ?? null) ? $metadata['enrichment_context'] : []);
-            $contentQuality = ($this->editorialQuality ?? new VideoEditorialQualityPolicy())->evaluate(is_array($metadata['editorial'] ?? null) ? $metadata['editorial'] : [], $editorialContext);
+            // Governed Video read-back is authoritative.  Do not re-derive a
+            // second quality decision from intake/editorial context here: a
+            // stale context can turn a canonical CONTENT_COMPLETE owner back
+            // into CONTENT_NEEDS_REVIEW during Capture aggregation.
+            $storedQuality = is_array($metadata['content_quality'] ?? null) ? $metadata['content_quality'] : [];
+            $contentQuality = $storedQuality !== [] && isset($storedQuality['status'])
+                ? new \NHK\Core\Domain\Video\VideoEditorialQuality(
+                    (string) $storedQuality['status'],
+                    array_values(array_map('strval', (array) ($storedQuality['blockers'] ?? []))),
+                )
+                : ($this->editorialQuality ?? new VideoEditorialQualityPolicy())->evaluate(is_array($metadata['editorial'] ?? null) ? $metadata['editorial'] : [], $editorialContext);
             if (!$contentQuality->complete()) {
                 $blockers[] = 'CONTENT_NEEDS_REVIEW';
                 continue;
@@ -142,21 +152,38 @@ final class CaptureVideoPublicationVerifier
                 continue;
             }
             $frontendVerified = null;
+            $publicEligible = true;
+            $frontendBlockers = [];
             if (is_callable($this->frontendReadback)) {
-                try { $frontendVerified = (bool) ($this->frontendReadback)($video->canonicalId, $path); }
-                catch (\Throwable) { $frontendVerified = false; }
+                try {
+                    $frontendReadback = ($this->frontendReadback)($video->canonicalId, $path);
+                    if (is_array($frontendReadback)) {
+                        $publicEligible = ($frontendReadback['public_eligible'] ?? false) === true;
+                        $frontendVerified = ($frontendReadback['frontend_verified'] ?? false) === true;
+                        $frontendBlockers = array_values(array_map('strval', (array) ($frontendReadback['blockers'] ?? [])));
+                    } else {
+                        $publicEligible = $frontendReadback === true;
+                        $frontendVerified = $publicEligible;
+                    }
+                } catch (\Throwable) {
+                    $publicEligible = false;
+                    $frontendVerified = false;
+                    $frontendBlockers = ['VIDEO_FRONTEND_READBACK_UNAVAILABLE'];
+                }
+                if (!$publicEligible && $frontendBlockers === []) $frontendBlockers[] = 'PUBLIC_ELIGIBILITY_NOT_VERIFIED';
                 if ($frontendVerified !== true) $blockers[] = 'VIDEO_FRONTEND_READBACK_FAILED';
+                array_push($blockers, ...$frontendBlockers);
             }
             $completion = $this->completion->finalize('video', $video->canonicalId, [
                 'canonical_readback' => ['canonical_id' => $video->canonicalId, 'platform' => $video->platform, 'external_id' => $video->externalVideoId],
                 'dependency_state' => 'COMPLETE',
                 'relation_or_usage_state' => 'COMPLETE',
-                'public_eligible' => true,
+                'public_eligible' => $publicEligible,
                 'frontend_verified' => $frontendVerified,
                 'content_quality' => $contentQuality->status,
-                'blockers' => $frontendVerified === false ? ['VIDEO_FRONTEND_READBACK_FAILED'] : [],
+                'blockers' => array_values(array_unique($blockers)),
             ]);
-            $items[] = ['video_id' => $video->canonicalId, 'platform' => $video->platform, 'external_id' => $video->externalVideoId, 'external_video_id' => $video->externalVideoId, 'status' => 'verified', 'completion' => $completion, 'public_identity' => ['identity_id' => $identity['identity_id'] ?? null, 'slug' => $identity['current_slug'], 'path' => $path]];
+            $items[] = ['video_id' => $video->canonicalId, 'platform' => $video->platform, 'external_id' => $video->externalVideoId, 'external_video_id' => $video->externalVideoId, 'status' => ($completion['complete'] ?? false) === true ? 'verified' : 'REVIEW_REQUIRED', 'completion' => $completion, 'public_identity' => ['identity_id' => $identity['identity_id'] ?? null, 'slug' => $identity['current_slug'], 'path' => $path]];
         }
         if ($items === [] && $blockers === []) return ['status' => 'not_requested', 'items' => [], 'blockers' => [], 'completion' => $this->completion->finalize('video', '', ['canonical_state' => 'BLOCKED', 'blockers' => ['VIDEO_NOT_REQUESTED']])];
         $completion = count($items) === 1

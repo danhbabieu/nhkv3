@@ -40,6 +40,9 @@ final class CaptureVideoPublicationVerifierTest extends TestCase
             $videos,
             new PublicIdentityService($identityRepository, static fn (string $slug): bool => false),
             $identityRepository,
+            null,
+            null,
+            static fn (string $id, string $path): bool => true,
         );
 
         $result = $service->verify([
@@ -219,6 +222,62 @@ final class CaptureVideoPublicationVerifierTest extends TestCase
 
         self::assertSame('REVIEW_REQUIRED', $result['status']);
         self::assertContains('PUBLIC_IDENTITY_PROJECTION_MISMATCH', $result['blockers']);
+        self::assertFalse($result['completion']['complete']);
+    }
+
+    public function test_canonical_content_quality_readback_overrides_stale_editorial_recalculation(): void
+    {
+        $videoId = UuidCodec::newV7();
+        $video = new Video($videoId, 'youtube', '4NmkQFrNeWQ', 'https://www.youtube.com/watch?v=4NmkQFrNeWQ', 'Video chính xác', [
+            'content_quality' => ['status' => 'CONTENT_COMPLETE', 'blockers' => []],
+            'editorial' => ['title' => 'Video chính xác'],
+            'hub' => ['primary' => ['key' => '06']],
+            'source' => ['availability' => 'available', 'embeddable' => true],
+            'semantic_attachments' => [['target_type' => 'variant', 'target_uuid' => UuidCodec::newV7(), 'predicate' => 'about', 'evidence_refs' => [['evidence_id' => UuidCodec::newV7()]]]],
+        ]);
+        $videos = $this->createMock(VideoRepository::class);
+        $videos->method('findByCanonicalId')->willReturn($video);
+        $identityRepository = new InMemoryCaptureIdentityRepository();
+        $service = new CaptureVideoPublicationVerifier(
+            $videos,
+            new PublicIdentityService($identityRepository, static fn (string $slug): bool => false),
+            $identityRepository,
+            null,
+            null,
+            static fn (string $id, string $path): bool => true,
+        );
+
+        $result = $service->verify(['capture_id' => UuidCodec::newV7(), 'assets' => [['kind' => 'video', 'video_id' => $videoId, 'video_proposal' => ['operation' => 'ingest']]]]);
+
+        self::assertSame('CONTENT_COMPLETE', $result['completion']['content_state']);
+        self::assertNotContains('CONTENT_NEEDS_REVIEW', $result['blockers']);
+    }
+
+    public function test_frontend_canonical_owner_mismatch_remains_a_precise_public_blocker(): void
+    {
+        $videoId = UuidCodec::newV7();
+        $video = new Video($videoId, 'youtube', '4NmkQFrNeWQ', 'https://www.youtube.com/watch?v=4NmkQFrNeWQ', 'Video chính xác', [
+            'editorial' => ['title' => 'Video chính xác', 'summary' => 'Tóm tắt', 'body' => str_repeat('Nội dung đã xác minh. ', 20), 'why_this_matters' => 'Phạm vi rõ ràng.'],
+            'hub' => ['primary' => ['key' => '06']],
+            'source' => ['availability' => 'available', 'embeddable' => true],
+            'semantic_attachments' => [['target_type' => 'variant', 'target_uuid' => UuidCodec::newV7(), 'predicate' => 'about', 'evidence_refs' => [['evidence_id' => UuidCodec::newV7()]]]],
+        ]);
+        $videos = $this->createMock(VideoRepository::class);
+        $videos->method('findByCanonicalId')->willReturn($video);
+        $identityRepository = new InMemoryCaptureIdentityRepository();
+        $service = new CaptureVideoPublicationVerifier(
+            $videos,
+            new PublicIdentityService($identityRepository, static fn (string $slug): bool => false),
+            $identityRepository,
+            null,
+            null,
+            static fn (string $id, string $path): array => ['public_eligible' => false, 'frontend_verified' => false, 'blockers' => ['VIDEO_FRONTEND_CANONICAL_OWNER_MISMATCH']],
+        );
+
+        $result = $service->verify(['capture_id' => UuidCodec::newV7(), 'assets' => [['kind' => 'video', 'video_id' => $videoId, 'video_proposal' => ['operation' => 'ingest']]]]);
+
+        self::assertContains('VIDEO_FRONTEND_CANONICAL_OWNER_MISMATCH', $result['blockers']);
+        self::assertContains('VIDEO_FRONTEND_READBACK_FAILED', $result['blockers']);
         self::assertFalse($result['completion']['complete']);
     }
 }
