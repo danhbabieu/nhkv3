@@ -96,11 +96,15 @@ final class McpReadHandler
             if ($videoId !== '') $videos[] = ['id' => $videoId, 'status' => (string) ($asset['status'] ?? '')];
         }
         return [
-            'status' => 'available',
+            // `status` describes the read result. Keep the persisted Capture
+            // lifecycle state separate so PARTIAL/REVIEW_REQUIRED cannot
+            // overwrite FOUND and become indistinguishable from transport
+            // absence.
+            'status' => 'found',
             'capture_id' => $capture->captureId,
             'purpose' => (string) ($context['purpose'] ?? 'EDITORIAL'),
             'intent' => is_array($context['content_intent'] ?? null) ? $context['content_intent'] : null,
-            'revision' => $capture->revision, 'stage' => $capture->stage, 'status' => $capture->status,
+            'revision' => $capture->revision, 'stage' => $capture->stage, 'capture_status' => $capture->status,
             'subject_resolution_packet' => $packet,
             'article' => $capture->articleId === null ? null : ['post_id' => $capture->articleId, 'state' => (string) ($diagnostics['publication']['status'] ?? '')],
             'video' => array_values(array_unique($videos, SORT_REGULAR)), 'media' => array_values($media),

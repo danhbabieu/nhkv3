@@ -48,6 +48,8 @@ final class McpCaptureReadContractTest extends TestCase
 
         $projection = $read->captureGet($id);
         self::assertSame($id, $projection['capture_id']);
+        self::assertSame('found', $projection['status']);
+        self::assertSame('PARTIAL', $projection['capture_status']);
         self::assertSame('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', $projection['subject_resolution_packet']['canonical_subject_id']);
         self::assertSame(631, $projection['article']['post_id']);
         self::assertSame('media-631', $projection['media'][0]['media_id']);

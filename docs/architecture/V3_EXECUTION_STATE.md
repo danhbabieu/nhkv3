@@ -1,5 +1,34 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-21 — Final closeout integration proof (LOCAL / NO LIVE MUTATION)
+
+INTEGRATION_ENVIRONMENT: The repository-provided environment exists and was
+used exactly as documented: local Homebrew MySQL on `127.0.0.1:3306`, tracked
+WordPress loader `public`, and exact guarded database `nhk_v3_test`. No Docker,
+staging database or production credentials were used.
+
+CAPTURE_INTEGRATION_PROOF: `CaptureCanonicalReadbackIntegrationTest` passed 1
+test / 8 assertions. It persisted a Capture through `WpdbCaptureRepository`,
+read it through `McpReadHandler` and `McpTransport`, and executed the public
+`nhk-v3/capture-get` Ability against the same runtime composition. The known
+Capture returned `status=found` with `capture_status=PARTIAL`; the random UUID
+returned explicit `status=not_found` / `CAPTURE_NOT_FOUND`. The test cleans up
+its exact fixture row in `nhk_v3_test` only.
+
+ROOT_CAUSE_CAPTURE_PROJECTION: The first integration run exposed a duplicate
+`status` key in `McpReadHandler::captureGet()`: the read-result status was
+overwritten by persisted lifecycle `PARTIAL`. The projection now keeps
+`status=found` separate from `capture_status`, preserving review/continuation
+state without collapsing FOUND into a lifecycle value.
+
+FINAL_VERIFICATION: Focused boundary suites pass 122 tests / 516 assertions.
+Final NHK Unit passes 2,024 tests / 9,946 assertions, with warnings and
+deprecations only. No Video or Semantic production code was changed in this
+closeout step. PHP lint, diff check, secret review and hardcoded live-ID review
+pass. No staging/production data, deployment or push was performed.
+
+STATUS: `FINAL_CLOSEOUT_COMPLETE_LOCAL / INTEGRATION_PASS / FULL_UNIT_PASS / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-21 — Final closeout boundary repair (LOCAL / NO LIVE MUTATION)
 
 ROOT_CAUSE_CAPTURE_READBACK: The public WordPress Ability bootstrap creates its

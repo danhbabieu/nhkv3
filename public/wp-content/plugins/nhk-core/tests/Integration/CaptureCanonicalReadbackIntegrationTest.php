@@ -43,12 +43,18 @@ final class CaptureCanonicalReadbackIntegrationTest extends TestCase
             $unknown = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 2, 'method' => 'tools/call', 'params' => ['name' => 'nhk.capture.get', 'arguments' => ['id' => '11111111-1111-4111-8111-111111111111']]], ['Mcp-Name' => 'nhk.capture.get']);
             $ability = wp_get_ability('nhk-v3/capture-get');
             self::assertNotNull($ability);
+            $previousUser = get_current_user_id();
+            $users = get_users(['role' => 'administrator', 'number' => 1]);
+            self::assertNotEmpty($users, 'Integration WordPress runtime must provide an administrator for public Ability execution.');
+            wp_set_current_user((int) $users[0]->ID);
             $abilityFound = $ability->execute(['id' => $id]);
-            self::assertSame('available', $found['body']['result']['structuredContent']['status']);
-            self::assertSame('REVIEW_REQUIRED', $found['body']['result']['structuredContent']['intent']['intent']);
+            self::assertSame('found', $found['body']['result']['structuredContent']['status']);
+            self::assertSame('PARTIAL', $found['body']['result']['structuredContent']['capture_status']);
+            self::assertSame('VIDEO', $found['body']['result']['structuredContent']['intent']['intent']);
             self::assertSame('not_found', $unknown['body']['result']['structuredContent']['status']);
             self::assertSame('CAPTURE_NOT_FOUND', $unknown['body']['result']['structuredContent']['reason']);
-            self::assertSame('available', $abilityFound['status']);
+            self::assertSame('found', $abilityFound['status']);
+            wp_set_current_user($previousUser);
         } finally {
             TestDatabaseGuard::assertDestructiveAllowed((string) $wpdb->get_var('SELECT DATABASE()'));
             $wpdb->query($wpdb->prepare('DELETE FROM ' . $wpdb->prefix . 'nhk_editorial_captures WHERE capture_uuid=%s', UuidCodec::toBinary($id)));
