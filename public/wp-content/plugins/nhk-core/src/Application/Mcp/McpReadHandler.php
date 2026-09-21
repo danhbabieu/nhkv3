@@ -22,6 +22,7 @@ use NHK\Core\Contracts\Media\WordPressMediaAttachmentIngestor;
 use NHK\Core\Application\Inventory\{CanonicalInventoryService, GraphInventoryService};
 use NHK\Core\Application\Graph\RelationBackfillService;
 use NHK\Core\Application\Presentation\LatestFirstOrder;
+use NHK\Core\Application\Capture\CaptureCurrentOutcomeReducer;
 
 final class McpReadHandler
 {
@@ -95,6 +96,7 @@ final class McpReadHandler
             $videoId = trim((string) ($asset['video_id'] ?? $asset['canonical_id'] ?? $asset['video_proposal']['payload']['canonical_id'] ?? ''));
             if ($videoId !== '') $videos[] = ['id' => $videoId, 'status' => (string) ($asset['status'] ?? '')];
         }
+        $retry = CaptureCurrentOutcomeReducer::retryEligibility($capture);
         return [
             // `status` describes the read result. Keep the persisted Capture
             // lifecycle state separate so PARTIAL/REVIEW_REQUIRED cannot
@@ -117,7 +119,7 @@ final class McpReadHandler
             'required_owners' => $completion['required_owners'] ?? [], 'missing_required_owners' => $completion['missing_required_owners'] ?? [],
             'publication' => is_array($diagnostics['publication'] ?? null) ? ['eligible' => ($diagnostics['publication']['eligible'] ?? false) === true, 'status' => (string) ($diagnostics['publication']['status'] ?? ''), 'blockers' => array_values(array_map('strval', (array) ($diagnostics['publication']['blockers'] ?? [])))] : null,
             'enrichment' => ['complete' => ($completion['complete'] ?? false) === true, 'deep_enrichment' => $diagnostics['deep_enrichment']['status'] ?? null, 'missing' => $completion['missing_required_owners'] ?? []],
-            'retry' => ['eligible' => !in_array($capture->status, ['COMPLETE', 'PUBLISHED'], true), 'capture_id' => $capture->captureId],
+            'retry' => ['eligible' => $retry['eligible'], 'reason' => $retry['reason'], 'capture_id' => $capture->captureId],
         ];
     }
 

@@ -46,4 +46,38 @@ final class StagingOperationDescriptorTest extends TestCase
         yield 'classification' => ['classification'];
         yield 'variant' => ['variant'];
     }
+
+    public function test_production_shaped_video_plan_and_reloaded_proposal_have_no_descriptor_diff(): void
+    {
+        $capture = new CaptureRecord(UuidCodec::newV7(), 'video-descriptor', hash('sha256', 'video-descriptor'), 'SEMANTICS_RECONCILED', 'SYSTEM_BLOCKED', context: ['purpose' => 'EDITORIAL', 'content_intent' => ['intent' => 'VIDEO']]);
+        $videoId = UuidCodec::newV7();
+        $subjectId = UuidCodec::newV7();
+        $dependencyIds = [UuidCodec::newV7(), UuidCodec::newV7(), UuidCodec::newV7()];
+        $plan = [
+            'entity_type' => 'video', 'operation' => 'ingest', 'subject_id' => $videoId,
+            'idempotency_key' => 'video-descriptor-final', 'dependency_ids' => $dependencyIds,
+            'payload' => [
+                'canonical_id' => $videoId,
+                'dependency_ids' => $dependencyIds,
+                'capture_revision' => 42,
+                'metadata' => [
+                    'source' => [
+                        'platform' => 'youtube', 'external_video_id' => 'dQw4w9WgXcQ',
+                        'canonical_source_url' => 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+                        'source_title' => 'Nguồn video', 'fetched_at' => '2026-09-21T01:00:00Z',
+                        'source_hash' => str_repeat('a', 64),
+                        'thumbnail_selection' => ['variant' => 'maxresdefault', 'url' => 'https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg', 'width' => 1280, 'height' => 720, 'probed_at' => '2026-09-21T01:00:01Z', 'probe_hash' => str_repeat('b', 64)],
+                    ],
+                    'subject_resolution_packet' => ['status' => 'RESOLVED', 'match' => 'uuid_exact', 'type' => 'variant', 'id' => $subjectId, 'revision' => 2],
+                    'semantic_attachments' => [['predicate' => 'about', 'target_type' => 'variant', 'target_uuid' => $subjectId, 'evidence_refs' => [['evidence_id' => $dependencyIds[2]]]]],
+                ],
+            ],
+        ];
+        $signed = StagingOperationDescriptor::fromPlan($plan, $capture->captureId, $capture->requestFingerprint);
+        $proposal = new Proposal(UuidCodec::newV7(), $videoId, 'ingest', $signed->payload + ['capture_id' => $capture->captureId, 'capture_fingerprint' => $capture->requestFingerprint, 'capture_revision' => 42, 'staging_acceptance' => ['approved' => true]], 'content', null, 'dependency', ProposalState::APPROVED, idempotencyKey: $plan['idempotency_key'], entityType: 'video');
+        $verified = StagingOperationDescriptor::fromProposal($proposal, ['capture_id' => $capture->captureId, 'capture_fingerprint' => $capture->requestFingerprint]);
+
+        self::assertSame([], StagingOperationDescriptor::diff($signed, $verified), json_encode(StagingOperationDescriptor::diff($signed, $verified), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        self::assertSame($signed->payloadFingerprint, $verified->payloadFingerprint);
+    }
 }

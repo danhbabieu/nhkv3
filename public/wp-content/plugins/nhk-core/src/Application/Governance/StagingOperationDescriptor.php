@@ -99,6 +99,54 @@ final readonly class StagingOperationDescriptor
     }
 
     /**
+     * Test/debug-only structural comparison of the two normalized descriptors.
+     * This is intentionally not exposed by an MCP or REST response.
+     *
+     * @return list<array{path:string,signed:mixed,verified:mixed}>
+     */
+    public static function diff(self $signed, self $verified): array
+    {
+        return self::diffValue($signed->debugValue(), $verified->debugValue());
+    }
+
+    /** @return array<string,mixed> */
+    private function debugValue(): array
+    {
+        return [
+            'entrypoint' => $this->entrypoint,
+            'capture_id' => $this->captureId,
+            'capture_fingerprint' => $this->captureFingerprint,
+            'entity_type' => $this->entityType,
+            'operation' => $this->operation,
+            'operation_family' => $this->operationFamily,
+            'create_semantics' => $this->createSemantics,
+            'subject_id' => $this->subjectId,
+            'target_uuid' => $this->targetUuid,
+            'proposed_uuid' => $this->proposedUuid,
+            'expected_revision' => $this->expectedRevision,
+            'idempotency_key' => $this->idempotencyKey,
+            'payload_fingerprint' => $this->payloadFingerprint,
+            'dependency_fingerprint' => $this->dependencyFingerprint,
+            'payload' => $this->payload,
+        ];
+    }
+
+    /** @return list<array{path:string,signed:mixed,verified:mixed}> */
+    private static function diffValue(mixed $signed, mixed $verified, string $path = '', bool $signedExists = true, bool $verifiedExists = true): array
+    {
+        if ($signedExists && $verifiedExists && is_array($signed) && is_array($verified)) {
+            $diff = [];
+            foreach (array_unique(array_merge(array_keys($signed), array_keys($verified)), SORT_REGULAR) as $key) {
+                $keyPath = $path === '' ? (string) $key : $path . '.' . $key;
+                $diff = array_merge($diff, self::diffValue($signed[$key] ?? null, $verified[$key] ?? null, $keyPath, array_key_exists($key, $signed), array_key_exists($key, $verified)));
+            }
+            return $diff;
+        }
+        if ($signedExists === $verifiedExists && $signed === $verified) return [];
+        return [['path' => $path, 'signed' => $signedExists ? $signed : '<missing>', 'verified' => $verifiedExists ? $verified : '<missing>']];
+    }
+
+    /**
      * Source retrieval receipts are persisted for provenance, but are not
      * semantic Video command inputs. A retry must not require a new semantic
      * approval merely because the same source was fetched or thumbnail-probed

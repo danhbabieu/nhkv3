@@ -81,4 +81,28 @@ final class McpCaptureReadContractTest extends TestCase
             'retry' => ['eligible' => false, 'reason' => 'CAPTURE_NOT_FOUND'],
         ], $read->captureGet('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'));
     }
+
+    public function test_capture_read_retry_projection_matches_shared_executor_gate_for_non_resumable_block(): void
+    {
+        $id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+        $record = new CaptureRecord($id, 'retry-parity', hash('sha256', 'retry-parity'), 'SEMANTICS_RECONCILED', 'SYSTEM_BLOCKED', diagnostics: [
+            'completion' => ['status' => 'COMPLETE', 'children' => [['owner_type' => 'video', 'complete' => true, 'status' => 'COMPLETE']]],
+            'resume_hints' => ['resume_children' => ['video']],
+        ]);
+        $repository = new class($record) implements CaptureRepository {
+            public function __construct(private CaptureRecord $record) {}
+            public function findByIdempotencyKey(string $key): ?CaptureRecord { return null; }
+            public function findById(string $captureId): ?CaptureRecord { return $captureId === $this->record->captureId ? $this->record : null; }
+            public function create(CaptureRecord $record): CaptureRecord { return $record; }
+            public function save(CaptureRecord $record): CaptureRecord { return $record; }
+        };
+        $read = new McpReadHandler(
+            $this->createMock(AuthorityRepository::class), new EntityTypeRegistry(),
+            $this->createMock(MediaRepository::class), $this->createMock(MediaAssetRepository::class), $this->createMock(MediaUsageRepository::class),
+            $this->createMock(VideoRepository::class), $this->createMock(KnowledgeRepository::class), $this->createMock(EvidenceRepository::class),
+            captures: $repository,
+        );
+
+        self::assertSame(['eligible' => false, 'reason' => 'CAPTURE_RETRY_NOT_ALLOWED', 'capture_id' => $id], $read->captureGet($id)['retry']);
+    }
 }
