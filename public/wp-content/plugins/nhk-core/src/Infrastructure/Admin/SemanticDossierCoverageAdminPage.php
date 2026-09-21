@@ -9,6 +9,8 @@ use NHK\Core\Application\Collector\{CollectorAuthoritySeedReconciler, CollectorC
 /** Read-only diagnostic UI. It has no semantic mutation path. */
 final class SemanticDossierCoverageAdminPage
 {
+    private const ADMIN_SCAN_LIMIT = 10;
+
     public function __construct(private SemanticDossierCoverageAudit $audit, private ?CollectorCoverageAudit $collectorAudit = null, private ?CollectorAuthoritySeedReconciler $collectorSeeds = null) {}
 
     public function register(): void
@@ -26,7 +28,10 @@ final class SemanticDossierCoverageAdminPage
             return;
         }
 
-        $report = $this->audit->run();
+        // A full dossier is intentionally expensive: it reads Graph, Knowledge,
+        // Media and public routing for every entity. Keep this diagnostic page
+        // bounded so a large dataset cannot take down the whole admin request.
+        $report = $this->audit->run(self::ADMIN_SCAN_LIMIT);
         $summary = is_array($report['summary'] ?? null) ? $report['summary'] : [];
         $items = is_array($report['items'] ?? null) ? $report['items'] : [];
         $typeFilter = function_exists('sanitize_key') ? sanitize_key((string) ($_GET['entity_type'] ?? '')) : trim((string) ($_GET['entity_type'] ?? ''));
@@ -36,6 +41,7 @@ final class SemanticDossierCoverageAdminPage
 
         echo '<div class="wrap"><h1>Semantic dossier coverage</h1>';
         echo '<p>Read-only audit: phản ánh dữ liệu hiện có thể chiếu ra frontend. Một khoảng trống không đồng nghĩa hệ thống được phép tự tạo quan hệ hoặc dữ liệu mới.</p>';
+        if (($summary['truncated'] ?? false) === true) echo '<div class="notice notice-warning"><p>Đang hiển thị mẫu giới hạn ' . esc_html((string) self::ADMIN_SCAN_LIMIT) . ' entity để tránh timeout. Đây không phải tổng kiểm kê toàn hệ thống.</p></div>';
         echo '<div style="display:grid;grid-template-columns:repeat(5,minmax(120px,1fr));gap:12px;max-width:1000px;margin:18px 0">';
         $cards = [
             'Entity' => (int) ($summary['entity_count'] ?? 0),
@@ -73,7 +79,7 @@ final class SemanticDossierCoverageAdminPage
             echo '</tr>';
         }
         echo '</tbody></table>';
-        if ($this->collectorAudit !== null) $this->renderCollectorCoverage($this->collectorAudit->run());
+        if ($this->collectorAudit !== null) $this->renderCollectorCoverage($this->collectorAudit->run(self::ADMIN_SCAN_LIMIT));
         echo '<p><strong>Data repair rule:</strong> báo cáo này chỉ xác định coverage. Mọi bổ sung quan hệ/tri thức phải có căn cứ riêng và đi qua Governance cùng read-back.</p></div>';
     }
 
@@ -83,6 +89,7 @@ final class SemanticDossierCoverageAdminPage
         $summary = is_array($report['summary'] ?? null) ? $report['summary'] : [];
         $items = is_array($report['items'] ?? null) ? $report['items'] : [];
         echo '<section style="margin-top:28px"><h2>Collector Profile coverage</h2><p>Read-only theo từng nhánh Classification; đây là kiểm kê độ phủ hiện có, không phải hàng đợi tự động bổ sung dữ liệu.</p>';
+        if (($summary['truncated'] ?? false) === true) echo '<div class="notice notice-warning"><p>Collector Profile cũng đang hiển thị mẫu giới hạn ' . esc_html((string) self::ADMIN_SCAN_LIMIT) . ' Classification để tránh timeout.</p></div>';
         echo '<p><strong>' . esc_html((string) ($summary['available_count'] ?? 0)) . '/' . esc_html((string) ($summary['classification_count'] ?? 0)) . '</strong> nhánh truy vấn được · <strong>' . esc_html((string) ($summary['knowledge_count'] ?? 0)) . '</strong> ghi nhận · <strong>' . esc_html((string) ($summary['unresolved_count'] ?? 0)) . '</strong> chưa xếp nhóm · <strong>' . esc_html((string) ($summary['media_count'] ?? 0)) . '</strong> ảnh · <strong>' . esc_html((string) ($summary['video_count'] ?? 0)) . '</strong> video</p>';
         echo '<table class="widefat striped"><thead><tr><th>Classification</th><th>Status</th><th>Knowledge</th><th>Unresolved</th><th>Images</th><th>Video</th><th>Reason</th></tr></thead><tbody>';
         if ($items === []) echo '<tr><td colspan="7">No Classification coverage records.</td></tr>';

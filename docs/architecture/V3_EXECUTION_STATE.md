@@ -1,5 +1,25 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-21 — Dossier coverage admin timeout guard (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE: The Dossier coverage admin page assembled a full Entity dossier for
+every active Authority entity and then assembled every Collector Profile in the
+same request. Those nested read projections fan out across Graph, Knowledge,
+Media, evidence and public-route queries and could exceed the 30-second PHP
+request limit on the demo dataset.
+
+FIXED_BOUNDARY: Both read-only coverage audits now accept an optional bounded
+scan limit and report `scanned_count` plus `truncated`. The admin page uses a
+10-entity/Classification cap and renders an explicit Vietnamese warning when
+the report is a sample rather than a full inventory. No semantic writer,
+database mutation, or data repair path was introduced.
+
+VERIFICATION: Targeted coverage tests pass 4 tests / 37 assertions. Changed PHP
+files lint clean, `git diff --check` passes, and no credentials or live IDs
+were added. No staging/production data, deployment or push was performed.
+
+STATUS: `DOSSIER_COVERAGE_TIMEOUT_GUARDED_LOCAL / UNIT_TARGET_PASS / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-21 — Unified Canonical Evolution Phase 1–8 local preparation
 
 PROGRAM_EVIDENCE: `docs/architecture/NHK_V3_UNIFIED_CANONICAL_EVOLUTION_PHASE1_TO_PHASE8_LOCAL_EVIDENCE_2026-09-21.md`

@@ -12,13 +12,19 @@ final class CollectorCoverageAudit
 {
     public function __construct(private AuthorityRepository $authority, private CollectorProfileQuery $profiles) {}
 
-    /** @return array{summary:array<string,int>,items:list<array<string,mixed>>} */
-    public function run(): array
+    /** @return array{summary:array<string,mixed>,items:list<array<string,mixed>>} */
+    public function run(int $limit = 0): array
     {
         $items = [];
-        $summary = ['classification_count' => 0, 'available_count' => 0, 'complete_count' => 0, 'truncated_count' => 0, 'unresolved_count' => 0, 'knowledge_count' => 0, 'media_count' => 0, 'video_count' => 0];
+        $limit = max(0, $limit);
+        $summary = ['classification_count' => 0, 'available_count' => 0, 'complete_count' => 0, 'truncated_count' => 0, 'unresolved_count' => 0, 'knowledge_count' => 0, 'media_count' => 0, 'video_count' => 0, 'scanned_count' => 0, 'truncated' => false];
         foreach ($this->authority->listByType('classification') as $entity) {
             if (!$entity instanceof AuthorityEntity || !$entity->active()) continue;
+            if ($limit > 0 && $summary['scanned_count'] >= $limit) {
+                $summary['truncated'] = true;
+                break;
+            }
+            $summary['scanned_count']++;
             $summary['classification_count']++;
             $profile = $this->profiles->build($entity->canonicalId, 1, 200);
             $coverage = is_array($profile['coverage'] ?? null) ? $profile['coverage'] : [];

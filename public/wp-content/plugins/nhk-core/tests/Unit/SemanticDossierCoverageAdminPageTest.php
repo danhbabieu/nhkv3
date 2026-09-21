@@ -18,6 +18,8 @@ final class SemanticDossierCoverageAdminPageTest extends TestCase
         foreach (['Graph', 'Knowledge', 'Evidence', 'Images', 'Video', 'Articles', 'Gaps'] as $label) self::assertStringContainsString($label, $source);
         foreach (['proposal-create', 'proposal-apply', 'relation_create', '->create(', '->update(', '->retire('] as $mutation) self::assertStringNotContainsString($mutation, $source);
         self::assertStringContainsString('Approved Collector seed reconciliation', $source);
+        self::assertStringContainsString('ADMIN_SCAN_LIMIT = 10', $source);
+        self::assertStringContainsString('timeout', strtolower($source));
         $seedSource = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/Collector/CollectorAuthoritySeedReconciler.php');
         self::assertStringContainsString('NO_MATCH_CREATE_REQUIRES_EVIDENCE', $seedSource);
     }

@@ -92,6 +92,24 @@ final class SemanticDossierCoverageAuditTest extends TestCase
         self::assertNotContains('ARTICLE_COVERAGE_EMPTY', $row['gaps']);
     }
 
+    public function test_audit_limit_stops_after_bounded_entity_scan_and_reports_truncation(): void
+    {
+        $types = new EntityTypeRegistry(); CanonicalEntityTypeCatalog::registerInto($types);
+        $authority = new AuthorityService($repo = new InMemoryAuthorityRepository(), $types);
+        $authority->create('movement', 'movement-a', 'Machine A');
+        $authority->create('movement', 'movement-b', 'Machine B');
+
+        $reader = static fn($entity): array => [
+            'status' => 'UNAVAILABLE',
+            'warnings' => ['PUBLIC_ROUTE_UNAVAILABLE'],
+        ];
+        $report = (new SemanticDossierCoverageAudit($types, $repo, $reader))->run(1);
+
+        self::assertSame(1, $report['summary']['scanned_count']);
+        self::assertTrue($report['summary']['truncated']);
+        self::assertCount(1, $report['items']);
+    }
+
     private function find(array $items, string $type, string $stableKey): array
     {
         foreach ($items as $item) if (($item['type'] ?? '') === $type && ($item['stable_key'] ?? '') === $stableKey) return $item;

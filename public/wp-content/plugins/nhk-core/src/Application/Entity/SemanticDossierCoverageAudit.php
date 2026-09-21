@@ -30,21 +30,30 @@ final class SemanticDossierCoverageAudit
         $this->reader = $reader;
     }
 
-    /** @return array{summary:array<string,int>,items:list<array<string,mixed>>} */
-    public function run(): array
+    /** @return array{summary:array<string,mixed>,items:list<array<string,mixed>>} */
+    public function run(int $limit = 0): array
     {
         $items = [];
+        $limit = max(0, $limit);
+        $scanned = 0;
         $summary = [
             'entity_count' => 0,
             'public_ready_count' => 0,
             'not_public_ready_count' => 0,
             'complete_core_count' => 0,
             'coverage_gap_count' => 0,
+            'scanned_count' => 0,
+            'truncated' => false,
         ];
 
         foreach ($this->types->all() as $definition) {
             foreach ($this->authority->listByType($definition->type) as $entity) {
                 if (!$entity instanceof AuthorityEntity || !$entity->active()) continue;
+                if ($limit > 0 && $scanned >= $limit) {
+                    $summary['truncated'] = true;
+                    break 2;
+                }
+                $scanned++;
                 $summary['entity_count']++;
                 $dossier = ($this->reader)($entity);
                 if (!is_array($dossier) || ($dossier['status'] ?? '') !== 'AVAILABLE') {
@@ -64,6 +73,7 @@ final class SemanticDossierCoverageAudit
             }
         }
 
+        $summary['scanned_count'] = $scanned;
         usort($items, static fn(array $a, array $b): int => [(string) $a['type'], (string) $a['stable_key']] <=> [(string) $b['type'], (string) $b['stable_key']]);
         return ['summary' => $summary, 'items' => $items];
     }
