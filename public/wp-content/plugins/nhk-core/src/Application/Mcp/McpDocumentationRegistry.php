@@ -448,12 +448,22 @@ final class McpDocumentationRegistry
             if (!$file->isFile()) continue;
             $relative = str_replace('\\', '/', substr($file->getPathname(), strlen($pluginRoot) + 1));
             if (str_starts_with($relative, 'tests/') || preg_match('/(^|\/)(?:\.env|.*\.pem)$/i', $relative) === 1) continue;
-            $hash = hash_file('sha256', $file->getPathname());
+            $hash = $this->buildInputHash($relative, $file->getPathname());
             if ($hash === false) return '';
             $files[$relative] = $hash;
         }
         ksort($files);
         return hash('sha256', self::json($files));
+    }
+
+    private function buildInputHash(string $relative, string $path): string|false
+    {
+        if ($relative !== 'resources/canonical-docs/manifest.json') return hash_file('sha256', $path);
+
+        $manifest = json_decode((string) @file_get_contents($path), true);
+        if (!is_array($manifest)) return false;
+        unset($manifest['generated_at']);
+        return hash('sha256', self::json($manifest));
     }
 
     private static function generatedAt(): string { $epoch = getenv('SOURCE_DATE_EPOCH'); return is_string($epoch) && ctype_digit($epoch) ? gmdate('c', (int) $epoch) : gmdate('c'); }

@@ -113,6 +113,31 @@ final class McpDocumentationRegistryTest extends TestCase
         self::assertContains('nhk.docs.bootstrap', $bootstrap['runtime_status']['registered_tools']);
     }
 
+    public function test_build_identity_normalizes_manifest_generation_timestamp(): void
+    {
+        $directory = sys_get_temp_dir() . '/nhk-build-identity-' . bin2hex(random_bytes(5));
+        self::assertTrue(mkdir($directory, 0755, true));
+        $first = $directory . '/first-manifest.json';
+        $second = $directory . '/second-manifest.json';
+        $manifest = ['schema_version' => 1, 'documentation_version' => 'docs', 'generated_at' => '2026-09-21T05:56:41+00:00', 'files' => []];
+        try {
+            self::assertNotFalse(file_put_contents($first, json_encode($manifest, JSON_THROW_ON_ERROR)));
+            $manifest['generated_at'] = '2026-09-21T05:56:49+00:00';
+            self::assertNotFalse(file_put_contents($second, json_encode($manifest, JSON_THROW_ON_ERROR)));
+            $method = new \ReflectionMethod(McpDocumentationRegistry::class, 'buildInputHash');
+            $method->setAccessible(true);
+            $registry = new McpDocumentationRegistry();
+            self::assertSame(
+                $method->invoke($registry, 'resources/canonical-docs/manifest.json', $first),
+                $method->invoke($registry, 'resources/canonical-docs/manifest.json', $second),
+            );
+        } finally {
+            @unlink($first);
+            @unlink($second);
+            $this->removeDirectory($directory);
+        }
+    }
+
     public function test_deployed_plugin_snapshot_precedes_stale_repository_docs(): void
     {
         $method = new \ReflectionMethod(McpDocumentationRegistry::class, 'roots');
