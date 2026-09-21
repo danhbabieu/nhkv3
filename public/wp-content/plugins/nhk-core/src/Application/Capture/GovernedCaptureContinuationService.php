@@ -1168,6 +1168,9 @@ final class GovernedCaptureContinuationService
             return ['proposal_id' => $proposal->id, 'status' => 'SYSTEM_BLOCKED', 'blockers' => $reasons];
         }
         $applied = ($this->apply)($proposal->id);
+        if (($plan['repair'] ?? false) === true && $this->knowledgeRepairPreview !== null) {
+            $applied['dependency_readback'] = $this->knowledgeRepairPreview->readback((string) ($plan['target_uuid'] ?? $plan['subject_id'] ?? ''));
+        }
         $lifecycle[] = 'CONTROLLED_APPLY';
         return $this->applied($proposal, $applied);
     }

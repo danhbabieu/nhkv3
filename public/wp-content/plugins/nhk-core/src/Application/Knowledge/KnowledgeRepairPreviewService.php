@@ -42,4 +42,16 @@ final class KnowledgeRepairPreviewService
             'blockers' => array_values(array_filter([$revisionOk ? null : 'KNOWLEDGE_REPAIR_REVISION_CHANGED', $manualReview ? 'KNOWLEDGE_REPAIR_DEPENDENCY_REVIEW_REQUIRED' : null])),
         ];
     }
+
+    public function readback(string $targetUuid): array
+    {
+        $claim = $this->claims->findByCanonicalId($targetUuid);
+        if ($claim === null) return ['status' => 'REVIEW_REQUIRED', 'reason' => 'KNOWLEDGE_REPAIR_READBACK_NOT_FOUND'];
+        $graph = [];
+        if ($this->graph !== null) {
+            $node = new NodeReference('knowledge', $claim->canonicalId);
+            foreach ([$this->graph->findOutgoing($node, null, 0, 100, true), $this->graph->findIncoming($node, null, 0, 100, true)] as $page) foreach ((array) ($page['items'] ?? []) as $edge) if (is_object($edge)) $graph[] = ['uuid' => $edge->edge_uuid, 'source' => $edge->source->reference->endpoint_key, 'predicate' => $edge->predicate, 'target' => $edge->target->reference->endpoint_key, 'active' => $edge->isActive(), 'revision' => $edge->revision];
+        }
+        return ['status' => 'READ_BACK', 'knowledge' => ['canonical_id' => $claim->canonicalId, 'stable_key' => $claim->stableKey, 'revision' => $claim->revision, 'text' => $claim->claimText, 'claim_type' => $claim->claimType, 'active' => $claim->active], 'graph_dependencies' => $graph, 'evidence_dependencies' => array_map(static fn ($item): array => ['canonical_id' => $item->canonicalId, 'claim_id' => $item->claimId, 'source_id' => $item->sourceId, 'active' => $item->active, 'revision' => $item->revision], $this->evidence->listByClaim($claim->canonicalId, true))];
+    }
 }
