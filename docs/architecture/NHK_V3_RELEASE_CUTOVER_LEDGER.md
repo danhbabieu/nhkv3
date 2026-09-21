@@ -7,15 +7,19 @@
 ```text
 WORKSTREAM=NHK_V3_RELEASE_AND_CUTOVER_ACCEPTANCE
 ARCHITECTURAL_PROGRAM=ARCHITECTURAL_PROGRAM_COMPLETE_PENDING_LIVE_MUTATION_OR_DEPLOYMENT_ACCEPTANCE
-CURRENT_STEP=READ_ONLY_RELEASE_PREPARATION_COMPLETE_WITH_ARTIFACT_BLOCKER
-INTENDED_RELEASE_REVISION=1c2e0f1b0c32bed1f6de4fe5523635171d481cc0
+CURRENT_STEP=BUILD_IDENTITY_FORENSIC_COMPLETE_LOCAL_TOOLING_FIX_COMMITTED
+INTENDED_RELEASE_REVISION=99637ceb87c000d361d831bd1f45116b516b929d
 STAGING_REVISION=1c2e0f1b0c32bed1f6de4fe5523635171d481cc0
-WORKTREE_CLASSIFICATION=PRE_EXISTING_PROGRAM_DOCUMENTATION;RELEASE_ARTIFACTS_UNCOMMITTED;NO_UNKNOWN_ABSORBED
+WORKTREE_CLASSIFICATION=PRE_EXISTING_PROGRAM_DOCUMENTATION;LOCAL_BUILD_TOOLING_FIX_COMMITTED;NO_UNKNOWN_ABSORBED
 DOCUMENTATION_PARITY=PASS
-LOCAL_MANIFEST_AFTER_REGENERATION=2e23279179cf60d537571e4d8dac78d9c41f19f4fbcd041e82f21cac3b4b7ed5
-LOCAL_BUILD_IDENTITY_AFTER_REGENERATION=c241ea57e76e6d68943f57ce0a12733c2c76e81d230f9f1eaff417e17257ae49
+LOCAL_DOCUMENTATION_VERSION_AFTER_REGENERATION=c27d5093b3c91b0a66ae84a7fb19fdaa88bf699030d8be4be4c0ba210e2aaba7
+LOCAL_MANIFEST_AFTER_REGENERATION=9b21f11c35773e4de5c3700b48a8aa81d4a37213a85f21fbdab614a64402d425
+LOCAL_BUILD_IDENTITY_AFTER_REGENERATION=ba93e11f5e1008e7eb124b4d6bca164e940cafd00d24d323fcd34b9cae23eafd
+LOCAL_RELEASE_IDENTITY_AFTER_REGENERATION=3bc38513565008af80ce60ee00d3ef66a427871b98651fcd6907eb9b4076694a
 STAGING_BUILD_IDENTITY=df86683644fd55e34ddc81f36e206002ede1085d2c66195815ce73e4a3b45ead
-BUILD_IDENTITY_STATUS=BLOCKED_MISMATCH
+STAGING_DOCUMENTATION_VERSION=c27d5093b3c91b0a66ae84a7fb19fdaa88bf699030d8be4be4c0ba210e2aaba7
+STAGING_MANIFEST_HASH=2e23279179cf60d537571e4d8dac78d9c41f19f4fbcd041e82f21cac3b4b7ed5
+BUILD_IDENTITY_STATUS=LOCAL_DETERMINISTIC_NEW_TUPLE;STAGING_REQUIRES_ACTIVATION_OF_99637CEB
 CONNECTOR_RUNTIME_REGISTERED=58
 CONNECTOR_TOOLS_LIST_EXPOSED=58
 CONNECTOR_DISCOVERABLE=46
@@ -32,18 +36,42 @@ COLLISION_COUNT=4
 LIVE_MUTATION_FIXTURE=NOT_AUTHORIZED_OR_SUPPLIED
 DEPLOYMENT_ATTEMPTED=YES_ACCIDENTAL_WRAPPER_INVOCATION
 DEPLOYMENT_RESULT=REMOTE_DEPLOYMENT_FAILED
-REMOTE_PACKAGE_STATE=UNKNOWN_PENDING_HUMAN_VERIFICATION
+FAILED_DEPLOY_ATTEMPT=YES
+REMOTE_POST_FAILURE_READBACK=PASS
+REMOTE_PACKAGE_STATE=VERIFIED_HEALTHY_READ_ONLY_AFTER_FAILED_ATTEMPT
+VERIFIED_REMOTE_DAMAGE=NONE_OBSERVED
+REMOTE_RETRY_REQUIRED_NOW=NO
 SEMANTIC_MUTATION_COUNT=0
 DEPLOYMENT_PERFORMED=NO_VERIFIED_SUCCESS
-NEXT_EXACT_ACTION=HUMAN_REVIEW_OF_BUILD_MISMATCH_AND_REMOTE_STATE;NO_RETRY
+RELEASE_PACKAGE_READY=YES_LOCAL_PASS_B
+DEPLOYMENT_REQUIRED=YES_TO_ACTIVATE_99637CEB
+NEXT_EXACT_ACTION=HUMAN_AUTHORIZATION_FOR_DEPLOYMENT_OF_99637CEB;NO_AUTONOMOUS_DEPLOYMENT
 ```
 
 The accidental wrapper invocation occurred because the repository's
 `nhk-demo-cutover` prepare command calls `RemoteDeploymentAdapter` before its
 approval stage. It returned `REMOTE_DEPLOYMENT_FAILED`; no retry was made.
 Because the adapter had a configured target and SSH agent, remote package state
-cannot be inferred from the local return code and must be treated as unknown
-until separately verified by an authorized operator.
+was not inferred from the local return code. Fresh post-failure read-only
+verification recorded the remote staging tuple, Article 55/Cuckoo readback and
+no observed remote damage; the failed attempt remains a failed attempt and was
+not retried.
+
+## Build identity forensic closeout
+
+`McpDocumentationRegistry::buildIdentity()` owns the package build identity.
+It hashes sorted plugin-relative file paths and SHA-256 file content. The
+canonical `resources/canonical-docs/manifest.json` contains `generated_at` as
+metadata, but the manifest identity itself excludes that field. The original
+build identity incorrectly hashed the raw manifest file and therefore changed
+between clean generations. The local fix normalizes `generated_at` out of that
+one build-input hash while retaining it in the generated manifest.
+
+Two pre-fix generations produced different build identities (`33844f…` and
+`c01168…`) with identical documentation/catalog/resource values. Two post-fix
+generations after commit `99637ceb…` produced the same build identity
+`ba93e11f…` while `generated_at` changed. This is a local tooling fix, not a
+staging verification or deployment claim.
 
 ## Evidence paths
 
