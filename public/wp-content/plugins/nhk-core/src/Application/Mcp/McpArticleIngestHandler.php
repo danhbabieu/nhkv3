@@ -25,7 +25,16 @@ class McpArticleIngestHandler
         if ($this->research !== null && trim((string) ($input['research_topic'] ?? '')) !== '') {
             $target = is_array($input['target_wp_post'] ?? null) ? $input['target_wp_post'] : [];
             $postId = preg_match('/^[1-9][0-9]*:([1-9][0-9]*)$/', (string) ($target['endpoint_key'] ?? ''), $matches) === 1 ? (int) $matches[1] : 0;
-            return $this->research->research((string) $input['research_topic'], is_array($input['research_subject'] ?? null) ? $input['research_subject'] : [], $postId > 0 ? ['post_id' => $postId] : [])->toArray();
+            // Research preflight is also the public explicit-Media path. Do
+            // not return before carrying the request's Article context into
+            // inventory/planning; otherwise article_media.selected is lost
+            // before ArticleMediaCoordinator can apply precedence over stale
+            // historical usage.
+            $articleContext = is_array($input['article_context'] ?? null) ? $input['article_context'] : [];
+            if ($postId > 0) $articleContext['post_id'] = $postId;
+            if (is_array($input['article_media'] ?? null)) $articleContext['article_media'] = $input['article_media'];
+            if (is_array($input['media_context'] ?? null)) $articleContext = array_replace_recursive($articleContext, $input['media_context']);
+            return $this->research->research((string) $input['research_topic'], is_array($input['research_subject'] ?? null) ? $input['research_subject'] : [], $articleContext)->toArray();
         }
         $target = is_array($input['target_wp_post'] ?? null) ? $input['target_wp_post'] : [];
         $endpoint = trim((string) ($target['endpoint_key'] ?? ''));

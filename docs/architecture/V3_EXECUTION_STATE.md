@@ -1,5 +1,52 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-21 — Final closeout boundary repair (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE_CAPTURE_READBACK: The public WordPress Ability bootstrap creates its
+own read composition inside `wp_abilities_api_init`, but `McpReadHandler` was
+given an out-of-scope `$captureRepository` variable. The MCP transport
+composition had the repository while the public Ability composition did not,
+so `nhk.capture.get` on that path returned `CAPTURE_READBACK_UNAVAILABLE` for
+both known and unknown IDs. The Ability composition now constructs the same
+`WpdbCaptureRepository` against the current `$wpdb` owner as Capture ingest and
+the transport composition.
+
+ROOT_CAUSE_ARTICLE_EXPLICIT_MEDIA: The public research-preflight branch in
+`McpArticleIngestHandler` returned before carrying `article_media` into
+`ArticleResearchPreflight`. Its inventory callback therefore inspected only
+historical `MediaUsage` and could not see the current explicit selection. The
+request context now carries the Article Media packet through the research
+boundary, and the production inventory projection treats a current explicit
+selection as authoritative input: compatible Media survives, while an
+incompatible explicit selection remains blocked instead of falling back to
+stale history. `USER_EXPLICIT` and `PINNED` metadata are retained in the
+bounded planning projection.
+
+VIDEO_BOUNDARY_STATUS: Current HEAD already contains the final Video scope
+primitive and shared environment verifier: final command payload and
+dependency fingerprints are signed by `StagingAcceptanceScopeVerifier`,
+`ProposalEligibilityService` invokes that verifier for Capture-bound Video
+proposals, and `GovernedCaptureContinuationService` rebuilds/reuses the same
+Capture child deterministically. Focused scope invalidation, reuse,
+continuation, duplicate-protection and canonical-readback suites remain green;
+no Video data was mutated.
+
+BOUNDARY_REGRESSION: Added a public research-preflight explicit-Media
+regression and an integration test that crosses the real
+`WpdbCaptureRepository` → `McpReadHandler` → `McpTransport` and public
+`nhk-v3/capture-get` Ability paths for FOUND, review-required continuation and
+NOT_FOUND. The integration test is environment-gated and was skipped because
+`NHK_WP_TEST_PATH`/`NHK_WP_TEST_DB` were not supplied in this local run.
+
+VERIFICATION: Focused boundary run passes 114 tests / 479 assertions, with
+deprecations only. Full NHK Unit passes 2,024 tests / 9,944 assertions, with
+17 warnings and deprecations only. Changed PHP files lint clean and
+`git diff --check` passes. No staging/production data, deployment or push was
+performed. Local acceptance remains incomplete until the exact integration
+runtime executes the new persistence/public-Ability test.
+
+STATUS: `FINAL_CLOSEOUT_LOCAL_PATCHED / UNIT_PASS / INTEGRATION_ENVIRONMENT_REQUIRED / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-21 — Public transport/readiness closeout repair (LOCAL / NO LIVE MUTATION)
 
 ROOT_CAUSE_CAPTURE_GET: The canonical Capture repository lookup was correctly

@@ -138,6 +138,14 @@ final class Plugin {
         add_action('wp_abilities_api_init', static function (): void {
             global $wpdb;
             if (!isset($wpdb) || !is_object($wpdb)) return;
+            // The Ability registry is bootstrapped in its own WordPress
+            // lifecycle callback.  Construct the canonical Capture
+            // repository inside this callback so the public Ability path
+            // reads the same persisted owner as Capture ingest and the MCP
+            // transport path.  Referencing the later composition-root local
+            // here leaves $captureRepository undefined and collapses every
+            // capture.get request into CAPTURE_READBACK_UNAVAILABLE.
+            $captureRepository = new WpdbCaptureRepository($wpdb);
             $types = new EntityTypeRegistry();
             CanonicalEntityTypeCatalog::registerInto($types);
             $authority = new WpdbAuthorityRepository($wpdb);
@@ -399,16 +407,32 @@ final class Plugin {
                         $suitabilityPolicy = new \NHK\Core\Application\Media\SemanticSuitabilityPolicy();
                         $primarySubjectId = trim((string) (($input['subject_resolution']['primary']['id'] ?? '')));
                         $subjectIdsForMedia = $primarySubjectId !== '' ? [$primarySubjectId] : $subjectIds;
+                        $selectedMedia = is_array($input['article_context']['article_media']['selected'] ?? null)
+                            ? $input['article_context']['article_media']['selected']
+                            : [];
+                        if (isset($selectedMedia['media_id'])) $selectedMedia = ['featured_primary' => $selectedMedia];
                         foreach (['featured_primary', 'inline_primary'] as $role) {
                             $usage = $usages->listByEndpoint('wp_post', $articleEndpoint, $role)[0] ?? null;
-                            $mediaItem = $usage !== null ? $media->findByCanonicalId($usage->mediaId) : null;
+                            $explicit = is_array($selectedMedia[$role] ?? null) ? $selectedMedia[$role] : null;
+                            $explicitId = trim((string) ($explicit['media_id'] ?? ''));
+                            // A current explicit selection is authoritative
+                            // input, including when it is later rejected for
+                            // incompatibility. Never fall back to stale
+                            // persisted usage after an explicit request.
+                            $mediaItem = $explicitId !== ''
+                                ? $media->findByCanonicalId($explicitId)
+                                : ($usage !== null ? $media->findByCanonicalId($usage->mediaId) : null);
+                            $selectionSource = $explicitId !== '' ? strtoupper(trim((string) ($explicit['selection_source'] ?? 'USER_EXPLICIT'))) : 'SYSTEM_AUTO';
                             $assessment = $mediaItem instanceof \NHK\Core\Domain\Media\Media
-                                ? $suitabilityPolicy->evaluateMedia($mediaItem, $assets->listByMediaId($mediaItem->canonicalId), ['subject_ids' => $subjectIdsForMedia], 'SYSTEM_AUTO', $role)
+                                ? $suitabilityPolicy->evaluateMedia($mediaItem, $assets->listByMediaId($mediaItem->canonicalId), ['subject_ids' => $subjectIdsForMedia, 'current_capture_media' => $explicitId !== '', 'article_explicit_media' => $explicitId !== ''], $selectionSource, $role)
                                 : ['requirement' => \NHK\Core\Application\Media\SemanticSuitabilityPolicy::OPTIONAL, 'availability' => \NHK\Core\Application\Media\SemanticSuitabilityPolicy::MISSING, 'suitability' => \NHK\Core\Application\Media\SemanticSuitabilityPolicy::UNKNOWN, 'valid_for_completeness' => false, 'diagnostic' => 'MEDIA_USAGE_INCOMPLETE'];
                             $effective = ($assessment['valid_for_completeness'] ?? false) === true && $mediaItem instanceof \NHK\Core\Domain\Media\Media && !$mediaItem->isSystemPlaceholder();
                             $articleMedia[$role] = [
                                 'media_id' => $effective ? $mediaItem->canonicalId : null,
                                 'persisted_media_id' => $mediaItem?->canonicalId,
+                                'requested_media_id' => $explicitId !== '' ? $explicitId : null,
+                                'selection_source' => $explicit['selection_source'] ?? null,
+                                'selection_policy' => $explicit['selection_policy'] ?? null,
                                 'placeholder' => !$effective,
                                 'suitability' => $assessment['suitability'],
                                 'availability' => $assessment['availability'],

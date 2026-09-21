@@ -5,6 +5,7 @@ namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Article\{ArticleIngestCoordinator, ArticleIngestPreflight};
 use NHK\Core\Application\Governance\GovernanceCapabilities;
+use NHK\Core\Application\Article\ArticleResearchPreflight;
 use NHK\Core\Application\Mcp\{McpArticleIngestHandler, McpToolCatalog};
 use NHK\Core\Contracts\Article\{ArticleOperationReceiptRepository, EditorialStateReader};
 use NHK\Core\Domain\Article\{ArticleIngestOutcome, ArticleOperationReceipt, EditorialPostState};
@@ -62,6 +63,56 @@ final class McpArticleContractTest extends TestCase
         self::assertTrue(McpToolCatalog::isGoverned('nhk.article.ingest'));
         self::assertFalse(McpToolCatalog::isGoverned('nhk.article.preflight'));
         self::assertContains('nhk_ingest_articles', GovernanceCapabilities::ALL);
+    }
+
+    public function test_public_research_preflight_preserves_explicit_media_selection(): void
+    {
+        $capturedContext = null;
+        $research = new ArticleResearchPreflight(
+            static fn (array $input): array => [
+                'status' => 'resolved',
+                'primary' => ['id' => 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'type' => 'model', 'name' => 'Odo 36'],
+                'subjects' => [['id' => 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'type' => 'model', 'name' => 'Odo 36']],
+            ],
+            static function (array $input) use (&$capturedContext): array {
+                $capturedContext = $input['article_context'] ?? null;
+                $selected = $capturedContext['article_media']['selected']['media_id'] ?? null;
+                return [
+                    'status' => 'available',
+                    'posts' => [['id' => '1:55', 'title' => 'Existing', 'subject_ids' => ['bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb']]],
+                    'current_categories' => [['id' => 2, 'name' => 'Đồng hồ', 'slug' => 'dong-ho']],
+                    'categories' => [['id' => 2, 'name' => 'Đồng hồ', 'slug' => 'dong-ho']],
+                    'article_media' => [
+                        'featured_primary' => ['media_id' => $selected, 'placeholder' => false, 'valid_for_completeness' => true],
+                        'inline_primary' => ['media_id' => $selected, 'placeholder' => false, 'valid_for_completeness' => true],
+                        'media_complete' => true,
+                    ],
+                    'media' => [], 'knowledge' => [], 'sources' => [], 'evidence' => [], 'relations' => [], 'videos' => [],
+                ];
+            },
+            static fn (array $relation): array => ['eligible' => true, 'route' => '/dong-ho/'],
+        );
+        $types = new EntityTypeRegistry(); CanonicalEntityTypeCatalog::registerInto($types);
+        $endpoints = new EndpointTypeRegistry(); $endpoints->register('wp_post', new FakeEndpointResolver('wp_post', ['1:55']));
+        $reader = new class implements EditorialStateReader { public function read(int $postId): ?EditorialPostState { return null; } };
+        $receipts = new class implements ArticleOperationReceiptRepository {
+            public function findByIdempotencyKey(string $key): ?ArticleOperationReceipt { return null; }
+            public function create(ArticleOperationReceipt $receipt): ArticleOperationReceipt { return $receipt; }
+            public function save(ArticleOperationReceipt $receipt): ArticleOperationReceipt { return $receipt; }
+        };
+        $handler = new McpArticleIngestHandler(new ArticleIngestCoordinator($receipts), new ArticleIngestPreflight($endpoints, new PredicateRegistry(), $types), $reader, research: $research);
+        $mediaId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+        $result = $handler->preflight([
+            'intent' => 'reconcile',
+            'research_topic' => 'Odo 36/10',
+            'research_subject' => ['exact' => ['name' => 'Odo 36', 'entity_type' => 'model']],
+            'target_wp_post' => ['endpoint_type' => 'wp_post', 'endpoint_key' => '1:55'],
+            'article_media' => ['selected' => ['media_id' => $mediaId, 'role' => 'featured_primary', 'selection_source' => 'USER_EXPLICIT', 'selection_policy' => 'PINNED']],
+        ]);
+
+        self::assertSame($mediaId, $capturedContext['article_media']['selected']['media_id']);
+        self::assertSame($mediaId, $result['media_plan']['featured_primary']['media_id']);
+        self::assertFalse($result['media_plan']['featured_primary']['placeholder']);
     }
 
 }
