@@ -1,5 +1,54 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-21 — Shared staging execution-envelope fingerprint proof (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE_CONFIRMED: The final semantic command fingerprint and the persisted
+Proposal payload are different representations. The latter carries the
+`staging_acceptance` execution envelope, whose timestamps, scope fingerprint,
+signature and copied command fingerprint authorize the command but cannot be
+part of the command it authorizes. Treating that envelope as command data is a
+self-referential fingerprint boundary and explains the residual payload-only
+staging mismatch.
+
+FIXED_BOUNDARY: `StagingOperationDescriptor::normalizeSemanticPayload()` is
+the shared Governance normalizer used by descriptor issuance and Proposal
+reload. It removes the well-defined execution envelope before command
+canonicalization while retaining all semantic payload fields. The existing
+scope packet remains independently verified, and the other Governance scope
+helpers now delegate their authorization stripping to the same shared boundary.
+No Video-specific stripper, live identifier, subject name or stable-key branch
+was added.
+
+HASH_PROOF: With generated UUID fixtures, `SIGNED_PAYLOAD_FINGERPRINT` and
+`HASH_A` are
+`5bccf44f11021f7053a405205703b9de67454ac0653b8692530b12078750c1c9`;
+`HASH_B` (persisted payload including `staging_acceptance`) is
+`1a3a46e9f688be484b30d372a2565c823a4867760c78a70674874b5d2d95bea5`; and
+`HASH_C` (the same persisted payload after removing only the execution
+envelope) equals HASH_A. Two different valid envelope timestamps/signatures
+produce the same semantic command fingerprint; changing a semantic field does
+not.
+
+GENERALITY: Production-shaped tests cover Video→Variant `about`, Video→Model
+`about`, zero and multiple semantic attachments, deterministic attachment
+ordering, reused command idempotency, a non-Video relation/create descriptor,
+semantic tamper rejection, scope tamper rejection and exact update/CAS
+revision behavior. UUID fixtures are generated; the five supplied live IDs
+and Odo-specific branches are absent from production source.
+
+VERIFICATION: Focused descriptor/scope/generic Video suite passes 32 tests /
+112 assertions. The full `NHK Unit` suite passes 2,053 tests / 10,495
+assertions with warnings/deprecations only. PHP lint and `git diff --check`
+pass. The all-suite command also exercised integration/contract suites but
+cannot pass in this environment because the required WordPress/MySQL test
+bootstrap is absent; those failures are infrastructure/configuration errors,
+not failures in this change. No schema or migration change, deployment, push,
+live read, or live mutation occurred.
+
+STATUS: `STAGING_EXECUTION_ENVELOPE_NORMALIZATION_FIXED_LOCAL / HASH_PROOF_PASS / FULL_UNIT_PASS / NO_LIVE_MUTATION`.
+
+NEXT_EXACT_ACTION: `USER_PUSH_PULL_BUILD; THEN RUN FRESH @v34 VIDEO ACCEPTANCE`.
+
 # Checkpoint — 2026-09-21 — System-wide MCP/Ability/connector descriptor parity (LOCAL / NO LIVE MUTATION)
 
 ROOT_CAUSE: Easy MCP had a tool-specific descriptor projection branch while

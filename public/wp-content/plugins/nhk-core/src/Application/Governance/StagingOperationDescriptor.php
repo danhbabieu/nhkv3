@@ -39,11 +39,7 @@ final readonly class StagingOperationDescriptor
         $payload = is_array($plan['payload'] ?? null) ? $plan['payload'] : [];
         $payload['capture_id'] = $captureId;
         $payload['capture_fingerprint'] = $captureFingerprint;
-        $payload = self::withoutAuthorization($payload);
-        if ($entity === 'video') {
-            unset($payload['capture_revision']);
-            $payload = self::withoutVideoRetrievalVolatility($payload);
-        }
+        $payload = self::normalizeSemanticPayload($payload, $entity);
         $dependencies = array_values(array_unique(array_map('strval', (array) ($payload['dependency_ids'] ?? $plan['dependency_ids'] ?? []))));
         sort($dependencies, SORT_STRING);
         $family = self::family($entity, $operation);
@@ -96,6 +92,28 @@ final readonly class StagingOperationDescriptor
     {
         foreach (['staging_acceptance', 'signature', 'fingerprint', 'approved', 'scope_fingerprint', 'proposal_command_fingerprint'] as $key) unset($value[$key]);
         return $value;
+    }
+
+    /**
+     * Normalize only command-semantic payload data before fingerprinting.
+     *
+     * The staging acceptance packet is execution authorization for the
+     * command, never part of the command it authorizes. Keeping this boundary
+     * here makes issuance and Proposal reload use the same law for every
+     * governed operation; scope verification still validates the packet
+     * independently before this normalized command is compared.
+     *
+     * @param array<string,mixed> $payload
+     * @return array<string,mixed>
+     */
+    public static function normalizeSemanticPayload(array $payload, ?string $entityType = null): array
+    {
+        $normalized = self::withoutAuthorization($payload);
+        if (strtolower(trim((string) $entityType)) === 'video') {
+            unset($normalized['capture_revision']);
+            $normalized = self::withoutVideoRetrievalVolatility($normalized);
+        }
+        return $normalized;
     }
 
     /**

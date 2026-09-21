@@ -276,7 +276,6 @@ final class StagingAcceptanceScope
     /** @param array<string,mixed> $value @return array<string,mixed> */
     public static function withoutAuthorization(array $value): array
     {
-        foreach (['staging_acceptance', 'signature', 'fingerprint', 'approved', 'scope_fingerprint', 'proposal_command_fingerprint'] as $key) unset($value[$key]);
-        return $value;
+        return StagingOperationDescriptor::withoutAuthorization($value);
     }
 }
