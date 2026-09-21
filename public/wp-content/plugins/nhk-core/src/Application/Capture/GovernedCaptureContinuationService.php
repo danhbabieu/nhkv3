@@ -1464,7 +1464,9 @@ final class GovernedCaptureContinuationService
     {
         if (!is_array($applied['canonical_readback'] ?? null)) throw new \RuntimeException('CANONICAL_READBACK_VERIFICATION_FAILED');
         $canonicalId = (string) ($applied['canonical_id'] ?? $applied['result_entity_uuid'] ?? ($applied['canonical_readback']['canonical_id'] ?? ''));
-        return ['proposal_id' => $proposal->id, 'entity_type' => $proposal->entityType, 'operation' => $proposal->operation, 'status' => 'APPLIED', 'canonical_id' => $canonicalId !== '' ? $canonicalId : null, 'canonical_readback' => $applied['canonical_readback'], 'idempotent' => (bool) ($applied['idempotent'] ?? false), 'completion' => $this->completion->finalize($proposal->entityType, $canonicalId, ['proposal_state' => 'applied', 'canonical_readback' => $applied['canonical_readback']])];
+        $entityType = strtolower(trim($proposal->entityType));
+        $dependencyRole = in_array($entityType, ['source', 'knowledge', 'evidence'], true);
+        return ['proposal_id' => $proposal->id, 'entity_type' => $proposal->entityType, 'operation' => $proposal->operation, 'status' => 'APPLIED', 'canonical_id' => $canonicalId !== '' ? $canonicalId : null, 'canonical_readback' => $applied['canonical_readback'], 'idempotent' => (bool) ($applied['idempotent'] ?? false), 'completion' => $this->completion->finalize($proposal->entityType, $canonicalId, ['proposal_state' => 'applied', 'canonical_readback' => $applied['canonical_readback'], 'owner_role' => $dependencyRole ? 'semantic_dependency' : 'canonical_required_owner', 'public_projection_owner' => !$dependencyRole])];
     }
 
     /** @param list<array<string,mixed>> $writes @return list<array<string,mixed>> */

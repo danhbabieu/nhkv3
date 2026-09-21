@@ -80,7 +80,9 @@ final class McpReadHandler
             ? $context['subject_resolution_packet']
             : (is_array($diagnostics['subject_resolution_packet'] ?? null) ? $diagnostics['subject_resolution_packet'] : null);
         $completion = is_array($diagnostics['completion'] ?? null) ? $diagnostics['completion'] : [];
-        $children = array_values(array_filter((array) ($completion['children'] ?? []), 'is_array'));
+        $children = \NHK\Core\Application\Completion\CompletionCoordinator::effectiveChildren(
+            array_values(array_filter((array) ($completion['children'] ?? []), 'is_array')),
+        );
         $ownersByIdentity = [];
         foreach ($children as $child) {
             $owner = [
@@ -89,7 +91,7 @@ final class McpReadHandler
                 'status' => (string) ($child['status'] ?? (($child['complete'] ?? false) === true ? 'COMPLETE' : 'INCOMPLETE')),
             ];
             $identity = strtolower(trim($owner['owner_type'])) . '|' . trim($owner['owner_id']);
-            if (!isset($ownersByIdentity[$identity])) $ownersByIdentity[$identity] = $owner;
+            $ownersByIdentity[$identity] = $owner;
         }
         $owners = array_values($ownersByIdentity);
         $media = [];

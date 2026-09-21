@@ -28,7 +28,7 @@ final class McpCaptureReadContractTest extends TestCase
             null,
             [['kind' => 'image', 'media_id' => 'media-631', 'attachment_id' => 630, 'attachment_readback_status' => 'verified']],
             ['purpose' => 'EDITORIAL', 'content_intent' => ['intent' => 'IMAGE_ARTICLE'], 'subject_resolution_packet' => ['status' => 'resolved', 'canonical_subject_id' => 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'entity_type' => 'model', 'canonical_name' => 'Odo 36/10'], 'raw_input' => 'private text', 'media_bindings' => [['target' => ['type' => 'wp_post', 'id' => '1:631'], 'role' => 'featured_primary', 'selection_source' => 'USER_EXPLICIT', 'selection_policy' => 'PINNED']]],
-            ['completion' => ['status' => 'PARTIAL', 'blockers' => ['IMAGE_ARTICLE_MEDIA_REQUIRED'], 'children' => [['owner_type' => 'video', 'owner_id' => 'video-631', 'status' => 'COMPLETE'], ['owner_type' => 'video', 'owner_id' => 'video-631', 'status' => 'COMPLETE'], ['owner_type' => 'wp_post', 'owner_id' => '631', 'status' => 'INCOMPLETE']], 'required_owners' => [['owner_type' => 'wp_post', 'owner_id' => '631']], 'missing_required_owners' => [['owner_type' => 'media', 'owner_id' => 'media-631']]]],
+            ['completion' => ['status' => 'PARTIAL', 'blockers' => ['IMAGE_ARTICLE_MEDIA_REQUIRED'], 'children' => [['owner_type' => 'video', 'owner_id' => 'video-631', 'status' => 'PARTIAL'], ['owner_type' => 'video', 'owner_id' => 'video-631', 'status' => 'COMPLETE'], ['owner_type' => 'wp_post', 'owner_id' => '631', 'status' => 'INCOMPLETE']], 'required_owners' => [['owner_type' => 'wp_post', 'owner_id' => '631']], 'missing_required_owners' => [['owner_type' => 'media', 'owner_id' => 'media-631']]]],
             [],
             4,
         );

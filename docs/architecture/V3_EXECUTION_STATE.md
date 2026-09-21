@@ -16307,3 +16307,33 @@ function redeclaration fatal before integration assertions. No R2-specific unit
 or contract failure remains. No semantic or live data mutation occurred.
 
 STATUS: `RELATIONSHIP_R2_LOCAL_PASS / UNIT_PASS / CONTRACT_PASS / SCHEMA_PARITY_PASS / LINT_PASS / DIFF_CHECK_PASS / NO_LIVE_MUTATION`.
+
+# Checkpoint — 2026-09-22 — Capture completion current-owner aggregation (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE_CONFIRMED: Capture completion aggregation appended historical and
+current projections for the same canonical owner as separate authoritative
+children. The aggregate therefore retained stale Video public/content blockers
+after the current Video verifier returned COMPLETE. `capture_get` also used a
+different first-owner projection rule. Knowledge dependency children could
+additionally inherit public/frontend blockers even though Source/Claim/Evidence
+are semantic dependencies rather than public projection owners.
+
+FIXED_BOUNDARIES: `CompletionCoordinator::effectiveChildren()` now converges
+children by exact normalized `owner_type + owner_id`, with explicit current
+outcome precedence and deterministic historical-to-current fallback. Earlier
+receipts remain immutable. `capture_get` consumes the same effective-child
+projection. Video completion aggregation normalizes Source/Claim/Evidence
+dependency roles to canonical/readback/relation requirements without fabricating
+public-route requirements; real dependency failures remain blocking.
+
+REGRESSION: Focused completion/read projection/retry suite passes 47 tests /
+213 assertions. Added same-owner old-partial/new-complete, old-complete/current
+failure, dependency public-role, real dependency failure, historical retry and
+read projection convergence coverage. PHP lint and `git diff --check` pass.
+Full Unit suite passes 2,086 tests / 11,371 assertions with existing warnings
+and deprecations. No schema, migration, deployment, push or live mutation was
+performed.
+
+STATUS=`CAPTURE_COMPLETION_CURRENT_OWNER_CONVERGENCE_FIXED_LOCALLY / FULL_UNIT_PASS / NO_LIVE_MUTATION`.
+
+NEXT_EXACT_ACTION: `USER_PUSH_PULL_BUILD; THEN RETRY EXISTING CAPTURE ON @v38 AND VERIFY FINAL CONVERGENCE`.

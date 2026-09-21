@@ -24,7 +24,9 @@ final class CompletionCoordinator
     {
         $ownerType = strtolower(trim($ownerType));
         $ownerId = trim($ownerId);
-        $publicCapable = in_array($ownerType, self::PUBLIC_CAPABLE, true);
+        $publicCapable = in_array($ownerType, self::PUBLIC_CAPABLE, true)
+            && ($evidence['public_projection_owner'] ?? true) !== false
+            && strtolower(trim((string) ($evidence['owner_role'] ?? ''))) !== 'semantic_dependency';
         $blockers = $this->strings($evidence['blockers'] ?? []);
         $canonicalReadbackVerified = $this->readBack($evidence['canonical_readback'] ?? null);
 
@@ -122,6 +124,8 @@ final class CompletionCoordinator
     /** @param list<array<string,mixed>> $children @return array<string,mixed> */
     public function aggregateCapture(string $captureId, array $children, array $evidence = []): array
     {
+        $children = $this->normalizeSemanticDependencyChildren($children, (array) ($evidence['semantic_dependency_owner_types'] ?? []));
+        $children = self::effectiveChildren($children);
         $packets = [];
         $blockers = $this->strings($evidence['blockers'] ?? []);
         foreach ($children as $child) {
@@ -171,6 +175,72 @@ final class CompletionCoordinator
             'children' => $packets,
             'resume_hints' => ['resume_children' => $resumeChildren],
         ];
+    }
+
+    /**
+     * Completion input is ordered from historical projections to the current
+     * recomputation. For one canonical owner, the last projection is the
+     * effective current outcome; earlier projections remain in receipts and
+     * audit history but cannot continue to poison the aggregate.
+     *
+     * @param list<array<string,mixed>> $children
+     * @return list<array<string,mixed>>
+     */
+    public static function effectiveChildren(array $children): array
+    {
+        $positions = [];
+        $currentPositions = [];
+        $effective = [];
+        foreach ($children as $child) {
+            if (!is_array($child)) continue;
+            $packet = is_array($child['completion'] ?? null) ? $child['completion'] : $child;
+            $ownerType = strtolower(trim((string) ($packet['owner_type'] ?? '')));
+            $ownerId = trim((string) ($packet['owner_id'] ?? ''));
+            $identity = $ownerType !== '' && $ownerId !== ''
+                ? $ownerType . '|' . $ownerId
+                : '__unkeyed__' . count($effective);
+            $isCurrent = ($child['current_outcome'] ?? false) === true || ($packet['current_outcome'] ?? false) === true;
+            if (isset($positions[$identity])) {
+                if ($isCurrent || !isset($currentPositions[$identity])) $effective[$positions[$identity]] = $child;
+                if ($isCurrent) $currentPositions[$identity] = true;
+                continue;
+            }
+            $positions[$identity] = count($effective);
+            if ($isCurrent) $currentPositions[$identity] = true;
+            $effective[] = $child;
+        }
+        return array_values($effective);
+    }
+
+    /** @param list<array<string,mixed>> $children @param list<mixed> $dependencyTypes @return list<array<string,mixed>> */
+    private function normalizeSemanticDependencyChildren(array $children, array $dependencyTypes): array
+    {
+        $dependencyTypes = array_values(array_unique(array_filter(array_map(static fn (mixed $type): string => strtolower(trim((string) $type)), $dependencyTypes))));
+        if ($dependencyTypes === []) return $children;
+        foreach ($children as $index => $child) {
+            if (!is_array($child)) continue;
+            $wrapped = is_array($child['completion'] ?? null);
+            $packet = $wrapped ? $child['completion'] : $child;
+            $type = strtolower(trim((string) ($packet['owner_type'] ?? '')));
+            if (!in_array($type, $dependencyTypes, true)) continue;
+            $ownerId = trim((string) ($packet['owner_id'] ?? ''));
+            $readback = is_array($packet['canonical_readback'] ?? null) ? $packet['canonical_readback'] : [];
+            if ($readback === [] && ($packet['canonical_readback_verified'] ?? false) === true && $ownerId !== '') $readback = ['canonical_id' => $ownerId];
+            $blockers = array_values(array_filter(array_map('strval', (array) ($packet['blockers'] ?? [])), static fn (string $blocker): bool => !in_array($blocker, ['PUBLIC_ELIGIBILITY_NOT_VERIFIED', 'FRONTEND_READBACK_NOT_VERIFIED'], true)));
+            $normalized = $this->finalize($type, $ownerId, [
+                'canonical_state' => $packet['canonical_state'] ?? null,
+                'canonical_readback' => $readback,
+                'dependency_state' => $packet['dependency_state'] ?? null,
+                'relation_or_usage_state' => $packet['relation_or_usage_state'] ?? null,
+                'blockers' => $blockers,
+                'owner_role' => 'semantic_dependency',
+                'public_projection_owner' => false,
+            ]);
+            if ($wrapped) $child['completion'] = $normalized;
+            else $child = $normalized;
+            $children[$index] = $child;
+        }
+        return $children;
     }
 
     private function readBack(mixed $value): bool

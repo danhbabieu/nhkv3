@@ -864,6 +864,7 @@ final class EditorialCaptureCoordinator
             'canonical_state' => 'COMPLETE',
             'canonical_readback' => ['canonical_id' => $record->captureId],
             'required_owners' => $requiredOwners,
+            'semantic_dependency_owner_types' => strtoupper(trim((string) ($intent['intent'] ?? ''))) === 'VIDEO' ? ['source', 'knowledge', 'evidence'] : [],
         ]);
         $diagnostics['completion'] = $completion;
         // A Capture-level frontend/final callback cannot promote an absent
@@ -1267,7 +1268,7 @@ final class EditorialCaptureCoordinator
                 ? ['completion' => $write['completion']]
                 : ['owner_type' => $type, 'owner_id' => (string) ($write['canonical_id'] ?? ''), 'canonical_readback' => $write['canonical_readback'] ?? null, 'dependency_state' => ($write['status'] ?? '') === 'APPLIED' ? 'COMPLETE' : 'PARTIAL', 'blockers' => (array) ($write['blockers'] ?? [])];
         }
-        foreach ((array) ($videoPublication['items'] ?? []) as $video) if (is_array($video) && is_array($video['completion'] ?? null)) $children[] = ['completion' => $video['completion']];
+        foreach ((array) ($videoPublication['items'] ?? []) as $video) if (is_array($video) && is_array($video['completion'] ?? null)) $children[] = ['completion' => $video['completion'], 'current_outcome' => true];
         $mediaIds = array_values(array_unique(array_filter(array_map('strval', (array) ($media['media_ids'] ?? [])), static fn (string $id): bool => trim($id) !== '')));
         $singleMediaId = trim((string) ($media['media_id'] ?? $media['canonical_id'] ?? ''));
         if ($singleMediaId !== '') $mediaIds[] = $singleMediaId;

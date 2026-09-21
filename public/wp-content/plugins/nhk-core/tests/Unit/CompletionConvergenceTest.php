@@ -128,6 +128,63 @@ final class CompletionConvergenceTest extends TestCase
         self::assertCount(3, $packet['children']);
     }
 
+    public function test_current_owner_projection_supersedes_historical_projection_by_identity(): void
+    {
+        $packet = (new CompletionCoordinator())->aggregateCapture('capture-1', [
+            ['completion' => ['owner_type' => 'video', 'owner_id' => 'video-1', 'status' => 'PARTIAL', 'complete' => false, 'blockers' => ['CONTENT_NEEDS_REVIEW']]],
+            ['completion' => ['owner_type' => 'video', 'owner_id' => 'video-1', 'status' => 'COMPLETE', 'complete' => true, 'canonical_state' => 'COMPLETE', 'canonical_readback_verified' => true, 'content_state' => 'CONTENT_COMPLETE', 'public_state' => 'READY', 'frontend_state' => 'VERIFIED', 'blockers' => []]],
+        ], ['canonical_state' => 'COMPLETE', 'canonical_readback' => ['canonical_id' => 'capture-1'], 'required_owners' => [['owner_type' => 'video', 'owner_id' => 'video-1']]]);
+
+        self::assertCount(1, $packet['children']);
+        self::assertSame('COMPLETE', $packet['children'][0]['status']);
+        self::assertTrue($packet['complete']);
+        self::assertNotContains('CONTENT_NEEDS_REVIEW', $packet['blockers']);
+    }
+
+    public function test_current_owner_failure_supersedes_historical_complete_projection(): void
+    {
+        $packet = (new CompletionCoordinator())->aggregateCapture('capture-1', [
+            ['owner_type' => 'video', 'owner_id' => 'video-1', 'status' => 'COMPLETE', 'complete' => true, 'canonical_readback' => ['canonical_id' => 'video-1'], 'content_quality' => 'CONTENT_COMPLETE', 'public_eligible' => true, 'frontend_verified' => true],
+            ['completion' => ['owner_type' => 'video', 'owner_id' => 'video-1', 'status' => 'PARTIAL', 'complete' => false, 'blockers' => ['FRONTEND_READBACK_NOT_VERIFIED']]],
+        ], ['canonical_state' => 'COMPLETE', 'canonical_readback' => ['canonical_id' => 'capture-1'], 'required_owners' => [['owner_type' => 'video', 'owner_id' => 'video-1']]]);
+
+        self::assertCount(1, $packet['children']);
+        self::assertSame('PARTIAL', $packet['children'][0]['status']);
+        self::assertFalse($packet['complete']);
+        self::assertContains('FRONTEND_READBACK_NOT_VERIFIED', $packet['blockers']);
+    }
+
+    public function test_semantic_video_dependencies_do_not_require_public_frontend_routes(): void
+    {
+        $packet = (new CompletionCoordinator())->finalize('knowledge', 'claim-1', [
+            'canonical_readback' => ['canonical_id' => 'claim-1'],
+            'dependency_state' => 'COMPLETE',
+            'relation_or_usage_state' => 'COMPLETE',
+            'owner_role' => 'semantic_dependency',
+            'public_projection_owner' => false,
+        ]);
+
+        self::assertTrue($packet['complete']);
+        self::assertSame('NOT_APPLICABLE', $packet['public_state']);
+        self::assertSame('NOT_APPLICABLE', $packet['frontend_state']);
+    }
+
+    public function test_real_semantic_dependency_failure_still_blocks_completion(): void
+    {
+        $packet = (new CompletionCoordinator())->finalize('evidence', 'evidence-1', [
+            'canonical_readback' => ['canonical_id' => 'evidence-1'],
+            'dependency_state' => 'PARTIAL',
+            'relation_or_usage_state' => 'COMPLETE',
+            'owner_role' => 'semantic_dependency',
+            'public_projection_owner' => false,
+            'blockers' => ['EVIDENCE_READBACK_INVALID'],
+        ]);
+
+        self::assertFalse($packet['complete']);
+        self::assertContains('EVIDENCE_READBACK_INVALID', $packet['blockers']);
+        self::assertSame('NOT_APPLICABLE', $packet['public_state']);
+    }
+
     public function test_relation_or_usage_can_be_not_applicable_without_inventing_an_edge(): void
     {
         $packet = (new CompletionCoordinator())->finalize('knowledge', 'claim-1', [
