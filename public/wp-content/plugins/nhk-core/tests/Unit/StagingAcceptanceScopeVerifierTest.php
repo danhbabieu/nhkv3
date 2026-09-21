@@ -406,6 +406,56 @@ final class StagingAcceptanceScopeVerifierTest extends TestCase
         self::assertFalse($verifier->verifyProposal($scope, $wrong));
     }
 
+    public function test_video_scope_ignores_retrieval_timestamps_and_snapshot_hash_but_binds_semantic_source_facts(): void
+    {
+        $captureId = UuidCodec::newV7();
+        $videoId = UuidCodec::newV7();
+        $subjectId = UuidCodec::newV7();
+        $payload = [
+            'canonical_id' => $videoId,
+            'metadata' => [
+                'source' => [
+                    'platform' => 'youtube',
+                    'external_video_id' => 'dQw4w9WgXcQ',
+                    'canonical_source_url' => 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+                    'source_title' => 'Odo 36/10',
+                    'fetched_at' => '2026-09-21T01:00:00Z',
+                    'source_hash' => str_repeat('a', 64),
+                    'thumbnail_selection' => [
+                        'variant' => 'maxresdefault',
+                        'url' => 'https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg',
+                        'width' => 1280,
+                        'height' => 720,
+                        'probed_at' => '2026-09-21T01:00:01Z',
+                        'probe_hash' => str_repeat('b', 64),
+                    ],
+                ],
+                'subject_resolution_packet' => ['type' => 'variant', 'id' => $subjectId, 'revision' => 2],
+            ],
+        ];
+        $capture = new CaptureRecord($captureId, 'video-volatility', hash('sha256', 'video-volatility'), 'SEMANTICS_RECONCILED', 'IN_PROGRESS', assets: [['kind' => 'video', 'video_proposal' => ['payload' => $payload]]], context: ['purpose' => 'EDITORIAL', 'content_intent' => ['intent' => 'VIDEO']]);
+        $videos = new class implements \NHK\Core\Contracts\Video\VideoRepository {
+            public function findByCanonicalId(string $id): ?\NHK\Core\Domain\Video\Video { return null; }
+            public function findByExternalReference(string $platform, string $externalVideoId): ?\NHK\Core\Domain\Video\Video { return null; }
+            public function create(\NHK\Core\Domain\Video\Video $video): \NHK\Core\Domain\Video\Video { return $video; }
+            public function update(\NHK\Core\Domain\Video\Video $video, int $expectedRevision): \NHK\Core\Domain\Video\Video { return $video; }
+            public function list(bool $includeInactive = false): array { return []; }
+        };
+        $verifier = new StagingAcceptanceScopeVerifier(static fn (): string => 'staging', 'test-secret', static fn (): bool => true, can: static fn (): bool => true, videos: $videos);
+        $scope = $verifier->issueForVideoPlan($capture, ['entity_type' => 'video', 'operation' => 'ingest', 'subject_id' => $videoId, 'proposed_uuid' => $videoId, 'payload' => $payload, 'plan_fingerprint' => hash('sha256', 'volatility-plan')]);
+        $retryPayload = $payload;
+        $retryPayload['metadata']['source']['fetched_at'] = '2026-09-21T02:00:00Z';
+        $retryPayload['metadata']['source']['source_hash'] = str_repeat('c', 64);
+        $retryPayload['metadata']['source']['thumbnail_selection']['probed_at'] = '2026-09-21T02:00:01Z';
+        $proposal = new Proposal(UuidCodec::newV7(), $videoId, 'ingest', $retryPayload + ['capture_id' => $captureId, 'capture_fingerprint' => $capture->requestFingerprint, 'staging_acceptance' => $scope], 'content', null, 'dependency', ProposalState::APPROVED, idempotencyKey: 'video-volatility', entityType: 'video');
+
+        self::assertTrue($verifier->verifyProposal($scope, $proposal));
+        $semanticChange = $proposal->payload;
+        $semanticChange['metadata']['source']['source_title'] = 'Different source title';
+        $tampered = new Proposal($proposal->id, $proposal->subjectId, $proposal->operation, $semanticChange, $proposal->contentFingerprint, $proposal->expectedRevision, $proposal->dependencyFingerprint, $proposal->state, idempotencyKey: $proposal->idempotencyKey, entityType: $proposal->entityType);
+        self::assertSame('STAGING_VIDEO_PAYLOAD_MISMATCH', $verifier->proposalFailureReason($scope, $tampered));
+    }
+
     /** @return array{0:CaptureRecord,1:array<string,mixed>,2:list<array<string,mixed>>} */
     private function fixture(): array
     {

@@ -40,7 +40,10 @@ final readonly class StagingOperationDescriptor
         $payload['capture_id'] = $captureId;
         $payload['capture_fingerprint'] = $captureFingerprint;
         $payload = self::withoutAuthorization($payload);
-        if ($entity === 'video') unset($payload['capture_revision']);
+        if ($entity === 'video') {
+            unset($payload['capture_revision']);
+            $payload = self::withoutVideoRetrievalVolatility($payload);
+        }
         $dependencies = array_values(array_unique(array_map('strval', (array) ($payload['dependency_ids'] ?? $plan['dependency_ids'] ?? []))));
         sort($dependencies, SORT_STRING);
         $family = self::family($entity, $operation);
@@ -93,5 +96,31 @@ final readonly class StagingOperationDescriptor
     {
         foreach (['staging_acceptance', 'signature', 'fingerprint', 'approved', 'scope_fingerprint', 'proposal_command_fingerprint'] as $key) unset($value[$key]);
         return $value;
+    }
+
+    /**
+     * Source retrieval receipts are persisted for provenance, but are not
+     * semantic Video command inputs. A retry must not require a new semantic
+     * approval merely because the same source was fetched or thumbnail-probed
+     * at a different time. Keep this normalization in the shared descriptor
+     * so scope issuance and Proposal verification apply exactly the same law.
+     *
+     * @param array<string,mixed> $payload
+     * @return array<string,mixed>
+     */
+    private static function withoutVideoRetrievalVolatility(array $payload): array
+    {
+        if (!is_array($payload['metadata'] ?? null)) return $payload;
+        $metadata = $payload['metadata'];
+        $source = is_array($metadata['source'] ?? null) ? $metadata['source'] : null;
+        if ($source !== null) {
+            unset($source['fetched_at'], $source['source_hash']);
+            foreach (['thumbnail_selection', 'thumbnail_presentation'] as $key) {
+                if (is_array($source[$key] ?? null)) unset($source[$key]['probed_at']);
+            }
+            $metadata['source'] = $source;
+        }
+        $payload['metadata'] = $metadata;
+        return $payload;
     }
 }
