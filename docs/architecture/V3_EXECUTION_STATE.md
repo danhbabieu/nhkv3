@@ -1,5 +1,49 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-21 — Public transport/readiness closeout repair (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE_CAPTURE_GET: The canonical Capture repository lookup was correctly
+wired, but both MCP and Ability adapters returned a nullable projection. A
+known record was structured locally while an unknown record serialized as
+successful `null`, making absence indistinguishable from hydration loss.
+
+ROOT_CAUSE_SEMANTIC_TRANSPORT: The public structured locator packet was
+normalized only when an explicit entity type was present. UUID and stable-key
+only packets therefore fell through to an empty typed map. The resolver now
+infers the registered type from canonical repository identity, preserves exact
+UUID/stable-key precedence and returns explicit locator diagnostics for unknown
+or malformed untyped packets.
+
+ROOT_CAUSE_ARTICLE_PREFLIGHT_TRANSPORT: The public preflight handler accepted
+the documented `article_media.selected` packet but did not carry it into the
+read-only Article Media projection or return bounded acceptance fields at the
+top level. The projection now evaluates the current explicit selection without
+mutating usage rows, preserves selection provenance/policy, and returns media
+binding, diagnostics, blockers, warnings, category/readiness and state-token
+fields.
+
+ROOT_CAUSE_PROPOSAL_ELIGIBILITY: Video Capture proposals in staging were
+checked for semantic/dependency eligibility, while the existing apply-time
+staging verifier remained the only scope admission gate. The staging runtime
+now reuses that same server-issued scope verifier during eligibility, reporting
+`STAGING_SCOPE_REQUIRED` versus `STAGING_SCOPE_NOT_APPROVED`; non-staging
+eligibility is unchanged.
+
+ADDITIONAL_ROOT_CAUSE_CAPTURE_TRANSPORT: `nhk.capture.get` was present in the
+public catalog and Ability map but absent from the canonical MCP dispatch
+registry, so public `tools/call` returned method-not-found before reaching the
+read handler. The shared dispatch registry now exposes the same read boundary.
+
+VERIFICATION: Full `NHK Unit` passes 2,021 tests / 9,933 assertions, with
+warnings/deprecations only. Final focused transport/readback, Article Media,
+Capture handoff, Video staging/reconciliation and Governance suites pass 61
+tests / 227 assertions, with deprecations only. Changed PHP files and the new
+transport regression lint clean, `git diff --check` passes, the secret review
+is clean, live IDs are absent from production source, and no staging/
+production data, deployment or push was touched.
+
+STATUS: `PUBLIC_TRANSPORT_AND_STAGING_ELIGIBILITY_FIXED_LOCAL / FULL_UNIT_PASS / COMMIT_READY / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-21 — Article Media policy closeout (LOCAL / NO LIVE MUTATION)
 
 ROOT_CAUSE_ARTICLE_MEDIA_POLICY: The four failures present at HEAD were added

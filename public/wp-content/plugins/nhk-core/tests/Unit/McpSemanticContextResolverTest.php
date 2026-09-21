@@ -141,4 +141,33 @@ final class McpSemanticContextResolverTest extends TestCase
         self::assertSame([], $unknown['candidates']);
         self::assertContains('variant', $unknown['missing']);
     }
+
+    public function test_public_locator_packets_resolve_uuid_and_stable_key_without_entity_type(): void
+    {
+        $types = new EntityTypeRegistry();
+        CanonicalEntityTypeCatalog::registerInto($types);
+        $repository = new InMemoryAuthorityRepository();
+        $model = new AuthorityEntity('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'model', 'nhk:model:odo.36', 'Odo 36', 2, []);
+        $repository->create($model);
+        $resolver = new McpSemanticContextResolver($repository, $types);
+
+        $uuid = $resolver->resolve(['canonical_uuid' => $model->canonicalId]);
+        self::assertSame($model->canonicalId, $uuid['resolved']['model']['id']);
+        self::assertSame([], $uuid['missing']);
+
+        $stable = $resolver->resolve(['stable_key' => $model->stableKey]);
+        self::assertSame($model->canonicalId, $stable['resolved']['model']['id']);
+        self::assertSame([], $stable['missing']);
+    }
+
+    public function test_unknown_public_locator_is_never_an_empty_silent_result(): void
+    {
+        $types = new EntityTypeRegistry();
+        CanonicalEntityTypeCatalog::registerInto($types);
+        $resolver = new McpSemanticContextResolver(new InMemoryAuthorityRepository(), $types);
+
+        $result = $resolver->resolve(['stable_key' => 'nhk:model:does-not-exist']);
+        self::assertNotSame([], $result['missing']);
+        self::assertNotSame([], $result['diagnostics']);
+    }
 }

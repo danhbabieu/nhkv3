@@ -259,18 +259,29 @@ final class ArticleMediaCoordinator
         $endpointKey = $this->endpointKey($postId);
         $context = $this->normalizeSubjectContext($context);
         $subjectIds = array_values(array_filter(array_map('strval', (array) ($context['subject_ids'] ?? [])), static fn (string $id): bool => trim($id) !== ''));
+        $requested = [];
+        $selection = is_array($context['article_media']['selected'] ?? null) ? $context['article_media']['selected'] : [];
+        if (isset($selection['media_id'])) $selection = [MediaUsageRoleRegistry::FEATURED_PRIMARY => $selection];
+        foreach ($selection as $slot => $value) {
+            if (!is_array($value)) $value = ['media_id' => (string) $value];
+            $mediaId = trim((string) ($value['media_id'] ?? ''));
+            if ($mediaId !== '') $requested[(string) $slot] = ['media_id' => $mediaId, 'selection_source' => strtoupper(trim((string) ($value['selection_source'] ?? 'USER_EXPLICIT'))) ?: 'USER_EXPLICIT', 'selection_policy' => strtoupper(trim((string) ($value['selection_policy'] ?? 'PINNED'))) ?: 'PINNED'];
+        }
         $slots = []; $slotMedia = []; $diagnostics = [];
         foreach (MediaUsageRoleRegistry::mandatoryArticleRoles() as $slot) {
             $existing = $this->existingSlotMedia($endpointKey, $slot);
-            $captureOwned = $existing instanceof Media && in_array($existing->canonicalId, array_values(array_filter(array_map('strval', (array) ($context['capture_owned_media_ids'] ?? [])))), true);
-            $assessment = $existing instanceof Media ? ($this->suitabilityPolicy ??= new SemanticSuitabilityPolicy())->evaluateMedia($existing, $this->assets->listByMediaId($existing->canonicalId), ['subject_ids' => $subjectIds, 'current_capture_media' => $captureOwned && (($this->existingSlotUsage($endpointKey, $slot)?->selectionSource ?? 'SYSTEM_AUTO') === 'USER_EXPLICIT')], $captureOwned && (($this->existingSlotUsage($endpointKey, $slot)?->selectionSource ?? 'SYSTEM_AUTO') === 'USER_EXPLICIT') ? 'USER_EXPLICIT' : 'SYSTEM_AUTO', $slot) : ['valid_for_completeness' => false, 'suitability' => SemanticSuitabilityPolicy::UNKNOWN, 'availability' => SemanticSuitabilityPolicy::MISSING, 'diagnostic' => 'MEDIA_USAGE_INCOMPLETE'];
-            $valid = ($assessment['valid_for_completeness'] ?? false) === true && $existing instanceof Media && !$existing->isSystemPlaceholder();
+            $explicit = $requested[$slot] ?? null;
+            $candidate = $explicit !== null ? $this->media->findByCanonicalId($explicit['media_id']) : $existing;
+            $captureOwned = $candidate instanceof Media && $explicit !== null;
+            $selectionSource = $explicit['selection_source'] ?? ($existing instanceof Media && ($this->existingSlotUsage($endpointKey, $slot)?->selectionSource ?? '') === 'USER_EXPLICIT' ? 'USER_EXPLICIT' : 'SYSTEM_AUTO');
+            $assessment = $candidate instanceof Media ? ($this->suitabilityPolicy ??= new SemanticSuitabilityPolicy())->evaluateMedia($candidate, $this->assets->listByMediaId($candidate->canonicalId), ['subject_ids' => $subjectIds, 'current_capture_media' => $captureOwned, 'article_explicit_media' => $explicit !== null], $selectionSource, $slot) : ['valid_for_completeness' => false, 'suitability' => SemanticSuitabilityPolicy::UNKNOWN, 'availability' => SemanticSuitabilityPolicy::MISSING, 'diagnostic' => 'MEDIA_USAGE_INCOMPLETE'];
+            $valid = ($assessment['valid_for_completeness'] ?? false) === true && $candidate instanceof Media && !$candidate->isSystemPlaceholder();
             $placeholder = !$valid;
-            $id = $valid ? $existing->canonicalId : '';
+            $id = $valid ? $candidate->canonicalId : '';
             $slotMedia[$slot] = $id;
-            $slots[$slot] = ['media_id' => $id, 'persisted_media_id' => $existing?->canonicalId, 'placeholder' => $placeholder, 'suitability' => $assessment['suitability'], 'availability' => $assessment['availability'], 'valid_for_completeness' => $valid, 'state' => $placeholder ? ($slot === MediaUsageRoleRegistry::FEATURED_PRIMARY ? MediaSeoStateRegistry::INCOMPLETE_FEATURED : MediaSeoStateRegistry::INCOMPLETE_INLINE) : MediaSeoStateRegistry::COMPLETE, 'blueprint' => ($this->blueprints->findByPostAndSlot($postId, $slot) ?? MediaSeoBlueprint::forPost($postId, $slot, $context))->toArray()];
+            $slots[$slot] = ['media_id' => $id, 'persisted_media_id' => $existing?->canonicalId, 'requested_media_id' => $explicit['media_id'] ?? null, 'selection_source' => $selectionSource, 'selection_policy' => $explicit['selection_policy'] ?? null, 'placeholder' => $placeholder, 'suitability' => $assessment['suitability'], 'availability' => $assessment['availability'], 'valid_for_completeness' => $valid, 'state' => $placeholder ? ($slot === MediaUsageRoleRegistry::FEATURED_PRIMARY ? MediaSeoStateRegistry::INCOMPLETE_FEATURED : MediaSeoStateRegistry::INCOMPLETE_INLINE) : MediaSeoStateRegistry::COMPLETE, 'blueprint' => ($this->blueprints->findByPostAndSlot($postId, $slot) ?? MediaSeoBlueprint::forPost($postId, $slot, $context))->toArray()];
             if ($placeholder) $diagnostics[] = ['code' => $slot === MediaUsageRoleRegistry::FEATURED_PRIMARY ? 'ARTICLE_MEDIA_FEATURED_MISSING' : 'ARTICLE_MEDIA_INLINE_MISSING', 'slot' => $slot];
-            if (!$valid && $existing instanceof Media && $assessment['diagnostic'] !== null) $diagnostics[] = ['code' => $assessment['diagnostic'], 'slot' => $slot, 'media_id' => $existing->canonicalId];
+            if (!$valid && $candidate instanceof Media && $assessment['diagnostic'] !== null) $diagnostics[] = ['code' => $assessment['diagnostic'], 'slot' => $slot, 'media_id' => $candidate->canonicalId];
         }
         return new ArticleMediaResult($postId, $endpointKey, $diagnostics === [] ? MediaSeoStateRegistry::COMPLETE : MediaSeoStateRegistry::PLACEHOLDER, $slotMedia, $slots, $diagnostics, '', $this->guidance($slots, $context));
     }

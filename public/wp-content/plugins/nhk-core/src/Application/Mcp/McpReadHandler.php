@@ -65,11 +65,12 @@ final class McpReadHandler
     }
 
     /** Read-only operator projection of one Capture; request secrets remain private. */
-    public function captureGet(string $id): ?array
+    public function captureGet(string $id): array
     {
-        if ($this->captures === null || !UuidCodec::isValid($id)) return null;
+        if (!UuidCodec::isValid($id)) throw new \InvalidArgumentException('Capture id must be a canonical UUID.');
+        if ($this->captures === null) return ['status' => 'unavailable', 'reason' => 'CAPTURE_READBACK_UNAVAILABLE', 'capture_id' => $id];
         $capture = $this->captures->findById($id);
-        if ($capture === null) return null;
+        if ($capture === null) return ['status' => 'not_found', 'reason' => 'CAPTURE_NOT_FOUND', 'capture_id' => $id, 'retry' => ['eligible' => false, 'reason' => 'CAPTURE_NOT_FOUND']];
         $context = $capture->context;
         $diagnostics = $capture->diagnostics;
         $packet = is_array($context['subject_resolution_packet'] ?? null)
@@ -95,6 +96,7 @@ final class McpReadHandler
             if ($videoId !== '') $videos[] = ['id' => $videoId, 'status' => (string) ($asset['status'] ?? '')];
         }
         return [
+            'status' => 'available',
             'capture_id' => $capture->captureId,
             'purpose' => (string) ($context['purpose'] ?? 'EDITORIAL'),
             'intent' => is_array($context['content_intent'] ?? null) ? $context['content_intent'] : null,

@@ -10,7 +10,12 @@ use NHK\Core\Domain\Governance\{DependencyGraph, EligibilityResult, ProposalStat
 
 final class ProposalEligibilityService
 {
+    /** @var callable(\NHK\Core\Domain\Governance\Proposal):bool|null */
+    private $stagingScopeVerifier = null;
     public function __construct(private ProposalRepository $proposals, private DependencyGraph $dependencies, private EligibilityReader $reader, private ?VideoProposalEligibilityEvaluator $video = null, private ?ClassifiedAsPolicy $classifiedAs = null, private ?MediaUsageRepository $mediaUsages = null) {}
+
+    /** Connect the existing server-issued staging verifier after runtime bootstrap. */
+    public function setStagingScopeVerifier(callable $verifier): void { $this->stagingScopeVerifier = $verifier; }
 
     public function check(string $proposalId): EligibilityResult
     {
@@ -27,6 +32,11 @@ final class ProposalEligibilityService
             return EligibilityResult::blocked('APPROVAL_BINDING_MISMATCH');
         }
         $reasons = [];
+        if ($this->stagingScopeVerifier !== null && $proposal->entityType === 'video' && in_array($proposal->operation, ['ingest', 'update'], true) && array_key_exists('capture_id', $proposal->payload)) {
+            $scope = $proposal->payload['staging_acceptance'] ?? null;
+            if (!is_array($scope)) $reasons[] = 'STAGING_SCOPE_REQUIRED';
+            elseif (!(bool) ($this->stagingScopeVerifier)($proposal)) $reasons[] = 'STAGING_SCOPE_NOT_APPROVED';
+        }
         $isCreation = in_array($proposal->operation, ['create', 'ingest'], true) && $proposal->targetUuid === null;
         // relation_create carries typed endpoint keys in its payload. A
         // WordPress endpoint key such as 1:487 is not an Authority UUID, so

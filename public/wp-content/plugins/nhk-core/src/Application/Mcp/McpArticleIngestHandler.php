@@ -40,9 +40,27 @@ class McpArticleIngestHandler
             }
             $details['wp_post_id'] = $state->postId;
             $details['wp_state_token'] = $state->token;
-            if ($this->articleMedia !== null) $details['media'] = $this->articleMedia->diagnoseForPost($state->postId, is_array($input['media_context'] ?? null) ? $input['media_context'] : ['subject' => $state->title])->toArray();
+            if ($this->articleMedia !== null) {
+                $mediaContext = is_array($input['media_context'] ?? null) ? $input['media_context'] : [];
+                if (is_array($input['article_media'] ?? null)) $mediaContext['article_media'] = $input['article_media'];
+                $details['media'] = $this->articleMedia->diagnoseForPost($state->postId, $mediaContext)->toArray();
+                $details['acceptance_state'] = ['readiness' => $details['media']['state'] ?? 'UNKNOWN', 'blockers' => array_values(array_map(static fn (array $item): string => (string) ($item['code'] ?? 'UNKNOWN'), (array) ($details['media']['diagnostics'] ?? [])))];
+            }
         }
-        return ['accepted' => $result->accepted, 'reasons' => $result->reasons, 'details' => $details];
+        $media = is_array($details['media'] ?? null) ? $details['media'] : [];
+        return [
+            'accepted' => $result->accepted,
+            'reasons' => $result->reasons,
+            'details' => $details,
+            'subject_resolution' => is_array($input['research_subject'] ?? null) ? $input['research_subject'] : null,
+            'media_binding' => $media,
+            'diagnostics' => array_values(array_merge((array) ($result->reasons ?? []), (array) ($media['diagnostics'] ?? []))),
+            'blockers' => array_values(array_map('strval', (array) ($result->reasons ?? []))),
+            'warnings' => [],
+            'category_plan' => null,
+            'readiness' => ['accepted' => $result->accepted, 'media_state' => $media['state'] ?? null],
+            'state_token' => (string) ($details['wp_state_token'] ?? ''),
+        ];
     }
 
     /** @return array<string,mixed> */

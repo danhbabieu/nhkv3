@@ -56,4 +56,27 @@ final class McpCaptureReadContractTest extends TestCase
         self::assertArrayNotHasKey('request_fingerprint', $projection);
         self::assertArrayNotHasKey('raw_input', $projection);
     }
+
+    public function test_unknown_capture_returns_explicit_not_found_instead_of_null(): void
+    {
+        $repository = new class implements CaptureRepository {
+            public function findByIdempotencyKey(string $key): ?CaptureRecord { return null; }
+            public function findById(string $captureId): ?CaptureRecord { return null; }
+            public function create(CaptureRecord $record): CaptureRecord { return $record; }
+            public function save(CaptureRecord $record): CaptureRecord { return $record; }
+        };
+        $read = new McpReadHandler(
+            $this->createMock(AuthorityRepository::class), new EntityTypeRegistry(),
+            $this->createMock(MediaRepository::class), $this->createMock(MediaAssetRepository::class), $this->createMock(MediaUsageRepository::class),
+            $this->createMock(VideoRepository::class), $this->createMock(KnowledgeRepository::class), $this->createMock(EvidenceRepository::class),
+            captures: $repository,
+        );
+
+        self::assertSame([
+            'status' => 'not_found',
+            'reason' => 'CAPTURE_NOT_FOUND',
+            'capture_id' => 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+            'retry' => ['eligible' => false, 'reason' => 'CAPTURE_NOT_FOUND'],
+        ], $read->captureGet('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'));
+    }
 }

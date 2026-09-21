@@ -31,6 +31,7 @@ final class McpDispatchRegistry
         'nhk.article.preflight' => 'nhk.article.preflight',
         'nhk.article.ingest' => 'nhk.article.ingest',
         'nhk.capture.ingest' => 'nhk.capture.ingest',
+        'nhk.capture.get' => 'nhk.capture.get',
         'nhk.category.resolve' => 'nhk.category.resolve',
         'nhk.category.create' => 'nhk.category.create',
         'nhk.category.update' => 'nhk.category.update',
