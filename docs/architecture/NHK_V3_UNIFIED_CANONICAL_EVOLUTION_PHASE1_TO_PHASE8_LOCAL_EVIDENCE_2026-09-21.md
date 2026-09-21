@@ -165,5 +165,93 @@ GATE_8_LOCAL=PASS_LOCAL_SHADOW_PREPARATION; LIVE_ACCEPTANCE_PENDING
 ```text
 EXIT_RESULT=PHASE8_LOCAL_SHADOW_PREPARATION_COMPLETE
 LIVE_ACCEPTANCE=REQUIRES_CHATGPT/MCP_READ_ONLY_VERIFICATION_AND_SEPARATE_HUMAN_AUTHORIZATION_FOR_MUTATION
-NEXT_EXACT_ACTION=RETURN_PHASE8_LIVE_ACCEPTANCE_HANDOFF_TO_CHATGPT
+NEXT_EXACT_ACTION=SEPARATE_RELEASE/CUTOVER_ACCEPTANCE; NO_DEPLOYMENT_OR_LIVE_MUTATION_PERFORMED
+```
+
+## Final release reconciliation — staging read-only evidence
+
+The following values were supplied from the fresh staging MCP read-only
+acceptance and reconciled against the local Git object database. They are
+recorded as evidence, not as permission to mutate or deploy.
+
+```text
+STAGING_ENVIRONMENT=staging
+STAGING_SITE=https://demo.1945.vn
+STAGING_SOURCE_REVISION=1c2e0f1b0c32bed1f6de4fe5523635171d481cc0
+LOCAL_SOURCE_REVISION=eddc3d18e587233391fb1e9b7d71a41866e80ca6
+MERGE_BASE=eddc3d18e587233391fb1e9b7d71a41866e80ca6
+LOCAL_CONTAINS_STAGING=NO
+STAGING_CONTAINS_LOCAL=YES
+REVISION_RELATIONSHIP=STAGING_AHEAD
+REVISION_CLASSIFICATION=PROGRAM_DOCUMENTATION_ONLY_DELTA
+PRODUCTION_SOURCE_DIFF=NONE
+CONTRACT_DOCUMENTATION_PARITY=PASS
+LIVE_READ_ONLY_ACCEPTANCE=PASS
+LIVE_MUTATION_ACCEPTANCE=NOT_RUN
+MUTATION_COUNT=0
+DEPLOYMENT_PERFORMED=NO
+PUBLIC_IDENTITY_SAMPLE=PASS
+PUBLIC_IDENTITY_GLOBAL_COVERAGE=NOT_PROVEN
+FULL_DEPLOYMENT_PARITY=NOT_PROVEN
+```
+
+The staging-only commit is `1c2e0f1b` and contains only the 12 documentation
+paths listed by `git diff --name-status eddc3d18..1c2e0f1b`. No production PHP,
+schema, migration, test or runtime source path differs between the two
+revisions.
+
+### Contract hash reconciliation
+
+| Path | Local SHA-256 | Staging SHA-256 | Match |
+|---|---|---|---|
+| `docs/architecture/ARTICLE_INGEST_CONTRACT.md` | `a19a18573de33917b6f9b9ecb74717186c60f9a2f726a11e732e3979fafdf7ce` | `a19a18573de33917b6f9b9ecb74717186c60f9a2f726a11e732e3979fafdf7ce` | YES |
+| `docs/architecture/04_MEDIA_MODEL.md` | `b2a26764642c8dbc04e2fb70d62c1a8370fe79ab504db9160e58716cfa58a4ba` | `b2a26764642c8dbc04e2fb70d62c1a8370fe79ab504db9160e58716cfa58a4ba` | YES |
+| `docs/architecture/06_KNOWLEDGE_SOURCE_MODEL.md` | `06495cadf10c57759cfb242638da25715fb14b55f895c6b11f10b333f4877985` | `06495cadf10c57759cfb242638da25715fb14b55f895c6b11f10b333f4877985` | YES |
+| `docs/architecture/16_P4_GOVERNANCE_CORE_CONTRACT.md` | `79c3b4c1c2574f07464486f5480d970614615ea86be64fc2bb136082d0f7f6d4` | `79c3b4c1c2574f07464486f5480d970614615ea86be64fc2bb136082d0f7f6d4` | YES |
+| `docs/architecture/RELATED_SEMANTIC_PROJECTION_CONTRACT.md` | `7acac3245e9694d9761d43e3e6f3240b16e39a0883f52287abad928b96056768` | `7acac3245e9694d9761d43e3e6f3240b16e39a0883f52287abad928b96056768` | YES |
+| `docs/mcp/NHK_V3_CONTENT_OPERATIONS_CONTROL_PLANE.md` | `d4b8facacab78748e76dd6a26a8e159e72aa8b33209e5c035acb7c1e1f8635cb` | `d4b8facacab78748e76dd6a26a8e159e72aa8b33209e5c035acb7c1e1f8635cb` | YES |
+
+### Staging capability parity
+
+```text
+RUNTIME_REGISTERED=58
+TOOLS_LIST_EXPOSED=58
+CALLABLE_DISPATCHED=58
+EASY_MCP_DESCRIPTOR_EXPOSED=46
+CONNECTOR_DISCOVERABLE=46
+```
+
+The 12 connector gaps are exposure gaps, not runtime capability absence. The
+five capability states remain separate. The live evidence does not establish
+successful invocation of every registered operation.
+
+### Live golden-case summary
+
+```text
+ARTICLE_55=PASS; accepted=true; MEDIA_COMPLETE; blockers=NONE
+ARTICLE_575=PASS; accepted=true; MEDIA_COMPLETE; blockers=NONE
+ARTICLE_548=PASS; accepted=true; MEDIA_PLACEHOLDER; blockers=NONE; upload_required=false
+VIDEO_GOLDEN=PASS; canonical live readback succeeded
+KNOWLEDGE_GOLDEN=PASS; supporting Source/Evidence present on canonical readback
+MEDIA_GOLDEN=PASS; canonical live readback succeeded; role vocabulary preserved
+PUBLIC_IDENTITY_SAMPLE=PASS; scoped audit KEEP=1 CHANGE=0 BLOCKED=0
+```
+
+The single Public Identity sample does not prove global coverage. No Article,
+Media, Video, Knowledge, Graph, URL or Public Identity mutation was performed.
+
+## Final program closeout decision
+
+```text
+PROGRAM_STATUS=ARCHITECTURAL_PROGRAM_COMPLETE_PENDING_LIVE_MUTATION_OR_DEPLOYMENT_ACCEPTANCE
+GATE_8_READ_ONLY=PASS
+CONTRACT_DOCUMENTATION_PARITY=PASS
+SOURCE_REVISION_RECONCILIATION=PASS_DOCUMENTATION_ONLY_DELTA
+FULL_DEPLOYMENT_PARITY=NOT_PROVEN
+RELEASE_CUTOVER=NOT_AUTHORIZED
+```
+
+The architectural/documentation program may close at this level. Deployment,
+live canonical-data mutation, Public Identity rollout and connector acceptance
+remain separate release/cutover work and are not implied by this closeout.
 ```
