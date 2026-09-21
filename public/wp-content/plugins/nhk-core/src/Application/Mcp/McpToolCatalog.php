@@ -42,6 +42,12 @@ final class McpToolCatalog
                 ],
                 'purpose' => ['type' => 'string', 'enum' => ['EDITORIAL', 'AUTHORITY', 'MIXED']],
                 'intent' => ['type' => 'string', 'enum' => ContentIntent::values()],
+                'dry_run' => ['type' => 'boolean'],
+                'knowledge_repair' => ['type' => 'object', 'properties' => [
+                    'canonical_knowledge_uuid' => self::uuidField(), 'expected_revision' => ['type' => 'integer', 'minimum' => 1], 'operation' => ['type' => 'string', 'enum' => ['update', 'retire']],
+                    'delta' => ['type' => 'object', 'properties' => ['text' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 10000], 'claim_type' => ['type' => 'string', 'enum' => ['fact', 'specification', 'history', 'technical', 'provenance', 'other']]], 'additionalProperties' => false],
+                    'reason' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 2000], 'provenance' => ['type' => 'object'], 'cleanup_class' => ['type' => 'string', 'enum' => \NHK\Core\Application\Capture\KnowledgeRepairIntent::CLEANUP_CLASSES],
+                ], 'required' => ['canonical_knowledge_uuid', 'expected_revision', 'operation', 'reason', 'provenance', 'cleanup_class'], 'additionalProperties' => false],
                 'authority_intent' => [
                     'type' => 'object',
                     'properties' => [

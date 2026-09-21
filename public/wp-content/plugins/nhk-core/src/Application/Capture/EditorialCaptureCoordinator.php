@@ -233,6 +233,30 @@ final class EditorialCaptureCoordinator
             if (($intent['status'] ?? '') !== 'resolved') {
                 return $this->save($record, CaptureStage::INTERPRETED, $assets, $diagnostics, $receipts, 'INTERPRETED', $record->articleId, $record->articleStateToken, 'REVIEW_REQUIRED');
             }
+            if (strtoupper(trim((string) ($intent['intent'] ?? ''))) === 'KNOWLEDGE_REPAIR') {
+                // Existing-Knowledge repair is target-bound. It deliberately
+                // stops before subject resolution, Article creation, claim
+                // retrieval and any title/text inference.
+                $repairContext = [
+                    'capture_id' => $record->captureId,
+                    'raw_input' => $text,
+                    'content_intent' => $intent,
+                    'knowledge_repair' => is_array($input['knowledge_repair'] ?? null) ? $input['knowledge_repair'] : [],
+                    'planning_input' => $input,
+                    'subject_resolution' => ['status' => 'not_requested', 'resolved' => [], 'primary' => null],
+                    'assets' => [], 'interpretation' => [], 'prior_diagnostics' => $diagnostics,
+                    'governance' => is_array($input['governance'] ?? null) ? $input['governance'] : [],
+                    'existing_capture_continuation' => ($input['existing_capture_continuation'] ?? false) === true,
+                    'continuation_idempotency_key' => (string) ($input['continuation_idempotency_key'] ?? ''),
+                ];
+                $diagnostics['subjects'] = ['status' => 'not_requested', 'reason' => 'KNOWLEDGE_REPAIR_TARGET_BOUND'];
+                $diagnostics['claim_retrieval'] = ['status' => 'not_requested', 'items' => [], 'selected_claims' => []];
+                $record = $this->save($record, CaptureStage::KNOWLEDGE_RETRIEVED, $assets, $diagnostics, $receipts, 'KNOWLEDGE_RETRIEVED', $record->articleId, $record->articleStateToken, 'SKIPPED');
+                $writes = ($this->semanticWriteBack)($repairContext + ['retrieval' => $diagnostics['claim_retrieval']]);
+                $diagnostics['semantic_write_back'] = $this->withoutBody($writes);
+                $status = (string) ($writes['status'] ?? 'REVIEW_REQUIRED');
+                return $this->save($record, CaptureStage::SEMANTICS_RECONCILED, $assets, $diagnostics, $receipts, 'SEMANTICS_RECONCILED', $record->articleId, $record->articleStateToken, $status);
+            }
             $articleRequired = ($intent['article_required'] ?? false) === true;
             $videoInput = is_array($input['video'] ?? null) ? $input['video'] : [];
             // Resolve before any draft/media writer. A UUID remains the

@@ -203,7 +203,7 @@ final class McpContractTest extends TestCase
         self::assertSame('internal_admin_only', $tools['nhk.video.ingest']['surface']);
         self::assertSame('internal_admin_only', $tools['nhk.knowledge.ingest']['surface']);
         self::assertArrayHasKey('video', $tools['nhk.capture.ingest']['inputSchema']['properties']);
-        self::assertSame(['VIDEO', 'IMAGE_ARTICLE', 'TEXT_ARTICLE', 'KNOWLEDGE_DELTA', 'MEDIA_ENRICHMENT'], $tools['nhk.capture.ingest']['inputSchema']['properties']['intent']['enum']);
+        self::assertSame(['VIDEO', 'IMAGE_ARTICLE', 'TEXT_ARTICLE', 'KNOWLEDGE_DELTA', 'KNOWLEDGE_REPAIR', 'MEDIA_ENRICHMENT'], $tools['nhk.capture.ingest']['inputSchema']['properties']['intent']['enum']);
         self::assertArrayHasKey('media_bindings', $tools['nhk.capture.ingest']['inputSchema']['properties']);
         self::assertSame(['representative'], $tools['nhk.media.bind']['inputSchema']['properties']['role']['enum']);
         self::assertContains('nhk.article.publish', SingleEntryPointPolicy::internalOnlyTools());

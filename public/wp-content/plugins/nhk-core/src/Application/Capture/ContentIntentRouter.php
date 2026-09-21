@@ -94,6 +94,11 @@ final class ContentIntentRouter
 
     private function assertExplicitIntentIsValid(ContentIntent $intent, array $input, array $assets): void
     {
+        if ($intent === ContentIntent::KNOWLEDGE_REPAIR) {
+            KnowledgeRepairIntent::fromArray(is_array($input['knowledge_repair'] ?? null) ? $input['knowledge_repair'] : []);
+            if ($assets !== []) throw new \InvalidArgumentException('KNOWLEDGE_REPAIR_ASSETS_FORBIDDEN');
+            if (($input['subject_hints'] ?? []) !== []) throw new \InvalidArgumentException('KNOWLEDGE_REPAIR_SUBJECT_INFERENCE_FORBIDDEN');
+        }
         if ($intent === ContentIntent::VIDEO) {
             try {
                 YouTubeUrlNormalizer::normalize(trim((string) ($input['video']['url'] ?? '')));
@@ -118,7 +123,7 @@ final class ContentIntentRouter
             'source' => $source,
             'article_required' => $intent->requiresArticle(),
             'media_required' => $intent->requiresMedia(),
-            'semantic_delta' => ['status' => $intent === ContentIntent::KNOWLEDGE_DELTA ? 'REQUIRED' : 'NONE'],
+            'semantic_delta' => ['status' => in_array($intent, [ContentIntent::KNOWLEDGE_DELTA, ContentIntent::KNOWLEDGE_REPAIR], true) ? 'REQUIRED' : 'NONE'],
             'diagnostics' => [],
             'signals' => $signals,
         ];

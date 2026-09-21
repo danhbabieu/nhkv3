@@ -7,9 +7,11 @@ use NHK\Core\Application\Completion\CompletionCoordinator;
 use NHK\Core\Application\Governance\GovernanceAutomationPolicyResolver;
 use NHK\Core\Application\Semantic\ClaimReusePolicy;
 use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
+use NHK\Core\Application\Knowledge\KnowledgeRepairPreviewService;
 use NHK\Core\Contracts\Governance\GovernedLifecycle;
 use NHK\Core\Contracts\Governance\PendingVideoProposalLookup;
 use NHK\Core\Contracts\Governance\VideoProposalReconciliationPort;
+use NHK\Core\Contracts\Knowledge\KnowledgeRepository;
 use NHK\Core\Domain\Governance\{CommandCanonicalizer, Proposal, ProposalState};
 use NHK\Core\Domain\Governance\ProposalSubjectBindingValidator;
 use NHK\Core\Domain\Knowledge\KnowledgeFacetProfile;
@@ -59,6 +61,8 @@ final class GovernedCaptureContinuationService
         /** @var callable(string,array<string,mixed>):array<string,mixed>|null */
         private $relationScopeIssuer = null,
         private ?CanonicalDependencyValidator $canonicalDependencies = null,
+        private ?KnowledgeRepository $knowledgeRepository = null,
+        private ?KnowledgeRepairPreviewService $knowledgeRepairPreview = null,
     ) {
         $this->completion = $completion ?? new CompletionCoordinator();
     }
@@ -284,6 +288,7 @@ final class GovernedCaptureContinuationService
             if ($priorResolved !== []) $resolved = $priorResolved;
         }
         $intent = strtoupper(trim((string) ($context['content_intent']['intent'] ?? '')));
+        if ($intent === 'KNOWLEDGE_REPAIR') return [$this->knowledgeRepairPlan($captureId, $context)];
         $subjects = array_values(array_filter($resolved, static fn (mixed $item): bool => is_array($item) && UuidCodec::isValid((string) ($item['id'] ?? '')) && trim((string) ($item['type'] ?? '')) !== '' && ($item['active'] ?? true) === true));
         $variants = array_values(array_filter($subjects, static fn (array $item): bool => ($item['type'] ?? '') === 'variant'));
         $plans = [];
@@ -669,7 +674,7 @@ final class GovernedCaptureContinuationService
     private function scopeDependencyPlan(string $captureId, array $plan): array
     {
         if (!in_array((string) ($plan['entity_type'] ?? ''), ['source', 'knowledge', 'evidence'], true)
-            || !in_array((string) ($plan['operation'] ?? ''), ['ingest', 'create', 'update'], true)
+            || !in_array((string) ($plan['operation'] ?? ''), ['ingest', 'create', 'update', 'retire'], true)
             || !is_callable($this->dependencyScopeIssuer)) return $plan;
         $payload = is_array($plan['payload'] ?? null) ? $plan['payload'] : [];
         unset($payload['staging_acceptance'], $payload['capture_fingerprint'], $payload['scope_fingerprint'], $payload['proposal_command_fingerprint']);
@@ -682,6 +687,26 @@ final class GovernedCaptureContinuationService
         $plan['payload']['proposal_command_fingerprint'] = (string) ($scope['proposal_command_fingerprint'] ?? '');
         $plan['payload']['staging_acceptance'] = $scope;
         return $plan;
+    }
+
+    /** @return array<string,mixed> */
+    private function knowledgeRepairPlan(string $captureId, array $context): array
+    {
+        if ($this->knowledgeRepository === null) throw new \RuntimeException('KNOWLEDGE_REPAIR_REPOSITORY_UNAVAILABLE');
+        $repair = KnowledgeRepairIntent::fromArray((array) ($context['planning_input']['knowledge_repair'] ?? $context['knowledge_repair'] ?? []));
+        $current = $this->knowledgeRepository->findByCanonicalId($repair->targetUuid);
+        if ($current === null) throw new \RuntimeException('KNOWLEDGE_REPAIR_TARGET_NOT_FOUND');
+        if ($current->revision !== $repair->expectedRevision) throw new \RuntimeException('KNOWLEDGE_REPAIR_REVISION_CHANGED');
+        $payload = ['canonical_id' => $repair->targetUuid, 'text' => $repair->text ?? $current->claimText, 'claim_type' => $repair->claimType ?? $current->claimType, 'provenance' => $repair->provenance, 'repair' => ['cleanup_class' => $repair->cleanupClass, 'reason' => $repair->reason, 'target_uuid' => $repair->targetUuid, 'expected_revision' => $repair->expectedRevision]];
+        if ($repair->operation === 'retire' && $this->knowledgeRepairPreview !== null) {
+            $preview = $this->knowledgeRepairPreview->preview($repair->toArray());
+            $payload['repair']['manual_review_required'] = ($preview['status'] ?? '') === 'REVIEW_REQUIRED';
+            $payload['repair']['dependency_inventory'] = ['graph' => $preview['graph_dependencies'] ?? [], 'evidence' => $preview['evidence_dependencies'] ?? [], 'blockers' => $preview['blockers'] ?? []];
+        }
+        $plan = $this->arguments('knowledge', $repair->operation, $repair->targetUuid, $payload, 'capture:' . $captureId . ':knowledge-repair:' . hash('sha256', CommandCanonicalizer::canonicalize($repair->toArray())), $repair->expectedRevision);
+        $plan['target_uuid'] = $repair->targetUuid;
+        $plan['repair'] = true;
+        return $this->scopeDependencyPlan($captureId, $plan);
     }
 
     /** @param array<string,mixed> $plan @return array<string,mixed> */

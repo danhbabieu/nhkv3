@@ -1,5 +1,61 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-21 — Existing Knowledge repair surface (LOCAL / NO LIVE MUTATION)
+
+SCOPE: Added typed `KNOWLEDGE_REPAIR` input to canonical
+`nhk.capture.ingest`, bound to one existing Knowledge UUID and expected
+revision. The repair path stops before subject inference, Article creation and
+new-claim planning; update/retire plans continue through the existing Proposal,
+Approval, Eligibility and Controlled Apply lifecycle. Stable keys are preserved
+by the Knowledge owner and retire is blocked when the read-only dependency
+inventory requires manual review.
+
+READ_ONLY_PREVIEW: Added target/revision/text/type/delta, Graph dependency,
+Evidence dependency and public-impact preview with `SAFE_TO_UPDATE`,
+`SAFE_TO_RETIRE` or `REVIEW_REQUIRED` outcomes. Cleanup classes are bounded to
+the four requested audit classes; live fixture UUIDs are absent from production
+source.
+
+VERIFICATION: Fresh documentation bootstrap/source parity passed (source
+revision `76e4db28ef6cc7f2ee08c5fb1725ffeb5cfd4ca8`, 58 registered tools);
+focused repair/contract/staging suites passed, and full NHK Unit passed 2,042
+tests / 10,024 assertions with warnings/deprecations only. PHP lint, diff check
+and live-ID source review passed. No schema/migration, data, deployment or
+live canary mutation occurred.
+
+STATUS: `KNOWLEDGE_REPAIR_SURFACE_LOCAL / UNIT_PASS / CONNECTOR_CANARY_PENDING / NO_LIVE_MUTATION`.
+
+NEXT_EXACT_ACTION: `VERIFY_DEPLOYED_BUILD_AND_SIGNED_STAGING_SCOPE; THEN RUN ONE-OBJECT_CANARY_ONLY`.
+
+# Checkpoint — 2026-09-21 — Video staging descriptor parity residual (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE: The staging descriptor already normalized Video CREATE/INGEST to
+`expected_revision=0`, while the persisted/reloaded Proposal legitimately
+hydrates its create revision as `null`. The normalized `fromPlan()` and
+`fromProposal()` paths now prove this is one canonical CREATE sentinel; the
+live-facing gap was bounded descriptor evidence, which previously collapsed to
+`STAGING_VIDEO_PAYLOAD_MISMATCH` without safe field-level diagnostics.
+
+FIXED_BOUNDARY: Video staging packets now retain a signed, bounded normalized
+descriptor snapshot. Eligibility can expose `SIGNED_NORMALIZED_DESCRIPTOR`,
+`VERIFIED_NORMALIZED_DESCRIPTOR` and `DESCRIPTOR_DIFF` containing only allowed
+metadata, field paths, value types and hashes; payload values, signatures and
+secrets are not exposed. CREATE/INGEST normalization is limited to new-owner
+semantics. UPDATE/retire CAS revisions remain positive and exact.
+
+TEST_EVIDENCE: Descriptor/scope/eligibility suites pass 30 tests / 99
+assertions. Added explicit `0` versus `null` Video ingest parity, update
+revision 4 versus 5 separation, and semantic tamper diagnostic coverage.
+Changed PHP files lint clean and `git diff --check` passes. The complete local
+Unit suite ran 2042 tests / 10004 assertions but remains non-green because of
+two pre-existing dirty-worktree failures outside this defect: a final
+`GraphService` mock in KnowledgeRepairPreviewServiceTest and an older
+EasyMCP intent expectation. No live IDs were mutated.
+
+STATUS: `STAGING_VIDEO_DESCRIPTOR_PARITY_FIXED_LOCAL / TARGET_PASS / FULL_UNIT_BASELINE_DIRTY / NO_LIVE_MUTATION`.
+
+NEXT_EXACT_ACTION: `USER_PUSH_PULL_BUILD; THEN RUN FRESH @v34 VIDEO ACCEPTANCE`.
+
 # Checkpoint — 2026-09-21 — Dossier coverage admin timeout guard (LOCAL / NO LIVE MUTATION)
 
 ROOT_CAUSE: The Dossier coverage admin page assembled a full Entity dossier for

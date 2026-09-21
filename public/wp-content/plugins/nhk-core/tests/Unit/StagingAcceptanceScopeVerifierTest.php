@@ -52,6 +52,12 @@ final class StagingAcceptanceScopeVerifierTest extends TestCase
         $changedPayload['title'] = 'changed after approval';
         $stale = new Proposal($proposal->id, $proposal->subjectId, $proposal->operation, $changedPayload, $proposal->contentFingerprint, $proposal->expectedRevision, $proposal->dependencyFingerprint, $proposal->state, idempotencyKey: $proposal->idempotencyKey, targetUuid: $proposal->targetUuid, entityType: $proposal->entityType);
         self::assertSame('STAGING_VIDEO_PAYLOAD_MISMATCH', $verifier->proposalFailureReason($scope, $stale));
+        $diagnostic = $verifier->proposalDescriptorDiagnostic($scope, $stale);
+        self::assertSame(0, $diagnostic['SIGNED_NORMALIZED_DESCRIPTOR']['expected_revision']);
+        self::assertSame(0, $diagnostic['VERIFIED_NORMALIZED_DESCRIPTOR']['expected_revision']);
+        self::assertNotEmpty($diagnostic['DESCRIPTOR_DIFF']);
+        self::assertArrayHasKey('signed_hash', $diagnostic['DESCRIPTOR_DIFF'][0]);
+        self::assertArrayNotHasKey('payload', $diagnostic['SIGNED_NORMALIZED_DESCRIPTOR']);
     }
 
     public function test_capture_child_relation_scope_is_exact_and_non_transferable(): void

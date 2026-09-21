@@ -31,6 +31,7 @@ final class StagingAcceptanceScope
         'knowledge:create' => 'knowledge_delta',
         'knowledge:ingest' => 'knowledge_delta',
         'knowledge:update' => 'knowledge_delta',
+        'knowledge:retire' => 'knowledge_delta',
         'source:create' => 'source_evidence_reconciliation',
         'source:ingest' => 'source_evidence_reconciliation',
         'evidence:create' => 'source_evidence_reconciliation',

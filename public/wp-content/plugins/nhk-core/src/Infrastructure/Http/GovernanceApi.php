@@ -38,7 +38,7 @@ final class GovernanceApi
     private function eligibility(\WP_REST_Request $request): array|\WP_Error
     {
         if (!$this->eligibility) return new \WP_Error('nhk_governance_unavailable', 'Eligibility service is not configured.', ['status' => 503]);
-        try { $result = $this->eligibility->check((string) $request['id']); return ['proposal_id' => (string) $request['id'], 'ready' => $result->ready, 'reasons' => $result->reasons]; } catch (\Throwable $error) { return $this->error($error); }
+        try { $result = $this->eligibility->check((string) $request['id']); return ['proposal_id' => (string) $request['id'], 'ready' => $result->ready, 'reasons' => $result->reasons] + ($result->diagnostics === [] ? [] : ['diagnostics' => $result->diagnostics]); } catch (\Throwable $error) { return $this->error($error); }
     }
 
     private function review(\WP_REST_Request $request): array|\WP_Error

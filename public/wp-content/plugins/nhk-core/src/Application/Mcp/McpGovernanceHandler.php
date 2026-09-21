@@ -142,7 +142,7 @@ final class McpGovernanceHandler implements GovernedLifecycle
     {
         if (!$this->eligibility) throw new \RuntimeException('Eligibility service is not configured.');
         $result = $this->eligibility->check($id);
-        return ['proposal_id' => $id, 'ready' => $result->ready, 'reasons' => $result->reasons];
+        return ['proposal_id' => $id, 'ready' => $result->ready, 'reasons' => $result->reasons] + ($result->diagnostics === [] ? [] : ['diagnostics' => $result->diagnostics]);
     }
     public function apply(string $id): array
     {

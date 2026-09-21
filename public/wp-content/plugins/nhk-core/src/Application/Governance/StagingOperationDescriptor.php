@@ -83,7 +83,7 @@ final readonly class StagingOperationDescriptor
     {
         return match ($entityType . ':' . $operation) {
             'source:create', 'source:ingest', 'source:update', 'evidence:create', 'evidence:ingest', 'evidence:update' => 'source_evidence_reconciliation',
-            'knowledge:create', 'knowledge:ingest', 'knowledge:update' => 'knowledge_delta',
+            'knowledge:create', 'knowledge:ingest', 'knowledge:update', 'knowledge:retire' => 'knowledge_delta',
             'video:ingest', 'video:update', 'video:retire', 'video:reactivate' => 'governed_video_plan',
             'video:source_refresh' => 'video_source_refresh',
             'relation:relation_create' => 'capture_child_relation',
@@ -107,6 +107,49 @@ final readonly class StagingOperationDescriptor
     public static function diff(self $signed, self $verified): array
     {
         return self::diffValue($signed->debugValue(), $verified->debugValue());
+    }
+
+    /**
+     * Return only bounded descriptor metadata for staging diagnostics. Payload
+     * values are deliberately reduced to hashes and key names.
+     *
+     * @return array<string,mixed>
+     */
+    public function diagnosticValue(): array
+    {
+        return [
+            'entrypoint' => $this->entrypoint,
+            'capture_id' => $this->captureId,
+            'capture_fingerprint' => $this->captureFingerprint,
+            'entity_type' => $this->entityType,
+            'operation' => $this->operation,
+            'operation_family' => $this->operationFamily,
+            'create_semantics' => $this->createSemantics,
+            'subject_id' => $this->subjectId,
+            'target_uuid' => $this->targetUuid,
+            'proposed_uuid' => $this->proposedUuid,
+            'expected_revision' => $this->expectedRevision,
+            'idempotency_key' => $this->idempotencyKey,
+            'payload_fingerprint' => $this->payloadFingerprint,
+            'dependency_fingerprint' => $this->dependencyFingerprint,
+            'payload_keys' => array_keys($this->payload),
+        ];
+    }
+
+    /** @return array{path:string,signed_type:string,verified_type:string,signed_hash:string,verified_hash:string}[] */
+    public static function diagnosticDiff(self $signed, self $verified): array
+    {
+        return array_map(static function (array $diff): array {
+            $signed = $diff['signed'] ?? '<missing>';
+            $verified = $diff['verified'] ?? '<missing>';
+            return [
+                'path' => (string) ($diff['path'] ?? ''),
+                'signed_type' => get_debug_type($signed),
+                'verified_type' => get_debug_type($verified),
+                'signed_hash' => hash('sha256', CommandCanonicalizer::canonicalize($signed)),
+                'verified_hash' => hash('sha256', CommandCanonicalizer::canonicalize($verified)),
+            ];
+        }, self::diff($signed, $verified));
     }
 
     /** @return array<string,mixed> */

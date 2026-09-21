@@ -120,6 +120,7 @@ final class GovernanceRuntimeFactory
             $scope = $proposal->payload['staging_acceptance'] ?? null;
             return is_array($scope) ? ($stagingScopeVerifier->proposalFailureReason($scope, $proposal) ?? true) : 'STAGING_SCOPE_REQUIRED';
         });
+        $eligibility->setStagingScopeDiagnosticProvider([$stagingScopeVerifier, 'proposalDescriptorDiagnostic']);
         $mediaBinding = new MediaBindingService($media, $assets, $usages, $authority, $types, new \NHK\Core\Infrastructure\Media\WpdbMediaBindingOperationRepository($wpdb), stagingGuard: new MediaBindingStagingGuard($environment, [$stagingScopeVerifier, 'verifyBindingRequest'], static fn (string $capability): bool => function_exists('current_user_can') && current_user_can($capability)));
         $stagingGuard = new OperationScopedStagingGuard(
             $environment,

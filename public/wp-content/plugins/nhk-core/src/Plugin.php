@@ -730,6 +730,7 @@ final class Plugin {
             $videoKnowledgeEnrichment = new VideoKnowledgeEnrichmentPlanner(new \NHK\Core\Application\Knowledge\KnowledgeEnrichmentPlanner($claims, $evidence, $sources));
             $videoEditorialResume = new \NHK\Core\Application\Video\VideoEditorialResumePlanner($videos, new VideoEditorialGenerator(), new VideoSeoProjection(), null, $videoKnowledgeEnrichment);
             $canonicalDependencies = new CanonicalDependencyValidator($claims, $sources, $evidence);
+            $knowledgeRepairPreview = new \NHK\Core\Application\Knowledge\KnowledgeRepairPreviewService($claims, $evidence, $graphService);
             $videoRelationCandidates = new VideoRelationCandidatePlanner(new PredicateRegistry(), $evidence, $claims, $sources, $canonicalDependencies);
             $videoCompleteness = new \NHK\Core\Application\Video\VideoCompletenessReconciliationService($videos, $graphService, $canonicalDependencies, new VideoCompletenessPolicy());
             $captureGovernance = new GovernedCaptureContinuationService(
@@ -800,6 +801,8 @@ final class Plugin {
                     return $scope;
                 },
                 canonicalDependencies: $canonicalDependencies,
+                knowledgeRepository: $claims,
+                knowledgeRepairPreview: $knowledgeRepairPreview,
             );
             $articleReceipts = new WpdbArticleOperationReceiptRepository($wpdb);
             $categoryGateway = new CategoryGateway(new WpCategoryStore());
@@ -1621,7 +1624,7 @@ final class Plugin {
             $recoveryBinding = defined('NHK_RUNTIME_MODE') && strtolower((string) NHK_RUNTIME_MODE) === 'recovery'
                 ? new \NHK\Core\Application\Mcp\RecoveryMcpRuntimeBinding($wpdb)
                 : null;
-            (new McpApi(new McpTransport($mcpRead, $mcpGovernance, static fn (string $capability): bool => current_user_can($capability), static fn (string $value): bool => in_array($value, $allowedOrigins, true), $articleHandler, $videoIntake, $wordpressAttachments, $categoryGateway, $draftGateway, new CanonicalDependencyValidator($claims, $sources, $evidence), $publicUrlMaintenance, $mediaBatchUpload, $documentation, $capture, $captureContinuation, $authorityCapture, static function (): bool { return (new MigrationStatus())->runtimeSchemaReady(); }, $imageIngest, semanticWritePolicy: $semanticWritePolicy, mediaBinding: $mediaBindingService, videoSourceRefresh: $videoSourceRefresh), $recoveryBinding))->register();
+            (new McpApi(new McpTransport($mcpRead, $mcpGovernance, static fn (string $capability): bool => current_user_can($capability), static fn (string $value): bool => in_array($value, $allowedOrigins, true), $articleHandler, $videoIntake, $wordpressAttachments, $categoryGateway, $draftGateway, new CanonicalDependencyValidator($claims, $sources, $evidence), $publicUrlMaintenance, $mediaBatchUpload, $documentation, $capture, $captureContinuation, $authorityCapture, static function (): bool { return (new MigrationStatus())->runtimeSchemaReady(); }, $imageIngest, semanticWritePolicy: $semanticWritePolicy, mediaBinding: $mediaBindingService, videoSourceRefresh: $videoSourceRefresh, knowledgeRepairPreview: $knowledgeRepairPreview), $recoveryBinding))->register();
             do_action('nhk_mcp_register_tools', McpToolCatalog::tools(), $mcpRead, $mcpGovernance);
         });
         add_action('admin_menu', [AdminPage::class, 'register']);

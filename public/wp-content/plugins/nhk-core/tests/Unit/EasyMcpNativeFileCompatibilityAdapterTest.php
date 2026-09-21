@@ -140,7 +140,7 @@ final class EasyMcpNativeFileCompatibilityAdapterTest extends TestCase
         self::assertArrayHasKey('capture_id', $tools[self::TARGET]['inputSchema']['properties']);
         self::assertSame('string', $tools[self::TARGET]['inputSchema']['properties']['capture_id']['type']);
         self::assertSame('uuid', $tools[self::TARGET]['inputSchema']['properties']['capture_id']['format']);
-        self::assertSame(['VIDEO', 'IMAGE_ARTICLE', 'TEXT_ARTICLE', 'KNOWLEDGE_DELTA', 'MEDIA_ENRICHMENT'], $tools[self::TARGET]['inputSchema']['properties']['intent']['enum']);
+        self::assertSame(['VIDEO', 'IMAGE_ARTICLE', 'TEXT_ARTICLE', 'KNOWLEDGE_DELTA', 'KNOWLEDGE_REPAIR', 'MEDIA_ENRICHMENT'], $tools[self::TARGET]['inputSchema']['properties']['intent']['enum']);
         self::assertSame([
             'type' => 'array',
             'minItems' => 1,

@@ -205,7 +205,7 @@ final class StagingAcceptanceScopeVerifier
         $plan['payload'] = is_array($plan['payload'] ?? null) ? $plan['payload'] : [];
         $plan['payload']['capture_revision'] = $capture->revision;
         $descriptor = StagingOperationDescriptor::fromPlan($plan, $capture->captureId, $capture->requestFingerprint);
-        if (!in_array($descriptor->entityType, ['source', 'knowledge', 'evidence'], true) || !in_array($descriptor->operation, ['ingest', 'create', 'update'], true)) throw new \RuntimeException('STAGING_DEPENDENCY_OPERATION_INVALID');
+        if (!in_array($descriptor->entityType, ['source', 'knowledge', 'evidence'], true) || !in_array($descriptor->operation, ['ingest', 'create', 'update', 'retire'], true)) throw new \RuntimeException('STAGING_DEPENDENCY_OPERATION_INVALID');
         $family = $descriptor->operationFamily;
         $payloadFingerprint = $descriptor->payloadFingerprint;
         $planFingerprint = hash('sha256', CommandCanonicalizer::canonicalize(StagingOperationDescriptor::withoutAuthorization($plan)));
@@ -416,6 +416,7 @@ final class StagingAcceptanceScopeVerifier
             'platform' => $platform, 'external_video_id' => $externalId, 'canonical_source_url' => $sourceUrl,
             'subject' => ['type' => $subjectType, 'uuid' => $subjectId, 'revision' => max(0, (int) ($subjectPacket['revision'] ?? $plan['subject_revision'] ?? 0))],
             'plan_fingerprint' => $planFingerprint, 'proposal_command_fingerprint' => $proposalCommandFingerprint,
+            'signed_normalized_descriptor' => $descriptor->diagnosticValue(),
             'dependency_ids' => array_values(array_map('strval', (array) ($descriptor->payload['dependency_ids'] ?? []))),
             'dependency_fingerprint' => $descriptor->dependencyFingerprint,
             'issued_at' => gmdate('c'), 'expires_at' => gmdate('c', time() + max(1, $this->ttlSeconds)),
@@ -526,6 +527,44 @@ final class StagingAcceptanceScopeVerifier
             $reason = trim($error->getMessage());
             return preg_match('/^[A-Z][A-Z0-9_]{2,100}$/', $reason) === 1 ? $reason : 'STAGING_SCOPE_NOT_APPROVED';
         }
+    }
+
+    /**
+     * Bounded evidence for an eligibility diagnostic. No payload, signature or
+     * secret is returned; values are represented by types and hashes only.
+     *
+     * @return array<string,mixed>
+     */
+    public function proposalDescriptorDiagnostic(array $scope, Proposal $proposal): array
+    {
+        if (($scope['operation_family'] ?? '') !== 'governed_video_plan') return [];
+        $verified = StagingOperationDescriptor::fromProposal($proposal, $scope);
+        $signed = is_array($scope['signed_normalized_descriptor'] ?? null) ? $scope['signed_normalized_descriptor'] : null;
+        return [
+            'SIGNED_NORMALIZED_DESCRIPTOR' => $signed,
+            'VERIFIED_NORMALIZED_DESCRIPTOR' => $verified->diagnosticValue(),
+            'DESCRIPTOR_DIFF' => $signed === null ? [['path' => 'signed_normalized_descriptor', 'signed_type' => 'missing', 'verified_type' => 'object', 'signed_hash' => hash('sha256', 'missing'), 'verified_hash' => hash('sha256', CommandCanonicalizer::canonicalize($verified->diagnosticValue()))]] : self::safeDiagnosticDiff($signed, $verified->diagnosticValue()),
+        ];
+    }
+
+    /** @param array<string,mixed> $signed @param array<string,mixed> $verified @return list<array<string,string>> */
+    private static function safeDiagnosticDiff(array $signed, array $verified): array
+    {
+        $diff = [];
+        foreach (array_unique(array_merge(array_keys($signed), array_keys($verified)), SORT_REGULAR) as $key) {
+            $signedExists = array_key_exists($key, $signed);
+            $verifiedExists = array_key_exists($key, $verified);
+            $signedValue = $signedExists ? $signed[$key] : '<missing>';
+            $verifiedValue = $verifiedExists ? $verified[$key] : '<missing>';
+            if ($signedExists && $verifiedExists && $signedValue === $verifiedValue) continue;
+            $diff[] = ['path' => (string) $key, 'signed_type' => get_debug_type($signedValue), 'verified_type' => get_debug_type($verifiedValue), 'signed_hash' => self::diagnosticHash($signedValue), 'verified_hash' => self::diagnosticHash($verifiedValue)];
+        }
+        return $diff;
+    }
+
+    private static function diagnosticHash(mixed $value): string
+    {
+        return hash('sha256', is_array($value) ? CommandCanonicalizer::canonicalize($value) : get_debug_type($value) . ':' . (string) $value);
     }
 
     /** @param array<string,mixed> $scope */

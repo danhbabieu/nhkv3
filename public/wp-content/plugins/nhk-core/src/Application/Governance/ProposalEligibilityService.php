@@ -12,10 +12,13 @@ final class ProposalEligibilityService
 {
     /** @var callable(\NHK\Core\Domain\Governance\Proposal):bool|string|null */
     private $stagingScopeVerifier = null;
+    /** @var callable(array<string,mixed>,\NHK\Core\Domain\Governance\Proposal):array<string,mixed>|null */
+    private $stagingScopeDiagnosticProvider = null;
     public function __construct(private ProposalRepository $proposals, private DependencyGraph $dependencies, private EligibilityReader $reader, private ?VideoProposalEligibilityEvaluator $video = null, private ?ClassifiedAsPolicy $classifiedAs = null, private ?MediaUsageRepository $mediaUsages = null) {}
 
     /** Connect the existing server-issued staging verifier after runtime bootstrap. */
     public function setStagingScopeVerifier(callable $verifier): void { $this->stagingScopeVerifier = $verifier; }
+    public function setStagingScopeDiagnosticProvider(callable $provider): void { $this->stagingScopeDiagnosticProvider = $provider; }
 
     public function check(string $proposalId): EligibilityResult
     {
@@ -32,14 +35,22 @@ final class ProposalEligibilityService
             return EligibilityResult::blocked('APPROVAL_BINDING_MISMATCH');
         }
         $reasons = [];
-        if ($this->stagingScopeVerifier !== null && $proposal->entityType === 'video' && in_array($proposal->operation, ['ingest', 'update'], true) && array_key_exists('capture_id', $proposal->payload)) {
+        $diagnostics = [];
+        if ($this->stagingScopeVerifier !== null && (($proposal->entityType === 'video' && in_array($proposal->operation, ['ingest', 'update'], true)) || ($proposal->entityType === 'knowledge' && in_array($proposal->operation, ['update', 'retire'], true))) && array_key_exists('capture_id', $proposal->payload)) {
             $scope = $proposal->payload['staging_acceptance'] ?? null;
             if (!is_array($scope)) $reasons[] = 'STAGING_SCOPE_REQUIRED';
             else {
                 $verification = ($this->stagingScopeVerifier)($proposal);
+                if ($this->stagingScopeDiagnosticProvider !== null) $diagnostics = ($this->stagingScopeDiagnosticProvider)($scope, $proposal);
                 if (is_string($verification) && $verification !== '') $reasons[] = $verification;
                 elseif ($verification !== true) $reasons[] = 'STAGING_SCOPE_NOT_APPROVED';
             }
+        }
+        if ($proposal->entityType === 'knowledge' && in_array($proposal->operation, ['update', 'retire'], true)) {
+            $repair = is_array($proposal->payload['repair'] ?? null) ? $proposal->payload['repair'] : [];
+            if (($repair['target_uuid'] ?? '') !== ($proposal->targetUuid ?: $proposal->subjectId)) $reasons[] = 'KNOWLEDGE_REPAIR_TARGET_MISMATCH';
+            if ((int) ($repair['expected_revision'] ?? 0) !== $proposal->expectedRevision) $reasons[] = 'KNOWLEDGE_REPAIR_REVISION_BINDING_MISMATCH';
+            if ($proposal->operation === 'retire' && (($repair['manual_review_required'] ?? false) === true)) $reasons[] = 'KNOWLEDGE_REPAIR_DEPENDENCY_REVIEW_REQUIRED';
         }
         $isCreation = in_array($proposal->operation, ['create', 'ingest'], true) && $proposal->targetUuid === null;
         // relation_create carries typed endpoint keys in its payload. A
@@ -123,7 +134,7 @@ final class ProposalEligibilityService
         }
         if ($this->video !== null) $reasons = array_merge($reasons, $this->video->evaluate($proposal));
         foreach ($this->dependencies->closure($proposalId) as $dependency) if (!$this->reader->isApplied($dependency)) $reasons[] = 'DEPENDENCY_NOT_APPLIED';
-        return $reasons ? EligibilityResult::blocked(...$reasons) : EligibilityResult::ready();
+        return $reasons ? new EligibilityResult(false, array_values(array_unique($reasons)), $diagnostics) : EligibilityResult::ready($diagnostics);
     }
 
     private function fingerprint(mixed $value): string

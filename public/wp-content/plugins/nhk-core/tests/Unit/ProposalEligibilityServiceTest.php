@@ -59,8 +59,16 @@ final class ProposalEligibilityServiceTest extends TestCase
         ], 'video-content', null, 'video-dependency', ProposalState::APPROVED, idempotencyKey: 'video-scope-diagnostic', entityType: 'video');
         $service = $this->service($proposal);
         $service->setStagingScopeVerifier(static fn (Proposal $checked): string => 'STAGING_VIDEO_PAYLOAD_MISMATCH');
+        $service->setStagingScopeDiagnosticProvider(static fn (array $scope, Proposal $checked): array => [
+            'SIGNED_NORMALIZED_DESCRIPTOR' => ['expected_revision' => 0],
+            'VERIFIED_NORMALIZED_DESCRIPTOR' => ['expected_revision' => 0],
+            'DESCRIPTOR_DIFF' => [['path' => 'payload_fingerprint', 'signed_type' => 'string', 'verified_type' => 'string', 'signed_hash' => str_repeat('a', 64), 'verified_hash' => str_repeat('b', 64)]],
+        ]);
 
-        self::assertContains('STAGING_VIDEO_PAYLOAD_MISMATCH', $service->check($proposal->id)->reasons);
+        $result = $service->check($proposal->id);
+        self::assertContains('STAGING_VIDEO_PAYLOAD_MISMATCH', $result->reasons);
+        self::assertSame(0, $result->diagnostics['SIGNED_NORMALIZED_DESCRIPTOR']['expected_revision']);
+        self::assertArrayHasKey('DESCRIPTOR_DIFF', $result->diagnostics);
     }
 
     public function test_explicit_video_subject_packet_is_authoritative_over_unresolved_title_hint(): void

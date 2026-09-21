@@ -80,4 +80,39 @@ final class StagingOperationDescriptorTest extends TestCase
         self::assertSame([], StagingOperationDescriptor::diff($signed, $verified), json_encode(StagingOperationDescriptor::diff($signed, $verified), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
         self::assertSame($signed->payloadFingerprint, $verified->payloadFingerprint);
     }
+
+    public function test_video_ingest_zero_plan_and_null_reloaded_proposal_are_one_canonical_create_descriptor(): void
+    {
+        $captureId = UuidCodec::newV7();
+        $captureFingerprint = hash('sha256', 'video-create-sentinel');
+        $videoId = UuidCodec::newV7();
+        $plan = [
+            'entity_type' => 'video', 'operation' => 'ingest', 'subject_id' => $videoId,
+            'expected_revision' => 0, 'idempotency_key' => 'video-create-sentinel',
+            'payload' => ['canonical_id' => $videoId, 'dependency_ids' => [], 'metadata' => ['source' => ['platform' => 'youtube', 'external_video_id' => 'oRfvArkX8NA']]],
+        ];
+        $signed = StagingOperationDescriptor::fromPlan($plan, $captureId, $captureFingerprint);
+        $reloaded = new Proposal(UuidCodec::newV7(), $videoId, 'ingest', $signed->payload, 'content', null, 'dependency', ProposalState::APPROVED, idempotencyKey: $plan['idempotency_key'], entityType: 'video');
+        $verified = StagingOperationDescriptor::fromProposal($reloaded, ['capture_id' => $captureId, 'capture_fingerprint' => $captureFingerprint]);
+
+        self::assertSame(0, $signed->expectedRevision);
+        self::assertNull($reloaded->expectedRevision);
+        self::assertSame(0, $verified->expectedRevision);
+        self::assertSame([], StagingOperationDescriptor::diff($signed, $verified));
+    }
+
+    public function test_video_update_revision_remains_exact_in_normalized_descriptor(): void
+    {
+        $captureId = UuidCodec::newV7();
+        $captureFingerprint = hash('sha256', 'video-update-cas');
+        $videoId = UuidCodec::newV7();
+        $base = ['entity_type' => 'video', 'operation' => 'update', 'subject_id' => $videoId, 'target_uuid' => $videoId, 'idempotency_key' => 'video-update-cas', 'payload' => ['canonical_id' => $videoId]];
+        $revision4 = StagingOperationDescriptor::fromPlan($base + ['expected_revision' => 4], $captureId, $captureFingerprint);
+        $revision5 = StagingOperationDescriptor::fromPlan($base + ['expected_revision' => 5], $captureId, $captureFingerprint);
+
+        self::assertSame(4, $revision4->expectedRevision);
+        self::assertSame(5, $revision5->expectedRevision);
+        self::assertNotSame($revision4->expectedRevision, $revision5->expectedRevision);
+        self::assertNotSame($revision4->diagnosticValue()['expected_revision'], $revision5->diagnosticValue()['expected_revision']);
+    }
 }

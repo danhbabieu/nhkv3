@@ -9,6 +9,7 @@ enum ContentIntent: string
     case IMAGE_ARTICLE = 'IMAGE_ARTICLE';
     case TEXT_ARTICLE = 'TEXT_ARTICLE';
     case KNOWLEDGE_DELTA = 'KNOWLEDGE_DELTA';
+    case KNOWLEDGE_REPAIR = 'KNOWLEDGE_REPAIR';
     case MEDIA_ENRICHMENT = 'MEDIA_ENRICHMENT';
 
     /** @return list<string> */

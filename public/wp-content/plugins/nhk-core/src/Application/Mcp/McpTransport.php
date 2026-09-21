@@ -10,6 +10,7 @@ use NHK\Core\Contracts\Media\WordPressMediaAttachmentIngestor;
 use NHK\Core\Application\Media\{ImageIngestEntrypoint, MediaBatchUploadService, MediaBindingService};
 use NHK\Core\Application\WordPress\{CategoryGateway, EditorialDraftGateway};
 use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
+use NHK\Core\Application\Knowledge\KnowledgeRepairPreviewService;
 use NHK\Core\Application\PublicIdentity\PublicUrlMaintenanceService;
 use NHK\Core\Application\Capture\{AuthorityCaptureService, EditorialCaptureContinuationService, EditorialCaptureCoordinator, PlanReapprovalRequired};
 use NHK\Core\Application\Runtime\{SemanticWritePolicyResolver, SemanticWritePolicyViolation};
@@ -46,6 +47,7 @@ final class McpTransport
         private ?SemanticWritePolicyResolver $semanticWritePolicy = null,
         private ?MediaBindingService $mediaBinding = null,
         private ?VideoSourceRefreshCommand $videoSourceRefresh = null,
+        private ?KnowledgeRepairPreviewService $knowledgeRepairPreview = null,
     ) {}
 
     /** @return array{status:int,body:?array} */
@@ -467,6 +469,10 @@ final class McpTransport
             throw new \InvalidArgumentException('CAPTURE_RESUME_REQUIRES_CAPTURE_ID');
         }
         ($this->documentation ?? new McpDocumentationRegistry())->assertCheckpoint((array) ($arguments['documentation_checkpoint'] ?? []));
+        if (($arguments['dry_run'] ?? false) === true) {
+            if (strtoupper(trim((string) ($arguments['intent'] ?? ''))) !== 'KNOWLEDGE_REPAIR' || $this->knowledgeRepairPreview === null) throw new \InvalidArgumentException('KNOWLEDGE_REPAIR_PREVIEW_REQUIRED');
+            return ['status' => 'PREVIEW', 'preview' => $this->knowledgeRepairPreview->preview((array) ($arguments['knowledge_repair'] ?? []))];
+        }
         unset($arguments['files']);
         if ($files !== []) {
             $arguments['files'] = $files;
