@@ -63,6 +63,13 @@ final class SemanticSuitabilityPolicy
         } elseif ($expected !== [] && $actual !== []) {
             $suitability = self::INELIGIBLE;
             $basis = 'persisted_subject_scope_mismatch';
+        } elseif ($expected === [] && in_array($candidate['role'] ?? '', ['featured_primary', 'inline_primary', 'inline_supporting'], true)) {
+            // A generic Article may use editorial Media without claiming that
+            // the asset proves a canonical semantic subject. Subject-bound
+            // representative/entity reuse still requires explicit persisted
+            // scope and is evaluated through the branches above.
+            $suitability = self::COMPATIBLE;
+            $basis = 'unscoped_article_media';
         } elseif ($expected === [] && ($candidate['article_explicit_media'] ?? false) === true) {
             // An explicit Article slot selection is valid editorial input when
             // there is no semantic target to validate. This does not grant
@@ -87,7 +94,7 @@ final class SemanticSuitabilityPolicy
 
         $auto = $availability === self::AVAILABLE
             && in_array($suitability, [self::EXACT, self::COMPATIBLE], true)
-            && in_array($basis, ['exact_canonical_subject_binding', 'registered_compatibility_rule', 'current_capture_selection_provenance', 'explicit_article_selection_without_semantic_target'], true);
+            && in_array($basis, ['exact_canonical_subject_binding', 'registered_compatibility_rule', 'current_capture_selection_provenance', 'explicit_article_selection_without_semantic_target', 'unscoped_article_media'], true);
         return [
             'requirement' => $requirement,
             'availability' => $availability,

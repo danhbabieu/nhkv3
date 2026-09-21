@@ -1,5 +1,39 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-21 — Article Media policy closeout (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE_ARTICLE_MEDIA_POLICY: The four failures present at HEAD were added
+after the clean `2e0a70b3` baseline (that baseline runs 34 ArticleMediaPolicy
+tests with no failures). Two scope fixtures exposed a real shared defect:
+ineligible current selections still allowed historical fallback, and an
+ineligible persisted usage was left active instead of being reconciled through
+the normal usage boundary. The supporting-placement fixture exposed state
+calculation that considered only mandatory slots. The representative tie
+fixture exposed that unscoped Article Media had no explicit suitability branch,
+so the stable-key ranking result was later discarded as incomplete.
+
+FIXED_BOUNDARY: Current Capture selections are now precedence-protected only
+when the request carries Capture context; an incompatible current selection
+cannot be silently replaced by stale history. Invalid existing usages are
+repointed through CAS-aware `MediaUsage` reconciliation to the selected
+replacement/placeholder. Valid supporting placements can complete the Media
+coordination state for an unscoped Article without creating semantic subject
+proof. Stable-key tie selection remains deterministic and now survives the
+final suitability gate. No live/staging data, direct SQL, deployment or push
+was performed.
+
+REGRESSION: `ArticleMediaPolicyTest` now covers the incompatible current
+Capture-versus-historical fallback case in addition to the existing explicit
+precedence, stale-usage, supporting-placement and stable-key tie cases.
+
+VERIFICATION: Baseline `2e0a70b3` ArticleMediaPolicy suite: 34 tests / 123
+assertions, PASS. Current focused suite: 36 tests, PASS. Current full Unit:
+2,018 tests, PASS, with existing warnings/deprecations only. Live connector
+parity and staging acceptance remain pending deployment and are not claimed by
+local tests.
+
+STATUS: `ARTICLE_MEDIA_POLICY_CLOSED_LOCAL / DEPLOYMENT_PENDING / LIVE_ACCEPTANCE_PENDING / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-21 — Explicit Capture Media precedence repair (LOCAL / NO LIVE MUTATION)
 
 ROOT_CAUSE: Article Media reconciliation normalized only structured slot
