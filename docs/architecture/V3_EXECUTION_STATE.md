@@ -1,5 +1,31 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-21 — Unified Relationship R1 read-only control plane (LOCAL / NO LIVE MUTATION)
+
+SCOPE: Added the read-only `nhk.relationship.registry`, `.list`, `.get` and
+`.preview` surfaces. Registry output projects the executable
+`EndpointTypeRegistry`/resolver registrations and `PredicateRegistry`; no
+second relation store, DB-editable rule matrix, mutation handler or new
+Clock-Type Authority type was added. Clock Type remains
+`entity_type=classification`, `family=clock_type`, `profile=clock_type`.
+
+PREVIEW: ADD, REPLACE, REMOVE and REACTIVATE are read-only plans. Validation
+normalizes endpoints, verifies registration/existence/activity, allow-lists,
+family scope, active/retired state, cardinality, evidence/provenance,
+revisions and dependency closure. REPLACE plans RETIRE plus CREATE/REACTIVATE;
+REMOVE plans RETIRE; retired edges never auto-reactivate. MediaUsage and
+Evidence remain owner-specific surfaces and are never projected as Graph edges.
+
+VERIFICATION: Focused relationship/MCP suite passes 48 tests / 698 assertions.
+Full NHK Unit passes 2,077 tests / 11,310 assertions with warnings and
+deprecations only. NHK Contract passes 6 tests / 48 assertions. Full PHP lint
+and `git diff --check` pass. Local deterministic fixture registry hash is
+`9c9451fe7f04d4e8a12bef2b2d339c5d35260bb138646a55423e29d595aacf9f`.
+
+STATUS: `RELATIONSHIP_R1_READ_ONLY_LOCAL / REGISTRY_PARITY_PASS / FULL_UNIT_PASS / CONTRACT_PASS / NO_LIVE_MUTATION`.
+
+NEXT_EXACT_ACTION: `DEPLOY_OR_PULL_CURRENT_BUILD; FRESH MCP DISCOVERY; READ-ONLY LIVE ACCEPTANCE ONLY; DO NOT OPEN R2.`
+
 # Checkpoint — 2026-09-21 — Shared JSON numeric canonicalization for governed payloads (LOCAL / NO LIVE MUTATION)
 
 ROOT_CAUSE_CONFIRMED: Proposal JSON persistence/reload changed a semantic
@@ -16047,6 +16073,40 @@ exact Graph relation intent. Canonical generated documentation was not run.
 
 STATUS=`STRUCTURED_AUTHORITY_RELATION_INTENT_IMPLEMENTED_LOCALLY / DEPLOYMENT_PENDING / SEMANTIC_MUTATION_NONE`.
 
+# Checkpoint — 2026-09-21 — Production-shaped Video CATEGORY_UNRESOLVED continuation (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE: The Capture Video governance path could create a Proposal and then
+lose the Video owner at the eligibility aggregation boundary when the only
+reported reason was `CATEGORY_UNRESOLVED`. The Capture retry reducer then saw a
+missing Video owner and incorrectly marked the deterministic editorial-review
+Capture retryable.
+
+FIXED_BOUNDARY: `GovernedCaptureContinuationService` now treats a Video ingest
+with only `CATEGORY_UNRESOLVED` as canonical-owner eligible and continues to
+Controlled Apply; the category remains in Video metadata/completeness and does
+not become a fabricated Hub value. `CaptureCurrentOutcomeReducer` now returns
+the existing `CAPTURE_RETRY_NOT_ALLOWED` reason for a review outcome whose
+deterministic blocker is category unresolved, while preserving retry behavior
+for actual transient failures and other existing resumable owners.
+
+PRODUCTION_SHAPED_PROOF: The same continuation executor path now has a
+generated-UUID Video test asserting Proposal creation, approval, eligibility
+override only for the category-only reason, Controlled Apply and canonical
+readback. A retry test covers the shared reducer/read-model predicate. Existing
+Video staging, numeric canonicalization, semantic tamper and CAS regressions
+remain green. No classifier, staging fingerprint, dependency ordering,
+thumbnail, numeric or attachment implementation was reopened.
+
+VERIFICATION: Full NHK Unit passes 2,068 tests / 11,172 assertions with existing
+warnings/deprecations. Focused Video/Capture/Governance/regression coverage
+passes 110 tests / 498 assertions. PHP lint and exact live-ID production scan
+pass; no Odo token was added to changed production files. No schema, migration,
+deployment, push or live mutation was performed.
+
+STATUS=`VIDEO_CATEGORY_UNRESOLVED_PRODUCTION_PATH_FIXED / FULL_UNIT_PASS / NO_LIVE_MUTATION`.
+
+NEXT_EXACT_ACTION: `USER_PUSH_PULL_BUILD; THEN RUN FRESH @v34 VIDEO ACCEPTANCE`.
+
 # Checkpoint — 2026-09-21 — Governed Video unresolved Hub classification boundary (LOCAL / NO LIVE MUTATION)
 
 ROOT_CAUSE: The Video Hub classifier correctly emitted `CATEGORY_UNRESOLVED`,
@@ -16079,3 +16139,37 @@ mutation was performed.
 STATUS=`VIDEO_CATEGORY_UNRESOLVED_BOUNDARY_FIXED_LOCALLY / FULL_UNIT_PASS / NO_LIVE_MUTATION`.
 
 NEXT_EXACT_ACTION: `USER_PUSH_PULL_BUILD; THEN RUN FRESH @v34 VIDEO ACCEPTANCE`.
+
+# Checkpoint — 2026-09-21 — Video canonical apply and owner readback separation (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE_CONFIRMED: The production-shaped path retained a valid Video
+proposal, but Controlled Apply called `assertVideoCompleteness()` after
+materializing semantic attachments. That assertion treated
+`CATEGORY_UNRESOLVED` as a canonical-owner veto. Independently, Capture
+completion aggregation iterated the semantic result wrapper instead of its
+`writes[]` children, so a valid Video canonical readback could not satisfy the
+required Video owner. A verified final callback could therefore coexist with
+an absent owner readback.
+
+FIXED_BOUNDARIES: Controlled Apply now filters only `CATEGORY_UNRESOLVED`
+from the canonical completeness veto; all source, editorial, semantic
+attachment, evidence and embed blockers remain fail-closed. The category is
+still persisted as unresolved and publication remains blocked. Capture
+completion now normalizes the governed result to its `writes[]` collection,
+and final readback is downgraded when any required owner is absent.
+
+PRODUCTION_SHAPED_PROOF: Generated-UUID coordinator tests cover Video intake
+composition, category-only publication review, canonical owner aggregation,
+and the missing-owner final-readback guard. The governed Video lifecycle test
+also applies a real Evidence-backed Graph attachment with unresolved category,
+preserving canonical active state, attachment Evidence refs and the category
+blocker. Existing retry/read-model, idempotency, staging, numeric, tamper and
+CAS regressions remain in scope.
+
+VERIFICATION: Focused suite passes 63 tests / 339 assertions after the final
+boundary changes. Full NHK Unit passes 2,077 tests / 11,310 assertions with
+existing warnings/deprecations. PHP lint, git diff check, exact live-ID scan,
+and changed-production Odo scan pass. No schema, migration, deployment, push
+or live mutation was performed.
+
+STATUS=`VIDEO_CATEGORY_CANONICAL_APPLY_AND_OWNER_READBACK_FIXED_LOCALLY / NO_LIVE_MUTATION`.

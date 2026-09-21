@@ -13,4 +13,5 @@ final class AuthorityEndpointResolver implements EndpointRevisionReader {
  public function normalize(NodeReference $r):NodeReference{if(!$this->supports($r->endpoint_type)||!UuidCodec::isValid($r->endpoint_key))throw new InvalidEndpointReference('Authority endpoint key must be UUID.');return $r;}
  public function exists(NodeReference $r):bool{return $this->repo->findByCanonicalId($r->endpoint_key)!==null;}
  public function revision(NodeReference $r):?int{return $this->repo->findByCanonicalId($r->endpoint_key)?->revision;}
+ public function state(NodeReference $r):array { $entity=$this->repo->findByCanonicalId($r->endpoint_key); return ['exists'=>$entity!==null,'active'=>$entity?->active()??false,'revision'=>$entity?->revision,'family'=>$entity?->payload['family']??null]; }
 }

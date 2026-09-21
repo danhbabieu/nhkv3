@@ -16,4 +16,5 @@ final class SourceEndpointResolver implements EndpointRevisionReader
     public function normalize(NodeReference $reference): NodeReference { if (!$this->supports($reference->endpoint_type) || !UuidCodec::isValid($reference->endpoint_key)) throw new InvalidEndpointReference('Source endpoint key must be UUID.'); return $reference; }
     public function exists(NodeReference $reference): bool { return $this->repository->findByCanonicalId($reference->endpoint_key) !== null; }
     public function revision(NodeReference $reference): ?int { return $this->repository->findByCanonicalId($reference->endpoint_key)?->revision; }
+    public function state(NodeReference $reference): array { $item=$this->repository->findByCanonicalId($reference->endpoint_key); return ['exists'=>$item!==null,'active'=>$item?->active??false,'revision'=>$item?->revision,'family'=>null]; }
 }

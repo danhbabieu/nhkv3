@@ -25,4 +25,5 @@ final class MediaEndpointResolver implements EndpointRevisionReader
 
     public function exists(NodeReference $reference): bool { return $this->repository->findByCanonicalId($reference->endpoint_key) !== null; }
     public function revision(NodeReference $reference): ?int { return $this->repository->findByCanonicalId($reference->endpoint_key)?->revision; }
+    public function state(NodeReference $reference): array { $item=$this->repository->findByCanonicalId($reference->endpoint_key); return ['exists'=>$item!==null,'active'=>$item?->active??false,'revision'=>$item?->revision,'family'=>null]; }
 }

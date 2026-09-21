@@ -803,6 +803,48 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
         self::assertSame($videoId, $result['writes'][0]['canonical_readback']['canonical_id']);
     }
 
+    public function test_capture_video_applies_when_category_is_the_only_eligibility_blocker(): void
+    {
+        $videoId = UuidCodec::newV7();
+        $proposalId = UuidCodec::newV7();
+        $proposal = new Proposal($proposalId, $videoId, 'ingest', [
+            'canonical_id' => $videoId,
+            'metadata' => ['category' => ['primary' => null], 'completeness' => ['publishable' => false, 'blockers' => ['CATEGORY_UNRESOLVED']]],
+        ], 'content', null, 'dependency', ProposalState::DRAFT, idempotencyKey: 'capture:category:video', entityType: 'video');
+        $governance = $this->createMock(GovernedLifecycle::class);
+        $governance->expects(self::once())->method('createFromArguments')->willReturn($proposal);
+        $governance->expects(self::once())->method('submit')->with($proposalId)->willReturn($proposal->transition(ProposalState::SUBMITTED));
+        $governance->expects(self::exactly(2))->method('review')->with($proposalId)->willReturnOnConsecutiveCalls(
+            ['state' => 'draft', 'entity_type' => 'video', 'operation' => 'ingest', 'content_fingerprint' => 'content', 'dependency_fingerprint' => 'dependency'],
+            ['state' => 'submitted', 'entity_type' => 'video', 'operation' => 'ingest', 'content_fingerprint' => 'content', 'dependency_fingerprint' => 'dependency'],
+        );
+        $governance->expects(self::once())->method('approve')->with($proposalId, 'content', 'dependency', self::anything())->willReturn($proposal->transition(ProposalState::APPROVED, 'system'));
+        $governance->expects(self::once())->method('eligibility')->with($proposalId)->willReturn(['ready' => false, 'reasons' => ['CATEGORY_UNRESOLVED']]);
+        $service = new GovernedCaptureContinuationService(
+            $governance,
+            static fn (string $id): array => ['canonical_id' => $videoId, 'canonical_readback' => ['canonical_id' => $videoId, 'entity_type' => 'video', 'active' => true, 'revision' => 1]],
+            $this->policies(['video'], ['video' => 'AUTO_PUBLISH']),
+            static fn (string $capability): bool => true,
+        );
+
+        $result = $service->execute('capture-category', 'capture-category:semantic', [
+            'subject_resolution' => ['resolved' => []],
+            'interpretation' => [],
+            'observations' => [],
+            'assets' => [[
+                'kind' => 'video',
+                'video_proposal' => [
+                    'entity_type' => 'video', 'operation' => 'ingest', 'subject_id' => $videoId,
+                    'payload' => ['canonical_id' => $videoId, 'metadata' => ['category' => ['primary' => null], 'completeness' => ['publishable' => false, 'blockers' => ['CATEGORY_UNRESOLVED']]]],
+                ],
+            ]],
+        ]);
+
+        self::assertSame('APPLIED', $result['status'], json_encode($result, JSON_UNESCAPED_UNICODE));
+        self::assertSame($videoId, $result['writes'][0]['canonical_readback']['canonical_id']);
+        self::assertSame($proposalId, $result['writes'][0]['proposal_id']);
+    }
+
     public function test_text_only_existing_capture_addendum_skips_unchanged_video_child_without_reentering_governance(): void
     {
         $governance = $this->createMock(GovernedLifecycle::class);

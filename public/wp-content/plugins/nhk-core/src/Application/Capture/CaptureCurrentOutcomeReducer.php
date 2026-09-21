@@ -23,6 +23,10 @@ final class CaptureCurrentOutcomeReducer
         if (!in_array(strtoupper(trim((string) ($completion['status'] ?? ''))), ['PARTIAL', 'REVIEW_REQUIRED'], true)) {
             return ['eligible' => false, 'reason' => 'CAPTURE_RETRY_NOT_ALLOWED'];
         }
+        $completionBlockers = array_values(array_map('strval', (array) ($completion['blockers'] ?? [])));
+        if (in_array('CATEGORY_UNRESOLVED', $completionBlockers, true) || self::failureCode($capture) === 'CATEGORY_UNRESOLVED') {
+            return ['eligible' => false, 'reason' => 'CAPTURE_RETRY_NOT_ALLOWED'];
+        }
         $hintPacket = is_array($capture->diagnostics['resume_hints'] ?? null)
             ? $capture->diagnostics['resume_hints']
             : (is_array($completion['resume_hints'] ?? null) ? $completion['resume_hints'] : []);

@@ -9,6 +9,7 @@ use NHK\Core\Application\Capture\ContentIntentRouter;
 use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, SubjectResolutionService, TextInputInterpreter};
 use NHK\Core\Contracts\Capture\CaptureRepository;
 use NHK\Core\Domain\Capture\CaptureRecord;
+use NHK\Core\Shared\Uuid\UuidCodec;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -149,6 +150,106 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
         self::assertSame('claim-existing', $result->diagnostics['deep_enrichment']['knowledge_reuse'][0]['claim_id']);
         self::assertSame(88, $result->diagnostics['deep_enrichment']['article_reuse_internal_link'][0]['post_id']);
         self::assertNull($result->diagnostics['deep_enrichment']['new_deep_content_opportunity']);
+    }
+
+    public function test_video_capture_composition_keeps_category_review_separate_from_owner_readback(): void
+    {
+        $captures = new Pr5CaptureRepository();
+        $calls = ['draft' => 0, 'semantic' => 0, 'media' => 0, 'publication' => 0, 'final' => 0];
+        $events = [];
+        $videoId = UuidCodec::newV7();
+        $proposalId = UuidCodec::newV7();
+        $coordinator = $this->coordinator(
+            $captures,
+            $calls,
+            $events,
+            semanticExtra: [
+                'status' => 'APPLIED',
+                'writes' => [[
+                    'entity_type' => 'video',
+                    'operation' => 'ingest',
+                    'proposal_id' => $proposalId,
+                    'status' => 'APPLIED',
+                    'canonical_id' => $videoId,
+                    'canonical_readback' => ['canonical_id' => $videoId, 'entity_type' => 'video', 'active' => true, 'revision' => 2],
+                    'completion' => ['owner_type' => 'video', 'owner_id' => $videoId, 'canonical_state' => 'COMPLETE', 'canonical_readback_verified' => true, 'dependency_state' => 'COMPLETE', 'relation_or_usage_state' => 'COMPLETE', 'content_state' => 'CONTENT_COMPLETE', 'public_state' => 'BLOCKED', 'frontend_state' => 'BLOCKED', 'complete' => false, 'status' => 'PARTIAL', 'blockers' => ['CATEGORY_UNRESOLVED']],
+                    'metadata' => ['category' => ['primary' => null], 'completeness' => ['publishable' => false, 'blockers' => ['CATEGORY_UNRESOLVED']]],
+                ]],
+            ],
+            videoEnrichment: static function (array $input) use ($videoId): array {
+                return [
+                'status' => 'verified',
+                'items' => [[
+                    'kind' => 'video',
+                    'video_proposal' => [
+                        'entity_type' => 'video',
+                        'operation' => 'ingest',
+                        'subject_id' => $videoId,
+                        'payload' => ['canonical_id' => $videoId, 'metadata' => ['category' => ['primary' => null], 'completeness' => ['publishable' => false, 'blockers' => ['CATEGORY_UNRESOLVED']]]],
+                    ],
+                ]],
+                ];
+            },
+            videoPublication: static function (array $input) use ($videoId): array {
+                return [
+                'status' => 'review_required',
+                'items' => [['video_id' => $videoId]],
+                'blockers' => ['CATEGORY_UNRESOLVED'],
+                ];
+            },
+        );
+
+        $result = $coordinator->execute([
+            'idempotency_key' => 'production-shaped-video-category-' . bin2hex(random_bytes(4)),
+            'intent' => 'VIDEO',
+            'purpose' => 'EDITORIAL',
+            'approval_confirmed' => true,
+            'publish' => false,
+            'title' => 'Production-shaped Video review',
+            'text' => 'Video semantic owner remains canonical while publication classification is unresolved.',
+            'video' => ['url' => 'https://youtu.be/' . substr(bin2hex(random_bytes(6)), 0, 11)],
+        ]);
+
+        self::assertSame('REVIEW_REQUIRED', $result->status);
+        self::assertSame($videoId, $result->diagnostics['semantic_write_back']['writes'][0]['canonical_readback']['canonical_id']);
+        self::assertSame($videoId, $result->diagnostics['completion']['required_owners'][0]['owner_id']);
+        self::assertSame([], $result->diagnostics['completion']['missing_required_owners']);
+        self::assertNotContains('REQUIRED_OWNER_READBACK_UNVERIFIED', $result->diagnostics['completion']['blockers']);
+        self::assertSame('verified', $result->diagnostics['final_read_back']['status']);
+        self::assertContains('CATEGORY_UNRESOLVED', $result->diagnostics['video_publication']['blockers']);
+        self::assertNull($result->assets[0]['video_proposal']['payload']['metadata']['category']['primary']);
+    }
+
+    public function test_missing_video_owner_cannot_be_reported_as_verified_final_readback(): void
+    {
+        $captures = new Pr5CaptureRepository();
+        $calls = ['draft' => 0, 'semantic' => 0, 'media' => 0, 'publication' => 0, 'final' => 0];
+        $events = [];
+        $videoId = UuidCodec::newV7();
+        $coordinator = $this->coordinator(
+            $captures,
+            $calls,
+            $events,
+            videoEnrichment: static function (array $input) use ($videoId): array {
+                return ['items' => [['kind' => 'video', 'video_id' => $videoId]]];
+            },
+            videoPublication: static function (array $input) use ($videoId): array {
+                return ['status' => 'review_required', 'items' => [['video_id' => $videoId]], 'blockers' => ['CATEGORY_UNRESOLVED']];
+            },
+        );
+
+        $result = $coordinator->execute([
+            'idempotency_key' => 'production-shaped-video-missing-owner-' . bin2hex(random_bytes(4)),
+            'intent' => 'VIDEO',
+            'purpose' => 'EDITORIAL',
+            'text' => 'Review must not masquerade as owner verification.',
+            'video' => ['url' => 'https://youtu.be/' . substr(bin2hex(random_bytes(6)), 0, 11)],
+        ]);
+
+        self::assertSame('REVIEW_REQUIRED', $result->status);
+        self::assertSame('blocked', $result->diagnostics['final_read_back']['status']);
+        self::assertSame('REQUIRED_OWNER_READBACK_UNVERIFIED', $result->diagnostics['final_read_back']['failure_code']);
+        self::assertContains('REQUIRED_OWNER_READBACK_UNVERIFIED', $result->diagnostics['completion']['blockers']);
     }
 
     /**

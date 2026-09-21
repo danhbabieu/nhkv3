@@ -32,4 +32,20 @@ final class CaptureCurrentOutcomeReducerTest extends TestCase
 
         self::assertSame('SEMANTIC_READBACK_UNAVAILABLE', CaptureCurrentOutcomeReducer::failureCode($capture));
     }
+
+    public function test_unresolved_video_category_is_not_retryable_when_only_owner_is_missing(): void
+    {
+        $capture = new CaptureRecord(
+            UuidCodec::newV7(), 'category-review', hash('sha256', 'category-review'), CaptureStage::SEMANTICS_RECONCILED->value, 'REVIEW_REQUIRED', null, null, [], [],
+            ['completion' => [
+                'status' => 'REVIEW_REQUIRED',
+                'blockers' => ['CATEGORY_UNRESOLVED'],
+                'missing_required_owners' => [['owner_type' => 'video', 'owner_id' => UuidCodec::newV7()]],
+                'resume_hints' => ['resume_children' => ['video']],
+            ]],
+            ['VIDEO_GOVERNANCE' => ['status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'latest' => ['status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'failure_code' => 'CATEGORY_UNRESOLVED']]],
+        );
+
+        self::assertSame(['eligible' => false, 'reason' => 'CAPTURE_RETRY_NOT_ALLOWED'], CaptureCurrentOutcomeReducer::retryEligibility($capture, ['resume_children' => ['video']]));
+    }
 }

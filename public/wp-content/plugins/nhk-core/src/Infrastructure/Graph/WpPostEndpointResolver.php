@@ -21,6 +21,7 @@ final class WpPostEndpointResolver implements EndpointRevisionReader {
         return $this->timestamp($post->post_modified_gmt ?? null, true)
             ?? $this->timestamp($post->post_modified ?? null, false);
     }
+    public function state(NodeReference $reference): array { [, $postId] = array_map('intval', explode(':', $reference->endpoint_key, 2)); $post=$this->post($postId); return ['exists'=>$post!==null,'active'=>$post!==null && (string) ($post->post_status ?? '') !== 'trash','revision'=>$this->revision($reference),'family'=>null]; }
 
     private function timestamp(mixed $value, bool $isGmt): ?int
     {

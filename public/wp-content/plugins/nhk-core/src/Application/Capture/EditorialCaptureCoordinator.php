@@ -817,17 +817,28 @@ final class EditorialCaptureCoordinator
         $diagnostics['final_read_back'] = $this->withoutBody($final);
         if (($final['status'] ?? '') !== 'verified') throw new \RuntimeException('CAPTURE_FINAL_READBACK_UNAVAILABLE');
 
+        $requiredOwners = $this->requiredOwners($intent, $record, $assets, $media, $videoPublication, $writes);
         $completion = $this->completion->aggregateCapture($record->captureId, $this->completionChildren($record, $writes, $media, $videoPublication, [], $final, false), [
             'canonical_state' => 'COMPLETE',
             'canonical_readback' => ['canonical_id' => $record->captureId],
-            'required_owners' => $this->requiredOwners($intent, $record, $assets, $media, $videoPublication, $writes),
+            'required_owners' => $requiredOwners,
         ]);
         $diagnostics['completion'] = $completion;
+        // A Capture-level frontend/final callback cannot promote an absent
+        // governed owner to VERIFIED. Keep canonical-owner verification
+        // separate from publication/final-stage review and make the missing
+        // owner explicit in the final read-back packet.
+        if (($completion['missing_required_owners'] ?? []) !== []) {
+            $diagnostics['final_read_back'] = array_merge(
+                is_array($diagnostics['final_read_back'] ?? null) ? $diagnostics['final_read_back'] : [],
+                ['status' => 'blocked', 'failure_code' => 'REQUIRED_OWNER_READBACK_UNVERIFIED'],
+            );
+        }
         $semanticStatus = strtoupper(trim((string) ($writes['status'] ?? '')));
         $status = ($completion['complete'] ?? false) === true
             ? 'COMPLETE'
             : (in_array($semanticStatus, ['REVIEW_REQUIRED', 'PLANNED', 'APPROVAL_PENDING'], true) || ($videoPublication['blockers'] ?? []) !== [] ? 'REVIEW_REQUIRED' : 'PARTIAL');
-        return $this->save($record, CaptureStage::SEMANTICS_RECONCILED, $assets, $diagnostics, $receipts, 'FINAL_READBACK', null, null, $status, 'VERIFIED');
+        return $this->save($record, CaptureStage::SEMANTICS_RECONCILED, $assets, $diagnostics, $receipts, 'FINAL_READBACK', null, null, $status, ($completion['missing_required_owners'] ?? []) !== [] ? 'BLOCKED' : 'VERIFIED');
     }
 
     /** @param array<string,mixed> $input */
@@ -1187,7 +1198,8 @@ final class EditorialCaptureCoordinator
                 'blockers' => array_merge($articleBlockers, array_values(array_map('strval', (array) ($publication['blockers'] ?? [])))),
             ];
         }
-        foreach ($writes as $write) {
+        $writeItems = is_array($writes['writes'] ?? null) ? $writes['writes'] : $writes;
+        foreach ($writeItems as $write) {
             if (!is_array($write) || !isset($write['completion']) && trim((string) ($write['canonical_id'] ?? '')) === '') continue;
             $type = trim((string) ($write['entity_type'] ?? 'knowledge')) ?: 'knowledge';
             $children[] = is_array($write['completion'] ?? null)

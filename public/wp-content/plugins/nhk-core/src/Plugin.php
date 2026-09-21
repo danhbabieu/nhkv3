@@ -61,7 +61,7 @@ use NHK\Core\Domain\Authority\{CanonicalEntityTypeCatalog, EntityTypeRegistry};
 use NHK\Core\Domain\Capture\CaptureRecord;
 use NHK\Core\Infrastructure\Authority\WpdbAuthorityRepository;
 use NHK\Core\Infrastructure\Audit\WpdbClockTypeClassificationAuditFactory;
-use NHK\Core\Application\Graph\{BrandAggregationQuery, GraphService, PredicateTraversalPolicy, RelatedSemanticQuery, SemanticNeighborhoodQuery, StructuralContextQuery};
+use NHK\Core\Application\Graph\{BrandAggregationQuery, GraphService, PredicateTraversalPolicy, RelatedSemanticQuery, SemanticNeighborhoodQuery, StructuralContextQuery, RelationshipReadService};
 use NHK\Core\Application\Graph\{LegacyRelationPlanner, RelationBackfillCandidate, RelationBackfillService};
 use NHK\Core\Application\Inventory\{CanonicalInventoryService, GraphInventoryService};
 use NHK\Core\Domain\Graph\{EndpointTypeRegistry, PredicateRegistry};
@@ -167,7 +167,8 @@ final class Plugin {
             $canonicalInventory = self::canonicalInventory($types, $authority, $media, $videos, $claims, $sources, $evidence);
             $graphInventory = new GraphInventoryService($graphRepository, $graphEndpoints, $predicates);
             $relationBackfill = self::relationBackfill($canonicalInventory, $graphInventory);
-            McpAbilityRegistration::registerReadAbilities(new McpReadHandler($authority, $types, $media, $assets, $usages, $videos, $claims, $evidence, new MigrationStatus(), $sources, null, new McpSemanticContextResolver($authority, $types), $wordpressAttachments, $neighborhood, $canonicalInventory, $graphInventory, $relationBackfill, new WpdbMediaBindingOperationRepository($wpdb), $captureRepository));
+            $relationshipRead = new RelationshipReadService($graphEndpoints, $predicates, $graphRepository);
+            McpAbilityRegistration::registerReadAbilities(new McpReadHandler($authority, $types, $media, $assets, $usages, $videos, $claims, $evidence, new MigrationStatus(), $sources, null, new McpSemanticContextResolver($authority, $types), $wordpressAttachments, $neighborhood, $canonicalInventory, $graphInventory, $relationBackfill, new WpdbMediaBindingOperationRepository($wpdb), $captureRepository, $relationshipRead));
             McpAbilityRegistration::registerCapabilityGatedReadAbilities();
             McpAbilityRegistration::registerGovernedAbilities();
         });
@@ -569,7 +570,8 @@ final class Plugin {
             $canonicalInventory = self::canonicalInventory($types, $authority, $media, $videos, $claims, $sources, $evidence);
             $graphInventory = new GraphInventoryService($graphRepository, $endpoints, $predicates);
             $relationBackfill = self::relationBackfill($canonicalInventory, $graphInventory);
-            $mcpRead = new McpReadHandler($authority, $types, $media, $assets, $usages, $videos, $claims, $evidence, new MigrationStatus(), $sources, null, new McpSemanticContextResolver($authority, $types), $wordpressAttachments, $mcpNeighborhood, $canonicalInventory, $graphInventory, $relationBackfill, null, $captureRepository);
+            $relationshipRead = new RelationshipReadService($endpoints, $predicates, $graphRepository);
+            $mcpRead = new McpReadHandler($authority, $types, $media, $assets, $usages, $videos, $claims, $evidence, new MigrationStatus(), $sources, null, new McpSemanticContextResolver($authority, $types), $wordpressAttachments, $mcpNeighborhood, $canonicalInventory, $graphInventory, $relationBackfill, null, $captureRepository, $relationshipRead);
             // Relations are governed semantic children of Capture article
             // reconciliation (for example, a post --about--> classification
             // binding). Register the existing relation boundary alongside

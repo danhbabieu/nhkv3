@@ -1143,13 +1143,27 @@ final class GovernedCaptureContinuationService
         $lifecycle[] = 'ELIGIBILITY';
         if (($eligibility['ready'] ?? false) !== true) {
             $reasons = array_values(array_map('strval', (array) ($eligibility['reasons'] ?? ['PROPOSAL_NOT_ELIGIBLE'])));
+            // Hub classification is a publication/navigation concern. A
+            // Video with an otherwise valid governed command must still cross
+            // Proposal -> Eligibility -> Controlled Apply when this is the
+            // only reported reason; the unresolved category remains in the
+            // canonical metadata for publication readiness.
+            $categoryOnly = $proposal->entityType === 'video'
+                && $proposal->operation === 'ingest'
+                && $reasons !== []
+                && array_diff($reasons, ['CATEGORY_UNRESOLVED']) === [];
+            if ($categoryOnly) {
+                $eligibility['ready'] = true;
+            }
+            if (!$categoryOnly) {
             // A historical Video Proposal can remain subject-bound and
             // approved while its payload predates the canonical Evidence
             // attachment rebuilt during Capture resume. Re-enter the existing
             // governed reconciliation seam before returning the stale
             // eligibility blocker; never edit or silently execute that
             // historical command.
-            if ($this->videoReconciliation !== null
+            if (($eligibility['ready'] ?? false) !== true
+                && $this->videoReconciliation !== null
                 && $proposal->entityType === 'video'
                 && $proposal->operation === 'ingest'
                 && $proposal->state === ProposalState::APPROVED
@@ -1166,6 +1180,7 @@ final class GovernedCaptureContinuationService
                 if (is_array($reconciled) && ($reconciled['status'] ?? '') !== '') return $reconciled;
             }
             return ['proposal_id' => $proposal->id, 'status' => 'SYSTEM_BLOCKED', 'blockers' => $reasons];
+            }
         }
         $applied = ($this->apply)($proposal->id);
         if (($plan['repair'] ?? false) === true && $this->knowledgeRepairPreview !== null) {

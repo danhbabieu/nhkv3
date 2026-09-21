@@ -233,7 +233,7 @@ final class VideoRelationLifecycleTest extends TestCase
                 'source' => ['identity_valid' => true, 'availability' => 'available', 'embeddable' => true],
                 'source_rights' => 'PUBLIC_EXTERNAL_REFERENCE',
                 'editorial' => ['title' => 'Video lifecycle', 'summary' => 'Summary', 'body' => 'Body'],
-                'category' => ['primary' => ['key' => '01']],
+                'category' => ['primary' => null],
                 'embed_url' => 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
                 'seo' => ['title' => 'Video lifecycle', 'description' => 'Summary'],
                 'semantic_attachments' => [[
@@ -246,7 +246,10 @@ final class VideoRelationLifecycleTest extends TestCase
         self::assertFalse((bool) $endpointStateAtCreate);
         self::assertTrue($video->active);
         self::assertSame($videoId, $videos->findByCanonicalId($videoId)?->canonicalId);
-        self::assertSame([], $video->metadata['completeness']['blockers']);
+        self::assertContains('CATEGORY_UNRESOLVED', $video->metadata['completeness']['blockers']);
+        self::assertFalse($video->metadata['completeness']['publishable']);
+        self::assertSame([['evidence_id' => $evidenceId]], $video->metadata['semantic_attachments'][0]['evidence_refs']);
+        self::assertCount(1, $graph->findOutgoing(new NodeReference('video', $videoId), 'about', 0, 10, false)['items']);
     }
 
     public function test_video_update_keeps_an_inverse_about_edge_without_creating_a_duplicate_forward_edge(): void

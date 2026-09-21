@@ -350,6 +350,16 @@ final class AuthorityProposalExecutor
         $metadata = $video->metadata;
         if ($attachments !== []) $metadata['semantic_attachments'] = $attachments;
         $result = ($this->completeness ?? new VideoCompletenessPolicy())->evaluate($metadata);
-        if (!$result->publishable) throw new \RuntimeException('VIDEO_COMPLETENESS_BLOCKED:' . implode(',', $result->blockers));
+        // Hub classification is a publication/navigation concern. It must
+        // remain visible in canonical metadata and keep the Video
+        // non-publishable, but it cannot veto a governed owner whose source,
+        // editorial payload and semantic attachment have already passed
+        // canonical read-back. Every other completeness blocker remains a
+        // fail-closed Controlled Apply guard.
+        $canonicalBlockers = array_values(array_filter(
+            $result->blockers,
+            static fn (string $blocker): bool => $blocker !== 'CATEGORY_UNRESOLVED',
+        ));
+        if ($canonicalBlockers !== []) throw new \RuntimeException('VIDEO_COMPLETENESS_BLOCKED:' . implode(',', $canonicalBlockers));
     }
 }

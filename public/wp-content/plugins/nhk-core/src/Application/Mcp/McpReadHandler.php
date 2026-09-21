@@ -23,6 +23,7 @@ use NHK\Core\Application\Inventory\{CanonicalInventoryService, GraphInventorySer
 use NHK\Core\Application\Graph\RelationBackfillService;
 use NHK\Core\Application\Presentation\LatestFirstOrder;
 use NHK\Core\Application\Capture\CaptureCurrentOutcomeReducer;
+use NHK\Core\Application\Graph\RelationshipReadService;
 
 final class McpReadHandler
 {
@@ -46,6 +47,7 @@ final class McpReadHandler
         private ?RelationBackfillService $relationBackfill = null,
         private ?MediaBindingOperationRepository $mediaBindingOperations = null,
         private ?CaptureRepository $captures = null,
+        private ?RelationshipReadService $relationships = null,
     ) { $this->delivery ??= PublicMediaAssetDelivery::fromEnvironment($assets, $media); }
 
     public function entityGet(string $type, string $id): ?array
@@ -193,6 +195,11 @@ final class McpReadHandler
         $report = $this->graphInventory->inventory($filters, $limit, $after);
         return $report->reason !== null ? ['status' => 'unavailable', 'reason' => $report->reason] : ['status' => 'available'] + $report->toArray();
     }
+
+    public function relationshipRegistry(): array { return $this->relationships?->registry() ?? ['status' => 'unavailable', 'reason' => 'RELATIONSHIP_REGISTRY_UNAVAILABLE']; }
+    public function relationshipList(array $filters, int $limit = 50, ?string $after = null): array { return $this->relationships?->list($filters, $limit, $after) ?? ['status' => 'unavailable', 'reason' => 'RELATIONSHIP_READ_UNAVAILABLE']; }
+    public function relationshipGet(string $id): array { return $this->relationships?->get($id) ?? ['status' => 'unavailable', 'reason' => 'RELATIONSHIP_READ_UNAVAILABLE']; }
+    public function relationshipPreview(array $input): array { return $this->relationships?->preview($input) ?? ['status' => 'unavailable', 'reason' => 'RELATIONSHIP_PREVIEW_UNAVAILABLE']; }
 
     public function relationBackfillDryRun(array $records): array
     {

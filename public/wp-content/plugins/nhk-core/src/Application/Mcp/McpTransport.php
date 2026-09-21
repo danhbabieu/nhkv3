@@ -147,7 +147,7 @@ final class McpTransport
         SingleEntryPointPolicy::guard($name, $this->can);
         $capability = match ($name) {
             'nhk.documentation.bootstrap', 'nhk.documentation.get', 'nhk.documentation.list', 'nhk.docs.bootstrap', 'nhk.docs.get' => 'read',
-            'nhk.article.preflight' => 'read',
+            'nhk.article.preflight', 'nhk.relationship.registry', 'nhk.relationship.list', 'nhk.relationship.get', 'nhk.relationship.preview' => 'read',
             'nhk.article.ingest' => 'nhk_ingest_articles',
             'nhk.capture.ingest' => 'nhk_ingest_articles',
             'nhk.category.create', 'nhk.category.update', 'nhk.category.assign', 'nhk.category.unassign', 'nhk.category.delete', 'nhk.article.draft.create', 'nhk.article.draft.update', 'nhk.article.publish', 'nhk.article.publish.review', 'nhk.article.publish.approve', 'nhk.article.trash', 'nhk.article.restore' => 'nhk_ingest_articles',
@@ -180,6 +180,10 @@ final class McpTransport
             'nhk.search' => $this->read->search((string) ($arguments['q'] ?? ''), (int) ($arguments['page'] ?? 1), (int) ($arguments['per_page'] ?? 20)),
             'nhk.canonical.inventory' => $this->read->canonicalInventory((array) ($arguments['filters'] ?? []), (int) ($arguments['limit'] ?? 50), isset($arguments['after']) ? (string) $arguments['after'] : null),
             'nhk.graph.inventory' => $this->read->graphInventory((array) ($arguments['filters'] ?? []), (int) ($arguments['limit'] ?? 50), isset($arguments['after']) ? (string) $arguments['after'] : null),
+            'nhk.relationship.registry' => $this->read->relationshipRegistry(),
+            'nhk.relationship.list' => $this->read->relationshipList((array) ($arguments['filters'] ?? []), (int) ($arguments['limit'] ?? 50), isset($arguments['after']) ? (string) $arguments['after'] : null),
+            'nhk.relationship.get' => $this->read->relationshipGet((string) ($arguments['id'] ?? '')),
+            'nhk.relationship.preview' => $this->read->relationshipPreview($arguments),
             'nhk.relation.backfill.dry_run' => $this->read->relationBackfillDryRun((array) ($arguments['records'] ?? [])),
             'nhk.relation.backfill.apply' => $this->governance->relationBatchApply((array) ($arguments['candidates'] ?? []), (bool) ($arguments['approval_confirmed'] ?? false)),
             'nhk.semantic.resolve' => $this->read->semanticResolve((array) ($arguments['context'] ?? [])),
