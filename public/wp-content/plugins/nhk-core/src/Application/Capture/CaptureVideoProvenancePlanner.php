@@ -401,7 +401,11 @@ final class CaptureVideoProvenancePlanner
             $metadata[$key]['thumbnail_selection'] = $selection;
         }
         if (!is_array($metadata['source'] ?? null)) $metadata['source'] = ['thumbnail_selection' => $selection];
-        $metadata['thumbnail_selection'] = $selection;
+        // Thumbnail selection is owned by the canonical source snapshot. Do
+        // not create a second metadata-level copy that can drift after the
+        // governed command is signed; SEO/VideoObject projections derive from
+        // this source-owned field.
+        unset($metadata['thumbnail_selection'], $metadata['thumbnail_presentation']);
         $payload['metadata'] = $metadata;
         $video['payload'] = $payload;
         return $video;

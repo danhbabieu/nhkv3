@@ -417,6 +417,7 @@ final class StagingAcceptanceScopeVerifier
             'subject' => ['type' => $subjectType, 'uuid' => $subjectId, 'revision' => max(0, (int) ($subjectPacket['revision'] ?? $plan['subject_revision'] ?? 0))],
             'plan_fingerprint' => $planFingerprint, 'proposal_command_fingerprint' => $proposalCommandFingerprint,
             'signed_normalized_descriptor' => $descriptor->diagnosticValue(),
+            'signed_normalized_semantic_payload' => $descriptor->semanticPayloadDiagnostic(),
             'dependency_ids' => array_values(array_map('strval', (array) ($descriptor->payload['dependency_ids'] ?? []))),
             'dependency_fingerprint' => $descriptor->dependencyFingerprint,
             'issued_at' => gmdate('c'), 'expires_at' => gmdate('c', time() + max(1, $this->ttlSeconds)),
@@ -543,7 +544,19 @@ final class StagingAcceptanceScopeVerifier
             'SIGNED_NORMALIZED_DESCRIPTOR' => $signed,
             'VERIFIED_NORMALIZED_DESCRIPTOR' => $verified->diagnosticValue(),
             'DESCRIPTOR_DIFF' => $signed === null ? [['path' => 'signed_normalized_descriptor', 'signed_type' => 'missing', 'verified_type' => 'object', 'signed_hash' => hash('sha256', 'missing'), 'verified_hash' => hash('sha256', CommandCanonicalizer::canonicalize($verified->diagnosticValue()))]] : self::safeDiagnosticDiff($signed, $verified->diagnosticValue()),
+            'SIGNED_NORMALIZED_SEMANTIC_PAYLOAD' => is_array($scope['signed_normalized_semantic_payload'] ?? null) ? $scope['signed_normalized_semantic_payload'] : null,
+            'VERIFIED_NORMALIZED_SEMANTIC_PAYLOAD' => $verified->semanticPayloadDiagnostic(),
+            'PAYLOAD_DIFF' => self::safePayloadDiff($scope, $verified),
         ];
+    }
+
+    /** @return list<array<string,mixed>> */
+    private static function safePayloadDiff(array $scope, StagingOperationDescriptor $verified): array
+    {
+        $signed = is_array($scope['signed_normalized_semantic_payload'] ?? null) ? $scope['signed_normalized_semantic_payload'] : null;
+        if ($signed === null) return [['path' => 'signed_normalized_semantic_payload', 'signed_type' => 'missing', 'verified_type' => 'object', 'signed_hash' => hash('sha256', 'missing'), 'verified_hash' => hash('sha256', CommandCanonicalizer::canonicalize($verified->semanticPayloadDiagnostic())), 'presence' => ['signed' => false, 'verified' => true]]];
+        if (($signed['tree_hash'] ?? '') === $verified->semanticPayloadDiagnostic()['tree_hash']) return [];
+        return [['path' => 'payload', 'signed_type' => 'normalized_semantic_payload', 'verified_type' => 'normalized_semantic_payload', 'signed_hash' => (string) ($signed['tree_hash'] ?? ''), 'verified_hash' => $verified->semanticPayloadDiagnostic()['tree_hash'], 'presence' => ['signed' => true, 'verified' => true]]];
     }
 
     /** @param array<string,mixed> $signed @param array<string,mixed> $verified @return list<array<string,string>> */

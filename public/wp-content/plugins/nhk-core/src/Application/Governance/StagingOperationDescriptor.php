@@ -154,6 +154,37 @@ final readonly class StagingOperationDescriptor
         ];
     }
 
+    /**
+     * Bounded metadata for the normalized semantic payload. The payload tree
+     * itself is never returned because it may contain private source prose or
+     * dependency material.
+     *
+     * @return array{tree_hash:string,top_level_keys:list<string>,byte_length:int}
+     */
+    public function semanticPayloadDiagnostic(): array
+    {
+        $canonical = CommandCanonicalizer::canonicalize($this->payload);
+        return [
+            'tree_hash' => hash('sha256', $canonical),
+            'top_level_keys' => array_values(array_map('strval', array_keys($this->payload))),
+            'byte_length' => strlen($canonical),
+        ];
+    }
+
+    /**
+     * Compare normalized semantic payloads without exposing their values.
+     * Presence is explicit so a missing nested field cannot be confused with
+     * a null field. The list is bounded for hostile or unexpectedly large
+     * payloads.
+     *
+     * @return list<array{path:string,signed_type:string,verified_type:string,signed_hash:string,verified_hash:string,presence:array{signed:bool,verified:bool}}>
+     */
+    public static function semanticPayloadDiff(self $signed, self $verified): array
+    {
+        $remaining = 64;
+        return self::boundedSemanticDiff($signed->payload, $verified->payload, '', true, true, $remaining);
+    }
+
     /** @return array{path:string,signed_type:string,verified_type:string,signed_hash:string,verified_hash:string}[] */
     public static function diagnosticDiff(self $signed, self $verified): array
     {
@@ -205,6 +236,49 @@ final readonly class StagingOperationDescriptor
         }
         if ($signedExists === $verifiedExists && $signed === $verified) return [];
         return [['path' => $path, 'signed' => $signedExists ? $signed : '<missing>', 'verified' => $verifiedExists ? $verified : '<missing>']];
+    }
+
+    /** @return list<array{path:string,signed_type:string,verified_type:string,signed_hash:string,verified_hash:string,presence:array{signed:bool,verified:bool}}> */
+    private static function boundedSemanticDiff(mixed $signed, mixed $verified, string $path, bool $signedExists, bool $verifiedExists, int &$remaining): array
+    {
+        if ($remaining < 1) return [];
+        if ($signedExists && $verifiedExists && is_array($signed) && is_array($verified)) {
+            $paths = [];
+            foreach (array_unique(array_merge(array_keys($signed), array_keys($verified)), SORT_REGULAR) as $key) {
+                $paths[] = self::boundedSemanticDiff(
+                    $signed[$key] ?? null,
+                    $verified[$key] ?? null,
+                    $path === '' ? (string) $key : $path . '.' . $key,
+                    array_key_exists($key, $signed),
+                    array_key_exists($key, $verified),
+                    $remaining,
+                );
+                if ($remaining < 1) break;
+            }
+            return array_merge(...$paths) ?: [];
+        }
+        if ($signedExists && $verifiedExists && self::sameSemanticValue($signed, $verified)) return [];
+        --$remaining;
+        return [[
+            'path' => substr($path, 0, 180),
+            'signed_type' => $signedExists ? get_debug_type($signed) : 'missing',
+            'verified_type' => $verifiedExists ? get_debug_type($verified) : 'missing',
+            'signed_hash' => self::semanticValueHash($signedExists ? $signed : null, $signedExists),
+            'verified_hash' => self::semanticValueHash($verifiedExists ? $verified : null, $verifiedExists),
+            'presence' => ['signed' => $signedExists, 'verified' => $verifiedExists],
+        ]];
+    }
+
+    private static function sameSemanticValue(mixed $left, mixed $right): bool
+    {
+        if (is_array($left) && is_array($right)) return CommandCanonicalizer::canonicalize($left) === CommandCanonicalizer::canonicalize($right);
+        return get_debug_type($left) === get_debug_type($right) && $left === $right;
+    }
+
+    private static function semanticValueHash(mixed $value, bool $present): string
+    {
+        if (!$present) return hash('sha256', '<missing>');
+        return hash('sha256', is_array($value) ? CommandCanonicalizer::canonicalize($value) : (get_debug_type($value) . ':' . var_export($value, true)));
     }
 
     /**
