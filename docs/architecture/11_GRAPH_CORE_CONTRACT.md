@@ -103,6 +103,14 @@ cardinality rồi resolve node và insert edge. Exact ACTIVE triple trả edge c
 không tăng revision. Triple RETIRED không tự resurrect; chỉ explicit reactivate.
 Cardinality violation fail rõ ràng, không auto-retire edge cũ.
 
+The read-only relationship preview applies the same generic transition rule:
+`ADD` against an exact ACTIVE triple is an idempotent `RELATION_NO_OP` and
+returns the existing `relation_id` plus `current_revision` in its planned
+transition/read-back. It creates no Proposal and performs no mutation. `ADD`
+against a RETIRED triple remains blocked with
+`RELATION_RETIRED_REACTIVATION_REQUIRED`; no predicate or owner-specific
+special case is permitted.
+
 Retire giữ row, set state/retired_at và tăng revision. Reactivate validate lại,
 xóa retired_at và tăng revision. expected revision mismatch ném typed
 `RelationRevisionConflict`.

@@ -1,5 +1,22 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-21 — Unified Relationship R1 active-triple preview no-op (LOCAL / NO LIVE MUTATION)
+
+FIXED_GAP: Generic `nhk.relationship.preview` transition planning now emits
+`RELATION_NO_OP` with `reason=ALREADY_ACTIVE`, `idempotent=true`,
+`relation_id` and `current_revision` when `ADD` resolves the exact existing
+ACTIVE source/predicate/target triple. The preview remains read-only: it does
+not create a Proposal or mutate Graph state. `ADD` against RETIRED remains
+`RELATION_RETIRED_REACTIVATION_REQUIRED`; no predicate/Odo special case was
+added, and existing R1 registry/list/get/preview behavior remains unchanged.
+
+VERIFICATION: Relationship/Graph focused suite 38 tests / 132 assertions;
+full NHK Unit 2,079 tests / 11,326 assertions; NHK Contract 6 tests / 48
+assertions; MCP schema parity 3 tests / 596 assertions; PHP lint and
+`git diff --check` pass. No schema/migration or live mutation was performed.
+
+STATUS: `RELATIONSHIP_R1_ACTIVE_TRIPLE_NO_OP_FIXED_LOCAL / UNIT_PASS / CONTRACT_PASS / SCHEMA_PARITY_PASS / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-21 — Unified Relationship R1 read-only control plane (LOCAL / NO LIVE MUTATION)
 
 SCOPE: Added the read-only `nhk.relationship.registry`, `.list`, `.get` and

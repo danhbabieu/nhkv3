@@ -51,6 +51,25 @@ final class RelationshipReadServiceTest extends TestCase
         self::assertSame($before, $this->repository->allEdges());
     }
 
+    public function test_preview_add_of_exact_active_triple_is_idempotent_no_op_with_relation_read_back(): void
+    {
+        $edge = $this->repository->createEdge($this->repository->resolveNode(new NodeReference('model', $this->model)), $this->predicates->get('model_of'), $this->repository->resolveNode(new NodeReference('brand', $this->brand)));
+        $before = $this->repository->allEdges();
+
+        $result = $this->service->preview(['operation' => 'ADD', 'source' => ['type' => 'model', 'id' => $this->model], 'target' => ['type' => 'brand', 'id' => $this->brand], 'predicate' => 'model_of', 'provenance' => 'EXPLICIT_USER_KNOWLEDGE']);
+
+        self::assertTrue($result['safe_to_apply']);
+        self::assertSame('ACTIVE', $result['current_state']);
+        self::assertSame($edge->edge_uuid, $result['planned_transition'][0]['relation_id']);
+        self::assertSame($edge->revision, $result['planned_transition'][0]['current_revision']);
+        self::assertSame('RELATION_NO_OP', $result['planned_transition'][0]['action']);
+        self::assertSame('ALREADY_ACTIVE', $result['planned_transition'][0]['reason']);
+        self::assertTrue($result['planned_transition'][0]['idempotent']);
+        self::assertSame($edge->edge_uuid, $result['current_relationships'][0]['edge_uuid']);
+        self::assertSame($edge->revision, $result['current_relationships'][0]['revision']);
+        self::assertSame($before, $this->repository->allEdges());
+    }
+
     public function test_invalid_endpoint_predicate_and_cardinality_fail_closed(): void
     {
         $invalid = $this->service->preview(['operation' => 'ADD', 'source' => ['type' => 'model', 'id' => $this->model], 'target' => ['type' => 'brand', 'id' => $this->brand], 'predicate' => 'not_registered']);
