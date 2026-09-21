@@ -92,7 +92,7 @@ final class StagingAcceptanceScope
             $scopeRevision = (int) ($scope['expected_revision'] ?? 0);
             $proposalRevision = (int) ($proposal->expectedRevision ?? 0);
             if ($scopeRevision !== $proposalRevision) throw new \RuntimeException('STAGING_EXPECTED_REVISION_SCOPE_MISMATCH');
-            foreach (['platform', 'external_video_id', 'canonical_source_url', 'plan_fingerprint', 'proposal_command_fingerprint'] as $field) {
+            foreach (['platform', 'external_video_id', 'canonical_source_url', 'plan_fingerprint'] as $field) {
                 if (!array_key_exists($field, $scope)) continue;
                 $proposalValue = $proposal->payload[$field] ?? null;
                 if ($proposalValue !== null && (string) $scope[$field] !== (string) $proposalValue) throw new \RuntimeException('STAGING_VIDEO_BINDING_MISMATCH');

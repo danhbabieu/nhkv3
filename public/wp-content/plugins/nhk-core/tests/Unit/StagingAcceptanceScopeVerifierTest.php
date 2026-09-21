@@ -28,6 +28,10 @@ final class StagingAcceptanceScopeVerifierTest extends TestCase
         ];
         $capture = new CaptureRecord($captureId, 'capture-video', hash('sha256', 'capture-video'), 'SEMANTICS_RECONCILED', 'IN_PROGRESS', null, null, [['kind' => 'video', 'video_proposal' => ['payload' => $capturePayload]]], ['purpose' => 'EDITORIAL', 'content_intent' => ['intent' => 'VIDEO']], [], [], 40);
         $finalPayload = $capturePayload;
+        // This legacy mirrored value is not command truth. Retry rebuilds a
+        // fresh signed fingerprint and the verifier must recompute from the
+        // normalized payload rather than compare the stale projection field.
+        $finalPayload['proposal_command_fingerprint'] = hash('sha256', 'stale-command');
         $finalPayload['metadata']['subject_resolution_packet'] = ['type' => 'classification', 'id' => $finalSubject, 'revision' => 2];
         $finalPayload['metadata']['semantic_attachments'] = [['predicate' => 'about', 'target_type' => 'classification', 'target_uuid' => $finalSubject, 'evidence_refs' => [['evidence_id' => UuidCodec::newV7()]], 'confidence' => 1.0]];
         $plan = ['entity_type' => 'video', 'operation' => 'ingest', 'subject_id' => $videoId, 'payload' => $finalPayload, 'proposed_uuid' => $videoId, 'idempotency_key' => 'video-reconcile-final', 'plan_fingerprint' => hash('sha256', 'final-plan')];
@@ -42,6 +46,12 @@ final class StagingAcceptanceScopeVerifierTest extends TestCase
         $scope = $verifier->issueForVideoPlan($capture, $plan);
         $proposal = new Proposal(UuidCodec::newV7(), $videoId, 'ingest', $finalPayload + ['capture_id' => $captureId, 'capture_fingerprint' => $capture->requestFingerprint, 'staging_acceptance' => $scope], 'content', null, 'dependency', ProposalState::APPROVED, idempotencyKey: 'video-reconcile-final', targetUuid: null, entityType: 'video');
         self::assertTrue($verifier->verifyProposal($scope, $proposal));
+        self::assertNull($verifier->proposalFailureReason($scope, $proposal));
+
+        $changedPayload = $proposal->payload;
+        $changedPayload['title'] = 'changed after approval';
+        $stale = new Proposal($proposal->id, $proposal->subjectId, $proposal->operation, $changedPayload, $proposal->contentFingerprint, $proposal->expectedRevision, $proposal->dependencyFingerprint, $proposal->state, idempotencyKey: $proposal->idempotencyKey, targetUuid: $proposal->targetUuid, entityType: $proposal->entityType);
+        self::assertSame('STAGING_VIDEO_PAYLOAD_MISMATCH', $verifier->proposalFailureReason($scope, $stale));
     }
 
     public function test_capture_child_relation_scope_is_exact_and_non_transferable(): void

@@ -79,12 +79,13 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
         $plan = $method->invoke($service, UuidCodec::newV7(), [
             'entity_type' => 'video', 'operation' => 'ingest', 'subject_id' => $videoId,
             'dependency_ids' => [UuidCodec::newV7(), UuidCodec::newV7()],
-            'payload' => ['canonical_id' => $videoId, 'metadata' => ['source' => ['platform' => 'youtube', 'external_video_id' => 'TA2haJAn3EM']]],
+            'payload' => ['canonical_id' => $videoId, 'proposal_command_fingerprint' => hash('sha256', 'stale-command'), 'metadata' => ['source' => ['platform' => 'youtube', 'external_video_id' => 'TA2haJAn3EM']]],
         ], []);
         self::assertIsArray($captured);
         self::assertMatchesRegularExpression('/^[a-f0-9]{64}$/', (string) ($captured['plan_fingerprint'] ?? ''));
         self::assertTrue((bool) ($plan['payload']['staging_acceptance']['approved'] ?? false));
         self::assertSame((string) $captured['plan_fingerprint'], (string) ($plan['plan_fingerprint'] ?? ''));
+        self::assertArrayNotHasKey('proposal_command_fingerprint', $plan['payload']);
     }
 
     public function test_existing_capture_video_resume_does_not_turn_applied_missing_evidence_receipt_into_a_proposal_skip(): void

@@ -49,6 +49,20 @@ final class ProposalEligibilityServiceTest extends TestCase
         self::assertSame(['CANONICAL_EVIDENCE_REQUIRED'], $service->check($proposal->id)->reasons);
     }
 
+    public function test_video_scope_verifier_mismatch_is_not_collapsed_into_not_approved(): void
+    {
+        $proposal = new Proposal(self::ID, self::SUBJECT, 'ingest', [
+            'canonical_id' => self::SUBJECT,
+            'capture_id' => '01a0b2e0-1888-7038-9811-2dd7e7073a27',
+            'staging_acceptance' => ['approved' => true],
+            'metadata' => [],
+        ], 'video-content', null, 'video-dependency', ProposalState::APPROVED, idempotencyKey: 'video-scope-diagnostic', entityType: 'video');
+        $service = $this->service($proposal);
+        $service->setStagingScopeVerifier(static fn (Proposal $checked): string => 'STAGING_VIDEO_PAYLOAD_MISMATCH');
+
+        self::assertContains('STAGING_VIDEO_PAYLOAD_MISMATCH', $service->check($proposal->id)->reasons);
+    }
+
     public function test_explicit_video_subject_packet_is_authoritative_over_unresolved_title_hint(): void
     {
         $proposal = $this->proposal([

@@ -10,7 +10,7 @@ use NHK\Core\Domain\Governance\{DependencyGraph, EligibilityResult, ProposalStat
 
 final class ProposalEligibilityService
 {
-    /** @var callable(\NHK\Core\Domain\Governance\Proposal):bool|null */
+    /** @var callable(\NHK\Core\Domain\Governance\Proposal):bool|string|null */
     private $stagingScopeVerifier = null;
     public function __construct(private ProposalRepository $proposals, private DependencyGraph $dependencies, private EligibilityReader $reader, private ?VideoProposalEligibilityEvaluator $video = null, private ?ClassifiedAsPolicy $classifiedAs = null, private ?MediaUsageRepository $mediaUsages = null) {}
 
@@ -35,7 +35,11 @@ final class ProposalEligibilityService
         if ($this->stagingScopeVerifier !== null && $proposal->entityType === 'video' && in_array($proposal->operation, ['ingest', 'update'], true) && array_key_exists('capture_id', $proposal->payload)) {
             $scope = $proposal->payload['staging_acceptance'] ?? null;
             if (!is_array($scope)) $reasons[] = 'STAGING_SCOPE_REQUIRED';
-            elseif (!(bool) ($this->stagingScopeVerifier)($proposal)) $reasons[] = 'STAGING_SCOPE_NOT_APPROVED';
+            else {
+                $verification = ($this->stagingScopeVerifier)($proposal);
+                if (is_string($verification) && $verification !== '') $reasons[] = $verification;
+                elseif ($verification !== true) $reasons[] = 'STAGING_SCOPE_NOT_APPROVED';
+            }
         }
         $isCreation = in_array($proposal->operation, ['create', 'ingest'], true) && $proposal->targetUuid === null;
         // relation_create carries typed endpoint keys in its payload. A

@@ -603,7 +603,12 @@ final class GovernedCaptureContinuationService
     {
         if (($plan['entity_type'] ?? '') !== 'video' || !in_array((string) ($plan['operation'] ?? ''), ['ingest', 'update'], true) || !is_callable($this->videoScopeIssuer)) return $plan;
         if (!is_array($plan['payload'] ?? null)) $plan['payload'] = [];
-        unset($plan['payload']['staging_acceptance'], $plan['payload']['capture_fingerprint'], $plan['payload']['scope_fingerprint']);
+        unset(
+            $plan['payload']['staging_acceptance'],
+            $plan['payload']['capture_fingerprint'],
+            $plan['payload']['scope_fingerprint'],
+            $plan['payload']['proposal_command_fingerprint'],
+        );
         // A resumed Video may have been reconstructed after Source/Claim/
         // Evidence read-back. The staging packet must be derived from this
         // exact final command, never from the historical child scope.

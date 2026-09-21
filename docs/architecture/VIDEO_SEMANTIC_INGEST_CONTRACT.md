@@ -241,10 +241,21 @@ orchestration parent after the final Video plan is built. The final governed
 Video plan is the only semantic command source for Proposal, staging scope,
 admission, eligibility and Controlled Apply. Required Source → Claim → Evidence
 dependencies are read back before an Evidence-backed relation can enter the
-executable scope. Historical approved proposals are never edited; stale payloads
-re-enter governed reconciliation and receive a fresh scope bound to the final
-command. Successful retries reuse Capture, Video, dependency and Graph
-identities. Public Identity is allocated only after canonical Video read-back.
+executable scope. The canonical staging authorization owner is the server-issued
+signed scope packet (issued by `StagingAcceptanceScopeVerifier` after exact
+staging admission); Proposal payload persistence is its immutable transport
+snapshot, not a second approval owner. Governance Proposal approval is a
+separate durable approval bound to Proposal revision and binding fingerprint.
+Eligibility and Controlled Apply verify the same packet from that Proposal
+payload. Retry rebuilds a fresh scope from the final command and removes stale
+mirrored `proposal_command_fingerprint` fields; verification recomputes the
+command hash from normalized payload and dependencies rather than trusting that
+mirror. Scope binding failures retain their specific machine-readable reason
+instead of collapsing into `STAGING_SCOPE_NOT_APPROVED`. Historical approved
+proposals are never edited; stale payloads re-enter governed reconciliation and
+receive a fresh scope bound to the final command. Successful retries reuse
+Capture, Video, dependency and Graph identities. Public Identity is allocated
+only after canonical Video read-back.
 
 Regression coverage includes URL identity normalization, VIDEO/no-Article intent,
 explicit subject precedence, Evidence binding/order, final-plan scope and

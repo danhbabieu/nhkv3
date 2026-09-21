@@ -512,8 +512,20 @@ final class StagingAcceptanceScopeVerifier
     /** @param array<string,mixed> $scope */
     public function verifyProposal(array $scope, Proposal $proposal): bool
     {
-        if (!$this->verifyPacket($scope) || ($scope['writer'] ?? '') !== 'canonical_governed') return false;
-        try { StagingAcceptanceScope::assertProposal($proposal, $scope); return true; } catch (\Throwable) { return false; }
+        return $this->proposalFailureReason($scope, $proposal) === null;
+    }
+
+    /** Return a safe, machine-readable reason when the exact signed scope fails. */
+    public function proposalFailureReason(array $scope, Proposal $proposal): ?string
+    {
+        if (!$this->verifyPacket($scope) || ($scope['writer'] ?? '') !== 'canonical_governed') return 'STAGING_SCOPE_NOT_APPROVED';
+        try {
+            StagingAcceptanceScope::assertProposal($proposal, $scope);
+            return null;
+        } catch (\Throwable $error) {
+            $reason = trim($error->getMessage());
+            return preg_match('/^[A-Z][A-Z0-9_]{2,100}$/', $reason) === 1 ? $reason : 'STAGING_SCOPE_NOT_APPROVED';
+        }
     }
 
     /** @param array<string,mixed> $scope */

@@ -12,7 +12,7 @@ use NHK\Core\Domain\Governance\{Proposal, ProposalSubjectBindingValidator};
  */
 final class OperationScopedStagingGuard implements StagingGuard
 {
-    /** @param callable():string $environment @param callable(string):bool $can @param callable(array<string,mixed>,Proposal):bool|null $scopeVerifier */
+    /** @param callable():string $environment @param callable(string):bool $can @param callable(array<string,mixed>,Proposal):bool|string|null $scopeVerifier */
     public function __construct(
         private $environment,
         private $can,
@@ -42,7 +42,9 @@ final class OperationScopedStagingGuard implements StagingGuard
         $scope = $proposal->payload['staging_acceptance'] ?? null;
         if (!is_array($scope)) throw new \RuntimeException('STAGING_SCOPE_REQUIRED');
         if (!is_callable($this->scopeVerifier)) throw new \RuntimeException('STAGING_SCOPE_VERIFIER_REQUIRED');
-        if (!(bool) ($this->scopeVerifier)($scope, $proposal)) throw new \RuntimeException('STAGING_SCOPE_NOT_APPROVED');
+        $verification = ($this->scopeVerifier)($scope, $proposal);
+        if (is_string($verification) && $verification !== '') throw new \RuntimeException($verification);
+        if ($verification !== true && $verification !== null) throw new \RuntimeException('STAGING_SCOPE_NOT_APPROVED');
         StagingAcceptanceScope::assertProposal($proposal, $scope);
     }
 
