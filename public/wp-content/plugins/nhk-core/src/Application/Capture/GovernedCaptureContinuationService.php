@@ -1230,6 +1230,9 @@ final class GovernedCaptureContinuationService
         if ($error instanceof VideoRelationEvidenceRequired) {
             return ['proposal_id' => (string) ($plan['proposal_id'] ?? ''), 'status' => 'REVIEW_REQUIRED', 'blockers' => [VideoRelationEvidenceRequired::ERROR_CODE]];
         }
+        if ($error instanceof VideoException && $error->getMessage() === 'VIDEO_INTENDED_CATEGORY_INVALID') {
+            return ['proposal_id' => (string) ($plan['proposal_id'] ?? ''), 'status' => 'SYSTEM_BLOCKED', 'blockers' => ['VIDEO_INTENDED_CATEGORY_INVALID'], 'error' => $error->getMessage()];
+        }
         if ($error instanceof CaptureOrchestrationBudgetExceeded || $error instanceof VideoException) {
             return ['proposal_id' => (string) ($plan['proposal_id'] ?? ''), 'status' => 'FAILED_RETRYABLE', 'blockers' => [$error instanceof CaptureOrchestrationBudgetExceeded ? 'CAPTURE_ORCHESTRATION_BUDGET_EXCEEDED' : 'VIDEO_EXTERNAL_TRANSIENT_FAILURE']];
         }
@@ -1246,7 +1249,7 @@ final class GovernedCaptureContinuationService
             $code = preg_match('/(?:^|:)([A-Z][A-Z0-9_]{2,63})$/', $message, $match) === 1 ? $match[1] : 'CAPTURE_GOVERNANCE_FAILED';
         }
         $blocked = preg_match('/(?:SUBJECT_BINDING|IDENTITY_CONFLICT|IDEMPOTENCY_STALE|IDEMPOTENCY_CONFLICT|BINDING_CONFLICT|REPAIR_REQUIRED|AMBIGUOUS|APPLIED_PROPOSAL_FORBIDDEN|INVARIANT|SCHEMA|CONTRACT|CAPABILITY|NOT_FOUND)/', $code) === 1;
-        $review = preg_match('/(?:EVIDENCE_REQUIRED|CANONICAL_EVIDENCE_REQUIRED|SUBJECT_UNRESOLVED|SOURCE_UNAVAILABLE|APPROVAL_REQUIRED|GOVERNANCE_APPROVAL_REQUIRED|DEPENDENCY_REQUIRED|REVIEW_REQUIRED)/', $code) === 1;
+        $review = preg_match('/(?:CATEGORY_UNRESOLVED|EVIDENCE_REQUIRED|CANONICAL_EVIDENCE_REQUIRED|SUBJECT_UNRESOLVED|SOURCE_UNAVAILABLE|APPROVAL_REQUIRED|GOVERNANCE_APPROVAL_REQUIRED|DEPENDENCY_REQUIRED|REVIEW_REQUIRED)/', $code) === 1;
         $status = $blocked ? 'SYSTEM_BLOCKED' : ($review ? 'REVIEW_REQUIRED' : 'FAILED_RETRYABLE');
         $result = ['proposal_id' => (string) ($plan['proposal_id'] ?? ''), 'status' => $status, 'blockers' => [$code], 'error' => $error->getMessage()];
         if (str_contains($code, 'STAGING_SCOPE') || str_contains($rawMessage, 'STAGING_SCOPE')) $result['admission'] = $this->admissionDiagnostics($plan, $code);

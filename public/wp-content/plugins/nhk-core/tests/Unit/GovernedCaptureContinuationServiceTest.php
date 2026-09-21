@@ -24,6 +24,27 @@ use PHPUnit\Framework\TestCase;
 
 final class GovernedCaptureContinuationServiceTest extends TestCase
 {
+    public function test_unresolved_editorial_category_is_reviewable_not_retryable(): void
+    {
+        $service = new GovernedCaptureContinuationService(
+            $this->createMock(GovernedLifecycle::class),
+            static fn (): array => [],
+            $this->policies(['video']),
+            static fn (): bool => true,
+        );
+        $method = new \ReflectionMethod($service, 'classifiedFailure');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($service, ['proposal_id' => ''], new \RuntimeException('CATEGORY_UNRESOLVED'));
+
+        self::assertSame('REVIEW_REQUIRED', $result['status']);
+        self::assertSame(['CATEGORY_UNRESOLVED'], $result['blockers']);
+
+        $invalid = $method->invoke($service, ['proposal_id' => ''], new \NHK\Core\Domain\Video\VideoException('VIDEO_INTENDED_CATEGORY_INVALID'));
+        self::assertSame('SYSTEM_BLOCKED', $invalid['status']);
+        self::assertSame(['VIDEO_INTENDED_CATEGORY_INVALID'], $invalid['blockers']);
+    }
+
     public function test_video_retry_does_not_reuse_pending_proposal_when_final_dependency_binding_changed(): void
     {
         $captureId = UuidCodec::newV7();

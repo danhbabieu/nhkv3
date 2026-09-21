@@ -43,7 +43,10 @@ final class EasyMcpNativeFileCompatibilityAdapterTest extends TestCase
         $tool = ['name' => 'wp_ability_nhk_v3_media_ingest', 'inputSchema' => ['type' => 'object']];
         $projected = EasyMcpNativeFileCompatibilityAdapter::projectTools([$tool])[0];
         $catalog = array_column(McpToolCatalog::tools(), null, 'name');
-        self::assertSame($catalog['nhk.media.ingest']['inputSchema'], $projected['inputSchema']);
+        self::assertJsonStringEqualsJsonString(
+            json_encode(EasyMcpNativeFileCompatibilityAdapter::normalizeFinalInputSchema($catalog['nhk.media.ingest']['inputSchema']), JSON_THROW_ON_ERROR),
+            json_encode($projected['inputSchema'], JSON_THROW_ON_ERROR),
+        );
     }
 
     public function test_projection_removes_invalid_empty_list_metadata_from_unrelated_tools(): void
@@ -60,6 +63,39 @@ final class EasyMcpNativeFileCompatibilityAdapterTest extends TestCase
         ]);
 
         self::assertSame(McpToolCatalog::schemaHash('nhk.media.ingest'), $projected[0]['_meta']['nhk/schemaHash']);
+    }
+
+    public function test_arbitrary_no_argument_tool_uses_strict_json_object_schema(): void
+    {
+        $projected = EasyMcpNativeFileCompatibilityAdapter::projectTools([[
+            'name' => 'wp_ability_nhk_v3_arbitrary_no_argument',
+            'inputSchema' => ['type' => 'object', 'properties' => [], 'required' => []],
+        ]])[0];
+
+        $encoded = json_encode($projected['inputSchema'], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+        self::assertSame('{"type":"object","properties":{}}', $encoded);
+    }
+
+    public function test_all_registered_nhk_connector_schemas_have_valid_json_schema_shapes(): void
+    {
+        $catalog = array_column(McpToolCatalog::tools(), null, 'name');
+        $tools = [];
+        foreach ($catalog as $toolName => $tool) {
+            $ability = McpAbilityRegistration::abilityNameForTool($toolName);
+            if ($ability === null) continue;
+            $tools[] = [
+                'name' => McpAbilityRegistration::connectorToolNameForAbility($ability),
+                'inputSchema' => $tool['inputSchema'],
+            ];
+        }
+
+        foreach (EasyMcpNativeFileCompatibilityAdapter::projectTools($tools) as $tool) {
+            $schema = json_decode(json_encode($tool['inputSchema'], JSON_THROW_ON_ERROR), false, 512, JSON_THROW_ON_ERROR);
+            self::assertSame('object', $schema->type ?? null, (string) $tool['name']);
+            self::assertIsObject($schema->properties ?? null, (string) $tool['name']);
+            self::assertFalse(isset($schema->required) && $schema->required === [], (string) $tool['name']);
+            self::assertValidJsonSchemaNode($schema, (string) $tool['name']);
+        }
     }
 
     public function test_open_widget_descriptor_projects_mcp_apps_resource_metadata(): void
@@ -159,7 +195,10 @@ final class EasyMcpNativeFileCompatibilityAdapterTest extends TestCase
             ['source_type', 'source_uuid', 'predicate', 'target_type', 'target_uuid', 'provenance', 'reason'],
             array_keys($tools[self::TARGET]['inputSchema']['properties']['authority_intent']['properties']['relation_intents']['items']['properties']),
         );
-        self::assertSame($catalog['nhk.media.ingest']['inputSchema'], $tools['wp_ability_nhk_v3_media_ingest']['inputSchema']);
+        self::assertJsonStringEqualsJsonString(
+            json_encode(EasyMcpNativeFileCompatibilityAdapter::normalizeFinalInputSchema($catalog['nhk.media.ingest']['inputSchema']), JSON_THROW_ON_ERROR),
+            json_encode($tools['wp_ability_nhk_v3_media_ingest']['inputSchema'], JSON_THROW_ON_ERROR),
+        );
         self::assertSame(McpToolCatalog::schemaHash('nhk.media.ingest'), $tools['wp_ability_nhk_v3_media_ingest']['_meta']['nhk/schemaHash']);
     }
 
@@ -376,6 +415,34 @@ final class EasyMcpNativeFileCompatibilityAdapterTest extends TestCase
         self::assertTrue(EasyMcpNativeFileCompatibilityAdapter::isSupportedVersion('1.7.17'));
         self::assertFalse(EasyMcpNativeFileCompatibilityAdapter::isSupportedVersion('1.7.18'));
         self::assertFalse(EasyMcpNativeFileCompatibilityAdapter::isSupportedVersion('2.0.0'));
+    }
+
+    private static function assertValidJsonSchemaNode(mixed $schema, string $toolName): void
+    {
+        if ($schema instanceof \stdClass) {
+            $type = $schema->type ?? null;
+            if ($type === 'object') {
+                self::assertIsObject($schema->properties ?? null, $toolName . '.properties');
+                self::assertFalse(isset($schema->required) && $schema->required === [], $toolName . '.required');
+                foreach (get_object_vars($schema->properties ?? new \stdClass()) as $child) self::assertValidJsonSchemaNode($child, $toolName);
+            }
+            if ($type === 'array') self::assertTrue(property_exists($schema, 'items'), $toolName . '.items');
+            foreach (['items', 'additionalProperties', 'contains', 'propertyNames', 'not'] as $key) {
+                if (property_exists($schema, $key)) self::assertValidJsonSchemaNode($schema->{$key}, $toolName . '.' . $key);
+            }
+            foreach (['allOf', 'anyOf', 'oneOf', 'prefixItems'] as $key) {
+                if (!property_exists($schema, $key) || !is_array($schema->{$key})) continue;
+                foreach ($schema->{$key} as $child) self::assertValidJsonSchemaNode($child, $toolName . '.' . $key);
+            }
+            foreach (['$defs', 'definitions', 'patternProperties'] as $key) {
+                if (!property_exists($schema, $key)) continue;
+                self::assertIsObject($schema->{$key}, $toolName . '.' . $key);
+                foreach (get_object_vars($schema->{$key}) as $child) self::assertValidJsonSchemaNode($child, $toolName . '.' . $key);
+            }
+        }
+        if (is_array($schema)) {
+            foreach ($schema as $child) self::assertValidJsonSchemaNode($child, $toolName);
+        }
     }
 
     public function test_version_diagnostic_is_explicit_and_fail_closed(): void

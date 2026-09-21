@@ -44,7 +44,11 @@ final class McpSchemaParityTest extends TestCase
             if ($ability === null) continue;
             if (in_array($toolName, ['nhk.media.upload-widget.open', 'nhk.media.widget-upload'], true)) continue;
             $connector = McpAbilityRegistration::connectorToolNameForAbility($ability);
-            self::assertSame($tool['inputSchema'], $projected[$connector]['inputSchema'], $toolName);
+            self::assertJsonStringEqualsJsonString(
+                json_encode(EasyMcpNativeFileCompatibilityAdapter::normalizeFinalInputSchema($tool['inputSchema']), JSON_THROW_ON_ERROR),
+                json_encode($projected[$connector]['inputSchema'], JSON_THROW_ON_ERROR),
+                $toolName,
+            );
             self::assertSame(McpToolCatalog::schemaHash($toolName), $projected[$connector]['_meta']['nhk/schemaHash'], $toolName);
         }
     }

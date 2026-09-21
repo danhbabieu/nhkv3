@@ -80,6 +80,9 @@ final class EasyMcpNativeFileCompatibilityAdapter
                 ? self::canonicalDefinitionForSpecialTool($name)
                 : self::canonicalDefinitionForConnectorTool($name);
             if ($canonical === null) {
+                if (is_array($tool['inputSchema'] ?? null)) {
+                    $tool['inputSchema'] = self::normalizeFinalInputSchema($tool['inputSchema']);
+                }
                 $tools[$index] = $tool;
                 continue;
             }
@@ -87,7 +90,7 @@ final class EasyMcpNativeFileCompatibilityAdapter
             // Keep Easy MCP's tool presence, filtering and annotations. Replace
             // only the NHK-owned descriptor fields that its serializer omitted.
             $tool['description'] = $canonical['description'];
-            $tool['inputSchema'] = $canonical['inputSchema'];
+            $tool['inputSchema'] = self::normalizeFinalInputSchema($canonical['inputSchema']);
             $isSpecialTool = in_array($name, [self::WIDGET_OPEN_TOOL, self::WIDGET_UPLOAD_TOOL], true);
             if (!$isSpecialTool) {
                 $tool['_meta'] = is_array($tool['_meta'] ?? null) && !array_is_list($tool['_meta']) ? $tool['_meta'] : [];
@@ -100,6 +103,51 @@ final class EasyMcpNativeFileCompatibilityAdapter
         }
 
         return $tools;
+    }
+
+    /**
+     * Normalize the final JSON Schema representation without changing its
+     * semantic contract. PHP uses [] for both an empty list and an empty
+     * associative map; JSON Schema requires `properties` to be an object.
+     * Empty `required` is omitted because it carries no constraint and strict
+     * connector validators reject the empty array form.
+     *
+     * @param array<string,mixed> $schema
+     * @return array<string,mixed>
+     */
+    public static function normalizeFinalInputSchema(array $schema): array
+    {
+        return self::normalizeSchemaNode($schema);
+    }
+
+    /** @param array<string,mixed> $schema @return array<string,mixed> */
+    private static function normalizeSchemaNode(array $schema): array
+    {
+        if (($schema['type'] ?? null) === 'object' && (!array_key_exists('properties', $schema) || $schema['properties'] === [])) {
+            $schema['properties'] = new \stdClass();
+        }
+
+        if (array_key_exists('properties', $schema) && is_array($schema['properties'])) {
+            foreach ($schema['properties'] as $name => $child) {
+                if (is_array($child)) $schema['properties'][$name] = self::normalizeSchemaNode($child);
+            }
+        }
+
+        if (isset($schema['required']) && is_array($schema['required'])) {
+            if ($schema['required'] === []) unset($schema['required']);
+        }
+
+        foreach (['items', 'additionalProperties', 'contains', 'propertyNames', 'not'] as $key) {
+            if (is_array($schema[$key] ?? null)) $schema[$key] = self::normalizeSchemaNode($schema[$key]);
+        }
+        foreach (['allOf', 'anyOf', 'oneOf', 'prefixItems'] as $key) {
+            if (!is_array($schema[$key] ?? null)) continue;
+            foreach ($schema[$key] as $index => $child) {
+                if (is_array($child)) $schema[$key][$index] = self::normalizeSchemaNode($child);
+            }
+        }
+
+        return $schema;
     }
 
     public static function projectToolsListDescriptor(mixed $response, mixed $server, mixed $request): mixed

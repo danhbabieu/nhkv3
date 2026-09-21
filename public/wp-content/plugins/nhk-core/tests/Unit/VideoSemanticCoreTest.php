@@ -380,6 +380,97 @@ final class VideoSemanticCoreTest extends TestCase
         self::assertCount(1, array_filter($classified['categories'], static fn (array $item): bool => $item['primary'] === true));
     }
 
+    public function test_classifier_keeps_weak_source_title_unresolved_without_guessing_a_hub(): void
+    {
+        $classified = (new VideoHubClassifier())->classify([
+            'source_title' => 'Bản ghi lưu trữ 17',
+            'source_description' => '',
+            'tags' => [],
+            'user_hint' => '',
+        ]);
+
+        self::assertNull($classified['primary']);
+        self::assertContains('CATEGORY_UNRESOLVED', $classified['warnings']);
+        self::assertSame([], $classified['evidence']);
+    }
+
+    public function test_unresolved_category_remains_in_preview_and_does_not_prevent_video_proposal_arguments(): void
+    {
+        $videoId = UuidCodec::newV7();
+        $service = new VideoIntakeService(
+            new YouTubeSourceAdapter(static fn (object $identity): array => [
+                'title' => 'Bản ghi lưu trữ 17',
+                'availability' => 'available',
+                'embeddable' => true,
+            ]),
+            $this->emptyVideos(),
+            new VideoHubClassifier(),
+            $this->planner(),
+            new VideoEditorialGenerator(),
+            new VideoCompletenessPolicy(),
+            new VideoSeoProjection(),
+        );
+
+        $preview = $service->preview(
+            'https://youtu.be/dQw4w9WgXcQ',
+            '',
+            null,
+            [],
+            '',
+            ['id' => $videoId, 'type' => 'variant', 'name' => 'Variant test'],
+            'Video tham chiếu test',
+        );
+        $arguments = $service->proposalArguments($preview, 'video-category-unresolved-test');
+
+        self::assertNull($preview->package['category']['primary']);
+        self::assertContains('CATEGORY_UNRESOLVED', $preview->package['completeness']['blockers']);
+        self::assertContains('CATEGORY_UNRESOLVED', $preview->warnings);
+        self::assertSame('video', $arguments['entity_type']);
+        self::assertSame($preview->videoId, $arguments['payload']['canonical_id']);
+        self::assertSame($preview->package, $arguments['payload']['metadata']);
+    }
+
+    public function test_explicit_valid_intended_category_resolves_classification_deterministically(): void
+    {
+        $service = new VideoIntakeService(
+            new YouTubeSourceAdapter(static fn (object $identity): array => [
+                'title' => 'Bản ghi lưu trữ 17',
+                'availability' => 'available',
+                'embeddable' => true,
+            ]),
+            $this->emptyVideos(),
+            new VideoHubClassifier(),
+            $this->planner(),
+            new VideoEditorialGenerator(),
+            new VideoCompletenessPolicy(),
+            new VideoSeoProjection(),
+        );
+
+        $preview = $service->preview('https://youtu.be/dQw4w9WgXcQ', '', '06');
+
+        self::assertSame('06', $preview->package['category']['primary']['key']);
+        self::assertNotContains('CATEGORY_UNRESOLVED', $preview->package['completeness']['blockers']);
+        self::assertNotContains('CATEGORY_UNRESOLVED', $preview->warnings);
+    }
+
+    public function test_unsupported_intended_category_fails_domain_validation(): void
+    {
+        $this->expectException(VideoException::class);
+        $this->expectExceptionMessage('VIDEO_INTENDED_CATEGORY_INVALID');
+
+        $service = new VideoIntakeService(
+            new YouTubeSourceAdapter(static fn (object $identity): array => ['title' => 'Bản ghi lưu trữ 17', 'availability' => 'available', 'embeddable' => true]),
+            $this->emptyVideos(),
+            new VideoHubClassifier(),
+            $this->planner(),
+            new VideoEditorialGenerator(),
+            new VideoCompletenessPolicy(),
+            new VideoSeoProjection(),
+        );
+
+        $service->preview('https://youtu.be/dQw4w9WgXcQ', '', '99');
+    }
+
     public function test_editorial_package_is_synthesis_and_completeness_blocks_orphan_and_missing_seo(): void
     {
         $editorial = (new VideoEditorialGenerator())->generate(

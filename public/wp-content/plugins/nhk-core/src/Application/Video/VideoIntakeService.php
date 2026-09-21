@@ -6,6 +6,7 @@ namespace NHK\Core\Application\Video;
 use NHK\Core\Application\Entity\PublicRouteResolver;
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Video\{VideoEditorialEnrichmentContext, VideoIntakePreview, VideoSourceRights};
+use NHK\Core\Domain\Video\VideoException;
 use NHK\Core\Shared\Uuid\UuidCodec;
 
 final class VideoIntakeService
@@ -27,6 +28,9 @@ final class VideoIntakeService
     /** @param list<array<string,mixed>> $intendedRelations @param array<string,mixed>|null $resolvedSubject */
     public function preview(string $url, string $userHint = '', ?string $intendedCategory = null, array $intendedRelations = [], string $editorialInstruction = '', ?array $resolvedSubject = null, string $editorialTitle = '', string $complianceNote = '', bool $allowDeferredEvidence = false): VideoIntakePreview
     {
+        if ($intendedCategory !== null && !array_key_exists($intendedCategory, VideoHubClassifier::hubs())) {
+            throw new VideoException('VIDEO_INTENDED_CATEGORY_INVALID');
+        }
         $resolution = $this->source->resolve($url);
         $snapshot = $resolution->snapshot->toArray();
         $chapters = (new VideoChapterParser())->parse((string) ($snapshot['source_description'] ?? ''), isset($snapshot['duration_seconds']) ? (int) $snapshot['duration_seconds'] : null);
@@ -63,9 +67,13 @@ final class VideoIntakeService
         $intendedTargets = array_values(array_unique(array_map(static fn (array $target): string => $target['type'] . ':' . $target['id'], $intendedTargets)));
         $intendedTargets = array_values(array_map(static function (string $key): array { [$type, $id] = explode(':', $key, 2); return ['id' => $id, 'type' => $type]; }, $intendedTargets));
         $category = $this->classifier->classify(['source_title' => $snapshot['source_title'] ?? '', 'source_description' => $snapshot['source_description'] ?? '', 'tags' => $snapshot['tags'] ?? [], 'user_hint' => $userHint]);
-        if ($intendedCategory !== null && isset(VideoHubClassifier::hubs()[$intendedCategory])) {
+        if ($intendedCategory !== null) {
             $category['primary'] = ['key' => $intendedCategory, 'label' => VideoHubClassifier::hubs()[$intendedCategory], 'primary' => true, 'score' => 0];
             $category['categories'] = [$category['primary']];
+            $category['warnings'] = array_values(array_filter(
+                (array) ($category['warnings'] ?? []),
+                static fn (string $warning): bool => $warning !== 'CATEGORY_UNRESOLVED',
+            ));
         }
         $enrichmentContext = [
             'source_facts' => trim((string) ($snapshot['source_title'] ?? '')) !== '' ? [['text' => (string) $snapshot['source_title']]] : [],

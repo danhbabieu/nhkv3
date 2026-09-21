@@ -33,6 +33,14 @@ STATUS: `GOVERNED_JSON_NUMERIC_CANONICALIZATION_FIXED_LOCAL / CONFIDENCE_ROUNDTR
 
 NEXT_EXACT_ACTION: `USER_PUSH_PULL_BUILD; THEN RUN FRESH @v34 VIDEO ACCEPTANCE`.
 
+CURRENT_WORKTREE_NOTE: A subsequent full Unit rerun observed six unrelated
+`McpSchemaParityTest` failures from the pre-existing dirty changes in
+`EasyMcpNativeFileCompatibilityAdapter.php` and its test (the adapter now
+normalizes empty JSON Schema objects and omits empty `required`). Those files
+were not modified by this Video task and were preserved. The focused Video,
+Capture, staging, numeric and tamper regression slice remains green at 112
+tests / 510 assertions.
+
 # Checkpoint — 2026-09-21 — Nested governed Video payload drift proof (LOCAL / NO LIVE MUTATION)
 
 ROOT_CAUSE_CONFIRMED: `CaptureVideoProvenancePlanner::withThumbnailSelection()`
@@ -16038,3 +16046,36 @@ source contracts to distinguish `requests[]` entity intent from `relations[]`
 exact Graph relation intent. Canonical generated documentation was not run.
 
 STATUS=`STRUCTURED_AUTHORITY_RELATION_INTENT_IMPLEMENTED_LOCALLY / DEPLOYMENT_PENDING / SEMANTIC_MUTATION_NONE`.
+
+# Checkpoint — 2026-09-21 — Governed Video unresolved Hub classification boundary (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE: The Video Hub classifier correctly emitted `CATEGORY_UNRESOLVED`,
+but the intake boundary did not enforce the registry contract for an explicit
+`intended_category`, and a deterministic category error could be classified as
+`FAILED_RETRYABLE` by the generic Capture failure mapper. This blurred the
+editorial/publication blocker with a transient technical failure.
+
+FIXED_BOUNDARY: Valid unresolved Video intake remains a DRAFT Proposal command
+with `classification.primary=null` and `CATEGORY_UNRESOLVED` retained in
+completeness diagnostics. Existing Video eligibility does not include that
+classification blocker, while publication/completeness remains non-publishable
+until classification is resolved. Unsupported explicit categories now fail
+domain validation; registered explicit categories clear only the unresolved
+classification diagnostic. No category is inferred from a subject, title or
+fixture, and no Article/Media/Knowledge/Authority orchestration was changed.
+
+REGRESSION: Generic generated UUID tests cover weak-title no-guessing,
+unresolved-category proposal arguments, explicit valid category, invalid
+category validation and deterministic review classification. Existing Video
+staging, numeric canonicalization and semantic tamper suites remain green.
+
+VERIFICATION: Focused Video/Capture suite passes 100 tests / 466 assertions.
+Full NHK Unit passes 2,063 tests / 10,534 assertions with existing warnings and
+deprecations. The default all-suite command also attempted environment-gated
+Integration/Contract tests and reported unavailable WordPress/database runtime;
+that is not a Unit failure. No schema, migration, deployment, push or live
+mutation was performed.
+
+STATUS=`VIDEO_CATEGORY_UNRESOLVED_BOUNDARY_FIXED_LOCALLY / FULL_UNIT_PASS / NO_LIVE_MUTATION`.
+
+NEXT_EXACT_ACTION: `USER_PUSH_PULL_BUILD; THEN RUN FRESH @v34 VIDEO ACCEPTANCE`.
