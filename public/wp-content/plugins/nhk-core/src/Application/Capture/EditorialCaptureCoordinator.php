@@ -111,6 +111,47 @@ final class EditorialCaptureCoordinator
         return $this->run($record, $input);
     }
 
+    /**
+     * Re-evaluate only the completion/public-readiness boundary for a Video
+     * whose governed semantic owner already has canonical APPLIED read-back.
+     * This deliberately does not re-enter physical ingest, semantic
+     * write-back, Proposal, Controlled Apply, or Graph mutation.
+     */
+    public function retryVideoCompletion(CaptureRecord $record, array $input): CaptureRecord
+    {
+        $intent = is_array($record->context['content_intent'] ?? null) ? $record->context['content_intent'] : [];
+        if (strtoupper(trim((string) ($intent['intent'] ?? ''))) !== 'VIDEO') throw new \RuntimeException('CAPTURE_VIDEO_COMPLETION_RETRY_NOT_SUPPORTED');
+        $writes = is_array($record->diagnostics['semantic_write_back'] ?? null) ? $record->diagnostics['semantic_write_back'] : [];
+        if (!in_array(strtoupper(trim((string) ($writes['status'] ?? ''))), ['APPLIED', 'IDEMPOTENT', 'REUSED', 'REUSED_VERIFIED', 'ALREADY_APPLIED'], true)) {
+            throw new \RuntimeException('CAPTURE_VIDEO_COMPLETION_RETRY_CANONICAL_READBACK_REQUIRED');
+        }
+        $resolution = is_array($record->diagnostics['subject_resolution'] ?? null)
+            ? $record->diagnostics['subject_resolution']
+            : (is_array($record->context['subject_resolution'] ?? null) ? $record->context['subject_resolution'] : []);
+        $retrieved = is_array($record->diagnostics['claim_retrieval'] ?? null) ? $record->diagnostics['claim_retrieval'] : ['status' => 'not_requested', 'items' => [], 'selected_claims' => []];
+        $media = is_array($record->diagnostics['media_enrichment'] ?? null)
+            ? $record->diagnostics['media_enrichment']
+            : (is_array($record->diagnostics['media_usage'] ?? null) ? $record->diagnostics['media_usage'] : []);
+        if (!is_callable($this->videoPublicationVerifier)) throw new \RuntimeException('VIDEO_PUBLIC_READINESS_VERIFIER_UNAVAILABLE');
+        $videoPublication = ($this->videoPublicationVerifier)([
+            'capture_id' => $record->captureId,
+            'assets' => $record->assets,
+            'subject_resolution' => $resolution,
+            'semantic_write_back' => $writes,
+            'existing_capture_continuation' => true,
+            'resume_mode' => 'RETRY',
+        ]);
+        $diagnostics = $record->diagnostics;
+        $diagnostics['video_publication'] = $this->withoutBody($videoPublication);
+        $diagnostics['completion_retry'] = [
+            'mode' => 'VIDEO_COMPLETION_ONLY',
+            'semantic_reentry' => false,
+            'governed_apply' => false,
+            'at' => gmdate('c'),
+        ];
+        return $this->finishNonArticleIntent($record, $record->assets, $diagnostics, $record->phaseReceipts, $intent, $retrieved, $writes, $videoPublication, $resolution, $media);
+    }
+
     /** Continue an existing Capture without repeating physical or draft creation. */
     public function continueWithAddendum(CaptureRecord $record, array $input): CaptureRecord
     {

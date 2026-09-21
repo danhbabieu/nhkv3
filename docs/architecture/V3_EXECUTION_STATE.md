@@ -16257,3 +16257,53 @@ mutation occurred; exact supplied live IDs are absent from production source.
 STATUS=`VIDEO_PUBLIC_READINESS_CONVERGENCE_FIXED_LOCALLY / FULL_UNIT_PASS / NO_LIVE_MUTATION`.
 
 NEXT_EXACT_ACTION: `USER_PUSH_PULL_BUILD; THEN RUN @v38 VIDEO PUBLIC-READINESS ACCEPTANCE`.
+
+# Checkpoint — 2026-09-22 — Existing Video Capture retry/continuation parity (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE_CONFIRMED: The canonical retry boundary required an idempotency key
+even when the exact Capture ID was supplied, rejected the documented matching
+`purpose`/`intent` control fields as payload, and always re-entered the full
+Capture coordinator. That made a historical PARTIAL completion with canonical
+Video `APPLIED` state unable to converge through a bounded completion retry.
+
+FIXED_BOUNDARIES: Retry now binds to the persisted Capture idempotency key when
+the optional key is omitted, validates matching control intent/purpose, and
+routes only canonical Video/APPLIED/read-back state through a completion-only
+continuation. The continuation re-runs Video public-readiness verification and
+Capture completion aggregation while preserving Video/Proposal/Graph identity;
+it does not repeat physical ingest, semantic write-back, Proposal, Controlled
+Apply, Graph mutation, or any staging acceptance. Historical receipts remain
+append-only and frontend blockers remain explicit.
+
+REGRESSION: Production-shaped historical PARTIAL Video retry proves the
+canonical completion verifier runs once, semantic/physical/draft phases do not
+re-enter, the exact frontend blocker is retained, and no addendum is created.
+Existing retry key, payload, read-only replay, transport routing and
+non-retryable coverage remains green. PHP lint and `git diff --check` pass.
+
+STATUS=`VIDEO_CAPTURE_RETRY_CONTINUATION_FIXED_LOCALLY / FOCUSED_UNIT_PASS / NO_LIVE_MUTATION`.
+
+NEXT_EXACT_ACTION: `USER_PUSH_PULL_BUILD; THEN RETRY EXISTING CAPTURE ON @v38 AND VERIFY CONVERGENCE`.
+# Checkpoint — 2026-09-22 — Unified Relationship Phase R2 governed Graph mutation (LOCAL / NO LIVE MUTATION)
+
+R2 local implementation adds the generic top-level `relationship_operations[]`
+Capture envelope for `ADD`, `REPLACE`, `REMOVE` and `REACTIVATE` while keeping
+`nhk.capture.ingest` as the only normal mutation entry and
+`nhk.relationship.preview` read-only. Capture reuses the existing relationship
+planner/preview validation path; Governance maps real transitions to
+`relation_create`, `relation_retire`, `relation_reactivate` and the new atomic
+`relation_replace` composite. Replace executes retire plus desired create or
+reactivate inside the existing Controlled Apply transaction and rolls back on
+desired-edge failure. Staging bindings/admission and canonical Graph read-back
+were extended for all four operations. No Odo/live UUID or hard-delete path was
+introduced.
+
+Verification: Unit PASS — 2,081 tests / 11,342 assertions; Contract PASS — 6
+tests / 48 assertions; PHP lint PASS; `git diff --check` PASS. The
+repository-wide default PHPUnit invocation is not green in this checkout: the
+unconfigured run lacks the WordPress/MySQL integration bootstrap, while the
+`NHK_WP_TEST_PATH=public` attempt reaches a pre-existing WordPress test-stub
+function redeclaration fatal before integration assertions. No R2-specific unit
+or contract failure remains. No semantic or live data mutation occurred.
+
+STATUS: `RELATIONSHIP_R2_LOCAL_PASS / UNIT_PASS / CONTRACT_PASS / SCHEMA_PARITY_PASS / LINT_PASS / DIFF_CHECK_PASS / NO_LIVE_MUTATION`.

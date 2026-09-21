@@ -28,7 +28,8 @@ final class AuthorityCaptureService
         $purpose = CapturePurposePolicy::resolve($input);
         if ($purpose === CapturePurpose::EDITORIAL) throw new \InvalidArgumentException('AUTHORITY_PURPOSE_CONFLICT');
         $intent = is_array($input['authority_intent'] ?? null) ? $input['authority_intent'] : [];
-        if (($intent['mode'] ?? '') !== 'PLAN') throw new \InvalidArgumentException('AUTHORITY_CONTINUATION_REQUIRED');
+        $hasRelationshipOperations = is_array($input['relationship_operations'] ?? null);
+        if (($intent['mode'] ?? '') !== 'PLAN' && !$hasRelationshipOperations) throw new \InvalidArgumentException('AUTHORITY_CONTINUATION_REQUIRED');
         $fingerprint = $this->fingerprint($input);
         $existing = $this->captures->findByIdempotencyKey($key);
         if ($existing !== null) {
@@ -45,11 +46,16 @@ final class AuthorityCaptureService
                 'observations' => is_array($input['observations'] ?? null) ? $input['observations'] : [],
                 'metadata' => is_array($input['metadata'] ?? null) ? $input['metadata'] : [],
                 'authority_intent' => is_array($input['authority_intent'] ?? null) ? $input['authority_intent'] : [],
+                'relationship_operations' => $hasRelationshipOperations ? $input['relationship_operations'] : [],
                 'documentation_checkpoint' => is_array($input['documentation_checkpoint'] ?? null) ? $input['documentation_checkpoint'] : [],
                 'planning_input' => $input,
             ], [], []
         ));
 
+        if ($hasRelationshipOperations) {
+            $intent['mode'] = 'PLAN';
+            $input['authority_intent'] = $intent;
+        }
         $plan = ($this->planner)($input, $record);
         $editorial = [];
         if ($purpose === CapturePurpose::MIXED) {
@@ -210,6 +216,7 @@ final class AuthorityCaptureService
             'observations' => is_array($input['observations'] ?? null) ? $input['observations'] : [],
             'metadata' => is_array($input['metadata'] ?? null) ? $input['metadata'] : [],
             'authority_intent' => is_array($input['authority_intent'] ?? null) ? $input['authority_intent'] : [],
+            'relationship_operations' => is_array($input['relationship_operations'] ?? null) ? $input['relationship_operations'] : [],
             'documentation_checkpoint' => is_array($input['documentation_checkpoint'] ?? null) ? $input['documentation_checkpoint'] : [],
         ]));
     }

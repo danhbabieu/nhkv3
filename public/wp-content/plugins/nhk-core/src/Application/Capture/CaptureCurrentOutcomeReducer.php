@@ -33,6 +33,12 @@ final class CaptureCurrentOutcomeReducer
         $hints = array_values(array_unique(array_map('strtolower', array_map('strval', (array) ($hintPacket['resume_children'] ?? [])))));
         $requested = array_values(array_unique(array_map('strtolower', array_map('strval', (array) ($input['resume_children'] ?? [])))));
         if ($requested === []) $requested = $hints;
+        // A historical Video Capture may have lost its original resume hint
+        // while the canonical Video and its governed read-back remain valid.
+        // In that state the only safe continuation is the bounded completion
+        // check; do not force the operator back through semantic Governance.
+        if ($hints === [] && self::supportsCanonicalVideoCompletionRetry($capture)) $hints = ['video'];
+        if ($requested === [] && self::supportsCanonicalVideoCompletionRetry($capture)) $requested = ['video'];
         if ($hints === [] || $requested === [] || array_diff($requested, $hints) !== []) return ['eligible' => false, 'reason' => 'CAPTURE_RETRY_NOT_ALLOWED'];
 
         $missing = (array) ($completion['missing_required_owners'] ?? []);
@@ -47,6 +53,31 @@ final class CaptureCurrentOutcomeReducer
             }
         }
         return ['eligible' => false, 'reason' => 'CAPTURE_RETRY_NOT_ALLOWED'];
+    }
+
+    public static function supportsCanonicalVideoCompletionRetry(CaptureRecord $capture): bool
+    {
+        $intent = is_array($capture->context['content_intent'] ?? null) ? $capture->context['content_intent'] : [];
+        if (strtoupper(trim((string) ($intent['intent'] ?? ''))) !== 'VIDEO') return false;
+        $semantic = is_array($capture->diagnostics['semantic_write_back'] ?? null)
+            ? $capture->diagnostics['semantic_write_back']
+            : [];
+        if (!in_array(strtoupper(trim((string) ($semantic['status'] ?? ''))), ['APPLIED', 'IDEMPOTENT', 'REUSED', 'REUSED_VERIFIED', 'ALREADY_APPLIED'], true)) return false;
+        $hasReadback = is_array($semantic['canonical_readback'] ?? null)
+            && trim((string) ($semantic['canonical_readback']['canonical_id'] ?? '')) !== '';
+        foreach ((array) ($semantic['writes'] ?? []) as $write) {
+            if (!is_array($write)) continue;
+            $readback = is_array($write['canonical_readback'] ?? null) ? $write['canonical_readback'] : [];
+            if (trim((string) ($readback['canonical_id'] ?? $write['canonical_id'] ?? '')) !== '') {
+                $hasReadback = true;
+                break;
+            }
+        }
+        if (!$hasReadback) return false;
+        foreach ($capture->assets as $asset) {
+            if (is_array($asset) && strtolower(trim((string) ($asset['kind'] ?? ''))) === 'video') return true;
+        }
+        return false;
     }
 
     public static function failureCode(CaptureRecord $capture): ?string

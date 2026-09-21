@@ -132,7 +132,7 @@ final class AuthorityProposalExecutor
             }
             return $video;
         }
-        if (in_array($proposal->operation, ['relation_create', 'relation_retire', 'relation_reactivate'], true)) {
+        if (in_array($proposal->operation, ['relation_create', 'relation_retire', 'relation_reactivate', 'relation_replace'], true)) {
             return $this->relation($proposal);
         }
         if ($proposal->entityType === 'knowledge' && $proposal->operation === 'collector_facet_update') {
@@ -222,6 +222,26 @@ final class AuthorityProposalExecutor
                 (string) ($proposal->payload['predicate'] ?? ''),
                 new NodeReference($targetType, $targetKey),
             );
+        }
+        if ($proposal->operation === 'relation_replace') {
+            $oldId = trim((string) ($proposal->payload['current_relation_id'] ?? $proposal->targetUuid ?? ''));
+            $old = $this->graph->findByUuid($oldId);
+            if ($old === null || !$old->isActive()) throw new \RuntimeException('RELATION_NOT_FOUND');
+            if ($old->revision !== (int) ($proposal->payload['expected_edge_revision'] ?? 0)) throw new \RuntimeException('REVISION_CONFLICT');
+            $this->graph->retire($oldId, $old->revision);
+            try {
+                $desired = new NodeReference((string) ($proposal->payload['target_type'] ?? ''), (string) ($proposal->payload['target_uuid'] ?? ''));
+                $source = new NodeReference((string) ($proposal->payload['source_type'] ?? ''), (string) ($proposal->payload['source_uuid'] ?? ''));
+                $existing = $this->graph->findEdge($source, (string) ($proposal->payload['predicate'] ?? ''), $desired);
+                if ($existing !== null && !$existing->isActive()) $new = $this->graph->reactivate($existing->edge_uuid, $existing->revision);
+                elseif ($existing !== null) throw new \RuntimeException('CARDINALITY_CONFLICT');
+                else $new = $this->graph->create($source, (string) ($proposal->payload['predicate'] ?? ''), $desired);
+                return $new;
+            } catch (\Throwable $error) {
+                // ControlledApply owns the enclosing transaction; this throw
+                // rolls back the retirement together with the desired step.
+                throw $error;
+            }
         }
         $edgeId = $proposal->targetUuid ?: $proposal->subjectId;
         return $proposal->operation === 'relation_retire'

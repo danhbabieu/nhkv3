@@ -68,6 +68,13 @@ final class RelationshipReadService
         $base = ['relationship_kind' => $kind, 'operation' => $operation, 'normalized_source' => $source, 'normalized_target' => $target, 'current_state' => 'UNKNOWN', 'current_relationships' => [], 'registry_rule' => null, 'cardinality_state' => ['status' => 'NOT_EVALUATED'], 'scope_state' => ['status' => 'NOT_EVALUATED'], 'evidence_state' => ['status' => 'NOT_EVALUATED'], 'provenance_state' => ['status' => 'NOT_EVALUATED'], 'revision_state' => ['status' => 'NOT_EVALUATED'], 'dependency_state' => ['status' => 'NOT_EVALUATED'], 'planned_transition' => [], 'blockers' => [], 'warnings' => [], 'safe_to_apply' => false, 'required_owner' => $kind === 'graph' ? 'Graph' : ucfirst($kind), 'required_governance_path' => 'READ_ONLY_PREVIEW_ONLY'];
         if ($kind !== 'graph') return $this->blocked($base, 'OWNER_SPECIFIC_SURFACE_REQUIRED');
         if (!in_array($operation, self::OPERATIONS, true)) return $this->blocked($base, 'INVALID_OPERATION');
+        $legacyPreview = !array_key_exists('expected_edge_revision', $input) && !array_key_exists('expected_revision', $input);
+        if (!$legacyPreview && in_array($operation, ['REPLACE', 'REMOVE', 'REACTIVATE'], true)
+            && trim((string) ($input['current_relation_id'] ?? '')) === '') return $this->blocked($base, 'RELATION_ID_REQUIRED');
+        if (!$legacyPreview && in_array($operation, ['REPLACE', 'REMOVE', 'REACTIVATE'], true)
+            && (int) ($input['expected_edge_revision'] ?? $input['expected_revision'] ?? 0) < 1) return $this->blocked($base, 'REVISION_REQUIRED');
+        $registryHash = trim((string) ($input['registry_hash'] ?? ''));
+        if ($registryHash !== '' && !hash_equals((string) $this->registry()['registry_hash'], $registryHash)) return $this->blocked($base, 'REGISTRY_HASH_CHANGED');
         if ($source === null || $target === null) return $this->blocked($base, 'ENDPOINT_UNSUPPORTED');
         try { $source = $this->endpoints->normalize(new NodeReference($source['type'], $source['id'])); $target = $this->endpoints->normalize(new NodeReference($target['type'], $target['id'])); }
         catch (\Throwable) { return $this->blocked($base, 'ENDPOINT_UNSUPPORTED'); }
@@ -91,6 +98,7 @@ final class RelationshipReadService
             $candidate = $this->graph->findByUuid($requestedRelation);
             if ($candidate === null) return $this->blocked($base, 'RELATION_NOT_FOUND');
             if ($candidate->predicate !== $predicateKey) return $this->blocked($base, 'PREDICATE_UNREGISTERED');
+            if ($candidate->source->reference->key() !== $source->key() || $candidate->target->reference->key() !== $target->key()) return $this->blocked($base, 'RELATION_ENDPOINT_MISMATCH');
             $current = [$candidate];
         }
         $base['current_relationships'] = array_map($this->edge(...), $current);
@@ -98,6 +106,8 @@ final class RelationshipReadService
         if ($operation === 'ADD' && $current !== [] && !$current[0]->isActive()) return $this->blocked($base, 'RELATION_RETIRED_REACTIVATION_REQUIRED');
         if ($operation === 'REACTIVATE' && ($current === [] || $current[0]->isActive())) return $this->blocked($base, $current === [] ? 'RELATION_NOT_FOUND' : 'RELATION_ALREADY_ACTIVE');
         if ($operation === 'REMOVE' && ($current === [] || !$current[0]->isActive())) return $this->blocked($base, 'RELATION_NOT_FOUND');
+        if (!$legacyPreview && in_array($operation, ['REPLACE', 'REMOVE', 'REACTIVATE'], true)
+            && $current !== [] && (int) ($input['expected_edge_revision'] ?? $input['expected_revision'] ?? 0) !== $current[0]->revision) return $this->blocked($base, 'REVISION_CONFLICT');
         $base['cardinality_state'] = $this->cardinality($rule, $source, $target, $current, $operation);
         if ($base['cardinality_state']['status'] !== 'PASS') return $this->blocked($base, 'CARDINALITY_CONFLICT');
         $base['evidence_state'] = $this->evidence($rule, (array) ($input['evidence_refs'] ?? []));
@@ -107,7 +117,15 @@ final class RelationshipReadService
         if ($sourceState['revision'] === null || $targetState['revision'] === null) return $this->blocked($base, 'REVISION_UNAVAILABLE');
         $base['revision_state'] = ['status' => 'PASS', 'source_revision' => $sourceState['revision'], 'target_revision' => $targetState['revision'], 'expected_revision' => $input['expected_revision'] ?? null];
         $base['dependency_state'] = ['status' => 'PASS', 'closure' => [['type' => $source->endpoint_type, 'id' => $source->endpoint_key, 'revision' => $sourceState['revision']], ['type' => $target->endpoint_type, 'id' => $target->endpoint_key, 'revision' => $targetState['revision']]]];
-        $base['planned_transition'] = $this->plan($operation, $current, $source, $predicateKey, $target);
+        $base['planned_transition'] = $this->plan($operation, $current, $source, $predicateKey, $target, $legacyPreview);
+        $base['preview_fingerprint'] = hash('sha256', self::json([
+            'operation' => $operation, 'source' => $base['normalized_source'], 'predicate' => $predicateKey,
+            'target' => $base['normalized_target'], 'current_relation_id' => $requestedRelation,
+            'expected_edge_revision' => $input['expected_edge_revision'] ?? $input['expected_revision'] ?? null,
+            'planned_transition' => $base['planned_transition'], 'registry_hash' => $this->registry()['registry_hash'],
+        ]));
+        $suppliedPreview = trim((string) ($input['preview_fingerprint'] ?? ''));
+        if ($suppliedPreview !== '' && !hash_equals($base['preview_fingerprint'], $suppliedPreview)) return $this->blocked($base, 'PREVIEW_FINGERPRINT_MISMATCH');
         $base['safe_to_apply'] = true;
         return $base;
     }
@@ -125,8 +143,8 @@ final class RelationshipReadService
     { if ($operation === 'REMOVE' || $operation === 'REACTIVATE') return ['status' => 'PASS']; foreach ($this->graph->allEdges(false) as $edge) { if ($edge->predicate !== $rule->key) continue; if ($rule->outbound_cardinality === 'ONE' && $edge->source->reference->key() === $source->key() && ($current === [] || $edge->edge_uuid !== $current[0]->edge_uuid)) return ['status' => 'BLOCKED']; if ($rule->inbound_cardinality === 'ONE' && $edge->target->reference->key() === $target->key() && ($current === [] || $edge->edge_uuid !== $current[0]->edge_uuid)) return ['status' => 'BLOCKED']; } return ['status' => 'PASS']; }
     private function evidence(PredicateDefinition $rule, array $refs): array
     { if ($rule->evidence_requirement !== 'REQUIRED') return ['status' => 'PASS']; if ($refs === []) return ['status' => 'BLOCKED', 'code' => 'EVIDENCE_REQUIRED']; foreach ($refs as $ref) { $id = is_array($ref) ? (string) ($ref['evidence_id'] ?? '') : ''; if ($id === '' || (is_callable($this->evidenceState) && !($this->evidenceState)($id))) return ['status' => 'BLOCKED', 'code' => 'EVIDENCE_INVALID']; } return ['status' => 'PASS']; }
-    private function plan(string $operation, array $current, NodeReference $source, string $predicate, NodeReference $target): array
-    { $desired = ['action' => 'CREATE_OR_REACTIVATE', 'source' => ['type' => $source->endpoint_type, 'id' => $source->endpoint_key], 'predicate' => $predicate, 'target' => ['type' => $target->endpoint_type, 'id' => $target->endpoint_key]]; return match ($operation) { 'REMOVE' => [['action' => 'RELATION_RETIRE', 'relation_id' => $current[0]->edge_uuid, 'expected_edge_revision' => $current[0]->revision]], 'REPLACE' => array_merge($current === [] ? [] : [['action' => 'RELATION_RETIRE', 'relation_id' => $current[0]->edge_uuid, 'expected_edge_revision' => $current[0]->revision]], [$desired]), 'REACTIVATE' => [['action' => 'RELATION_REACTIVATE', 'relation_id' => $current[0]->edge_uuid, 'expected_edge_revision' => $current[0]->revision]], 'ADD' => $current !== [] && $current[0]->isActive() ? [['action' => 'RELATION_NO_OP', 'reason' => 'ALREADY_ACTIVE', 'idempotent' => true, 'relation_id' => $current[0]->edge_uuid, 'current_revision' => $current[0]->revision]] : [$desired], default => [$desired] }; }
+    private function plan(string $operation, array $current, NodeReference $source, string $predicate, NodeReference $target, bool $legacyPreview = false): array
+    { $desired = ['action' => 'CREATE_OR_REACTIVATE', 'source' => ['type' => $source->endpoint_type, 'id' => $source->endpoint_key], 'predicate' => $predicate, 'target' => ['type' => $target->endpoint_type, 'id' => $target->endpoint_key]]; return match ($operation) { 'REMOVE' => [['action' => 'RELATION_RETIRE', 'relation_id' => $current[0]->edge_uuid, 'expected_edge_revision' => $current[0]->revision]], 'REPLACE' => $legacyPreview ? array_merge([['action' => 'RELATION_RETIRE', 'relation_id' => $current[0]->edge_uuid, 'expected_edge_revision' => $current[0]->revision]], [$desired]) : [['action' => 'RELATION_REPLACE', 'relation_id' => $current[0]->edge_uuid, 'expected_edge_revision' => $current[0]->revision] + $desired], 'REACTIVATE' => [['action' => 'RELATION_REACTIVATE', 'relation_id' => $current[0]->edge_uuid, 'expected_edge_revision' => $current[0]->revision]], 'ADD' => $current !== [] && $current[0]->isActive() ? [['action' => 'RELATION_NO_OP', 'reason' => 'ALREADY_ACTIVE', 'idempotent' => true, 'relation_id' => $current[0]->edge_uuid, 'current_revision' => $current[0]->revision]] : [$desired], default => [$desired] }; }
     private function edge($edge): array { return ['edge_uuid' => $edge->edge_uuid, 'source' => ['type' => $edge->source->reference->endpoint_type, 'id' => $edge->source->reference->endpoint_key], 'predicate' => $edge->predicate, 'target' => ['type' => $edge->target->reference->endpoint_type, 'id' => $edge->target->reference->endpoint_key], 'state' => $edge->state === EdgeState::ACTIVE ? 'ACTIVE' : 'RETIRED', 'revision' => $edge->revision]; }
     private function locator(mixed $value, mixed $type, mixed $id): ?array { if (is_array($value)) { $type = $value['type'] ?? $value['endpoint_type'] ?? $type; $id = $value['id'] ?? $value['uuid'] ?? $value['endpoint_key'] ?? $id; } return is_string($type) && is_string($id) && trim($type) !== '' && trim($id) !== '' ? ['type' => trim($type), 'id' => trim($id)] : null; }
     private function blocked(array $base, string $code): array { $base['blockers'][] = $code; $base['safe_to_apply'] = false; return $base; }

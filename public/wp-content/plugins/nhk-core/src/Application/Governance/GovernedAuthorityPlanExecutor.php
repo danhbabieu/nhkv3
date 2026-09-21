@@ -137,7 +137,7 @@ final class GovernedAuthorityPlanExecutor implements GovernedAuthorityPlanApplie
     {
         $action = strtoupper((string) ($candidate['action'] ?? 'CREATE'));
         $isRelation = isset($candidate['predicate']) || isset($candidate['source_type']);
-        $operation = $isRelation ? 'relation_create' : (strtolower($action) === 'create' ? 'create' : strtolower($action));
+        $operation = $isRelation ? (strtolower((string) ($candidate['operation'] ?? '')) === 'replace' ? 'relation_replace' : (strtolower((string) ($candidate['operation'] ?? '')) === 'remove' ? 'relation_retire' : (strtolower((string) ($candidate['operation'] ?? '')) === 'reactivate' ? 'relation_reactivate' : 'relation_create'))) : (strtolower($action) === 'create' ? 'create' : strtolower($action));
         $entityType = $isRelation ? 'relation' : (string) ($candidate['entity_type'] ?? '');
         $payload = $candidate;
         $payload['candidate_id'] = (string) ($candidate['candidate_id'] ?? '');
@@ -166,10 +166,10 @@ final class GovernedAuthorityPlanExecutor implements GovernedAuthorityPlanApplie
         if ($stagingAcceptance !== null) $payload['staging_acceptance'] = $stagingAcceptance;
         $contentFingerprint = hash('sha256', CommandCanonicalizer::canonicalize($payload));
         $dependencyIds = array_values(array_filter(array_map('strval', (array) ($candidate['dependencies'] ?? []))));
-        $targetUuid = !$isRelation && !in_array($operation, ['create', 'ingest'], true) ? trim((string) ($candidate['canonical_uuid'] ?? $candidate['target_uuid'] ?? '')) : null;
-        $expectedRevision = !$isRelation && !in_array($operation, ['create', 'ingest'], true)
+        $targetUuid = $isRelation && in_array($operation, ['relation_retire', 'relation_reactivate'], true) ? trim((string) ($candidate['current_relation_id'] ?? '')) : (!$isRelation && !in_array($operation, ['create', 'ingest'], true) ? trim((string) ($candidate['canonical_uuid'] ?? $candidate['target_uuid'] ?? '')) : null);
+        $expectedRevision = $isRelation && in_array($operation, ['relation_retire', 'relation_reactivate'], true) ? max(1, (int) ($candidate['expected_edge_revision'] ?? 1)) : (!$isRelation && !in_array($operation, ['create', 'ingest'], true)
             ? max(1, (int) ($candidate['expected_revision'] ?? $candidate['canonical_revision'] ?? 1))
-            : null;
+            : null);
         $scopeSuffix = $stagingAcceptance === null ? '' : ':' . hash('sha256', CommandCanonicalizer::canonicalize($stagingAcceptance));
         return ['operation' => $operation, 'entity_type' => $entityType, 'subject_id' => (string) ($candidate['canonical_uuid'] ?? $candidate['source_uuid'] ?? $entityType), 'target_uuid' => $targetUuid, 'expected_revision' => $expectedRevision, 'payload' => $payload, 'content_fingerprint' => $contentFingerprint, 'dependency_fingerprint' => hash('sha256', CommandCanonicalizer::canonicalize($dependencyIds)), 'dependency_ids' => $dependencyIds, 'idempotency_key' => 'authority-plan:' . $planFingerprint . ':' . (string) ($candidate['candidate_id'] ?? '') . $scopeSuffix, 'actor' => $actor];
     }

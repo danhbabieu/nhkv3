@@ -484,7 +484,9 @@ final class McpTransport
         }
         $intent = is_array($arguments['authority_intent'] ?? null) ? $arguments['authority_intent'] : [];
         $declaredPurpose = strtoupper(trim((string) ($arguments['purpose'] ?? '')));
-        $authorityPacket = in_array($declaredPurpose, ['AUTHORITY', 'MIXED'], true) || in_array((string) ($intent['mode'] ?? ''), ['PLAN', 'APPLY_APPROVED_PLAN'], true);
+        $authorityPacket = in_array($declaredPurpose, ['AUTHORITY', 'MIXED'], true)
+            || in_array((string) ($intent['mode'] ?? ''), ['PLAN', 'APPLY_APPROVED_PLAN'], true)
+            || is_array($arguments['relationship_operations'] ?? null);
         if ($authorityPacket) {
             $this->assertAuthoritySemanticWriteAllowed();
             if ($this->authorityCapture === null) throw new \RuntimeException('AUTHORITY_CAPTURE_UNAVAILABLE');

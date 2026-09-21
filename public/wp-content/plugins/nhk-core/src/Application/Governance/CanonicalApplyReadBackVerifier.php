@@ -18,7 +18,7 @@ final class CanonicalApplyReadBackVerifier
         // example entity_type=knowledge), but its canonical apply result is
         // owned by Graph. Keep the check strict while resolving the correct
         // canonical owner for the result.
-        $canonicalType = in_array($proposal->operation, ['relation_create', 'relation_retire', 'relation_reactivate'], true)
+        $canonicalType = in_array($proposal->operation, ['relation_create', 'relation_retire', 'relation_reactivate', 'relation_replace'], true)
             ? 'relation'
             : $proposal->entityType;
         $readBack = ($this->reader)($canonicalType, $resultId);

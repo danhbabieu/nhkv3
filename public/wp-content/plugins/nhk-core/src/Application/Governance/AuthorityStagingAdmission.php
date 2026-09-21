@@ -48,7 +48,7 @@ final class AuthorityStagingAdmission
             $operation = strtolower(trim((string) ($binding['operation'] ?? '')));
             if ($candidateId === '' || str_contains($candidateId, '*') || in_array($candidateId, $candidateIds, true)
                 || ($entityType !== 'relation' && !$types->has($entityType))
-                || ($entityType === 'relation' && $operation !== 'relation_create')
+                || ($entityType === 'relation' && !in_array($operation, ['relation_create', 'relation_retire', 'relation_reactivate', 'relation_replace'], true))
                 || ($entityType !== 'relation' && !in_array($operation, self::OPERATIONS, true))) return false;
             $candidateIds[] = $candidateId;
             if (!preg_match('/^[a-f0-9]{64}$/i', (string) ($binding['candidate_payload_fingerprint'] ?? ''))
@@ -87,14 +87,21 @@ final class AuthorityStagingAdmission
         $predicate = trim((string) ($binding['predicate'] ?? ''));
         $sourceType = strtolower(trim((string) ($binding['source_type'] ?? '')));
         $targetType = strtolower(trim((string) ($binding['target_type'] ?? '')));
-        if (strtolower((string) ($binding['operation'] ?? '')) !== 'relation_create'
+        $operation = strtolower((string) ($binding['operation'] ?? ''));
+        if (!in_array($operation, ['relation_create', 'relation_retire', 'relation_reactivate', 'relation_replace'], true)
             || $predicate === '' || $sourceType === '' || $targetType === ''
             || !$this->registeredRelation($predicates, $predicate, $sourceType, $targetType)
-            || !UuidCodec::isValid((string) ($binding['target_uuid'] ?? ''))
-            || (int) ($binding['target_revision'] ?? 0) < 1) return false;
+            || !$this->validEndpointKey($targetType, (string) ($binding['target_uuid'] ?? ''))
+            || ($operation === 'relation_create' && (int) ($binding['target_revision'] ?? 0) < 1)
+            || ($operation !== 'relation_create' && (!UuidCodec::isValid((string) ($binding['current_relation_id'] ?? '')) || (int) ($binding['expected_edge_revision'] ?? 0) < 1))) return false;
         // A relation source may be created by an earlier candidate in the
         // same plan, so source_uuid can legitimately bind later.
-        return ($binding['source_uuid'] ?? '') === '' || UuidCodec::isValid((string) $binding['source_uuid']);
+        return ($binding['source_uuid'] ?? '') === '' || $this->validEndpointKey($sourceType, (string) $binding['source_uuid']);
+    }
+
+    private function validEndpointKey(string $type, string $key): bool
+    {
+        return $type === 'wp_post' ? preg_match('/^[1-9][0-9]*:[1-9][0-9]*$/', $key) === 1 : UuidCodec::isValid($key);
     }
 
     private function registeredRelation(PredicateRegistry $predicates, string $predicate, string $sourceType, string $targetType): bool

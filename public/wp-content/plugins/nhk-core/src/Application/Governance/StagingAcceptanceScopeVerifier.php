@@ -290,7 +290,7 @@ final class StagingAcceptanceScopeVerifier
         foreach (['reuse', 'create_candidates', 'update_candidates', 'relation_candidates', 'relation_reuse'] as $bucket) foreach ((array) ($plan[$bucket] ?? []) as $candidate) {
             if (!is_array($candidate) || !in_array((string) ($candidate['candidate_id'] ?? ''), $candidateIds, true) || strtoupper((string) ($candidate['action'] ?? 'CREATE')) === 'REUSE') continue;
             $isRelation = isset($candidate['predicate']) || isset($candidate['source_type']);
-            $operation = $isRelation ? 'relation_create' : (strtolower((string) ($candidate['action'] ?? 'create')) === 'create' ? 'create' : strtolower((string) ($candidate['action'] ?? 'update')));
+            $operation = $isRelation ? match (strtoupper((string) ($candidate['operation'] ?? 'ADD'))) { 'REMOVE' => 'relation_retire', 'REACTIVATE' => 'relation_reactivate', 'REPLACE' => 'relation_replace', default => 'relation_create' } : (strtolower((string) ($candidate['action'] ?? 'create')) === 'create' ? 'create' : strtolower((string) ($candidate['action'] ?? 'update')));
             $entityType = $isRelation ? 'relation' : (string) ($candidate['entity_type'] ?? '');
             $subjectId = $isRelation ? (string) ($candidate['source_uuid'] ?? $candidate['source_id'] ?? '') : ($operation === 'create' ? $entityType : (string) ($candidate['canonical_uuid'] ?? $candidate['target_uuid'] ?? ''));
             $targetUuid = !$isRelation && !in_array($operation, ['create', 'ingest'], true) ? trim((string) ($candidate['canonical_uuid'] ?? $candidate['target_uuid'] ?? '')) : '';
@@ -299,7 +299,7 @@ final class StagingAcceptanceScopeVerifier
                 ? [
                     'candidate_id' => (string) $candidate['candidate_id'],
                     'entity_type' => 'relation',
-                    'operation' => 'relation_create',
+                    'operation' => $operation,
                     'subject_id' => $subjectId,
                     'source_type' => (string) ($candidate['source_type'] ?? ''),
                     'source_uuid' => $subjectId,
@@ -311,6 +311,10 @@ final class StagingAcceptanceScopeVerifier
                     'expected_revision' => null,
                 ]
                 : ['candidate_id' => (string) $candidate['candidate_id'], 'entity_type' => $entityType, 'operation' => $operation, 'subject_id' => $subjectId, 'target_uuid' => $targetUuid, 'expected_revision' => !in_array($operation, ['create', 'ingest'], true) ? max(1, (int) ($candidate['expected_revision'] ?? $candidate['canonical_revision'] ?? 1)) : null];
+            if ($isRelation && $operation !== 'relation_create') {
+                $binding['current_relation_id'] = (string) ($candidate['current_relation_id'] ?? '');
+                $binding['expected_edge_revision'] = (int) ($candidate['expected_edge_revision'] ?? 0);
+            }
             $binding['dependencies'] = $dependencies;
             $binding['dependency_fingerprint'] = hash('sha256', CommandCanonicalizer::canonicalize($dependencies));
             $binding['candidate_payload_fingerprint'] = hash('sha256', CommandCanonicalizer::canonicalize($candidate));

@@ -84,7 +84,7 @@ final readonly class StagingOperationDescriptor
             'knowledge:create', 'knowledge:ingest', 'knowledge:update', 'knowledge:retire' => 'knowledge_delta',
             'video:ingest', 'video:update', 'video:retire', 'video:reactivate' => 'governed_video_plan',
             'video:source_refresh' => 'video_source_refresh',
-            'relation:relation_create' => 'capture_child_relation',
+            'relation:relation_create', 'relation:relation_retire', 'relation:relation_reactivate', 'relation:relation_replace' => 'capture_child_relation',
             default => '',
         };
     }

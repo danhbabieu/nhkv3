@@ -47,6 +47,23 @@ final class McpToolCatalog
                 'purpose' => ['type' => 'string', 'enum' => ['EDITORIAL', 'AUTHORITY', 'MIXED']],
                 'intent' => ['type' => 'string', 'enum' => ContentIntent::values()],
                 'dry_run' => ['type' => 'boolean'],
+                'relationship_operations' => [
+                    'type' => 'array', 'minItems' => 1, 'maxItems' => 50,
+                    'items' => ['type' => 'object', 'additionalProperties' => false, 'properties' => [
+                        'operation' => ['type' => 'string', 'enum' => ['ADD', 'REPLACE', 'REMOVE', 'REACTIVATE']],
+                        'relationship_kind' => ['type' => 'string', 'enum' => ['graph']],
+                        'source' => ['type' => 'object', 'required' => ['type', 'id'], 'additionalProperties' => false],
+                        'predicate' => ['type' => 'string', 'minLength' => 1],
+                        'target' => ['type' => 'object', 'required' => ['type', 'id'], 'additionalProperties' => false],
+                        'current_relation_id' => self::uuidField(true),
+                        'expected_edge_revision' => ['type' => 'integer', 'minimum' => 1],
+                        'provenance' => ['type' => 'string'],
+                        'evidence_refs' => ['type' => 'array', 'items' => ['type' => 'object']],
+                        'reason' => ['type' => 'string'],
+                        'preview_fingerprint' => ['type' => 'string'],
+                        'registry_hash' => ['type' => 'string'],
+                    ], 'required' => ['operation', 'relationship_kind', 'source', 'predicate', 'target']],
+                ],
                 'knowledge_repair' => ['type' => 'object', 'properties' => [
                     'canonical_knowledge_uuid' => self::uuidField(), 'expected_revision' => ['type' => 'integer', 'minimum' => 1], 'operation' => ['type' => 'string', 'enum' => ['update', 'retire']],
                     'delta' => ['type' => 'object', 'properties' => ['text' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 10000], 'claim_type' => ['type' => 'string', 'enum' => ['fact', 'specification', 'history', 'technical', 'provenance', 'other']]], 'additionalProperties' => false],

@@ -150,6 +150,63 @@ final class EditorialCaptureContinuationTest extends TestCase
         self::assertCount(0, $addenda->records);
     }
 
+    public function test_historical_applied_video_retry_rechecks_public_readiness_without_semantic_reentry(): void
+    {
+        $captures = new ContinuationCaptureRepository();
+        $addenda = new ContinuationAddendumRepository();
+        $videoId = UuidCodec::newV7();
+        $capture = new CaptureRecord(
+            UuidCodec::newV7(),
+            'capture-historical-video-retry',
+            hash('sha256', 'historical-video-retry'),
+            CaptureStage::SEMANTICS_RECONCILED->value,
+            'PARTIAL',
+            null,
+            null,
+            [['kind' => 'video', 'video_id' => $videoId, 'video_proposal' => ['payload' => ['canonical_id' => $videoId]]]],
+            ['purpose' => 'EDITORIAL', 'raw_input' => 'Video đã tồn tại.', 'content_intent' => ['intent' => 'VIDEO', 'article_required' => false]],
+            [
+                'completion' => ['status' => 'PARTIAL', 'blockers' => ['PUBLIC_ELIGIBILITY_NOT_VERIFIED', 'CONTENT_NEEDS_REVIEW'], 'missing_required_owners' => [], 'children' => [['owner_type' => 'video', 'owner_id' => $videoId, 'status' => 'PARTIAL', 'complete' => false]]],
+                'semantic_write_back' => ['status' => 'APPLIED', 'canonical_readback' => ['canonical_id' => $videoId, 'revision' => 7], 'writes' => []],
+            ],
+            ['SEMANTICS_RECONCILED' => ['status' => 'COMPLETED', 'result' => 'APPLIED']],
+        );
+        $captures->create($capture);
+        $events = [];
+        $service = new EditorialCaptureContinuationService($captures, $addenda, $this->coordinator($captures, $events, null, static function (array $context) use (&$events, $videoId): array {
+            $events['video_verifier'] = ($events['video_verifier'] ?? 0) + 1;
+            $complete = ($events['pass'] ?? false) === true;
+            return ['status' => $complete ? 'VERIFIED' : 'PARTIAL', 'items' => [['video_id' => $videoId, 'completion' => ['owner_type' => 'video', 'owner_id' => $videoId, 'status' => $complete ? 'COMPLETE' : 'PARTIAL', 'complete' => $complete, 'canonical_readback' => ['canonical_id' => $videoId], 'dependency_state' => 'COMPLETE', 'relation_or_usage_state' => 'COMPLETE', 'content_state' => 'CONTENT_COMPLETE', 'public_state' => $complete ? 'READY' : 'BLOCKED', 'frontend_state' => $complete ? 'VERIFIED' : 'BLOCKED', 'blockers' => $complete ? [] : ['FRONTEND_READBACK_NOT_VERIFIED']]]], 'blockers' => $complete ? [] : ['FRONTEND_READBACK_NOT_VERIFIED']];
+        }));
+
+        $result = $service->retry([
+            'capture_id' => $capture->captureId,
+            'resume_mode' => 'RETRY',
+            'purpose' => 'EDITORIAL',
+            'intent' => 'VIDEO',
+            'governance' => ['approval_confirmed' => true],
+        ]);
+
+        self::assertSame($capture->captureId, $result['capture']['capture_id']);
+        self::assertSame('REVIEW_REQUIRED', $result['capture']['status']);
+        self::assertContains('FRONTEND_READBACK_NOT_VERIFIED', $result['capture']['diagnostics']['completion']['blockers']);
+        self::assertSame(1, $events['video_verifier']);
+        self::assertArrayNotHasKey('semantic', $events);
+        self::assertArrayNotHasKey('physical', $events);
+        self::assertArrayNotHasKey('draft', $events);
+        self::assertTrue($result['retry']['eligible']);
+        self::assertCount(0, $addenda->records);
+
+        $events['pass'] = true;
+        $converged = $service->retry(['capture_id' => $capture->captureId, 'resume_mode' => 'RETRY']);
+        self::assertSame('COMPLETE', $converged['capture']['status']);
+        self::assertNotContains('CONTENT_NEEDS_REVIEW', $converged['capture']['diagnostics']['completion']['blockers']);
+        self::assertNotContains('PUBLIC_ELIGIBILITY_NOT_VERIFIED', $converged['capture']['diagnostics']['completion']['blockers']);
+        self::assertSame(2, $events['video_verifier']);
+        self::assertFalse($converged['retry']['eligible']);
+        self::assertSame('CAPTURE_RETRY_NOT_ALLOWED', $converged['retry']['reason']);
+    }
+
     public function test_complete_capture_without_missing_owner_is_read_only_no_op(): void
     {
         $captures = new ContinuationCaptureRepository();
@@ -798,7 +855,7 @@ final class EditorialCaptureContinuationTest extends TestCase
     }
 
     /** @param array<string,int|string> $events */
-    private function coordinator(ContinuationCaptureRepository $captures, array &$events, ?callable $semantic = null): EditorialCaptureCoordinator
+    private function coordinator(ContinuationCaptureRepository $captures, array &$events, ?callable $semantic = null, ?callable $videoVerifier = null): EditorialCaptureCoordinator
     {
         return new EditorialCaptureCoordinator(
             $captures,
@@ -813,6 +870,11 @@ final class EditorialCaptureContinuationTest extends TestCase
             static fn (array $context): array => ['eligible' => false, 'blockers' => ['OWNER_PUBLICATION_REQUIRED']],
             static fn (array $context): array => ['status' => 'verified'],
             static function (array $context): array { return ['ok' => true, 'state_token' => $context['expected_state_token'] ?? 'state-342']; },
+            null,
+            null,
+            null,
+            null,
+            $videoVerifier,
         );
     }
 }

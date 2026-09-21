@@ -20,16 +20,20 @@ final class EditorialCaptureContinuationService
         $captureId = trim((string) ($input['capture_id'] ?? ''));
         $key = trim((string) ($input['idempotency_key'] ?? ''));
         if (!UuidCodec::isValid($captureId)) return $this->retryFailure($captureId, 'CAPTURE_RETRY_CAPTURE_ID_INVALID');
-        if ($key === '') return $this->retryFailure($captureId, 'CAPTURE_RETRY_IDEMPOTENCY_KEY_REQUIRED');
         if (strtoupper(trim((string) ($input['resume_mode'] ?? ''))) !== 'RETRY') return $this->retryFailure($captureId, 'CAPTURE_RETRY_MODE_REQUIRED');
-        foreach (['text', 'content', 'title', 'excerpt', 'subject_hints', 'observations', 'metadata', 'media', 'items', 'media_ids', 'existing_media_urls', 'media_bindings', 'media_operations', 'publish', 'video', 'files', 'followup_mode', 'intent', 'purpose'] as $field) {
-            if (!array_key_exists($field, $input)) continue;
-            $value = $input[$field];
-            if (is_array($value) ? $value !== [] : ($value === true || trim((string) $value) !== '')) return $this->retryFailure($captureId, 'CAPTURE_RETRY_PAYLOAD_NOT_ALLOWED');
-        }
         $capture = $this->captures->findById($captureId);
         if (!$capture instanceof CaptureRecord) return $this->retryFailure($captureId, 'CAPTURE_NOT_FOUND');
-        if (!hash_equals($capture->idempotencyKey, $key)) return $this->retryFailure($captureId, 'CAPTURE_RETRY_IDEMPOTENCY_KEY_MISMATCH', $capture);
+        if ($key !== '' && !hash_equals($capture->idempotencyKey, $key)) return $this->retryFailure($captureId, 'CAPTURE_RETRY_IDEMPOTENCY_KEY_MISMATCH', $capture);
+        foreach (['text', 'content', 'title', 'excerpt', 'subject_hints', 'observations', 'metadata', 'media', 'items', 'media_ids', 'existing_media_urls', 'media_bindings', 'media_operations', 'publish', 'video', 'files', 'followup_mode'] as $field) {
+            if (!array_key_exists($field, $input)) continue;
+            $value = $input[$field];
+            if (is_array($value) ? $value !== [] : ($value === true || trim((string) $value) !== '')) return $this->retryFailure($captureId, 'CAPTURE_RETRY_PAYLOAD_NOT_ALLOWED', $capture);
+        }
+        $intent = strtoupper(trim((string) ($input['intent'] ?? '')));
+        $storedIntent = is_array($capture->context['content_intent'] ?? null) ? strtoupper(trim((string) ($capture->context['content_intent']['intent'] ?? ''))) : '';
+        if ($intent !== '' && $storedIntent !== '' && $intent !== $storedIntent) return $this->retryFailure($captureId, 'CAPTURE_RETRY_INTENT_MISMATCH', $capture);
+        $purpose = strtoupper(trim((string) ($input['purpose'] ?? '')));
+        if ($purpose !== '' && $purpose !== strtoupper(trim((string) ($capture->context['purpose'] ?? 'EDITORIAL')))) return $this->retryFailure($captureId, 'CAPTURE_RETRY_PURPOSE_MISMATCH', $capture);
         $retryDecision = CaptureCurrentOutcomeReducer::retryEligibility($capture, $input);
         $completionResumable = $retryDecision['eligible'] && $capture->status !== 'FAILED_RETRYABLE';
         if (!$completionResumable && in_array($capture->stage, [CaptureStage::READY_FOR_PUBLICATION->value, CaptureStage::PUBLISHED->value], true)) {
@@ -39,8 +43,11 @@ final class EditorialCaptureContinuationService
 
         $retryInput = $this->rehydrateRetryInput($capture, $input);
         try {
-            $continued = $this->coordinator->retry($capture, $retryInput);
-            return ['capture' => $continued->toArray(), 'retry' => ['mode' => 'RETRY', 'status' => $continued->status, 'code' => CaptureCurrentOutcomeReducer::failureCode($continued)]];
+            $continued = CaptureCurrentOutcomeReducer::supportsCanonicalVideoCompletionRetry($capture)
+                ? $this->coordinator->retryVideoCompletion($capture, $retryInput)
+                : $this->coordinator->retry($capture, $retryInput);
+            $decision = CaptureCurrentOutcomeReducer::retryEligibility($continued);
+            return ['capture' => $continued->toArray(), 'retry' => ['mode' => 'RETRY', 'status' => $continued->status, 'code' => CaptureCurrentOutcomeReducer::failureCode($continued), 'eligible' => $decision['eligible'], 'reason' => $decision['reason']]];
         } catch (\Throwable $error) {
             return $this->retryFailure($captureId, $this->code($error), $this->captures->findById($captureId));
         }
@@ -207,6 +214,7 @@ final class EditorialCaptureContinuationService
         if ($children === []) {
             $children = array_values(array_unique(array_map('strtolower', array_map('strval', (array) ($capture->diagnostics['resume_hints']['resume_children'] ?? [])))));
         }
+        if ($children === [] && CaptureCurrentOutcomeReducer::supportsCanonicalVideoCompletionRetry($capture)) $children = ['video'];
         if ($children !== []) $governance['resume_children'] = $children;
         return [
             'purpose' => (string) ($context['purpose'] ?? 'EDITORIAL'),

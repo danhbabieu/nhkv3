@@ -57,7 +57,7 @@ final class ProposalEligibilityService
         // WordPress endpoint key such as 1:487 is not an Authority UUID, so
         // do not send it through the generic canonical-target check before
         // the relation-specific revision checks below.
-        if ($proposal->operation !== 'relation_create' && !$isCreation && $proposal->subjectId !== '' && !$this->reader->targetExists($proposal->targetUuid ?: $proposal->subjectId)) $reasons[] = 'TARGET_NOT_FOUND';
+        if (!in_array($proposal->operation, ['relation_create', 'relation_retire', 'relation_reactivate', 'relation_replace'], true) && !$isCreation && $proposal->subjectId !== '' && !$this->reader->targetExists($proposal->targetUuid ?: $proposal->subjectId)) $reasons[] = 'TARGET_NOT_FOUND';
         if ($proposal->entityType === 'media' && $proposal->operation === 'representative_bind') {
             $mediaRevision = (int) ($proposal->payload['media_revision'] ?? $proposal->expectedRevision ?? 0);
             $targetRevision = (int) ($proposal->payload['target_revision'] ?? 0);
@@ -102,7 +102,7 @@ final class ProposalEligibilityService
             if ($sourceRevision < 1 || $targetRevision < 1) $reasons[] = 'MERGE_REVISIONS_REQUIRED';
             if ($proposal->subjectId !== '' && $this->reader->targetRevision($proposal->subjectId) !== $sourceRevision) $reasons[] = 'SOURCE_REVISION_CHANGED';
             if ($proposal->targetUuid !== null && $this->reader->targetRevision($proposal->targetUuid) !== $targetRevision) $reasons[] = 'TARGET_REVISION_CHANGED';
-        } elseif ($proposal->operation === 'relation_create') {
+        } elseif (in_array($proposal->operation, ['relation_create', 'relation_retire', 'relation_reactivate', 'relation_replace'], true)) {
             if (($proposal->payload['predicate'] ?? '') === 'classified_as') {
                 try {
                     ($this->classifiedAs ?? new ClassifiedAsPolicy())->assertCandidate([
@@ -120,7 +120,8 @@ final class ProposalEligibilityService
             $targetRevision = (int) ($proposal->payload['target_revision'] ?? 0);
             $sourceId = (string) ($proposal->payload['source_uuid'] ?? $proposal->subjectId);
             $targetId = (string) ($proposal->payload['target_uuid'] ?? '');
-            if ($sourceRevision < 1 || $targetRevision < 1 || $this->reader->targetRevision($sourceId) !== $sourceRevision || $this->reader->targetRevision($targetId) !== $targetRevision) $reasons[] = 'TARGET_REVISION_CHANGED';
+            if ($proposal->operation === 'relation_create' && ($sourceRevision < 1 || $targetRevision < 1 || $this->reader->targetRevision($sourceId) !== $sourceRevision || $this->reader->targetRevision($targetId) !== $targetRevision)) $reasons[] = 'TARGET_REVISION_CHANGED';
+            if ($proposal->operation !== 'relation_create' && (int) ($proposal->payload['expected_edge_revision'] ?? 0) < 1) $reasons[] = 'REVISION_CONFLICT';
         } elseif (!$isCreation && !($proposal->entityType === 'media' && in_array($proposal->operation, ['add', 'replace', 'remove'], true)) && $proposal->subjectId !== '' && $proposal->expectedRevision > 0 && $this->reader->targetRevision($proposal->targetUuid ?: $proposal->subjectId) !== $proposal->expectedRevision) $reasons[] = 'TARGET_REVISION_CHANGED';
         $dependencyRevisions = $proposal->payload['dependency_revisions'] ?? [];
         if (is_array($dependencyRevisions)) {

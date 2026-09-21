@@ -878,7 +878,7 @@ final class Plugin {
             $capture = null;
             $authorityCapture = new \NHK\Core\Application\Capture\AuthorityCaptureService(
                 $captureRepository,
-                static function (array $input, \NHK\Core\Domain\Capture\CaptureRecord $capture) use ($authority, $types, $documentation, $automationResolver, $authorityPolicyStorage, $explicitRelationIntentPlanner): array {
+                static function (array $input, \NHK\Core\Domain\Capture\CaptureRecord $capture) use ($authority, $types, $documentation, $automationResolver, $authorityPolicyStorage, $explicitRelationIntentPlanner, $relationshipRead): array {
                     $checkpoint = $documentation->bootstrap();
                     $generic = \NHK\Core\Domain\Governance\AutomationMode::REVIEW_REQUIRED;
                     foreach (['brand', 'model', 'variant', 'movement', 'music', 'component', 'classification', 'specimen', 'product'] as $type) if (in_array($automationResolver->resolve($type), [\NHK\Core\Domain\Governance\AutomationMode::AUTO_APPROVE, \NHK\Core\Domain\Governance\AutomationMode::AUTO_PUBLISH], true)) $generic = \NHK\Core\Domain\Governance\AutomationMode::AUTO_APPROVE;
@@ -895,7 +895,32 @@ final class Plugin {
                         'predicate_registry_fingerprint' => hash('sha256', json_encode(array_map(static fn ($definition): array => [$definition->key, $definition->allowed_source_types, $definition->allowed_target_types, $definition->outbound_cardinality, $definition->inbound_cardinality], $predicateRegistry->all()), JSON_THROW_ON_ERROR)),
                         'semantic_contract_version' => 'authority-graph-2026-09-11',
                     ]);
-                    return (new \NHK\Core\Application\Authority\AuthorityIntentPlanner($authority, $types, relationIntents: $explicitRelationIntentPlanner))->plan($input, ['capture_id' => $capture->captureId, 'capture_revision' => (int) ($capture->context['planning_revision'] ?? $capture->revision), 'contract' => $contract]);
+                    $plan = (new \NHK\Core\Application\Authority\AuthorityIntentPlanner($authority, $types, relationIntents: $explicitRelationIntentPlanner))->plan($input, ['capture_id' => $capture->captureId, 'capture_revision' => (int) ($capture->context['planning_revision'] ?? $capture->revision), 'contract' => $contract]);
+                    $operations = $input['relationship_operations'] ?? [];
+                    if (is_array($operations) && array_is_list($operations)) {
+                        foreach ($operations as $operationInput) {
+                            if (!is_array($operationInput)) { $plan['blockers'][] = ['code' => 'RELATION_OPERATION_MALFORMED']; continue; }
+                            $preview = $relationshipRead->preview($operationInput);
+                            $operation = strtoupper((string) ($operationInput['operation'] ?? ''));
+                            $fingerprint = (string) ($preview['preview_fingerprint'] ?? '');
+                            if (!($preview['safe_to_apply'] ?? false)) { $plan['blockers'] = array_merge($plan['blockers'], array_map(static fn ($code): array => ['code' => (string) $code], (array) ($preview['blockers'] ?? ['RELATION_OPERATION_BLOCKED']))); continue; }
+                            $transition = (array) ($preview['planned_transition'] ?? []);
+                            $candidate = [
+                                'candidate_id' => 'relationship-operation-' . hash('sha256', json_encode([$operationInput, $fingerprint], JSON_THROW_ON_ERROR)),
+                                'entity_type' => 'relation', 'operation' => $operation, 'action' => $operation === 'ADD' ? 'CREATE' : $operation,
+                                'source_type' => (string) ($preview['normalized_source']['type'] ?? ''), 'source_uuid' => (string) ($preview['normalized_source']['id'] ?? ''),
+                                'predicate' => (string) ($operationInput['predicate'] ?? ''), 'target_type' => (string) ($preview['normalized_target']['type'] ?? ''), 'target_uuid' => (string) ($preview['normalized_target']['id'] ?? ''),
+                                'current_relation_id' => (string) ($operationInput['current_relation_id'] ?? ''), 'expected_edge_revision' => (int) ($operationInput['expected_edge_revision'] ?? 0),
+                                'source_revision' => (int) ($preview['revision_state']['source_revision'] ?? 0), 'target_revision' => (int) ($preview['revision_state']['target_revision'] ?? 0),
+                                'provenance' => (string) ($operationInput['provenance'] ?? ''), 'evidence_refs' => (array) ($operationInput['evidence_refs'] ?? []), 'reason' => (string) ($operationInput['reason'] ?? ''),
+                                'preview_fingerprint' => $fingerprint, 'registry_hash' => (string) ($operationInput['registry_hash'] ?? ''), 'dependencies' => [], 'transition' => $transition,
+                            ];
+                            if ($operation === 'ADD' && (($transition[0]['action'] ?? '') === 'RELATION_NO_OP')) $plan['relation_reuse'][] = $candidate + ['action' => 'REUSE', 'canonical_id' => $transition[0]['relation_id'] ?? '', 'revision' => $transition[0]['current_revision'] ?? 0, 'idempotent' => true];
+                            else $plan['relation_candidates'][] = $candidate;
+                        }
+                        $plan['create_relations'] = array_values($plan['relation_candidates']);
+                    }
+                    return $plan;
                 },
                 static function (array $input, \NHK\Core\Domain\Capture\CaptureRecord $capture) use ($draftGateway): array {
                     return $draftGateway->create(['capture_id' => $capture->captureId, 'idempotency_key' => $capture->captureId . ':article', 'title' => (string) ($input['title'] ?? ''), 'content' => (string) ($input['text'] ?? $input['content'] ?? ''), 'excerpt' => (string) ($input['excerpt'] ?? '')]);
