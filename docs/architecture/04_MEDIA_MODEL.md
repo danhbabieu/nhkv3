@@ -427,3 +427,15 @@ representative role only when admitted by the registered
 `RepresentativeEligibilityRegistry` profiles. Movement generation/type
 remains the registered Movement payload contract; no new entity type,
 endpoint type or registry entry is invented by MediaUsage.
+
+### Phase 1 policy-owner clarification — 2026-09-21
+
+`SemanticSuitabilityPolicy` is the single owner of semantic suitability
+(`EXACT`, `COMPATIBLE`, `REVIEW_REQUIRED`, `INELIGIBLE`, `UNKNOWN`).
+`RepresentativeEligibilityRegistry` is the single owner of whether a target
+may receive representative coverage. `Media` owns canonical identity and
+`MediaUsage` owns target, role, placement and contextual presentation metadata.
+Roles such as `featured_primary`, `inline_primary`, `representative`,
+`technical_detail`, `evidence` and `gallery` are not suitability values.
+Article, MCP and historical P6 material consume these policies and must not
+define competing suitability or representative rules.

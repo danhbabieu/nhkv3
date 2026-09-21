@@ -128,45 +128,95 @@ selection is read-only and does not imply live acceptance.
 | Public URL identity, historic redirect and collision fail-closed behavior | `PersistedPublicIdentityRouteTest`, `HistoricPublicRouteResolverTest`, `PublicEntityRoutesTest` |
 | SEO/projection eligibility and sitemap policy | `ArticleSeoGateTest`, `EntitySeoProjectionTest`, `PreferredImageSeoProjectionTest`, `MediaAssetDeliveryTest` |
 
-## Known defects and blockers
+## Known defects
 
-These are recorded as baseline evidence, not implementation instructions:
+These are actual observed system/data/projection defects retained as regression
+evidence, not implementation instructions:
 
-1. The local WordPress/MySQL runtime is unavailable, so database schema state,
-   persisted fixtures, repository hydration and WordPress route behavior are
-   unverified at this checkpoint.
-2. The local MCP HTTP endpoint is unavailable, so deployed MCP catalog parity,
-   protocol behavior, connector exposure and live build identity are unverified.
-3. Integration/live acceptance cannot be claimed. Unit and Contract tests are
-   not substitutes for guarded `nhk_v3_test` integration evidence.
-4. Existing execution/parity evidence records open deployment, V2 parity,
-   public Media/Video readiness, migration review and cutover-readiness debt;
-   those items remain separate from the Phase 0 baseline and must not be
-   silently converted into architectural requirements.
+1. Article/Media semantic mismatch evidence exists in the current execution
+   and test records.
+2. Article native/canonical Media projection inconsistency evidence exists.
+3. Wrong cross-Article Media reuse evidence exists.
+
+Operational limitations are classified separately below and are not treated as
+architecture defects.
+
+## Environment limitations and deferred gates
+
+- Codex localhost WordPress/MySQL is unavailable; this does not invalidate
+  independently verified staging read-only evidence.
+- Codex cannot directly call the staging connector in this session.
+- Mutation boundaries were intentionally not exercised during Phase 0.
+- Deployment/cutover acceptance remains deferred to the applicable deployment
+  and Phase 8 gates.
 
 ## Verification performed
 
 | Check | Result |
 |---|---|
-| `vendor/bin/phpunit --testsuite 'NHK Unit'` | PASS — 2,025 tests, 9,950 assertions; 17 warnings, 30 deprecations, 27 PHPUnit deprecations |
+| `vendor/bin/phpunit --testsuite 'NHK Unit'` | PASS — 2,025 tests, 9,951 assertions; 17 warnings, 30 deprecations, 27 PHPUnit deprecations |
 | `vendor/bin/phpunit --testsuite 'NHK Contract'` | PASS — 6 tests, 48 assertions |
 | `php tools/deployment-preflight.php --expected-head=340c7493...` | 6 PASS, 5 environment-blocked FAILs |
 | `php tools/mcp-wire-smoke.php --base-url=http://localhost` | BLOCKED — connection refused before protocol negotiation |
 | Git status/diff check | PASS — clean before Phase 0; the only current uncommitted item is this Phase 0 evidence document |
 
-## Gate 0 result
+## Final Gate 0 result
 
-`EXIT_RESULT=BLOCKED_PENDING_RUNTIME`
+The current target staging runtime was independently verified by the connected
+ChatGPT/MCP client through fresh read-only calls. The verified tuple is:
 
-The repository/docs/worktree baseline is recorded and no code/data/schema/live
-mutation occurred. Gate 0 is not declared complete because `CURRENT_RUNTIME`
-and real runtime-backed golden-case evidence cannot be verified while the
-WordPress/MCP runtime is unavailable. Phase 1 must not start.
+```text
+SOURCE_REVISION=340c7493d06135d589b3f8e61310ac40080981f1
+RUNTIME_VERSION=0.1.0
+DOCUMENTATION_VERSION=5129662cd44be50ea52123f35c8f59e446c3377e580d5b5ceed6245e358d7d04
+MANIFEST_HASH=bc1b265f42a3e6190d407fae60b296f4897972eae334587ca2096feac58bc62e
+BUILD_IDENTITY=b44422e3243b593f45f0bb7dccf374be7b849f4560cd14faea2ba99df037e001
+CATALOG_VERSION=ac7bb409c18b9a3daea8e7f72aa47c95509b1d1234b082abc4d8015f99885650
+RESOURCE_VERSION=2644fca6bc74621085ce7271d21053ce7bff1e6011e842eee945015bb8d10c03
+RELEASE_IDENTITY=ec2fccdf068381f25ad3478a873976c021a14cc09f7e1901fc4be744cedb3dd8
+ENVIRONMENT=staging
+SITE=https://demo.1945.vn
+BOOTSTRAP_GENERATED_AT=2026-09-21T02:52:50+00:00
+```
 
-`NEXT_EXACT_ACTION=Restore or provide the approved read-only local WordPress/
-MySQL and MCP runtime, then rerun deployment preflight, documentation/runtime
-identity read-back, MCP wire smoke, guarded integration baseline and the
-selected golden-case probes. Do not enable semantic writes or mutate data.`
+Current-client read exposure is verified for documentation, environment/site,
+Article, Media, Video, Knowledge and scoped Public URL read boundaries.
+Mutation callability was intentionally not exercised.
+
+The local/staging build and release identities remain different and are
+recorded as `DEPLOYMENT_ARTIFACT_IDENTITY_VARIANCE`. Source, runtime,
+documentation, manifest, catalog and resource identities match. Therefore:
+
+```text
+FULL_PACKAGE_EQUIVALENCE=NOT_PROVEN
+FULL_DEPLOYMENT_PARITY=NOT_PROVEN
+DEPLOYMENT_ARTIFACT_VARIANCE=OPEN
+```
+
+This variance does not block Phase 1 Contract Audit, but must remain open for
+full deployment parity and Phase 8 closeout.
+
+Updated golden cases include healthy public Article `wp_post 55`, healthy draft
+Article `wp_post 575`, valid no-image draft Article `wp_post 548`, the two live
+Video cases, supported Knowledge, the scoped stable Public URL audit, and the
+multi-context Media `01a084c3-aceb-76fe-aa22-2500bc09562e`. Media evidence
+preserves existing roles (`featured_primary`, `inline_primary`,
+`representative`, `technical_detail`, `evidence`, `gallery`) and suitability
+states; no `contextual` MediaUsage role was invented.
+
+```text
+GATE_0A_REPOSITORY_DOCUMENTATION_BASELINE=PASS
+GATE_0B_RUNTIME_BUILD_IDENTITY=PASS_WITH_RECORDED_DEPLOYMENT_ARTIFACT_VARIANCE
+GATE_0C_GOLDEN_CASE_EVIDENCE=PASS
+GATE_0D_NO_MUTATION_AUDIT=PASS
+OFFICIAL_GATE_0=PASS
+PHASE_1=NOT_STARTED
+```
+
+The single persistent Program Ledger is
+`docs/architecture/NHK_V3_UNIFIED_CANONICAL_EVOLUTION_PROGRAM_LEDGER.md`.
+`V3_EXECUTION_STATE.md` remains dated execution evidence; its overlap with the
+Program Ledger is deferred to Phase 1 classification.
 
 ## Gate 0 reconciliation addendum
 
@@ -221,12 +271,11 @@ session. The report must retain producer, timestamp, evidence ID and
 canonical read-back payload hashes before it is promoted to fully verified
 Gate 0 evidence.
 
-The single Program Ledger and machine-readable evidence packet schemas are
-defined by the follow-up Gate 0 task but are not physically created here: no
-repository Program Ledger currently exists, and the task explicitly keeps
-Gate 0 read-only until the identity discrepancy and evidence provenance are
-resolved. `V3_EXECUTION_STATE.md` remains dated execution evidence, not a
-silently created second Program Ledger.
+The single Program Ledger is now recorded at
+`docs/architecture/NHK_V3_UNIFIED_CANONICAL_EVOLUTION_PROGRAM_LEDGER.md`.
+Machine-readable evidence packet schemas remain a Phase 1/2 documentation
+follow-up. `V3_EXECUTION_STATE.md` remains dated execution evidence, not a
+second Program Ledger.
 
 Updated verification at this addendum:
 
@@ -240,4 +289,4 @@ Updated verification at this addendum:
 - Current uncommitted change classification: this baseline document is
   `PROGRAM_WORK`; no source/code/schema/data/deployment mutation occurred.
 
-`EXIT_RESULT=CONDITIONAL_PENDING_BUILD_IDENTITY_AND_EVIDENCE_PROVENANCE`
+`EXIT_RESULT=SUPERSEDED_BY_PHASE0_FINAL_CLOSEOUT`

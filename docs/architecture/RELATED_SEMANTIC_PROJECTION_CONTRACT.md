@@ -320,3 +320,14 @@ Frontend consumers must not infer relations from external URLs, WordPress
 attachments or private Source/Evidence. A public-safe Knowledge projection may
 be included only after its own policy/readiness gate and does not make a Graph
 relation public; relation eligibility remains independent.
+
+## Phase 1 projection classification clarification — 2026-09-21
+
+The read-only projection may classify an eligible result as `DIRECT`, `DERIVED`,
+`CONTEXTUAL` or `EDITORIAL/DISCOVERY` when the current result vocabulary and
+consumer support the distinction. Graph reachability is a candidate-discovery
+signal only: it does not inherit Claim truth, strengthen a relation or permit
+shortcut persistence. Every emitted result remains traceable to canonical
+endpoints and the registered relation/provenance path. If a consumer cannot
+preserve the distinction, the result remains review/blocked rather than being
+promoted to a stronger semantic class.

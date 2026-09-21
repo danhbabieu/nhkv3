@@ -178,6 +178,27 @@ canonical Claim/revision reuse happen before any new proposal. A bounded
 continuation may update the existing Article draft, but Article prose remains
 editorial output and is never Evidence.
 
+### Phase 1 scope and provenance matrix — 2026-09-21
+
+The following matrix is the minimum classification boundary for Knowledge
+reuse and projection. It clarifies existing law; it does not add a new Claim
+type, endpoint, predicate or storage field.
+
+| Scope | Typical role | Required provenance/evidence | Allowed projection | Forbidden generalization |
+|---|---|---|---|---|
+| `CANONICAL_FACT` | subject-scoped atomic claim | resolved canonical Source/Evidence as applicable | governed public-safe Claim/Article projection | broadening subject or facet without evidence |
+| `CONFIGURATION` | configured relation/facet | explicit canonical subject and registered relation | bounded semantic/editorial context | treating configuration as universal fact |
+| `SPECIMEN` | one physical object | exact specimen identity and observation provenance | specimen-scoped observation | Variant/Model/Brand fact |
+| `OBSERVATION` | observed feature/state | observation source and scope | review-scoped or bounded Article context | canonical fact without governed evidence |
+| `EDITORIAL_EXPERIENCE` | reader-facing interpretation | editorial ownership and copy compliance | native WordPress prose | Evidence or semantic owner |
+| `HYPOTHESIS` | unresolved interpretation | explicit hypothesis status | review-only planning | public fact |
+| `DERIVED_CANDIDATE` | bounded query/research result | explainable path and source claims | proposal/review input | persisted shortcut truth |
+| `UNRESOLVED` | ambiguity or missing support | diagnostic evidence | blocked/review state | guessed identity or scope |
+
+Narrower scope cannot silently widen. Multiple provenance records may support
+one claim, but provenance count alone never upgrades semantic scope. Conflicting
+claims remain scoped and are not collapsed by projection.
+
 ### Knowledge facet visual dependency — 2026-09-11
 
 A Knowledge note/facet may declare a `VisualSupportRequirement` for a

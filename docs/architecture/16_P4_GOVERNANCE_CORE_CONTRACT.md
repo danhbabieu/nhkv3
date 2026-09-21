@@ -95,3 +95,14 @@ existing owner services and read-back; a visual relation that would alter
 semantic Claim/Source/Evidence/Graph state still requires its normal Proposal,
 Governance and eligibility gates. No visual binding may be exposed as Evidence
 or Claim merely because its suitability review passed.
+
+### Phase 1 policy-owner clarification — 2026-09-21
+
+Governance policy/services own semantic legality, approvals, materiality,
+dependency closure and CAS eligibility. `ControlledApplyService` executes an
+already-authorized mutation and records Apply/read-back state. A domain
+repository persists only its own canonical owner. MCP transport, handlers and
+composition roots admit, dispatch and wire these services; they must not copy
+Governance policy or create a parallel mutation writer. Execution refresh,
+dependency freshness and runtime checkpoint state are distinct from semantic
+materiality and semantic approval validity.

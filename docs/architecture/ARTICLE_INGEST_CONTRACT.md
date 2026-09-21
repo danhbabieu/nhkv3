@@ -433,6 +433,21 @@ durable media/editorial read-back carries the exact current token. Any other
 token drift remains a native WordPress CAS conflict. Recovery never guesses,
 replays a generic writer, overwrites user prose, or bypasses Governance.
 
+### Phase 1 policy-owner clarification — 2026-09-21
+
+Capture remains orchestration and continuation remains convergence orchestration.
+The shared `CompletionCoordinator` is the single policy boundary that decides
+`COMPLETE`, `PARTIAL` or `BLOCKED` from canonical owner read-back,
+dependencies, relation/usage reconciliation and applicable projection state.
+Domain services report domain-owned state; MCP transports and adapters only
+admit, dispatch and project results. No domain-specific completion-fix service
+or MCP-specific completion rule may be introduced.
+
+Article consumes the shared Media suitability result and does not redefine
+semantic suitability. Managed Article sections may be regenerated from bounded
+canonical selections, while human-authored prose remains outside the managed
+boundary.
+
 Managed Article sections carry explicit origin, semantic owner, editorial
 purpose and regeneration policy. Knowledge/Source/Evidence validity alone does
 not grant public-prose eligibility: provenance, internal diagnostics,

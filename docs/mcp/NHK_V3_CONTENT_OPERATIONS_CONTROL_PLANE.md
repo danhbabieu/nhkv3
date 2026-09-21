@@ -597,3 +597,13 @@ approved: AUTO_PUBLISH must still pass
 generation/type is available only through the canonical Movement contract and
 its registered `generation`/`movement_type` fields; a Media operation cannot
 mint a new registry entry.
+
+## Phase 1 capability-conformance clarification — 2026-09-21
+
+Manual capability tables in this document are observational evidence only.
+Executable capability truth is the source registry/catalog plus runtime
+registration. The following are separate facts and must not be collapsed:
+`RUNTIME_REGISTERED`, `TOOLS_LIST_EXPOSED`, `CONNECTOR_DISCOVERABLE`,
+`CALLABLE_DISPATCHED` and `ACTUAL_SUCCESSFUL_CALL`. A generated or test-derived
+conformance artifact may summarize the comparison, but it is not a new
+operation authority and does not replace fresh target-runtime discovery.
