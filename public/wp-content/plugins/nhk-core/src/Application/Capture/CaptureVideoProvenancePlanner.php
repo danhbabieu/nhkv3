@@ -365,6 +365,12 @@ final class CaptureVideoProvenancePlanner
         $payload = is_array($video['payload'] ?? null) ? $video['payload'] : [];
         $metadata = is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [];
         $metadata['semantic_attachments'] = $attachments;
+        if ($attachments !== [] && is_array($metadata['completeness'] ?? null)) {
+            $metadata['completeness']['blockers'] = array_values(array_filter(
+                array_map('strval', (array) ($metadata['completeness']['blockers'] ?? [])),
+                static fn (string $blocker): bool => $blocker !== 'NO_SEMANTIC_ATTACHMENT',
+            ));
+        }
         $payload['metadata'] = $metadata;
         $video['payload'] = $payload;
         return $video;

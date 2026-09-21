@@ -424,6 +424,7 @@ final class McpAbilityRegistration
                 'execute_callback' => static fn (mixed $input = null): mixed => self::execute($toolName, $read, $input),
                 'permission_callback' => static fn (): bool => self::canRead($toolName),
                 'meta' => [
+                    'schema_hash' => McpToolCatalog::schemaHash($toolName),
                     'public' => true,
                     'show_in_rest' => true,
                     'surface' => 'read_only',
@@ -449,6 +450,7 @@ final class McpAbilityRegistration
                 'execute_callback' => static fn (mixed $input = null): mixed => self::executeMcp($toolName, $input),
                 'permission_callback' => static fn (): bool => self::canGoverned($toolName),
                 'meta' => [
+                    'schema_hash' => McpToolCatalog::schemaHash($toolName),
                     'public' => true,
                     'show_in_rest' => true,
                     'surface' => 'read_only',
@@ -481,6 +483,7 @@ final class McpAbilityRegistration
                 'execute_callback' => static fn (mixed $input = null): mixed => self::executeMcp($toolName, $input),
                 'permission_callback' => static fn (): bool => self::canGoverned($toolName),
                 'meta' => [
+                    'schema_hash' => McpToolCatalog::schemaHash($toolName),
                     // The widget upload remains capability-gated and
                     // internal-only, but must be discoverable by the Easy MCP
                     // admin surface so an administrator can explicitly enable
@@ -530,6 +533,13 @@ final class McpAbilityRegistration
         }
 
         return $schema;
+    }
+
+    /** Public read-only projection used by parity diagnostics/tests. */
+    public static function inputSchemaForTool(string $toolName): array
+    {
+        foreach (McpToolCatalog::tools() as $tool) if (($tool['name'] ?? '') === $toolName) return self::abilityInputSchema($toolName, (array) ($tool['inputSchema'] ?? []));
+        return [];
     }
 
     /** @return list<string> */

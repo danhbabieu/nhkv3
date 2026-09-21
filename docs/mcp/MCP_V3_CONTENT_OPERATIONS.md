@@ -315,6 +315,15 @@ addendum/idempotency key; it cannot create duplicate semantic records. New
 submissions still return review-only semantic candidates until their governed
 workflow is explicitly continued.
 
+Capture input vocabulary and typed packets have one executable schema owner in
+the MCP Tool Catalog. WordPress Ability schemas and Easy MCP/tools-list
+descriptors are read-only projections of that catalog; they must not maintain
+independent intent enums or packet fields. The schema identity is deterministic
+and changes when the canonical input schema changes. Descriptor parity across
+MCP, Ability and connector discovery is therefore a deployment/runtime gate.
+The existing-Knowledge repair packet uses this same projection path and does
+not create a separate connector schema.
+
 The resolved Capture subject is one immutable typed handoff packet for all
 child coordinators. Video, Claim and Media components consume that packet and
 must not independently broaden or reinterpret the primary subject. Historical

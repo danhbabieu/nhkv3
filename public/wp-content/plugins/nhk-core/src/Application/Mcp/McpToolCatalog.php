@@ -426,6 +426,20 @@ final class McpToolCatalog
         return array_column(self::tools(), 'name');
     }
 
+    public static function schemaHash(string $toolName): string
+    {
+        foreach (self::tools() as $tool) if (($tool['name'] ?? '') === $toolName) return hash('sha256', self::canonicalJson((array) ($tool['inputSchema'] ?? [])));
+        return '';
+    }
+
+    /** @return array<string,string> */
+    public static function schemaHashes(): array
+    {
+        $hashes = [];
+        foreach (self::names() as $name) $hashes[$name] = self::schemaHash($name);
+        return $hashes;
+    }
+
     private static function tool(string $name, string $description, array $properties, array $required, bool $governed = false, array $connectorMeta = []): array
     {
         $surface = SingleEntryPointPolicy::surface($name);
@@ -449,6 +463,18 @@ final class McpToolCatalog
         ];
         if ($connectorMeta !== []) $definition['connectorMeta'] = $connectorMeta;
         return $definition;
+    }
+
+    private static function canonicalJson(mixed $value): string
+    {
+        if (is_array($value)) {
+            if (array_is_list($value)) return '[' . implode(',', array_map([self::class, 'canonicalJson'], $value)) . ']';
+            ksort($value);
+            $pairs = [];
+            foreach ($value as $key => $item) $pairs[] = json_encode((string) $key, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . ':' . self::canonicalJson($item);
+            return '{' . implode(',', $pairs) . '}';
+        }
+        return json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?: 'null';
     }
 
     /** @return array{type:string|list<string>,format:string,pattern:string} */

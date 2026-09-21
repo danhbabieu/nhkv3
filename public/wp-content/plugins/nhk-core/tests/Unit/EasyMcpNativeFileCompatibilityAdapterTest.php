@@ -41,8 +41,9 @@ final class EasyMcpNativeFileCompatibilityAdapterTest extends TestCase
     public function test_projection_does_not_change_unrelated_tools(): void
     {
         $tool = ['name' => 'wp_ability_nhk_v3_media_ingest', 'inputSchema' => ['type' => 'object']];
-
-        self::assertSame([$tool], EasyMcpNativeFileCompatibilityAdapter::projectTools([$tool]));
+        $projected = EasyMcpNativeFileCompatibilityAdapter::projectTools([$tool])[0];
+        $catalog = array_column(McpToolCatalog::tools(), null, 'name');
+        self::assertSame($catalog['nhk.media.ingest']['inputSchema'], $projected['inputSchema']);
     }
 
     public function test_projection_removes_invalid_empty_list_metadata_from_unrelated_tools(): void
@@ -58,7 +59,7 @@ final class EasyMcpNativeFileCompatibilityAdapterTest extends TestCase
             ['name' => self::TARGET, 'inputSchema' => ['type' => 'object']],
         ]);
 
-        self::assertArrayNotHasKey('_meta', $projected[0]);
+        self::assertSame(McpToolCatalog::schemaHash('nhk.media.ingest'), $projected[0]['_meta']['nhk/schemaHash']);
     }
 
     public function test_open_widget_descriptor_projects_mcp_apps_resource_metadata(): void
@@ -158,7 +159,8 @@ final class EasyMcpNativeFileCompatibilityAdapterTest extends TestCase
             ['source_type', 'source_uuid', 'predicate', 'target_type', 'target_uuid', 'provenance', 'reason'],
             array_keys($tools[self::TARGET]['inputSchema']['properties']['authority_intent']['properties']['relation_intents']['items']['properties']),
         );
-        self::assertSame($easyMcpTools[1], $tools['wp_ability_nhk_v3_media_ingest']);
+        self::assertSame($catalog['nhk.media.ingest']['inputSchema'], $tools['wp_ability_nhk_v3_media_ingest']['inputSchema']);
+        self::assertSame(McpToolCatalog::schemaHash('nhk.media.ingest'), $tools['wp_ability_nhk_v3_media_ingest']['_meta']['nhk/schemaHash']);
     }
 
     public function test_rest_post_dispatch_projects_capture_schema_before_final_echo(): void

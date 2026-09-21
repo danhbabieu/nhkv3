@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Core\Infrastructure\Mcp;
 
-use NHK\Core\Application\Mcp\{McpAppsResourceRegistry, McpToolCatalog};
+use NHK\Core\Application\Mcp\{McpAbilityRegistration, McpAppsResourceRegistry, McpToolCatalog};
 
 /**
  * Narrow compatibility boundary for Easy MCP versions that do not forward
@@ -76,12 +76,9 @@ final class EasyMcpNativeFileCompatibilityAdapter
             }
 
             $name = (string) ($tool['name'] ?? '');
-            $canonical = match ($name) {
-                self::TARGET_TOOL => self::captureDefinition(),
-                self::WIDGET_OPEN_TOOL => self::widgetOpenDefinition(),
-                self::WIDGET_UPLOAD_TOOL => self::widgetUploadDefinition(),
-                default => null,
-            };
+            $canonical = in_array($name, [self::WIDGET_OPEN_TOOL, self::WIDGET_UPLOAD_TOOL], true)
+                ? self::canonicalDefinitionForSpecialTool($name)
+                : self::canonicalDefinitionForConnectorTool($name);
             if ($canonical === null) {
                 $tools[$index] = $tool;
                 continue;
@@ -91,10 +88,13 @@ final class EasyMcpNativeFileCompatibilityAdapter
             // only the NHK-owned descriptor fields that its serializer omitted.
             $tool['description'] = $canonical['description'];
             $tool['inputSchema'] = $canonical['inputSchema'];
+            $isSpecialTool = in_array($name, [self::WIDGET_OPEN_TOOL, self::WIDGET_UPLOAD_TOOL], true);
+            if (!$isSpecialTool) {
+                $tool['_meta'] = is_array($tool['_meta'] ?? null) && !array_is_list($tool['_meta']) ? $tool['_meta'] : [];
+                $tool['_meta']['nhk/schemaHash'] = McpToolCatalog::schemaHash((string) ($canonical['name'] ?? ''));
+            }
             if (is_array($canonical['connectorMeta'] ?? null) && $canonical['connectorMeta'] !== [] && !array_is_list($canonical['connectorMeta'])) {
-                $tool['_meta'] = $canonical['connectorMeta'];
-            } else {
-                unset($tool['_meta']);
+                $tool['_meta'] = array_merge(is_array($tool['_meta'] ?? null) ? $tool['_meta'] : [], $canonical['connectorMeta']);
             }
             $tools[$index] = $tool;
         }
@@ -394,13 +394,30 @@ final class EasyMcpNativeFileCompatibilityAdapter
         }
     }
 
-    /** @return array<string,mixed>|null */
-    private static function captureDefinition(): ?array
+    /**
+     * Resolve every NHK connector descriptor from the registered catalog.
+     * Easy MCP is a transport projection; it must not own a second schema
+     * vocabulary or a tool-specific enum copy.
+     *
+     * @return array<string,mixed>|null
+     */
+    private static function canonicalDefinitionForConnectorTool(string $connectorTool): ?array
     {
-        foreach (McpToolCatalog::tools() as $tool) {
-            if (($tool['name'] ?? null) === 'nhk.capture.ingest') return $tool;
+        $toolName = McpAbilityRegistration::toolNameForConnectorTool($connectorTool);
+        if ($toolName === null) {
+            return null;
         }
+        foreach (McpToolCatalog::tools() as $tool) if (($tool['name'] ?? '') === $toolName) return $tool;
         return null;
+    }
+
+    private static function canonicalDefinitionForSpecialTool(string $connectorTool): ?array
+    {
+        return match ($connectorTool) {
+            self::WIDGET_OPEN_TOOL => self::widgetOpenDefinition(),
+            self::WIDGET_UPLOAD_TOOL => self::widgetUploadDefinition(),
+            default => null,
+        };
     }
 
     /** @return array<string,mixed>|null */

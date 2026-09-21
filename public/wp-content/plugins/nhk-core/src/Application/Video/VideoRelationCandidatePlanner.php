@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Video;
 
 use NHK\Core\Domain\Graph\PredicateRegistry;
+use NHK\Core\Domain\Governance\CommandCanonicalizer;
 use NHK\Core\Domain\Video\{VideoRelationCandidate, VideoRelationEvidenceRequired};
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
 use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
@@ -49,6 +50,14 @@ final class VideoRelationCandidatePlanner
             $seen[$key] = true;
             $result[] = new VideoRelationCandidate('video', $videoId, $targetId, $targetType, $predicate, $origin, $evidence, trim((string) ($relation['reason'] ?? '')), max(0.0, min(1.0, (float) ($relation['confidence'] ?? 0.0))));
         }
+        // `about` is registered as MANY/MANY, so attachment order is not
+        // semantic. Canonicalize that representation before it reaches the
+        // governed Video payload fingerprint; callers may provide the same
+        // valid relation set in any input order.
+        usort($result, static fn (VideoRelationCandidate $left, VideoRelationCandidate $right): int => strcmp(
+            CommandCanonicalizer::canonicalize($left->toProposalPayload()),
+            CommandCanonicalizer::canonicalize($right->toProposalPayload()),
+        ));
         return $result;
     }
 }

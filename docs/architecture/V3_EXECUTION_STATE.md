@@ -1,5 +1,57 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-21 — System-wide MCP/Ability/connector descriptor parity (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE: Easy MCP had a tool-specific descriptor projection branch while
+the canonical Ability/runtime schema was owned by `McpToolCatalog`. This left
+room for a registered runtime packet to be absent from connector discovery.
+
+FIXED_BOUNDARY: Every NHK connector tool now resolves its descriptor through
+the registered Ability-to-tool mapping and the canonical catalog. Ability
+schema projection remains limited to the documented native-file/media
+compatibility transform. Generic parity tests cover properties, required
+fields and nested schemas; deterministic catalog schema hashes are exposed in
+Ability and Easy MCP diagnostics.
+
+VERIFICATION: Focused parity suite passes 71 tests / 1,265 assertions. Full NHK
+Unit passes 2,051 tests / 10,487 assertions with warnings/deprecations only;
+Contract suite passes 6 tests / 48 assertions. No live connector discovery,
+deployment, schema/database mutation or semantic data mutation occurred.
+
+STATUS: `MCP_DESCRIPTOR_PARITY_FIXED_LOCAL / FULL_UNIT_PASS / LIVE_DISCOVERY_PENDING / NO_LIVE_MUTATION`.
+
+NEXT_EXACT_ACTION: `DEPLOY_OR_PULL_CURRENT_BUILD; RUN FRESH_TOOLS_LIST_AND_CONNECTOR_SCHEMA_HASH_COMPARISON`.
+
+# Checkpoint — 2026-09-21 — Generic governed Video final-payload proof (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE_CONFIRMED: The live residual was a pipeline-ordering defect: the
+staging signature could represent a preliminary Video payload before canonical
+Source/Knowledge/Evidence read-back had materialized semantic attachments.
+Current local orchestration materializes the final Evidence-backed attachments
+first, then constructs the final Video command and issues staging scope from
+that command. The previous `expected_revision` residual remains solved by the
+shared descriptor normalization and was not reopened.
+
+GENERIC_FIX: The existing `VideoRelationCandidatePlanner` deterministically
+sorts registered `about` MANY/MANY attachments before payload fingerprinting.
+`CaptureVideoProvenancePlanner` removes only the derived stale
+`NO_SEMANTIC_ATTACHMENT` blocker once a non-empty final attachment set exists;
+independent blockers such as `CATEGORY_UNRESOLVED` remain intact. No new Video
+writer, owner, operation or Odo-specific branch was added.
+
+PROOF: Generic UUID fixtures cover Video→Variant, Video→Model, zero
+attachments, one final signed attachment, multiple attachment ordering,
+target/predicate/Evidence tamper rejection and idempotent reuse. Focused
+Video/Capture/Governance suites pass 159 tests / 691 assertions. Full Unit
+suite passes 2051 tests / 10487 assertions; only warnings/deprecations remain.
+Production source audit found zero task live IDs and zero Odo-specific
+branches. PHP lint, diff check and secret review pass. No schema, migration,
+deployment, push or live mutation occurred.
+
+STATUS: `STAGING_VIDEO_FINAL_PAYLOAD_GENERICITY_PASS / FULL_UNIT_PASS / NO_LIVE_MUTATION`.
+
+NEXT_EXACT_ACTION: `USER_PUSH_PULL_BUILD; THEN RUN FRESH @v34 VIDEO ACCEPTANCE`.
+
 # Checkpoint — 2026-09-21 — Existing Knowledge repair surface (LOCAL / NO LIVE MUTATION)
 
 SCOPE: Added typed `KNOWLEDGE_REPAIR` input to canonical
