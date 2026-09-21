@@ -178,6 +178,15 @@ final class StagingOperationDescriptorTest extends TestCase
         self::assertNotSame($revision4->diagnosticValue()['expected_revision'], $revision5->diagnosticValue()['expected_revision']);
     }
 
+    public function test_malformed_fractional_cas_revision_is_not_coerced_to_an_integer(): void
+    {
+        $this->expectExceptionMessage('EXPECTED_REVISION_INTEGER_REQUIRED');
+        StagingOperationDescriptor::fromPlan([
+            'entity_type' => 'video', 'operation' => 'update', 'subject_id' => UuidCodec::newV7(),
+            'expected_revision' => 4.5, 'idempotency_key' => 'malformed-cas', 'payload' => [],
+        ], UuidCodec::newV7(), hash('sha256', 'malformed-cas'));
+    }
+
     /** @param array<string,mixed> $plan */
     private static function descriptorFromPlan(array $plan, string $captureId, string $captureFingerprint): StagingOperationDescriptor
     {

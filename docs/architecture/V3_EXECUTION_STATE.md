@@ -1,5 +1,38 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-21 — Shared JSON numeric canonicalization for governed payloads (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE_CONFIRMED: Proposal JSON persistence/reload changed a semantic
+attachment confidence from PHP float `1.0` to integer `1`. The semantic value
+was unchanged, but the old `CommandCanonicalizer` preserved the lexical zero
+fraction and therefore produced a different governed payload fingerprint.
+
+FIXED_BOUNDARY: `CommandCanonicalizer` now canonicalizes finite mathematically
+integral floats as their safely representable integer (`1.0→1`, `0.0→0`,
+`-0.0→0`) while retaining fractional floats (`0.95`, `1.25`) and preserving
+string/boolean type distinctions. Non-finite values fail closed with
+`JsonException`. No Proposal persistence coercion and no Video-specific numeric
+branch were added. `StagingOperationDescriptor` rejects non-integer CAS input
+instead of coercing `4.5` to `4`.
+
+PROOF: Generic canonicalizer tests prove nested `1.0 == 1`, `"1" != 1`,
+`true != 1`, `0.95 != 0.96`, `1.25 != 1`, and non-finite rejection. A
+production-shaped governed Video fixture proves confidence `1.0` round-trips
+through JSON as `1` with the same fingerprint; confidence `0.95` remains
+fractional and round-trips with the same fingerprint; `0.95→0.90` fails as
+`STAGING_VIDEO_PAYLOAD_MISMATCH`. Existing target/predicate/Evidence/source,
+scope, CAS, dependency and bounded nested payload diagnostics remain covered.
+
+VERIFICATION: Focused Video/Governance/Canonicalizer suite passes 122 tests /
+546 assertions. Full `NHK Unit` passes 2,059 tests / 10,520 assertions with
+warnings and deprecations only. PHP lint, `git diff --check`, secret review
+and hardcoded live-ID review pass. No schema/migration, deployment, push, live
+read or live mutation occurred.
+
+STATUS: `GOVERNED_JSON_NUMERIC_CANONICALIZATION_FIXED_LOCAL / CONFIDENCE_ROUNDTRIP_PASS / FULL_UNIT_PASS / NO_LIVE_MUTATION`.
+
+NEXT_EXACT_ACTION: `USER_PUSH_PULL_BUILD; THEN RUN FRESH @v34 VIDEO ACCEPTANCE`.
+
 # Checkpoint — 2026-09-21 — Nested governed Video payload drift proof (LOCAL / NO LIVE MUTATION)
 
 ROOT_CAUSE_CONFIRMED: `CaptureVideoProvenancePlanner::withThumbnailSelection()`

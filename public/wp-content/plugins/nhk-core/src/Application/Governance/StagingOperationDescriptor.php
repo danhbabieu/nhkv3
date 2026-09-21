@@ -43,7 +43,9 @@ final readonly class StagingOperationDescriptor
         $dependencies = array_values(array_unique(array_map('strval', (array) ($payload['dependency_ids'] ?? $plan['dependency_ids'] ?? []))));
         sort($dependencies, SORT_STRING);
         $family = self::family($entity, $operation);
-        $expected = array_key_exists('expected_revision', $plan) && $plan['expected_revision'] !== null ? (int) $plan['expected_revision'] : null;
+        $rawExpected = $plan['expected_revision'] ?? null;
+        if ($rawExpected !== null && !is_int($rawExpected)) throw new \InvalidArgumentException('EXPECTED_REVISION_INTEGER_REQUIRED');
+        $expected = $rawExpected;
         if ($operation === 'ingest' && in_array($entity, ['source', 'knowledge', 'evidence', 'video'], true)) $expected = 0;
         return new self(
             'nhk.capture.ingest', $captureId, $captureFingerprint, $entity, $operation, $family,

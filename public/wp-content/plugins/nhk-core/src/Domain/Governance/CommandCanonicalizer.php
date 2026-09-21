@@ -8,6 +8,11 @@ final class CommandCanonicalizer
     public static function canonicalize(array $command): string
     {
         $normalize = static function (mixed $value) use (&$normalize): mixed {
+            if (is_float($value)) {
+                if (!is_finite($value)) throw new \JsonException('Non-finite numeric values are not canonicalizable.');
+                if (floor($value) === $value && $value >= PHP_INT_MIN && $value <= PHP_INT_MAX) return (int) $value;
+                return $value;
+            }
             if (!is_array($value)) return $value;
             if (array_is_list($value)) return array_map($normalize, $value);
             ksort($value, SORT_STRING);

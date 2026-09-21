@@ -97,6 +97,34 @@ final class VideoGovernanceGenericityTest extends TestCase
         self::assertArrayNotHasKey('verified', $diagnostic['PAYLOAD_DIFF'][0]);
     }
 
+    public function test_confidence_one_and_fractional_confidence_survive_json_reload_but_fractional_tamper_fails(): void
+    {
+        $videoId = UuidCodec::newV7();
+        $targetId = UuidCodec::newV7();
+        $evidenceId = UuidCodec::newV7();
+        $capture = $this->capture(UuidCodec::newV7());
+        $verifier = $this->verifier();
+        $payload = $this->payload($videoId, 'variant', $targetId, $evidenceId);
+        $scope = $verifier->issueForVideoPlan($capture, ['entity_type' => 'video', 'operation' => 'ingest', 'subject_id' => $videoId, 'proposed_uuid' => $videoId, 'payload' => $payload, 'idempotency_key' => 'confidence-integral', 'plan_fingerprint' => hash('sha256', 'confidence-integral')]);
+        $reloaded = json_decode(json_encode($payload, JSON_THROW_ON_ERROR), true, 512, JSON_THROW_ON_ERROR);
+        $proposal = new Proposal(UuidCodec::newV7(), $videoId, 'ingest', $reloaded + ['capture_id' => $capture->captureId, 'capture_fingerprint' => $capture->requestFingerprint, 'staging_acceptance' => $scope], 'content', null, 'dependency', ProposalState::APPROVED, idempotencyKey: 'confidence-integral', entityType: 'video');
+        self::assertSame(1, $proposal->payload['metadata']['semantic_attachments'][0]['confidence']);
+        self::assertTrue($verifier->verifyProposal($scope, $proposal));
+
+        $fractionalPayload = $payload;
+        $fractionalPayload['metadata']['semantic_attachments'][0]['confidence'] = 0.95;
+        $fractionalScope = $verifier->issueForVideoPlan($capture, ['entity_type' => 'video', 'operation' => 'ingest', 'subject_id' => $videoId, 'proposed_uuid' => $videoId, 'payload' => $fractionalPayload, 'idempotency_key' => 'confidence-fractional', 'plan_fingerprint' => hash('sha256', 'confidence-fractional')]);
+        $fractionalReloaded = json_decode(json_encode($fractionalPayload, JSON_THROW_ON_ERROR), true, 512, JSON_THROW_ON_ERROR);
+        $fractionalProposal = new Proposal(UuidCodec::newV7(), $videoId, 'ingest', $fractionalReloaded + ['capture_id' => $capture->captureId, 'capture_fingerprint' => $capture->requestFingerprint, 'staging_acceptance' => $fractionalScope], 'content', null, 'dependency', ProposalState::APPROVED, idempotencyKey: 'confidence-fractional', entityType: 'video');
+        self::assertSame(0.95, $fractionalProposal->payload['metadata']['semantic_attachments'][0]['confidence']);
+        self::assertTrue($verifier->verifyProposal($fractionalScope, $fractionalProposal));
+
+        $tampered = $fractionalReloaded;
+        $tampered['metadata']['semantic_attachments'][0]['confidence'] = 0.90;
+        $tamperedProposal = new Proposal(UuidCodec::newV7(), $videoId, 'ingest', $tampered + ['capture_id' => $capture->captureId, 'capture_fingerprint' => $capture->requestFingerprint, 'staging_acceptance' => $fractionalScope], 'content', null, 'dependency', ProposalState::APPROVED, idempotencyKey: 'confidence-tampered', entityType: 'video');
+        self::assertSame('STAGING_VIDEO_PAYLOAD_MISMATCH', $verifier->proposalFailureReason($fractionalScope, $tamperedProposal));
+    }
+
     public function test_zero_attachment_does_not_invent_relation_and_keeps_blocker(): void
     {
         $result = (new VideoCompletenessPolicy())->evaluate([

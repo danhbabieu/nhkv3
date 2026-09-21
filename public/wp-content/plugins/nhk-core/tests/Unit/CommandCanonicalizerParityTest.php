@@ -26,4 +26,22 @@ final class CommandCanonicalizerParityTest extends TestCase
         self::assertNotSame(CommandCanonicalizer::canonicalize(['value' => '1']), CommandCanonicalizer::canonicalize(['value' => 1]));
         self::assertNotSame(CommandCanonicalizer::canonicalize(['value' => '']), CommandCanonicalizer::canonicalize(['value' => null]));
     }
+
+    public function testJsonNumericRoundTripCanonicalizesIntegralFloats_withoutCollapsingTypes(): void
+    {
+        self::assertSame(
+            CommandCanonicalizer::canonicalize(['nested' => ['x' => 1.0, 'zero' => -0.0, 'items' => [2.0, 0.5]]]),
+            CommandCanonicalizer::canonicalize(['nested' => ['x' => 1, 'zero' => 0, 'items' => [2, 0.5]]]),
+        );
+        self::assertNotSame(CommandCanonicalizer::canonicalize(['x' => 1]), CommandCanonicalizer::canonicalize(['x' => '1']));
+        self::assertNotSame(CommandCanonicalizer::canonicalize(['x' => 1]), CommandCanonicalizer::canonicalize(['x' => true]));
+        self::assertNotSame(CommandCanonicalizer::canonicalize(['x' => 0.95]), CommandCanonicalizer::canonicalize(['x' => 0.96]));
+        self::assertNotSame(CommandCanonicalizer::canonicalize(['x' => 1.25]), CommandCanonicalizer::canonicalize(['x' => 1]));
+    }
+
+    public function testNonFiniteNumbers_fail_closed(): void
+    {
+        $this->expectException(\JsonException::class);
+        CommandCanonicalizer::canonicalize(['x' => INF]);
+    }
 }
