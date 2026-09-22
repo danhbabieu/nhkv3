@@ -71,6 +71,13 @@ final class VideoEditorialResumePlanner
                 && is_array($metadata['seo_projection'] ?? null)
             ) return $this->reuse($video, $fingerprint);
         }
+        if ($this->sharedEditorial === null && $existingFingerprint !== '' && hash_equals($existingFingerprint, $fingerprint)) {
+            $desired = $this->desiredPackage($video, $source, $subject, $delta, $proposalMetadata);
+            if ($this->canonicalEditorialPayloadMatches($video, $desired, $fingerprint)) {
+                return $this->reuse($video, $fingerprint, $desired);
+            }
+            $staleEditorialReplay = true;
+        }
         // Legacy Videos may not carry a fingerprint. An explicit resume with
         // no editorial input is still a no-op; do not mint an unnecessary
         // revision merely to add bookkeeping.
