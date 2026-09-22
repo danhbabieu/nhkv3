@@ -122,20 +122,23 @@ final class GovernanceRuntimeFactory
             if (!in_array($proposal->entityType, $authorityTypes, true)) return null;
             $audit = is_array($proposal->payload['project_build_audit'] ?? null) ? $proposal->payload['project_build_audit'] : [];
             $captureId = trim((string) ($audit['capture_id'] ?? $proposal->payload['capture_id'] ?? ''));
-            $candidateId = trim((string) ($proposal->payload['candidate_id'] ?? ''));
-            if ($captureId === '' || $candidateId === '' || !\NHK\Core\Shared\Uuid\UuidCodec::isValid($captureId)) return null;
+            if ($captureId === '' || !\NHK\Core\Shared\Uuid\UuidCodec::isValid($captureId)) throw new \RuntimeException('GOVERNED_CANDIDATE_BINDING_REQUIRED');
             $capture = $captureRepository->findById($captureId);
-            if (!$capture instanceof \NHK\Core\Domain\Capture\CaptureRecord) return null;
+            if (!$capture instanceof \NHK\Core\Domain\Capture\CaptureRecord) throw new \RuntimeException('PERSISTED_CAPTURE_NOT_FOUND');
+            $binding = (new \NHK\Core\Application\Governance\AuthorityProposalCandidateBindingResolver())->resolve($proposal, $capture);
             $plan = is_array($capture->context['authority_plan'] ?? null) ? $capture->context['authority_plan'] : [];
             $planFingerprint = trim((string) ($audit['plan_fingerprint'] ?? $plan['plan_fingerprint'] ?? ''));
-            if (!preg_match('/^[a-f0-9]{64}$/i', $planFingerprint)) return null;
+            if (!preg_match('/^[a-f0-9]{64}$/i', $planFingerprint)) throw new \RuntimeException('STAGING_PLAN_SCOPE_MISMATCH');
             $plan['plan_fingerprint'] = $planFingerprint;
-            try { return $stagingScopeVerifier->issueForAuthorityPlan($capture, $plan, [$candidateId]); }
-            catch (\Throwable) { return null; }
+            return $stagingScopeVerifier->issueForAuthorityPlan($capture, $plan, [$binding['candidate_id']]);
         };
-        $eligibility->setStagingScopeVerifier(static function (\NHK\Core\Domain\Governance\Proposal $proposal) use ($stagingScopeVerifier, $environment): bool|string {
+        $eligibility->setStagingScopeVerifier(static function (\NHK\Core\Domain\Governance\Proposal $proposal) use ($stagingScopeVerifier, $environment, $authorityScopeResolver): bool|string {
             if (strtolower(trim($environment())) !== 'staging') return true;
             $scope = $proposal->payload['staging_acceptance'] ?? null;
+            if (!is_array($scope)) {
+                try { $scope = $authorityScopeResolver($proposal); }
+                catch (\Throwable $error) { return trim($error->getMessage()) ?: 'STAGING_SCOPE_REQUIRED'; }
+            }
             return is_array($scope) ? ($stagingScopeVerifier->proposalFailureReason($scope, $proposal) ?? true) : 'STAGING_SCOPE_REQUIRED';
         });
         $eligibility->setStagingScopeResolver($authorityScopeResolver);

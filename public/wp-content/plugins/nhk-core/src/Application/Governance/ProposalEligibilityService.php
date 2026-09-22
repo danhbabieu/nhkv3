@@ -47,22 +47,25 @@ final class ProposalEligibilityService
             || $authorityScoped;
         if ($this->stagingScopeVerifier !== null && (($proposal->entityType === 'video' && in_array($proposal->operation, ['ingest', 'update'], true)) || ($proposal->entityType === 'knowledge' && in_array($proposal->operation, ['update', 'retire'], true)) || $authorityScoped) && $captureBound) {
             $scope = $proposal->payload['staging_acceptance'] ?? null;
+            $scopeResolutionError = null;
             if (!is_array($scope) && is_callable($this->stagingScopeResolver)) {
                 try { $scope = ($this->stagingScopeResolver)($proposal); }
-                catch (\Throwable) { $scope = null; }
+                catch (\Throwable $error) { $scope = null; $scopeResolutionError = trim($error->getMessage()); }
             }
             if (!is_array($scope)) {
-                $reasons[] = 'STAGING_SCOPE_REQUIRED';
+                $reasons[] = $scopeResolutionError !== null && preg_match('/^[A-Z][A-Z0-9_]{2,100}$/', $scopeResolutionError) === 1 ? $scopeResolutionError : 'STAGING_SCOPE_REQUIRED';
                 $diagnostics['staging_scope'] = [
                     'status' => 'MISSING',
                     'resolution' => 'PERSISTED_CAPTURE_AUTHORITY_CONTEXT',
                     'capture_id_present' => $captureBound,
                     'candidate_id_present' => trim((string) ($proposal->payload['candidate_id'] ?? '')) !== '',
+                    'resolution_reason' => $scopeResolutionError,
                 ];
             }
             else {
                 $verification = ($this->stagingScopeVerifier)($proposal);
-                if ($this->stagingScopeDiagnosticProvider !== null) $diagnostics = ($this->stagingScopeDiagnosticProvider)($scope, $proposal);
+                $diagnostics['staging_scope'] = ['status' => 'RESOLVED', 'resolution' => 'PERSISTED_CAPTURE_AUTHORITY_CONTEXT', 'capture_id_present' => true, 'candidate_id_present' => trim((string) ($proposal->payload['candidate_id'] ?? '')) !== '' || count((array) ($scope['candidate_bindings'] ?? [])) === 1];
+                if ($this->stagingScopeDiagnosticProvider !== null) $diagnostics = array_replace($diagnostics, ($this->stagingScopeDiagnosticProvider)($scope, $proposal));
                 if (is_string($verification) && $verification !== '') $reasons[] = $verification;
                 elseif ($verification !== true) $reasons[] = 'STAGING_SCOPE_NOT_APPROVED';
             }

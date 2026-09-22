@@ -1,5 +1,49 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-22 — Authority proposal candidate binding recovery (LOCAL / LIVE MCP PENDING)
+
+ROOT_CAUSE_CONFIRMED: The v42-era staging resolver required
+`proposal.payload.candidate_id` even when the proposal retained an exact Capture
+and plan fingerprint. Submit, review, approve and repository hydration preserve
+the Proposal payload; the live legacy/direct proposals were created without a
+candidate binding. Capture persisted the Authority plan and, after approved
+continuation, the approved plan fingerprint and candidate IDs.
+
+FIXED_BOUNDARY: Added a read-only `AuthorityProposalCandidateBindingResolver`
+used by the staging-scope resolver. It reconstructs only one candidate that is
+approved in the persisted Capture authority result and exactly matches the
+proposal operation, entity type, subject, target, revision and plan
+fingerprint. Zero matches, ambiguous matches, missing governed evidence,
+cross-Capture evidence and fingerprint mismatch remain fail-closed. The signed
+scope verifier now accepts a recovered binding only when exactly one signed
+candidate binding matches; it never mutates the legacy Proposal or creates a
+candidate. Eligibility and Controlled Apply use the same resolver semantics and
+surface `LEGACY_PROPOSAL_MISSING_CANDIDATE_BINDING` when recovery evidence is
+insufficient.
+
+VERIFICATION: Resolver and staging lifecycle tests pass 19 tests / 32
+assertions, including recovered rename and retire, ambiguity, missing binding,
+cross-Capture mismatch and plan fingerprint mismatch. Changed PHP files lint
+clean and `git diff --check` passes. The full PHPUnit command reaches 2,359
+tests but retains environment-gated integration/contract errors and failures
+without the guarded WPDB runtime and `NHK_WP_TEST_PATH=public`; no semantic or
+staging data was mutated. Live MCP inspection and acceptance remain pending
+because no NHK MCP runtime/credentials are available in this session.
+
+STATUS: `AUTHORITY_CANDIDATE_BINDING_RECOVERY_LOCAL_READY / LIVE_MCP_PENDING / SEMANTIC_MUTATION_NONE`.
+
+LIVE EVIDENCE: Documentation bootstrap on the connected v07 runtime reports
+staging `PROJECT_BUILD`, source revision `743c586da49e5c39a8e4a5ecf64e3ea45af6aa24`
+and build identity `009aae864a6458e00ed9ff23c58c6159dc704132e45374b604f9d6a856858c97`.
+Read-only Eligibility for the three supplied proposal IDs still returns
+`STAGING_SCOPE_REQUIRED` with `capture_id_present=true` and
+`candidate_id_present=false`. Read-only Proposal Review confirms all three are
+`APPROVED`, but their wire payloads contain only semantic fields (`name`/
+`aliases`/`reason` or `reason`); no candidate ID, project-build audit or signed
+staging packet is exposed. No deterministic legacy binding can therefore be
+proven from the current live read surface, and no Apply or new mutation was
+attempted.
+
 # Checkpoint — 2026-09-22 — H.3 topic fulfillment and semantic concepts (NO PERSISTENCE)
 
 FIXED_BOUNDARY: Added the shared read-only `TopicFulfillment` evaluator for

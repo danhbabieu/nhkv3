@@ -239,9 +239,11 @@ final class StagingAcceptanceScope
         $audit = is_array($proposal->payload['project_build_audit'] ?? null) ? $proposal->payload['project_build_audit'] : [];
         if (!preg_match('/^[a-f0-9]{64}$/i', $planFingerprint) || !hash_equals($planFingerprint, (string) ($audit['plan_fingerprint'] ?? ''))) throw new \RuntimeException('STAGING_PLAN_SCOPE_MISMATCH');
         $candidateId = trim((string) ($proposal->payload['candidate_id'] ?? ''));
-        if ($candidateId === '') throw new \RuntimeException('STAGING_CANDIDATE_SCOPE_REQUIRED');
+        $matchingBindings = [];
         foreach ((array) ($scope['candidate_bindings'] ?? []) as $binding) {
-            if (!is_array($binding) || (string) ($binding['candidate_id'] ?? '') !== $candidateId) continue;
+            if (!is_array($binding)) continue;
+            $bindingCandidateId = (string) ($binding['candidate_id'] ?? '');
+            if ($candidateId !== '' && $bindingCandidateId !== $candidateId) continue;
             if ((string) ($binding['entity_type'] ?? '') !== $proposal->entityType || (string) ($binding['operation'] ?? '') !== $proposal->operation) continue;
             if ($proposal->entityType === 'relation') {
                 $payload = $proposal->payload;
@@ -252,13 +254,17 @@ final class StagingAcceptanceScope
                     || (string) ($binding['target_uuid'] ?? '') !== (string) ($payload['target_uuid'] ?? '')
                     || (int) ($binding['source_revision'] ?? 0) !== (int) ($payload['source_revision'] ?? 0)
                     || (int) ($binding['target_revision'] ?? 0) !== (int) ($payload['target_revision'] ?? 0)) continue;
-                return;
+                $matchingBindings[$bindingCandidateId] = $binding;
+                continue;
             }
             if ((string) ($binding['subject_id'] ?? '') !== $proposal->subjectId || (string) ($binding['target_uuid'] ?? '') !== (string) ($proposal->targetUuid ?? '')) continue;
             $expected = $binding['expected_revision'] ?? null;
             if ($expected !== null && (int) $expected !== (int) $proposal->expectedRevision) continue;
-            return;
+            $matchingBindings[$bindingCandidateId] = $binding;
         }
+        if (count($matchingBindings) === 1) return;
+        if ($candidateId === '' && count($matchingBindings) > 1) throw new \RuntimeException('STAGING_CANDIDATE_SCOPE_AMBIGUOUS');
+        if ($candidateId === '') throw new \RuntimeException('STAGING_CANDIDATE_SCOPE_REQUIRED');
         throw new \RuntimeException('STAGING_CANDIDATE_SCOPE_MISMATCH');
     }
 
