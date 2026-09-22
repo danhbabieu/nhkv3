@@ -504,6 +504,33 @@ final class EasyMcpNativeFileCompatibilityAdapterTest extends TestCase
         self::assertSame($unknown, EasyMcpNativeFileCompatibilityAdapter::projectFinalToolsListDescriptor($unknown, null, $unknownRequest));
     }
 
+    public function test_easy_mcp_1718_modern_resources_list_projects_image_upload_resource(): void
+    {
+        $request = new class {
+            public function get_route(): string { return '/easy-mcp-ai/v1/mcp'; }
+            public function get_json_params(): array { return [
+                'jsonrpc' => '2.0',
+                'id' => 14,
+                'method' => 'resources/list',
+                'params' => ['_meta' => ['io.modelcontextprotocol/protocolVersion' => '2026-07-28']],
+            ]; }
+        };
+        $response = [
+            'jsonrpc' => '2.0',
+            'id' => 14,
+            'result' => [
+                'resources' => [],
+                '_meta' => ['io.modelcontextprotocol/serverInfo' => ['name' => 'easy-mcp-ai', 'version' => '1.7.18']],
+            ],
+        ];
+
+        $final = EasyMcpNativeFileCompatibilityAdapter::projectFinalToolsListDescriptor($response, null, $request);
+
+        self::assertSame('ui://nhk/image-upload/v2.html', $final['result']['resources'][0]['uri']);
+        self::assertSame('text/html;profile=mcp-app', $final['result']['resources'][0]['mimeType']);
+        self::assertSame('1.7.18', $final['result']['_meta']['io.modelcontextprotocol/serverInfo']['version']);
+    }
+
     /**
      * Minimal executable model of Easy MCP 1.7.16's ability registration,
      * definition materialization, tools/list sanitization, and JSON-RPC
@@ -554,12 +581,16 @@ final class EasyMcpNativeFileCompatibilityAdapterTest extends TestCase
         return $schema;
     }
 
-    public function test_only_supported_easy_mcp_versions_are_enabled(): void
+    public function test_easy_mcp_versions_split_ui_projection_from_legacy_native_multipart_proxy(): void
     {
-        self::assertTrue(EasyMcpNativeFileCompatibilityAdapter::isSupportedVersion('1.7.16'));
-        self::assertTrue(EasyMcpNativeFileCompatibilityAdapter::isSupportedVersion('1.7.17'));
-        self::assertTrue(EasyMcpNativeFileCompatibilityAdapter::isSupportedVersion('1.7.18'));
-        self::assertFalse(EasyMcpNativeFileCompatibilityAdapter::isSupportedVersion('2.0.0'));
+        foreach (['1.7.16', '1.7.17', '1.7.18'] as $version) {
+            self::assertTrue(EasyMcpNativeFileCompatibilityAdapter::isUiResourceCompatibleVersion($version));
+        }
+        foreach (['1.7.16', '1.7.17'] as $version) {
+            self::assertTrue(EasyMcpNativeFileCompatibilityAdapter::isLegacyNativeMultipartCompatibleVersion($version));
+        }
+        self::assertFalse(EasyMcpNativeFileCompatibilityAdapter::isLegacyNativeMultipartCompatibleVersion('1.7.18'));
+        self::assertFalse(EasyMcpNativeFileCompatibilityAdapter::isUiResourceCompatibleVersion('2.0.0'));
     }
 
     private static function assertValidJsonSchemaNode(mixed $schema, string $toolName): void
@@ -612,9 +643,12 @@ final class EasyMcpNativeFileCompatibilityAdapterTest extends TestCase
         self::assertSame([
             'code' => 'EASY_MCP_NATIVE_FILE_COMPAT_ACTIVE',
             'version' => '1.7.16',
+            'ui_resource_projection' => true,
+            'legacy_native_multipart_proxy' => true,
             'native_file_support_upstream' => false,
         ], EasyMcpNativeFileCompatibilityAdapter::diagnosticForVersion('1.7.16'));
-        self::assertSame('EASY_MCP_NATIVE_FILE_COMPAT_ACTIVE', EasyMcpNativeFileCompatibilityAdapter::diagnosticForVersion('1.7.18')['code']);
+        self::assertSame('EASY_MCP_UI_RESOURCE_COMPAT_ACTIVE', EasyMcpNativeFileCompatibilityAdapter::diagnosticForVersion('1.7.18')['code']);
+        self::assertFalse(EasyMcpNativeFileCompatibilityAdapter::diagnosticForVersion('1.7.18')['legacy_native_multipart_proxy']);
     }
 
     public function test_multipart_scope_requires_exact_endpoint_target_and_native_file_parts(): void
@@ -625,7 +659,7 @@ final class EasyMcpNativeFileCompatibilityAdapterTest extends TestCase
         self::assertTrue(EasyMcpNativeFileCompatibilityAdapter::shouldHandle('/easy-mcp-ai/v1/mcp', $rpc, $files, '1.7.16'));
         self::assertFalse(EasyMcpNativeFileCompatibilityAdapter::shouldHandle('/nhk/v1/mcp', $rpc, $files, '1.7.16'));
         self::assertFalse(EasyMcpNativeFileCompatibilityAdapter::shouldHandle('/easy-mcp-ai/v1/mcp', $rpc, [], '1.7.16'));
-        self::assertTrue(EasyMcpNativeFileCompatibilityAdapter::shouldHandle('/easy-mcp-ai/v1/mcp', $rpc, $files, '1.7.18'));
+        self::assertFalse(EasyMcpNativeFileCompatibilityAdapter::shouldHandle('/easy-mcp-ai/v1/mcp', $rpc, $files, '1.7.18'));
 
         self::assertTrue(EasyMcpNativeFileCompatibilityAdapter::shouldHandle('/easy-mcp-ai/v1/mcp', $rpc, ['files' => [
             ['name' => 'one.jpg', 'tmp_name' => '/tmp/one.jpg', 'type' => 'image/jpeg', 'size' => 12, 'error' => 0],
@@ -712,6 +746,28 @@ final class EasyMcpNativeFileCompatibilityAdapterTest extends TestCase
             ],
         ], $normalized['files']);
         self::assertNotSame(['file_000000009f0082119bfda7a3663e9084'], $normalized['files']);
+    }
+
+    public function test_easy_mcp_1718_does_not_normalize_native_files_for_legacy_proxy(): void
+    {
+        $input = [
+            'idempotency_key' => 'capture-native-file-upstream-owned',
+            'files' => ['file-one'],
+        ];
+        $files = ['files' => [
+            'name' => ['camera.jpg'],
+            'type' => ['image/jpeg'],
+            'tmp_name' => ['/tmp/php-native-camera'],
+            'error' => [UPLOAD_ERR_OK],
+            'size' => [1234],
+        ]];
+
+        self::assertSame($input, EasyMcpNativeFileCompatibilityAdapter::normalizeNativeFileInput(
+            $input,
+            'nhk-v3/capture-ingest',
+            $files,
+            '1.7.18',
+        ));
     }
 
     public function test_direct_easy_mcp_1717_normalization_preserves_native_file_order_and_cardinality(): void

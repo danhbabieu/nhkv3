@@ -22,7 +22,10 @@ final class EasyMcpNativeFileCompatibilityAdapter
     private const WIDGET_UPLOAD_TOOL = 'wp_ability_nhk_v3_media_widget_upload';
 
     /** @var list<string> */
-    private const SUPPORTED_VERSIONS = ['1.7.16', '1.7.17', '1.7.18'];
+    private const UI_RESOURCE_COMPATIBLE_VERSIONS = ['1.7.16', '1.7.17', '1.7.18'];
+
+    /** @var list<string> */
+    private const LEGACY_NATIVE_MULTIPART_PROXY_VERSIONS = ['1.7.16', '1.7.17'];
 
     private static bool $registered = false;
     private static bool $proxyDispatch = false;
@@ -48,15 +51,31 @@ final class EasyMcpNativeFileCompatibilityAdapter
 
     public static function isSupportedVersion(string $version): bool
     {
-        return in_array($version, self::SUPPORTED_VERSIONS, true);
+        return self::isUiResourceCompatibleVersion($version);
     }
 
-    /** @return array{code:string,version:string,native_file_support_upstream:bool} */
+    public static function isUiResourceCompatibleVersion(string $version): bool
+    {
+        return in_array($version, self::UI_RESOURCE_COMPATIBLE_VERSIONS, true);
+    }
+
+    public static function isLegacyNativeMultipartCompatibleVersion(string $version): bool
+    {
+        return in_array($version, self::LEGACY_NATIVE_MULTIPART_PROXY_VERSIONS, true);
+    }
+
+    /** @return array{code:string,version:string,ui_resource_projection:bool,legacy_native_multipart_proxy:bool,native_file_support_upstream:bool} */
     public static function diagnosticForVersion(string $version): array
     {
+        $uiProjection = self::isUiResourceCompatibleVersion($version);
+        $legacyProxy = self::isLegacyNativeMultipartCompatibleVersion($version);
         return [
-            'code' => self::isSupportedVersion($version) ? 'EASY_MCP_NATIVE_FILE_COMPAT_ACTIVE' : 'EASY_MCP_VERSION_UNSUPPORTED',
+            'code' => $legacyProxy
+                ? 'EASY_MCP_NATIVE_FILE_COMPAT_ACTIVE'
+                : ($uiProjection ? 'EASY_MCP_UI_RESOURCE_COMPAT_ACTIVE' : 'EASY_MCP_VERSION_UNSUPPORTED'),
             'version' => $version,
+            'ui_resource_projection' => $uiProjection,
+            'legacy_native_multipart_proxy' => $legacyProxy,
             'native_file_support_upstream' => false,
         ];
     }
@@ -155,6 +174,7 @@ final class EasyMcpNativeFileCompatibilityAdapter
 
     public static function projectToolsListDescriptor(mixed $response, mixed $server, mixed $request): mixed
     {
+        if (!self::uiResourceProjectionEnabled()) return $response;
         if (!is_object($request) || !method_exists($request, 'get_route') || rtrim((string) $request->get_route(), '/') !== rtrim(self::ENDPOINT, '/')) return $response;
         $rpc = self::requestRpc($request);
         if ($rpc !== null && !in_array(($rpc['method'] ?? null), ['tools/list', 'resources/list', 'resources/read'], true)) return $response;
@@ -174,7 +194,7 @@ final class EasyMcpNativeFileCompatibilityAdapter
     /** @param array<string,mixed> $rpc @param array<string,mixed> $files */
     public static function shouldHandle(string $route, array $rpc, array $files, string $version): bool
     {
-        if ($route !== self::ENDPOINT || !self::isSupportedVersion($version)) return false;
+        if ($route !== self::ENDPOINT || !self::isLegacyNativeMultipartCompatibleVersion($version)) return false;
         if (($rpc['method'] ?? null) !== 'tools/call') return false;
         $params = is_array($rpc['params'] ?? null) ? $rpc['params'] : [];
         if (($params['name'] ?? null) !== self::TARGET_TOOL) return false;
@@ -197,7 +217,7 @@ final class EasyMcpNativeFileCompatibilityAdapter
         // the multipart request. Do not make native-file normalization depend
         // on the compatibility proxy having been entered; the Ability must
         // see objects before WP_Ability::validate_input() on either path.
-        if (!self::isSupportedInstalledVersion()) return $input;
+        if (!self::isLegacyNativeMultipartProxyInstalled()) return $input;
         $files = isset($_FILES) && is_array($_FILES) ? $_FILES : [];
 
         return self::normalizeNativeFileInput($input, $abilityName, $files, self::installedVersion());
@@ -210,7 +230,7 @@ final class EasyMcpNativeFileCompatibilityAdapter
      */
     public static function validateAbilityInput(mixed $validity, mixed $input, string $abilityName): mixed
     {
-        if ($abilityName !== 'nhk-v3/capture-ingest' || !self::isSupportedInstalledVersion() || !is_array($input)) return $validity;
+        if ($abilityName !== 'nhk-v3/capture-ingest' || !self::isLegacyNativeMultipartProxyInstalled() || !is_array($input)) return $validity;
         $provided = $input['files'] ?? null;
         if ($provided === null || $provided === [] || !array_key_exists('files', $input)) return $validity;
 
@@ -224,7 +244,7 @@ final class EasyMcpNativeFileCompatibilityAdapter
     /** @param array<string,mixed> $files @return mixed */
     public static function normalizeNativeFileInput(mixed $input, string $abilityName, array $files, string $version): mixed
     {
-        if ($abilityName !== 'nhk-v3/capture-ingest' || !is_array($input) || !self::isSupportedVersion($version)) return $input;
+        if ($abilityName !== 'nhk-v3/capture-ingest' || !is_array($input) || !self::isLegacyNativeMultipartCompatibleVersion($version)) return $input;
 
         $nativeFiles = self::nativeFileDescriptors($files['files'] ?? null);
         if ($nativeFiles === []) return $input;
@@ -244,7 +264,7 @@ final class EasyMcpNativeFileCompatibilityAdapter
     {
         if (self::$proxyDispatch || !is_object($request) || !method_exists($request, 'get_route')) return $response;
         if (method_exists($request, 'get_header') && $request->get_header('X-NHK-ChatGPT-Gateway') === '1') return $response;
-        if (!self::isSupportedInstalledVersion() || !method_exists($request, 'get_file_params')) return $response;
+        if (!self::isLegacyNativeMultipartProxyInstalled() || !method_exists($request, 'get_file_params')) return $response;
 
         $files = $request->get_file_params();
         $rpc = self::requestRpc($request);
@@ -278,6 +298,7 @@ final class EasyMcpNativeFileCompatibilityAdapter
 
     public static function projectFinalToolsListDescriptor(mixed $data, mixed $server, mixed $request): mixed
     {
+        if (!self::uiResourceProjectionEnabled()) return $data;
         if (!is_object($request) || !method_exists($request, 'get_route') || rtrim((string) $request->get_route(), '/') !== rtrim(self::ENDPOINT, '/')) return $data;
         $rpc = self::requestRpc($request);
         return match ($rpc['method'] ?? 'tools/list') {
@@ -330,9 +351,16 @@ final class EasyMcpNativeFileCompatibilityAdapter
         return defined('EASY_MCP_AI_VERSION') ? (string) constant('EASY_MCP_AI_VERSION') : '';
     }
 
-    private static function isSupportedInstalledVersion(): bool
+    private static function isLegacyNativeMultipartProxyInstalled(): bool
     {
-        return self::isSupportedVersion(self::installedVersion());
+        return self::isLegacyNativeMultipartCompatibleVersion(self::installedVersion());
+    }
+
+    private static function uiResourceProjectionEnabled(): bool
+    {
+        // Direct unit callers do not load Easy MCP's plugin constant. In the
+        // live filter path, an unknown version remains fail-closed.
+        return !defined('EASY_MCP_AI_VERSION') || self::isUiResourceCompatibleVersion(self::installedVersion());
     }
 
     private static function containsNativeFile(mixed $value): bool

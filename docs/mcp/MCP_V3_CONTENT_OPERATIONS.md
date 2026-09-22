@@ -751,17 +751,20 @@ The thin NHK Ability callback preserves native `$_FILES` parts when the Ability
 adapter receives them and delegates to `/nhk/v1/mcp`. Easy MCP 1.7.16 and
 1.7.17's stock dynamic Ability serializer emits only `inputSchema` and
 annotations, while its MCP transport accepts `application/json` only. NHK
-therefore registers a version-gated compatibility adapter for those tested
-versions: it projects the Capture descriptor from this catalog and, only for
-the exact Easy MCP Capture route, re-dispatches a JSON envelope through Easy
-MCP while retaining the original native `$_FILES` parts. Easy MCP remains the
-owner of authentication, token scope and permission checks; the adapter never
-adds a writer or changes the canonical Capture boundary. Unknown Easy MCP
-versions fail closed, and the adapter must be removed or disabled when
+therefore keeps two independent compatibility gates: UI/resource projection
+supports Easy MCP 1.7.16, 1.7.17 and 1.7.18 for `tools/list`, MCP Apps
+metadata, `resources/list`, `resources/read` and
+`ui://nhk/image-upload/v2.html`; the legacy native multipart proxy supports
+only 1.7.16 and 1.7.17. Easy MCP 1.7.18 remains upstream-owned for native AI
+client file transport, so `shouldHandle()`, `interceptMultipartCapture()` and
+old `$_FILES` normalization are disabled for that version. Easy MCP remains
+the owner of authentication, token scope and permission checks; the adapter
+never adds a writer or changes the canonical Capture boundary. Unknown Easy
+MCP versions fail closed, and the adapter must be removed or disabled when
 upstream native file-parameter support is verified. Its bounded diagnostics
-report `EASY_MCP_NATIVE_FILE_COMPAT_ACTIVE` for the tested versions and
-`EASY_MCP_VERSION_UNSUPPORTED` otherwise. It is not permission to use a direct
-Media or WordPress writer.
+distinguish `EASY_MCP_NATIVE_FILE_COMPAT_ACTIVE`,
+`EASY_MCP_UI_RESOURCE_COMPAT_ACTIVE` and `EASY_MCP_VERSION_UNSUPPORTED`. It is
+not permission to use a direct Media or WordPress writer.
 
 The canonical lifecycle is multipart batch → native WordPress attachment
 creation with the 1920px public sizing policy →
