@@ -720,7 +720,6 @@ final class EasyMcpNativeFileCompatibilityAdapterTest extends TestCase
 
         $reflection = new \ReflectionClass(EasyMcpNativeFileCompatibilityAdapter::class);
         $method = $reflection->getMethod('withNativeFiles');
-        $method->setAccessible(true);
         $seen = $method->invoke(null, $files, static function (): array {
             return $_FILES;
         });

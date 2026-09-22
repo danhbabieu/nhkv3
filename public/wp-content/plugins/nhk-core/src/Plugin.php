@@ -85,6 +85,8 @@ use NHK\Core\Infrastructure\Snapshot\SnapshotRuntimeComposition;
 final class Plugin {
     private const REWRITE_VERSION = '10';
     public static function boot(string $pluginFile): void {
+        global $wpdb;
+        $captureRepository = isset($wpdb) && is_object($wpdb) ? new WpdbCaptureRepository($wpdb) : null;
         // Keep an already-installed site aware of the code's migration target;
         // activation is not required for an upgrade health check to be honest.
         update_option('nhk_core_migration_target', MediaBindingOperationMigration022::VERSION, false);
@@ -135,17 +137,9 @@ final class Plugin {
         add_action('rest_api_init', [McpAbilityRegistration::class, 'logEasyMcpExportDiagnostics'], PHP_INT_MAX);
         EasyMcpNativeFileCompatibilityAdapter::register();
         ChatGptMcpGateway::register();
-        add_action('wp_abilities_api_init', static function (): void {
+        add_action('wp_abilities_api_init', static function () use (&$captureRepository): void {
             global $wpdb;
             if (!isset($wpdb) || !is_object($wpdb)) return;
-            // The Ability registry is bootstrapped in its own WordPress
-            // lifecycle callback.  Construct the canonical Capture
-            // repository inside this callback so the public Ability path
-            // reads the same persisted owner as Capture ingest and the MCP
-            // transport path.  Referencing the later composition-root local
-            // here leaves $captureRepository undefined and collapses every
-            // capture.get request into CAPTURE_READBACK_UNAVAILABLE.
-            $captureRepository = new WpdbCaptureRepository($wpdb);
             $types = new EntityTypeRegistry();
             CanonicalEntityTypeCatalog::registerInto($types);
             $authority = new WpdbAuthorityRepository($wpdb);
@@ -268,7 +262,7 @@ final class Plugin {
             if ($publicMediaDelivery !== null) (new PublicMediaAssetRoutes($publicMediaDelivery))->register();
             (new PublicKnowledgeRoutes(new KnowledgePageQuery($publicClaims, $publicEvidence, $publicSources, $publicStatus)))->register();
         }
-        add_action('rest_api_init', static function () use (&$sharedAttachmentBridge, $claimOwnerUrl): void {
+        add_action('rest_api_init', static function () use (&$sharedAttachmentBridge, &$captureRepository, $claimOwnerUrl): void {
             (new HealthCheck(new MigrationStatus()))->register_routes();
             global $wpdb;
             if (!isset($wpdb) || !is_object($wpdb)) return;
@@ -707,7 +701,6 @@ final class Plugin {
                 $authority,
             );
             add_filter('nhk_v3_clock_type_creation_lifecycle', fn (mixed $current): mixed => $current ?? $clockTypeLifecycle, 10, 1);
-            $captureRepository = new WpdbCaptureRepository($wpdb);
             if ($governanceRuntime->videoReconciliation !== null) {
                 $governanceRuntime->videoReconciliation->setScopeIssuer(static function (string $captureId, array $plan) use ($captureRepository, $stagingScopeVerifier): array {
                     $capture = $captureRepository->findById($captureId);

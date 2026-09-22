@@ -77,4 +77,25 @@ final class EasyMcpNativeFileCompatibilityIntegrationTest extends TestCase
             $_FILES = $previousFiles;
         }
     }
+
+    public function test_wordpress_bootstrap_and_mcp_registration_emit_no_php_warnings_or_notices(): void
+    {
+        $errors = [];
+        set_error_handler(static function (int $severity, string $message, string $file, int $line) use (&$errors): bool {
+            if ($severity === E_WARNING || $severity === E_NOTICE || $severity === E_USER_WARNING || $severity === E_USER_NOTICE) {
+                $errors[] = [$message, $file, $line];
+                return true;
+            }
+            return false;
+        });
+
+        try {
+            do_action('wp_abilities_api_init');
+            do_action('rest_api_init');
+        } finally {
+            restore_error_handler();
+        }
+
+        self::assertSame([], $errors, (string) wp_json_encode($errors));
+    }
 }

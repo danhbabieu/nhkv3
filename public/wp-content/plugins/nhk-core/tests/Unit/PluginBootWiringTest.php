@@ -28,7 +28,7 @@ final class PluginBootWiringTest extends TestCase
         $inventoryStart = strpos($plugin, 'static function (array $input) use ($authority, $types, $claims, $sources, $evidence, $media, $assets, $usages, $videos, $graphService, $predicates)');
         self::assertNotFalse($inventoryStart, 'Article inventory composition must capture its required MediaAssetRepository.');
 
-        $inventory = substr($plugin, $inventoryStart, strpos($plugin, "                [$articlePublicEligibility, 'evaluate']", $inventoryStart) - $inventoryStart);
+        $inventory = substr($plugin, $inventoryStart, strpos($plugin, "                [\$articlePublicEligibility, 'evaluate']", $inventoryStart) - $inventoryStart);
         self::assertStringContainsString('$assets->listByMediaId', $inventory);
         self::assertStringContainsString('$input[\'subject_resolution\'][\'primary\'][\'id\']', $inventory);
         self::assertStringNotContainsString('$resolution[\'primary\'][\'id\']', $inventory);
@@ -71,6 +71,16 @@ final class PluginBootWiringTest extends TestCase
             strpos($plugin, "add_action('rest_api_init', static function ()"),
             strpos($plugin, $bootstrap)
         );
+    }
+
+    public function test_capture_repository_has_one_declaration_before_every_rest_api_use(): void
+    {
+        $plugin = (string) file_get_contents(__DIR__ . '/../../src/Plugin.php');
+        $declaration = 'new WpdbCaptureRepository($wpdb)';
+        $firstUse = 'McpAbilityRegistration::registerReadAbilities';
+
+        self::assertSame(1, substr_count($plugin, $declaration));
+        self::assertLessThan(strpos($plugin, $firstUse), strpos($plugin, $declaration));
     }
 
     public function test_media_binding_read_ability_has_registered_operation_repository_and_dispatch_case(): void

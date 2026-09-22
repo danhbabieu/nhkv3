@@ -35,6 +35,7 @@ final class McpWidgetUploadTest extends TestCase
         $open = $this->tool('nhk.media.upload-widget.open');
         self::assertSame('ui://nhk/image-upload/v2.html', $open['connectorMeta']['ui']['resourceUri'] ?? null);
         self::assertSame(['model', 'app'], $open['connectorMeta']['ui']['visibility'] ?? null);
+        self::assertSame('ui://nhk/image-upload/v2.html', $open['connectorMeta']['openai/outputTemplate'] ?? null);
     }
 
     public function test_widget_upload_delegates_one_structured_reference_and_returns_file_id(): void
