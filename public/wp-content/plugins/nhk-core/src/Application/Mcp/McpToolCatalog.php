@@ -593,9 +593,19 @@ final class McpToolCatalog
     /** @return array<string,array<string,mixed>> */
     private static function relationshipOperationProperties(): array
     {
-        $properties = [];
+        $properties = [
+            // Keep a discriminator-safe fallback projection for connectors
+            // that inspect only `properties`; the executable oneOf below is
+            // still authoritative for the full branch contract.
+            'operation' => ['type' => 'string', 'enum' => ['ADD', 'REPLACE', 'REMOVE', 'REACTIVATE', 'REPRESENTATIVE_BIND', 'CREATE', 'UPDATE', 'RETIRE']],
+            'relationship_kind' => ['type' => 'string', 'enum' => ['graph', 'media_usage', 'evidence']],
+            'provenance' => ['oneOf' => [['type' => 'string'], ['type' => 'object']]],
+        ];
         foreach (self::relationshipOperationVariants(true) as $variant) {
-            foreach ((array) ($variant['properties'] ?? []) as $key => $schema) $properties[$key] = $schema;
+            foreach ((array) ($variant['properties'] ?? []) as $key => $schema) {
+                if (in_array($key, ['operation', 'relationship_kind', 'provenance'], true)) continue;
+                $properties[$key] ??= $schema;
+            }
         }
         return $properties;
     }

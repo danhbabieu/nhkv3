@@ -26,6 +26,36 @@ final class CaptureClassifiedAsRuntimeIntegrationTest extends TestCase
         self::assertNotContains('CLASSIFICATION_SCOPE_UNSUPPORTED', $plan['blockers']);
     }
 
+    public function test_capture_authority_plan_uses_canonical_default_provenance_for_typed_membership(): void
+    {
+        $sourceId = UuidCodec::newV7();
+        $targetId = UuidCodec::newV7();
+        $authority = new InMemoryAuthorityRepository();
+        $authority->create(new AuthorityEntity($sourceId, 'variant', 'nhk:variant:runtime-default', 'Runtime Variant', 1, []));
+        $authority->create(new AuthorityEntity($targetId, 'classification', 'nhk:classification:runtime-default', 'Clock Type', 1, ['family' => 'clock_type']));
+        $endpoints = new EndpointTypeRegistry();
+        $endpoints->register('variant', new RuntimeAuthorityEndpointResolver('variant', [$sourceId => 1]));
+        $endpoints->register('classification', new RuntimeAuthorityEndpointResolver('classification', [$targetId => 1]));
+        $state = static function (NodeReference $reference) use ($authority): ?array {
+            $record = $authority->findByCanonicalId($reference->endpoint_key);
+            return $record === null ? null : ['active' => $record->active(), 'revision' => $record->revision, 'family' => $record->payload['family'] ?? null];
+        };
+        $planner = new ExplicitRelationIntentPlanner($endpoints, new PredicateRegistry(), $state, static fn (): array => [], new ClassifiedAsPolicy());
+        $plan = (new AuthorityIntentPlanner($authority, (function (): EntityTypeRegistry { $types = new EntityTypeRegistry(); CanonicalEntityTypeCatalog::registerInto($types); return $types; })(), relationIntents: $planner))->plan([
+            'purpose' => 'AUTHORITY',
+            'authority_intent' => ['mode' => 'PLAN', 'relation_intents' => [[
+                'source_type' => 'variant', 'source_uuid' => $sourceId, 'predicate' => 'classified_as',
+                'target_type' => 'classification', 'target_uuid' => $targetId,
+            ]]],
+        ], ['capture_id' => UuidCodec::newV7(), 'capture_revision' => 1]);
+
+        self::assertSame([], $plan['blockers']);
+        self::assertCount(1, $plan['relation_candidates']);
+        self::assertSame('EXPLICIT_USER_KNOWLEDGE', $plan['relation_candidates'][0]['provenance']);
+        self::assertNotNull($plan['relation_candidates'][0]['capture_id']);
+        self::assertSame($plan['plan_fingerprint'], $plan['relation_candidates'][0]['plan_fingerprint']);
+    }
+
     public function test_capture_authority_plan_rejects_classification_without_family(): void
     {
         $plan = $this->plan(false);

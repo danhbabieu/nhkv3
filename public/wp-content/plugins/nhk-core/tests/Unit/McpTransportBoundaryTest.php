@@ -66,6 +66,35 @@ final class McpTransportBoundaryTest extends TestCase
         self::assertTrue(true);
     }
 
+    public function test_capture_relationship_operations_use_graph_and_evidence_discriminators(): void
+    {
+        $schema = array_values(array_filter(McpToolCatalog::tools(), static fn (array $tool): bool => $tool['name'] === 'nhk.capture.ingest'))[0]['inputSchema'];
+        $base = ['idempotency_key' => 'discriminator-contract', 'documentation_checkpoint' => ['documentation_version' => str_repeat('b', 64), 'manifest_hash' => str_repeat('a', 64)]];
+        $graph = $base + ['relationship_operations' => [[
+            'operation' => 'REMOVE', 'relationship_kind' => 'graph',
+            'source' => ['type' => 'variant', 'id' => 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'],
+            'predicate' => 'configured_with_music',
+            'target' => ['type' => 'music', 'id' => 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'],
+            'current_relation_id' => 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+            'expected_edge_revision' => 1,
+            'provenance' => 'EXPLICIT_USER_KNOWLEDGE',
+        ]]];
+        $evidence = $base + ['relationship_operations' => [[
+            'operation' => 'RETIRE', 'relationship_kind' => 'evidence',
+            'evidence_uuid' => 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+            'claim_uuid' => 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', 'claim_revision' => 1,
+            'source_uuid' => 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', 'source_revision' => 1,
+        ]]];
+        $this->invokeValidator($schema, $graph);
+        $this->invokeValidator($schema, $evidence);
+        $this->expectExceptionMessage('ONE_OF_NO_MATCH');
+        $this->invokeValidator($schema, $base + ['relationship_operations' => [[
+            'operation' => 'REMOVE', 'relationship_kind' => 'evidence',
+            'source' => ['type' => 'variant', 'id' => 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'],
+            'predicate' => 'configured_with_music', 'target' => ['type' => 'music', 'id' => 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'],
+        ]]]);
+    }
+
     public function test_oneof_reports_deterministic_ambiguity_and_combined_no_match(): void
     {
         $ambiguous = [

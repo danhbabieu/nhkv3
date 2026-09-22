@@ -31,6 +31,35 @@ final class RelationshipOwnerContract
         return $input;
     }
 
+    /** @param array<string,mixed> $operation */
+    public static function assertCaptureOperation(array $operation): void
+    {
+        $kind = trim((string) ($operation['relationship_kind'] ?? self::GRAPH));
+        $operationName = strtoupper(trim((string) ($operation['operation'] ?? '')));
+        $required = match ($kind) {
+            self::GRAPH => ['ADD', 'REPLACE', 'REMOVE', 'REACTIVATE'],
+            self::MEDIA_USAGE => ['ADD', 'REPLACE', 'REMOVE', 'REPRESENTATIVE_BIND'],
+            self::EVIDENCE => ['CREATE', 'UPDATE', 'RETIRE', 'REACTIVATE'],
+            default => throw new \InvalidArgumentException('RELATIONSHIP_KIND_UNSUPPORTED'),
+        };
+        if (!in_array($operationName, $required, true)) throw new \InvalidArgumentException('RELATIONSHIP_OPERATION_INVALID');
+        if ($kind === self::GRAPH && (!is_array($operation['source'] ?? null) || !is_array($operation['target'] ?? null) || trim((string) ($operation['predicate'] ?? '')) === '')) {
+            throw new \InvalidArgumentException('GRAPH_RELATION_OPERATION_FIELDS_REQUIRED');
+        }
+        if ($kind === self::EVIDENCE && (!isset($operation['claim_uuid'], $operation['claim_revision'], $operation['source_uuid'], $operation['source_revision'])) ) {
+            throw new \InvalidArgumentException('EVIDENCE_RELATION_OPERATION_FIELDS_REQUIRED');
+        }
+    }
+
+    /** @param array<string,mixed> $input */
+    public static function assertCaptureOperations(array $input): void
+    {
+        foreach ((array) ($input['relationship_operations'] ?? []) as $operation) {
+            if (!is_array($operation)) throw new \InvalidArgumentException('RELATION_OPERATION_MALFORMED');
+            self::assertCaptureOperation($operation);
+        }
+    }
+
     /** Route unified MediaUsage input through the established MediaBindingService input. */
     public static function routeMediaCompatibility(array $input): array
     {

@@ -94,7 +94,17 @@ final class DictionaryRuntime
         );
 
         $this->planning = new DictionaryPlanningService(new DictionaryTermDetector($this->normalizer), $resolver, $this->candidates, $this->mentions, new DictionaryLinkPlanner());
-        $this->curation = new DictionaryCurationService($this->candidates, $this->concepts, null, $this->normalizer);
+        $this->curation = new DictionaryCurationService(
+            $this->candidates,
+            $this->concepts,
+            null,
+            $this->normalizer,
+            function (string $type, string $id): bool {
+                if (!$this->types->has($type)) return false;
+                $entity = $this->authority->findByCanonicalId($id);
+                return $entity instanceof AuthorityEntity && $entity->entityType === $type && $entity->active();
+            },
+        );
         $mediaProjection = new EntityMediaProjection(new WpdbMediaRepository($database), new WpdbMediaAssetRepository($database), new WpdbMediaUsageRepository($database));
         $this->publicQuery = new DictionaryPublicQuery(
             $this->concepts,
@@ -262,9 +272,9 @@ final class DictionaryRuntime
 
     private function entityForms(AuthorityEntity $entity): array
     {
-        $forms = [$entity->canonicalName];
-        foreach ((array) ($entity->payload['aliases'] ?? []) as $alias) if (is_string($alias) && trim($alias) !== '') $forms[] = trim($alias);
-        return array_values(array_unique($forms));
+        // Lexical equivalents belong to Dictionary Label, never to the
+        // Authority payload.  Authority remains the canonical name lookup.
+        return [$entity->canonicalName];
     }
 
     private function slug(string $value): string

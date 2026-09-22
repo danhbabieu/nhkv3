@@ -1,48 +1,10 @@
-# Checkpoint — 2026-09-22 — P0 Task 6 generic IMAGE_ARTICLE orchestration (LOCAL / DEPLOYMENT PENDING)
+# P0 Checkpoints — 2026-09-22 (LOCAL / DEPLOYMENT PENDING)
 
-ROOT_CAUSE_CONFIRMED: The generic full-path acceptance fixture did not provide
-the coordinator's canonical publisher success shape (`ok=true` plus published
-post read-back), so the flow stopped at `COMPOSED`; this was an adapter-contract
-fixture gap, not a production Article-specific branch.
-
-FIXED_BOUNDARY: Added a generic `IMAGE_ARTICLE` orchestration proof using an
-explicit registered subject hint, explicit Media, stale reusable Media input,
-semantic/media/publication/final callbacks and publish/read-back. The test
-records the SubjectResolutionPacket ID at each downstream boundary and proves
-one Article, one explicit Media usage, stale Media exclusion, native permalink
-and rendered read-back. No historical canary identifiers or production logic
-were added.
-
-VERIFICATION: Focused orchestration and prior P0 regression suite passes 127
-tests / 509 assertions. `git diff --check` passes. Existing unrelated working
-tree edits remain untouched. No schema, direct DB, semantic mutation or live
-acceptance was performed.
-
-STATUS: `P0_TASK6_GENERIC_IMAGE_ARTICLE_LOCAL_READY / DEPLOYMENT_PENDING / SEMANTIC_MUTATION_NONE`.
-
-# Checkpoint — 2026-09-22 — P0 Task 5 native WordPress Article route/publication lifecycle (LOCAL / DEPLOYMENT PENDING)
-
-ROOT_CAUSE_CONFIRMED: Native Article publication readiness still used the
-semantic `CANONICAL_PUBLIC_IDENTITY_INVALID` diagnostic and the draft gateway
-did not repair a titled draft whose native slug/permalink read-back was empty.
-Publication transitions also trusted the writer return path without a final
-canonical native route read-back.
-
-FIXED_BOUNDARY: Native WordPress Article readiness now checks only the
-post-native route fields (`postId`, `slug`, `permalink`) and does not require an
-Authority PublicIdentity. Titled drafts with no native route allocate a
-deterministic WordPress slug through the existing EditorialPostStore writer,
-then require canonical read-back. Direct and Owner-governed publication both
-require publish status plus non-empty native slug/permalink read-back before
-reporting completion; route loss is a verification failure/blocker.
-
-VERIFICATION: Task 5 focused tests pass 28 tests / 120 assertions. Changed PHP
-files lint clean and `git diff --check` passes. No direct DB writer, forced
-status/thumbnail, semantic PublicIdentity mutation, duplicate Article/Media or
-live/staging mutation was used. Deployment remains pending until generic E2E
-and full suite pass.
-
-STATUS: `P0_TASK5_NATIVE_ROUTE_PUBLICATION_LOCAL_READY / DEPLOYMENT_PENDING / SEMANTIC_MUTATION_NONE`.
+Tasks 5–6: native Article slug/permalink allocation and publish read-back no
+longer require semantic PublicIdentity; generic IMAGE_ARTICLE proves one
+Capture/Article, shared subject packet, explicit Media over stale reusable
+Media, publication and rendered read-back. Focused suite: 127 tests / 509
+assertions; no canary/live mutation. `P0_TASK6_LOCAL_READY`.
 
 # NHK V3 Execution State
 
@@ -17323,3 +17285,39 @@ by unavailable connected runtime/deployment read-back; no staging, production,
 V2, WordPress semantic or article mutation was performed.
 
 STATUS: `AUTHORITY_ELIGIBILITY_APPLY_PARITY_ARTICLE_TRASH_READBACK_CLASSIFIED_AS_RUNTIME_FIXED_LOCAL / DEPLOYMENT_PENDING / LIVE_ACCEPTANCE_BLOCKED_BY_RUNTIME / SEMANTIC_MUTATION_NONE`
+
+# Checkpoint — 2026-09-22 — Capture classified_as provenance, Graph relationship discriminator and Dictionary Authority binding (LOCAL / DEPLOYMENT PENDING)
+
+ROOT_CAUSE_CONFIRMED: Typed `classified_as` intents without an explicit
+provenance inherited the non-canonical `EXPLICIT_USER_RELATION` value, which
+the registered policy correctly rejected as `CLASSIFICATION_SCOPE_UNSUPPORTED`.
+Relation candidates also lacked persisted Capture/plan binding. Capture Graph
+relationship schemas merged the three owner branches into one conflicting
+`properties` projection, so connectors that inspected only the flattened
+projection could validate Graph REMOVE as Evidence. Dictionary already owns
+Concept/Label state; Authority aliases were therefore removed from Dictionary's
+fallback lexical source and approved Concepts may bind to an active canonical
+Authority owner without minting a Dictionary URL.
+
+FIXED_BOUNDARIES: `classified_as` defaults only missing typed provenance to the
+canonical `EXPLICIT_USER_KNOWLEDGE` source class; target activity, type, family,
+endpoint registry and predicate checks remain fail-closed. Relation candidates
+now carry Capture ID, plan fingerprint, deterministic dependencies and reason.
+Capture relationship operations have an explicit Graph/MediaUsage/Evidence
+branch assertion in both MCP transport paths, and the public fallback schema
+uses non-conflicting discriminator projections while executable `oneOf` remains
+authoritative. Dictionary curation validates active Authority destinations and
+preserves canonical owner routing on rename. Article Trash was audited and
+remains unchanged: its gateway only performs the native Post transition and
+canonical status read-back; no Media/attachment writer is in that path.
+
+VERIFICATION: Focused Capture/Graph/MCP/Dictionary suite passes 77 tests / 2,693
+assertions. Full Unit invocation reaches 2,412 tests / 13,306 assertions but is
+environment-gated here: 42 integration/bootstrap errors and 14 contract
+failures require the guarded WordPress/MySQL runtime (`NHK_WP_TEST_PATH=public`)
+or existing runtime bootstrap, with no failure originating in the focused
+changed-boundary suite. PHP lint and `git diff --check` pass. No migration,
+staging, production, V2, live Capture Apply, article/media mutation or
+deployment was performed.
+
+STATUS: `CAPTURE_GRAPH_DICTIONARY_BOUNDARIES_FIXED_LOCAL / DEPLOYMENT_PENDING / LIVE_ACCEPTANCE_BLOCKED_BY_RUNTIME / SEMANTIC_MUTATION_NONE`

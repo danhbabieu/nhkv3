@@ -11,7 +11,7 @@ final class DictionaryCurationService
 {
     private DictionaryTermNormalizer $normalizer;
 
-    public function __construct(private DictionaryCandidateRepository $candidates, private DictionaryConceptRepository $concepts, private $idGenerator = null, ?DictionaryTermNormalizer $normalizer = null)
+    public function __construct(private DictionaryCandidateRepository $candidates, private DictionaryConceptRepository $concepts, private $idGenerator = null, ?DictionaryTermNormalizer $normalizer = null, private $destinationValidator = null)
     {
         $this->normalizer = $normalizer ?? new DictionaryTermNormalizer();
     }
@@ -56,8 +56,12 @@ final class DictionaryCurationService
     {
         $current = $this->concepts->findById($conceptId);
         if ($current === null || $current->revision !== $expectedRevision) throw new \RuntimeException('DICTIONARY_CONCEPT_REVISION_CONFLICT');
+        $destinationType = $destinationType !== null ? trim($destinationType) : null;
+        $destinationId = $destinationId !== null ? trim($destinationId) : null;
+        if (($destinationType === null) !== ($destinationId === null)) throw new \InvalidArgumentException('DICTIONARY_DESTINATION_INCOMPLETE');
+        if ($destinationType !== null && is_callable($this->destinationValidator) && !($this->destinationValidator)($destinationType, $destinationId)) throw new \RuntimeException('DICTIONARY_DESTINATION_UNAVAILABLE');
         $merged = array_merge($current->context, $context);
-        if (trim((string) $destinationUrl) === '' && trim((string) ($merged['public_slug'] ?? '')) === '') throw new \RuntimeException('DICTIONARY_PUBLIC_SLUG_OR_OWNER_REQUIRED');
+        if (trim((string) $destinationUrl) === '' && trim((string) ($merged['public_slug'] ?? '')) === '' && $destinationType === null) throw new \RuntimeException('DICTIONARY_PUBLIC_SLUG_OR_OWNER_REQUIRED');
         $approved = new DictionaryConcept($current->conceptId, $current->preferredLabel, $current->definition, DictionaryConcept::APPROVED, $destinationType, $destinationId, $destinationUrl, $merged, $current->revision);
         return $this->concepts->updateConcept($approved, $expectedRevision);
     }

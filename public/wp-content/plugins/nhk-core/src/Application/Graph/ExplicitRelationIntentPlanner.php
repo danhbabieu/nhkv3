@@ -46,13 +46,20 @@ final class ExplicitRelationIntentPlanner
                 $result['blockers'][] = ['code' => 'RELATION_INTENT_IDENTITY_REQUIRED'];
                 continue;
             }
+            $provenance = trim((string) ($intent['provenance'] ?? ''));
+            // A typed user relation is explicit user knowledge unless the
+            // caller supplies another registered provenance.  The former
+            // EXPLICIT_USER_RELATION value was never in the canonical
+            // provenance registry and made valid classified_as intents fail
+            // closed as CLASSIFICATION_SCOPE_UNSUPPORTED.
+            if ($provenance === '' && $predicate === 'classified_as') $provenance = 'EXPLICIT_USER_KNOWLEDGE';
             $normalized[] = [
                 'source_type' => $sourceType,
                 'source_uuid' => $sourceUuid,
                 'predicate' => $predicate,
                 'target_type' => $targetType,
                 'target_uuid' => $targetUuid,
-                'provenance' => trim((string) ($intent['provenance'] ?? '')) ?: 'EXPLICIT_USER_RELATION',
+                'provenance' => $provenance !== '' ? $provenance : 'EXPLICIT_USER_RELATION',
                 'reason' => trim((string) ($intent['reason'] ?? '')),
             ];
         }

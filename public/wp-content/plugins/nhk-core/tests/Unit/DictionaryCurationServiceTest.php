@@ -37,6 +37,35 @@ final class DictionaryCurationServiceTest extends TestCase
         self::assertSame(DictionaryLabel::COLLOQUIAL, $result['label']->kind);
     }
 
+    public function test_approved_concept_can_bind_labels_to_an_active_canonical_owner_without_creating_a_public_dictionary_url(): void
+    {
+        $concept = new DictionaryConcept('concept-owner', 'Mặt bát giác nằm', 'Clock type', DictionaryConcept::DRAFT, null, null, null, [], 1);
+        $concepts = new class($concept) implements DictionaryConceptRepository {
+            public function __construct(private DictionaryConcept $concept) {}
+            public function findById(string $id): ?DictionaryConcept { return $id === $this->concept->conceptId ? $this->concept : null; }
+            public function findApprovedByNormalizedLabel(string $normalizedLabel, array $context = []): array { return []; }
+            public function listApproved(int $limit = 500): array { return []; }
+            public function listLabels(string $conceptId, bool $includeInactive = false): array { return []; }
+            public function createConcept(DictionaryConcept $concept): DictionaryConcept { return $concept; }
+            public function updateConcept(DictionaryConcept $concept, int $expectedRevision): DictionaryConcept { $this->concept = new DictionaryConcept($concept->conceptId, $concept->preferredLabel, $concept->definition, $concept->status, $concept->destinationType, $concept->destinationId, $concept->destinationUrl, $concept->context, $concept->revision + 1); return $this->concept; }
+            public function addLabel(DictionaryLabel $label): DictionaryLabel { return $label; }
+        };
+        $ownerCandidate = new DictionaryCandidate('owner-candidate', 'mặt nằm', hash('sha256', '{}'), ['Mặt nằm'], DictionaryCandidateState::NEEDS_REVIEW, [], [], 1, 'a', 'b', 1);
+        [$candidateRepo] = $this->repositories($ownerCandidate);
+        $service = new DictionaryCurationService(
+            $candidateRepo,
+            $concepts,
+            null,
+            null,
+            static fn (string $type, string $id): bool => $type === 'classification' && $id === 'authority-1',
+        );
+        $approved = $service->approveConcept('concept-owner', 1, 'classification', 'authority-1');
+        self::assertSame(DictionaryConcept::APPROVED, $approved->status);
+        self::assertSame('classification', $approved->destinationType);
+        self::assertSame('authority-1', $approved->destinationId);
+        self::assertNull($approved->destinationUrl);
+    }
+
     private function repositories(DictionaryCandidate $candidate, ?DictionaryConcept $existingConcept = null): array
     {
         $candidateRepo = new class($candidate) implements DictionaryCandidateRepository {

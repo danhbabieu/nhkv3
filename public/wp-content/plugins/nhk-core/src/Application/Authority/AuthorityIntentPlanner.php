@@ -67,6 +67,7 @@ final class AuthorityIntentPlanner
         $plan['article'] = $hasArticle ? ['requested' => true, 'mode' => ($plan['reuse'] !== [] || $plan['create_candidates'] !== []) ? 'MIXED' : 'EDITORIAL'] : null;
         $plan['plan_fingerprint'] = AuthorityPlanFingerprint::compute((string) ($captureContext['capture_id'] ?? ''), max(1, (int) ($captureContext['capture_revision'] ?? 1)), $plan, is_array($captureContext['contract'] ?? null) ? $captureContext['contract'] : (is_array($input['documentation_checkpoint'] ?? null) ? $input['documentation_checkpoint'] : []));
         $this->bindUpdateCandidates($plan, (string) ($captureContext['capture_id'] ?? ''), (string) $plan['plan_fingerprint']);
+        $this->bindRelationCandidates($plan, (string) ($captureContext['capture_id'] ?? ''), (string) $plan['plan_fingerprint']);
         return $plan;
     }
 
@@ -533,6 +534,21 @@ final class AuthorityIntentPlanner
             $candidate['reason'] = (string) ($candidate['reason'] ?? 'Explicit Authority curation update for an exact active canonical target.');
         }
         unset($candidate);
+    }
+
+    /** @param array<string,mixed> $plan */
+    private function bindRelationCandidates(array &$plan, string $captureId, string $planFingerprint): void
+    {
+        foreach (['relation_candidates', 'relation_reuse'] as $bucket) {
+            foreach ($plan[$bucket] as &$candidate) {
+                if (!is_array($candidate)) continue;
+                $candidate['capture_id'] = $captureId !== '' ? $captureId : null;
+                $candidate['plan_fingerprint'] = $planFingerprint;
+                $candidate['dependencies'] = array_values((array) ($candidate['dependencies'] ?? []));
+                $candidate['reason'] = (string) ($candidate['reason'] ?? 'Explicit canonical relation request.');
+            }
+            unset($candidate);
+        }
     }
 
     /** @param array<string,mixed> $request @return array<string,mixed> */

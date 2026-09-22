@@ -174,6 +174,7 @@ final class McpTransport
         if ($name === 'nhk.relationship.preview') $arguments = RelationshipOwnerContract::normalize($arguments);
         if ($name === 'nhk.capture.ingest') {
             $arguments = RelationshipOwnerContract::normalizeCapture($arguments);
+            RelationshipOwnerContract::assertCaptureOperations($arguments);
             if (($arguments['dry_run'] ?? false) !== true) $arguments = RelationshipOwnerContract::routeMediaCompatibility($arguments);
         }
         $result = match ($dispatch) {

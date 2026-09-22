@@ -707,6 +707,7 @@ final class McpAbilityRegistration
         if ($tool === 'nhk.relationship.preview') $input = RelationshipOwnerContract::normalize($input);
         if ($tool === 'nhk.capture.ingest') {
             $input = RelationshipOwnerContract::normalizeCapture($input);
+            RelationshipOwnerContract::assertCaptureOperations($input);
             if (($input['dry_run'] ?? false) !== true) $input = RelationshipOwnerContract::routeMediaCompatibility($input);
         }
         try {
