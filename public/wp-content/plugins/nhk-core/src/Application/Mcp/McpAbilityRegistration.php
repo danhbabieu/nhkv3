@@ -8,6 +8,7 @@ use NHK\Core\Application\Graph\RelationshipOwnerContract;
 final class McpAbilityRegistration
 {
     private const CATEGORY = 'nhk-v3-content-operations';
+    public const MCP_APP_DIAGNOSTICS_ABILITY = 'nhk-v3/mcp-app-diagnostics';
 
     /** @var list<string> */
     private const EASY_MCP_OPERATOR_ALLOWED_TOOL_PATTERNS = [
@@ -45,6 +46,7 @@ final class McpAbilityRegistration
         'nhk-v3/source-ingest',
         'nhk-v3/evidence-ingest',
         'nhk-v3/proposal-create',
+        self::MCP_APP_DIAGNOSTICS_ABILITY,
     ];
 
     public static function bootstrapRegistry(): void
@@ -170,7 +172,7 @@ final class McpAbilityRegistration
         ));
         $boundedContinuation = self::publicationContinuationAbilityNames();
 
-        return array_values(array_unique(array_merge($preserved, self::operatorEnabledAbilityAllowlist(), $boundedContinuation, self::articleLifecycleAbilityAllowlist(), $explicitInternal)));
+        return array_values(array_unique(array_merge($preserved, self::operatorEnabledAbilityAllowlist(), $boundedContinuation, self::articleLifecycleAbilityAllowlist(), $explicitInternal, [self::MCP_APP_DIAGNOSTICS_ABILITY])));
     }
 
     public static function reconcileEasyMcpEnabledAbilities(): void
@@ -396,7 +398,7 @@ final class McpAbilityRegistration
     /** @return list<string> */
     public static function abilityNames(): array
     {
-        return array_values(array_merge(self::READ_TOOL_MAP, self::CAPABILITY_GATED_READ_TOOL_MAP, self::GOVERNED_TOOL_MAP));
+        return array_values(array_unique(array_merge(self::READ_TOOL_MAP, self::CAPABILITY_GATED_READ_TOOL_MAP, self::GOVERNED_TOOL_MAP, [self::MCP_APP_DIAGNOSTICS_ABILITY])));
     }
 
     /** @return array<string,string> */
@@ -464,6 +466,26 @@ final class McpAbilityRegistration
                 ],
             ]);
         }
+    }
+
+    public static function registerDiagnosticsAbility(): void
+    {
+        if (!function_exists('wp_register_ability')) return;
+        wp_register_ability(self::MCP_APP_DIAGNOSTICS_ABILITY, [
+            'label' => 'NHK MCP App Diagnostics',
+            'description' => 'Read the latest sanitized Easy MCP App wire-event metadata. Administrator-only and read-only; response bodies and credentials are never returned.',
+            'category' => self::CATEGORY,
+            'input_schema' => ['type' => 'object', 'properties' => new \stdClass(), 'additionalProperties' => false],
+            'output_schema' => ['type' => 'object', 'properties' => ['events' => ['type' => 'array']], 'required' => ['events'], 'additionalProperties' => false],
+            'execute_callback' => static fn (mixed $input = null): array => ['events' => McpAppDiagnostics::latest()],
+            'permission_callback' => static fn (): bool => !function_exists('current_user_can') || current_user_can('manage_options'),
+            'meta' => [
+                'public' => true,
+                'show_in_rest' => true,
+                'surface' => 'internal_admin_only',
+                'annotations' => ['readonly' => true, 'destructive' => false, 'idempotent' => true],
+            ],
+        ]);
     }
 
     /**

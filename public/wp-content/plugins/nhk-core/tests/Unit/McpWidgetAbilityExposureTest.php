@@ -35,4 +35,11 @@ final class McpWidgetAbilityExposureTest extends TestCase
             self::assertNotContains(McpAbilityRegistration::abilityNameForTool($tool), McpAbilityRegistration::operatorEnabledAbilityAllowlist());
         }
     }
+
+    public function test_mcp_app_diagnostics_is_a_read_only_admin_easy_mcp_ability(): void
+    {
+        self::assertContains('nhk-v3/mcp-app-diagnostics', McpAbilityRegistration::abilityNames());
+        self::assertContains('nhk-v3/mcp-app-diagnostics', McpAbilityRegistration::explicitInternalAdminAbilityAllowlist());
+        self::assertContains('nhk-v3/mcp-app-diagnostics', McpAbilityRegistration::ensureEasyMcpEnabledAbilities([]));
+    }
 }

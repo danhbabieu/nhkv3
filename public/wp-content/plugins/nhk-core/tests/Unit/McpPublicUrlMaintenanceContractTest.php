@@ -58,6 +58,7 @@ final class McpPublicUrlMaintenanceContractTest extends TestCase
             'nhk-v3/source-ingest',
             'nhk-v3/evidence-ingest',
             'nhk-v3/proposal-create',
+            'nhk-v3/mcp-app-diagnostics',
         ], McpAbilityRegistration::explicitInternalAdminAbilityAllowlist());
         self::assertNotContains($ability, McpAbilityRegistration::ensureEasyMcpEnabledAbilities([]));
         self::assertContains($ability, McpAbilityRegistration::ensureEasyMcpEnabledAbilities([$ability]));

@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Tests\Integration;
 
 use NHK\Core\Infrastructure\Mcp\EasyMcpNativeFileCompatibilityAdapter;
+use NHK\Core\Application\Mcp\McpAppDiagnostics;
 use NHK\Tests\Support\TestDatabaseGuard;
 use PHPUnit\Framework\TestCase;
 
@@ -46,6 +47,34 @@ final class EasyMcpNativeFileCompatibilityIntegrationTest extends TestCase
         ], $tools['wp_ability_nhk_v3_capture_ingest']['inputSchema']['properties']['resume_children']);
         self::assertSame(['files'], $tools['wp_ability_nhk_v3_capture_ingest']['_meta']['openai/fileParams']);
         self::assertArrayNotHasKey('_meta', $tools['wp_ability_nhk_v3_media_ingest']);
+    }
+
+    public function test_real_easy_mcp_boundary_records_tools_call_without_storing_body(): void
+    {
+        if (!defined('EASY_MCP_AI_VERSION')) self::markTestSkipped('Easy MCP AI version constant is unavailable.');
+
+        McpAppDiagnostics::reset();
+        $request = new \WP_REST_Request('POST', '/easy-mcp-ai/v1/mcp');
+        $request->set_body((string) wp_json_encode([
+            'jsonrpc' => '2.0',
+            'id' => 77,
+            'method' => 'tools/call',
+            'params' => ['name' => 'wp_ability_nhk_v3_mcp_app_diagnostics', 'arguments' => []],
+        ]));
+        $response = new \WP_REST_Response([
+            'jsonrpc' => '2.0',
+            'id' => 77,
+            'result' => ['contents' => [['uri' => 'ui://diagnostic', 'mimeType' => 'text/plain', 'text' => 'private body']]],
+        ], 200);
+
+        EasyMcpNativeFileCompatibilityAdapter::projectToolsListDescriptor($response, rest_get_server(), $request);
+        $event = McpAppDiagnostics::latest()[0];
+
+        self::assertSame('tools/call', $event['protocol_method']);
+        self::assertSame(77, $event['request_id']);
+        self::assertSame(1, $event['contents_count']);
+        self::assertSame(strlen('private body'), $event['contents_0_text_byte_length']);
+        self::assertArrayNotHasKey('text', $event);
     }
 
     public function test_unauthenticated_multipart_capture_is_denied_before_nhk_dispatch(): void

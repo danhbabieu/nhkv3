@@ -49,6 +49,7 @@ final class McpGovernanceQueueExposureTest extends TestCase
             }
         }
         $registeredAbilityNames = McpAbilityRegistration::abilityNames();
+        $catalogAbilityNames[] = 'nhk-v3/mcp-app-diagnostics';
         sort($catalogAbilityNames);
         sort($registeredAbilityNames);
         self::assertSame(array_values(array_unique($catalogAbilityNames)), array_values(array_unique($registeredAbilityNames)));

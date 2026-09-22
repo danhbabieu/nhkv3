@@ -520,7 +520,7 @@ final class McpContractTest extends TestCase
         ], McpAbilityRegistration::governedAbilityNames());
         self::assertSame('nhk-v3/article-preflight', McpAbilityRegistration::abilityNameForTool('nhk.article.preflight'));
         self::assertSame('nhk-v3/article-ingest', McpAbilityRegistration::abilityNameForTool('nhk.article.ingest'));
-        self::assertCount(count(McpToolCatalog::tools()) - count(McpAbilityRegistration::explicitExclusionReasons()), McpAbilityRegistration::abilityNames());
+        self::assertCount(count(McpToolCatalog::tools()) - count(McpAbilityRegistration::explicitExclusionReasons()) + 1, McpAbilityRegistration::abilityNames());
     }
 
     public function test_every_catalog_tool_is_registered_or_has_an_explicit_exclusion_reason(): void
@@ -779,6 +779,7 @@ final class McpContractTest extends TestCase
                 McpAbilityRegistration::operatorEnabledAbilityAllowlist(),
                 McpAbilityRegistration::publicationContinuationAbilityNames(),
                 ['nhk-v3/article-draft-create', 'nhk-v3/article-draft-update', 'nhk-v3/article-publish-review', 'nhk-v3/article-publish-approve', 'nhk-v3/article-publish', 'nhk-v3/article-trash', 'nhk-v3/article-restore'],
+                ['nhk-v3/mcp-app-diagnostics'],
             ))),
             $enabled,
         );

@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Core\Infrastructure\Mcp;
 
-use NHK\Core\Application\Mcp\{McpAbilityRegistration, McpAppsResourceRegistry, McpToolCatalog};
+use NHK\Core\Application\Mcp\{McpAbilityRegistration, McpAppDiagnostics, McpAppsResourceRegistry, McpToolCatalog};
 
 /**
  * Narrow compatibility boundary for Easy MCP versions that do not forward
@@ -181,9 +181,15 @@ final class EasyMcpNativeFileCompatibilityAdapter
         if (!self::uiResourceProjectionEnabled()) return $response;
         if (!is_object($request) || !method_exists($request, 'get_route') || rtrim((string) $request->get_route(), '/') !== rtrim(self::ENDPOINT, '/')) return $response;
         $rpc = self::requestRpc($request);
-        if ($rpc !== null && !in_array(($rpc['method'] ?? null), ['initialize', 'server/discover', 'tools/list', 'resources/list', 'resources/read'], true)) return $response;
+        if ($rpc !== null && !in_array(($rpc['method'] ?? null), ['initialize', 'server/discover', 'tools/list', 'tools/call', 'resources/list', 'resources/read'], true)) return $response;
         if (!is_object($response) || !method_exists($response, 'get_data') || !method_exists($response, 'set_data')) return $response;
-        if (method_exists($response, 'get_status') && (int) $response->get_status() !== 200) return $response;
+        $status = method_exists($response, 'get_status') ? (int) $response->get_status() : 200;
+        $data = $response->get_data();
+        if (!is_array($data)) $data = [];
+        if ($status !== 200) {
+            McpAppDiagnostics::record($rpc ?? [], $data, $status, $status !== 401 && $status !== 403);
+            return $response;
+        }
 
         // Easy MCP has already completed authentication, token-scope and
         // WordPress-capability checks before this post-dispatch filter runs.
@@ -191,15 +197,15 @@ final class EasyMcpNativeFileCompatibilityAdapter
         // never turn a 401/403 response into an HTML resource.
         self::$authenticatedWireResponse = true;
 
-        $data = $response->get_data();
         if (!is_array($data)) return $response;
-        self::logProtocolDiagnostic($rpc ?? [], $data, method_exists($response, 'get_status') ? (int) $response->get_status() : 200);
         $projected = match ($rpc['method'] ?? 'tools/list') {
             'initialize', 'server/discover' => self::projectProtocolCapabilities($data),
+            'tools/call' => $data,
             'resources/list' => self::projectResourceListData($data),
             'resources/read' => self::projectResourceReadData($data, $rpc),
             default => self::projectToolsListData($data),
         };
+        McpAppDiagnostics::record($rpc ?? [], is_array($projected) ? $projected : $data, $status, true);
         if ($projected !== $data) $response->set_data($projected);
         return $response;
     }
@@ -386,28 +392,6 @@ final class EasyMcpNativeFileCompatibilityAdapter
         $data['result'] = McpAppsResourceRegistry::read($uri);
         unset($data['error']);
         return $data;
-    }
-
-    /** @param array<string,mixed> $rpc @param array<string,mixed> $data */
-    private static function logProtocolDiagnostic(array $rpc, array $data, int $status): void
-    {
-        $method = (string) ($rpc['method'] ?? '');
-        if ($method === '') return;
-        $result = is_array($data['result'] ?? null) ? $data['result'] : [];
-        $capabilities = is_array($result['capabilities'] ?? null) ? $result['capabilities'] : [];
-        $extensions = is_array($capabilities['extensions'] ?? null) ? $capabilities['extensions'] : [];
-        $body = function_exists('wp_json_encode') ? wp_json_encode($data) : json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-        $diagnostic = [
-            'protocol_method' => $method,
-            'request_id' => $rpc['id'] ?? null,
-            'http_status' => $status,
-            'authenticated' => $status !== 401 && $status !== 403,
-            'requested_resource_uri' => is_array($rpc['params'] ?? null) ? (($rpc['params']['uri'] ?? null) ?: null) : null,
-            'response_error_code' => is_array($data['error'] ?? null) ? ($data['error']['code'] ?? null) : null,
-            'response_body_bytes' => is_string($body) ? strlen($body) : 0,
-            'advertised_extension_names' => array_values(array_map('strval', array_keys($extensions))),
-        ];
-        error_log('[nhk-mcp-apps] ' . (function_exists('wp_json_encode') ? wp_json_encode($diagnostic) : json_encode($diagnostic, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)));
     }
 
     private static function installedVersion(): string

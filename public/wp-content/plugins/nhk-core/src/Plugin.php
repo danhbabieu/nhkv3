@@ -165,6 +165,7 @@ final class Plugin {
                 'media_usage' => new \NHK\Core\Application\Graph\MediaUsageRelationshipAdapter($usages),
                 'evidence' => new \NHK\Core\Application\Graph\EvidenceRelationshipAdapter($evidence, $claims, $sources),
             ]);
+            McpAbilityRegistration::registerDiagnosticsAbility();
             McpAbilityRegistration::registerReadAbilities(new McpReadHandler($authority, $types, $media, $assets, $usages, $videos, $claims, $evidence, new MigrationStatus(), $sources, null, new McpSemanticContextResolver($authority, $types), $wordpressAttachments, $neighborhood, $canonicalInventory, $graphInventory, $relationBackfill, new WpdbMediaBindingOperationRepository($wpdb), $captureRepository, $relationshipRead));
             McpAbilityRegistration::registerCapabilityGatedReadAbilities();
             McpAbilityRegistration::registerGovernedAbilities();
