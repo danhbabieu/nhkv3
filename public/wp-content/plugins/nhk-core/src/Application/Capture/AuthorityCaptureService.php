@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Capture;
 
 use NHK\Core\Application\Completion\CompletionCoordinator;
+use NHK\Core\Application\Graph\RelationshipOwnerContract;
 use NHK\Core\Contracts\Capture\CaptureRepository;
 use NHK\Core\Domain\Capture\{CaptureRecord, CapturePurpose, CaptureStage};
 use NHK\Core\Domain\Governance\CommandCanonicalizer;
@@ -23,6 +24,7 @@ final class AuthorityCaptureService
     /** @param array<string,mixed> $input */
     public function execute(array $input): CaptureRecord
     {
+        $input = RelationshipOwnerContract::normalizeCapture($input);
         $key = trim((string) ($input['idempotency_key'] ?? ''));
         if ($key === '') throw new \InvalidArgumentException('Capture idempotency key is required.');
         $purpose = CapturePurposePolicy::resolve($input);

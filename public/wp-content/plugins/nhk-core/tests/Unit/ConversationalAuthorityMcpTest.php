@@ -303,6 +303,50 @@ final class ConversationalAuthorityMcpTest extends TestCase
         }
     }
 
+    public function test_r3_owner_discriminator_is_strict_and_legacy_graph_defaults_without_fingerprint_drift(): void
+    {
+        $documentation = new McpDocumentationRegistry();
+        $checkpoint = $documentation->bootstrap();
+        $graph = $this->relationshipReadService();
+        $beforeEdges = $graph->list([])['items'];
+        $transport = new McpTransport(
+            $this->readHandler($graph),
+            new McpGovernanceHandler(new GovernanceService(new \NHK\Tests\Support\InMemoryProposalRepository())),
+            static fn (string $capability): bool => in_array($capability, ['read', 'nhk_ingest_articles'], true),
+            documentation: $documentation,
+        );
+        $base = ['operation' => 'ADD', 'source' => ['type' => 'model', 'id' => '11111111-1111-4111-8111-111111111111'], 'predicate' => 'model_of', 'target' => ['type' => 'brand', 'id' => '22222222-2222-4222-8222-222222222222']];
+        $legacy = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/call', 'params' => ['name' => 'nhk.relationship.preview', 'arguments' => $base]], []);
+        $explicit = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 2, 'method' => 'tools/call', 'params' => ['name' => 'nhk.relationship.preview', 'arguments' => $base + ['relationship_kind' => 'graph']]], []);
+        self::assertSame(200, $legacy['status']);
+        self::assertSame($explicit['body']['result']['structuredContent'], $legacy['body']['result']['structuredContent']);
+
+        $uuid = '33333333-3333-4333-8333-333333333333';
+        foreach ([
+            ['operation' => 'REPRESENTATIVE_BIND', 'relationship_kind' => 'media_usage', 'media' => ['type' => 'media', 'id' => $uuid], 'target' => ['type' => 'model', 'id' => $uuid], 'usage_id' => $uuid, 'expected_usage_revision' => 1],
+            ['operation' => 'CREATE', 'relationship_kind' => 'evidence', 'claim_uuid' => $uuid, 'claim_revision' => 1, 'source_uuid' => $uuid, 'source_revision' => 1, 'relation' => 'supports', 'excerpt' => 'excerpt', 'locator' => 'https://example.test/source'],
+        ] as $ordinal => $arguments) {
+            $result = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 10 + $ordinal, 'method' => 'tools/call', 'params' => ['name' => 'nhk.relationship.preview', 'arguments' => $arguments]], []);
+            self::assertSame(200, $result['status'], $result['body']['error']['message'] ?? 'owner schema rejected');
+        }
+
+        $invalid = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 20, 'method' => 'tools/call', 'params' => ['name' => 'nhk.relationship.preview', 'arguments' => ['operation' => 'CREATE', 'relationship_kind' => 'media_usage', 'media' => ['type' => 'media', 'id' => $uuid], 'target' => ['type' => 'model', 'id' => $uuid]]]], []);
+        self::assertSame(400, $invalid['status']);
+        self::assertSame($beforeEdges, $graph->list([])['items']);
+    }
+
+    public function test_unified_media_capture_operation_routes_to_legacy_media_binding_input(): void
+    {
+        $uuid = '33333333-3333-4333-8333-333333333333';
+        $input = \NHK\Core\Application\Graph\RelationshipOwnerContract::routeMediaCompatibility([
+            'relationship_operations' => [['operation' => 'REPRESENTATIVE_BIND', 'relationship_kind' => 'media_usage', 'media' => ['type' => 'media', 'id' => $uuid], 'target' => ['type' => 'model', 'id' => $uuid]]],
+            'media_operations' => [['operation' => 'update', 'target' => ['type' => 'media', 'id' => $uuid]]],
+        ]);
+        self::assertSame([], $input['relationship_operations']);
+        self::assertSame(['update', 'representative_bind'], array_column($input['media_operations'], 'operation'));
+        self::assertSame(['type' => 'media', 'id' => $uuid], $input['media_operations'][1]['media']);
+    }
+
     public function test_relationship_only_mixed_capture_does_not_create_an_article(): void
     {
         $captures = new TransportCaptureRepository();

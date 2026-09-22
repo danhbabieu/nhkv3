@@ -16592,3 +16592,59 @@ V2 or semantic data was mutated.
 STATUS=`GOVERNANCE_CLASSIFIED_AS_PLAN_APPLY_PARITY_AND_PUBLIC_URL_SAFETY_FIXED_LOCALLY / UNIT_PASS / NO_LIVE_MUTATION`.
 
 NEXT_EXACT_ACTION: `USER_PUSH_PULL_BUILD; THEN RETRY EXISTING CAPTURE ON @v39 AND VERIFY COMPLETE`.
+
+# Checkpoint — 2026-09-22 — @v41 completion status persistence/readback mapping (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE_CONFIRMED: The persisted completion packet could carry an explicit
+historical `status=PARTIAL` while its current canonical readback,
+dependency/relation states and blockers had already converged. The aggregate
+boundary trusted that wrapped status instead of projecting status from current
+fields through the existing CompletionCoordinator predicate.
+
+FIXED_BOUNDARY: `aggregateCapture()` now recomputes wrapped completion packets
+that contain current canonical readback through `CompletionCoordinator::finalize()`.
+The refresh path and persistence/readback therefore expose COMPLETE for valid
+Source, Claim, Evidence and Video children. Missing readback remains
+unpromoted, Video-only projection consistency remains enforced, and effective
+child identity/current-attempt precedence is unchanged.
+
+VERIFICATION: Focused Capture/Completion/Ability/read/Video matrix passes 90
+tests / 430 assertions. Full `NHK Unit` passes 2,114 tests / 12,540 assertions
+with 17 warnings, 37 deprecations and 27 PHPUnit deprecations only. PHP lint,
+`git diff --check`, secret scan and prohibited live-ID scan pass. No schema or
+migration change is present or required. No staging scope, controlled Apply,
+Video, Graph or Proposal mutation was executed; no live retry, Capture, SQL,
+deployment, push, pull or visibility mutation was performed.
+
+STATUS=`VIDEO_CAPTURE_COMPLETION_STATUS_PERSISTENCE_FIXED_LOCALLY / FULL_UNIT_PASS / NO_LIVE_MUTATION`.
+
+NEXT_EXACT_ACTION: `USER_PUSH_PULL_BUILD; THEN RUN ONE FINAL @v41 BOUNDED RETRY AND VERIFY COMPLETE`.
+
+# Checkpoint — 2026-09-22 — R3 connector owner-discriminator compatibility (LOCAL / NO LIVE MUTATION)
+
+SCOPE: Connector/runtime schema compatibility only. Graph, MediaBindingService,
+KnowledgeService, EvidenceRepository and Governance semantics were not changed;
+R4 and live mutation were not entered.
+
+FIXED_BOUNDARY: Added one shared owner discriminator normalizer with omitted
+`relationship_kind` defaulting to `graph` before preview/Capture fingerprinting.
+`nhk.relationship.preview`, `relationship.list/get` and Capture relationship
+operations now advertise owner-specific `oneOf` schemas: Graph operations remain
+ADD/REPLACE/REMOVE/REACTIVATE, MediaUsage adds REPRESENTATIVE_BIND, and Evidence
+uses CREATE/UPDATE/RETIRE/REACTIVATE with canonical dependency IDs/revisions and
+owner payload fields. The strict transport validator now evaluates root and
+nested `oneOf` plus `const`, and the Ability path uses the same normalization.
+Legacy Graph relationship packets and `media_operations[]` remain present.
+
+REGRESSION: Legacy and explicit Graph previews are identical; strict MediaUsage
+REPRESENTATIVE_BIND and Evidence operations are accepted; invalid cross-owner
+operations are rejected; owner-aware list/get descriptors remain compatible;
+Capture Graph packets remain valid; owner previews do not create Graph edges;
+preview remains zero-mutation.
+
+VERIFICATION: Full Unit passes 2,116 tests / 12,851 assertions. Contract,
+schema-parity and final Easy MCP/tools-list descriptor coverage passes 82 tests /
+3,248 assertions. PHP lint and `git diff --check` pass. No migration, database,
+staging, controlled Apply, live Capture, deployment or push was performed.
+
+STATUS=`R3_CONNECTOR_OWNER_SCHEMA_COMPATIBILITY_FIXED_LOCALLY / UNIT_PASS / NO_LIVE_MUTATION`.

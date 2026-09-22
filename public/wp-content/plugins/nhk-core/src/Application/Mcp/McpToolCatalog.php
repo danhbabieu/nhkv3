@@ -24,9 +24,9 @@ final class McpToolCatalog
             self::tool('nhk.canonical.inventory', 'Read-only inventory of canonical records with filtering before bounded pagination.', ['filters' => ['type' => 'object'], 'limit' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 100], 'after' => ['type' => 'string']], []),
             self::tool('nhk.graph.inventory', 'Read-only inventory of all Graph edges with endpoint diagnostics.', ['filters' => ['type' => 'object'], 'limit' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 100], 'after' => ['type' => 'string']], []),
             self::tool('nhk.relationship.registry', 'Read-only projection of the executable endpoint and predicate registries.', [], []),
-            self::tool('nhk.relationship.list', 'Read-only bounded relationship listing dispatched to the selected canonical owner.', ['filters' => ['type' => 'object', 'properties' => ['relationship_kind' => ['type' => 'string', 'enum' => ['graph', 'media_usage', 'evidence']]]], 'limit' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 200], 'after' => ['type' => 'string']], []),
-            self::tool('nhk.relationship.get', 'Read one canonical owner relationship without mutation.', ['id' => self::uuidField(), 'relationship_kind' => ['type' => 'string', 'enum' => ['graph', 'media_usage', 'evidence']], 'context' => ['type' => 'object']], ['id']),
-            self::tool('nhk.relationship.preview', 'Read-only deterministic owner-aware relationship preview.', ['operation' => ['type' => 'string', 'enum' => ['ADD', 'REPLACE', 'REMOVE', 'REACTIVATE', 'REPRESENTATIVE_BIND', 'CREATE', 'UPDATE', 'RETIRE']], 'relationship_kind' => ['type' => 'string', 'enum' => ['graph', 'media_usage', 'evidence']], 'source' => self::endpointReferenceField(), 'target' => self::endpointReferenceField(), 'predicate' => ['type' => 'string'], 'current_relation_id' => self::uuidField(true), 'expected_revision' => ['type' => 'integer', 'minimum' => 1], 'expected_usage_revision' => ['type' => 'integer', 'minimum' => 1], 'expected_evidence_revision' => ['type' => 'integer', 'minimum' => 1], 'usage_id' => self::uuidField(true), 'evidence_uuid' => self::uuidField(true), 'claim_uuid' => self::uuidField(true), 'claim_revision' => ['type' => 'integer', 'minimum' => 1], 'source_uuid' => self::uuidField(true), 'source_revision' => ['type' => 'integer', 'minimum' => 1], 'provenance' => ['type' => 'string'], 'evidence_refs' => ['type' => 'array', 'items' => ['type' => 'object']], 'reason' => ['type' => 'string']], ['operation', 'relationship_kind']),
+            self::tool('nhk.relationship.list', 'Read-only bounded relationship listing dispatched to the selected canonical owner.', ['filters' => self::relationshipListFiltersField(), 'limit' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 200], 'after' => ['type' => 'string']], []),
+            self::tool('nhk.relationship.get', 'Read one canonical owner relationship without mutation.', ['__schema' => ['type' => 'object', 'oneOf' => self::relationshipGetVariants()]], []),
+            self::tool('nhk.relationship.preview', 'Read-only deterministic owner-aware relationship preview.', ['__schema' => ['type' => 'object', 'oneOf' => self::relationshipPreviewVariants()]], []),
             self::tool('nhk.relation.backfill.dry_run', 'Read-only relation backfill scan with fail-closed machine-readable statuses.', ['records' => ['type' => 'array', 'items' => ['type' => 'object']]], ['records']),
             self::tool('nhk.relation.backfill.apply', 'Apply an authenticated, explicitly confirmed batch of deterministic relation candidates through Governance.', ['candidates' => ['type' => 'array', 'items' => ['type' => 'object']], 'approval_confirmed' => ['type' => 'boolean']], ['candidates', 'approval_confirmed'], true),
             self::tool('nhk.semantic.resolve', 'Resolve read-only Authority context by UUID, stable key or exact name/alias; ambiguous matches remain candidates.', ['context' => ['type' => 'object']], ['context']),
@@ -49,29 +49,7 @@ final class McpToolCatalog
                 'dry_run' => ['type' => 'boolean'],
                 'relationship_operations' => [
                     'type' => 'array', 'minItems' => 1, 'maxItems' => 50,
-                    'items' => ['type' => 'object', 'additionalProperties' => false, 'properties' => [
-                        'operation' => ['type' => 'string', 'enum' => ['ADD', 'REPLACE', 'REMOVE', 'REACTIVATE', 'REPRESENTATIVE_BIND', 'CREATE', 'UPDATE', 'RETIRE']],
-                        'relationship_kind' => ['type' => 'string', 'enum' => ['graph', 'media_usage', 'evidence']],
-                        'source' => self::endpointReferenceField(),
-                        'predicate' => ['type' => 'string', 'minLength' => 1],
-                        'target' => self::endpointReferenceField(),
-                        'current_relation_id' => self::uuidField(true),
-                        'expected_edge_revision' => ['type' => 'integer', 'minimum' => 1],
-                        'provenance' => ['type' => 'string'],
-                        'evidence_refs' => ['type' => 'array', 'items' => ['type' => 'object']],
-                        'reason' => ['type' => 'string'],
-                        'preview_fingerprint' => ['type' => 'string'],
-                        'registry_hash' => ['type' => 'string'],
-                        'usage_id' => self::uuidField(true),
-                        'expected_usage_revision' => ['type' => 'integer', 'minimum' => 1],
-                        'evidence_uuid' => self::uuidField(true),
-                        'expected_evidence_revision' => ['type' => 'integer', 'minimum' => 1],
-                        'claim_uuid' => self::uuidField(true),
-                        'claim_revision' => ['type' => 'integer', 'minimum' => 1],
-                        'source_uuid' => self::uuidField(true),
-                        'source_revision' => ['type' => 'integer', 'minimum' => 1],
-                        'dependency_revisions' => ['type' => 'object', 'additionalProperties' => ['type' => 'integer', 'minimum' => 1]],
-                    ], 'required' => ['operation', 'relationship_kind', 'source', 'predicate', 'target']],
+                    'items' => ['type' => 'object', 'properties' => self::relationshipOperationProperties(), 'oneOf' => self::relationshipOperationVariants(true), 'additionalProperties' => false],
                 ],
                 'knowledge_repair' => ['type' => 'object', 'properties' => [
                     'canonical_knowledge_uuid' => self::uuidField(), 'expected_revision' => ['type' => 'integer', 'minimum' => 1], 'operation' => ['type' => 'string', 'enum' => ['update', 'retire']],
@@ -482,10 +460,14 @@ final class McpToolCatalog
         } elseif ($surface === 'deprecated') {
             $description = '[DEPRECATED COMPATIBILITY ALIAS] Use nhk.documentation.*. ' . $description;
         }
+        $schema = isset($properties['__schema']) && is_array($properties['__schema'])
+            ? $properties['__schema']
+            : ['type' => 'object', 'properties' => $properties, 'required' => $required, 'additionalProperties' => false];
+        if (isset($properties['__schema'])) $schema['required'] = $required;
         $definition = [
             'name' => $name,
             'description' => $description,
-            'inputSchema' => ['type' => 'object', 'properties' => $properties, 'required' => $required, 'additionalProperties' => false],
+            'inputSchema' => $schema,
             'kind' => $governed ? 'mutation' : 'read',
             'governed' => $governed,
             'surface' => $surface,
@@ -580,6 +562,71 @@ final class McpToolCatalog
             'required' => ['media_ref', 'target'],
             'additionalProperties' => false,
         ];
+    }
+
+    /** @return array<string,mixed> */
+    private static function relationshipListFiltersField(): array
+    {
+        return ['oneOf' => [
+            ['type' => 'object', 'properties' => ['relationship_kind' => ['const' => 'graph'], 'state' => ['type' => 'string'], 'predicate' => ['type' => 'string'], 'source_type' => ['type' => 'string'], 'source_id' => ['type' => 'string'], 'target_type' => ['type' => 'string'], 'target_id' => ['type' => 'string']], 'additionalProperties' => false],
+            ['type' => 'object', 'properties' => ['relationship_kind' => ['const' => 'media_usage'], 'endpoint_type' => ['type' => 'string'], 'endpoint_key' => ['type' => 'string'], 'role' => ['type' => 'string']], 'required' => ['relationship_kind'], 'additionalProperties' => false],
+            ['type' => 'object', 'properties' => ['relationship_kind' => ['const' => 'evidence'], 'claim_uuid' => self::uuidField(true), 'source_uuid' => self::uuidField(true)], 'required' => ['relationship_kind'], 'additionalProperties' => false],
+        ]];
+    }
+
+    /** @return list<array<string,mixed>> */
+    private static function relationshipGetVariants(): array
+    {
+        return [
+            ['type' => 'object', 'properties' => ['id' => self::uuidField(), 'relationship_kind' => ['const' => 'graph'], 'context' => ['type' => 'object']], 'required' => ['id'], 'additionalProperties' => false],
+            ['type' => 'object', 'properties' => ['id' => self::uuidField(), 'relationship_kind' => ['const' => 'media_usage'], 'context' => ['type' => 'object']], 'required' => ['id', 'relationship_kind'], 'additionalProperties' => false],
+            ['type' => 'object', 'properties' => ['id' => self::uuidField(), 'relationship_kind' => ['const' => 'evidence'], 'context' => ['type' => 'object']], 'required' => ['id', 'relationship_kind'], 'additionalProperties' => false],
+        ];
+    }
+
+    /** @return list<array<string,mixed>> */
+    private static function relationshipPreviewVariants(): array
+    {
+        return self::relationshipOperationVariants(false);
+    }
+
+    /** @return array<string,array<string,mixed>> */
+    private static function relationshipOperationProperties(): array
+    {
+        $properties = [];
+        foreach (self::relationshipOperationVariants(true) as $variant) {
+            foreach ((array) ($variant['properties'] ?? []) as $key => $schema) $properties[$key] = $schema;
+        }
+        return $properties;
+    }
+
+    /** @return list<array<string,mixed>> */
+    private static function relationshipOperationVariants(bool $capture): array
+    {
+        $graph = [
+            'type' => 'object', 'properties' => [
+                'operation' => ['type' => 'string', 'enum' => ['ADD', 'REPLACE', 'REMOVE', 'REACTIVATE']],
+                'relationship_kind' => ['const' => 'graph'], 'source' => self::endpointReferenceField(), 'predicate' => ['type' => 'string', 'minLength' => 1], 'target' => self::endpointReferenceField(),
+                'current_relation_id' => self::uuidField(true), 'expected_edge_revision' => ['type' => 'integer', 'minimum' => 1], 'expected_revision' => ['type' => 'integer', 'minimum' => 1],
+                'provenance' => ['type' => 'string'], 'evidence_refs' => ['type' => 'array', 'items' => ['type' => 'object']], 'reason' => ['type' => 'string'], 'preview_fingerprint' => ['type' => 'string'], 'registry_hash' => ['type' => 'string'], 'dependency_revisions' => ['type' => 'object', 'additionalProperties' => ['type' => 'integer', 'minimum' => 1]],
+            ], 'required' => ['operation', 'source', 'predicate', 'target'], 'additionalProperties' => false,
+        ];
+        $media = [
+            'type' => 'object', 'properties' => [
+                'operation' => ['type' => 'string', 'enum' => ['ADD', 'REPLACE', 'REMOVE', 'REPRESENTATIVE_BIND']], 'relationship_kind' => ['const' => 'media_usage'],
+                'media' => self::endpointReferenceField(), 'target' => self::endpointReferenceField(), 'role' => ['type' => 'string', 'minLength' => 1], 'placement_key' => ['type' => 'string', 'minLength' => 1],
+                'usage_id' => self::uuidField(true), 'expected_usage_revision' => ['type' => 'integer', 'minimum' => 1], 'expected_revision' => ['type' => 'integer', 'minimum' => 1], 'provenance' => ['type' => 'object'], 'reason' => ['type' => 'string'],
+            ], 'required' => ['operation', 'relationship_kind', 'media', 'target'], 'additionalProperties' => false,
+        ];
+        $evidence = [
+            'type' => 'object', 'properties' => [
+                'operation' => ['type' => 'string', 'enum' => ['CREATE', 'UPDATE', 'RETIRE', 'REACTIVATE']], 'relationship_kind' => ['const' => 'evidence'],
+                'evidence_uuid' => self::uuidField(true), 'expected_evidence_revision' => ['type' => 'integer', 'minimum' => 1], 'expected_revision' => ['type' => 'integer', 'minimum' => 1],
+                'claim_uuid' => self::uuidField(), 'claim_revision' => ['type' => 'integer', 'minimum' => 1], 'source_uuid' => self::uuidField(), 'source_revision' => ['type' => 'integer', 'minimum' => 1],
+                'relation' => ['type' => 'string', 'enum' => ['supports', 'contradicts', 'qualifies']], 'excerpt' => ['type' => 'string'], 'locator' => ['type' => 'string'], 'payload' => ['type' => 'object'], 'metadata' => ['type' => 'object'], 'reason' => ['type' => 'string'],
+            ], 'required' => ['operation', 'relationship_kind', 'claim_uuid', 'claim_revision', 'source_uuid', 'source_revision'], 'additionalProperties' => false,
+        ];
+        return [$graph, $media, $evidence];
     }
 
     /** @return array<string,array<string,mixed>> */

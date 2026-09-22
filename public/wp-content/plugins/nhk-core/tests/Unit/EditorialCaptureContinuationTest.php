@@ -356,7 +356,7 @@ final class EditorialCaptureContinuationTest extends TestCase
         $writes = [];
         foreach ([['id' => $sourceId, 'phase' => 'VIDEO_SOURCE_GOVERNANCE'], ['id' => $claimId, 'phase' => 'VIDEO_CLAIM_GOVERNANCE'], ['id' => $evidenceId, 'phase' => 'VIDEO_EVIDENCE_GOVERNANCE']] as $dependency) {
             $writes[] = ['entity_type' => 'knowledge', 'canonical_id' => $dependency['id'], 'completion' => [
-                'owner_type' => 'knowledge', 'owner_id' => $dependency['id'], 'canonical_state' => 'BLOCKED',
+                'owner_type' => 'knowledge', 'owner_id' => $dependency['id'], 'status' => 'PARTIAL', 'complete' => false, 'canonical_state' => 'BLOCKED',
                 'canonical_readback_verified' => false, 'dependency_state' => 'PARTIAL', 'relation_or_usage_state' => 'PARTIAL',
                 'blockers' => ['CANONICAL_READBACK_UNVERIFIED'],
             ]];
@@ -401,10 +401,22 @@ final class EditorialCaptureContinuationTest extends TestCase
             $this->createMock(MediaRepository::class), $this->createMock(MediaAssetRepository::class), $this->createMock(MediaUsageRepository::class),
             $this->createMock(VideoRepository::class), $claims, $evidenceRepository,
             sources: $sources,
+            captures: $captures,
         );
         self::assertNull($publicRead->sourceGet($sourceId));
         self::assertNull($publicRead->knowledgeGet($claimId));
         self::assertNull($publicRead->evidenceGet($evidenceId));
+        $projection = $publicRead->captureGet($capture->captureId);
+        self::assertSame('COMPLETE', $projection['capture_status']);
+        self::assertSame([], $projection['blockers']);
+        self::assertFalse($projection['retry']['eligible']);
+        self::assertSame('CAPTURE_RETRY_NOT_ALLOWED', $projection['retry']['reason']);
+        $ownerStatuses = [];
+        foreach ($projection['owners'] as $owner) $ownerStatuses[(string) ($owner['owner_type'] ?? '')] = $owner['status'] ?? null;
+        self::assertSame('COMPLETE', $ownerStatuses['source']);
+        self::assertSame('COMPLETE', $ownerStatuses['knowledge']);
+        self::assertSame('COMPLETE', $ownerStatuses['evidence']);
+        self::assertSame('COMPLETE', $ownerStatuses['video']);
     }
 
     public function test_missing_internal_dependency_remains_blocked(): void

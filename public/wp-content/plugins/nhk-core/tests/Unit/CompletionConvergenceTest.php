@@ -154,6 +154,33 @@ final class CompletionConvergenceTest extends TestCase
         self::assertContains('FRONTEND_READBACK_NOT_VERIFIED', $packet['blockers']);
     }
 
+    public function test_current_completion_fields_recompute_stale_explicit_status(): void
+    {
+        $packet = (new CompletionCoordinator())->aggregateCapture('capture-1', [
+            ['completion' => [
+                'owner_type' => 'source',
+                'owner_id' => 'source-1',
+                'status' => 'PARTIAL',
+                'complete' => false,
+                'canonical_state' => 'COMPLETE',
+                'canonical_readback' => ['canonical_id' => 'source-1', 'revision' => 1],
+                'canonical_readback_verified' => true,
+                'dependency_state' => 'COMPLETE',
+                'relation_or_usage_state' => 'COMPLETE',
+                'public_state' => 'NOT_APPLICABLE',
+                'frontend_state' => 'NOT_APPLICABLE',
+                'blockers' => [],
+            ]],
+        ], [
+            'canonical_state' => 'COMPLETE',
+            'canonical_readback' => ['canonical_id' => 'capture-1'],
+        ]);
+
+        self::assertSame('COMPLETE', $packet['children'][0]['status']);
+        self::assertTrue($packet['children'][0]['complete']);
+        self::assertTrue($packet['complete']);
+    }
+
     public function test_semantic_video_dependencies_do_not_require_public_frontend_routes(): void
     {
         $packet = (new CompletionCoordinator())->finalize('knowledge', 'claim-1', [

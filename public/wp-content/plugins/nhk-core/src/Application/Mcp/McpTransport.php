@@ -13,6 +13,7 @@ use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
 use NHK\Core\Application\Knowledge\KnowledgeRepairPreviewService;
 use NHK\Core\Application\PublicIdentity\PublicUrlMaintenanceService;
 use NHK\Core\Application\Capture\{AuthorityCaptureService, EditorialCaptureContinuationService, EditorialCaptureCoordinator, PlanReapprovalRequired};
+use NHK\Core\Application\Graph\RelationshipOwnerContract;
 use NHK\Core\Application\Runtime\{SemanticWritePolicyResolver, SemanticWritePolicyViolation};
 use NHK\Core\Domain\Knowledge\DependencyValidationException;
 use NHK\Core\Infrastructure\Mcp\ChatGptMcpGatewayException;
@@ -170,6 +171,11 @@ final class McpTransport
         if ($capability !== null && (!$this->can || !(bool) ($this->can)($capability))) throw new McpPermissionDenied($capability);
         if ($definition['kind'] === 'mutation' && $this->can !== null && !(bool) ($this->can)('read')) throw new McpPermissionDenied('read');
         $this->validateArguments($definition['inputSchema'], $arguments);
+        if ($name === 'nhk.relationship.preview') $arguments = RelationshipOwnerContract::normalize($arguments);
+        if ($name === 'nhk.capture.ingest') {
+            $arguments = RelationshipOwnerContract::normalizeCapture($arguments);
+            if (($arguments['dry_run'] ?? false) !== true) $arguments = RelationshipOwnerContract::routeMediaCompatibility($arguments);
+        }
         $result = match ($dispatch) {
             'nhk.documentation.bootstrap', 'nhk.docs.bootstrap' => ($this->documentation ?? new McpDocumentationRegistry())->bootstrap(),
             'nhk.documentation.get' => ($this->documentation ?? new McpDocumentationRegistry())->get((string) ($arguments['path'] ?? ''), isset($arguments['start_line']) ? (int) $arguments['start_line'] : null, isset($arguments['line_count']) ? (int) $arguments['line_count'] : null),
@@ -549,6 +555,10 @@ final class McpTransport
 
     private function validateArguments(array $schema, array $arguments): void
     {
+        if (isset($schema['oneOf']) && is_array($schema['oneOf'])) {
+            $this->validateArgumentValue('arguments', $arguments, $schema);
+            return;
+        }
         foreach ((array) ($schema['required'] ?? []) as $key) {
             if (!array_key_exists((string) $key, $arguments)) throw new \InvalidArgumentException('Missing required argument: ' . $key . '.');
         }
@@ -563,6 +573,15 @@ final class McpTransport
 
     private function validateArgumentValue(string $key, mixed $value, array $schema): void
     {
+        if (isset($schema['oneOf']) && is_array($schema['oneOf'])) {
+            $matches = 0;
+            foreach ($schema['oneOf'] as $variant) {
+                if (!is_array($variant)) continue;
+                try { $this->validateArgumentValue($key, $value, $variant); $matches++; } catch (\InvalidArgumentException) { }
+            }
+            if ($matches !== 1) throw new \InvalidArgumentException('Argument does not match exactly one owner schema: ' . $key . '.');
+            return;
+        }
         $types = (array) ($schema['type'] ?? '');
         $valid = match (true) {
             $value === null => in_array('null', $types, true),
@@ -576,6 +595,7 @@ final class McpTransport
         if ($value === null) return;
         if (($schema['format'] ?? '') === 'uuid' && (!is_string($value) || !UuidCodec::isValid($value))) throw new \InvalidArgumentException('Argument has invalid format: ' . $key . '.');
         if (($schema['format'] ?? '') === 'uri' && (!is_string($value) || filter_var($value, FILTER_VALIDATE_URL) === false)) throw new \InvalidArgumentException('Argument has invalid format: ' . $key . '.');
+        if (array_key_exists('const', $schema) && $value !== $schema['const']) throw new \InvalidArgumentException('Argument has invalid discriminator: ' . $key . '.');
         if (isset($schema['pattern']) && is_string($value) && preg_match('/' . $schema['pattern'] . '/', $value) !== 1) throw new \InvalidArgumentException('Argument has invalid format: ' . $key . '.');
         if (isset($schema['enum']) && !in_array($value, (array) $schema['enum'], true)) throw new \InvalidArgumentException('Argument has invalid value: ' . $key . '.');
         if (isset($schema['minLength']) && is_string($value) && strlen($value) < (int) $schema['minLength']) throw new \InvalidArgumentException('Argument is too short: ' . $key . '.');

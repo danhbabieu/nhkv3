@@ -132,8 +132,9 @@ final class CompletionCoordinator
         foreach ($children as $child) {
             if (!is_array($child)) continue;
             $packet = is_array($child['completion'] ?? null)
-                ? $child['completion']
+                ? $this->recomputeCurrentCompletion($child['completion'])
                 : $this->finalize((string) ($child['owner_type'] ?? ''), (string) ($child['owner_id'] ?? ''), $child);
+            if (is_array($child['completion'] ?? null)) $child['completion'] = $packet;
             $packets[] = $packet;
             if (($packet['complete'] ?? false) !== true) array_push($blockers, ...$this->strings($packet['blockers'] ?? []));
         }
@@ -256,6 +257,27 @@ final class CompletionCoordinator
     private function readBack(mixed $value): bool
     {
         return is_array($value) && trim((string) ($value['canonical_id'] ?? $value['id'] ?? '')) !== '';
+    }
+
+    /** @param array<string,mixed> $packet @return array<string,mixed> */
+    private function recomputeCurrentCompletion(array $packet): array
+    {
+        if (!is_array($packet['canonical_readback'] ?? null) || !$this->readBack($packet['canonical_readback'])) return $packet;
+        $evidence = [
+            'proposal_state' => $packet['proposal_state'] ?? null,
+            'canonical_state' => $packet['canonical_state'] ?? null,
+            'canonical_readback' => $packet['canonical_readback'],
+            'dependency_state' => $packet['dependency_state'] ?? null,
+            'relation_or_usage_state' => $packet['relation_or_usage_state'] ?? null,
+            'content_quality' => $packet['content_state'] ?? null,
+            'public_state' => $packet['public_state'] ?? null,
+            'frontend_state' => $packet['frontend_state'] ?? null,
+            'blockers' => $packet['blockers'] ?? [],
+            'owner_role' => ($packet['public_state'] ?? null) === 'NOT_APPLICABLE' && ($packet['frontend_state'] ?? null) === 'NOT_APPLICABLE' ? 'semantic_dependency' : null,
+            'public_projection_owner' => !(($packet['public_state'] ?? null) === 'NOT_APPLICABLE' && ($packet['frontend_state'] ?? null) === 'NOT_APPLICABLE'),
+        ];
+        if (array_key_exists('projection_consistency', $packet) && strtoupper(trim((string) $packet['projection_consistency'])) !== 'NOT_APPLICABLE') $evidence['projection_consistency'] = $packet['projection_consistency'];
+        return $this->finalize((string) ($packet['owner_type'] ?? ''), (string) ($packet['owner_id'] ?? ''), $evidence);
     }
 
     /** @param list<string> $allowed */

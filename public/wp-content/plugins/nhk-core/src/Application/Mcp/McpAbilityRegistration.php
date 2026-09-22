@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Mcp;
 
+use NHK\Core\Application\Graph\RelationshipOwnerContract;
+
 final class McpAbilityRegistration
 {
     private const CATEGORY = 'nhk-v3-content-operations';
@@ -680,6 +682,11 @@ final class McpAbilityRegistration
     private static function execute(string $tool, McpReadHandler $read, mixed $input): mixed
     {
         $input = is_array($input) ? $input : [];
+        if ($tool === 'nhk.relationship.preview') $input = RelationshipOwnerContract::normalize($input);
+        if ($tool === 'nhk.capture.ingest') {
+            $input = RelationshipOwnerContract::normalizeCapture($input);
+            if (($input['dry_run'] ?? false) !== true) $input = RelationshipOwnerContract::routeMediaCompatibility($input);
+        }
         try {
             return match ($tool) {
                 'nhk.search' => $read->search((string) ($input['q'] ?? ''), (int) ($input['page'] ?? 1), (int) ($input['per_page'] ?? 20)),
