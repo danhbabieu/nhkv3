@@ -1,5 +1,30 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-22 — Easy MCP 1.7.18 authenticated resource wire boundary (LOCAL / DEPLOYMENT PENDING)
+
+ROOT_CAUSE_CONFIRMED: Easy MCP 1.7.18 authenticates and permission-checks first,
+then its native Resource_Registry returns `Resource not found` for the NHK
+`ui://` URI before WordPress serializes the JSON-RPC body. The adapter's prior
+projection was not explicitly bound to the successful post-dispatch response,
+so the final echo path could not prove that auth had completed and could risk
+replacing an auth failure.
+
+FIXED_BOUNDARY: The adapter now projects only HTTP-200 Easy MCP responses seen
+at `rest_post_dispatch`, after authentication, token scope and WordPress
+capability checks. The exact NHK v3 URI is replaced with the bundled HTML;
+unknown URIs and non-200 auth responses remain unchanged. Tools metadata,
+native Easy MCP file transport in 1.7.18, legacy 1.7.16/1.7.17 multipart
+compatibility, and Media/Capture semantics are unchanged.
+
+VERIFICATION: Full Unit passes 2,136 tests / 12,924 assertions with existing
+warnings/deprecations; focused MCP App/Easy MCP passes 37 tests / 793
+assertions; PHP lint and `git diff --check` pass. The real authenticated Easy
+MCP 1.7.18 REST/Server/ResourceRegistry regression is added and correctly
+skips locally because the guarded WordPress/Easy MCP runtime is unavailable.
+Deployment and fresh authenticated v43 wire read-back remain pending.
+
+STATUS: `EASY_MCP_1_7_18_AUTHENTICATED_RESOURCE_WIRE_BOUNDARY_LOCAL / REAL_INTEGRATION_ADDED / DEPLOYMENT_PENDING`.
+
 # Checkpoint — 2026-09-22 — Authority Proposal Apply staging-scope recovery (LOCAL / DEPLOYMENT PENDING)
 
 ROOT_CAUSE: `OperationScopedStagingGuard::assertAllowed()` raised

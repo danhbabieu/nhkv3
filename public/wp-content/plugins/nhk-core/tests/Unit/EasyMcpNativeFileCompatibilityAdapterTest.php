@@ -504,6 +504,29 @@ final class EasyMcpNativeFileCompatibilityAdapterTest extends TestCase
         self::assertSame($unknown, EasyMcpNativeFileCompatibilityAdapter::projectFinalToolsListDescriptor($unknown, null, $unknownRequest));
     }
 
+    public function test_resource_projection_never_replaces_authenticated_error_boundary_failures(): void
+    {
+        $request = new class {
+            public function get_route(): string { return '/easy-mcp-ai/v1/mcp'; }
+            public function get_json_params(): array { return [
+                'jsonrpc' => '2.0',
+                'id' => 15,
+                'method' => 'resources/read',
+                'params' => ['uri' => 'ui://nhk/image-upload/v3.html'],
+            ]; }
+        };
+        $response = new class {
+            /** @var array<string,mixed> */
+            public array $data = ['jsonrpc' => '2.0', 'id' => 15, 'error' => ['code' => -32001, 'message' => 'Authentication required']];
+            public function get_status(): int { return 401; }
+            public function get_data(): array { return $this->data; }
+            public function set_data(array $data): void { $this->data = $data; }
+        };
+
+        self::assertSame($response, EasyMcpNativeFileCompatibilityAdapter::projectToolsListDescriptor($response, null, $request));
+        self::assertArrayHasKey('error', $response->data);
+    }
+
     public function test_easy_mcp_1718_modern_resources_list_projects_image_upload_resource(): void
     {
         $request = new class {

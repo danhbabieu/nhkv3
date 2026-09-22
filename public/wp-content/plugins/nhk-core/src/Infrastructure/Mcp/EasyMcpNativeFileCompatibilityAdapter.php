@@ -29,6 +29,7 @@ final class EasyMcpNativeFileCompatibilityAdapter
 
     private static bool $registered = false;
     private static bool $proxyDispatch = false;
+    private static bool $authenticatedWireResponse = false;
 
     public static function register(): void
     {
@@ -174,11 +175,19 @@ final class EasyMcpNativeFileCompatibilityAdapter
 
     public static function projectToolsListDescriptor(mixed $response, mixed $server, mixed $request): mixed
     {
+        self::$authenticatedWireResponse = false;
         if (!self::uiResourceProjectionEnabled()) return $response;
         if (!is_object($request) || !method_exists($request, 'get_route') || rtrim((string) $request->get_route(), '/') !== rtrim(self::ENDPOINT, '/')) return $response;
         $rpc = self::requestRpc($request);
         if ($rpc !== null && !in_array(($rpc['method'] ?? null), ['tools/list', 'resources/list', 'resources/read'], true)) return $response;
         if (!is_object($response) || !method_exists($response, 'get_data') || !method_exists($response, 'set_data')) return $response;
+        if (method_exists($response, 'get_status') && (int) $response->get_status() !== 200) return $response;
+
+        // Easy MCP has already completed authentication, token-scope and
+        // WordPress-capability checks before this post-dispatch filter runs.
+        // Only this successful wire response may be projected. In particular,
+        // never turn a 401/403 response into an HTML resource.
+        self::$authenticatedWireResponse = true;
 
         $data = $response->get_data();
         if (!is_array($data)) return $response;
@@ -299,6 +308,7 @@ final class EasyMcpNativeFileCompatibilityAdapter
     public static function projectFinalToolsListDescriptor(mixed $data, mixed $server, mixed $request): mixed
     {
         if (!self::uiResourceProjectionEnabled()) return $data;
+        if (defined('EASY_MCP_AI_VERSION') && !self::$authenticatedWireResponse) return $data;
         if (!is_object($request) || !method_exists($request, 'get_route') || rtrim((string) $request->get_route(), '/') !== rtrim(self::ENDPOINT, '/')) return $data;
         $rpc = self::requestRpc($request);
         return match ($rpc['method'] ?? 'tools/list') {
