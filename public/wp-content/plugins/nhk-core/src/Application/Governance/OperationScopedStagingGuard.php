@@ -12,7 +12,7 @@ use NHK\Core\Domain\Governance\{Proposal, ProposalSubjectBindingValidator};
  */
 final class OperationScopedStagingGuard implements StagingGuard
 {
-    /** @param callable():string $environment @param callable(string):bool $can @param callable(array<string,mixed>,Proposal):bool|string|null $scopeVerifier */
+    /** @param callable():string $environment @param callable(string):bool $can @param callable(array<string,mixed>,Proposal):bool|string|null $scopeVerifier @param callable(Proposal):array<string,mixed>|null $scopeResolver */
     public function __construct(
         private $environment,
         private $can,
@@ -20,6 +20,7 @@ final class OperationScopedStagingGuard implements StagingGuard
         private int $maxPayloadBytes = 1000000,
         private int $maxDependencyCount = 50,
         private $scopeVerifier = null,
+        private $scopeResolver = null,
     ) {}
 
     public function assertAllowed(Proposal $proposal): void
@@ -40,6 +41,9 @@ final class OperationScopedStagingGuard implements StagingGuard
         if (is_array($dependencies) && count($dependencies) > $this->maxDependencyCount) throw new \RuntimeException('STAGING_DEPENDENCY_BOUND_EXCEEDED');
         if (trim($proposal->idempotencyKey) === '') throw new \RuntimeException('STAGING_IDEMPOTENCY_REQUIRED');
         $scope = $proposal->payload['staging_acceptance'] ?? null;
+        if (!is_array($scope) && is_callable($this->scopeResolver)) {
+            $scope = ($this->scopeResolver)($proposal);
+        }
         if (!is_array($scope)) throw new \RuntimeException('STAGING_SCOPE_REQUIRED');
         if (!is_callable($this->scopeVerifier)) throw new \RuntimeException('STAGING_SCOPE_VERIFIER_REQUIRED');
         $verification = ($this->scopeVerifier)($scope, $proposal);

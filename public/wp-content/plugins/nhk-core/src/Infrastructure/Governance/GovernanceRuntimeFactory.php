@@ -22,6 +22,7 @@ use NHK\Core\Infrastructure\Governance\WpdbAuditSink as GovernanceAuditSink;
 use NHK\Core\Infrastructure\Knowledge\{WpdbEvidenceRepository, WpdbKnowledgeRepository, WpdbSourceRepository};
 use NHK\Core\Infrastructure\Media\{WpdbMediaAssetRepository, WpdbMediaRepository, WpdbMediaUsageRepository, WordPressMediaAttachmentBridge};
 use NHK\Core\Infrastructure\Video\WpdbVideoRepository;
+use NHK\Core\Infrastructure\Capture\WpdbCaptureRepository;
 use NHK\Core\Application\PublicIdentity\PublicIdentityService;
 use NHK\Core\Infrastructure\PublicIdentity\WpdbPublicIdentityRepository;
 
@@ -46,6 +47,7 @@ final class GovernanceRuntimeFactory
         $classifiedAsPolicy = new ClassifiedAsPolicy();
         $graphService = new GraphService($graphRepository, $endpoints, $predicates, new GraphAuditSink(), new ClassificationHierarchyPolicy($authority, $graphRepository), $classifiedAsPolicy);
         $proposalRepository = new WpdbProposalRepository($wpdb);
+        $captureRepository = new WpdbCaptureRepository($wpdb);
         $governanceAudit = new GovernanceAuditSink($wpdb);
         $transactionManager = new WpdbTransactionManager($wpdb);
         $governance = new GovernanceService($proposalRepository, $governanceAudit, $transactionManager, new WordPressGovernanceAuthorizer());
@@ -126,6 +128,25 @@ final class GovernanceRuntimeFactory
             $environment,
             static fn (string $capability): bool => function_exists('current_user_can') && current_user_can($capability),
             scopeVerifier: [$stagingScopeVerifier, 'proposalFailureReason'],
+            scopeResolver: static function (\NHK\Core\Domain\Governance\Proposal $proposal) use ($captureRepository, $stagingScopeVerifier): ?array {
+                $authorityTypes = ['brand', 'model', 'variant', 'movement', 'music', 'component', 'classification', 'specimen', 'product'];
+                if (!in_array($proposal->entityType, $authorityTypes, true)) return null;
+                $audit = is_array($proposal->payload['project_build_audit'] ?? null) ? $proposal->payload['project_build_audit'] : [];
+                $captureId = trim((string) ($audit['capture_id'] ?? $proposal->payload['capture_id'] ?? ''));
+                $candidateId = trim((string) ($proposal->payload['candidate_id'] ?? ''));
+                if ($captureId === '' || $candidateId === '' || !\NHK\Core\Shared\Uuid\UuidCodec::isValid($captureId)) return null;
+                $capture = $captureRepository->findById($captureId);
+                if (!$capture instanceof \NHK\Core\Domain\Capture\CaptureRecord) return null;
+                $plan = is_array($capture->context['authority_plan'] ?? null) ? $capture->context['authority_plan'] : [];
+                $planFingerprint = trim((string) ($audit['plan_fingerprint'] ?? $plan['plan_fingerprint'] ?? ''));
+                if (!preg_match('/^[a-f0-9]{64}$/i', $planFingerprint)) return null;
+                $plan['plan_fingerprint'] = $planFingerprint;
+                try {
+                    return $stagingScopeVerifier->issueForAuthorityPlan($capture, $plan, [$candidateId]);
+                } catch (\Throwable) {
+                    return null;
+                }
+            },
         );
         $controlledApply = new ControlledApplyService(
             $proposalRepository,
