@@ -16942,3 +16942,37 @@ blockers remain unchanged. No schema/migration, staging, production, V2,
 Capture, SQL, deployment, push or semantic data mutation was performed.
 
 STATUS=`SEMANTIC_SEO_INTERNAL_LINKING_FIXED_LOCALLY / FULL_UNIT_PASS / NO_LIVE_MUTATION`.
+
+# Checkpoint — 2026-09-22 — Shared editorial quality gate (LOCAL / NO LIVE MUTATION)
+
+SCOPE: Checkpoint F only: transient Editorial Context Pack, Editorial Plan,
+Editorial Draft and Semantic SEO Plan → one deterministic Editorial Quality
+Report. No Article/Video/Image-specific gates, rewrite, re-enrichment,
+persistence, publication, frontend integration, schema or migration were added.
+
+FIXED_BOUNDARY: Added `EditorialQualityGate` and transient
+`EditorialQualityReport`. The gate evaluates factual grounding, scope,
+evidence, knowledge utilization, information gain, reader journey, topic
+centrality, redundancy, template/boilerplate, public language, visual support,
+SEO readiness, internal-link quality, public claim compliance, traceability,
+profile fit and public readiness. It consumes existing claim eligibility and
+revision metadata, draft traces and information-gain diagnostics, visual
+support state, public-copy guards and SEO readiness; it does not retrieve,
+select, compose, rewrite, publish or mutate semantic truth. It reports
+per-dimension `BLOCK`/`WARN`/`INFO` severity and exact readiness vocabulary
+`READY`, `INCOMPLETE`, `BLOCKED`, `UNAVAILABLE`, `NOT_APPLICABLE`; no opaque
+aggregate score is produced. Stale or ineligible Claim usage, scope widening,
+underused relevant Knowledge, low information gain, buried core topics,
+redundancy, boilerplate, internal jargon/UUIDs, unsupported promotion,
+unresolved or representative-only visual support, SEO mismatch and invalid
+public links remain visible diagnostics or fail-closed blockers.
+
+REGRESSION: Focused quality-gate suite passes 33 tests / 64 assertions. The
+quality/compliance/SEO/Visual Support matrix passes 63 tests / 166
+assertions. Full NHK Unit passes 2,187 tests / 13,105 assertions with existing
+warnings/deprecations. PHP lint, `git diff --check`, secret review and
+anti-hardcoding checks pass for changed checkpoint files. No schema/migration,
+staging, production, V2, Capture, SQL, deployment, push or semantic data
+mutation was performed.
+
+STATUS=`EDITORIAL_QUALITY_GATE_FIXED_LOCALLY / FULL_UNIT_PASS / NO_LIVE_MUTATION`.
