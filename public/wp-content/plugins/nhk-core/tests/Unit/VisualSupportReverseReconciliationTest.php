@@ -149,6 +149,42 @@ final class VisualSupportReverseReconciliationTest extends TestCase
         self::assertSame('VISUAL_NOT_FOUND', $requirement->unresolvedReason);
     }
 
+    public function test_invalid_visual_candidate_is_review_diagnostic_without_persisting_requirement(): void
+    {
+        $repo = new VisualSupportMemoryRepository();
+        $result = (new VisualSupportRequirementService($repo))->tryRequire(
+            self::SUBJECT,
+            'variant',
+            'configuration',
+            'UNKNOWN_FEATURE',
+            'technical_detail',
+            subjectType: 'model',
+        );
+
+        self::assertSame('REVIEW_REQUIRED', $result['status']);
+        self::assertSame('VISUAL_FEATURE_KEY_INVALID', $result['diagnostic']);
+        self::assertNull($result['requirement']);
+        self::assertCount(0, $repo->all());
+    }
+
+    public function test_visual_candidate_without_canonical_subject_is_skipped_as_enrichment(): void
+    {
+        $repo = new VisualSupportMemoryRepository();
+        $result = (new VisualSupportRequirementService($repo))->tryRequire(
+            '',
+            'variant',
+            'configuration',
+            'DIAL',
+            'technical_detail',
+            subjectType: 'model',
+        );
+
+        self::assertSame('REVIEW_REQUIRED', $result['status']);
+        self::assertSame('VISUAL_SUBJECT_REQUIRED', $result['diagnostic']);
+        self::assertNull($result['requirement']);
+        self::assertCount(0, $repo->all());
+    }
+
     /** @return array<string,mixed> */
     private function context(string $subjectId, string $feature, string $scope = 'variant', string $facet = 'configuration', string $intent = 'technical_detail'): array
     {

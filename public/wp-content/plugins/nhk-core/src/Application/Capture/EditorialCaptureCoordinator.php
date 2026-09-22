@@ -585,18 +585,24 @@ final class EditorialCaptureCoordinator
 
             $visualOpportunities = $this->visualOpportunityDetector?->detect($text, $interpretation, $resolution) ?? [];
             $visualRequirements = [];
+            $visualDiagnostics = [];
             $primary = is_array($resolution['primary'] ?? null) ? $resolution['primary'] : [];
             if ($visualOpportunities !== [] && $this->visualSupportRequirements !== null) {
                 foreach ($visualOpportunities as $opportunity) {
-                    $requirement = $this->visualSupportRequirements->require((string) $primary['id'], (string) $opportunity['scope'], (string) $opportunity['facet'], (string) $opportunity['feature_key'], (string) $opportunity['visual_intent'], [
+                    $attempt = $this->visualSupportRequirements->tryRequire((string) ($primary['id'] ?? ''), (string) ($opportunity['scope'] ?? ''), (string) ($opportunity['facet'] ?? ''), (string) ($opportunity['feature_key'] ?? ''), (string) ($opportunity['visual_intent'] ?? ''), [
                         'consumer' => $record->articleId !== null ? ['endpoint_type' => 'wp_post', 'endpoint_key' => (string) $record->articleId] : ['endpoint_type' => 'capture', 'endpoint_key' => $record->captureId],
                         'feature_label' => (string) ($opportunity['feature_label'] ?? ''), 'recommended_view' => (string) ($opportunity['recommended_view'] ?? ''), 'reason' => (string) ($opportunity['reason'] ?? ''), 'priority' => (int) ($opportunity['priority'] ?? 0), 'potential_reuse' => $opportunity['potential_reuse'] ?? [], 'opportunity_source' => 'editorial_capture',
                     ], (string) $primary['type']);
-                    $visualRequirements[] = ['requirement_id' => $requirement->canonicalId, 'state' => $requirement->state, 'revision' => $requirement->revision, 'feature_key' => $requirement->featureKey];
+                    $requirement = $attempt['requirement'] ?? null;
+                    if ($requirement instanceof \NHK\Core\Domain\Media\VisualSupportRequirement) {
+                        $visualRequirements[] = ['requirement_id' => $requirement->canonicalId, 'state' => $requirement->state, 'revision' => $requirement->revision, 'feature_key' => $requirement->featureKey];
+                    } elseif (trim((string) ($attempt['diagnostic'] ?? '')) !== '') {
+                        $visualDiagnostics[] = ['code' => (string) $attempt['diagnostic'], 'status' => 'REVIEW_REQUIRED', 'feature_key' => (string) ($opportunity['feature_key'] ?? '')];
+                    }
                 }
             }
             $diagnostics['visual_opportunities'] = $visualOpportunities;
-            $diagnostics['visual_support'] = ['status' => $visualRequirements === [] ? 'not_requested' : 'optional_enrichment', 'requirements' => $visualRequirements];
+            $diagnostics['visual_support'] = ['status' => $visualRequirements === [] && $visualDiagnostics === [] ? 'not_requested' : 'optional_enrichment', 'requirements' => $visualRequirements, 'diagnostics' => $visualDiagnostics];
 
             $inputMetadata = is_array($input['metadata'] ?? null) ? $input['metadata'] : [];
             $semanticContext = ['capture_id' => $record->captureId, 'article_id' => $record->articleId, 'article_endpoint_key' => $record->articleId !== null ? ((function_exists('get_current_blog_id') ? (int) get_current_blog_id() : 1) . ':' . (int) $record->articleId) : '', 'raw_input' => $text, 'continuation_delta_text' => trim((string) ($input['continuation_delta_text'] ?? '')), 'assets' => $assets, 'media_bindings' => is_array($input['media_bindings'] ?? null) ? $input['media_bindings'] : [], 'media_operations' => is_array($input['media_operations'] ?? null) ? $input['media_operations'] : [], 'interpretation' => $interpretation, 'subject_resolution' => $resolution, 'subject_resolution_packet' => $subjectPacket->toArray(), 'content_intent' => $intent, 'visual_opportunities' => $visualOpportunities, 'visual_support' => $diagnostics['visual_support'], 'visual_context' => is_array($input['visual_context'] ?? null) ? $input['visual_context'] : [], 'observations' => is_array($input['observations'] ?? null) ? $input['observations'] : [], 'provenance_packets' => is_array($inputMetadata['provenance_packets'] ?? null) ? $inputMetadata['provenance_packets'] : [], 'existing_capture_continuation' => ($input['existing_capture_continuation'] ?? false) === true, 'continuation_idempotency_key' => (string) ($input['continuation_idempotency_key'] ?? ''), 'governance' => is_array($input['governance'] ?? null) ? $input['governance'] : [], 'prior_diagnostics' => $diagnostics, 'phase_receipts' => $receipts];

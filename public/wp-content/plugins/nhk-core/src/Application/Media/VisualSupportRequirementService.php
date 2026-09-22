@@ -4,7 +4,10 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Media;
 
 use NHK\Core\Contracts\Media\VisualSupportRequirementRepository;
+use NHK\Core\Domain\Knowledge\KnowledgeFacetProfile;
 use NHK\Core\Domain\Media\VisualSupportRequirement;
+use NHK\Core\Domain\Media\{MediaDetailTypeRegistry, VisualSupportIntentRegistry};
+use NHK\Core\Shared\Uuid\UuidCodec;
 
 /** Application owner for the durable requirement ledger; not a semantic writer. */
 final class VisualSupportRequirementService
@@ -28,6 +31,25 @@ final class VisualSupportRequirementService
     public function get(string $id): ?VisualSupportRequirement
     {
         return $this->requirements->findById($id);
+    }
+
+    /** @param array<string,mixed> $context @return array{status:string,requirement:?VisualSupportRequirement,diagnostic:?string} */
+    public function tryRequire(string $subjectId, string $scope, string $facet, string $featureKey, string $visualIntent, array $context = [], string $subjectType = 'entity'): array
+    {
+        $subjectId = trim($subjectId);
+        $subjectType = trim($subjectType);
+        if (!UuidCodec::isValid($subjectId)) return ['status' => 'REVIEW_REQUIRED', 'requirement' => null, 'diagnostic' => 'VISUAL_SUBJECT_REQUIRED'];
+        if ($subjectType === '' || preg_match('/^[a-z][a-z0-9_]{0,63}$/', $subjectType) !== 1) return ['status' => 'REVIEW_REQUIRED', 'requirement' => null, 'diagnostic' => 'VISUAL_SUBJECT_TYPE_INVALID'];
+        if (!in_array($scope, KnowledgeFacetProfile::SCOPES, true) || !in_array($facet, KnowledgeFacetProfile::FACETS, true)) return ['status' => 'REVIEW_REQUIRED', 'requirement' => null, 'diagnostic' => 'VISUAL_SCOPE_OR_FACET_INVALID'];
+        if (!in_array($featureKey, MediaDetailTypeRegistry::all(), true)) return ['status' => 'REVIEW_REQUIRED', 'requirement' => null, 'diagnostic' => 'VISUAL_FEATURE_KEY_INVALID'];
+        if (!in_array($visualIntent, VisualSupportIntentRegistry::all(), true)) return ['status' => 'REVIEW_REQUIRED', 'requirement' => null, 'diagnostic' => 'VISUAL_INTENT_INVALID'];
+        try {
+            return ['status' => 'PERSISTED', 'requirement' => $this->require($subjectId, $scope, $facet, $featureKey, $visualIntent, $context, $subjectType), 'diagnostic' => null];
+        } catch (\InvalidArgumentException $error) {
+            $diagnostic = strtoupper(trim($error->getMessage()));
+            $diagnostic = preg_replace('/_+$/', '', preg_replace('/[^A-Z0-9_]+/', '_', $diagnostic) ?: 'VISUAL_REQUIREMENT_INVALID') ?: 'VISUAL_REQUIREMENT_INVALID';
+            return ['status' => 'REVIEW_REQUIRED', 'requirement' => null, 'diagnostic' => $diagnostic];
+        }
     }
 
     /** @param array<string,mixed> $current @param array<string,mixed> $incoming @return array<string,mixed> */
