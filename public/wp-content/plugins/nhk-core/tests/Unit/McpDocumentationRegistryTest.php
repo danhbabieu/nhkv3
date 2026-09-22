@@ -113,6 +113,15 @@ final class McpDocumentationRegistryTest extends TestCase
         self::assertContains('nhk.docs.bootstrap', $bootstrap['runtime_status']['registered_tools']);
     }
 
+    public function test_current_execution_state_fits_the_canonical_document_limit(): void
+    {
+        $executionState = dirname(__DIR__, 6) . '/docs/architecture/V3_EXECUTION_STATE.md';
+        $size = filesize($executionState);
+
+        self::assertIsInt($size);
+        self::assertGreaterThan($size, McpDocumentationRegistry::MAX_DOCUMENT_BYTES);
+    }
+
     public function test_build_identity_normalizes_manifest_generation_timestamp(): void
     {
         $directory = sys_get_temp_dir() . '/nhk-build-identity-' . bin2hex(random_bytes(5));
