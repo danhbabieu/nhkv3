@@ -123,6 +123,19 @@ final class EasyMcpNativeFileCompatibilityIntegrationTest extends TestCase
         add_filter('rest_post_dispatch', $captureNative, 9, 3);
 
         try {
+            $discoverResponse = $this->dispatchAuthenticatedWire($rawToken, 'server/discover', 400, null);
+            $discoverWire = $this->wireBody($discoverResponse);
+            self::assertSame('2.0', $discoverWire['jsonrpc']);
+            self::assertSame(['mimeTypes' => ['text/html;profile=mcp-app']], $discoverWire['result']['capabilities']['extensions']['io.modelcontextprotocol/ui'] ?? null);
+            self::assertArrayHasKey('tools', $discoverWire['result']['capabilities']);
+            self::assertArrayHasKey('resources', $discoverWire['result']['capabilities']);
+            self::assertArrayHasKey('serverInfo', $discoverWire['result']);
+
+            $initializeResponse = $this->dispatchAuthenticatedWire($rawToken, 'initialize', 401, null);
+            $initializeWire = $this->wireBody($initializeResponse);
+            self::assertSame('2026-07-28', $initializeWire['result']['protocolVersion']);
+            self::assertSame(['mimeTypes' => ['text/html;profile=mcp-app']], $initializeWire['result']['capabilities']['extensions']['io.modelcontextprotocol/ui'] ?? null);
+
             $listResponse = $this->dispatchAuthenticatedWire($rawToken, 'resources/list', 401, null);
             $listWire = $this->wireBody($listResponse);
             self::assertSame('2.0', $listWire['jsonrpc']);

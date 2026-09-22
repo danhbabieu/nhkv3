@@ -1,5 +1,30 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-22 — Easy MCP 1.7.18 MCP Apps capability negotiation (LOCAL / DEPLOYMENT PENDING)
+
+ROOT_CAUSE_CONFIRMED: The Easy MCP/NHK compatibility boundary projected the
+NHK resource list/read and widget metadata but did not advertise the MCP Apps
+extension in the actual Easy MCP `server/discover` or `initialize` result.
+The live authenticated resource checks therefore passed while ChatGPT still
+failed the MCP Apps host negotiation and showed `Failed to fetch template`.
+
+FIXED_BOUNDARY: The compatibility adapter now deep-merges only
+`capabilities.extensions["io.modelcontextprotocol/ui"]` with
+`mimeTypes: ["text/html;profile=mcp-app"]` for both protocol responses. It
+preserves tools, resources, serverInfo, protocolVersion, authentication and
+unrelated extensions. Temporary sanitized Easy MCP diagnostics record only
+method, request id, status, auth result, resource URI, JSON-RPC error code,
+body byte length and extension names.
+
+VERIFICATION: The focused unit suite passes with modern `server/discover`,
+legacy `initialize`, exact resource read, unknown-resource fail-closed and
+auth-boundary coverage. Guarded WordPress integration remains unavailable
+locally because the test bootstrap cannot establish its database connection.
+Deployment and fresh authenticated v43 wire/render verification remain
+pending.
+
+STATUS: `EASY_MCP_1_7_18_MCP_APPS_NEGOTIATION_LOCAL / DEPLOYMENT_PENDING / CHATGPT_RENDER_UNVERIFIED`
+
 # Checkpoint — 2026-09-22 — Easy MCP 1.7.18 authenticated resource wire boundary (LOCAL / DEPLOYMENT PENDING)
 
 ROOT_CAUSE_CONFIRMED: Easy MCP 1.7.18 authenticates and permission-checks first,
@@ -23,12 +48,13 @@ MCP 1.7.18 REST/Server/ResourceRegistry regression is added and correctly
 skips locally because the guarded WordPress/Easy MCP runtime is unavailable.
 Deployment and fresh authenticated v43 wire read-back remain pending.
 
-LIVE READ-BACK: Approved deployment verifier passed for source revision
-`e97a0c2117d89f4a5ce097a72eec19d7027b236d`; the existing authenticated
-ChatGPT connector retried `ui://nhk/image-upload/v3.html` and rendered the NHK
-MCP App iframe successfully. No tool/widget, Media or Capture mutation occurred.
+LIVE READ-BACK: The previously recorded `CHATGPT_RENDER_PASS` was false. At
+21:32 on source revision `76186f511fc9ab7ee016b2f938b64dcad2678b43`, the
+authenticated ChatGPT connector still showed `Error loading app` / `Failed to
+fetch template` for `ui://nhk/image-upload/v3.html`. No tool/widget, Media or
+Capture mutation occurred.
 
-STATUS: `EASY_MCP_1_7_18_AUTHENTICATED_RESOURCE_WIRE_BOUNDARY_DEPLOYED / CHATGPT_RENDER_PASS / SEMANTIC_BOUNDARY_PRESERVED`.
+STATUS: `EASY_MCP_1_7_18_AUTHENTICATED_RESOURCE_WIRE_BOUNDARY_DEPLOYED / CHATGPT_RENDER_FAILED / SEMANTIC_BOUNDARY_PRESERVED`.
 
 # Checkpoint — 2026-09-22 — Authority Proposal Apply staging-scope recovery (LOCAL / DEPLOYMENT PENDING)
 

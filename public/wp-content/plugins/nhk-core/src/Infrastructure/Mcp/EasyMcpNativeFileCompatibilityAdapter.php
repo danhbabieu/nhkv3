@@ -20,6 +20,8 @@ final class EasyMcpNativeFileCompatibilityAdapter
     private const TARGET_TOOL = 'wp_ability_nhk_v3_capture_ingest';
     private const WIDGET_OPEN_TOOL = 'wp_ability_nhk_v3_media_upload_widget_open';
     private const WIDGET_UPLOAD_TOOL = 'wp_ability_nhk_v3_media_widget_upload';
+    private const MCP_APPS_EXTENSION = 'io.modelcontextprotocol/ui';
+    private const MCP_APPS_MIME_TYPE = 'text/html;profile=mcp-app';
 
     /** @var list<string> */
     private const UI_RESOURCE_COMPATIBLE_VERSIONS = ['1.7.16', '1.7.17', '1.7.18'];
@@ -179,7 +181,7 @@ final class EasyMcpNativeFileCompatibilityAdapter
         if (!self::uiResourceProjectionEnabled()) return $response;
         if (!is_object($request) || !method_exists($request, 'get_route') || rtrim((string) $request->get_route(), '/') !== rtrim(self::ENDPOINT, '/')) return $response;
         $rpc = self::requestRpc($request);
-        if ($rpc !== null && !in_array(($rpc['method'] ?? null), ['tools/list', 'resources/list', 'resources/read'], true)) return $response;
+        if ($rpc !== null && !in_array(($rpc['method'] ?? null), ['initialize', 'server/discover', 'tools/list', 'resources/list', 'resources/read'], true)) return $response;
         if (!is_object($response) || !method_exists($response, 'get_data') || !method_exists($response, 'set_data')) return $response;
         if (method_exists($response, 'get_status') && (int) $response->get_status() !== 200) return $response;
 
@@ -191,7 +193,9 @@ final class EasyMcpNativeFileCompatibilityAdapter
 
         $data = $response->get_data();
         if (!is_array($data)) return $response;
+        self::logProtocolDiagnostic($rpc ?? [], $data, method_exists($response, 'get_status') ? (int) $response->get_status() : 200);
         $projected = match ($rpc['method'] ?? 'tools/list') {
+            'initialize', 'server/discover' => self::projectProtocolCapabilities($data),
             'resources/list' => self::projectResourceListData($data),
             'resources/read' => self::projectResourceReadData($data, $rpc),
             default => self::projectToolsListData($data),
@@ -312,10 +316,38 @@ final class EasyMcpNativeFileCompatibilityAdapter
         if (!is_object($request) || !method_exists($request, 'get_route') || rtrim((string) $request->get_route(), '/') !== rtrim(self::ENDPOINT, '/')) return $data;
         $rpc = self::requestRpc($request);
         return match ($rpc['method'] ?? 'tools/list') {
+            'initialize', 'server/discover' => self::projectProtocolCapabilities($data),
             'resources/list' => self::projectResourceListData($data),
             'resources/read' => self::projectResourceReadData($data, $rpc),
             default => self::projectToolsListData($data),
         };
+    }
+
+    /**
+     * Advertise MCP Apps without replacing Easy MCP's capability envelope.
+     * This is intentionally shared by legacy initialize and modern
+     * server/discover because ChatGPT may negotiate either wire path.
+     *
+     * @param array<string,mixed> $data
+     * @return array<string,mixed>
+     */
+    public static function projectProtocolCapabilities(array $data): array
+    {
+        if (!is_array($data['result'] ?? null)) return $data;
+        $result = $data['result'];
+        $capabilities = is_array($result['capabilities'] ?? null) ? $result['capabilities'] : [];
+        $extensions = is_array($capabilities['extensions'] ?? null) ? $capabilities['extensions'] : [];
+        $mcpApps = is_array($extensions[self::MCP_APPS_EXTENSION] ?? null)
+            ? $extensions[self::MCP_APPS_EXTENSION]
+            : [];
+        $mimeTypes = is_array($mcpApps['mimeTypes'] ?? null) ? $mcpApps['mimeTypes'] : [];
+        if (!in_array(self::MCP_APPS_MIME_TYPE, $mimeTypes, true)) $mimeTypes[] = self::MCP_APPS_MIME_TYPE;
+        $mcpApps['mimeTypes'] = array_values($mimeTypes);
+        $extensions[self::MCP_APPS_EXTENSION] = $mcpApps;
+        $capabilities['extensions'] = $extensions;
+        $result['capabilities'] = $capabilities;
+        $data['result'] = $result;
+        return $data;
     }
 
     /** @param mixed $data @return mixed */
@@ -354,6 +386,28 @@ final class EasyMcpNativeFileCompatibilityAdapter
         $data['result'] = McpAppsResourceRegistry::read($uri);
         unset($data['error']);
         return $data;
+    }
+
+    /** @param array<string,mixed> $rpc @param array<string,mixed> $data */
+    private static function logProtocolDiagnostic(array $rpc, array $data, int $status): void
+    {
+        $method = (string) ($rpc['method'] ?? '');
+        if ($method === '') return;
+        $result = is_array($data['result'] ?? null) ? $data['result'] : [];
+        $capabilities = is_array($result['capabilities'] ?? null) ? $result['capabilities'] : [];
+        $extensions = is_array($capabilities['extensions'] ?? null) ? $capabilities['extensions'] : [];
+        $body = function_exists('wp_json_encode') ? wp_json_encode($data) : json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        $diagnostic = [
+            'protocol_method' => $method,
+            'request_id' => $rpc['id'] ?? null,
+            'http_status' => $status,
+            'authenticated' => $status !== 401 && $status !== 403,
+            'requested_resource_uri' => is_array($rpc['params'] ?? null) ? (($rpc['params']['uri'] ?? null) ?: null) : null,
+            'response_error_code' => is_array($data['error'] ?? null) ? ($data['error']['code'] ?? null) : null,
+            'response_body_bytes' => is_string($body) ? strlen($body) : 0,
+            'advertised_extension_names' => array_values(array_map('strval', array_keys($extensions))),
+        ];
+        error_log('[nhk-mcp-apps] ' . (function_exists('wp_json_encode') ? wp_json_encode($diagnostic) : json_encode($diagnostic, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)));
     }
 
     private static function installedVersion(): string

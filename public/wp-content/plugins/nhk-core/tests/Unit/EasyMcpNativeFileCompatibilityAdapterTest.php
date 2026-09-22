@@ -460,6 +460,76 @@ final class EasyMcpNativeFileCompatibilityAdapterTest extends TestCase
         self::assertSame('1.7.18', $final['result']['_meta']['io.modelcontextprotocol/serverInfo']['version']);
     }
 
+    public function test_easy_mcp_protocol_projection_deep_merges_mcp_apps_extension_for_modern_discover(): void
+    {
+        $request = new class {
+            public function get_route(): string { return '/easy-mcp-ai/v1/mcp'; }
+            public function get_json_params(): array { return [
+                'jsonrpc' => '2.0',
+                'id' => 21,
+                'method' => 'server/discover',
+                'params' => [
+                    '_meta' => [
+                        'io.modelcontextprotocol/protocolVersion' => '2026-07-28',
+                        'io.modelcontextprotocol/clientCapabilities' => ['extensions' => ['client.example' => []]],
+                    ],
+                ],
+            ]; }
+        };
+        $response = [
+            'jsonrpc' => '2.0',
+            'id' => 21,
+            'result' => [
+                'protocolVersions' => ['2026-07-28'],
+                'capabilities' => [
+                    'tools' => new \stdClass(),
+                    'resources' => ['subscribe' => true],
+                    'extensions' => ['vendor.example' => ['enabled' => true]],
+                ],
+                'serverInfo' => ['name' => 'easy-mcp-ai', 'version' => '1.7.18'],
+            ],
+        ];
+
+        $projected = EasyMcpNativeFileCompatibilityAdapter::projectFinalToolsListDescriptor($response, null, $request);
+
+        self::assertSame(['enabled' => true], $projected['result']['capabilities']['extensions']['vendor.example']);
+        self::assertSame(['mimeTypes' => ['text/html;profile=mcp-app']], $projected['result']['capabilities']['extensions']['io.modelcontextprotocol/ui']);
+        self::assertSame(['subscribe' => true], $projected['result']['capabilities']['resources']);
+        self::assertSame(['name' => 'easy-mcp-ai', 'version' => '1.7.18'], $projected['result']['serverInfo']);
+    }
+
+    public function test_easy_mcp_legacy_initialize_protocol_projection_preserves_existing_capabilities(): void
+    {
+        $request = new class {
+            public function get_route(): string { return '/easy-mcp-ai/v1/mcp'; }
+            public function get_json_params(): array { return [
+                'jsonrpc' => '2.0',
+                'id' => 22,
+                'method' => 'initialize',
+                'params' => ['protocolVersion' => '2025-11-25', 'capabilities' => new \stdClass()],
+            ]; }
+        };
+        $response = [
+            'jsonrpc' => '2.0',
+            'id' => 22,
+            'result' => [
+                'protocolVersion' => '2025-11-25',
+                'capabilities' => [
+                    'tools' => new \stdClass(),
+                    'resources' => new \stdClass(),
+                    'extensions' => ['vendor.example' => ['mode' => 'legacy']],
+                ],
+                'serverInfo' => ['name' => 'easy-mcp-ai', 'version' => '1.7.18'],
+            ],
+        ];
+
+        $projected = EasyMcpNativeFileCompatibilityAdapter::projectFinalToolsListDescriptor($response, null, $request);
+
+        self::assertSame('2025-11-25', $projected['result']['protocolVersion']);
+        self::assertSame(['mode' => 'legacy'], $projected['result']['capabilities']['extensions']['vendor.example']);
+        self::assertSame(['mimeTypes' => ['text/html;profile=mcp-app']], $projected['result']['capabilities']['extensions']['io.modelcontextprotocol/ui']);
+    }
+
     public function test_easy_mcp_1718_modern_resources_read_projects_exact_uri_and_keeps_unknown_uri_failed_closed(): void
     {
         $request = new class {
