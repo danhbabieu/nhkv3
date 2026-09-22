@@ -167,7 +167,10 @@ final class Plugin {
             $canonicalInventory = self::canonicalInventory($types, $authority, $media, $videos, $claims, $sources, $evidence);
             $graphInventory = new GraphInventoryService($graphRepository, $graphEndpoints, $predicates);
             $relationBackfill = self::relationBackfill($canonicalInventory, $graphInventory);
-            $relationshipRead = new RelationshipReadService($graphEndpoints, $predicates, $graphRepository);
+            $relationshipRead = new RelationshipReadService($graphEndpoints, $predicates, $graphRepository, null, null, [
+                'media_usage' => new \NHK\Core\Application\Graph\MediaUsageRelationshipAdapter($usages),
+                'evidence' => new \NHK\Core\Application\Graph\EvidenceRelationshipAdapter($evidence, $claims, $sources),
+            ]);
             McpAbilityRegistration::registerReadAbilities(new McpReadHandler($authority, $types, $media, $assets, $usages, $videos, $claims, $evidence, new MigrationStatus(), $sources, null, new McpSemanticContextResolver($authority, $types), $wordpressAttachments, $neighborhood, $canonicalInventory, $graphInventory, $relationBackfill, new WpdbMediaBindingOperationRepository($wpdb), $captureRepository, $relationshipRead));
             McpAbilityRegistration::registerCapabilityGatedReadAbilities();
             McpAbilityRegistration::registerGovernedAbilities();
@@ -570,7 +573,10 @@ final class Plugin {
             $canonicalInventory = self::canonicalInventory($types, $authority, $media, $videos, $claims, $sources, $evidence);
             $graphInventory = new GraphInventoryService($graphRepository, $endpoints, $predicates);
             $relationBackfill = self::relationBackfill($canonicalInventory, $graphInventory);
-            $relationshipRead = new RelationshipReadService($endpoints, $predicates, $graphRepository);
+            $relationshipRead = new RelationshipReadService($endpoints, $predicates, $graphRepository, null, null, [
+                'media_usage' => new \NHK\Core\Application\Graph\MediaUsageRelationshipAdapter($usages),
+                'evidence' => new \NHK\Core\Application\Graph\EvidenceRelationshipAdapter($evidence, $claims, $sources),
+            ]);
             $mcpRead = new McpReadHandler($authority, $types, $media, $assets, $usages, $videos, $claims, $evidence, new MigrationStatus(), $sources, null, new McpSemanticContextResolver($authority, $types), $wordpressAttachments, $mcpNeighborhood, $canonicalInventory, $graphInventory, $relationBackfill, null, $captureRepository, $relationshipRead);
             // Relations are governed semantic children of Capture article
             // reconciliation (for example, a post --about--> classification

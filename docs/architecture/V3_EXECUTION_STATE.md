@@ -1,5 +1,27 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-22 — Unified relationship R3 owner adapters (LOCAL / NO LIVE MUTATION)
+
+SCOPE: Added typed Graph, MediaUsage and Evidence owner adapter boundaries behind
+the existing read-only relationship facade. Graph R1/R2 preview/list/get logic
+and registry hash remain the canonical Graph path. MediaUsage reads dispatch to
+the existing MediaUsage repository and advertise the exact usage CAS required
+by MediaBindingService. Evidence reads dispatch to EvidenceRepository and keep
+supports/contradicts/qualifies Evidence-owned; no Graph projection is added.
+
+GOVERNANCE: Evidence proposal eligibility now requires Claim UUID/revision and
+Source UUID/revision in both the explicit payload and dependency_revisions;
+revision drift fails closed before Controlled Apply. Capture remains the only
+normal mutation entry and owner-specific writes continue through existing
+Governance/MediaBindingService/KnowledgeService paths.
+
+VERIFICATION: Relationship focused suite 11 tests / 60 assertions; Contract
+6 tests / 48 assertions; schema parity 3 tests / 1,557 assertions; full Unit
+was exercised with one unrelated pre-existing Clock Type error. PHP lint and
+git diff --check pass. No schema migration, live mutation or bulk reconciliation.
+
+STATUS: `RELATIONSHIP_R3_OWNER_ADAPTERS_LOCAL / CONTRACT_PASS / SCHEMA_PARITY_PASS / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-21 — Unified Relationship R1 active-triple preview no-op (LOCAL / NO LIVE MUTATION)
 
 FIXED_GAP: Generic `nhk.relationship.preview` transition planning now emits

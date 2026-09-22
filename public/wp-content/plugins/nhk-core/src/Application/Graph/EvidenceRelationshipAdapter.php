@@ -1,0 +1,27 @@
+<?php
+declare(strict_types=1);
+
+namespace NHK\Core\Application\Graph;
+
+use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
+use NHK\Core\Domain\Knowledge\Evidence;
+
+/** Read-only Evidence owner adapter; Evidence values never become Graph predicates. */
+final class EvidenceRelationshipAdapter implements RelationshipOwnerAdapter
+{
+    private const OPERATIONS = ['CREATE', 'UPDATE', 'RETIRE', 'REACTIVATE'];
+    public function __construct(private ?EvidenceRepository $evidence = null, private ?KnowledgeRepository $claims = null, private ?SourceRepository $sources = null) {}
+    public function kind(): string { return 'evidence'; }
+    public function registry(): array { return ['relationship_kind' => $this->kind(), 'canonical_owner' => 'Evidence', 'read_only' => true, 'operations' => self::OPERATIONS, 'relation_values' => ['supports', 'contradicts', 'qualifies'], 'graph_projection' => false, 'required_dependencies' => ['claim_uuid', 'claim_revision', 'source_uuid', 'source_revision']]; }
+    public function list(array $filters, int $limit = 50, ?string $after = null): array
+    {
+        if ($this->evidence === null) return ['status' => 'available', 'relationship_kind' => $this->kind(), 'items' => [], 'next_cursor' => null]; $claim = trim((string) ($filters['claim_uuid'] ?? '')); $source = trim((string) ($filters['source_uuid'] ?? '')); $items = $claim !== '' ? $this->evidence->listByClaim($claim, true) : ($source !== '' ? $this->evidence->listBySource($source, true) : []); $rows = array_map($this->row(...), $items); usort($rows, static fn (array $a, array $b): int => $a['evidence_uuid'] <=> $b['evidence_uuid']); if ($after !== null && $after !== '') $rows = array_values(array_filter($rows, static fn (array $row): bool => strcmp($row['evidence_uuid'], $after) > 0)); $page = array_slice($rows, 0, min(200, max(1, $limit))); return ['status' => 'available', 'relationship_kind' => $this->kind(), 'canonical_owner' => 'Evidence', 'items' => $page, 'next_cursor' => count($rows) > count($page) ? $page[array_key_last($page)]['evidence_uuid'] : null];
+    }
+    public function get(string $id, array $context = []): array { $record = $this->evidence?->findByCanonicalId($id); return $record === null ? ['status' => 'not_found', 'relationship_kind' => $this->kind(), 'reason' => 'EVIDENCE_NOT_FOUND'] : ['status' => 'available', 'relationship_kind' => $this->kind(), 'canonical_owner' => 'Evidence', 'relationship' => $this->row($record)]; }
+    public function preview(array $input): array
+    {
+        $operation = strtoupper(trim((string) ($input['operation'] ?? ''))); $base = ['relationship_kind' => $this->kind(), 'canonical_owner' => 'Evidence', 'operation' => $operation, 'current_state' => 'UNKNOWN', 'current_relationships' => [], 'current_record' => null, 'revision_state' => ['status' => 'NOT_EVALUATED'], 'dependency_state' => ['status' => 'NOT_EVALUATED'], 'blockers' => [], 'warnings' => [], 'planned_transition' => [], 'safe_to_apply' => false]; if (!in_array($operation, self::OPERATIONS, true)) return $this->blocked($base, 'INVALID_OPERATION'); $claimId = trim((string) ($input['claim_uuid'] ?? '')); $sourceId = trim((string) ($input['source_uuid'] ?? '')); $claim = $this->claims?->findByCanonicalId($claimId); $source = $this->sources?->findByCanonicalId($sourceId); if ($claim === null || $source === null) return $this->blocked($base, 'DEPENDENCY_NOT_FOUND'); $base['dependency_state'] = ['status' => 'PASS', 'closure' => [['type' => 'claim', 'id' => $claimId, 'revision' => $claim->revision], ['type' => 'source', 'id' => $sourceId, 'revision' => $source->revision]]]; if (isset($input['claim_revision']) && (int) $input['claim_revision'] !== $claim->revision) return $this->blocked($base, 'CLAIM_REVISION_CONFLICT'); if (isset($input['source_revision']) && (int) $input['source_revision'] !== $source->revision) return $this->blocked($base, 'SOURCE_REVISION_CONFLICT'); if (in_array($operation, ['UPDATE', 'RETIRE', 'REACTIVATE'], true)) { $record = $this->evidence?->findByCanonicalId((string) ($input['evidence_uuid'] ?? $input['id'] ?? '')); if ($record === null) return $this->blocked($base, 'EVIDENCE_NOT_FOUND'); if ((int) ($input['expected_evidence_revision'] ?? $input['expected_revision'] ?? 0) !== $record->revision) return $this->blocked($base, 'EVIDENCE_REVISION_CONFLICT'); $base['current_record'] = $this->row($record); $base['current_state'] = $record->active ? 'ACTIVE' : 'RETIRED'; } $base['revision_state'] = ['status' => 'PASS', 'claim_revision' => $claim->revision, 'source_revision' => $source->revision, 'expected_evidence_revision' => $input['expected_evidence_revision'] ?? $input['expected_revision'] ?? null]; $base['planned_transition'] = [['action' => 'EVIDENCE_' . $operation]]; $base['safe_to_apply'] = true; $base['preview_fingerprint'] = hash('sha256', json_encode([$this->kind(), $operation, $input, $claim->revision, $source->revision], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)); return $base;
+    }
+    private function row(Evidence $record): array { return ['evidence_uuid' => $record->canonicalId, 'claim_uuid' => $record->claimId, 'source_uuid' => $record->sourceId, 'relation' => $record->relation, 'excerpt' => $record->excerpt, 'locator' => $record->locator, 'state' => $record->active ? 'ACTIVE' : 'RETIRED', 'revision' => $record->revision, 'metadata' => $record->metadata]; }
+    private function blocked(array $base, string $code): array { $base['blockers'][] = $code; return $base; }
+}

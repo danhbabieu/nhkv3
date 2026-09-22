@@ -182,7 +182,7 @@ final class McpTransport
             'nhk.graph.inventory' => $this->read->graphInventory((array) ($arguments['filters'] ?? []), (int) ($arguments['limit'] ?? 50), isset($arguments['after']) ? (string) $arguments['after'] : null),
             'nhk.relationship.registry' => $this->read->relationshipRegistry(),
             'nhk.relationship.list' => $this->read->relationshipList((array) ($arguments['filters'] ?? []), (int) ($arguments['limit'] ?? 50), isset($arguments['after']) ? (string) $arguments['after'] : null),
-            'nhk.relationship.get' => $this->read->relationshipGet((string) ($arguments['id'] ?? '')),
+            'nhk.relationship.get' => $this->read->relationshipGet((string) ($arguments['id'] ?? ''), isset($arguments['relationship_kind']) ? (string) $arguments['relationship_kind'] : null, (array) ($arguments['context'] ?? [])),
             'nhk.relationship.preview' => $this->read->relationshipPreview($arguments),
             'nhk.relation.backfill.dry_run' => $this->read->relationBackfillDryRun((array) ($arguments['records'] ?? [])),
             'nhk.relation.backfill.apply' => $this->governance->relationBatchApply((array) ($arguments['candidates'] ?? []), (bool) ($arguments['approval_confirmed'] ?? false)),

@@ -206,7 +206,7 @@ final class McpReadHandler
 
     public function relationshipRegistry(): array { return $this->relationships?->registry() ?? ['status' => 'unavailable', 'reason' => 'RELATIONSHIP_REGISTRY_UNAVAILABLE']; }
     public function relationshipList(array $filters, int $limit = 50, ?string $after = null): array { return $this->relationships?->list($filters, $limit, $after) ?? ['status' => 'unavailable', 'reason' => 'RELATIONSHIP_READ_UNAVAILABLE']; }
-    public function relationshipGet(string $id): array { return $this->relationships?->get($id) ?? ['status' => 'unavailable', 'reason' => 'RELATIONSHIP_READ_UNAVAILABLE']; }
+    public function relationshipGet(string $id, ?string $kind = null, array $context = []): array { return $this->relationships?->get($id, $kind, $context) ?? ['status' => 'unavailable', 'reason' => 'RELATIONSHIP_READ_UNAVAILABLE']; }
     public function relationshipPreview(array $input): array { return $this->relationships?->preview($input) ?? ['status' => 'unavailable', 'reason' => 'RELATIONSHIP_PREVIEW_UNAVAILABLE']; }
 
     public function relationBackfillDryRun(array $records): array

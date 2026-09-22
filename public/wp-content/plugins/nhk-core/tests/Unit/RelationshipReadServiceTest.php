@@ -6,6 +6,9 @@ namespace NHK\Tests\Unit;
 use NHK\Core\Application\Graph\RelationshipReadService;
 use NHK\Core\Application\Mcp\{McpToolCatalog, McpDispatchRegistry};
 use NHK\Core\Domain\Graph\{EndpointTypeRegistry, FakeEndpointResolver, NodeReference, PredicateRegistry};
+use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim, Source};
+use NHK\Core\Application\Graph\{EvidenceRelationshipAdapter, MediaUsageRelationshipAdapter};
+use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
 use NHK\Tests\Support\InMemoryGraphRepository;
 use PHPUnit\Framework\TestCase;
 
@@ -100,10 +103,50 @@ final class RelationshipReadServiceTest extends TestCase
     public function test_owner_specific_kinds_never_become_graph_edges(): void
     {
         $media = $this->service->list(['relationship_kind' => 'media_usage']);
-        $evidence = $this->service->preview(['operation' => 'ADD', 'relationship_kind' => 'evidence', 'source' => ['type' => 'knowledge', 'id' => $this->model], 'target' => ['type' => 'source', 'id' => $this->brand], 'predicate' => 'about']);
+        $evidence = $this->service->preview(['operation' => 'CREATE', 'relationship_kind' => 'evidence', 'claim_uuid' => $this->model, 'source_uuid' => $this->brand]);
         self::assertSame('MediaUsage', $media['owner']);
-        self::assertContains('OWNER_SPECIFIC_SURFACE_REQUIRED', $evidence['blockers']);
+        self::assertContains('DEPENDENCY_NOT_FOUND', $evidence['blockers']);
         self::assertSame([], $this->repository->allEdges());
+    }
+
+    public function test_registry_exposes_owner_adapters_without_changing_graph_hash(): void
+    {
+        $registry = $this->service->registry();
+        self::assertSame(['graph', 'media_usage', 'evidence'], array_keys($registry['relationship_kinds']));
+        self::assertSame('Evidence', $registry['relationship_kinds']['evidence']['canonical_owner']);
+        self::assertFalse($registry['relationship_kinds']['evidence']['graph_projection']);
+        self::assertNotEmpty($registry['registry_hash']);
+    }
+
+    public function test_evidence_preview_binds_claim_and_source_revisions_and_never_writes_graph(): void
+    {
+        $claimId = '33333333-3333-4333-8333-333333333333';
+        $sourceId = '44444444-4444-4444-8444-444444444444';
+        $evidenceId = '55555555-5555-4555-8555-555555555555';
+        $claims = $this->createMock(KnowledgeRepository::class);
+        $sources = $this->createMock(SourceRepository::class);
+        $evidence = $this->createMock(EvidenceRepository::class);
+        $claims->method('findByCanonicalId')->with($claimId)->willReturn(new KnowledgeClaim($claimId, 'claim.one', 'A claim', revision: 4));
+        $sources->method('findByCanonicalId')->with($sourceId)->willReturn(new Source($sourceId, 'source.one', 'A source', revision: 7));
+        $evidence->method('findByCanonicalId')->with($evidenceId)->willReturn(new Evidence($evidenceId, $claimId, $sourceId, excerpt: 'Excerpt', revision: 2));
+        $adapter = new EvidenceRelationshipAdapter($evidence, $claims, $sources);
+        $preview = $adapter->preview(['operation' => 'UPDATE', 'evidence_uuid' => $evidenceId, 'claim_uuid' => $claimId, 'claim_revision' => 4, 'source_uuid' => $sourceId, 'source_revision' => 7, 'expected_evidence_revision' => 2]);
+        self::assertTrue($preview['safe_to_apply']);
+        self::assertSame([4, 7], [$preview['revision_state']['claim_revision'], $preview['revision_state']['source_revision']]);
+        self::assertSame([], $this->repository->allEdges());
+        $stale = $adapter->preview(['operation' => 'RETIRE', 'evidence_uuid' => $evidenceId, 'claim_uuid' => $claimId, 'claim_revision' => 3, 'source_uuid' => $sourceId, 'source_revision' => 7, 'expected_evidence_revision' => 2]);
+        self::assertContains('CLAIM_REVISION_CONFLICT', $stale['blockers']);
+    }
+
+    public function test_media_usage_preview_requires_exact_usage_cas_for_replace_and_remove(): void
+    {
+        $adapter = new MediaUsageRelationshipAdapter();
+        foreach (['REPLACE', 'REMOVE'] as $operation) {
+            $result = $adapter->preview(['operation' => $operation]);
+            self::assertContains('USAGE_REVISION_BINDING_REQUIRED', $result['blockers']);
+            self::assertFalse($result['safe_to_apply']);
+        }
+        self::assertContains('USAGE_REVISION_BINDING_REQUIRED', $adapter->preview(['operation' => 'REPRESENTATIVE_BIND'])['blockers']);
     }
 
     public function test_subtype_cycle_and_missing_family_fail_closed(): void
@@ -117,6 +160,46 @@ final class RelationshipReadServiceTest extends TestCase
         $missingFamily = new RelationshipReadService($this->endpoints, $this->predicates, $this->repository, static fn (NodeReference $reference): array => ['exists' => true, 'active' => true, 'revision' => 1, 'family' => null]);
         $result = $missingFamily->preview(['operation' => 'ADD', 'source' => ['type' => 'classification', 'id' => $a], 'target' => ['type' => 'classification', 'id' => $b], 'predicate' => 'subtype_of']);
         self::assertContains('CLASSIFICATION_FAMILY_UNRESOLVED', $result['blockers']);
+    }
+
+    public function test_classified_as_requires_target_family_but_not_source_family(): void
+    {
+        $variant = '66666666-6666-4666-8666-666666666666';
+        $classification = '77777777-7777-4777-8777-777777777777';
+        $this->endpoints->register('variant', new FakeEndpointResolver('variant', [$variant]));
+        $this->endpoints->register('classification', new FakeEndpointResolver('classification', [$classification]));
+        $state = static fn (NodeReference $reference): array => [
+            'exists' => true, 'active' => true, 'revision' => 1,
+            'family' => $reference->endpoint_type === 'classification' ? 'clock_type' : null,
+        ];
+        $service = new RelationshipReadService($this->endpoints, $this->predicates, $this->repository, $state);
+
+        $result = $service->preview([
+            'operation' => 'ADD', 'source' => ['type' => 'variant', 'id' => $variant],
+            'target' => ['type' => 'classification', 'id' => $classification],
+            'predicate' => 'classified_as', 'provenance' => 'EXPLICIT_USER_KNOWLEDGE',
+        ]);
+
+        self::assertTrue($result['safe_to_apply']);
+        self::assertSame([], $result['blockers']);
+    }
+
+    public function test_classified_as_blocks_missing_target_family_with_precise_reason(): void
+    {
+        $variant = '88888888-8888-4888-8888-888888888888';
+        $classification = '99999999-9999-4999-8999-999999999999';
+        $this->endpoints->register('variant', new FakeEndpointResolver('variant', [$variant]));
+        $this->endpoints->register('classification', new FakeEndpointResolver('classification', [$classification]));
+        $service = new RelationshipReadService($this->endpoints, $this->predicates, $this->repository, static fn (): array => ['exists' => true, 'active' => true, 'revision' => 1, 'family' => null]);
+
+        $result = $service->preview([
+            'operation' => 'ADD', 'source' => ['type' => 'variant', 'id' => $variant],
+            'target' => ['type' => 'classification', 'id' => $classification],
+            'predicate' => 'classified_as', 'provenance' => 'EXPLICIT_USER_KNOWLEDGE',
+        ]);
+
+        self::assertFalse($result['safe_to_apply']);
+        self::assertContains('CLASSIFICATION_FAMILY_REQUIRED', $result['blockers']);
     }
 
     public function test_four_tools_are_registered_read_only_and_dispatchable_without_schema_special_case(): void

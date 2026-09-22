@@ -123,6 +123,22 @@ final class ProposalEligibilityService
             if ($proposal->operation === 'relation_create' && ($sourceRevision < 1 || $targetRevision < 1 || $this->reader->targetRevision($sourceId) !== $sourceRevision || $this->reader->targetRevision($targetId) !== $targetRevision)) $reasons[] = 'TARGET_REVISION_CHANGED';
             if ($proposal->operation !== 'relation_create' && (int) ($proposal->payload['expected_edge_revision'] ?? 0) < 1) $reasons[] = 'REVISION_CONFLICT';
         } elseif (!$isCreation && !($proposal->entityType === 'media' && in_array($proposal->operation, ['add', 'replace', 'remove'], true)) && $proposal->subjectId !== '' && $proposal->expectedRevision > 0 && $this->reader->targetRevision($proposal->targetUuid ?: $proposal->subjectId) !== $proposal->expectedRevision) $reasons[] = 'TARGET_REVISION_CHANGED';
+        if ($proposal->entityType === 'evidence' && in_array($proposal->operation, ['create', 'ingest', 'update', 'retire', 'reactivate'], true)) {
+            $claimId = (string) ($proposal->payload['claim_uuid'] ?? $proposal->payload['claim_id'] ?? '');
+            $sourceId = (string) ($proposal->payload['source_uuid'] ?? $proposal->payload['source_id'] ?? '');
+            $dependencies = is_array($proposal->payload['dependency_revisions'] ?? null) ? $proposal->payload['dependency_revisions'] : [];
+            $hasExplicitBinding = array_key_exists('claim_revision', $proposal->payload)
+                || array_key_exists('source_revision', $proposal->payload)
+                || $dependencies !== [];
+            if ($hasExplicitBinding) {
+                $claimRevision = (int) ($proposal->payload['claim_revision'] ?? $dependencies[$claimId] ?? 0);
+                $sourceRevision = (int) ($proposal->payload['source_revision'] ?? $dependencies[$sourceId] ?? 0);
+                if ($claimId === '' || $sourceId === '' || $claimRevision < 1 || $sourceRevision < 1) $reasons[] = 'EVIDENCE_DEPENDENCY_BINDING_REQUIRED';
+                if ($claimId !== '' && $claimRevision > 0 && $this->reader->targetRevision($claimId) !== $claimRevision) $reasons[] = 'CLAIM_REVISION_CHANGED';
+                if ($sourceId !== '' && $sourceRevision > 0 && $this->reader->targetRevision($sourceId) !== $sourceRevision) $reasons[] = 'SOURCE_REVISION_CHANGED';
+                if (($dependencies[$claimId] ?? null) !== $claimRevision || ($dependencies[$sourceId] ?? null) !== $sourceRevision) $reasons[] = 'EVIDENCE_DEPENDENCY_BINDING_MISMATCH';
+            }
+        }
         $dependencyRevisions = $proposal->payload['dependency_revisions'] ?? [];
         if (is_array($dependencyRevisions)) {
             foreach ($dependencyRevisions as $dependencyUuid => $expectedRevision) {

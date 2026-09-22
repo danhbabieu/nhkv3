@@ -17,9 +17,24 @@ final class RelationshipReadService
         private GraphRepository $graph,
         private $endpointState = null,
         private $evidenceState = null,
-    ) {}
+        array $ownerAdapters = [],
+    ) {
+        $this->adapters = ['media_usage' => $ownerAdapters['media_usage'] ?? new MediaUsageRelationshipAdapter(), 'evidence' => $ownerAdapters['evidence'] ?? new EvidenceRelationshipAdapter()];
+        $this->graphAdapter = new GraphRelationshipAdapter(fn (): array => $this->graphRegistry(), fn (array $filters, int $limit, ?string $after): array => $this->graphList($filters, $limit, $after), fn (string $id): array => $this->graphGet($id), fn (array $input): array => $this->graphPreview($input));
+    }
+
+    /** @var array<string,RelationshipOwnerAdapter> */
+    private array $adapters;
+    private GraphRelationshipAdapter $graphAdapter;
 
     public function registry(): array
+    {
+        $payload = $this->graphRegistry();
+        $payload['relationship_kinds'] = ['graph' => $this->graphAdapter->registry(), 'media_usage' => $this->adapters['media_usage']->registry(), 'evidence' => $this->adapters['evidence']->registry()];
+        return $payload;
+    }
+
+    private function graphRegistry(): array
     {
         $endpoints = [];
         foreach ($this->endpoints->all() as $type => $resolver) {
@@ -35,7 +50,12 @@ final class RelationshipReadService
     public function list(array $filters, int $limit = 50, ?string $after = null): array
     {
         $kind = (string) ($filters['relationship_kind'] ?? 'graph');
-        if ($kind !== 'graph') return $this->ownerSpecific($kind);
+        if ($kind !== 'graph') return isset($this->adapters[$kind]) ? $this->adapters[$kind]->list($filters, $limit, $after) : $this->ownerSpecific($kind);
+        return $this->graphList($filters, $limit, $after);
+    }
+
+    private function graphList(array $filters, int $limit = 50, ?string $after = null): array
+    {
         $limit = min(200, max(1, $limit));
         $rows = [];
         foreach ($this->graph->allEdges(true) as $edge) {
@@ -53,7 +73,14 @@ final class RelationshipReadService
         return ['status' => 'available', 'relationship_kind' => 'graph', 'items' => $items, 'next_cursor' => count($rows) > $limit ? $items[array_key_last($items)]['edge_uuid'] : null];
     }
 
-    public function get(string $id): array
+    public function get(string $id, ?string $kind = null, array $context = []): array
+    {
+        $kind = $kind ?? 'graph';
+        if ($kind !== 'graph') return isset($this->adapters[$kind]) ? $this->adapters[$kind]->get($id, $context) : ['status' => 'not_found', 'relationship_kind' => $kind, 'reason' => 'OWNER_UNSUPPORTED'];
+        return $this->graphGet($id);
+    }
+
+    private function graphGet(string $id): array
     {
         $edge = $this->graph->findByUuid($id);
         return $edge === null ? ['status' => 'not_found', 'reason' => 'RELATION_NOT_FOUND', 'relationship_kind' => 'graph'] : ['status' => 'available', 'relationship_kind' => 'graph', 'relationship' => $this->edge($edge)];
@@ -66,7 +93,17 @@ final class RelationshipReadService
         $target = $this->locator($input['target'] ?? null, $input['target_type'] ?? null, $input['target_id'] ?? null);
         $kind = (string) ($input['relationship_kind'] ?? 'graph');
         $base = ['relationship_kind' => $kind, 'operation' => $operation, 'normalized_source' => $source, 'normalized_target' => $target, 'current_state' => 'UNKNOWN', 'current_relationships' => [], 'registry_rule' => null, 'cardinality_state' => ['status' => 'NOT_EVALUATED'], 'scope_state' => ['status' => 'NOT_EVALUATED'], 'evidence_state' => ['status' => 'NOT_EVALUATED'], 'provenance_state' => ['status' => 'NOT_EVALUATED'], 'revision_state' => ['status' => 'NOT_EVALUATED'], 'dependency_state' => ['status' => 'NOT_EVALUATED'], 'planned_transition' => [], 'blockers' => [], 'warnings' => [], 'safe_to_apply' => false, 'required_owner' => $kind === 'graph' ? 'Graph' : ucfirst($kind), 'required_governance_path' => 'READ_ONLY_PREVIEW_ONLY'];
-        if ($kind !== 'graph') return $this->blocked($base, 'OWNER_SPECIFIC_SURFACE_REQUIRED');
+        if ($kind !== 'graph') return isset($this->adapters[$kind]) ? $this->adapters[$kind]->preview($input) : $this->blocked($base, 'OWNER_SPECIFIC_SURFACE_REQUIRED');
+        return $this->graphPreview($input);
+    }
+
+    private function graphPreview(array $input): array
+    {
+        $operation = strtoupper(trim((string) ($input['operation'] ?? '')));
+        $source = $this->locator($input['source'] ?? null, $input['source_type'] ?? null, $input['source_id'] ?? null);
+        $target = $this->locator($input['target'] ?? null, $input['target_type'] ?? null, $input['target_id'] ?? null);
+        $kind = 'graph';
+        $base = ['relationship_kind' => $kind, 'operation' => $operation, 'normalized_source' => $source, 'normalized_target' => $target, 'current_state' => 'UNKNOWN', 'current_relationships' => [], 'registry_rule' => null, 'cardinality_state' => ['status' => 'NOT_EVALUATED'], 'scope_state' => ['status' => 'NOT_EVALUATED'], 'evidence_state' => ['status' => 'NOT_EVALUATED'], 'provenance_state' => ['status' => 'NOT_EVALUATED'], 'revision_state' => ['status' => 'NOT_EVALUATED'], 'dependency_state' => ['status' => 'NOT_EVALUATED'], 'planned_transition' => [], 'blockers' => [], 'warnings' => [], 'safe_to_apply' => false, 'required_owner' => 'Graph', 'required_governance_path' => 'READ_ONLY_PREVIEW_ONLY'];
         if (!in_array($operation, self::OPERATIONS, true)) return $this->blocked($base, 'INVALID_OPERATION');
         $legacyPreview = !array_key_exists('expected_edge_revision', $input) && !array_key_exists('expected_revision', $input);
         if (!$legacyPreview && in_array($operation, ['REPLACE', 'REMOVE', 'REACTIVATE'], true)

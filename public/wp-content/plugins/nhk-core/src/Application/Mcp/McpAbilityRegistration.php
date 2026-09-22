@@ -687,7 +687,7 @@ final class McpAbilityRegistration
                 'nhk.graph.inventory' => $read->graphInventory((array) ($input['filters'] ?? []), (int) ($input['limit'] ?? 50), isset($input['after']) ? (string) $input['after'] : null),
                 'nhk.relationship.registry' => $read->relationshipRegistry(),
                 'nhk.relationship.list' => $read->relationshipList((array) ($input['filters'] ?? []), (int) ($input['limit'] ?? 50), isset($input['after']) ? (string) $input['after'] : null),
-                'nhk.relationship.get' => $read->relationshipGet((string) ($input['id'] ?? '')),
+                'nhk.relationship.get' => $read->relationshipGet((string) ($input['id'] ?? ''), isset($input['relationship_kind']) ? (string) $input['relationship_kind'] : null, (array) ($input['context'] ?? [])),
                 'nhk.relationship.preview' => $read->relationshipPreview($input),
                 'nhk.relation.backfill.dry_run' => $read->relationBackfillDryRun((array) ($input['records'] ?? [])),
                 'nhk.semantic.resolve' => $read->semanticResolve((array) ($input['context'] ?? [])),

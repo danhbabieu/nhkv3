@@ -136,6 +136,28 @@ final class ProposalEligibilityServiceTest extends TestCase
         self::assertContains('TARGET_REVISION_CHANGED', $this->service($stale, mediaUsages: $usages, relationReader: $reader)->check($stale->id)->reasons);
     }
 
+    public function test_evidence_requires_claim_and_source_revision_binding_and_blocks_drift(): void
+    {
+        $claim = '33333333-3333-4333-8333-333333333333';
+        $source = '44444444-4444-4444-8444-444444444444';
+        $payload = ['claim_uuid' => $claim, 'source_uuid' => $source, 'claim_revision' => 4, 'source_revision' => 7, 'dependency_revisions' => [$claim => 4, $source => 7], 'excerpt' => 'Excerpt', 'relation' => 'supports'];
+        $proposal = new Proposal(self::ID, '55555555-5555-4555-8555-555555555555', 'create', $payload, 'evidence-content', null, 'evidence-dependency', ProposalState::APPROVED, idempotencyKey: 'evidence-create', entityType: 'evidence');
+        $reader = new class($claim, $source) implements EligibilityReader {
+            public function __construct(private string $claim, private string $source) {}
+            public function isApplied(string $dependencyUuid): bool { return true; }
+            public function targetRevision(string $targetUuid): ?int { return $targetUuid === $this->claim ? 4 : ($targetUuid === $this->source ? 7 : 1); }
+            public function targetExists(string $targetUuid): bool { return true; }
+        };
+        self::assertTrue($this->service($proposal, relationReader: $reader)->check($proposal->id)->ready);
+        $staleReader = new class($claim, $source) implements EligibilityReader {
+            public function __construct(private string $claim, private string $source) {}
+            public function isApplied(string $dependencyUuid): bool { return true; }
+            public function targetRevision(string $targetUuid): ?int { return $targetUuid === $this->claim ? 4 : ($targetUuid === $this->source ? 8 : 1); }
+            public function targetExists(string $targetUuid): bool { return true; }
+        };
+        self::assertContains('SOURCE_REVISION_CHANGED', $this->service($proposal, relationReader: $staleReader)->check($proposal->id)->reasons);
+    }
+
     private function service(Proposal $proposal, ?SubjectResolutionService $subjectResolver = null, ?EligibilityReader $relationReader = null, ?MediaUsageRepository $mediaUsages = null): ProposalEligibilityService
     {
         $repository = new class($proposal) implements ProposalRepository {
