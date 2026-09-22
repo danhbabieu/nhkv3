@@ -260,13 +260,13 @@ final class ExplicitRelationIntentPlannerTest extends TestCase
         self::assertNotSame($first['relation_candidates'][0]['candidate_id'], $third['relation_candidates'][0]['candidate_id']);
     }
 
-    public function test_classified_as_planning_reports_apply_policy_blocker_for_unsupported_provenance(): void
+    public function test_classified_as_planning_normalizes_legacy_wire_provenance_alias(): void
     {
         $source = UuidCodec::newV7();
         $target = UuidCodec::newV7();
         $planner = $this->planner([
             'variant' => [$source => ['active' => true, 'revision' => 2]],
-            'classification' => [$target => ['active' => true, 'revision' => 3]],
+            'classification' => [$target => ['active' => true, 'revision' => 3, 'family' => 'clock_type']],
         ]);
 
         $result = $planner->plan([[
@@ -278,8 +278,9 @@ final class ExplicitRelationIntentPlannerTest extends TestCase
             'provenance' => 'EXPLICIT_USER_RELATION',
         ]]);
 
-        self::assertSame([], $result['relation_candidates']);
-        self::assertContains('CLASSIFICATION_SCOPE_UNSUPPORTED', array_column($result['blockers'], 'code'));
+        self::assertCount(1, $result['relation_candidates']);
+        self::assertSame([], $result['blockers']);
+        self::assertSame('EXPLICIT_USER_KNOWLEDGE', $result['relation_candidates'][0]['provenance']);
     }
 
     public function test_classified_as_planning_accepts_variant_membership_when_target_classification_has_family(): void

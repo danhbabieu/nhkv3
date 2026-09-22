@@ -17321,3 +17321,37 @@ staging, production, V2, live Capture Apply, article/media mutation or
 deployment was performed.
 
 STATUS: `CAPTURE_GRAPH_DICTIONARY_BOUNDARIES_FIXED_LOCAL / DEPLOYMENT_PENDING / LIVE_ACCEPTANCE_BLOCKED_BY_RUNTIME / SEMANTIC_MUTATION_NONE`
+
+# Checkpoint — 2026-09-23 — H.4 Golden Video Odo 36 resume intent boundary (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE_CONFIRMED: The Capture continuation planner allowed an absent
+intent to fall back to `KNOWLEDGE_DELTA` whenever the interpreter emitted an
+atomic claim candidate. A Video asset with an editorial hint could therefore
+produce a Knowledge proposal and its governed `about` relation during a Video
+resume/reconciliation path, even when canonical Claims had already been
+reconciled. Separately, the Capture dry-run transport returned
+`KNOWLEDGE_REPAIR_PREVIEW_REQUIRED` for unsupported non-repair input, which
+misclassified Video input as a repair request.
+
+FIXED_BOUNDARIES: Explicit `VIDEO` intent never requests a semantic delta, and
+an asset-only Video input with no explicit intent no longer inherits the legacy
+empty-intent Knowledge fallback. The existing canonical Claim reuse,
+Video-UUID identity, Evidence/Eligibility and Governance boundaries remain
+unchanged. Unsupported Capture dry-runs now return
+`CAPTURE_DRY_RUN_UNSUPPORTED`; `KNOWLEDGE_REPAIR_PREVIEW_REQUIRED` remains
+reserved for an actual `KNOWLEDGE_REPAIR` preview whose preview service is
+unavailable. No canonical data, Video, Claim, Evidence, Graph or Proposal row
+was mutated.
+
+REGRESSION: Added focused coverage proving a Video asset cannot create
+Knowledge/Relation plans from interpreter candidates and that Video dry-run
+input cannot be reported as Knowledge Repair preview. Focused Video/Capture/
+Knowledge/MCP suite passes 149 tests / 769 assertions. Full NHK Unit reaches
+2,244 tests / 12,335 assertions but retains one unrelated pre-existing
+`McpSchemaParityTest::testRegisteredAbilitySchemasAreCatalogProjections`
+failure (`relationship_operations.items.oneOf` actual size 0, expected 3),
+plus existing warnings/deprecations. Changed PHP lint and `git diff --check`
+pass. No schema/migration, staging, production, V2, deployment, push or
+Checkpoint I work was performed.
+
+STATUS=`H4_GOLDEN_VIDEO_ODO36_RESUME_INTENT_BOUNDARY_FIXED_LOCALLY / FULL_UNIT_SCHEMA_PARITY_BLOCKED / NO_LIVE_MUTATION / CHECKPOINT_I_NOT_ENTERED`.

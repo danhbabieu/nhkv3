@@ -403,6 +403,29 @@ final class ConversationalAuthorityMcpTest extends TestCase
         self::assertSame('KNOWLEDGE_REPAIR_PREVIEW_REQUIRED', $result['body']['error']['message']);
     }
 
+    public function test_video_dry_run_does_not_misreport_knowledge_repair_preview_requirement(): void
+    {
+        $documentation = new McpDocumentationRegistry();
+        $checkpoint = $documentation->bootstrap();
+        $transport = new McpTransport(
+            $this->readHandler(),
+            new McpGovernanceHandler(new GovernanceService(new \NHK\Tests\Support\InMemoryProposalRepository())),
+            static fn (string $capability): bool => in_array($capability, ['nhk_ingest_articles', 'read'], true),
+            documentation: $documentation,
+        );
+
+        $result = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 6, 'method' => 'tools/call', 'params' => ['name' => 'nhk.capture.ingest', 'arguments' => [
+            'idempotency_key' => 'video-dry-run',
+            'dry_run' => true,
+            'intent' => 'VIDEO',
+            'video' => ['url' => 'https://youtu.be/dQw4w9WgXcQ'],
+            'documentation_checkpoint' => ['documentation_version' => $checkpoint['documentation_version'], 'manifest_hash' => $checkpoint['manifest_hash']],
+        ]]], []);
+
+        self::assertSame(400, $result['status']);
+        self::assertSame('CAPTURE_DRY_RUN_UNSUPPORTED', $result['body']['error']['message']);
+    }
+
     private function readHandler(?RelationshipReadService $relationships = null): McpReadHandler
     {
         return new McpReadHandler($this->createMock(AuthorityRepository::class), new EntityTypeRegistry(), $this->createMock(MediaRepository::class), $this->createMock(MediaAssetRepository::class), $this->createMock(MediaUsageRepository::class), $this->createMock(VideoRepository::class), $this->createMock(KnowledgeRepository::class), $this->createMock(EvidenceRepository::class), null, $this->createMock(SourceRepository::class), relationships: $relationships);

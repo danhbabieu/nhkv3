@@ -48,11 +48,14 @@ final class ExplicitRelationIntentPlanner
             }
             $provenance = trim((string) ($intent['provenance'] ?? ''));
             // A typed user relation is explicit user knowledge unless the
-            // caller supplies another registered provenance.  The former
-            // EXPLICIT_USER_RELATION value was never in the canonical
-            // provenance registry and made valid classified_as intents fail
-            // closed as CLASSIFICATION_SCOPE_UNSUPPORTED.
-            if ($provenance === '' && $predicate === 'classified_as') $provenance = 'EXPLICIT_USER_KNOWLEDGE';
+            // caller supplies another registered provenance.  Older MCP
+            // clients used EXPLICIT_USER_RELATION for this wire field; it is
+            // a transport alias, not a semantic provenance class. Normalize
+            // it before the canonical ClassifiedAsPolicy runs so the real
+            // Capture path cannot reject an otherwise valid membership.
+            if ($predicate === 'classified_as' && in_array($provenance, ['', 'EXPLICIT_USER_RELATION'], true)) {
+                $provenance = 'EXPLICIT_USER_KNOWLEDGE';
+            }
             $normalized[] = [
                 'source_type' => $sourceType,
                 'source_uuid' => $sourceUuid,

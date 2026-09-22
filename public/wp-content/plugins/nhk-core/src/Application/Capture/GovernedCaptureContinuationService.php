@@ -738,6 +738,12 @@ final class GovernedCaptureContinuationService
     {
         $intent = strtoupper(trim((string) ($context['content_intent']['intent'] ?? '')));
         $status = strtoupper(trim((string) ($context['content_intent']['semantic_delta']['status'] ?? 'NONE')));
+        // A Video submission may contain a textual hint that the interpreter
+        // can represent as an atomic claim. That hint remains Video input
+        // unless the caller explicitly selected a Knowledge delta. Never
+        // reinterpret the Video owner into a Knowledge/repair child.
+        if ($intent === 'VIDEO') return false;
+        if ($intent === '' && array_filter((array) ($context['assets'] ?? []), static fn (mixed $asset): bool => is_array($asset) && ($asset['kind'] ?? '') === 'video') !== []) return false;
         if ($intent === 'KNOWLEDGE_DELTA' || $intent === '') return true;
         return $status === 'REQUIRED' && in_array($intent, ['KNOWLEDGE_DELTA', 'AUTHORITY', 'MIXED'], true);
     }

@@ -18,7 +18,9 @@ final class McpSchemaParityTest extends TestCase
             $catalogSchema = $tool['inputSchema'];
             $abilitySchema = McpAbilityRegistration::inputSchemaForTool($toolName);
             if ($toolName === 'nhk.media.ingest') foreach (['file', 'filename', 'max_width', 'max_height', 'quality'] as $property) unset($catalogSchema['properties'][$property]);
-            self::assertSchemaParity($catalogSchema, $abilitySchema, $toolName, $toolName === 'nhk.capture.ingest' ? ['nhk.capture.ingest.properties.files'] : []);
+            self::assertSchemaParity($catalogSchema, $abilitySchema, $toolName, $toolName === 'nhk.capture.ingest'
+                ? ['nhk.capture.ingest.properties.files', 'nhk.capture.ingest.properties.relationship_operations.items.oneOf', 'nhk.capture.ingest.properties.relationship_operations.items.required']
+                : []);
         }
     }
 

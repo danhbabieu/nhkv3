@@ -533,6 +533,9 @@ final class McpAbilityRegistration
     /** @return array<string,mixed> */
     private static function abilityInputSchema(string $tool, array $schema): array
     {
+        if ($tool === 'nhk.capture.ingest') {
+            $schema = self::abilityCaptureSchema($schema);
+        }
         if ($tool === 'nhk.capture.ingest' && isset($schema['properties']['files'])) {
             // Ability validation sees the native descriptors produced by the
             // connector boundary. The canonical MCP catalog remains the
@@ -560,6 +563,48 @@ final class McpAbilityRegistration
             unset($schema['properties'][$property]);
         }
 
+        return $schema;
+    }
+
+    /**
+     * WordPress Ability/Easy MCP validates Ability input independently from
+     * the canonical MCP transport. Its validator reports the nested oneOf
+     * diagnostics from every relationship owner branch and, in the live
+     * bridge, can select the Evidence branch for a valid Graph operation.
+     * Keep the Ability boundary structurally lossless but discriminator-safe;
+     * McpTransport remains the authoritative strict owner validator after the
+     * callback re-enters /nhk/v1/mcp.
+     *
+     * @param array<string,mixed> $schema
+     * @return array<string,mixed>
+     */
+    private static function abilityCaptureSchema(array $schema): array
+    {
+        $operations = $schema['properties']['relationship_operations'] ?? null;
+        if (!is_array($operations) || !is_array($operations['items'] ?? null)) return $schema;
+
+        $items = $operations['items'];
+        $variants = is_array($items['oneOf'] ?? null) ? $items['oneOf'] : [];
+        if ($variants === []) return $schema;
+
+        $properties = is_array($items['properties'] ?? null) ? $items['properties'] : [];
+        foreach ($variants as $variant) {
+            if (!is_array($variant)) continue;
+            foreach ((array) ($variant['properties'] ?? []) as $key => $property) {
+                if (!array_key_exists($key, $properties)) $properties[$key] = $property;
+            }
+        }
+
+        // The application boundary applies the actual owner-specific required
+        // fields and operation matrix. The Ability schema only needs to admit
+        // the complete lossless packet without evaluating mutually exclusive
+        // owner branches itself.
+        $items['properties'] = $properties;
+        unset($items['oneOf']);
+        $items['required'] = ['operation'];
+        $items['additionalProperties'] = false;
+        $operations['items'] = $items;
+        $schema['properties']['relationship_operations'] = $operations;
         return $schema;
     }
 

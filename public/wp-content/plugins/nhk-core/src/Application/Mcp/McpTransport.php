@@ -487,7 +487,7 @@ final class McpTransport
                 return ['status' => 'PREVIEW', 'preview' => $this->knowledgeRepairPreview->preview((array) $arguments['knowledge_repair'])];
             }
             if ($relationshipOnly) return $this->previewRelationshipOperations($arguments);
-            throw new \InvalidArgumentException('KNOWLEDGE_REPAIR_PREVIEW_REQUIRED');
+            throw new \InvalidArgumentException('CAPTURE_DRY_RUN_UNSUPPORTED');
         }
         unset($arguments['files']);
         if ($files !== []) {

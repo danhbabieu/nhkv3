@@ -106,6 +106,21 @@ final class EasyMcpNativeFileCompatibilityAdapterTest extends TestCase
         );
     }
 
+    public function test_capture_ability_schema_does_not_validate_relationship_union_as_one_of(): void
+    {
+        $catalog = array_column(McpToolCatalog::tools(), null, 'name');
+        $catalogItems = $catalog['nhk.capture.ingest']['inputSchema']['properties']['relationship_operations']['items'];
+        $abilityItems = McpAbilityRegistration::inputSchemaForTool('nhk.capture.ingest')['properties']['relationship_operations']['items'];
+
+        self::assertArrayHasKey('oneOf', $catalogItems);
+        self::assertArrayNotHasKey('oneOf', $abilityItems);
+        self::assertSame(['operation'], $abilityItems['required']);
+        foreach (['source', 'target', 'media', 'claim_uuid', 'source_uuid', 'provenance', 'evidence_refs'] as $property) {
+            self::assertArrayHasKey($property, $abilityItems['properties']);
+        }
+        self::assertFalse($abilityItems['additionalProperties']);
+    }
+
     public function test_projection_does_not_change_unrelated_tools(): void
     {
         $tool = ['name' => 'wp_ability_nhk_v3_media_ingest', 'inputSchema' => ['type' => 'object']];

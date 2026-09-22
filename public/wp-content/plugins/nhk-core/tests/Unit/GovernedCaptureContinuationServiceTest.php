@@ -148,6 +148,47 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
         self::assertArrayNotHasKey('proposal_id', $result[0]);
     }
 
+    public function test_video_asset_without_explicit_semantic_delta_does_not_become_knowledge_delta(): void
+    {
+        $videoId = UuidCodec::newV7();
+        $subjectId = UuidCodec::newV7();
+        $service = new GovernedCaptureContinuationService(
+            $this->createMock(GovernedLifecycle::class),
+            static fn (): array => [],
+            $this->policies(),
+            static fn (): bool => true,
+        );
+        $plans = new \ReflectionMethod($service, 'plans');
+        $plans->setAccessible(true);
+
+        $result = $plans->invoke($service, 'capture-video-golden', 'resume-video', [
+            'assets' => [[
+                'kind' => 'video',
+                'video_proposal' => [
+                    'entity_type' => 'video',
+                    'operation' => 'ingest',
+                    'payload' => ['canonical_id' => $videoId],
+                ],
+            ]],
+            'subject_resolution' => [
+                'primary' => ['id' => $subjectId, 'type' => 'variant', 'revision' => 1],
+                'resolved' => [['id' => $subjectId, 'type' => 'variant', 'revision' => 1]],
+            ],
+            'interpretation' => ['user_claim_candidates' => [[
+                'text' => 'Odo 36 có ba phiên bản vách máy.',
+                'scope' => 'variant',
+                'facet' => 'configuration',
+                'provenance' => 'EXPLICIT_USER_KNOWLEDGE',
+            ]]],
+        ]);
+
+        self::assertNotEmpty($result);
+        self::assertSame(['video'], array_values(array_unique(array_map(
+            static fn (array $plan): string => (string) ($plan['entity_type'] ?? (isset($plan['capture_video_provenance']) ? 'video' : 'unknown')),
+            $result,
+        ))));
+    }
+
     public function test_applied_evidence_receipt_is_not_reused_when_canonical_owner_is_missing(): void
     {
         $evidenceId = UuidCodec::newV7();
