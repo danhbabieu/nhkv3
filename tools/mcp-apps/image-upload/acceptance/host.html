@@ -51,7 +51,7 @@
             setTimeout(() => frame.contentWindow.postMessage({
               jsonrpc: '2.0',
               method: 'ui/notifications/tool-result',
-              params: { content: [{ type: 'text', text: JSON.stringify({ resourceUri: 'ui://nhk/image-upload.html' }) }] },
+              params: { content: [{ type: 'text', text: JSON.stringify({ resourceUri: 'ui://nhk/image-upload/v2.html' }) }] },
             }, '*'), 0);
             return;
           }

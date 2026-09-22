@@ -97,7 +97,10 @@ final class EasyMcpNativeFileCompatibilityAdapter
                 $tool['_meta']['nhk/schemaHash'] = McpToolCatalog::schemaHash((string) ($canonical['name'] ?? ''));
             }
             if (is_array($canonical['connectorMeta'] ?? null) && $canonical['connectorMeta'] !== [] && !array_is_list($canonical['connectorMeta'])) {
-                $tool['_meta'] = array_merge(is_array($tool['_meta'] ?? null) ? $tool['_meta'] : [], $canonical['connectorMeta']);
+                $tool['_meta'] = array_replace_recursive(
+                    is_array($tool['_meta'] ?? null) && !array_is_list($tool['_meta']) ? $tool['_meta'] : [],
+                    $canonical['connectorMeta'],
+                );
             }
             $tools[$index] = $tool;
         }

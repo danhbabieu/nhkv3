@@ -1,5 +1,23 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-22 — NHK Image Upload MCP App v2 fixed resource (LOCAL / NO LIVE MUTATION)
+
+FIXED_GAP: Easy MCP's final `tools/list` projection now publishes the canonical
+NHK Image Upload template metadata with cache-busting URI
+`ui://nhk/image-upload/v2.html`, preserving existing auth/security metadata.
+The same URI is registered as a fixed MCP resource and `resources/read` returns
+the bundled HTML with `text/html;profile=mcp-app`. The physical bundle path and
+upload workflow remain unchanged; no external origins were found, so no CSP
+metadata was added.
+
+VERIFICATION: Focused MCP descriptor/resource suite passes 7 tests / 48
+assertions; frontend build, tests (33) and typecheck pass; MCP/Media unit suite
+passes 308 tests / 4,093 assertions. Integration tests remain skipped because
+the guarded WordPress/MySQL bootstrap is unavailable. No deployment, remote
+cache purge, live read or live mutation occurred.
+
+STATUS: `NHK_IMAGE_UPLOAD_MCP_APP_V2_LOCAL / RESOURCE_CONTRACT_PASS / NO_DEPLOYMENT`.
+
 # Checkpoint — 2026-09-22 — Unified relationship R3 owner adapters (LOCAL / NO LIVE MUTATION)
 
 SCOPE: Added typed Graph, MediaUsage and Evidence owner adapter boundaries behind
