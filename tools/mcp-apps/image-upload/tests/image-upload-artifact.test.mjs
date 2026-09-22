@@ -100,3 +100,12 @@ test("the View requires operator naming context and emits the required diagnosti
   ]) assert.match(view, new RegExp(stage));
   assert.match(view, /metadata:\s*\{\s*description:/);
 });
+
+test("the View catches bootstrap failures and leaves a visible error state", async () => {
+  const view = await source();
+
+  assert.match(view, /function showBootstrapError/);
+  assert.match(view, /BOOTSTRAP_INIT_FAILED/);
+  assert.match(view, /Không thể khởi tạo trình tải ảnh NHK/);
+  assert.match(view, /void boot\(\)/);
+});

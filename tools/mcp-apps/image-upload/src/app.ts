@@ -51,6 +51,31 @@ function createIdempotencyKey(): string {
   return `chatgpt-widget-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+function showBootstrapError(error: unknown): void {
+  const state = document.getElementById("state");
+  const status = document.getElementById("status");
+  const diagnostics = document.getElementById("diagnostics");
+  if (state) state.textContent = "ERROR";
+  if (status) {
+    status.dataset.state = "ERROR";
+    status.className = "failure";
+    status.textContent = `Không thể khởi tạo trình tải ảnh NHK: ${safeErrorMessage(error)}`;
+  }
+  if (diagnostics) {
+    const row = document.createElement("div");
+    row.textContent = `ERROR · ERROR · BOOTSTRAP_INIT_FAILED · ${safeErrorMessage(error)}`;
+    diagnostics.append(row);
+  }
+}
+
+async function boot(): Promise<void> {
+  try {
+    await start();
+  } catch (error: unknown) {
+    showBootstrapError(error);
+  }
+}
+
 async function start(): Promise<void> {
   const input = byId<HTMLInputElement>("files");
   const select = byId<HTMLButtonElement>("select");
@@ -402,5 +427,5 @@ async function start(): Promise<void> {
   }
 }
 
-if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => void start(), { once: true });
-else void start();
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => void boot(), { once: true });
+else void boot();

@@ -6,14 +6,16 @@ namespace NHK\Core\Application\Mcp;
 final class McpAppsResourceRegistry
 {
     public const IMAGE_UPLOAD_URI = 'ui://nhk/image-upload.html';
+    private const RESOURCE_META = ['ui' => ['prefersBorder' => true]];
 
-    /** @return array{resources:list<array<string,string>>} */
+    /** @return array{resources:list<array<string,mixed>>} */
     public static function list(): array
     {
         return ['resources' => [[
             'uri' => self::IMAGE_UPLOAD_URI,
             'name' => 'NHK image uploader',
             'mimeType' => 'text/html;profile=mcp-app',
+            '_meta' => self::RESOURCE_META,
         ]]];
     }
 
@@ -28,7 +30,7 @@ final class McpAppsResourceRegistry
             'uri' => self::IMAGE_UPLOAD_URI,
             'mimeType' => 'text/html;profile=mcp-app',
             'text' => $text,
-            '_meta' => ['ui' => ['prefersBorder' => true]],
+            '_meta' => self::RESOURCE_META,
         ]]];
     }
 }

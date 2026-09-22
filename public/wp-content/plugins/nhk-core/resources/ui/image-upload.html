@@ -12274,6 +12274,29 @@ function asFiles(value) {
 function createIdempotencyKey() {
   return `chatgpt-widget-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
+function showBootstrapError(error2) {
+  const state = document.getElementById("state");
+  const status = document.getElementById("status");
+  const diagnostics = document.getElementById("diagnostics");
+  if (state) state.textContent = "ERROR";
+  if (status) {
+    status.dataset.state = "ERROR";
+    status.className = "failure";
+    status.textContent = `Không thể khởi tạo trình tải ảnh NHK: ${safeErrorMessage(error2)}`;
+  }
+  if (diagnostics) {
+    const row = document.createElement("div");
+    row.textContent = `ERROR · ERROR · BOOTSTRAP_INIT_FAILED · ${safeErrorMessage(error2)}`;
+    diagnostics.append(row);
+  }
+}
+async function boot() {
+  try {
+    await start();
+  } catch (error2) {
+    showBootstrapError(error2);
+  }
+}
 async function start() {
   const input = byId("files");
   const select = byId("select");
@@ -12347,21 +12370,6 @@ async function start() {
       const caption = document.createElement("figcaption");
       caption.textContent = file ? `${fileName} (${(fileSize / 1048576).toFixed(2)} MB)` : `${fileName} (ChatGPT Library)`;
       figure.append(caption);
-      const metadata = item.metadata ??= {};
-      [
-        ["title", "Tiêu đề ảnh", "Ví dụ: Bộ máy Odo 36/10"],
-        ["alt_text", "Mô tả thay thế", "Mô tả ngắn, chính xác về ảnh"],
-        ["caption", "Chú thích ảnh", "Tùy chọn"]
-      ].forEach(([field, label, placeholder]) => {
-        const labelElement = document.createElement("label");
-        labelElement.textContent = `${label} ${item.ordinal !== undefined ? `(Ảnh ${item.ordinal + 1})` : ""}`;
-        const inputElement = document.createElement(field === "caption" ? "textarea" : "input");
-        inputElement.value = metadata[field] ?? "";
-        inputElement.placeholder = placeholder;
-        inputElement.maxLength = field === "caption" ? 2000 : 500;
-        inputElement.addEventListener("input", () => { metadata[field] = inputElement.value; });
-        figure.append(labelElement, inputElement);
-      });
       previews.append(figure);
     });
     summary.textContent = `${selected.length} ảnh, ${(total / 1048576).toFixed(2)} MB`;
@@ -12435,7 +12443,7 @@ async function start() {
     }
     const result = await app.callServerTool({
       name: SERVER_TOOL_NAME,
-      arguments: { idempotency_key: `${operationKey}${retryingPartialBatch ? `:retry:${attempt}` : ":media"}`, metadata: { description: namingContext }, items: references.map((item) => ({ client_file_id: item.file_id, filename: item.file_name, sort_order: item.ordinal, media: item.media })), files: references }
+      arguments: { idempotency_key: `${operationKey}${retryingPartialBatch ? `:retry:${attempt}` : ":media"}`, metadata: { description: namingContext }, items: references.map((item) => ({ client_file_id: item.file_id, filename: item.file_name, sort_order: item.ordinal, ordinal: item.ordinal, media: item.media })), files: references }
     });
     recordDiagnostic("SERVER_TOOL_CALL_RESULT", "DONE", "SERVER_TOOL_RESULT_RECEIVED");
     const manifest = extractUploadManifest(result);
@@ -12560,7 +12568,7 @@ async function start() {
     enrichmentStatus = "NOT_RUN";
     retryOperationKey = null;
     retryAttempt = 0;
-    selected = asFiles(input.files).filter((file) => IMAGE_TYPES.test(file.type)).map((file, ordinal) => ({ kind: "local", file, ordinal, metadata: {} }));
+    selected = asFiles(input.files).filter((file) => IMAGE_TYPES.test(file.type)).map((file) => ({ kind: "local", file }));
     recordDiagnostic("FILE_SELECTED", "DONE", "LOCAL_FILE_SELECTED");
     recordDiagnostic("FILE_PREVIEW_READY", "DONE", "LOCAL_FILE_PREVIEW_READY");
     renderSelection();
@@ -12573,7 +12581,7 @@ async function start() {
       enrichmentStatus = "NOT_RUN";
       retryOperationKey = null;
       retryAttempt = 0;
-      selected = normalizeSelectedFiles(await host.selectFiles()).map((item, ordinal) => ({ ...item, ordinal, metadata: item.metadata ?? {} }));
+      selected = normalizeSelectedFiles(await host.selectFiles());
       recordDiagnostic("FILE_SELECTED", "DONE", "LIBRARY_FILE_SELECTED");
       recordDiagnostic("FILE_PREVIEW_READY", "DONE", "LIBRARY_FILE_PREVIEW_READY");
       renderSelection();
@@ -12606,8 +12614,8 @@ async function start() {
     setState("ERROR", `Không thể kết nối MCP Apps: ${safeErrorMessage(error2)}`);
   }
 }
-if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => void start(), { once: true });
-else void start();</script>
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => void boot(), { once: true });
+else void boot();</script>
   </head>
   <body>
     <h2>Ảnh NHK</h2>

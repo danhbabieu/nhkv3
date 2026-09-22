@@ -20,10 +20,13 @@ final class McpAppsImageUploadTest extends TestCase
         $listed = McpAppsResourceRegistry::list();
         self::assertSame('ui://nhk/image-upload.html', $listed['resources'][0]['uri']);
         self::assertSame('text/html;profile=mcp-app', $listed['resources'][0]['mimeType']);
+        self::assertSame(['ui' => ['prefersBorder' => true]], $listed['resources'][0]['_meta']);
 
         $resource = McpAppsResourceRegistry::read('ui://nhk/image-upload.html');
         self::assertSame('ui://nhk/image-upload.html', $resource['contents'][0]['uri']);
         self::assertSame('text/html;profile=mcp-app', $resource['contents'][0]['mimeType']);
+        self::assertNotSame('', trim($resource['contents'][0]['text']));
+        self::assertSame(['ui' => ['prefersBorder' => true]], $resource['contents'][0]['_meta']);
         self::assertStringContainsString('uploadFile', $resource['contents'][0]['text']);
         self::assertStringContainsString('getFileDownloadUrl', $resource['contents'][0]['text']);
         self::assertStringContainsString('setWidgetState', $resource['contents'][0]['text']);
@@ -47,6 +50,14 @@ final class McpAppsImageUploadTest extends TestCase
         self::assertSame(200, $open['status']);
         self::assertFalse($open['body']['result']['isError']);
         self::assertSame('ui://nhk/image-upload.html', $open['body']['result']['structuredContent']['resourceUri']);
+    }
+
+    public function test_widget_bootstrap_has_a_visible_error_fallback(): void
+    {
+        $source = (string) file_get_contents(__DIR__ . '/../../../../../../tools/mcp-apps/image-upload/src/app.ts');
+        self::assertStringContainsString('function showBootstrapError', $source);
+        self::assertStringContainsString('BOOTSTRAP_INIT_FAILED', $source);
+        self::assertStringContainsString('Không thể khởi tạo trình tải ảnh NHK', $source);
     }
 
     private function readHandler(): McpReadHandler
