@@ -65,7 +65,7 @@ final class PublicUrlMaintenanceService
     }
 
     /** @return array<string,mixed> */
-    public function reproject(string $idempotencyKey, bool $prePublicConfirmed, ?string $ownerId = null, int $batchSize = 25): array
+    public function reproject(string $idempotencyKey, bool $prePublicConfirmed, ?string $ownerId = null, int $batchSize = 25, int $cursor = 0): array
     {
         if (!$prePublicConfirmed) return ['status'=>'BLOCKED','reason_code'=>'PRE_PUBLIC_CONFIRMATION_REQUIRED','mutation_count'=>0];
         if (trim($idempotencyKey) === '') return ['status'=>'BLOCKED','reason_code'=>'IDEMPOTENCY_KEY_REQUIRED','mutation_count'=>0];
@@ -79,13 +79,17 @@ final class PublicUrlMaintenanceService
         $outcomes = [];
         $batchSize = max(1, min(100, $batchSize));
         $attempted = 0;
+        $eligibleIndex = 0;
+        $cursor = max(0, $cursor);
         foreach ((array)($plan['items'] ?? []) as $index => $item) {
             if (!in_array((string)($item['action'] ?? ''), ['ALLOCATE','CHANGE'], true)) continue;
+            if ($eligibleIndex++ < $cursor) continue;
             if ($attempted >= $batchSize) break;
             $attempted++;
-            $owner = (string) ($item['owner_id'] ?? $index);
+            $owner = (string) ($item['owner_id'] ?? '');
+            $idempotencyOwner = UuidCodec::isValid($owner) ? $owner : (string) $index;
             try {
-                ($this->apply)($item, $idempotencyKey . ':' . $owner);
+                ($this->apply)($item, $idempotencyKey . ':' . $idempotencyOwner);
                 $mutationCount++;
                 $outcomes[] = ['owner_id' => $owner, 'status' => 'APPLIED'];
             } catch (\Throwable $error) {
@@ -93,9 +97,11 @@ final class PublicUrlMaintenanceService
             }
         }
 
-        $remaining = count(array_filter((array) ($plan['items'] ?? []), static fn (mixed $item): bool => is_array($item) && in_array((string) ($item['action'] ?? ''), ['ALLOCATE', 'CHANGE'], true))) > $attempted;
+        $totalEligible = count(array_filter((array) ($plan['items'] ?? []), static fn (mixed $item): bool => is_array($item) && in_array((string) ($item['action'] ?? ''), ['ALLOCATE', 'CHANGE'], true)));
+        $nextCursor = min($totalEligible, $cursor + $attempted);
+        $remaining = $nextCursor < $totalEligible;
         if (array_filter($outcomes, static fn (array $outcome): bool => in_array($outcome['status'], ['FAILED', 'RETRYABLE'], true)) !== [] || $remaining) {
-            return ['status' => $remaining ? 'PARTIAL' : 'FAILED', 'reason_code' => $remaining ? 'PUBLIC_URL_BATCH_CHECKPOINT_REQUIRED' : 'PUBLIC_URL_REPROJECTION_WRITE_FAILED', 'mutation_count' => $mutationCount, 'outcomes' => $outcomes, 'next_cursor' => $attempted, 'plan' => $plan];
+            return ['status' => $remaining ? 'PARTIAL' : 'FAILED', 'reason_code' => $remaining ? 'PUBLIC_URL_BATCH_CHECKPOINT_REQUIRED' : 'PUBLIC_URL_REPROJECTION_WRITE_FAILED', 'mutation_count' => $mutationCount, 'outcomes' => $outcomes, 'next_cursor' => $nextCursor, 'readback' => $this->audit(), 'plan' => $plan];
         }
 
         $readback = $this->audit();

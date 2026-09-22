@@ -16455,4 +16455,34 @@ mutation or semantic data mutation was performed.
 
 STATUS=`VIDEO_CAPTURE_INTERNAL_DEPENDENCY_READBACK_VERIFIED_LOCALLY / FULL_UNIT_PASS / NO_LIVE_MUTATION`.
 
+# Checkpoint — 2026-09-22 — Governance classified_as and public URL repair (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE_CONFIRMED: Explicit relation planning validated predicate/endpoints
+but did not run the registered `classified_as` scope/provenance policy. It could
+therefore return `blockers=[]` for a candidate that Proposal Eligibility would
+reject at Apply. The public URL audit also collapsed missing variant route scope
+into generic inventory invalidity, while reprojection accepted unsafe public URL
+changes without explicit redirect/atomicity evidence.
+
+FIXED_BOUNDARIES: `classified_as` planning now applies the same registered
+policy used by Governance Eligibility and emits deterministic blockers before
+approval; valid candidates use the source-type scope required by the policy.
+Variant audits expose `MISSING_REQUIRED_ROUTE_SCOPE` and
+`MISSING_VARIANT_MODEL_PARENT` without guessing a Model. Public URL planning
+requires explicit redirect safety for existing public identities, preserves
+cosmetic changes when marked unnecessary, and batch maintenance reports
+per-owner outcomes with bounded resumable checkpoints/idempotency keys.
+
+REGRESSION: Added focused planner, URL audit and URL safety tests. Existing
+completion convergence and Capture retry/readback regressions remain green.
+
+VERIFICATION: NHK Unit passes 2,097 tests / 12,373 assertions with existing
+warnings/deprecations. Focused Governance/Capture/URL suite passes 93 tests /
+360 assertions. PHP lint and diff checks are required before checkpoint close.
+The unfiltered default suite remains environment-blocked by the existing
+WordPress/MySQL bootstrap and contract runtime errors; no staging, production,
+V2 or semantic data was mutated.
+
+STATUS=`GOVERNANCE_CLASSIFIED_AS_PLAN_APPLY_PARITY_AND_PUBLIC_URL_SAFETY_FIXED_LOCALLY / UNIT_PASS / NO_LIVE_MUTATION`.
+
 NEXT_EXACT_ACTION: `USER_PUSH_PULL_BUILD; THEN RETRY EXISTING CAPTURE ON @v39 AND VERIFY COMPLETE`.

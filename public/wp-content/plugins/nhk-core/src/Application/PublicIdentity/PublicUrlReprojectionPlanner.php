@@ -61,12 +61,15 @@ final class PublicUrlReprojectionPlanner
             try {
                 $routePrefix = trim((string) ($item['route_prefix'] ?? ''));
                 $stripLexicalPrefix = (string) ($item['strip_lexical_prefix'] ?? '');
-                $isTaken = function(string $candidate) use (&$reserved, &$reservedOwners, $keyPrefix, $item, $externallyOccupied): bool {
+                $collisionOwners = [];
+                $isTaken = function(string $candidate) use (&$reserved, &$reservedOwners, &$collisionOwners, $keyPrefix, $item, $externallyOccupied): bool {
                     if (isset($reserved[$keyPrefix . $candidate])) {
+                        $collisionOwners = array_values(array_unique(array_merge($collisionOwners, $reservedOwners[$keyPrefix . $candidate] ?? [])));
                         return true;
                     }
                     $occupied = $externallyOccupied($item, $candidate);
                     if (is_array($occupied)) {
+                        $collisionOwners = array_values(array_unique(array_merge($collisionOwners, array_map('strval', (array) ($occupied['owner_ids'] ?? $occupied['owners'] ?? [])))));
                         return ($occupied['occupied'] ?? true) === true;
                     }
                     return (bool) $occupied;
@@ -79,7 +82,7 @@ final class PublicUrlReprojectionPlanner
                     ? 'COLLISION_REQUIRES_RECONCILIATION'
                     : 'PUBLIC_URL_PLANNING_FAILED';
                 if ($planned['blocker'] === 'COLLISION_REQUIRES_RECONCILIATION') {
-                    $planned['collision_owner_ids'] = $reservedOwners[$keyPrefix . $current] ?? [];
+                    $planned['collision_owner_ids'] = $collisionOwners;
                 }
                 $blocked++;
                 $items[] = $planned;
