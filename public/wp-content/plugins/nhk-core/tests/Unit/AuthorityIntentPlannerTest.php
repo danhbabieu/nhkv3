@@ -346,6 +346,71 @@ final class AuthorityIntentPlannerTest extends TestCase
         self::assertContains('IDENTITY_CONFLICT', array_column($plan['ambiguities'], 'code'));
     }
 
+    public function test_exact_active_classification_uuid_with_explicit_renamed_name_emits_one_governed_rename_candidate(): void
+    {
+        $canonicalId = '54fae8ec-e7fd-4130-a9da-7469bcaacd29';
+        $captureId = '01a0c9eb-ffff-7fff-8fff-ffffffffffff';
+        $entity = $this->entity('classification', 'nhk:classification:clock-type.mat-braz-nam', 'Mặt Braz nằm', ['family' => 'clock_type'], $canonicalId);
+
+        $plan = (new AuthorityIntentPlanner(new PlannerAuthorityRepository([$entity]), $this->types))->plan([
+            'authority_intent' => ['mode' => 'PLAN', 'requests' => [[
+                'entity_type' => 'classification',
+                'canonical_uuid' => $canonicalId,
+                'name' => 'Mặt bát giác nằm',
+                'allow_create' => false,
+            ]]],
+        ], ['capture_id' => $captureId, 'capture_revision' => 3]);
+
+        self::assertSame([], $plan['blockers']);
+        self::assertSame([], $plan['ambiguities']);
+        self::assertCount(1, $plan['update_candidates']);
+        self::assertSame('RENAME', $plan['update_candidates'][0]['action']);
+        self::assertSame('rename', $plan['update_candidates'][0]['operation']);
+        self::assertSame($captureId, $plan['update_candidates'][0]['capture_id']);
+        self::assertSame($canonicalId, $plan['update_candidates'][0]['canonical_uuid']);
+        self::assertSame(1, $plan['update_candidates'][0]['expected_revision']);
+        self::assertSame(['name' => 'Mặt bát giác nằm'], $plan['update_candidates'][0]['requested_delta']);
+        self::assertSame($plan['plan_fingerprint'], $plan['update_candidates'][0]['plan_fingerprint']);
+        self::assertSame('EXPLICIT_AUTHORITY_CURATION', $plan['update_candidates'][0]['provenance']);
+        self::assertSame([], $plan['create_candidates']);
+    }
+
+    public function test_exact_active_classification_uuid_with_same_name_is_reuse_without_rename_candidate(): void
+    {
+        $canonicalId = '54fae8ec-e7fd-4130-a9da-7469bcaacd29';
+        $entity = $this->entity('classification', 'nhk:classification:clock-type.mat-braz-nam', 'Mặt Braz nằm', ['family' => 'clock_type'], $canonicalId);
+
+        $plan = (new AuthorityIntentPlanner(new PlannerAuthorityRepository([$entity]), $this->types))->plan([
+            'authority_intent' => ['mode' => 'PLAN', 'requests' => [[
+                'entity_type' => 'classification', 'canonical_uuid' => $canonicalId, 'name' => 'Mặt Braz nằm', 'allow_create' => false,
+            ]]],
+        ]);
+
+        self::assertSame([], $plan['update_candidates']);
+        self::assertSame([], $plan['ambiguities']);
+        self::assertCount(1, $plan['reuse']);
+    }
+
+    public function test_classification_alias_delta_remains_fail_closed_against_authority_schema(): void
+    {
+        $canonicalId = '54fae8ec-e7fd-4130-a9da-7469bcaacd29';
+        $entity = $this->entity('classification', 'nhk:classification:clock-type.mat-braz-nam', 'Mặt Braz nằm', ['family' => 'clock_type'], $canonicalId);
+
+        $plan = (new AuthorityIntentPlanner(new PlannerAuthorityRepository([$entity]), $this->types))->plan([
+            'authority_intent' => ['mode' => 'PLAN', 'requests' => [[
+                'entity_type' => 'classification',
+                'canonical_uuid' => $canonicalId,
+                'name' => 'Mặt bát giác nằm',
+                'allow_create' => false,
+                'payload_delta' => ['aliases' => ['Mặt nằm', 'Mặt ngang', 'Mặt bát giác ngang']],
+            ]]],
+        ]);
+
+        self::assertSame([], $plan['update_candidates']);
+        self::assertSame(['UNSUPPORTED_AUTHORITY_FIELD'], array_column($plan['blockers'], 'code'));
+        self::assertSame(['aliases'], $plan['blockers'][0]['fields']);
+    }
+
     public function test_uuid_not_found_does_not_fallback_to_create_even_when_creation_is_allowed(): void
     {
         $canonicalId = '01a090fd-9a71-7665-af5f-08f6e25b533e';

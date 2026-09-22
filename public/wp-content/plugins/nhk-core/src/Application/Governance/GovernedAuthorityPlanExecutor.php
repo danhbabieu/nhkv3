@@ -145,10 +145,11 @@ final class GovernedAuthorityPlanExecutor implements GovernedAuthorityPlanApplie
             $entityPayload = is_array($candidate['entity_payload'] ?? null)
                 ? $candidate['entity_payload']
                 : array_filter(['family' => $candidate['family'] ?? null, 'aliases' => $candidate['aliases'] ?? null, 'description' => $candidate['description'] ?? null], static fn (mixed $value): bool => $value !== null && $value !== '' && $value !== []);
+            if ($action === 'RENAME') $entityPayload = [];
             $payload = [
                 'candidate_id' => $payload['candidate_id'],
                 'stable_key' => (string) ($candidate['stable_key'] ?? $candidate['proposed_stable_key'] ?? $candidate['stable_key_preview'] ?? ''),
-                'name' => (string) ($candidate['canonical_name'] ?? $candidate['name'] ?? $candidate['proposed_canonical_name'] ?? ''),
+                'name' => (string) ($action === 'RENAME' ? ($candidate['requested_name'] ?? $candidate['name'] ?? '') : ($candidate['canonical_name'] ?? $candidate['name'] ?? $candidate['proposed_canonical_name'] ?? '')),
                 'entity_payload' => $entityPayload,
             ];
         }

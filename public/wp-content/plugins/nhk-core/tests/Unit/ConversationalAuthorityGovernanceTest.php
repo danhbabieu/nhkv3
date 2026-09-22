@@ -77,6 +77,39 @@ final class ConversationalAuthorityGovernanceTest extends TestCase
         self::assertSame('nhk:brand:hermle', $proposal?->payload['stable_key']);
     }
 
+    public function test_approved_authority_rename_binds_requested_name_to_one_submitted_proposal(): void
+    {
+        $repository = new InMemoryProposalRepository();
+        $handler = new McpGovernanceHandler(new GovernanceService($repository));
+        $target = \NHK\Core\Shared\Uuid\UuidCodec::newV7();
+        $plan = [
+            'reuse' => [], 'create_candidates' => [], 'relation_candidates' => [],
+            'update_candidates' => [[
+                'candidate_id' => 'candidate-rename',
+                'action' => 'RENAME',
+                'operation' => 'rename',
+                'entity_type' => 'classification',
+                'canonical_uuid' => $target,
+                'canonical_revision' => 4,
+                'expected_revision' => 4,
+                'canonical_name' => 'Mặt Braz nằm',
+                'requested_name' => 'Mặt bát giác nằm',
+                'requested_delta' => ['name' => 'Mặt bát giác nằm'],
+                'dependencies' => [],
+            ]],
+        ];
+
+        $result = (new GovernedAuthorityPlanExecutor($handler))->execute($plan, str_repeat('a', 64), str_repeat('a', 64), ['candidate-rename'], ConversationalAuthorityPolicy::REVIEW_REQUIRED);
+        $proposal = $repository->find($result['proposal_ids'][0]);
+
+        self::assertSame('REVIEW_REQUIRED', $result['status']);
+        self::assertSame('rename', $proposal?->operation);
+        self::assertSame($target, $proposal?->subjectId);
+        self::assertSame(4, $proposal?->expectedRevision);
+        self::assertSame('Mặt bát giác nằm', $proposal?->payload['name']);
+        self::assertSame('candidate-rename', $proposal?->payload['candidate_id']);
+    }
+
     public function test_changed_plan_fingerprint_blocks_before_proposal_creation(): void
     {
         $repository = new InMemoryProposalRepository();

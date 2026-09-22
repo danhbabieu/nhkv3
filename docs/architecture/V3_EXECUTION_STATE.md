@@ -1,5 +1,31 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-22 — Authority exact-UUID rename planning (LOCAL / LIVE MCP BLOCKED)
+
+ROOT_CAUSE_CONFIRMED: `AuthorityIntentPlanner` treated an explicit requested
+name that differed from the exact active `canonical_uuid` as review-only
+`IDENTITY_CONFLICT` and returned before producing an update candidate. The
+registered Classification schema allows `family` and `description`, not
+`aliases`; alias input therefore remains fail-closed at the Authority owner
+boundary and is not copied into Classification payloads.
+
+FIXED_BOUNDARIES: Exact active UUID + explicit Authority curation + changed
+name + `allow_create=false` now produces one deterministic governed `RENAME`
+candidate bound to Capture ID, canonical UUID/type, expected revision, requested
+delta, provenance/reason and plan fingerprint. Governance proposal materialization
+passes the requested name to the existing `rename` operation; no apply path or
+alternate writer was added. Existing unknown UUID, inactive target, wrong type,
+same-name no-op and alias schema fail-closed behavior remain enforced.
+
+VERIFICATION: Targeted Authority/Capture/Governance suite passes 75 tests / 342
+assertions. Full NHK Unit passes 2,224 tests / 13,246 assertions with existing
+warnings/deprecations. Full PHP lint and `git diff --check` pass. Deployment
+preflight is blocked by the local WordPress bootstrap/database runtime
+(`WORDPRESS_BOOTSTRAP_FAILED`), so no live Capture, Proposal, Eligibility or
+Apply operation was attempted and no semantic data was mutated.
+
+STATUS: `AUTHORITY_EXACT_UUID_RENAME_CANDIDATE_FIXED_LOCAL / LIVE_MCP_BLOCKED / SEMANTIC_MUTATION_NONE`.
+
 # Checkpoint — 2026-09-22 — Authority proposal candidate binding recovery (LOCAL / LIVE MCP PENDING)
 
 ROOT_CAUSE_CONFIRMED: The v42-era staging resolver required

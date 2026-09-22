@@ -66,6 +66,7 @@ final class AuthorityIntentPlanner
         $hasArticle = $purpose !== 'AUTHORITY' && preg_match('/\b(?:bài|bài viết|bài giới thiệu|article)\b/iu', $text) === 1;
         $plan['article'] = $hasArticle ? ['requested' => true, 'mode' => ($plan['reuse'] !== [] || $plan['create_candidates'] !== []) ? 'MIXED' : 'EDITORIAL'] : null;
         $plan['plan_fingerprint'] = AuthorityPlanFingerprint::compute((string) ($captureContext['capture_id'] ?? ''), max(1, (int) ($captureContext['capture_revision'] ?? 1)), $plan, is_array($captureContext['contract'] ?? null) ? $captureContext['contract'] : (is_array($input['documentation_checkpoint'] ?? null) ? $input['documentation_checkpoint'] : []));
+        $this->bindUpdateCandidates($plan, (string) ($captureContext['capture_id'] ?? ''), (string) $plan['plan_fingerprint']);
         return $plan;
     }
 
@@ -289,6 +290,11 @@ final class AuthorityIntentPlanner
             // server-owned identity before any create-only name/stable-key
             // policy is evaluated, and reject conflicting redundant locators.
             if ($name !== '' && !$this->matchesCanonicalNameOrAlias($entityById, $name)) {
+                if (($request['allow_create'] ?? false) !== true && $payloadDelta === []) {
+                    $this->renameCandidate($plan, $entityById, $name);
+                    $this->reuse($plan, $entityById, 'uuid_exact', $family);
+                    return;
+                }
                 $plan['ambiguities'][] = [
                     'code' => 'IDENTITY_CONFLICT',
                     'entity_type' => $type,
@@ -461,6 +467,7 @@ final class AuthorityIntentPlanner
         $plan['update_candidates'][] = [
             'candidate_id' => $this->candidateId('UPDATE', $entity->entityType, $entity->canonicalId . '|' . $entity->revision . '|' . json_encode($patch, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)),
             'action' => 'UPDATE',
+            'operation' => 'update',
             'entity_type' => $entity->entityType,
             'canonical_uuid' => $entity->canonicalId,
             'canonical_revision' => $entity->revision,
@@ -473,12 +480,59 @@ final class AuthorityIntentPlanner
             'before' => $entity->payload,
             'after' => $payload,
             'delta' => $delta,
+            'requested_delta' => $delta,
             'scope' => 'capture',
             'provenance' => 'EXPLICIT_USER_KNOWLEDGE',
             'dependencies' => [],
             'review_diagnostics' => [],
         ];
         return true;
+    }
+
+    /** @param array<string,mixed> $plan */
+    private function renameCandidate(array &$plan, AuthorityEntity $entity, string $requestedName): void
+    {
+        $requestedName = trim($requestedName);
+        $plan['update_candidates'][] = [
+            'candidate_id' => $this->candidateId('RENAME', $entity->entityType, $entity->canonicalId . '|' . $entity->revision . '|' . $requestedName),
+            'action' => 'RENAME',
+            'operation' => 'rename',
+            'capture_id' => null,
+            'entity_type' => $entity->entityType,
+            'canonical_uuid' => $entity->canonicalId,
+            'canonical_revision' => $entity->revision,
+            'expected_revision' => $entity->revision,
+            'canonical_name' => $entity->canonicalName,
+            'requested_name' => $requestedName,
+            'stable_key' => $entity->stableKey,
+            'family' => $entity->payload['family'] ?? null,
+            'requested_delta' => ['name' => $requestedName],
+            'delta' => ['name' => $requestedName],
+            'before' => ['name' => $entity->canonicalName],
+            'after' => ['name' => $requestedName],
+            'scope' => 'capture',
+            'provenance' => 'EXPLICIT_AUTHORITY_CURATION',
+            'reason' => 'Explicit curator-requested rename of an exact active canonical Authority target.',
+            'dependencies' => [],
+            'review_diagnostics' => [],
+        ];
+    }
+
+    /** @param array<string,mixed> $plan */
+    private function bindUpdateCandidates(array &$plan, string $captureId, string $planFingerprint): void
+    {
+        foreach ($plan['update_candidates'] as &$candidate) {
+            if (!is_array($candidate)) continue;
+            $candidate['capture_id'] = $captureId !== '' ? $captureId : null;
+            $candidate['plan_fingerprint'] = $planFingerprint;
+            $candidate['target_uuid'] = (string) ($candidate['canonical_uuid'] ?? '');
+            $candidate['operation'] = strtolower((string) ($candidate['operation'] ?? $candidate['action'] ?? 'update'));
+            $candidate['requested_delta'] = is_array($candidate['requested_delta'] ?? null)
+                ? $candidate['requested_delta']
+                : (is_array($candidate['delta'] ?? null) ? $candidate['delta'] : []);
+            $candidate['reason'] = (string) ($candidate['reason'] ?? 'Explicit Authority curation update for an exact active canonical target.');
+        }
+        unset($candidate);
     }
 
     /** @param array<string,mixed> $request @return array<string,mixed> */

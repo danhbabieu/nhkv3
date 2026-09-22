@@ -91,6 +91,31 @@ final class ConversationalAuthorityCaptureTest extends TestCase
         self::assertSame(1, $plannerCalls);
     }
 
+    public function test_authority_rename_candidate_survives_capture_persistence_and_reload(): void
+    {
+        $captures = new AuthorityCaptureRepository();
+        $candidate = [
+            'candidate_id' => 'candidate-rename', 'action' => 'RENAME', 'operation' => 'rename',
+            'entity_type' => 'classification', 'canonical_uuid' => '54fae8ec-e7fd-4130-a9da-7469bcaacd29',
+            'expected_revision' => 1, 'requested_delta' => ['name' => 'Mặt bát giác nằm'],
+            'capture_id' => 'capture-bound', 'plan_fingerprint' => str_repeat('a', 64),
+        ];
+        $service = new AuthorityCaptureService($captures, static fn (array $input, CaptureRecord $capture): array => [
+            'reuse' => [], 'create_candidates' => [], 'update_candidates' => [$candidate],
+            'relation_candidates' => [], 'plan_fingerprint' => str_repeat('a', 64),
+        ]);
+
+        $planned = $service->execute([
+            'idempotency_key' => 'rename-capture', 'purpose' => 'AUTHORITY',
+            'authority_intent' => ['mode' => 'PLAN'],
+        ]);
+        $reloaded = $captures->findById($planned->captureId);
+
+        self::assertNotNull($reloaded);
+        self::assertSame($candidate, $reloaded->context['authority_plan']['update_candidates'][0]);
+        self::assertSame($planned->captureId, $reloaded->captureId);
+    }
+
     public function test_mixed_capture_creates_at_most_one_editorial_post_on_replay(): void
     {
         $captures = new AuthorityCaptureRepository();
