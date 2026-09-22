@@ -16819,3 +16819,36 @@ the documented `NHK_WP_TEST_PATH=public` runtime. PHP lint and `git diff
 V2, Capture, SQL, deployment, push, or semantic data mutation was performed.
 
 STATUS=`SHARED_EDITORIAL_CLAIM_RETRIEVAL_ELIGIBILITY_FIXED_LOCALLY / FULL_UNIT_PASS / NO_LIVE_MUTATION`.
+
+# Checkpoint — 2026-09-22 — Knowledge selection and transient Editorial Context Pack (LOCAL / NO LIVE MUTATION)
+
+SCOPE: Checkpoint C only: eligible Claim candidates → deterministic editorial
+selection → transient Context Pack. Reader Journey, prose composition, SEO,
+public projection, automatic regeneration, schema and migration remain out of
+scope.
+
+FIXED_BOUNDARY: Added the shared `EditorialKnowledgeSelector` and immutable
+transient `EditorialContextPack`. Selection consumes only retrieval candidates
+marked `eligibility=eligible`; ineligible Claims are preserved only as excluded
+diagnostics. Deterministic utility dimensions cover topic relevance,
+information gain, reader value and semantic coverage, with direct/neighborhood
+ordering, redundancy control, bounded selection budgets, deterministic roles
+(`CORE`, `CONTEXT`, `EXPLANATION`) and selection reasons. Canonical Claim
+UUID/revision, original subject, scope/evidence result, provenance references,
+Graph path and discovery origin remain intact. Visual-support requirements are
+preserved or surfaced as `UNRESOLVED`; representative Media is never treated as
+feature support.
+
+PROFILE_BOUNDARY: Article, Video, Image and Media use the same selector. An
+unsupported profile fails closed. Retrieval-unavailable state remains distinct
+from no-eligible and no-useful selection outcomes. No AI/LLM dependency or
+semantic mutation was introduced.
+
+REGRESSION: Focused retrieval/selection matrix passes 13 tests / 53
+assertions. Full NHK Unit passes 2,141 tests / 12,948 assertions with existing
+warnings/deprecations. PHP lint, `git diff --check` and secret review pass for
+the changed checkpoint files. The previously documented unfiltered integration
+bootstrap blockers remain unchanged. No schema/migration, staging, production,
+V2, Capture, SQL, deployment, push or semantic data mutation was performed.
+
+STATUS=`KNOWLEDGE_SELECTION_CONTEXT_PACK_FIXED_LOCALLY / FULL_UNIT_PASS / NO_LIVE_MUTATION`.
