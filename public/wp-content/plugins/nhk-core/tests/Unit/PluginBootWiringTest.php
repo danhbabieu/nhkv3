@@ -104,6 +104,19 @@ final class PluginBootWiringTest extends TestCase
         self::assertStringNotContainsString("'blockers' => ['SEMANTIC_WRITE_BACK_REQUIRES_GOVERNANCE']", $plugin);
     }
 
+    public function test_public_capture_ability_composition_passes_one_internal_dependency_validator_through_transport_and_coordinator(): void
+    {
+        $plugin = (string) file_get_contents(__DIR__ . '/../../src/Plugin.php');
+        self::assertStringContainsString('$canonicalDependencies = new CanonicalDependencyValidator($claims, $sources, $evidence);', $plugin);
+        self::assertStringContainsString('new McpTransport(', $plugin);
+        self::assertStringContainsString('new CanonicalDependencyValidator($claims, $sources, $evidence)', $plugin);
+        self::assertStringContainsString('new EditorialCaptureCoordinator(', $plugin);
+        self::assertStringContainsString('$canonicalDependencies,', $plugin);
+        self::assertStringContainsString('McpAbilityRegistration::registerGovernedAbilities();', $plugin);
+        self::assertStringContainsString("'nhk.capture.ingest' => 'nhk-v3/capture-ingest'", (string) file_get_contents(__DIR__ . '/../../src/Application/Mcp/McpAbilityRegistration.php'));
+        self::assertStringContainsString('rest_do_request($request)', (string) file_get_contents(__DIR__ . '/../../src/Application/Mcp/McpAbilityRegistration.php'));
+    }
+
     public function test_capture_owned_draft_write_suppresses_generic_post_media_hook_until_capture_reconciliation(): void
     {
         $plugin = (string) file_get_contents(__DIR__ . '/../../src/Plugin.php');

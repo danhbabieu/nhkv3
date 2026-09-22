@@ -335,6 +335,78 @@ final class EditorialCaptureContinuationTest extends TestCase
         self::assertSame(['eligible' => false, 'reason' => 'CAPTURE_RETRY_NOT_ALLOWED', 'capture_id' => $capture->captureId], $projection['retry']);
     }
 
+    public function test_retry_reconstructs_historical_source_claim_evidence_kinds_and_revisions_from_governance_receipts(): void
+    {
+        $captures = new ContinuationCaptureRepository();
+        $addenda = new ContinuationAddendumRepository();
+        $sourceId = UuidCodec::newV7();
+        $claimId = UuidCodec::newV7();
+        $evidenceId = UuidCodec::newV7();
+        $videoId = UuidCodec::newV7();
+        $source = new Source($sourceId, 'source:historical', 'Private source', metadata: ['visibility' => 'PRIVATE']);
+        $claim = new KnowledgeClaim($claimId, 'claim:historical', 'Private claim', provenance: ['metadata' => ['verification_status' => 'PRIVATE']]);
+        $evidence = new Evidence($evidenceId, $claimId, $sourceId, excerpt: 'Hidden evidence', metadata: ['visibility' => 'HIDDEN']);
+        $claims = $this->createMock(KnowledgeRepository::class);
+        $claims->method('findByCanonicalId')->willReturnCallback(static fn (string $id): ?KnowledgeClaim => $id === $claimId ? $claim : null);
+        $sources = $this->createMock(SourceRepository::class);
+        $sources->method('findByCanonicalId')->willReturnCallback(static fn (string $id): ?Source => $id === $sourceId ? $source : null);
+        $evidenceRepository = $this->createMock(EvidenceRepository::class);
+        $evidenceRepository->method('findByCanonicalId')->willReturnCallback(static fn (string $id): ?Evidence => $id === $evidenceId ? $evidence : null);
+        $validator = new CanonicalDependencyValidator($claims, $sources, $evidenceRepository);
+        $writes = [];
+        foreach ([['id' => $sourceId, 'phase' => 'VIDEO_SOURCE_GOVERNANCE'], ['id' => $claimId, 'phase' => 'VIDEO_CLAIM_GOVERNANCE'], ['id' => $evidenceId, 'phase' => 'VIDEO_EVIDENCE_GOVERNANCE']] as $dependency) {
+            $writes[] = ['entity_type' => 'knowledge', 'canonical_id' => $dependency['id'], 'completion' => [
+                'owner_type' => 'knowledge', 'owner_id' => $dependency['id'], 'canonical_state' => 'BLOCKED',
+                'canonical_readback_verified' => false, 'dependency_state' => 'COMPLETE', 'relation_or_usage_state' => 'COMPLETE',
+                'blockers' => ['CANONICAL_READBACK_UNVERIFIED'],
+            ]];
+        }
+        $capture = new CaptureRecord(
+            UuidCodec::newV7(), 'capture-historical-kinds', hash('sha256', 'historical-kinds'), CaptureStage::SEMANTICS_RECONCILED->value, 'PARTIAL', null, null,
+            [['kind' => 'video', 'video_id' => $videoId, 'video_proposal' => ['payload' => ['canonical_id' => $videoId]]]],
+            ['purpose' => 'EDITORIAL', 'content_intent' => ['intent' => 'VIDEO', 'article_required' => false]],
+            [
+                'completion' => ['status' => 'PARTIAL', 'blockers' => ['CANONICAL_READBACK_UNVERIFIED'], 'children' => [], 'missing_required_owners' => []],
+                'resume_hints' => ['resume_children' => ['video']],
+                'semantic_write_back' => ['status' => 'APPLIED', 'canonical_readback' => ['canonical_id' => $videoId], 'writes' => $writes],
+            ],
+            [
+                'VIDEO_SOURCE_GOVERNANCE' => ['status' => 'COMPLETED', 'result' => 'REUSED_VERIFIED', 'canonical_id' => $sourceId, 'revision' => 1],
+                'VIDEO_CLAIM_GOVERNANCE' => ['status' => 'COMPLETED', 'result' => 'REUSED_VERIFIED', 'canonical_id' => $claimId, 'revision' => 1],
+                'VIDEO_EVIDENCE_GOVERNANCE' => ['status' => 'COMPLETED', 'result' => 'REUSED_VERIFIED', 'canonical_id' => $evidenceId, 'revision' => 1],
+            ],
+        );
+        $captures->create($capture);
+        $events = [];
+        $service = new EditorialCaptureContinuationService($captures, $addenda, $this->coordinator($captures, $events, null, static function (array $context) use ($videoId): array {
+            return ['status' => 'VERIFIED', 'items' => [['video_id' => $videoId, 'completion' => ['owner_type' => 'video', 'owner_id' => $videoId, 'status' => 'COMPLETE', 'complete' => true, 'canonical_readback' => ['canonical_id' => $videoId], 'dependency_state' => 'COMPLETE', 'relation_or_usage_state' => 'COMPLETE', 'content_state' => 'CONTENT_COMPLETE', 'public_state' => 'READY', 'frontend_state' => 'VERIFIED', 'blockers' => []]]], 'blockers' => []];
+        }, $validator));
+
+        $result = $service->retry(['capture_id' => $capture->captureId, 'resume_mode' => 'RETRY', 'resume_children' => ['video']]);
+        $children = [];
+        foreach ($result['capture']['diagnostics']['completion']['children'] as $child) $children[(string) ($child['owner_type'] ?? '')] = $child;
+
+        self::assertSame('COMPLETE', $result['capture']['status']);
+        self::assertSame('COMPLETE', $children['source']['status']);
+        self::assertSame('COMPLETE', $children['knowledge']['status']);
+        self::assertSame('COMPLETE', $children['evidence']['status'], json_encode($result['capture']['diagnostics']['completion'], JSON_THROW_ON_ERROR));
+        self::assertSame(1, $children['source']['canonical_readback']['revision'], json_encode($result['capture']['diagnostics']['completion'], JSON_THROW_ON_ERROR));
+        self::assertSame(1, $children['knowledge']['canonical_readback']['revision']);
+        self::assertSame(1, $children['evidence']['canonical_readback']['revision']);
+        self::assertSame([], $result['capture']['diagnostics']['completion']['blockers']);
+        self::assertArrayNotHasKey('semantic', $events);
+
+        $publicRead = new McpReadHandler(
+            $this->createMock(AuthorityRepository::class), new EntityTypeRegistry(),
+            $this->createMock(MediaRepository::class), $this->createMock(MediaAssetRepository::class), $this->createMock(MediaUsageRepository::class),
+            $this->createMock(VideoRepository::class), $claims, $evidenceRepository,
+            sources: $sources,
+        );
+        self::assertNull($publicRead->sourceGet($sourceId));
+        self::assertNull($publicRead->knowledgeGet($claimId));
+        self::assertNull($publicRead->evidenceGet($evidenceId));
+    }
+
     public function test_missing_internal_dependency_remains_blocked(): void
     {
         $claims = $this->createMock(KnowledgeRepository::class);
@@ -350,6 +422,27 @@ final class EditorialCaptureContinuationTest extends TestCase
 
         self::assertSame('BLOCKED', $result['writes'][0]['completion']['canonical_state']);
         self::assertContains('CANONICAL_CLAIM_REQUIRED', $result['writes'][0]['completion']['blockers']);
+        self::assertFalse($result['writes'][0]['completion']['complete']);
+    }
+
+    public function test_missing_dependency_validator_is_reported_as_runtime_composition_invalid(): void
+    {
+        $captures = new ContinuationCaptureRepository();
+        $events = [];
+        $coordinator = $this->coordinator($captures, $events);
+        $method = new \ReflectionMethod($coordinator, 'refreshVideoDependencyWrites');
+        $method->setAccessible(true);
+        $sourceId = UuidCodec::newV7();
+        $result = $method->invoke($coordinator, [
+            'writes' => [[
+                'entity_type' => 'knowledge',
+                'canonical_id' => $sourceId,
+                'completion' => ['owner_type' => 'knowledge', 'owner_id' => $sourceId, 'dependency_state' => 'COMPLETE', 'relation_or_usage_state' => 'COMPLETE'],
+            ]],
+        ], ['VIDEO_SOURCE_GOVERNANCE' => ['canonical_id' => $sourceId, 'revision' => 1]]);
+
+        self::assertSame('BLOCKED', $result['writes'][0]['completion']['canonical_state']);
+        self::assertContains('RUNTIME_COMPOSITION_INVALID', $result['writes'][0]['completion']['blockers']);
         self::assertFalse($result['writes'][0]['completion']['complete']);
     }
 

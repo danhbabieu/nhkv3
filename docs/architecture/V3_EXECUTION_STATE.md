@@ -16404,6 +16404,44 @@ STATUS=`CAPTURE_CURRENT_OUTCOME_PARITY_FIXED_LOCALLY / FULL_UNIT_PASS / NO_LIVE_
 
 NEXT_EXACT_ACTION: `USER_PUSH_PULL_BUILD; THEN READ CAPTURE ON @v39; IF NEEDED RUN ONE BOUNDED RETRY; VERIFY COMPLETE`.
 
+# Checkpoint — 2026-09-22 — @v40 historical Video dependency-kind reconstruction (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE_CONFIRMED: The public Ability and MCP transport composition already
+constructed the required `CanonicalDependencyValidator` from the internal
+Source, Knowledge and Evidence repositories and passed it to the Capture
+coordinator. The remaining production discrepancy was historical dependency
+shape: persisted completion rows exposed Source, Claim and Evidence uniformly
+as `owner_type=knowledge`. Completion retry therefore mapped all three rows to
+the Claim validator and lost the governed dependency kind and recorded revision.
+
+FIXED_BOUNDARY: Completion-only Video retry now reconstructs dependency kind
+from the existing governed receipts
+`VIDEO_SOURCE_GOVERNANCE`, `VIDEO_CLAIM_GOVERNANCE` and
+`VIDEO_EVIDENCE_GOVERNANCE`, carrying canonical UUID and recorded revision
+into the internal validator. Refreshed current readbacks replace the stale
+dependency children, are persisted in `semantic_write_back` and completion
+packets, and flow through `effectiveChildren()`/`aggregateCapture()`. A missing
+required validator now reports `RUNTIME_COMPOSITION_INVALID`, distinct from
+canonical data absence. Public PRIVATE/HIDDEN getters remain visibility-
+filtered and are not used for canonical validation.
+
+VERIFICATION: Focused production-shaped Capture/Ability/completion/read/Video
+selection passes 74 tests / 343 assertions. It proves Source/Claim/Evidence
+kind reconstruction, recorded revision 1 handoff, exactly bounded internal
+dependency validation, current-child replacement, public-null/internal-pass,
+missing composition, missing canonical dependency, revision drift, terminal
+persistence, capture_get parity, no semantic re-entry, exact replay,
+same-owner convergence, Video publication and Graph regressions. Full `NHK
+Unit` passes 2,105 tests / 12,438 assertions with 17 warnings, 37
+deprecations and 27 PHPUnit deprecations only. PHP lint and `git diff --check`
+pass. No schema or migration change is present or required. No live retry,
+Capture, SQL, deployment, push, pull, visibility mutation or semantic data
+mutation was performed.
+
+STATUS=`VIDEO_CAPTURE_HISTORICAL_DEPENDENCY_KIND_RECONSTRUCTION_FIXED_LOCALLY / FULL_UNIT_PASS / NO_LIVE_MUTATION`.
+
+NEXT_EXACT_ACTION: `USER_PUSH_PULL_BUILD; THEN RUN ONE FINAL @v40 BOUNDED RETRY AND VERIFY COMPLETE`.
+
 # Checkpoint — 2026-09-22 — Capture dry-run intent routing (LOCAL / NO LIVE MUTATION)
 
 ROOT_CAUSE_CONFIRMED: `McpTransport::captureIngest()` applied the Knowledge

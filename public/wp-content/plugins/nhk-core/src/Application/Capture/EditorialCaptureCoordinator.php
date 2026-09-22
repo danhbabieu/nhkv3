@@ -125,7 +125,7 @@ final class EditorialCaptureCoordinator
         $intent = is_array($record->context['content_intent'] ?? null) ? $record->context['content_intent'] : [];
         if (strtoupper(trim((string) ($intent['intent'] ?? ''))) !== 'VIDEO') throw new \RuntimeException('CAPTURE_VIDEO_COMPLETION_RETRY_NOT_SUPPORTED');
         $writes = is_array($record->diagnostics['semantic_write_back'] ?? null) ? $record->diagnostics['semantic_write_back'] : [];
-        $writes = $this->refreshVideoDependencyWrites($writes);
+        $writes = $this->refreshVideoDependencyWrites($writes, $record->phaseReceipts);
         if (!in_array(strtoupper(trim((string) ($writes['status'] ?? ''))), ['APPLIED', 'IDEMPOTENT', 'REUSED', 'REUSED_VERIFIED', 'ALREADY_APPLIED'], true)) {
             throw new \RuntimeException('CAPTURE_VIDEO_COMPLETION_RETRY_CANONICAL_READBACK_REQUIRED');
         }
@@ -147,6 +147,7 @@ final class EditorialCaptureCoordinator
         ]);
         $diagnostics = $record->diagnostics;
         $diagnostics['video_publication'] = $this->withoutBody($videoPublication);
+        $diagnostics['semantic_write_back'] = $writes;
         $diagnostics['completion_retry'] = [
             'mode' => 'VIDEO_COMPLETION_ONLY',
             'semantic_reentry' => false,
@@ -156,33 +157,52 @@ final class EditorialCaptureCoordinator
         return $this->finishNonArticleIntent($record, $record->assets, $diagnostics, $record->phaseReceipts, $intent, $retrieved, $writes, $videoPublication, $resolution, $media);
     }
 
-    /** @param array<string,mixed> $writes @return array<string,mixed> */
-    private function refreshVideoDependencyWrites(array $writes): array
+    /** @param array<string,mixed> $writes @param array<string,mixed> $phaseReceipts @return array<string,mixed> */
+    private function refreshVideoDependencyWrites(array $writes, array $phaseReceipts = []): array
     {
-        if ($this->canonicalDependencies === null) return $writes;
         $items = is_array($writes['writes'] ?? null) ? $writes['writes'] : [];
+        $bindings = $this->historicalDependencyBindings($phaseReceipts);
         foreach ($items as $index => $write) {
             if (!is_array($write) || !is_array($write['completion'] ?? null)) continue;
             $completion = $write['completion'];
             $ownerType = strtolower(trim((string) ($completion['owner_type'] ?? $write['entity_type'] ?? '')));
             $ownerId = trim((string) ($completion['owner_id'] ?? $write['canonical_id'] ?? ''));
-            $kind = $ownerType === 'knowledge' ? 'claim' : $ownerType;
+            $binding = $bindings[$ownerId] ?? null;
+            $kind = is_array($binding) && in_array($binding['kind'] ?? '', ['source', 'claim', 'evidence'], true)
+                ? (string) $binding['kind']
+                : ($ownerType === 'knowledge' ? 'claim' : $ownerType);
             if (!in_array($kind, ['source', 'claim', 'evidence'], true) || $ownerId === '') continue;
             $recordedReadback = is_array($completion['canonical_readback'] ?? null)
                 ? $completion['canonical_readback']
                 : (is_array($write['canonical_readback'] ?? null) ? $write['canonical_readback'] : []);
             $recordedRevision = (int) ($recordedReadback['revision'] ?? 0);
+            if ($recordedRevision < 1 && is_array($binding)) $recordedRevision = (int) ($binding['revision'] ?? 0);
+            $canonicalOwnerType = $kind === 'claim' ? 'knowledge' : $kind;
+            if ($this->canonicalDependencies === null) {
+                $items[$index]['entity_type'] = $canonicalOwnerType;
+                $items[$index]['completion'] = $this->completion->finalize($canonicalOwnerType, $ownerId, [
+                    'canonical_state' => 'BLOCKED',
+                    'dependency_state' => 'BLOCKED',
+                    'relation_or_usage_state' => $completion['relation_or_usage_state'] ?? 'PARTIAL',
+                    'blockers' => ['RUNTIME_COMPOSITION_INVALID'],
+                    'owner_role' => 'semantic_dependency',
+                    'public_projection_owner' => false,
+                ]);
+                continue;
+            }
             try {
                 $entity = match ($kind) {
                     'source' => $this->canonicalDependencies->source($ownerId),
                     'claim' => $this->canonicalDependencies->claim($ownerId),
                     'evidence' => $this->canonicalDependencies->evidence($ownerId),
                 };
-                $currentReadback = ['canonical_id' => $ownerId, 'entity_type' => $kind === 'claim' ? 'knowledge' : $kind, 'active' => $entity->active, 'revision' => $entity->revision];
+                $currentReadback = ['canonical_id' => $ownerId, 'entity_type' => $canonicalOwnerType, 'active' => $entity->active, 'revision' => $entity->revision];
                 $revisionDrift = $recordedRevision > 0 && $recordedRevision !== $entity->revision;
                 $blockers = array_values(array_filter(array_map('strval', (array) ($completion['blockers'] ?? [])), static fn (string $blocker): bool => !in_array($blocker, ['CANONICAL_READBACK_UNVERIFIED', 'PUBLIC_ELIGIBILITY_NOT_VERIFIED', 'FRONTEND_READBACK_NOT_VERIFIED'], true)));
                 if ($revisionDrift) $blockers[] = 'CANONICAL_DEPENDENCY_REVISION_MISMATCH';
-                $items[$index]['completion'] = $this->completion->finalize($ownerType, $ownerId, [
+                $items[$index]['entity_type'] = $canonicalOwnerType;
+                $items[$index]['canonical_readback'] = $currentReadback;
+                $items[$index]['completion'] = $this->completion->finalize($canonicalOwnerType, $ownerId, [
                     'canonical_state' => $revisionDrift ? 'BLOCKED' : 'COMPLETE',
                     'canonical_readback' => $currentReadback,
                     'dependency_state' => $completion['dependency_state'] ?? 'COMPLETE',
@@ -193,7 +213,8 @@ final class EditorialCaptureCoordinator
                 ]);
             } catch (\Throwable $error) {
                 $code = $error instanceof DependencyValidationException ? $error->errorCode : 'CANONICAL_DEPENDENCY_READBACK_UNAVAILABLE';
-                $items[$index]['completion'] = $this->completion->finalize($ownerType, $ownerId, [
+                $items[$index]['entity_type'] = $canonicalOwnerType;
+                $items[$index]['completion'] = $this->completion->finalize($canonicalOwnerType, $ownerId, [
                     'canonical_state' => 'BLOCKED',
                     'dependency_state' => 'BLOCKED',
                     'relation_or_usage_state' => $completion['relation_or_usage_state'] ?? 'PARTIAL',
@@ -205,6 +226,25 @@ final class EditorialCaptureCoordinator
         }
         $writes['writes'] = $items;
         return $writes;
+    }
+
+    /** @param array<string,mixed> $phaseReceipts @return array<string,array{kind:string,revision:int}> */
+    private function historicalDependencyBindings(array $phaseReceipts): array
+    {
+        $bindings = [];
+        foreach ([
+            'VIDEO_SOURCE_GOVERNANCE' => 'source',
+            'VIDEO_CLAIM_GOVERNANCE' => 'claim',
+            'VIDEO_EVIDENCE_GOVERNANCE' => 'evidence',
+        ] as $phase => $kind) {
+            $receipt = is_array($phaseReceipts[$phase] ?? null) ? $phaseReceipts[$phase] : [];
+            $receipt = is_array($receipt['latest'] ?? null) ? $receipt['latest'] : $receipt;
+            $readback = is_array($receipt['canonical_readback'] ?? null) ? $receipt['canonical_readback'] : [];
+            $id = trim((string) ($receipt['canonical_id'] ?? $readback['canonical_id'] ?? ''));
+            if ($id === '') continue;
+            $bindings[$id] = ['kind' => $kind, 'revision' => (int) ($receipt['revision'] ?? $readback['revision'] ?? 0)];
+        }
+        return $bindings;
     }
 
     /** Continue an existing Capture without repeating physical or draft creation. */
