@@ -204,6 +204,20 @@ context path used by the target design. The fix is to feed Video's existing
 editorial owner from the shared pack, not to create a second Video knowledge
 engine.
 
+### 7.4 Visual Support cross-cutting gap
+
+`VISUAL_SUPPORT_REQUIREMENT_CONTRACT.md` is ACTIVE whenever editorial output
+names a visually explainable technical or recognition feature. The shared
+design must distinguish `Representative Media` from `feature-support Media`:
+a general Odo 36 representative image does not prove or illustrate every
+wall-plate variant. Feature support requires exact canonical subject, scope,
+facet, registered feature key and visual intent, then reuse or binding through
+the existing Visual Support Requirement, MediaUsage and MediaBinding owners.
+
+Missing or ineligible visual support remains distinct from Knowledge missing,
+Evidence missing, Media unavailable, a feature that does not require public
+visual support, and deliberate projection omission.
+
 ## 8. Target TO-BE architecture
 
 ### 8.1 Composition decision
@@ -315,6 +329,9 @@ EditorialContextPack {
   candidate_claims[], selected_claims[], excluded_candidates[],
   supporting_entities[], supporting_concepts[],
   dictionary_context, internal_link_candidates[], related_content[],
+  visual_support_requirements[], eligible_feature_media[],
+  unresolved_visual_support[], visual_support_paths[],
+  support_role_feature_map[],
   journey_plan, profile_inputs, diagnostics, dependency_snapshot
 }
 ```
@@ -337,6 +354,30 @@ controlled class) and scope. It must not flatten them into canonical Claims.
 The pack may carry semantic keywords/topic context and link candidates as
 derived projections. Dictionary concepts remain lexical state; link targets
 must be public-route eligible and owner-correct.
+
+### 10.1 Feature visual-support flow
+
+`selected feature Claim → VisualSupportRequirement lookup/reconciliation →
+exact Media scope/facet/feature/intent validation → eligible MediaUsage or
+MediaBinding reuse → feature-support path → quality/readiness decision →
+public projection`.
+
+The pack records requirements and support paths as read-model context only.
+`VisualSupportRequirementService` remains the application ledger and
+`MediaBindingService` remains the canonical Media → MediaUsage → exact target
+owner. No new Media, Evidence or visual-truth store is created. An image
+observation may explain why a requirement was detected, but cannot prove a
+Claim or broaden its scope.
+
+Reverse reconciliation starts from canonical Media read-back and searches only
+bounded missing/review requirements, validating exact subject/scope/facet/
+feature/intent before reuse. A later unsuitable/private/placeholder asset,
+changed MediaUsage or changed Claim scope invalidates applicable support/readiness
+projection without deleting Media or silently rewriting public copy.
+
+Public projection selects only a public-safe eligible derivative. Missing,
+private, review-required, unavailable, placeholder or mismatched feature Media
+is omitted or keeps the visual expansion qualified/review-required.
 
 ## 11. Knowledge selection design
 
@@ -420,15 +461,17 @@ projection law.
 `SharedEditorialQualityEvaluator` should return a diagnostic read model with
 separate dimensions, without inventing a persistent enum:
 
-* factual grounding;
-* subject/scope correctness;
-* Knowledge utilization;
+* `FACTUAL_GROUNDING` — prose traces to input or eligible canonical context;
+* `SCOPE_CORRECTNESS` — subject, facet and Claim scope are not broadened;
+* `EVIDENCE_ELIGIBILITY` — Source/Evidence and provenance are eligible;
+* `VISUAL_SUPPORT_READINESS` — exact feature support is resolved or explicitly omittable;
+* `EDITORIAL_QUALITY` — usefulness, information gain, journey and readability;
 * information gain beyond direct input;
 * reader journey coherence;
 * readability;
 * repetition/template-language detection;
 * semantic coverage;
-* SEO readiness;
+* `SEO_READINESS` — route, lexical, structured-data and asset inputs are eligible;
 * internal-link usefulness;
 * public-claim compliance.
 
@@ -437,8 +480,14 @@ Keep these states distinct:
 * semantic completion — canonical semantic dependencies/read-back;
 * editorial completion — owner package has a coherent grounded result;
 * SEO readiness — projection inputs/routes/assets are valid;
-* public readiness — all applicable owner, compliance, rendered and route gates
-  pass.
+* `PUBLIC_READINESS` — all applicable owner, visual, compliance, rendered and
+  route gates pass.
+
+These names are conceptual/read-model dimensions, not new persistent enums.
+Visual support diagnostics must distinguish `KNOWLEDGE_MISSING`,
+`EVIDENCE_MISSING`, `MEDIA_UNAVAILABLE`, `VISUAL_SUPPORT_NOT_REQUIRED`,
+`VISUAL_SUPPORT_REVIEW_REQUIRED`, `VISUAL_SUPPORT_OMITTED_BY_PROJECTION` and
+`VISUAL_SUPPORT_READY` without creating a new semantic owner.
 
 Do not treat `COMPLETE` in one dimension as completion in another. Existing
 `CompletionCoordinator`, Article publication gates, Video completeness and
@@ -450,11 +499,21 @@ blocked or narrowed only through an evidence-bound policy decision.
 
 ## 16. Living Knowledge and re-enrichment
 
-The first implementation should use the existing Article `claim_trace`,
-`research_snapshot`, managed-section dependency fingerprints and Video editorial
-input/metadata fingerprints as compatibility evidence. The shared pack should
-include a deterministic `dependency_snapshot` in memory and in owner-specific
-existing metadata only where that owner already supports it.
+The first implementation should extend/combine existing dependency evidence,
+not create a duplicate dependency owner. Article already has `claim_trace`,
+`research_snapshot`, managed-section dependency fingerprints and composition
+revision. Video existing-Capture editorial resume already fingerprints source
+identity/revision, user editorial delta, resolved subject, selected Claim
+IDs/revisions and policy version. That Video mechanism remains the Video
+owner's dependency mechanism; the shared pack supplies the same canonical
+inputs and may contribute a deterministic fingerprint component, but does not
+replace Video metadata or create a second Video dependency store.
+
+Article, Image-led and other profiles may eventually apply the same principle:
+canonical subject/revision + selected Claim IDs/revisions + visual-support
+requirement/Media revisions + Dictionary/SEO policy version → deterministic
+recomputation/fingerprint. Start with read-time recomputation and existing
+owner traces before considering a new persisted dependency schema.
 
 When a Claim revision changes:
 
@@ -471,7 +530,20 @@ read model over existing traces/fingerprints is safer. A later persisted index
 would require a separate contract, owner decision, retention policy and
 constitutional review.
 
-## 17. Ownership and write-boundary table
+## 17. Public copy boundary
+
+No reader-facing title, summary, body, excerpt, SEO description, Open Graph
+copy, VideoObject description, card copy or related-content description may
+contain internal diagnostics, workflow tokens, canonical UUIDs, stable keys,
+Governance terminology, MCP terminology or Graph/Evidence implementation
+jargon unless those terms are genuinely the editorial subject matter.
+
+Machine-readable provenance, Claim IDs/revisions, paths, requirement states and
+diagnostics remain machine-readable in owner metadata/read models. They are not
+reader-facing disclosure. Public composition uses natural Vietnamese-first copy
+and the existing compliance/public-copy guards.
+
+## 18. Ownership and write-boundary table
 
 | Operation | Shared layer may do | Shared layer may not do |
 |---|---|---|
@@ -486,7 +558,7 @@ constitutional review.
 | Re-enrich | propose preview/diff and call existing owner workflow after approval | silently rewrite public content |
 | Complete | aggregate diagnostics and owner read-backs | infer quality from field presence or ingest success |
 
-## 18. Impact/dependency matrix
+## 19. Impact/dependency matrix
 
 | Area | Current responsibility | Proposed change | Risk/owner | Code expected? | Schema/migration? | Tests |
 |---|---|---|---|---:|---:|---|
@@ -498,7 +570,7 @@ constitutional review.
 | Dictionary | lexical preview | add pack projection | lexical truth confusion | Small adapter | No | candidate/ambiguous/link ownership |
 | Article | research/composition | consume pack and journey | WordPress ownership | Yes | No | claim trace, body, publication gates |
 | Video | package/readiness | consume pack, remove duplicate semantic assembly | Video scope/revision | Yes | No | sparse input, governed update, SEO |
-| Media/Image | observations/usage | consume pack without broadening scope | visual inference becomes fact | Yes | No | observation vs Evidence, Visual Support |
+| Media/Image | observations/usage | consume pack without broadening scope; resolve exact feature support | visual inference becomes fact; representative image is mistaken for feature support | Yes | No | observation vs Evidence, Visual Support, reverse reconciliation |
 | SEO | projections | consume shared plan | invented/stronger copy | Yes | No | canonical route, claims, links |
 | Compliance | public claim checks | evaluate every profile | legal/public drift | Reuse | No | unsupported superiority/scope |
 | Governance | durable mutation | unchanged; gate selected write-back | bypass risk | No/adapter only | No | signed scope, CAS, idempotency |
@@ -507,7 +579,7 @@ constitutional review.
 | Testing | domain/contract suites | add shared golden fixtures/property cases | false COMPLETE | Yes | No | matrix below |
 | Documentation | contracts/status/execution state | add reviewed contract/spec and checkpoint | law drift | This document only now | No | documentation manifest/path checks |
 
-## 19. Failure modes and fail-closed behavior
+## 20. Failure modes and fail-closed behavior
 
 * Missing/stale documentation checkpoint: reject Capture as existing
   `DOCUMENTATION_CHECKPOINT_REQUIRED/STALE`.
@@ -528,8 +600,14 @@ constitutional review.
 * Video sparse context: use shared eligible pack or remain review/incomplete;
   do not fill with unsupported generic facts.
 * Generated prose/every visual observation: never become Evidence automatically.
+* Generic representative Media for a specific feature: reject as feature support
+  unless exact subject/scope/facet/feature/intent validation passes.
+* Visual Support missing while Knowledge/Evidence is otherwise eligible: keep
+  factual Claim state separate; omit or qualify only the visual expansion.
+* Visual Support is not required for the feature/profile: record that explicit
+  state rather than reporting Media unavailable.
 
-## 20. Observability and diagnostics
+## 21. Observability and diagnostics
 
 Use existing status vocabulary and diagnostics where possible. New diagnostics
 should be read-model codes, not persisted domain enums, until a contract proves
@@ -541,6 +619,8 @@ durability is necessary. Every pack/plan should expose bounded metadata:
 * candidate/eligible/selected/excluded counts;
 * exclusion reasons by policy category;
 * Claim IDs/revisions and dependency fingerprint, not private full evidence;
+* visual-support requirement state, exact feature mapping, Media/MediaUsage
+  revisions and bounded support path;
 * journey/profile/quality dimension results;
 * Dictionary and route availability;
 * compliance/readiness blockers and owner read-back state.
@@ -548,7 +628,7 @@ durability is necessary. Every pack/plan should expose bounded metadata:
 Do not return complete private Source/Evidence payloads, secrets, signatures or
 unbounded prose in diagnostics.
 
-## 21. Testing strategy
+## 22. Testing strategy
 
 ### 21.1 Contract/unit tests
 
@@ -559,6 +639,8 @@ unbounded prose in diagnostics.
 * Ranking cannot select an ineligible high-score candidate.
 * Selection revalidates AI IDs/revisions and rejects stale/unknown choices.
 * Graph paths preserve direct/derived class, alternative path and bounds.
+* Visual Support resolves exact feature scope and never treats a generic
+  representative image as support for every feature.
 * Reader journey is deterministic, role-aware, capped and profile-specific.
 * Quality distinguishes semantic, editorial, SEO and public readiness.
 * Compliance blocks unsupported superiority/rarity/popularity/chronology.
@@ -571,6 +653,8 @@ unbounded prose in diagnostics.
   governed CAS, idempotency and `VideoCompletenessPolicy`.
 * Media observations remain scoped and Visual Support does not create Claim or
   Graph truth.
+* Visual support states distinguish Knowledge/Evidence/Media gaps, not-required
+  support and deliberate public omission.
 * Dictionary/SEO/link projections omit unavailable/private/ineligible targets.
 * Claim revision produces preview/review-required re-enrichment, never a silent
   write.
@@ -584,7 +668,7 @@ Evidence, Graph-unavailable, Dictionary-unavailable, no-media and no-transcript
 fixtures. Include Article, Video, image-led Article, Knowledge-only and
 MEDIA_ENRICHMENT intents. Do not seed or mutate development/production data.
 
-## 22. Golden Acceptance Case — “3 phiên bản vách máy của đồng hồ Odo 36”
+## 23. Golden Acceptance Case — “3 phiên bản vách máy của đồng hồ Odo 36”
 
 This is a behavior fixture, not an implementation special case. No code may
 mention or branch on Odo 36.
@@ -604,12 +688,27 @@ Expected design behavior:
 9. Build semantic SEO context from eligible concepts/Dictionary/routes.
 10. Reject invented popularity, rarity, chronology, superiority or technical
     facts.
+11. Mark selected vách cam, vách xoáy, máy 3 vách, vách sọc or vách hở Claims
+    as visually explainable when the applicable feature policy says so.
+12. Resolve `VisualSupportRequirement` for each selected feature, reuse exact
+    suitable Media where available, and retain the support role/feature mapping.
+13. Do not use a generic Odo 36 representative image as proof of every
+    wall-plate variant.
+14. Let the composer omit or qualify a visual expansion when support is
+    missing/ineligible while preserving the factual Claim decision.
+15. Produce natural public copy with no internal diagnostics, IDs or workflow
+    language.
+16. Produce semantic SEO only from eligible subject, Claim, Dictionary, route
+    and Media context.
+17. Preserve Claim UUID/revision, policy version, visual-support dependency and
+    other existing owner fingerprint inputs for deterministic re-enrichment.
+18. Do not add an Odo 36 special case.
 
 If the canonical movement/Claim records are absent or unavailable, the result
 must clearly say the topic is incomplete/review-required rather than inventing
 the expected terms.
 
-## 23. Rollout checkpoints
+## 24. Rollout checkpoints
 
 These are design checkpoints only; each requires a fresh contract/status review,
 tests, PHP lint, `git diff --check`, secret review and execution-state update
@@ -639,7 +738,7 @@ before any code checkpoint.
 13. **Regression/cutover readiness:** run golden corpus and produce a readiness
     report; do not perform production cutover autonomously.
 
-## 24. Migration assessment
+## 25. Migration assessment
 
 No schema change or migration is expected for the first implementation. The
 safe initial form is transient pack plus owner-specific existing trace,
@@ -648,7 +747,7 @@ Media or Graph data should be backfilled. A future durable dependency index or
 persisted selection history would require a separate constitutional/contract
 decision and is not implied by this design.
 
-## 25. Open questions
+## 26. Open questions
 
 1. Should `EditorialContextPack` remain Capture-local and be passed by value, or
    receive a bounded immutable cache/read-model identity for long-running
@@ -670,13 +769,23 @@ decision and is not implied by this design.
    Capture path in the target deployment, or must Video remain a distinct
    external-reference intake until runtime/client exposure is verified?
 
-## 26. Explicitly rejected alternatives
+## 27. Explicitly rejected alternatives
 
 * **A new Editorial Intelligence database/store:** rejected; duplicates
   Knowledge/Graph and violates ownership.
 * **Graph traversal as truth:** rejected; reachability is discovery only.
+* **Graph path equals truth:** rejected; path context must still pass Claim
+  scope, provenance, Evidence and relevance eligibility.
 * **Copying Article/Video prose into Knowledge:** rejected; generated prose is
   not Evidence.
+* **Generic representative image satisfies all technical visual support:**
+  rejected; feature support requires exact scope/facet/feature/intent.
+* **OCR/caption becomes Knowledge automatically:** rejected; these remain
+  observations/candidates until the governed Knowledge/Evidence path.
+* **A separate Article, Video or Image knowledge-selection engine:** rejected;
+  all profiles consume the shared read-model selection seam.
+* **Persistent Context Pack as a semantic owner:** rejected; the pack is
+  transient/read-model context only.
 * **A Video-only enrichment engine:** rejected; it would diverge from shared
   semantics and reproduce the current thin-context problem.
 * **Unbounded full-corpus Claim search:** rejected; violates scope, budget and
@@ -685,6 +794,8 @@ decision and is not implied by this design.
   editorial read-model labels.
 * **Automatic silent re-enrichment:** rejected; Living Knowledge changes need
   preview, review and the existing owner workflow.
+* **Unconditional public regeneration after Claim revision:** rejected; owner
+  review, compliance, route/read-back and publication gates remain required.
 * **SEO as truth or fallback identity:** rejected by SEO/public identity law.
 * **One universal prose template:** rejected; journeys must vary by intent and
   profile while remaining grounded.
