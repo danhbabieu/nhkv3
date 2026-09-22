@@ -36,7 +36,20 @@ final class ArticlePublicationGateTest extends TestCase
         $result = (new ArticlePublicationGate())->check($draft, $this->evidence(), $draft->token);
         self::assertFalse($result->eligible);
         self::assertContains('EDITORIAL_POST_NOT_DRAFT', $result->blockers);
-        self::assertContains('CANONICAL_PUBLIC_IDENTITY_INVALID', $result->blockers);
+        self::assertContains('PUBLIC_ROUTE_NOT_READY', $result->blockers);
+        self::assertNotContains('CANONICAL_PUBLIC_IDENTITY_INVALID', $result->blockers);
+    }
+
+    public function test_native_article_route_does_not_require_semantic_public_identity(): void
+    {
+        $draft = new EditorialPostState(1, '1:1', 'post', 'draft', 'Title', 'Body', '', 'title', '/title/', 1, 1);
+        $evidence = $this->evidence();
+        unset($evidence['public_identity'], $evidence['authority_public_identity']);
+
+        $result = (new ArticlePublicationGate())->check($draft, $evidence, $draft->token);
+
+        self::assertTrue($result->eligible);
+        self::assertNotContains('CANONICAL_PUBLIC_IDENTITY_INVALID', $result->blockers);
     }
 
     public function test_soft_incomplete_media_links_optional_data_and_rendered_unavailability_do_not_block(): void

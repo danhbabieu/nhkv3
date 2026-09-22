@@ -1,3 +1,27 @@
+# Checkpoint — 2026-09-22 — P0 Task 5 native WordPress Article route/publication lifecycle (LOCAL / DEPLOYMENT PENDING)
+
+ROOT_CAUSE_CONFIRMED: Native Article publication readiness still used the
+semantic `CANONICAL_PUBLIC_IDENTITY_INVALID` diagnostic and the draft gateway
+did not repair a titled draft whose native slug/permalink read-back was empty.
+Publication transitions also trusted the writer return path without a final
+canonical native route read-back.
+
+FIXED_BOUNDARY: Native WordPress Article readiness now checks only the
+post-native route fields (`postId`, `slug`, `permalink`) and does not require an
+Authority PublicIdentity. Titled drafts with no native route allocate a
+deterministic WordPress slug through the existing EditorialPostStore writer,
+then require canonical read-back. Direct and Owner-governed publication both
+require publish status plus non-empty native slug/permalink read-back before
+reporting completion; route loss is a verification failure/blocker.
+
+VERIFICATION: Task 5 focused tests pass 28 tests / 120 assertions. Changed PHP
+files lint clean and `git diff --check` passes. No direct DB writer, forced
+status/thumbnail, semantic PublicIdentity mutation, duplicate Article/Media or
+live/staging mutation was used. Deployment remains pending until generic E2E
+and full suite pass.
+
+STATUS: `P0_TASK5_NATIVE_ROUTE_PUBLICATION_LOCAL_READY / DEPLOYMENT_PENDING / SEMANTIC_MUTATION_NONE`.
+
 # NHK V3 Execution State
 
 # Checkpoint — 2026-09-22 — Authority exact-UUID rename planning (LOCAL / LIVE MCP BLOCKED)

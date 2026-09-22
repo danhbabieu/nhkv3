@@ -29,11 +29,30 @@ final class EditorialDraftGateway
         if ($captureOwned) CaptureEditorialWriteGuard::enter();
         try {
             $state = $this->posts->createDraft(['post_title' => (string) ($input['title'] ?? ''), 'post_content' => (string) ($input['content'] ?? ''), 'post_excerpt' => (string) ($input['excerpt'] ?? ''), 'post_author' => (int) ($input['author'] ?? 0)]);
+            $state = $this->ensureNativeRoute($state);
         } finally {
             if ($captureOwned) CaptureEditorialWriteGuard::leave();
         }
         $receipt = $this->receipts->create(new ArticleOperationReceipt((string) ($input['operation_id'] ?? UuidCodec::newV7()), $key, $fingerprint, 'create', $state->endpointKey, $state->postId, 'draft', ArticleIngestOutcome::GOVERNANCE_PENDING, false, [], [], [], 1, null, null, $state->token, [], [], [], ['publication_blockers' => ['DRAFT_INCOMPLETE_FOR_PUBLICATION'], 'research' => $research]));
         return $this->result($receipt, $state);
+    }
+
+    private function ensureNativeRoute(EditorialPostState $state): EditorialPostState
+    {
+        if ($state->slug !== '' || $state->permalink !== '' || $state->title === '') return $state;
+        $slug = function_exists('sanitize_title') ? (string) sanitize_title($state->title) : $this->fallbackSlug($state->title);
+        if ($slug === '') $slug = 'article-' . $state->postId;
+        $this->posts->update($state->postId, ['post_name' => $slug]);
+        $readBack = $this->posts->read($state->postId);
+        if ($readBack === null || $readBack->slug === '' || $readBack->permalink === '') throw new \RuntimeException('EDITORIAL_NATIVE_ROUTE_READBACK_FAILED');
+        return $readBack;
+    }
+
+    private function fallbackSlug(string $title): string
+    {
+        $value = function_exists('iconv') ? (string) iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $title) : $title;
+        $value = strtolower(trim((string) preg_replace('/[^a-z0-9]+/i', '-', $value), '-'));
+        return $value;
     }
 
     /** @param array<string,mixed> $fields */
@@ -166,6 +185,14 @@ final class EditorialDraftGateway
             $state = $readBack;
         } else {
             if ($current->status === 'trash') $state = $this->posts->restore($postId); else $state = $current;
+        }
+        if ($intent === 'publish') {
+            $readBack = $this->posts->read($postId);
+            if ($readBack === null || $readBack->status !== 'publish' || $readBack->slug === '' || $readBack->permalink === '') {
+                $receipt = $this->receipts->create(new ArticleOperationReceipt(UuidCodec::newV7(), $idempotencyKey, $fingerprint, $intent, $current->endpointKey, $current->postId, 'editorial', ArticleIngestOutcome::VERIFICATION_FAILED, true, [], [], ['code' => 'EDITORIAL_PUBLIC_ROUTE_READBACK_FAILED'], 1, null, null, $readBack?->token ?? $current->token, [], [], [], ['expected_status' => 'publish', 'observed_status' => $readBack?->status ?? 'unavailable', 'slug_present' => $readBack?->slug !== '', 'permalink_present' => $readBack?->permalink !== '']));
+                return ['ok' => false, 'reason' => 'EDITORIAL_PUBLIC_ROUTE_READBACK_FAILED', 'post' => $readBack?->snapshot(), 'state_token' => $readBack?->token ?? $current->token, 'receipt' => $receipt->toArray()];
+            }
+            $state = $readBack;
         }
         $receipt = $this->receipts->create(new ArticleOperationReceipt(UuidCodec::newV7(), $idempotencyKey, $fingerprint, $intent, $state->endpointKey, $state->postId, 'editorial', ArticleIngestOutcome::COMPLETED, false, [], [], [], 1, null, null, $state->token, [], [], [], ['status' => $state->status], $this->withoutBody($evidence)));
         return ['ok' => true, 'post' => $state->snapshot(), 'state_token' => $state->token, 'receipt' => $receipt->toArray(), 'publication_warnings' => $publicationWarnings];

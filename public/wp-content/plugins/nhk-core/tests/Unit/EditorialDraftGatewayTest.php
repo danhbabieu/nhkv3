@@ -22,6 +22,23 @@ final class EditorialDraftGatewayTest extends TestCase
         self::assertSame(1, $posts->creates); self::assertSame($first['post_id'], $second['post_id']); self::assertSame('draft', $first['post']['status']); self::assertArrayNotHasKey('content', $first['receipt']); self::assertStringNotContainsString('Nội dung bí mật', json_encode($first['receipt'], JSON_UNESCAPED_UNICODE)); self::assertContains('DRAFT_INCOMPLETE_FOR_PUBLICATION', $first['publication_blockers']);
     }
 
+    public function test_create_allocates_native_slug_and_reads_back_permalink_for_titled_draft(): void
+    {
+        $posts = new RouteAllocatingEditorialStore();
+        $gateway = new EditorialDraftGateway($posts, new FakeReceiptRepo());
+
+        $result = $gateway->create([
+            'idempotency_key' => 'native-route-1',
+            'title' => 'Native Article',
+            'content' => 'Draft body',
+        ]);
+
+        self::assertTrue($result['ok']);
+        self::assertSame('native-article', $result['post']['slug']);
+        self::assertSame('/native-article/', $result['post']['permalink']);
+        self::assertSame(['post_name' => 'native-article'], $posts->updates);
+    }
+
     public function test_stale_state_blocks_update_and_blocked_research_blocks_create(): void
     {
         $posts = new FakeEditorialStore(); $gateway = new EditorialDraftGateway($posts, new FakeReceiptRepo()); $created = $gateway->create(['idempotency_key' => 'draft-2', 'title' => 'A', 'content' => 'B']);
@@ -55,6 +72,25 @@ final class EditorialDraftGatewayTest extends TestCase
         self::assertSame('VERIFICATION_FAILED', $result['receipt']['outcome']);
         self::assertSame('trash', $result['receipt']['diagnostics']['expected_status']);
         self::assertSame('draft', $result['receipt']['diagnostics']['observed_status']);
+    }
+
+    public function test_publish_never_reports_completed_when_native_permalink_readback_is_missing(): void
+    {
+        $posts = new RouteDroppingPublishStore();
+        $gateway = new EditorialDraftGateway($posts, new FakeReceiptRepo());
+        $created = $gateway->create(['idempotency_key' => 'publish-route-readback', 'title' => 'Publishable', 'content' => 'Body']);
+        $evidence = array_fill_keys([
+            'research_acceptable', 'subject_resolved', 'duplicate_intent_handled', 'category_resolved',
+            'semantic_plan_complete', 'semantic_readback_verified', 'media_usage_complete',
+            'real_image_requirements_met', 'claim_compliance_acceptable', 'seo_projection_valid',
+            'internal_links_valid', 'structured_data_valid', 'public_route_ready', 'rendered_public_verification',
+        ], true);
+
+        $result = $gateway->publish(1, (string) $created['state_token'], $evidence, 'publish-route-readback-op');
+
+        self::assertFalse($result['ok']);
+        self::assertSame('EDITORIAL_PUBLIC_ROUTE_READBACK_FAILED', $result['reason']);
+        self::assertSame('VERIFICATION_FAILED', $result['receipt']['outcome']);
     }
 
     public function test_state_token_match_is_exact_and_uses_the_current_snapshot_as_the_comparison_side(): void
@@ -240,4 +276,42 @@ final class FakeReceiptRepo implements ArticleOperationReceiptRepository
     public function findByIdempotencyKey(string $key): ?ArticleOperationReceipt { return $this->rows[$key] ?? null; }
     public function create(ArticleOperationReceipt $receipt): ArticleOperationReceipt { return $this->rows[$receipt->idempotencyKey] ??= $receipt; }
     public function save(ArticleOperationReceipt $receipt): ArticleOperationReceipt { return $this->rows[$receipt->idempotencyKey] = $receipt; }
+}
+
+final class RouteAllocatingEditorialStore implements EditorialPostStore
+{
+    public array $updates = [];
+    private ?EditorialPostState $row = null;
+
+    public function read(int $postId): ?EditorialPostState { return $this->row; }
+    public function createDraft(array $fields): EditorialPostState
+    {
+        return $this->row = new EditorialPostState(1, '1:1', 'post', 'draft', (string) ($fields['post_title'] ?? ''), (string) ($fields['post_content'] ?? ''), '', '', '', 0, 0);
+    }
+    public function update(int $postId, array $fields): EditorialPostState
+    {
+        $this->updates = $fields;
+        $slug = (string) ($fields['post_name'] ?? '');
+        return $this->row = new EditorialPostState(1, '1:1', 'post', 'draft', $this->row->title, $this->row->content, '', $slug, '/' . $slug . '/', 1, 1);
+    }
+    public function publish(int $postId): EditorialPostState { return $this->row; }
+    public function trash(int $postId): EditorialPostState { return $this->row; }
+    public function restore(int $postId): EditorialPostState { return $this->row; }
+}
+
+final class RouteDroppingPublishStore implements EditorialPostStore
+{
+    private ?EditorialPostState $row = null;
+    public function read(int $postId): ?EditorialPostState { return $this->row; }
+    public function createDraft(array $fields): EditorialPostState
+    {
+        return $this->row = new EditorialPostState(1, '1:1', 'post', 'draft', (string) ($fields['post_title'] ?? ''), (string) ($fields['post_content'] ?? ''), '', 'publishable', '/publishable/', 0, 0);
+    }
+    public function update(int $postId, array $fields): EditorialPostState { return $this->row; }
+    public function publish(int $postId): EditorialPostState
+    {
+        return $this->row = new EditorialPostState(1, '1:1', 'post', 'publish', $this->row->title, $this->row->content, '', '', '', 1, 1);
+    }
+    public function trash(int $postId): EditorialPostState { return $this->row; }
+    public function restore(int $postId): EditorialPostState { return $this->row; }
 }

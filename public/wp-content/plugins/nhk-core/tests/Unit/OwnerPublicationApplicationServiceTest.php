@@ -62,6 +62,17 @@ final class OwnerPublicationApplicationServiceTest extends TestCase
         self::assertSame('COMPLETED', $replay['publication_receipt']['outcome']);
     }
 
+    public function test_owner_publication_does_not_complete_when_native_route_readback_is_missing(): void
+    {
+        $posts = new OwnerPublicationRouteDroppingStore();
+        $service = new OwnerPublicationApplicationService($posts, new OwnerPublicationFakeDecisionRepository(), static fn (PublicationPrincipal $principal): bool => true);
+
+        $result = $service->request(1, $posts->rows[1]->token, ownerPublicationEvidence(), 'route-readback-owner', new PublicationPrincipal('owner-1', 'mcp', 'turn-route'));
+
+        self::assertSame('SYSTEM_BLOCKED', $result['outcome']);
+        self::assertContains('PUBLIC_ROUTE_READBACK_FAILED', $result['diagnostics']);
+    }
+
     public function test_already_published_is_terminal_and_does_not_republish(): void
     {
         $posts = new OwnerPublicationFakeStore();
@@ -84,7 +95,7 @@ function ownerPublicationEvidence(array $overrides = []): array
     return array_replace($evidence, $overrides);
 }
 
-final class OwnerPublicationFakeStore implements EditorialPostStore
+class OwnerPublicationFakeStore implements EditorialPostStore
 {
     /** @var array<int,EditorialPostState> */ public array $rows;
     public int $publishCalls = 0;
@@ -95,6 +106,15 @@ final class OwnerPublicationFakeStore implements EditorialPostStore
     public function publish(int $postId): EditorialPostState { $this->publishCalls++; $old = $this->rows[$postId]; return $this->rows[$postId] = new EditorialPostState($old->postId, $old->endpointKey, $old->postType, 'publish', $old->title, $old->content, $old->excerpt, $old->slug, $old->permalink, $old->latestRevisionId + 1, $old->revisionCount + 1); }
     public function trash(int $postId): EditorialPostState { return $this->rows[$postId]; }
     public function restore(int $postId): EditorialPostState { return $this->rows[$postId]; }
+}
+
+final class OwnerPublicationRouteDroppingStore extends OwnerPublicationFakeStore
+{
+    public function publish(int $postId): EditorialPostState
+    {
+        $old = $this->rows[$postId];
+        return $this->rows[$postId] = new EditorialPostState($old->postId, $old->endpointKey, $old->postType, 'publish', $old->title, $old->content, $old->excerpt, '', '', $old->latestRevisionId + 1, $old->revisionCount + 1);
+    }
 }
 
 final class OwnerPublicationFakeDecisionRepository implements OwnerPublicationDecisionRepository

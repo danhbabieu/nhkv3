@@ -91,6 +91,7 @@ final class OwnerPublicationApplicationService implements OwnerPublicationServic
             $readback = $this->posts->read($state->postId);
         }
         if ($readback === null || $readback->status !== 'publish') return $this->blocked('PUBLICATION_RESULT_UNCERTAIN');
+        if ($readback->slug === '' || $readback->permalink === '') return $this->blocked('PUBLIC_ROUTE_READBACK_FAILED');
         $published = $result + ['post' => $readback->snapshot(), 'state_token' => $readback->token, 'public_url' => $readback->permalink];
         if ($this->receipts === null) return $published;
         try {

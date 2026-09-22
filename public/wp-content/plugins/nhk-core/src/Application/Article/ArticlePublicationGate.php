@@ -23,7 +23,10 @@ final class ArticlePublicationGate
         if (!in_array($intent, ['TEXT_ARTICLE', 'IMAGE_ARTICLE'], true)) $intent = 'TEXT_ARTICLE';
         if ($draft->status !== 'draft') $blockers[] = 'EDITORIAL_POST_NOT_DRAFT';
         if ($expectedStateToken === '' || !hash_equals($expectedStateToken, $draft->token)) $blockers[] = 'EDITORIAL_CAS_REQUIRED';
-        if ($draft->postId < 1 || $draft->endpointKey === '' || $draft->slug === '' || $draft->permalink === '') $blockers[] = 'CANONICAL_PUBLIC_IDENTITY_INVALID';
+        // Native WordPress Articles use the post's own slug/permalink lifecycle.
+        // Semantic Authority PublicIdentity is a separate boundary and must not
+        // be required to publish an editorial wp_post.
+        if ($draft->postId < 1 || $draft->slug === '' || $draft->permalink === '') $blockers[] = 'PUBLIC_ROUTE_NOT_READY';
         $this->requireTrue($evidence, 'research_acceptable', 'RESEARCH_PREFLIGHT_BLOCKED', $blockers);
         $this->requireTrue($evidence, 'subject_resolved', 'SUBJECT_UNRESOLVED', $blockers);
         if (($evidence['subject_persistence_status'] ?? '') === 'unattached_planning_candidate') {
