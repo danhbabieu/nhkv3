@@ -28,7 +28,8 @@ final class ClaimRetrievalEngine
             }
             $rows = ($this->claims)($subject, $neighborhood);
             if (!is_array($rows)) { $blockers[] = 'CLAIM_RETRIEVAL_UNAVAILABLE'; continue; }
-            foreach ($rows as $row) {
+            $rowLimit = min($this->limit, max(1, (int) ($context['result_limit'] ?? $this->limit)), 200);
+            foreach (array_slice($rows, 0, $rowLimit) as $row) {
                 if (!is_array($row)) continue;
                 $candidate = $this->candidate($row, $subject, $neighborhood, $intent);
                 $key = $candidate['claim_id'] . ':' . $candidate['claim_revision'];
@@ -40,7 +41,7 @@ final class ClaimRetrievalEngine
             $score = $right['score'] <=> $left['score'];
             return $score !== 0 ? $score : strcmp($left['claim_id'], $right['claim_id']);
         });
-        $items = array_slice($items, 0, min($this->limit, 200));
+        $items = array_slice($items, 0, min($this->limit, max(1, (int) ($context['result_limit'] ?? $this->limit)), 200));
         $selected = array_values(array_filter($items, static fn (array $item): bool => $item['decision'] === 'include'));
         return ['status' => $blockers === [] ? 'available' : 'partial', 'items' => $items, 'selected_claims' => $selected, 'blockers' => array_values(array_unique($blockers))];
     }
@@ -59,24 +60,30 @@ final class ClaimRetrievalEngine
         $provenance = (string) ($row['provenance'] ?? '');
         $evidence = (string) ($row['evidence_status'] ?? 'NO_EVIDENCE');
         $text = (string) ($row['text'] ?? $row['claim_text'] ?? '');
-        $score = (float) ($row['relevance'] ?? 0.0);
-        $score += $claimSubject !== '' && $claimSubject === $subjectId ? 5.0 : 0.0;
-        $score += $hop === 0 ? 3.0 : max(0.0, 2.0 - $hop);
-        $score += $evidence === 'SUPPORTED_WITHIN_SCOPE' ? 3.0 : ($evidence === 'INSUFFICIENT_EVIDENCE' ? -1.0 : -2.0);
-        $score += $intent !== '' ? $this->overlap($intent, strtolower($text)) : 0.0;
+        $topicOverlap = $intent !== '' ? $this->overlap($intent, strtolower($text)) : 0.0;
+        $score = 0.0;
         $decision = 'include';
         $reason = 'subject, scope, provenance, evidence and registered applicability path passed the bounded retrieval policy';
         $warnings = [];
         if ($id === '' || $text === '') { $decision = 'exclude'; $reason = 'claim identity or text is missing'; }
         elseif (!$this->applicableToSubject($claimSubject, $claimSubjectType, $subject, $path)) { $decision = 'exclude'; $reason = 'Claim has no explainable subject-scoped applicability path'; $warnings[] = 'SEMANTIC_SCOPE_NOT_APPLICABLE'; }
         elseif ($scope === 'specimen-only' && ($subject['type'] ?? '') !== 'specimen') { $decision = 'exclude'; $reason = 'specimen-scoped Claim cannot generalize to this subject'; $warnings[] = 'SPECIMEN_SCOPE_LIMIT'; }
+        elseif ($intent !== '' && $topicOverlap <= 0.0) { $decision = 'exclude'; $reason = 'Claim is not relevant to the editorial topic'; $warnings[] = 'TOPIC_IRRELEVANT'; }
         elseif ($evidence !== 'SUPPORTED_WITHIN_SCOPE') { $decision = 'review'; $reason = 'evidence is absent or insufficient for direct prose'; $warnings[] = 'EVIDENCE_SCOPE_REVIEW'; }
         elseif ($provenance === '') { $decision = 'review'; $reason = 'provenance is unavailable'; $warnings[] = 'PROVENANCE_UNAVAILABLE'; }
+        if ($decision === 'include') {
+            $score = (float) ($row['relevance'] ?? 0.0);
+            $score += $claimSubject !== '' && $claimSubject === $subjectId ? 5.0 : 0.0;
+            $score += $hop === 0 ? 3.0 : max(0.0, 2.0 - $hop);
+            $score += $evidence === 'SUPPORTED_WITHIN_SCOPE' ? 3.0 : -2.0;
+            $score += $topicOverlap;
+        }
         return [
             'claim_id' => $id, 'claim_revision' => $revision, 'text' => $text, 'subject_id' => $claimSubject, 'subject_type' => $claimSubjectType,
             'scope' => $scope, 'provenance' => $provenance, 'evidence_status' => $evidence,
             'relation_path' => $path, 'hop_count' => $hop, 'score' => round($score, 6),
             'decision' => $decision, 'reason' => $reason, 'warnings' => $warnings,
+            'source_ids' => array_values((array) ($row['source_ids'] ?? [])), 'evidence_ids' => array_values((array) ($row['evidence_ids'] ?? [])),
         ];
     }
 

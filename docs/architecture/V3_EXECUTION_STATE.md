@@ -16788,3 +16788,29 @@ review pass. No migration, database, staging, controlled Apply, live Capture,
 deployment or push was performed.
 
 STATUS=`R3_GENERIC_ONEOF_VALIDATOR_PARITY_FIXED_LOCALLY / FULL_UNIT_PASS / NO_LIVE_MUTATION`.
+
+# Checkpoint — 2026-09-22 — Shared editorial Claim retrieval and eligibility seam (LOCAL / NO LIVE MUTATION)
+
+SCOPE: Shared Knowledge retrieval and Claim eligibility only. No editorial
+prose, SEO, Context Pack, selection engine, schema, migration, Evidence write,
+Graph write or public projection was added.
+
+FIXED_BOUNDARY: Added the transient `EditorialClaimRetrievalService` façade
+over the existing bounded `ClaimRetrievalEngine`. It accepts one resolved
+canonical subject, topic/intent, bounded hints and profile context, and returns
+bounded candidate Claims with canonical ID/revision, original and primary
+subjects, direct-vs-neighborhood origin, explainable Graph path, source/evidence
+references, scope compatibility, evidence state, deterministic eligibility and
+exclusion reasons. Existing retrieval now enforces topic relevance before
+ranking, preserves direct Claims without a Graph hop, and honors the requested
+result limit before candidate processing.
+
+REGRESSION: Focused retrieval/scope/neighborhood suite passes 8 tests / 29
+assertions. Full NHK Unit passes 2,136 tests / 12,924 assertions with existing
+warnings/deprecations. The unfiltered default suite remains environment
+blocked: 34 WordPress/MySQL bootstrap errors and 14 acceptance failures require
+the documented `NHK_WP_TEST_PATH=public` runtime. PHP lint and `git diff
+--check` pass for this checkpoint. No schema/migration, staging, production,
+V2, Capture, SQL, deployment, push, or semantic data mutation was performed.
+
+STATUS=`SHARED_EDITORIAL_CLAIM_RETRIEVAL_ELIGIBILITY_FIXED_LOCALLY / FULL_UNIT_PASS / NO_LIVE_MUTATION`.
