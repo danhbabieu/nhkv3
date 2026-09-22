@@ -32,6 +32,7 @@ final class PublicUrlReprojectionPlanner
         });
 
         $reserved = [];
+        $reservedOwners = [];
         $items = [];
         $blocked = 0;
         $changes = 0;
@@ -60,8 +61,15 @@ final class PublicUrlReprojectionPlanner
             try {
                 $routePrefix = trim((string) ($item['route_prefix'] ?? ''));
                 $stripLexicalPrefix = (string) ($item['strip_lexical_prefix'] ?? '');
-                $isTaken = function(string $candidate) use (&$reserved, $keyPrefix, $item, $externallyOccupied): bool {
-                    return isset($reserved[$keyPrefix . $candidate]) || $externallyOccupied($item, $candidate);
+                $isTaken = function(string $candidate) use (&$reserved, &$reservedOwners, $keyPrefix, $item, $externallyOccupied): bool {
+                    if (isset($reserved[$keyPrefix . $candidate])) {
+                        return true;
+                    }
+                    $occupied = $externallyOccupied($item, $candidate);
+                    if (is_array($occupied)) {
+                        return ($occupied['occupied'] ?? true) === true;
+                    }
+                    return (bool) $occupied;
                 };
                 $desired = $routePrefix !== '' || $stripLexicalPrefix !== ''
                     ? $this->slugs->resolveForRoute($name, $qualifiers, $isTaken, $routePrefix, $stripLexicalPrefix)
@@ -70,13 +78,34 @@ final class PublicUrlReprojectionPlanner
                 $planned['blocker'] = $error->getMessage() === 'PUBLIC_SLUG_COLLISION_REQUIRES_RECONCILIATION'
                     ? 'COLLISION_REQUIRES_RECONCILIATION'
                     : 'PUBLIC_URL_PLANNING_FAILED';
+                if ($planned['blocker'] === 'COLLISION_REQUIRES_RECONCILIATION') {
+                    $planned['collision_owner_ids'] = $reservedOwners[$keyPrefix . $current] ?? [];
+                }
                 $blocked++;
                 $items[] = $planned;
                 continue;
             }
 
             $reserved[$keyPrefix . $desired] = true;
+            $reservedOwners[$keyPrefix . $desired] = [(string) ($item['owner_id'] ?? '')];
             $planned['desired_slug'] = $desired;
+            if (($item['current_is_public'] ?? false) === true && $current !== '' && $current !== $desired) {
+                if (($item['public_url_change_required'] ?? true) === false) {
+                    $planned['desired_slug'] = $current;
+                    $planned['action'] = 'KEEP';
+                    $planned['change_safety'] = ['status' => 'NOT_REQUIRED'];
+                    $kept++;
+                    $items[] = $planned;
+                    continue;
+                }
+                if (($item['redirect_required'] ?? false) !== true || ($item['redirect_atomic'] ?? false) !== true) {
+                    $planned['blocker'] = 'PUBLIC_URL_CHANGE_SAFETY_UNVERIFIED';
+                    $blocked++;
+                    $items[] = $planned;
+                    continue;
+                }
+                $planned['change_safety'] = ['status' => 'VERIFIED', 'redirect_required' => true, 'redirect_atomic' => true];
+            }
             if ($current === $desired && $currentScope === $scope) {
                 $planned['action'] = 'KEEP';
                 $kept++;

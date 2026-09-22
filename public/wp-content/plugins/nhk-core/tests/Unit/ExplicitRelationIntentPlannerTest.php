@@ -260,6 +260,28 @@ final class ExplicitRelationIntentPlannerTest extends TestCase
         self::assertNotSame($first['relation_candidates'][0]['candidate_id'], $third['relation_candidates'][0]['candidate_id']);
     }
 
+    public function test_classified_as_planning_reports_apply_policy_blocker_for_unsupported_provenance(): void
+    {
+        $source = UuidCodec::newV7();
+        $target = UuidCodec::newV7();
+        $planner = $this->planner([
+            'variant' => [$source => ['active' => true, 'revision' => 2]],
+            'classification' => [$target => ['active' => true, 'revision' => 3]],
+        ]);
+
+        $result = $planner->plan([[
+            'source_type' => 'variant',
+            'source_uuid' => $source,
+            'predicate' => 'classified_as',
+            'target_type' => 'classification',
+            'target_uuid' => $target,
+            'provenance' => 'EXPLICIT_USER_RELATION',
+        ]]);
+
+        self::assertSame([], $result['relation_candidates']);
+        self::assertContains('CLASSIFICATION_SCOPE_UNSUPPORTED', array_column($result['blockers'], 'code'));
+    }
+
     public function test_relation_candidate_fingerprint_changes_when_predicate_or_endpoint_identity_changes(): void
     {
         $otherClassification = UuidCodec::newV7();

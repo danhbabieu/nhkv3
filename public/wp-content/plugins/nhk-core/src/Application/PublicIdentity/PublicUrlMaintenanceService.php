@@ -65,7 +65,7 @@ final class PublicUrlMaintenanceService
     }
 
     /** @return array<string,mixed> */
-    public function reproject(string $idempotencyKey, bool $prePublicConfirmed, ?string $ownerId = null): array
+    public function reproject(string $idempotencyKey, bool $prePublicConfirmed, ?string $ownerId = null, int $batchSize = 25): array
     {
         if (!$prePublicConfirmed) return ['status'=>'BLOCKED','reason_code'=>'PRE_PUBLIC_CONFIRMATION_REQUIRED','mutation_count'=>0];
         if (trim($idempotencyKey) === '') return ['status'=>'BLOCKED','reason_code'=>'IDEMPOTENCY_KEY_REQUIRED','mutation_count'=>0];
@@ -76,20 +76,26 @@ final class PublicUrlMaintenanceService
         if (($plan['status'] ?? '') !== 'READY') return [...$plan, 'mutation_count'=>0];
 
         $mutationCount = 0;
+        $outcomes = [];
+        $batchSize = max(1, min(100, $batchSize));
+        $attempted = 0;
         foreach ((array)($plan['items'] ?? []) as $index => $item) {
             if (!in_array((string)($item['action'] ?? ''), ['ALLOCATE','CHANGE'], true)) continue;
+            if ($attempted >= $batchSize) break;
+            $attempted++;
+            $owner = (string) ($item['owner_id'] ?? $index);
             try {
-                ($this->apply)($item, $idempotencyKey . ':' . $index);
+                ($this->apply)($item, $idempotencyKey . ':' . $owner);
                 $mutationCount++;
+                $outcomes[] = ['owner_id' => $owner, 'status' => 'APPLIED'];
             } catch (\Throwable $error) {
-                return [
-                    'status'=>'FAILED',
-                    'reason_code'=>'PUBLIC_URL_REPROJECTION_WRITE_FAILED',
-                    'failed_index'=>$index,
-                    'mutation_count'=>$mutationCount,
-                    'plan'=>$plan,
-                ];
+                $outcomes[] = ['owner_id' => $owner, 'status' => $this->isRetryable($error) ? 'RETRYABLE' : 'FAILED', 'reason_code' => $this->scopedWriteFailureCode($error)];
             }
+        }
+
+        $remaining = count(array_filter((array) ($plan['items'] ?? []), static fn (mixed $item): bool => is_array($item) && in_array((string) ($item['action'] ?? ''), ['ALLOCATE', 'CHANGE'], true))) > $attempted;
+        if (array_filter($outcomes, static fn (array $outcome): bool => in_array($outcome['status'], ['FAILED', 'RETRYABLE'], true)) !== [] || $remaining) {
+            return ['status' => $remaining ? 'PARTIAL' : 'FAILED', 'reason_code' => $remaining ? 'PUBLIC_URL_BATCH_CHECKPOINT_REQUIRED' : 'PUBLIC_URL_REPROJECTION_WRITE_FAILED', 'mutation_count' => $mutationCount, 'outcomes' => $outcomes, 'next_cursor' => $attempted, 'plan' => $plan];
         }
 
         $readback = $this->audit();
@@ -97,7 +103,7 @@ final class PublicUrlMaintenanceService
             return ['status'=>'FAILED','reason_code'=>'PUBLIC_URL_REPROJECTION_READBACK_FAILED','mutation_count'=>$mutationCount,'plan'=>$plan,'readback'=>$readback];
         }
 
-        return ['status'=>'APPLIED','mutation_count'=>$mutationCount,'plan'=>$plan,'readback'=>$readback];
+        return ['status'=>'APPLIED','mutation_count'=>$mutationCount,'outcomes' => $outcomes, 'plan'=>$plan,'readback'=>$readback];
     }
 
     /** @return array<string,mixed> */
@@ -194,5 +200,10 @@ final class PublicUrlMaintenanceService
             'IDEMPOTENCY_KEY_CONFLICT', 'IDEMPOTENCY_CONFLICT' => 'IDEMPOTENCY_CONFLICT',
             default => 'PUBLIC_URL_REPROJECTION_WRITE_FAILED',
         };
+    }
+
+    private function isRetryable(\Throwable $error): bool
+    {
+        return in_array($this->scopedWriteFailureCode($error), ['PUBLIC_URL_REPROJECTION_WRITE_FAILED', 'PUBLIC_URL_REVISION_CAS_MISMATCH'], true);
     }
 }

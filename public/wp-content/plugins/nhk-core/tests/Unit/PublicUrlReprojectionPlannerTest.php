@@ -58,4 +58,23 @@ final class PublicUrlReprojectionPlannerTest extends TestCase
         $planner = new PublicUrlReprojectionPlanner();
         self::assertSame($planner->plan($items, static fn(array $item, string $slug): bool => false), $planner->plan($items, static fn(array $item, string $slug): bool => false));
     }
+
+    public function test_existing_public_identity_requires_explicit_change_safety_evidence(): void
+    {
+        $plan = (new PublicUrlReprojectionPlanner())->plan([[
+            'kind' => 'video',
+            'owner_id' => 'v1',
+            'route_type' => 'video',
+            'scope' => 'root',
+            'name' => 'Video mới',
+            'current_slug' => 'video-cu',
+            'current_is_public' => true,
+            'redirect_required' => true,
+            'redirect_atomic' => false,
+            'qualifiers' => [],
+        ]], static fn(array $item, string $slug): bool => false);
+
+        self::assertSame('BLOCKED', $plan['status']);
+        self::assertSame('PUBLIC_URL_CHANGE_SAFETY_UNVERIFIED', $plan['items'][0]['blocker']);
+    }
 }

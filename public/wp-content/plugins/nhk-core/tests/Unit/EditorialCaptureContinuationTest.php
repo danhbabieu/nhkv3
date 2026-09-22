@@ -321,6 +321,7 @@ final class EditorialCaptureContinuationTest extends TestCase
         self::assertSame('COMPLETE', $result['retry']['status']);
         self::assertFalse($result['retry']['eligible']);
         self::assertSame('CAPTURE_RETRY_NOT_ALLOWED', $result['retry']['reason']);
+        self::assertArrayNotHasKey('semantic', $events);
 
         $read = new McpReadHandler(
             $this->createMock(AuthorityRepository::class), new EntityTypeRegistry(),

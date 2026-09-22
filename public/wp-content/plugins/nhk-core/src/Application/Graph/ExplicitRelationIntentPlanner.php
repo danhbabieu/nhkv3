@@ -19,6 +19,7 @@ final class ExplicitRelationIntentPlanner
         private PredicateRegistry $predicates,
         private $endpointState,
         private $relationState,
+        private ?ClassifiedAsPolicy $classifiedAs = null,
     ) {}
 
     /** @param list<array<string,mixed>> $relationIntents @return array<string,mixed> */
@@ -114,6 +115,20 @@ final class ExplicitRelationIntentPlanner
             'source_revision' => $references['source']['revision'],
             'target_revision' => $references['target']['revision'],
         ];
+        if ($intent['predicate'] === 'classified_as') {
+            try {
+                ($this->classifiedAs ?? new ClassifiedAsPolicy())->assertCandidate([
+                    'source_type' => $packet['source_type'],
+                    'scope' => $packet['source_type'],
+                    'provenance' => $packet['provenance'],
+                    'target_type' => $packet['target_type'],
+                    'target_family' => $packet['target_family'] ?? '',
+                ]);
+            } catch (\Throwable $error) {
+                $result['blockers'][] = ['code' => $error->getMessage(), 'predicate' => 'classified_as', 'source_uuid' => $packet['source_uuid'], 'target_uuid' => $packet['target_uuid']];
+                return;
+            }
+        }
         $existing = is_callable($this->relationState) ? ($this->relationState)($packet) : null;
         if (is_array($existing) && strtoupper((string) ($existing['status'] ?? '')) === 'CARDINALITY_CONFLICT') {
             $result['blockers'][] = ['code' => 'RELATION_CARDINALITY_CONFLICT'] + $packet + $existing;
@@ -153,7 +168,7 @@ final class ExplicitRelationIntentPlanner
             'target_revision' => $packet['target_revision'],
             'provenance' => $packet['provenance'],
             'reason' => $packet['reason'],
-            'scope' => 'capture',
+            'scope' => $packet['predicate'] === 'classified_as' ? $packet['source_type'] : 'capture',
             'dependencies' => [],
             'review_diagnostics' => [],
         ];

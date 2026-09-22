@@ -16366,6 +16366,44 @@ STATUS=`VIDEO_CAPTURE_INTERNAL_DEPENDENCY_READBACK_FIXED_LOCALLY / FULL_UNIT_PAS
 
 NEXT_EXACT_ACTION: `USER_PUSH_PULL_BUILD; THEN RETRY EXISTING CAPTURE ON @v39 AND VERIFY COMPLETE`.
 
+# Checkpoint — 2026-09-22 — @v39 Capture convergence parity repaired locally (NO LIVE MUTATION)
+
+ROOT_CAUSE_CONFIRMED: `capture_ingest` retry admission evaluated the persisted
+Capture outcome before entering the bounded Video completion refresh, while
+`capture_get` projected that same stale persisted snapshot. A stale terminal-
+looking completion could therefore return `CAPTURE_RETRY_NOT_ALLOWED` without
+persisting the refreshed current outcome, leaving the read model stale.
+
+REPAIRED_BOUNDARY: `EditorialCaptureContinuationService::retry()` now routes an
+existing governed Video with an empty or `video`-only resume selection through
+the existing completion-only `retryVideoCompletion()` boundary before terminal
+retry rejection. That boundary refreshes internal Source/Claim/Evidence state
+through `CanonicalDependencyValidator`, recomputes completion, persists the
+Capture, and returns the converged Capture. `capture_get` remains a bounded
+persistence read model; after Option A convergence it reads the same persisted
+current outcome. No semantic re-entry, second staging scope, Controlled Apply,
+Video mutation or Graph mutation is performed.
+
+PARITY: Stale persisted/current complete retry test proves returned Capture is
+`COMPLETE` with no blockers, retry code/reason
+`CAPTURE_RETRY_NOT_ALLOWED`, and subsequent `capture_get` returns
+`capture_status=COMPLETE`, empty blockers and `retry.eligible=false`. Negative
+missing/revision-drift dependency coverage remains fail-closed and retry/read
+outcomes remain aligned. Exact replay, same-owner convergence, publication and
+Graph regressions remain green.
+
+VERIFICATION: Focused Capture continuation/read/completion/Video persistence
+suite passes 57 tests / 271 assertions. Full `NHK Unit` passes 2,094 tests /
+12,366 assertions with 17 warnings, 36 deprecations and 27 PHPUnit
+deprecations only. Changed PHP lint and `git diff --check` pass. Secret/
+credential and prohibited live-ID scans pass with no matches. No schema or
+migration change is present or required. No live retry, Capture, SQL, deploy,
+push, pull, visibility mutation or semantic data mutation was performed.
+
+STATUS=`CAPTURE_CURRENT_OUTCOME_PARITY_FIXED_LOCALLY / FULL_UNIT_PASS / NO_LIVE_MUTATION`.
+
+NEXT_EXACT_ACTION: `USER_PUSH_PULL_BUILD; THEN READ CAPTURE ON @v39; IF NEEDED RUN ONE BOUNDED RETRY; VERIFY COMPLETE`.
+
 # Checkpoint — 2026-09-22 — Capture dry-run intent routing (LOCAL / NO LIVE MUTATION)
 
 ROOT_CAUSE_CONFIRMED: `McpTransport::captureIngest()` applied the Knowledge

@@ -18,6 +18,14 @@ final class PublicIdentityReadinessAudit
         if ($slug === '') { $status = 'INVALID_SLUG'; $reasons[] = 'EMPTY_SLUG'; }
         if (($record['hydrated'] ?? true) !== true) { $status = 'HYDRATION_LOSS'; $reasons[] = 'HYDRATION_LOSS'; }
         if (($record['eligible'] ?? true) !== true) { $status = 'INELIGIBLE'; $reasons[] = 'PUBLIC_ELIGIBILITY_BLOCKED'; }
+        $routeType = strtolower(trim((string) ($record['route_type'] ?? '')));
+        $requiredScope = strtolower(trim((string) ($record['required_route_scope'] ?? '')));
+        $modelParent = trim((string) ($record['model_parent_id'] ?? ''));
+        if ($routeType === 'variant' && ($requiredScope === 'model' || $requiredScope === '') && ($modelParent === '' || !UuidCodec::isValid($modelParent))) {
+            $status = 'INELIGIBLE';
+            $reasons[] = 'MISSING_REQUIRED_ROUTE_SCOPE';
+            $reasons[] = 'MISSING_VARIANT_MODEL_PARENT';
+        }
         return ['owner_id' => $owner, 'route_type' => (string) ($record['route_type'] ?? ''), 'status' => $status, 'reasons' => $reasons];
     }
 }
