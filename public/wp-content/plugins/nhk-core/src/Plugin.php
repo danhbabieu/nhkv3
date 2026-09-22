@@ -677,7 +677,7 @@ final class Plugin {
                 $resolver = $endpoints->resolver($reference->endpoint_type);
                 if (!$resolver instanceof \NHK\Core\Contracts\Graph\EndpointRevisionReader) return null;
                 $revision = $resolver->revision($reference);
-                return ['active' => $active, 'revision' => $revision];
+                return ['active' => $active, 'revision' => $revision, 'family' => $record->payload['family'] ?? null];
             };
             $relationIntentState = static function (array $packet) use ($graphService): array {
                 $source = new \NHK\Core\Domain\Graph\NodeReference((string) ($packet['source_type'] ?? ''), (string) ($packet['source_uuid'] ?? ''));
