@@ -16852,3 +16852,34 @@ bootstrap blockers remain unchanged. No schema/migration, staging, production,
 V2, Capture, SQL, deployment, push or semantic data mutation was performed.
 
 STATUS=`KNOWLEDGE_SELECTION_CONTEXT_PACK_FIXED_LOCALLY / FULL_UNIT_PASS / NO_LIVE_MUTATION`.
+
+# Checkpoint — 2026-09-22 — Reader Journey Planner and shared editorial composer (LOCAL / NO LIVE MUTATION)
+
+SCOPE: Checkpoint D only: transient Editorial Context Pack → deterministic
+Reader Journey Plan → shared Editorial Draft. SEO, full Quality Gate, public
+frontend, Living Knowledge regeneration, dependency persistence, schema and
+migration remain out of scope.
+
+FIXED_BOUNDARY: Added transient `EditorialPlan`, `EditorialDraft`,
+`ReaderJourneyPlanner` and `SharedEditorialComposer`. The planner consumes only
+selected eligible Claims from the existing Context Pack and orders them after a
+profile-specific source/topic opening. The shared composer supports Article,
+Video and Image/Media through one deterministic core, keeps source input
+central, adds only selected Claim text, and records private Claim
+ID/revision/subject/path/role traceability. Public copy is checked through the
+existing `PublicEditorialCopyGuard`; internal identifiers, Graph/Governance/
+MCP/provenance/Evidence jargon are not emitted. Sparse input remains
+source-grounded without fabricated enrichment.
+
+VISUAL_BOUNDARY: Existing Context Pack visual-support state is carried into the
+plan/draft diagnostics. Unresolved feature support remains unresolved; no Media
+is invented and representative Media is not treated as feature proof.
+
+REGRESSION: Focused retrieval/selection/journey/composer matrix passes 18 tests
+/ 80 assertions. Full NHK Unit passes 2,146 tests / 12,975 assertions with
+existing warnings/deprecations. PHP lint, `git diff --check` and secret review
+pass for changed checkpoint files. The documented WordPress/MySQL integration
+bootstrap blockers remain unchanged. No schema/migration, staging, production,
+V2, Capture, SQL, deployment, push or semantic data mutation was performed.
+
+STATUS=`READER_JOURNEY_SHARED_COMPOSER_FIXED_LOCALLY / FULL_UNIT_PASS / NO_LIVE_MUTATION`.

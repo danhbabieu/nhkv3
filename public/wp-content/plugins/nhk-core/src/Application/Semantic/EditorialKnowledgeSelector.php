@@ -81,12 +81,12 @@ final class EditorialKnowledgeSelector
             'excluded_count' => count($excluded),
             'policy_version' => 'editorial-selection-v1',
             'information_gain' => array_sum(array_map(static fn (array $item): float => (float) ($item['utility']['information_gain'] ?? 0.0), $selected)),
-        ], $visualSupport);
+        ], $visualSupport, $inputContext);
     }
 
-    private function pack(string $status, array $subject, string $topic, array $profile, string $retrievalStatus, array $selected, array $excluded, array $blockers, array $diagnostics, array $visualSupport = []): EditorialContextPack
+    private function pack(string $status, array $subject, string $topic, array $profile, string $retrievalStatus, array $selected, array $excluded, array $blockers, array $diagnostics, array $visualSupport = [], array $inputContext = []): EditorialContextPack
     {
-        return new EditorialContextPack($status, $subject, trim($topic), $profile, $retrievalStatus, array_values($selected), array_values($excluded), array_values($visualSupport), array_values($blockers), $diagnostics);
+        return new EditorialContextPack($status, $subject, trim($topic), $profile, $retrievalStatus, array_values($selected), array_values($excluded), $inputContext, array_values($visualSupport), array_values($blockers), $diagnostics);
     }
 
     private function utility(array $candidate, array $topicTokens, array $inputTokens, string $profile): array
