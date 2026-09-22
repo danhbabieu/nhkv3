@@ -16909,3 +16909,36 @@ bootstrap blockers remain unchanged. No schema/migration, staging, production,
 V2, Capture, SQL, deployment, push or semantic data mutation was performed.
 
 STATUS=`READER_JOURNEY_SHARED_COMPOSER_FIXED_LOCALLY / FULL_UNIT_PASS / NO_LIVE_MUTATION`.
+
+# Checkpoint — 2026-09-22 — Semantic SEO and bounded internal-link planning (LOCAL / NO LIVE MUTATION)
+
+SCOPE: Checkpoint E only: shared editorial context → transient Semantic SEO
+Plan. No SEO persistence, slug ownership, Knowledge/Graph/Evidence mutation,
+automatic publication, frontend redesign, quality gate or re-enrichment was
+added.
+
+FIXED_BOUNDARY: Added `SemanticSeoPlan` and `SemanticSeoPlanner` as a shared
+projection-only seam consuming EditorialContextPack, EditorialPlan,
+EditorialDraft, approved Dictionary context, existing public identity and
+bounded public link candidates. It derives search intent and a bounded semantic
+cluster from selected editorial truth, creates differentiated title/H1/meta/OG
+copy, reuses `SeoReadinessPolicy` and `PublicEditorialCopyGuard`, preserves
+canonical URL ownership, filters private/UUID/internal/unrelated/self links,
+prefers canonical Dictionary owners, and reports duplicate intent without
+mutating content. Structured data is restricted to supported visible-content
+types and selected eligible Claim IDs; no SEO text becomes Evidence.
+
+PROFILE_BOUNDARY: Article, Video and Image profiles share the same planner;
+Video/Image remain owner-specific projection concerns. No second Graph crawl,
+keyword stuffing, fallback slug, unsupported promotional claim, or Odo-specific
+production branch was introduced.
+
+REGRESSION: Focused SEO planner suite passes 6 tests / 59 assertions. Broader
+SEO/Dictionary/projection matrix passes 94 tests / 512 assertions with 3
+documented skips. Full NHK Unit passes 2,154 tests / 13,041 assertions with
+existing warnings/deprecations. PHP lint, `git diff --check`, secret review and
+anti-hardcoding checks pass. Existing WordPress/MySQL integration bootstrap
+blockers remain unchanged. No schema/migration, staging, production, V2,
+Capture, SQL, deployment, push or semantic data mutation was performed.
+
+STATUS=`SEMANTIC_SEO_INTERNAL_LINKING_FIXED_LOCALLY / FULL_UNIT_PASS / NO_LIVE_MUTATION`.

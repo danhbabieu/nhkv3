@@ -34,7 +34,7 @@ final class SemanticSeoPlannerTest extends TestCase
         $missing = $this->planner()->plan($this->pack(), $this->editorialPlan(), $this->draft(), ['public_identity' => ['public_eligible' => true, 'canonical_identity' => true]]);
         $ambiguous = $this->planner()->plan($this->pack(), $this->editorialPlan(), $this->draft(), ['public_identity' => ['canonical_url' => '/mau/odo36/', 'public_eligible' => true, 'canonical_identity' => false]]);
 
-        self::assertSame('BLOCKED', $missing->readiness);
+        self::assertSame('INCOMPLETE', $missing->readiness);
         self::assertContains('MISSING_PUBLIC_IDENTITY', $missing->blockers);
         self::assertNull($missing->canonicalUrl);
         self::assertSame('BLOCKED', $ambiguous->readiness);
@@ -46,7 +46,7 @@ final class SemanticSeoPlannerTest extends TestCase
         $plan = $this->planner()->plan($this->pack(), $this->editorialPlan(), $this->draft(), [
             'public_identity' => ['canonical_url' => '/mau/odo36/', 'public_eligible' => true, 'canonical_identity' => true],
             'internal_link_candidates' => [
-                ['id' => 'model-1', 'label' => 'Odo 36', 'url' => '/mau/odo36/', 'public_eligible' => true, 'semantic_relevance' => 0.9],
+                ['id' => 'model-1', 'label' => 'Máy Odo 36', 'url' => '/bo-may/odo-36/', 'public_eligible' => true, 'semantic_relevance' => 0.9],
                 ['id' => 'private', 'label' => 'Private', 'url' => '/private/', 'public_eligible' => false, 'semantic_relevance' => 1.0],
                 ['id' => 'uuid', 'label' => 'UUID', 'url' => '/' . self::SUBJECT . '/', 'public_eligible' => true, 'semantic_relevance' => 1.0],
                 ['id' => 'unrelated', 'label' => 'Nhạc Westminster', 'url' => '/ban-nhac/westminster/', 'public_eligible' => true, 'semantic_relevance' => 0.0],
