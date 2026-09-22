@@ -544,7 +544,7 @@ final class ArticleMediaPolicyTest extends TestCase
         $adapter = new class implements WordPressArticleMediaAdapter {
             public array $synced = [];
             public function read(int $postId): array { return ['featured_media_id' => null, 'inline_media_ids' => [], 'managed_inline_media_id' => null, 'featured_attachment_id' => 0, 'inline_attachment_ids' => [], 'content' => '']; }
-            public function synchronize(int $postId, array $result): array { $this->synced[] = [$postId, $result]; return $this->read($postId); }
+            public function synchronize(int $postId, array $result): array { $this->synced[] = [$postId, $result]; return ['featured_media_id' => $result['slot_media']['featured_primary'], 'inline_media_ids' => [$result['slot_media']['inline_primary']], 'managed_inline_media_id' => $result['slot_media']['inline_primary'], 'featured_attachment_id' => 901, 'inline_attachment_ids' => [902], 'content' => '']; }
             public function attachmentForMedia(Media $media, MediaAsset $asset, string $contextualAlt = '', array $context = []): array { return []; }
             public function adoptAttachment(int $attachmentId): ?string { return null; }
         };
@@ -557,6 +557,34 @@ final class ArticleMediaPolicyTest extends TestCase
         self::assertSame($featured->canonicalId, $adapter->synced[0][1]['slot_media']['featured_primary']);
         self::assertSame($inline->canonicalId, $adapter->synced[0][1]['slot_media']['inline_primary']);
         self::assertSame('MEDIA_COMPLETE', $result->state);
+    }
+
+    public function test_featured_media_requires_native_attachment_readback_as_well_as_media_usage(): void
+    {
+        [$media, $assets, $usages, $blueprints, $service] = $this->stores();
+        $featured = $service->create('native-readback-featured', 'Native readback featured', 'ready');
+        $inline = $service->create('native-readback-inline', 'Native readback inline', 'ready');
+        $service->addAsset($featured->canonicalId, 'original', 'uploads/native-featured.jpg', hash('sha256', 'native-featured'), 'image/jpeg', 10, 1200, 675, 'PUBLIC');
+        $service->addAsset($inline->canonicalId, 'original', 'uploads/native-inline.jpg', hash('sha256', 'native-inline'), 'image/jpeg', 10, 1200, 800, 'PUBLIC');
+        $adapter = new class($featured->canonicalId, $inline->canonicalId) implements WordPressArticleMediaAdapter {
+            public function __construct(private string $featured, private string $inline) {}
+            public function read(int $postId): array { return ['featured_media_id' => $this->featured, 'inline_media_ids' => [$this->inline], 'managed_inline_media_id' => null, 'featured_attachment_id' => 0, 'inline_attachment_ids' => [], 'content' => '']; }
+            public function synchronize(int $postId, array $result): array { return ['featured_media_id' => $this->featured, 'inline_media_ids' => [$this->inline], 'managed_inline_media_id' => null, 'featured_attachment_id' => 0, 'inline_attachment_ids' => [], 'content' => '']; }
+            public function attachmentForMedia(Media $media, MediaAsset $asset, string $contextualAlt = '', array $context = []): array { return []; }
+            public function adoptAttachment(int $attachmentId): ?string { return null; }
+        };
+
+        $result = (new ArticleMediaCoordinator($service, $media, $assets, $usages, $blueprints, 1, $adapter))->ensureForPost(52, [
+            'capture_id' => 'capture-native-readback',
+            'capture_has_physical_assets' => true,
+            'capture_owned_media_ids' => [$featured->canonicalId, $inline->canonicalId],
+        ], [
+            'featured_primary' => ['media_id' => $featured->canonicalId, 'selection_source' => 'USER_EXPLICIT'],
+            'inline_primary' => ['media_id' => $inline->canonicalId, 'selection_source' => 'USER_EXPLICIT'],
+        ]);
+
+        self::assertSame('MEDIA_PLACEHOLDER', $result->state);
+        self::assertContains('ARTICLE_MEDIA_FEATURED_READBACK_MISMATCH', array_column($result->diagnostics, 'code'));
     }
 
     public function test_seo_projection_uses_the_wordpress_attachment_representation(): void

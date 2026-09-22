@@ -185,7 +185,13 @@ final class ArticleMediaCoordinator
             if (is_array($editorial) && isset($editorial['state_token'])) $payload['editorial_state_token'] = (string) $editorial['state_token'];
             $readback = $this->wordpress->synchronize($postId, $payload);
             $actualFeatured = trim((string) ($readback['featured_media_id'] ?? ''));
-            if ($actualFeatured !== '' && $actualFeatured !== ($slotMedia[MediaUsageRoleRegistry::FEATURED_PRIMARY] ?? '')) {
+            $expectedFeatured = (string) ($slotMedia[MediaUsageRoleRegistry::FEATURED_PRIMARY] ?? '');
+            $featuredExplicit = (($selectedContextBySlot[MediaUsageRoleRegistry::FEATURED_PRIMARY]['selection_source'] ?? '') === 'USER_EXPLICIT');
+            $featuredNativeMismatch = $expectedFeatured !== '' && ($actualFeatured !== $expectedFeatured || (int) ($readback['featured_attachment_id'] ?? 0) < 1);
+            if ($featuredNativeMismatch) {
+                $diagnostics[] = ['code' => 'ARTICLE_MEDIA_FEATURED_READBACK_MISMATCH', 'expected_media_id' => $expectedFeatured, 'actual_media_id' => $actualFeatured, 'featured_attachment_id' => (int) ($readback['featured_attachment_id'] ?? 0)];
+            }
+            if ($actualFeatured !== '' && $actualFeatured !== $expectedFeatured && !$featuredExplicit) {
                 $blueprint = $this->blueprints->findByPostAndSlot($postId, MediaUsageRoleRegistry::FEATURED_PRIMARY) ?? MediaSeoBlueprint::forPost($postId, MediaUsageRoleRegistry::FEATURED_PRIMARY, $context, MediaSeoStateRegistry::COMPLETE);
                 $actualRequiresScope = !($subjectScopeLocked && in_array($actualFeatured, $captureOwnedMediaIds, true));
                 if ($this->usableMedia($actualFeatured, $blueprint, $actualRequiresScope) !== null) {
@@ -201,7 +207,13 @@ final class ArticleMediaCoordinator
                 $actualMediaId = trim((string) $actualMediaId);
                 if ($actualMediaId !== '' && $actualMediaId !== ($slotMedia[MediaUsageRoleRegistry::FEATURED_PRIMARY] ?? '')) { $actualInline = $actualMediaId; break; }
             }
-            if ($actualInline !== '' && $actualInline !== ($slotMedia[MediaUsageRoleRegistry::INLINE_PRIMARY] ?? '')) {
+            $expectedInline = (string) ($slotMedia[MediaUsageRoleRegistry::INLINE_PRIMARY] ?? '');
+            $inlineExplicit = (($selectedContextBySlot[MediaUsageRoleRegistry::INLINE_PRIMARY]['selection_source'] ?? '') === 'USER_EXPLICIT');
+            $inlineNativeMismatch = $expectedInline !== '' && ($actualInline !== $expectedInline || (array) ($readback['inline_attachment_ids'] ?? []) === []);
+            if ($inlineNativeMismatch) {
+                $diagnostics[] = ['code' => 'ARTICLE_MEDIA_INLINE_READBACK_MISMATCH', 'expected_media_id' => $expectedInline, 'actual_media_id' => $actualInline, 'inline_attachment_ids' => array_values(array_map('intval', (array) ($readback['inline_attachment_ids'] ?? [])))];
+            }
+            if ($actualInline !== '' && $actualInline !== $expectedInline && !$inlineExplicit) {
                 $blueprint = $this->blueprints->findByPostAndSlot($postId, MediaUsageRoleRegistry::INLINE_PRIMARY) ?? MediaSeoBlueprint::forPost($postId, MediaUsageRoleRegistry::INLINE_PRIMARY, $context, MediaSeoStateRegistry::COMPLETE);
                 $actualRequiresScope = !($subjectScopeLocked && in_array($actualInline, $captureOwnedMediaIds, true));
                 if ($this->usableMedia($actualInline, $blueprint, $actualRequiresScope) !== null) {
@@ -219,14 +231,15 @@ final class ArticleMediaCoordinator
             // media truth.
             $canonical = $subjectIds === [] ? $result : $this->diagnoseForPost($postId, $context);
             $planSnapshot = ['phase' => 'plan', 'code' => 'MEDIA_USAGE_RECONCILIATION', 'status' => $usagePlan['status'], 'actions' => $usagePlan['actions']];
-            $finalDiagnostics = array_merge([$planSnapshot], $canonical->diagnostics);
+            $finalDiagnostics = array_merge([$planSnapshot], $diagnostics, $canonical->diagnostics);
             $finalSlotMedia = $canonical->slotMedia;
             foreach ($canonical->slots as $slot => $slotState) {
                 if (($slotState['valid_for_completeness'] ?? false) !== true && ($result->slots[$slot]['placeholder'] ?? false) === true) {
                     $finalSlotMedia[$slot] = (string) ($result->slotMedia[$slot] ?? '');
                 }
             }
-            $result = new ArticleMediaResult($postId, $endpointKey, $canonical->state, $finalSlotMedia, $canonical->slots, $finalDiagnostics, (string) ($readback['state_token'] ?? $canonical->editorialStateToken), $canonical->guidance);
+            $nativeReadbackMismatch = $featuredNativeMismatch || $inlineNativeMismatch;
+            $result = new ArticleMediaResult($postId, $endpointKey, $nativeReadbackMismatch ? MediaSeoStateRegistry::PLACEHOLDER : $canonical->state, $finalSlotMedia, $canonical->slots, $finalDiagnostics, (string) ($readback['state_token'] ?? $canonical->editorialStateToken), $canonical->guidance);
         }
         return $result;
     }
