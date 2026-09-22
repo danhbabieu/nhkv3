@@ -16672,3 +16672,31 @@ schema-parity and final Easy MCP/tools-list descriptor coverage passes 82 tests 
 staging, controlled Apply, live Capture, deployment or push was performed.
 
 STATUS=`R3_CONNECTOR_OWNER_SCHEMA_COMPATIBILITY_FIXED_LOCALLY / UNIT_PASS / NO_LIVE_MUTATION`.
+
+# Checkpoint — 2026-09-22 — R3 strict generic oneOf branch parity (LOCAL / NO LIVE MUTATION)
+
+SCOPE: Generic MCP JSON-schema branch evaluation only. Graph, MediaUsage,
+Evidence, Governance and Capture business semantics and owner schemas were not
+changed; R4 and live mutation were not entered.
+
+FIXED_BOUNDARY: `McpTransport::validateArgumentValue()` now evaluates every
+`oneOf` branch independently, counts only fully valid branches, preserves
+branch-indexed zero-match diagnostics, returns deterministic `ONE_OF_AMBIGUOUS`
+for multiple matches, and applies the same rule recursively to array items.
+Branch `const`, `enum`, `required` and `additionalProperties` failures are
+contained within branch matching, so nonmatching owner errors cannot leak when
+exactly one branch matches.
+
+REGRESSION: Explicit MediaUsage/Evidence relationship list/get packets,
+Capture nested MediaUsage `REPLACE`, Graph omitted-kind compatibility,
+deterministic ambiguity, and combined zero-match diagnostics are covered.
+
+VERIFICATION: Focused boundary tests pass 6 tests / 23 assertions. Full Unit
+passes 2,124 tests / 12,879 assertions. Contract passes 6 tests / 48
+assertions. Schema/parity and Easy MCP descriptor/tool-list coverage passes 34
+tests / 2,652 assertions. Easy MCP integration bridge tests are unavailable
+and were skipped (27 tests). Composer PHP lint, `git diff --check` and secret
+review pass. No migration, database, staging, controlled Apply, live Capture,
+deployment or push was performed.
+
+STATUS=`R3_GENERIC_ONEOF_VALIDATOR_PARITY_FIXED_LOCALLY / FULL_UNIT_PASS / NO_LIVE_MUTATION`.

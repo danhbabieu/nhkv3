@@ -575,11 +575,22 @@ final class McpTransport
     {
         if (isset($schema['oneOf']) && is_array($schema['oneOf'])) {
             $matches = 0;
-            foreach ($schema['oneOf'] as $variant) {
+            $failures = [];
+            foreach (array_values($schema['oneOf']) as $index => $variant) {
                 if (!is_array($variant)) continue;
-                try { $this->validateArgumentValue($key, $value, $variant); $matches++; } catch (\InvalidArgumentException) { }
+                try {
+                    $this->validateArgumentValue($key, $value, $variant);
+                    ++$matches;
+                } catch (\InvalidArgumentException $error) {
+                    $failures[$index] = $error->getMessage();
+                }
             }
-            if ($matches !== 1) throw new \InvalidArgumentException('Argument does not match exactly one owner schema: ' . $key . '.');
+            if ($matches > 1) throw new \InvalidArgumentException('ONE_OF_AMBIGUOUS: ' . $key . '.');
+            if ($matches === 0) {
+                $details = [];
+                foreach ($failures as $index => $failure) $details[] = 'branch[' . $index . ']: ' . $failure;
+                throw new \InvalidArgumentException('ONE_OF_NO_MATCH: ' . $key . '. ' . implode(' | ', $details));
+            }
             return;
         }
         $types = (array) ($schema['type'] ?? '');
