@@ -16388,6 +16388,34 @@ STATUS=`VIDEO_CAPTURE_INTERNAL_DEPENDENCY_READBACK_FIXED_LOCALLY / FULL_UNIT_PAS
 
 NEXT_EXACT_ACTION: `USER_PUSH_PULL_BUILD; THEN RETRY EXISTING CAPTURE ON @v39 AND VERIFY COMPLETE`.
 
+# Checkpoint — 2026-09-22 — @v41 role-aware Video dependency completion mapping (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE_CONFIRMED: Canonical Source/Claim/Evidence validation succeeded, but
+completion retry preserved stale PARTIAL dependency/relation fields from the
+historical public-projection completion packet. The stale fields kept semantic
+dependency children PARTIAL even after canonical readback verification and
+left Capture retry eligible.
+
+FIXED_BOUNDARY: A verified governed dependency receipt now supplies explicit
+completion evidence for the semantic dependency role. When canonical readback
+passes, revision matches and no real blocker remains, retry recomputes the
+dependency and relation/evidence states as COMPLETE. Public/frontend fields
+remain NOT_APPLICABLE for Source/Claim/Evidence; Video still requires its
+public/frontend/content requirements. Canonical, relation, missing-data and
+revision failures remain fail-closed.
+
+VERIFICATION: Focused Capture/Completion/Ability/read/Video matrix passes 89
+tests / 419 assertions. Full `NHK Unit` passes 2,105 tests / 12,438 assertions
+with 17 warnings, 37 deprecations and 27 PHPUnit deprecations only. PHP lint,
+`git diff --check`, secret scan and prohibited live-ID scan pass. No schema or
+migration change is present or required. No staging scope, controlled Apply,
+Video, Graph or Proposal mutation was executed; no live retry, Capture, SQL,
+deployment, push, pull or visibility mutation was performed.
+
+STATUS=`VIDEO_CAPTURE_ROLE_AWARE_COMPLETION_MAPPING_FIXED_LOCALLY / FULL_UNIT_PASS / NO_LIVE_MUTATION`.
+
+NEXT_EXACT_ACTION: `USER_PUSH_PULL_BUILD; THEN READ CAPTURE ON @v41; RUN ONE BOUNDED RETRY IF STILL PARTIAL; VERIFY COMPLETE`.
+
 # Checkpoint — 2026-09-22 — @v39 Capture convergence parity repaired locally (NO LIVE MUTATION)
 
 ROOT_CAUSE_CONFIRMED: `capture_ingest` retry admission evaluated the persisted

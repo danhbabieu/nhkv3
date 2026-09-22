@@ -122,7 +122,8 @@ final class ExplicitRelationIntentPlanner
                     'scope' => $packet['source_type'],
                     'provenance' => $packet['provenance'],
                     'target_type' => $packet['target_type'],
-                    'target_family' => $packet['target_family'] ?? '',
+                    'target_family' => $references['target']['family'] ?? null,
+                    'target_active' => $references['target']['active'] ?? null,
                 ]);
             } catch (\Throwable $error) {
                 $result['blockers'][] = ['code' => $error->getMessage(), 'predicate' => 'classified_as', 'source_uuid' => $packet['source_uuid'], 'target_uuid' => $packet['target_uuid']];
@@ -166,6 +167,7 @@ final class ExplicitRelationIntentPlanner
             'target_type' => $packet['target_type'],
             'target_uuid' => $packet['target_uuid'],
             'target_revision' => $packet['target_revision'],
+            'target_family' => $references['target']['family'] ?? null,
             'provenance' => $packet['provenance'],
             'reason' => $packet['reason'],
             'scope' => $packet['predicate'] === 'classified_as' ? $packet['source_type'] : 'capture',
@@ -174,7 +176,7 @@ final class ExplicitRelationIntentPlanner
         ];
     }
 
-    /** @param array<string,mixed> $intent @param \NHK\Core\Domain\Graph\PredicateDefinition $definition @param array<string,mixed> $result @return array{reference:NodeReference,revision:int}|null */
+    /** @param array<string,mixed> $intent @param \NHK\Core\Domain\Graph\PredicateDefinition $definition @param array<string,mixed> $result @return array{reference:NodeReference,revision:int,family:?string,active:bool}|null */
     private function resolveEndpoint(string $side, array $intent, \NHK\Core\Domain\Graph\PredicateDefinition $definition, array &$result): ?array
     {
         $uuid = trim((string) ($intent[$side . '_uuid'] ?? ''));
@@ -199,7 +201,7 @@ final class ExplicitRelationIntentPlanner
                 }
                 if (!$resolver instanceof EndpointRevisionReader) continue;
                 $revision = (int) ($state['revision'] ?? $resolver->revision($reference) ?? 0);
-                if ($revision > 0) $matches[] = ['reference' => $reference, 'revision' => $revision];
+                if ($revision > 0) $matches[] = ['reference' => $reference, 'revision' => $revision, 'family' => isset($state['family']) ? (string) $state['family'] : null, 'active' => true];
             } catch (\Throwable) {
                 continue;
             }

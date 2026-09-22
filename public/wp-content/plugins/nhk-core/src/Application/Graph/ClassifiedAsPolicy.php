@@ -19,10 +19,12 @@ final class ClassifiedAsPolicy
         $provenance = trim((string) ($packet['provenance'] ?? ''));
         $targetType = trim((string) ($packet['target_type'] ?? ''));
         $targetFamily = trim((string) ($packet['target_family'] ?? ''));
-        if ($targetType !== '' && $targetType !== 'classification') throw new \RuntimeException('CLASSIFICATION_SCOPE_UNSUPPORTED');
-        if ($targetFamily !== '' && $targetFamily !== 'clock_type') throw new \RuntimeException('CLASSIFICATION_SCOPE_UNSUPPORTED');
+        if ($targetType !== '' && $targetType !== 'classification') throw new \RuntimeException('CLASSIFICATION_TARGET_INVALID');
         if (!in_array($source, self::SOURCES, true) || $scope !== $source) throw new \RuntimeException('CLASSIFICATION_SCOPE_UNSUPPORTED');
         if (!in_array($provenance, self::PROVENANCE, true)) throw new \RuntimeException('CLASSIFICATION_SCOPE_UNSUPPORTED');
         if ($provenance === 'OBSERVED_FROM_MEDIA' && $source !== 'specimen') throw new \RuntimeException('CLASSIFICATION_SCOPE_UNSUPPORTED');
+        if (array_key_exists('target_active', $packet) && $packet['target_active'] !== true) throw new \RuntimeException('CLASSIFICATION_TARGET_INACTIVE');
+        if ($targetType === 'classification' && array_key_exists('target_family', $packet) && $targetFamily === '') throw new \RuntimeException('CLASSIFICATION_FAMILY_REQUIRED');
+        if ($targetFamily !== '' && $targetFamily !== 'clock_type') throw new \RuntimeException('CLASSIFICATION_FAMILY_UNSUPPORTED');
     }
 }

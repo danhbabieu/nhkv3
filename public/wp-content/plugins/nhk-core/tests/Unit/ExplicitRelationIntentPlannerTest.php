@@ -282,6 +282,24 @@ final class ExplicitRelationIntentPlannerTest extends TestCase
         self::assertContains('CLASSIFICATION_SCOPE_UNSUPPORTED', array_column($result['blockers'], 'code'));
     }
 
+    public function test_classified_as_planning_accepts_variant_membership_when_target_classification_has_family(): void
+    {
+        $source = UuidCodec::newV7();
+        $target = UuidCodec::newV7();
+        $result = $this->planner([
+            'variant' => [$source => ['active' => true, 'revision' => 2]],
+            'classification' => [$target => ['active' => true, 'revision' => 3, 'family' => 'clock_type']],
+        ])->plan([[
+            'source_type' => 'variant', 'source_uuid' => $source, 'predicate' => 'classified_as',
+            'target_type' => 'classification', 'target_uuid' => $target,
+            'provenance' => 'EXPLICIT_USER_KNOWLEDGE',
+        ]]);
+
+        self::assertCount(1, $result['relation_candidates']);
+        self::assertSame([], $result['blockers']);
+        self::assertSame('clock_type', $result['relation_candidates'][0]['target_family']);
+    }
+
     public function test_relation_candidate_fingerprint_changes_when_predicate_or_endpoint_identity_changes(): void
     {
         $otherClassification = UuidCodec::newV7();
@@ -338,7 +356,7 @@ final class ExplicitRelationIntentPlannerTest extends TestCase
         ], $changes);
     }
 
-    /** @param array<string,array<string,array{active:bool,revision:int}>> $states @param array<string,array<string,mixed>> $edges */
+    /** @param array<string,array<string,array{active:bool,revision:int,family?:string}>> $states @param array<string,array<string,mixed>> $edges */
     private function planner(array $states, array $edges = []): ExplicitRelationIntentPlanner
     {
         $endpoints = new \NHK\Core\Domain\Graph\EndpointTypeRegistry();

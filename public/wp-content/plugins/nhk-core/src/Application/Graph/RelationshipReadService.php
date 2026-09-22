@@ -128,6 +128,20 @@ final class RelationshipReadService
         if (!$rule->allow_self_relation && $source->key() === $target->key()) return $this->blocked($base, 'SELF_RELATION_FORBIDDEN');
         $base['scope_state'] = $this->scope($rule, $source, $target, $sourceState, $targetState);
         if ($base['scope_state']['status'] !== 'PASS') return $this->blocked($base, (string) $base['scope_state']['code']);
+        if ($predicateKey === 'classified_as') {
+            try {
+                (new ClassifiedAsPolicy())->assertCandidate([
+                    'source_type' => $source->endpoint_type,
+                    'scope' => $source->endpoint_type,
+                    'provenance' => trim((string) ($input['provenance'] ?? '')),
+                    'target_type' => $target->endpoint_type,
+                    'target_family' => $targetState['family'],
+                    'target_active' => $targetState['active'],
+                ]);
+            } catch (\Throwable $error) {
+                return $this->blocked($base, $error->getMessage());
+            }
+        }
         if ($predicateKey === 'subtype_of' && $this->hasSubtypePath($target, $source)) return $this->blocked($base, 'HIERARCHY_CYCLE');
         $current = array_values(array_filter($this->graph->allEdges(true), static fn ($edge): bool => $edge->predicate === $predicateKey && $edge->source->reference->key() === $source->key() && $edge->target->reference->key() === $target->key()));
         $requestedRelation = trim((string) ($input['current_relation_id'] ?? ''));

@@ -38,6 +38,7 @@ final class ClockTypeMembershipGovernanceService
             'target_type' => 'classification',
             'target_uuid' => $candidate->targetClassificationUuid,
             'target_key' => $candidate->targetClassificationUuid,
+            'target_family' => $candidate->targetFamily,
             'target_revision' => $candidate->targetRevision,
             'scope' => $candidate->sourceType,
             'provenance' => $candidate->provenanceClass,
