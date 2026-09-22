@@ -732,8 +732,7 @@ final class EditorialCaptureCoordinator
 
             $observations = array_merge($semanticContext['observations'], is_array($interpretation['media_observations'] ?? null) ? $interpretation['media_observations'] : []);
             $this->beginPhase('COMPOSED');
-            $sharedDraft = is_array($sharedEditorial['draft'] ?? null) ? $sharedEditorial['draft'] : null;
-            if ($sharedDraft !== null && is_object($sharedEditorial['draft'])) $sharedDraft = $sharedEditorial['draft'];
+            $sharedDraft = is_array($sharedEditorial ?? null) ? ($sharedEditorial['draft'] ?? null) : null;
             $composition = is_object($sharedDraft)
                 ? ['title' => $sharedDraft->title, 'excerpt' => $sharedDraft->summary, 'content' => $sharedDraft->body, 'claim_trace' => $sharedDraft->claimTrace, 'research_snapshot' => ['source' => 'shared_editorial_pipeline', 'profile' => $sharedDraft->profile], 'managed_sections' => [], 'seo_projection' => is_object($sharedEditorial['seo_plan'] ?? null) ? $sharedEditorial['seo_plan']->toArray() : []]
                 : $this->composer->compose($text, $observations, $retrieved['selected_claims'] ?? [], ['title' => (string) ($input['title'] ?? ''), 'excerpt' => (string) ($input['excerpt'] ?? ''), 'asset_count' => count($assets), 'assets' => $assets, 'visual_opportunities' => $visualOpportunities, 'prior_composition' => is_array($diagnostics['composition'] ?? null) ? $diagnostics['composition'] : []]);
