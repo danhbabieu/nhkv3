@@ -114,6 +114,65 @@ final class ConversationalAuthorityCaptureTest extends TestCase
         self::assertSame(1, $posts);
     }
 
+    public function test_relationship_only_capture_never_invokes_editorial_owner_for_any_admission_purpose(): void
+    {
+        foreach ([null, 'AUTHORITY', 'MIXED'] as $ordinal => $purpose) {
+            $captures = new AuthorityCaptureRepository();
+            $editorialCalls = 0;
+            $mixedContinuationCalls = 0;
+            $service = new AuthorityCaptureService(
+                $captures,
+                static fn (array $input, CaptureRecord $capture): array => [
+                    'relation_candidates' => [[
+                        'candidate_id' => 'relationship-add',
+                        'entity_type' => 'relation',
+                        'action' => 'CREATE',
+                        'source_type' => 'model',
+                        'source_uuid' => 'source-' . $ordinal,
+                        'predicate' => 'model_of',
+                        'target_type' => 'brand',
+                        'target_uuid' => 'target-' . $ordinal,
+                    ]],
+                    'relation_reuse' => [],
+                    'plan_fingerprint' => str_repeat((string) ($ordinal + 1), 64),
+                ],
+                static function () use (&$editorialCalls): array {
+                    ++$editorialCalls;
+                    throw new \LogicException('relationship-only Capture must not create an Article');
+                },
+                static fn (CaptureRecord $capture, array $plan, array $ids): array => [
+                    'status' => 'APPLIED',
+                    'proposal_ids' => ['proposal-' . $ordinal],
+                    'canonical_readback' => ['relation' => 'verified'],
+                ],
+                static function () use (&$mixedContinuationCalls): array {
+                    ++$mixedContinuationCalls;
+                    throw new \LogicException('relationship-only Capture must not continue editorial reconciliation');
+                },
+            );
+            $input = [
+                'idempotency_key' => 'relationship-only-purpose-' . $ordinal,
+                'relationship_operations' => [['operation' => 'ADD']],
+            ];
+            if ($purpose !== null) $input['purpose'] = $purpose;
+
+            $planned = $service->execute($input);
+            $applied = $service->continueWithApproval($planned->captureId, [
+                'authority_intent' => [
+                    'mode' => 'APPLY_APPROVED_PLAN',
+                    'approved_plan_fingerprint' => $planned->context['plan_fingerprint'],
+                    'approved_candidate_ids' => ['relationship-add'],
+                ],
+            ]);
+
+            self::assertNull($planned->articleId);
+            self::assertNull($applied->articleId);
+            self::assertSame('APPLIED', $applied->status);
+            self::assertSame(0, $editorialCalls);
+            self::assertSame(0, $mixedContinuationCalls);
+        }
+    }
+
     public function test_same_approval_is_replanned_when_pending_policy_contract_changes(): void
     {
         $captures = new AuthorityCaptureRepository();

@@ -473,12 +473,13 @@ final class McpTransport
             throw new \InvalidArgumentException('CAPTURE_RESUME_REQUIRES_CAPTURE_ID');
         }
         ($this->documentation ?? new McpDocumentationRegistry())->assertCheckpoint((array) ($arguments['documentation_checkpoint'] ?? []));
+        $relationshipOnly = \NHK\Core\Application\Capture\CapturePurposePolicy::isRelationshipOnly($arguments);
         if (($arguments['dry_run'] ?? false) === true) {
             if ($this->isKnowledgeRepairPreviewRequest($arguments)) {
                 if ($this->knowledgeRepairPreview === null) throw new \InvalidArgumentException('KNOWLEDGE_REPAIR_PREVIEW_REQUIRED');
                 return ['status' => 'PREVIEW', 'preview' => $this->knowledgeRepairPreview->preview((array) $arguments['knowledge_repair'])];
             }
-            if ($this->hasRelationshipOperations($arguments)) return $this->previewRelationshipOperations($arguments);
+            if ($relationshipOnly) return $this->previewRelationshipOperations($arguments);
             throw new \InvalidArgumentException('KNOWLEDGE_REPAIR_PREVIEW_REQUIRED');
         }
         unset($arguments['files']);
@@ -490,7 +491,7 @@ final class McpTransport
         $declaredPurpose = strtoupper(trim((string) ($arguments['purpose'] ?? '')));
         $authorityPacket = in_array($declaredPurpose, ['AUTHORITY', 'MIXED'], true)
             || in_array((string) ($intent['mode'] ?? ''), ['PLAN', 'APPLY_APPROVED_PLAN'], true)
-            || is_array($arguments['relationship_operations'] ?? null);
+            || $relationshipOnly;
         if ($authorityPacket) {
             $this->assertAuthoritySemanticWriteAllowed();
             if ($this->authorityCapture === null) throw new \RuntimeException('AUTHORITY_CAPTURE_UNAVAILABLE');
@@ -512,12 +513,6 @@ final class McpTransport
         return strtoupper(trim((string) ($arguments['intent'] ?? ''))) === 'KNOWLEDGE_REPAIR'
             && is_array($arguments['knowledge_repair'] ?? null)
             && $arguments['knowledge_repair'] !== [];
-    }
-
-    /** @param array<string,mixed> $arguments */
-    private function hasRelationshipOperations(array $arguments): bool
-    {
-        return is_array($arguments['relationship_operations'] ?? null) && $arguments['relationship_operations'] !== [];
     }
 
     /** @param array<string,mixed> $arguments */

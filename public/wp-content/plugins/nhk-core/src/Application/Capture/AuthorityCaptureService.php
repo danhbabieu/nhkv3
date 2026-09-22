@@ -28,7 +28,7 @@ final class AuthorityCaptureService
         $purpose = CapturePurposePolicy::resolve($input);
         if ($purpose === CapturePurpose::EDITORIAL) throw new \InvalidArgumentException('AUTHORITY_PURPOSE_CONFLICT');
         $intent = is_array($input['authority_intent'] ?? null) ? $input['authority_intent'] : [];
-        $hasRelationshipOperations = is_array($input['relationship_operations'] ?? null);
+        $hasRelationshipOperations = CapturePurposePolicy::isRelationshipOnly($input);
         if (($intent['mode'] ?? '') !== 'PLAN' && !$hasRelationshipOperations) throw new \InvalidArgumentException('AUTHORITY_CONTINUATION_REQUIRED');
         $fingerprint = $this->fingerprint($input);
         $existing = $this->captures->findByIdempotencyKey($key);
@@ -58,7 +58,7 @@ final class AuthorityCaptureService
         }
         $plan = ($this->planner)($input, $record);
         $editorial = [];
-        if ($purpose === CapturePurpose::MIXED) {
+        if ($purpose === CapturePurpose::MIXED && !$hasRelationshipOperations) {
             if (!is_callable($this->mixedEditorial)) throw new \RuntimeException('MIXED_EDITORIAL_OWNER_UNAVAILABLE');
             $editorial = ($this->mixedEditorial)($input, $record);
         }
@@ -116,7 +116,10 @@ final class AuthorityCaptureService
         $saveBase = $record;
         $context['authority_result'] = ['approved_plan_fingerprint' => $approvedFingerprint, 'approved_candidate_ids' => $approvedIds, 'result' => $result];
         $status = strtoupper((string) ($result['status'] ?? '')) === 'APPLIED' ? 'APPLIED' : 'APPROVAL_PENDING';
-        if ($purpose === CapturePurpose::MIXED && $status === 'APPLIED' && is_callable($this->mixedContinuation)) {
+        $relationshipOnly = CapturePurposePolicy::isRelationshipOnly(
+            is_array($record->context['planning_input'] ?? null) ? $record->context['planning_input'] : [],
+        );
+        if ($purpose === CapturePurpose::MIXED && !$relationshipOnly && $status === 'APPLIED' && is_callable($this->mixedContinuation)) {
             $reconciliation = ($this->mixedContinuation)($record, $result);
             // The editorial coordinator may advance the same Capture while
             // reconciling the existing Post. Carry that canonical record

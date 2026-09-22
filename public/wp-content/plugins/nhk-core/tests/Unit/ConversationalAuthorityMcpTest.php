@@ -303,6 +303,39 @@ final class ConversationalAuthorityMcpTest extends TestCase
         }
     }
 
+    public function test_relationship_only_mixed_capture_does_not_create_an_article(): void
+    {
+        $captures = new TransportCaptureRepository();
+        $editorialCalls = 0;
+        $authorityCapture = new AuthorityCaptureService(
+            $captures,
+            static fn (array $input, CaptureRecord $capture): array => [
+                'relation_candidates' => [[
+                    'candidate_id' => 'relationship-only',
+                    'entity_type' => 'relation',
+                    'action' => 'CREATE',
+                ]],
+                'relation_reuse' => [],
+                'plan_fingerprint' => str_repeat('a', 64),
+                'blockers' => [],
+            ],
+            static function () use (&$editorialCalls): array {
+                ++$editorialCalls;
+                throw new \LogicException('relationship-only Capture must not create an Article');
+            },
+        );
+
+        $record = $authorityCapture->execute([
+            'idempotency_key' => 'relationship-only-mixed',
+            'purpose' => 'MIXED',
+            'relationship_operations' => [['operation' => 'ADD']],
+        ]);
+
+        self::assertSame(0, $editorialCalls);
+        self::assertNull($record->articleId);
+        self::assertSame('MIXED', $record->context['purpose']);
+    }
+
     public function test_knowledge_repair_dry_run_still_requires_its_own_preview_service(): void
     {
         $documentation = new McpDocumentationRegistry();

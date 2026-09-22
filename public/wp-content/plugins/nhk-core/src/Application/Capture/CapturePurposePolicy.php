@@ -9,12 +9,19 @@ use NHK\Core\Domain\Capture\CapturePurpose;
 final class CapturePurposePolicy
 {
     /** @param array<string,mixed> $input */
+    public static function isRelationshipOnly(array $input): bool
+    {
+        return is_array($input['relationship_operations'] ?? null)
+            && $input['relationship_operations'] !== [];
+    }
+
+    /** @param array<string,mixed> $input */
     public static function resolve(array $input): CapturePurpose
     {
         $declared = trim((string) ($input['purpose'] ?? ''));
         $intent = $input['authority_intent'] ?? null;
         $hasIntent = is_array($intent) && $intent !== [];
-        $hasRelationshipOperations = is_array($input['relationship_operations'] ?? null) && $input['relationship_operations'] !== [];
+        $hasRelationshipOperations = self::isRelationshipOnly($input);
 
         if ($declared === '') {
             if ($hasIntent) throw new \InvalidArgumentException('AUTHORITY_PURPOSE_REQUIRED');
