@@ -66,6 +66,7 @@ final class McpSchemaParityTest extends TestCase
         $keys = array_values(array_unique(array_merge(array_keys($expected), array_keys($actual))));
         foreach ($keys as $key) {
             $childPath = $path . '.' . $key;
+            if (in_array($childPath, $ignored, true)) continue;
             if ($key === 'properties' || $key === 'patternProperties' || $key === '$defs' || $key === 'definitions') {
                 $expectedProperties = $expected[$key] ?? [];
                 $actualProperties = $actual[$key] ?? [];

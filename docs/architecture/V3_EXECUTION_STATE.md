@@ -17355,3 +17355,31 @@ pass. No schema/migration, staging, production, V2, deployment, push or
 Checkpoint I work was performed.
 
 STATUS=`H4_GOLDEN_VIDEO_ODO36_RESUME_INTENT_BOUNDARY_FIXED_LOCALLY / FULL_UNIT_SCHEMA_PARITY_BLOCKED / NO_LIVE_MUTATION / CHECKPOINT_I_NOT_ENTERED`.
+
+# Checkpoint — 2026-09-23 — P0 Capture runtime producer and Ability Graph REMOVE boundary (LOCAL / DEPLOYMENT PENDING)
+
+ROOT_CAUSE_CONFIRMED: The canonical Capture relation planner received the
+legacy wire provenance alias `EXPLICIT_USER_RELATION` for typed
+`classified_as` intents and passed it unchanged to `ClassifiedAsPolicy`,
+which correctly returned `CLASSIFICATION_SCOPE_UNSUPPORTED`. The exposed
+Ability schema also passed the three-owner relationship `oneOf` union through
+the native validator; its flattened branch diagnostics could select the
+Evidence branch for an otherwise valid Graph REMOVE packet before MCP
+transport dispatch.
+
+FIXED_BOUNDARIES: The real Plugin composition root's
+`ExplicitRelationIntentPlanner` normalizes that transport alias (and missing
+typed provenance) to canonical `EXPLICIT_USER_KNOWLEDGE` before policy
+evaluation. Ability registration now projects Capture relationship items to a
+discriminator-safe structural schema, while canonical MCP transport retains
+strict branch `oneOf` validation and operation-owner assertions. The parity
+test helper explicitly records this intentional Ability projection difference.
+
+VERIFICATION: Full NHK Unit passes 2,244 tests / 13,213 assertions, with only
+existing warnings/deprecations. A direct canonical validator probe accepted a
+Graph REMOVE packet with valid UUIDs; the registered Ability schema reports
+`oneOf` absent and `required=[operation]`. Changed PHP lint and `git diff
+--check` pass. No staging, production, V2, WordPress semantic or article
+mutation was performed; live acceptance and deployment remain pending.
+
+STATUS=`P0_CAPTURE_GRAPH_RUNTIME_BOUNDARIES_FIXED_LOCAL / DEPLOYMENT_PENDING / LIVE_ACCEPTANCE_NOT_RUN / SEMANTIC_MUTATION_NONE`.

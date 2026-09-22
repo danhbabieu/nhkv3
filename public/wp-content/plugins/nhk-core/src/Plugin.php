@@ -238,6 +238,10 @@ final class Plugin {
                 if (CaptureEditorialWriteGuard::active()) return;
                 if ($attachmentBridge->isHandlingWrite()) return;
                 if ($post->post_type !== 'post' || wp_is_post_revision($postId) || wp_is_post_autosave($postId)) return;
+                // Trash is a lifecycle-only mutation. WordPress fires
+                // wp_after_insert_post for the status transition, but a
+                // trashed post must never enter editorial/media enrichment.
+                if ($post->post_status === 'trash') return;
                 try {
                     $articleMedia->ensureForPost($postId, ['subject' => (string) $post->post_title, 'planned_title' => (string) $post->post_title]);
                 } catch (\Throwable $error) {

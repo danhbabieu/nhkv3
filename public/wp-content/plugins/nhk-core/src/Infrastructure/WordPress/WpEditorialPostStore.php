@@ -28,13 +28,23 @@ final class WpEditorialPostStore implements EditorialPostStore
         $state = $this->read($postId); if ($state === null) throw new \RuntimeException('EDITORIAL_DRAFT_READBACK_FAILED'); return $state;
     }
     public function publish(int $postId): EditorialPostState { return $this->transition($postId, 'publish', 'EDITORIAL_PUBLISH_FAILED'); }
-    public function trash(int $postId): EditorialPostState { return $this->transition($postId, 'trash', 'EDITORIAL_TRASH_FAILED'); }
-    public function restore(int $postId): EditorialPostState { return $this->transition($postId, 'draft', 'EDITORIAL_RESTORE_FAILED'); }
+    public function trash(int $postId): EditorialPostState { return $this->lifecycle($postId, 'trash', 'wp_trash_post', 'EDITORIAL_TRASH_FAILED'); }
+    public function restore(int $postId): EditorialPostState { return $this->lifecycle($postId, 'draft', 'wp_untrash_post', 'EDITORIAL_RESTORE_FAILED'); }
     private function transition(int $postId, string $status, string $failure): EditorialPostState
     {
         if (!function_exists('wp_update_post')) throw new \RuntimeException('WORDPRESS_EDITORIAL_UNAVAILABLE');
         $result = wp_update_post(['ID' => $postId, 'post_status' => $status], true);
         if (is_wp_error($result) || (int) $result !== $postId) throw new \RuntimeException($failure);
+        $state = $this->read($postId);
+        if ($state === null || $state->status !== $status) throw new \RuntimeException('EDITORIAL_STATUS_READBACK_FAILED');
+        return $state;
+    }
+
+    private function lifecycle(int $postId, string $status, string $function, string $failure): EditorialPostState
+    {
+        if (!function_exists($function)) throw new \RuntimeException('WORDPRESS_EDITORIAL_UNAVAILABLE');
+        $result = $function === 'wp_trash_post' ? wp_trash_post($postId) : wp_untrash_post($postId);
+        if ($result === false || $result === null) throw new \RuntimeException($failure);
         $state = $this->read($postId);
         if ($state === null || $state->status !== $status) throw new \RuntimeException('EDITORIAL_STATUS_READBACK_FAILED');
         return $state;

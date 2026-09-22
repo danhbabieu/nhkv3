@@ -137,6 +137,27 @@ final class PluginBootWiringTest extends TestCase
         );
     }
 
+    public function test_article_trash_hook_cannot_enter_generic_media_reconciliation(): void
+    {
+        $plugin = (string) file_get_contents(__DIR__ . '/../../src/Plugin.php');
+        $hook = strpos($plugin, '$reconcilePostMedia = static function');
+        $reconcile = strpos($plugin, '$articleMedia->ensureForPost', $hook);
+
+        self::assertNotFalse($hook);
+        self::assertNotFalse($reconcile);
+        self::assertStringContainsString("if (\$post->post_status === 'trash') return;", substr($plugin, $hook, $reconcile - $hook));
+    }
+
+    public function test_wordpress_article_lifecycle_uses_native_trash_boundaries(): void
+    {
+        $store = (string) file_get_contents(__DIR__ . '/../../src/Infrastructure/WordPress/WpEditorialPostStore.php');
+
+        self::assertStringContainsString('wp_trash_post($postId)', $store);
+        self::assertStringContainsString('wp_untrash_post($postId)', $store);
+        self::assertStringNotContainsString("return \$this->transition(\$postId, 'trash'", $store);
+        self::assertStringNotContainsString("return \$this->transition(\$postId, 'draft'", $store);
+    }
+
     public function test_capture_publication_gate_consumes_locked_subject_resolution_state(): void
     {
         $plugin = (string) file_get_contents(__DIR__ . '/../../src/Plugin.php');
