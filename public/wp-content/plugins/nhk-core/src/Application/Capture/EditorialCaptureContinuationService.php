@@ -34,6 +34,23 @@ final class EditorialCaptureContinuationService
         if ($intent !== '' && $storedIntent !== '' && $intent !== $storedIntent) return $this->retryFailure($captureId, 'CAPTURE_RETRY_INTENT_MISMATCH', $capture);
         $purpose = strtoupper(trim((string) ($input['purpose'] ?? '')));
         if ($purpose !== '' && $purpose !== strtoupper(trim((string) ($capture->context['purpose'] ?? 'EDITORIAL')))) return $this->retryFailure($captureId, 'CAPTURE_RETRY_PURPOSE_MISMATCH', $capture);
+        $requestedChildren = array_values(array_unique(array_map('strtolower', array_map('strval', (array) ($input['resume_children'] ?? [])))));
+        $videoCompletionRetry = CaptureCurrentOutcomeReducer::supportsCanonicalVideoCompletionRetry($capture)
+            && ($requestedChildren === [] || $requestedChildren === ['video']);
+        if ($videoCompletionRetry) {
+            $retryInput = $this->rehydrateRetryInput($capture, $input);
+            try {
+                // Refresh and persist the bounded current outcome before a
+                // terminal no-retry response. This keeps retry admission and
+                // capture.get on the same current Capture projection.
+                $continued = $this->coordinator->retryVideoCompletion($capture, $retryInput);
+                $decision = CaptureCurrentOutcomeReducer::retryEligibility($continued);
+                $terminalCode = $decision['eligible'] ? CaptureCurrentOutcomeReducer::failureCode($continued) : $decision['reason'];
+                return ['capture' => $continued->toArray(), 'retry' => ['mode' => 'RETRY', 'status' => $continued->status, 'code' => $terminalCode, 'eligible' => $decision['eligible'], 'reason' => $decision['reason']]];
+            } catch (\Throwable $error) {
+                return $this->retryFailure($captureId, $this->code($error), $this->captures->findById($captureId));
+            }
+        }
         $retryDecision = CaptureCurrentOutcomeReducer::retryEligibility($capture, $input);
         $completionResumable = $retryDecision['eligible'] && $capture->status !== 'FAILED_RETRYABLE';
         if (!$completionResumable && in_array($capture->stage, [CaptureStage::READY_FOR_PUBLICATION->value, CaptureStage::PUBLISHED->value], true)) {
@@ -43,11 +60,10 @@ final class EditorialCaptureContinuationService
 
         $retryInput = $this->rehydrateRetryInput($capture, $input);
         try {
-            $continued = CaptureCurrentOutcomeReducer::supportsCanonicalVideoCompletionRetry($capture)
-                ? $this->coordinator->retryVideoCompletion($capture, $retryInput)
-                : $this->coordinator->retry($capture, $retryInput);
+            $continued = $this->coordinator->retry($capture, $retryInput);
             $decision = CaptureCurrentOutcomeReducer::retryEligibility($continued);
-            return ['capture' => $continued->toArray(), 'retry' => ['mode' => 'RETRY', 'status' => $continued->status, 'code' => CaptureCurrentOutcomeReducer::failureCode($continued), 'eligible' => $decision['eligible'], 'reason' => $decision['reason']]];
+            $retryCode = $decision['eligible'] ? CaptureCurrentOutcomeReducer::failureCode($continued) : $decision['reason'];
+            return ['capture' => $continued->toArray(), 'retry' => ['mode' => 'RETRY', 'status' => $continued->status, 'code' => $retryCode, 'eligible' => $decision['eligible'], 'reason' => $decision['reason']]];
         } catch (\Throwable $error) {
             return $this->retryFailure($captureId, $this->code($error), $this->captures->findById($captureId));
         }

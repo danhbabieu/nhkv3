@@ -265,6 +265,75 @@ final class EditorialCaptureContinuationTest extends TestCase
         self::assertFalse($result['retry']['eligible']);
     }
 
+    public function test_terminal_video_retry_converges_stale_capture_before_returning_not_allowed(): void
+    {
+        $captures = new ContinuationCaptureRepository();
+        $addenda = new ContinuationAddendumRepository();
+        $videoId = UuidCodec::newV7();
+        $capture = new CaptureRecord(
+            UuidCodec::newV7(),
+            'capture-terminal-convergence',
+            hash('sha256', 'terminal-convergence'),
+            CaptureStage::SEMANTICS_RECONCILED->value,
+            'PARTIAL',
+            null,
+            null,
+            [['kind' => 'video', 'video_id' => $videoId, 'video_proposal' => ['payload' => ['canonical_id' => $videoId]]]],
+            ['purpose' => 'EDITORIAL', 'content_intent' => ['intent' => 'VIDEO', 'article_required' => false]],
+            [
+                'completion' => [
+                    'status' => 'COMPLETE',
+                    'blockers' => ['CANONICAL_READBACK_UNVERIFIED'],
+                    'children' => [
+                        ['owner_type' => 'source', 'owner_id' => UuidCodec::newV7(), 'status' => 'BLOCKED', 'complete' => false],
+                        ['owner_type' => 'knowledge', 'owner_id' => UuidCodec::newV7(), 'status' => 'BLOCKED', 'complete' => false],
+                        ['owner_type' => 'evidence', 'owner_id' => UuidCodec::newV7(), 'status' => 'BLOCKED', 'complete' => false],
+                        ['owner_type' => 'video', 'owner_id' => $videoId, 'status' => 'COMPLETE', 'complete' => true],
+                    ],
+                    'missing_required_owners' => [],
+                ],
+                'resume_hints' => ['resume_children' => ['video']],
+                'semantic_write_back' => ['status' => 'APPLIED', 'canonical_readback' => ['canonical_id' => $videoId], 'writes' => []],
+            ],
+            ['SEMANTICS_RECONCILED' => ['status' => 'COMPLETED', 'result' => 'APPLIED']],
+        );
+        $captures->create($capture);
+        $events = [];
+        $service = new EditorialCaptureContinuationService($captures, $addenda, $this->coordinator($captures, $events, null, static function (array $context) use ($videoId): array {
+            return ['status' => 'VERIFIED', 'items' => [['video_id' => $videoId, 'completion' => [
+                'owner_type' => 'video', 'owner_id' => $videoId, 'status' => 'COMPLETE', 'complete' => true,
+                'canonical_readback' => ['canonical_id' => $videoId], 'dependency_state' => 'COMPLETE',
+                'relation_or_usage_state' => 'COMPLETE', 'content_state' => 'CONTENT_COMPLETE',
+                'public_state' => 'READY', 'frontend_state' => 'VERIFIED', 'blockers' => [],
+            ]]], 'blockers' => []];
+        }));
+
+        $result = $service->retry([
+            'capture_id' => $capture->captureId,
+            'idempotency_key' => $capture->idempotencyKey,
+            'resume_mode' => 'RETRY',
+            'resume_children' => ['video'],
+        ]);
+
+        self::assertSame('COMPLETE', $result['capture']['status']);
+        self::assertSame([], $result['capture']['diagnostics']['completion']['blockers']);
+        self::assertSame('CAPTURE_RETRY_NOT_ALLOWED', $result['retry']['code']);
+        self::assertSame('COMPLETE', $result['retry']['status']);
+        self::assertFalse($result['retry']['eligible']);
+        self::assertSame('CAPTURE_RETRY_NOT_ALLOWED', $result['retry']['reason']);
+
+        $read = new McpReadHandler(
+            $this->createMock(AuthorityRepository::class), new EntityTypeRegistry(),
+            $this->createMock(MediaRepository::class), $this->createMock(MediaAssetRepository::class), $this->createMock(MediaUsageRepository::class),
+            $this->createMock(VideoRepository::class), $this->createMock(KnowledgeRepository::class), $this->createMock(EvidenceRepository::class),
+            captures: $captures,
+        );
+        $projection = $read->captureGet($capture->captureId);
+        self::assertSame('COMPLETE', $projection['capture_status']);
+        self::assertSame([], $projection['blockers']);
+        self::assertSame(['eligible' => false, 'reason' => 'CAPTURE_RETRY_NOT_ALLOWED', 'capture_id' => $capture->captureId], $projection['retry']);
+    }
+
     public function test_missing_internal_dependency_remains_blocked(): void
     {
         $claims = $this->createMock(KnowledgeRepository::class);
