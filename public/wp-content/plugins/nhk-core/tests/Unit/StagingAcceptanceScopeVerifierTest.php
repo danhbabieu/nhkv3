@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Tests\Unit;
 
-use NHK\Core\Application\Governance\{CaptureChildRelationStagingAdmission, OperationScopedStagingGuard, StagingAcceptanceScopeVerifier, VideoStagingAdmission};
+use NHK\Core\Application\Governance\{CaptureChildRelationStagingAdmission, MediaBindingStagingGuard, OperationScopedStagingGuard, StagingAcceptanceScopeVerifier, VideoStagingAdmission};
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Capture\CaptureRecord;
 use NHK\Core\Domain\Governance\{Proposal, ProposalState};
@@ -129,6 +129,33 @@ final class StagingAcceptanceScopeVerifierTest extends TestCase
         self::assertSame('wp_post', $scope['target']['type']);
         self::assertSame('1:617', $scope['target']['id']);
         self::assertTrue($verifier->verifyProposal($scope, $proposal));
+    }
+
+    public function test_direct_media_usage_writer_rejects_payload_tampering_under_valid_capture_scope(): void
+    {
+        $capture = new CaptureRecord(UuidCodec::newV7(), 'article-media-guard', hash('sha256', 'article-media-guard'), 'MEDIA_RECONCILED', 'IN_PROGRESS', 618, null, [], ['purpose' => 'EDITORIAL', 'content_intent' => ['intent' => 'IMAGE_ARTICLE']], [], [], 7);
+        $mediaId = UuidCodec::newV7();
+        $operation = [
+            'operation' => 'replace', 'idempotency_key' => 'capture:618:featured-replace', 'media' => ['id' => $mediaId],
+            'target' => ['type' => 'wp_post', 'blog_id' => 1, 'post_id' => 618], 'usage_id' => UuidCodec::newV7(),
+            'expected_usage_revision' => 3, 'role' => 'featured_primary', 'placement_key' => 'featured_primary',
+            'selection_source' => 'USER_EXPLICIT', 'selection_policy' => 'PINNED',
+        ];
+        $verifier = new StagingAcceptanceScopeVerifier(static fn (): string => 'staging', 'test-secret', static fn (): bool => true, can: static fn (): bool => true);
+        $scope = $verifier->issueForMediaUsageOperation($capture, $operation);
+        $guard = new MediaBindingStagingGuard(
+            static fn (): string => 'staging',
+            static fn (array $scope, array $request): bool => true,
+            static fn (): bool => true,
+        );
+
+        $this->expectExceptionMessage('STAGING_MEDIA_USAGE_PAYLOAD_MISMATCH');
+        $guard(array_replace($operation, [
+            'target' => ['type' => 'wp_post', 'id' => '1:618'],
+            'capture_id' => $capture->captureId,
+            'staging_acceptance' => $scope,
+            'placement_key' => 'tampered-placement',
+        ]));
     }
 
     public function test_media_metadata_scope_binds_exact_capture_media_revision_and_payload(): void
