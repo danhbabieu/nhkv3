@@ -102,6 +102,22 @@ final class SemanticSeoPlannerTest extends TestCase
         self::assertStringNotContainsString('Odo 36 có ba phiên bản vách máy — Odo 36 có ba phiên bản vách máy', $plan->metaDescription);
         self::assertNotSame($plan->title . ' — ' . $plan->metaDescription, $plan->openGraph['description']);
         foreach ($plan->semanticCluster as $phrase) self::assertGreaterThanOrEqual(2, count(preg_split('/\s+/u', $phrase) ?: []), $phrase);
+        self::assertNotContains('Odo phiên', $plan->semanticCluster);
+        self::assertNotContains('bản vách máy', $plan->semanticCluster);
+        self::assertCount(count($plan->semanticCluster), $plan->diagnostics['semantic_cluster_sources']);
+    }
+
+    public function test_unfulfilled_enumeration_is_narrowed_without_fabricating_members(): void
+    {
+        $pack = $this->pack();
+        $plan = $this->planner()->plan($pack, $this->editorialPlan(), $this->draft(), [
+            'public_identity' => ['canonical_url' => '/mau/odo36/', 'public_eligible' => true, 'canonical_identity' => true],
+        ]);
+
+        self::assertStringNotContainsString('3 phiên bản', $plan->title);
+        self::assertTrue($plan->diagnostics['title_narrowed']);
+        self::assertSame('ENUMERATION_PROMISE_UNFULFILLED', $plan->diagnostics['topic_fulfillment']['diagnostic']);
+        self::assertStringNotContainsString('vách hở', $plan->metaDescription);
     }
 
     private function planner(): SemanticSeoPlanner { return new SemanticSeoPlanner(); }

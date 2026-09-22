@@ -63,6 +63,9 @@ final class EditorialQualityGate
         $body = trim($draft->title . ' ' . $draft->summary . ' ' . $draft->body);
         $topic = trim($pack->topic);
         if ($topic !== '' && !$this->containsTopic($body, $topic)) $add('topic_centrality', 'WARN', 'TOPIC_CENTRALITY_WEAK');
+        $fulfillment = (new TopicFulfillment())->evaluate($topic, $pack->selectedClaims, $draft->body);
+        if (!$fulfillment['fulfilled'] && $fulfillment['diagnostic'] !== null) $add('topic_centrality', 'WARN', (string) $fulfillment['diagnostic']);
+        if ($topic !== '' && $draft->title !== '' && !$this->containsTopic($draft->title, $topic)) $add('topic_centrality', 'WARN', 'TITLE_BODY_COVERAGE_GAP');
         $knownClaimText = implode(' ', array_map(static fn (array $claim): string => (string) ($claim['text'] ?? ''), array_values($selected)));
         foreach ($this->sentences($draft->body) as $sentence) {
             if (preg_match('/\b(?:sản xuất|ra đời|phát hành)\b.{0,80}\b(?:19|20)\d{2}\b/iu', $sentence) === 1 && !$this->containsTopic($knownClaimText, $sentence)) $add('factual_grounding', 'BLOCK', 'UNTRACEABLE_FACTUAL_ASSERTION');
@@ -94,7 +97,7 @@ final class EditorialQualityGate
         }
         if (($seo->diagnostics['cannibalization']['status'] ?? '') === 'review') $add('internal_link_quality', 'WARN', 'DUPLICATE_INTENT_REVIEW');
         if (!in_array($profile, ['article', 'video', 'image', 'media'], true)) $add('profile_fit', 'BLOCK', 'UNKNOWN_EDITORIAL_PROFILE');
-        if ($profile === 'video' && (!preg_match('/\bvideo\b/iu', $body) || !$this->containsTopic($body, $topic) || !$this->hasCoreSpine($body, $selected))) $add('profile_fit', 'WARN', 'VIDEO_TOPIC_SPINE_WEAK');
+        if ($profile === 'video' && (!$this->containsTopic($body, $topic) || !$this->hasCoreSpine($body, $selected))) $add('profile_fit', 'WARN', 'VIDEO_TOPIC_SPINE_WEAK');
         if (in_array($profile, ['image', 'media'], true) && !preg_match('/\b(?:hình ảnh|ảnh)\b/iu', $body)) $add('profile_fit', 'WARN', 'IMAGE_PROFILE_MARKER_MISSING');
 
         $blockers = array_values(array_unique(array_slice($blockers, 0, 30)));

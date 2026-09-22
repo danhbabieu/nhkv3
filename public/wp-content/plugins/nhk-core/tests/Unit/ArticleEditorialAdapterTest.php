@@ -23,7 +23,8 @@ final class ArticleEditorialAdapterTest extends TestCase
             'public_identity' => ['canonical_url' => '/bai-viet/odo-36/', 'canonical_identity' => true, 'public_eligible' => true],
         ]);
 
-        self::assertSame('READY', $result['quality_report']->readiness);
+        self::assertSame('INCOMPLETE', $result['quality_report']->readiness);
+        self::assertContains('ENUMERATION_PROMISE_UNFULFILLED', $result['quality_report']->warnings);
         self::assertSame('article', $result['draft']->profile);
         self::assertSame('claim-1', $result['draft']->claimTrace[0]['claim_id']);
         self::assertSame('/bai-viet/odo-36/', $result['seo_plan']->canonicalUrl);

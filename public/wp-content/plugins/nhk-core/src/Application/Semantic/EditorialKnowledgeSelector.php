@@ -7,6 +7,12 @@ namespace NHK\Core\Application\Semantic;
 final class EditorialKnowledgeSelector
 {
     private const SUPPORTED_PROFILES = ['article', 'video', 'image', 'media'];
+    private TopicFulfillment $topicFulfillment;
+
+    public function __construct(?TopicFulfillment $topicFulfillment = null)
+    {
+        $this->topicFulfillment = $topicFulfillment ?? new TopicFulfillment();
+    }
 
     /** @param array<string,mixed> $retrieval @param array<string,mixed> $primarySubject @param array<string,mixed> $profile @param array<string,mixed> $inputContext */
     public function select(array $retrieval, string $topic, array $primarySubject, array $profile = [], array $inputContext = []): EditorialContextPack
@@ -21,6 +27,8 @@ final class EditorialKnowledgeSelector
         }
 
         $limit = max(1, min(20, (int) ($profile['selection_limit'] ?? ['article' => 8, 'video' => 6, 'image' => 6, 'media' => 6][$profileName])));
+        $promise = $this->topicFulfillment->promise($topic);
+        if ($promise['kind'] === 'enumeration') $limit = max($limit, min(20, (int) $promise['required_count']));
         $all = array_values(array_filter((array) ($retrieval['items'] ?? []), 'is_array'));
         $eligible = array_values(array_filter((array) ($retrieval['eligible_claims'] ?? []), static fn (mixed $candidate): bool => is_array($candidate) && ($candidate['eligibility'] ?? '') === 'eligible'));
         $inputTokens = $this->tokens((string) ($inputContext['raw_input'] ?? ''));
@@ -55,7 +63,7 @@ final class EditorialKnowledgeSelector
             }
             $duplicate = false;
             foreach ($selected as $prior) {
-                if ($this->redundant((string) ($candidate['text'] ?? ''), (string) ($prior['text'] ?? ''))) {
+                if ($this->redundant((string) ($candidate['text'] ?? ''), (string) ($prior['text'] ?? '')) && !$this->isTopicCompletion($candidate, $selected, $topic)) {
                     $duplicate = true;
                     break;
                 }
@@ -67,6 +75,7 @@ final class EditorialKnowledgeSelector
             }
             $candidate['editorial_role'] = $this->role($candidate, $selected);
             $candidate['selection_reason'] = $this->selectionReason($candidate);
+            if ($this->isTopicCompletion($candidate, $selected, $topic)) $candidate['selection_reason'] = 'eligible Claim completes a detected topic promise';
             unset($candidate['_selection_order']);
             $selected[] = $candidate;
         }
@@ -111,6 +120,23 @@ final class EditorialKnowledgeSelector
         return ($candidate['retrieval_origin'] ?? '') === 'direct'
             ? 'direct eligible Claim adds topic coverage and reader context'
             : 'bounded eligible neighbor adds explainable contextual information';
+    }
+
+    private function isTopicCompletion(array $candidate, array $selected, string $topic): bool
+    {
+        $promise = $this->topicFulfillment->promise($topic);
+        if ($promise['kind'] !== 'enumeration') return false;
+        $concepts = array_map(fn (string $value): string => $this->conceptKey($value), $this->topicFulfillment->candidateConcepts($candidate));
+        if ($concepts === []) return false;
+        $known = [];
+        foreach ($selected as $prior) foreach ($this->topicFulfillment->candidateConcepts($prior) as $concept) $known[$this->conceptKey($concept)] = true;
+        $new = array_values(array_filter($concepts, static fn (string $concept): bool => $concept !== '' && !isset($known[$concept])));
+        return $new !== [] && count($known) < (int) $promise['required_count'];
+    }
+
+    private function conceptKey(string $value): string
+    {
+        return trim((string) (preg_replace('/[^\p{L}\p{N}]+/u', ' ', mb_strtolower($value)) ?? $value));
     }
 
     private function redundant(string $left, string $right): bool

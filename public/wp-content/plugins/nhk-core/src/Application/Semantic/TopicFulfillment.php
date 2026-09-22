@@ -18,6 +18,11 @@ final class TopicFulfillment
         $supportedKey = $this->key($supported);
         $covered = [];
         $missing = [];
+        $candidateConcepts = [];
+        foreach ($eligible as $claim) $candidateConcepts = array_merge($candidateConcepts, $this->candidateConcepts($claim));
+        if ($promise['kind'] === 'enumeration') {
+            $promise['terms'] = array_values(array_unique($candidateConcepts));
+        }
         foreach ($promise['terms'] as $term) {
             if (str_contains($copyKey, $this->key($term)) && str_contains($supportedKey, $this->key($term))) $covered[] = $term;
             else $missing[] = $term;
@@ -44,7 +49,7 @@ final class TopicFulfillment
     {
         $value = trim($topic);
         $lower = $this->lower($value);
-        if (preg_match('/\b(\d+)\s+(?:types?|kinds?|versions?|features?|items?)\b/iu', $lower, $match) === 1) {
+        if (preg_match('/\b(\d+)\s+(?:types?|kinds?|versions?|features?|items?|loại|phiên bản|đặc điểm|tính năng)\b/iu', $lower, $match) === 1) {
             $count = (int) $match[1];
             return ['kind' => 'enumeration', 'required_count' => $count, 'terms' => $this->enumerationTerms($value)];
         }
@@ -64,7 +69,8 @@ final class TopicFulfillment
         $concepts = [];
         foreach (['topic_concepts', 'semantic_concepts', 'completion_concepts'] as $field) foreach ((array) ($claim[$field] ?? []) as $concept) if (is_string($concept) && trim($concept) !== '') $concepts[] = trim($concept);
         $text = (string) ($claim['text'] ?? $claim['claim_text'] ?? '');
-        if (preg_match('/\b(?:types?|kinds?|versions?|loại|phiên bản)\b[^:：]*[:：]\s*(.+)$/iu', $text, $match) === 1) {
+        if (preg_match('/\b(?:types?|kinds?|versions?|loại|phiên bản)\b[^:：]*[:：]\s*(.+)$/iu', $text, $match) !== 1) preg_match('/\b(?:gồm|include|includes)\s*[:：]?\s*(.+)$/iu', $text, $match);
+        if (isset($match[1])) {
             foreach (preg_split('/\s*(?:,|;|\band\b|\bvà\b)\s*/iu', trim($match[1], " .!?") ) ?: [] as $concept) if (trim($concept) !== '') $concepts[] = trim($concept);
         }
         return array_values(array_unique($concepts));
@@ -80,6 +86,7 @@ final class TopicFulfillment
     /** @return list<string> */
     private function comparisonTerms(string $topic): array
     {
+        $topic = preg_replace('/^.*?\b(?:between|giữa)\b/iu', '', $topic) ?? $topic;
         $parts = preg_split('/\b(?:and|và|versus|vs|với)\b/iu', $topic) ?: [];
         return array_values(array_filter(array_map('trim', $parts), static fn (string $part): bool => $part !== '' && mb_strlen($part) >= 2));
     }

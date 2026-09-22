@@ -20,10 +20,12 @@ final class SemanticSeoPlanner
         $canonical = trim((string) ($identity['canonical_url'] ?? ''));
         $canonicalIdentity = ($identity['canonical_identity'] ?? $canonical !== '') === true;
         $publicEligible = ($identity['public_eligible'] ?? true) === true;
-        $intent = $this->intent($pack->topic, $pack->selectedClaims);
-        $title = $this->title($pack->topic, $profile);
-        $h1 = trim($pack->topic);
-        $meta = $this->meta($pack->topic, $pack->selectedClaims);
+        $fulfillment = (new TopicFulfillment())->evaluate($pack->topic, $pack->selectedClaims, $draft->body);
+        $topic = $fulfillment['fulfilled'] ? $pack->topic : $this->narrowTopic($pack->topic);
+        $intent = $this->intent($topic, $pack->selectedClaims);
+        $title = $this->title($topic, $profile);
+        $h1 = trim($topic);
+        $meta = $this->meta($topic, $pack->selectedClaims);
         (new PublicEditorialCopyGuard())->assertSafe($title);
         (new PublicEditorialCopyGuard())->assertSafe($h1);
         (new PublicEditorialCopyGuard())->assertSafe($meta);
@@ -40,13 +42,13 @@ final class SemanticSeoPlanner
             'structured_data_applicable' => ($context['structured_data_applicable'] ?? true) === true,
         ]);
         $canonicalUrl = $readinessResult->status() === SeoReadinessResult::READY ? $canonical : null;
-        $cluster = $this->cluster($pack->topic, $pack->selectedClaims, (array) ($context['dictionary_terms'] ?? []));
+        $cluster = $this->cluster($topic, $pack->selectedClaims, (array) ($context['dictionary_terms'] ?? []));
         $dictionary = $this->dictionary((array) ($context['dictionary_terms'] ?? []));
         $links = $this->links((array) ($context['internal_link_candidates'] ?? []), $canonicalUrl);
         $cannibalization = $this->cannibalization($pack->primarySubject, $intent, (array) ($context['competing_pages'] ?? []));
         $structured = $this->structured($context['structured_data'] ?? null, $canonicalUrl, $title, $pack->selectedClaims);
         $trace = array_values(array_map(static fn (array $claim): array => ['claim_id' => (string) ($claim['claim_id'] ?? ''), 'claim_revision' => max(1, (int) ($claim['claim_revision'] ?? 1)), 'original_subject' => $claim['original_subject'] ?? [], 'editorial_role' => (string) ($claim['editorial_role'] ?? '')], array_filter($pack->selectedClaims, 'is_array')));
-        $diagnostics = ['cannibalization' => $cannibalization, 'profile' => $profile, 'selected_claim_count' => count($trace), 'projection_only' => true, 'policy_version' => 'semantic-seo-v1'];
+        $diagnostics = ['cannibalization' => $cannibalization, 'profile' => $profile, 'selected_claim_count' => count($trace), 'projection_only' => true, 'policy_version' => 'semantic-seo-v1', 'topic_fulfillment' => $fulfillment, 'title_narrowed' => $topic !== $pack->topic, 'semantic_cluster_sources' => $this->clusterSources($cluster, $topic, $pack->selectedClaims, (array) ($context['dictionary_terms'] ?? []))];
         if ($profile === '' || !in_array($profile, self::PROFILES, true)) $readinessResult = new \NHK\Core\Domain\Seo\SeoReadinessResult(SeoReadinessResult::NOT_APPLICABLE, ['PROFILE_UNSUPPORTED']);
         return new SemanticSeoPlan($readinessResult->status(), $profile, $intent, $pack->primarySubject, $pack->topic, $cluster, $title, $h1, $meta, $canonicalUrl, ['title' => $title, 'description' => $meta, 'canonical' => $canonicalUrl], $links, $dictionary, $structured, $trace, $diagnostics, $readinessResult->reasons());
     }
@@ -83,28 +85,57 @@ final class SemanticSeoPlanner
     private function cluster(string $topic, array $claims, array $dictionary): array
     {
         $subjectPhrase = $this->subjectPhrase($topic);
-        $values = $subjectPhrase !== '' ? [$subjectPhrase] : [];
+        $values = array_filter([$subjectPhrase, $topic]);
         foreach ($dictionary as $term) if (is_array($term)) $values[] = (string) ($term['term'] ?? '');
-        foreach ($claims as $claim) if (is_array($claim) && ($claim['eligibility'] ?? 'eligible') === 'eligible') $values[] = (string) ($claim['text'] ?? '');
-        $values[] = $topic;
-        $result = []; $seen = [];
-        if ($subjectPhrase !== '' && count(preg_split('/\s+/u', $subjectPhrase) ?: []) >= 2) {
-            $result[] = $subjectPhrase;
-            $seen[$this->phraseKey($subjectPhrase)] = true;
+        $sourceMap = [];
+        foreach ($claims as $claim) {
+            if (!is_array($claim) || ($claim['eligibility'] ?? 'eligible') !== 'eligible') continue;
+            foreach ((new TopicFulfillment())->candidateConcepts($claim) as $concept) $values[] = $concept;
+            foreach (['original_subject', 'resolved_primary_subject', 'subject', 'object'] as $field) if (is_array($claim[$field] ?? null) && trim((string) ($claim[$field]['name'] ?? '')) !== '') $values[] = (string) $claim[$field]['name'];
         }
+        $result = []; $seen = [];
         foreach ($values as $value) {
-            $tokens = $this->phraseTokens($value);
-            for ($size = min(5, count($tokens)); $size >= 2; $size--) {
-                for ($offset = 0; $offset + $size <= count($tokens); $offset++) {
-                    $phrase = implode(' ', array_slice($tokens, $offset, $size));
-                    $key = $this->phraseKey($phrase);
-                    if ($key === '' || isset($seen[$key])) continue;
-                    $seen[$key] = true; $result[] = $phrase;
-                    if (count($result) >= 16) return $result;
-                }
-            }
+            $phrase = trim((string) $value);
+            if (!$this->meaningfulPhrase($phrase)) continue;
+            $key = $this->phraseKey($phrase);
+            if (isset($seen[$key])) continue;
+            $seen[$key] = true; $result[] = $phrase;
+            $sourceMap[$phrase] = $this->phraseSource($phrase, $topic, $claims, $dictionary);
         }
         return $result;
+    }
+
+    private function meaningfulPhrase(string $phrase): bool
+    {
+        $tokens = $this->phraseTokens($phrase);
+        if (count($tokens) < 2) return false;
+        $stop = ['của', 'và', 'là', 'có', 'đây', 'một', 'những', 'được', 'giúp', 'cho', 'the', 'of', 'and', 'a'];
+        return !in_array($this->lower((string) ($tokens[0] ?? '')), $stop, true) && !in_array($this->lower((string) end($tokens)), $stop, true);
+    }
+
+    private function lower(string $value): string { return function_exists('mb_strtolower') ? mb_strtolower($value) : strtolower($value); }
+
+    private function phraseSource(string $phrase, string $topic, array $claims, array $dictionary): string
+    {
+        if ($phrase === $topic) return 'explicit_topic_phrase';
+        if ($phrase === $this->subjectPhrase($topic)) return 'canonical_subject_label';
+        foreach ($dictionary as $item) if (is_array($item) && trim((string) ($item['term'] ?? '')) === $phrase) return 'approved_dictionary_form';
+        return 'selected_claim_concept';
+    }
+
+    /** @return array<string,string> */
+    private function clusterSources(array $cluster, string $topic, array $claims, array $dictionary): array
+    {
+        $sources = [];
+        foreach ($cluster as $phrase) $sources[$phrase] = $this->phraseSource((string) $phrase, $topic, $claims, $dictionary);
+        return $sources;
+    }
+
+    private function narrowTopic(string $topic): string
+    {
+        $narrowed = preg_replace('/^\s*(?:\d+|three|four|five|ba|bốn|năm)\s+(?:types?|kinds?|versions?|features?|loại|phiên bản|đặc điểm|tính năng)\s+(?:(?:of|của)\s+)?/iu', '', trim($topic));
+        $narrowed = trim((string) ($narrowed ?? $topic), " .:;—–-");
+        return $narrowed !== '' ? $narrowed : trim($topic);
     }
 
     /** @return list<string> */

@@ -15,7 +15,7 @@ final class EditorialQualityGateTest extends TestCase
         $report = $this->gate()->evaluate($this->pack(), $this->plan(), $this->draft(), $this->seo());
 
         self::assertInstanceOf(EditorialQualityReport::class, $report);
-        self::assertSame('READY', $report->readiness);
+        self::assertSame('INCOMPLETE', $report->readiness);
         self::assertSame('article', $report->profile);
         self::assertSame('READY', $report->dimensions['factual_grounding']['status']);
         self::assertSame('READY', $report->dimensions['seo_readiness']['status']);
@@ -363,9 +363,9 @@ final class EditorialQualityGateTest extends TestCase
     {
         $report = $this->gate()->evaluate($this->pack(), $this->plan(), $this->draft(), $this->seo());
 
-        self::assertSame('READY', $report->readiness);
+        self::assertSame('INCOMPLETE', $report->readiness);
         self::assertSame([], $report->blockers);
-        self::assertSame([], $report->warnings);
+        self::assertContains('ENUMERATION_PROMISE_UNFULFILLED', $report->warnings);
     }
 
     private function gate(): EditorialQualityGate { return new EditorialQualityGate(); }

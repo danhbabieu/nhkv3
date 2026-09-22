@@ -1,5 +1,38 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-22 — H.3 topic fulfillment and semantic concepts (NO PERSISTENCE)
+
+FIXED_BOUNDARY: Added the shared read-only `TopicFulfillment` evaluator for
+enumeration, comparison, explanation and feature promises. Editorial quality
+now distinguishes factual safety from topic completion and emits deterministic
+coverage diagnostics; unsupported enumerations remain `INCOMPLETE` and may be
+conservatively narrowed in SEO framing without inventing members.
+
+SELECTION_BOUNDARY: `EditorialKnowledgeSelector` preserves eligible Claims
+that add missing enumerated concepts, classifying them as topic-completion
+information rather than redundant information. Eligibility, scope, evidence
+and provenance gates remain unchanged.
+
+SEO_BOUNDARY: `SemanticSeoPlanner` no longer generates arbitrary sliding
+n-grams. Semantic clusters use explicit topic phrases, canonical subject
+labels, eligible Claim concepts and approved Dictionary forms, reject
+fragments, deduplicate normalized equivalents and expose deterministic phrase
+origins in diagnostics. Public leads no longer emit profile labels such as
+`Video:` or `Hình ảnh:`.
+
+VERIFICATION: Focused H.3 retrieval/selector/journey/composer/SEO/quality plus
+Article/Video adapter coverage passes 64 tests / 227 assertions. Full Unit
+suite passes 2,213 tests / 13,211 assertions with repository warnings,
+deprecations and skips. PHP lint and `git diff --check` pass. The full default
+command retains the pre-existing guarded integration/contract environment
+errors and failures when run without `NHK_WP_TEST_PATH=public` and the guarded
+WPDB runtime. The Odo read-only fixture with three explicit supported members
+returns `READY`; the count-only fixture returns `INCOMPLETE` with
+`ENUMERATION_PROMISE_UNFULFILLED`. No schema, migration, persistence or live
+data mutation was performed.
+
+STATUS: `H3_TOPIC_FULFILLMENT_SEMANTIC_CONCEPTS_LOCAL_READY / NO_PERSISTENCE / CHECKPOINT_I_NOT_STARTED`.
+
 # Checkpoint — 2026-09-22 — H.2 editorial naturalness and semantic phrase quality (NO PERSISTENCE)
 
 FIXED_BOUNDARY: Refined the existing shared `SharedEditorialComposer` seam to

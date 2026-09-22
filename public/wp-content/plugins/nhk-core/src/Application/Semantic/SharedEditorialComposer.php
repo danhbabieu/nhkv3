@@ -19,8 +19,6 @@ final class SharedEditorialComposer
         $title = $this->title($plan->topic, $input);
         $paragraphs = [];
         $opening = $input !== '' ? $input : $this->normalizeSentence($plan->topic);
-        if ($plan->profile === 'video' && $opening !== '' && preg_match('/\bvideo\b/iu', $opening) !== 1) $opening = 'Video: ' . $opening;
-        if (in_array($plan->profile, ['image', 'media'], true) && $opening !== '' && preg_match('/\b(?:hình ảnh|ảnh)\b/iu', $opening) !== 1) $opening = 'Hình ảnh: ' . $opening;
         if ($opening !== '') $paragraphs[] = $opening;
 
         $trace = [];

@@ -36,7 +36,7 @@ final class TopicFulfillmentTest extends TestCase
     {
         $claims = [
             $this->claim('overview', 'The instrument has three types of case.'),
-            $this->claim('members', 'The three types are open, closed, and carved.', 'direct'),
+            $this->claim('members', 'The three types are: open, closed, and carved.', 'direct'),
         ];
         $pack = (new EditorialKnowledgeSelector())->select(
             ['status' => 'available', 'eligible_claims' => $claims, 'items' => $claims],
@@ -56,6 +56,21 @@ final class TopicFulfillmentTest extends TestCase
 
         self::assertStringNotContainsString('Video:', $draft->body);
         self::assertStringContainsString('A useful topic.', $draft->body);
+    }
+
+    public function test_comparison_requires_both_sides_and_comparison_language(): void
+    {
+        $evaluator = new TopicFulfillment();
+        $claims = [['text' => 'Alpha and beta are documented.', 'eligibility' => 'eligible']];
+        self::assertTrue($evaluator->evaluate('differences between alpha and beta', $claims, 'The differences between alpha and beta are clear.')['fulfilled']);
+        self::assertSame('COMPARISON_PROMISE_UNFULFILLED', $evaluator->evaluate('differences between alpha and beta', $claims, 'Alpha is documented.')['diagnostic']);
+    }
+
+    public function test_explanation_promise_is_weak_without_an_explanatory_spine(): void
+    {
+        $result = (new TopicFulfillment())->evaluate('how the mechanism works', [['text' => 'The mechanism is documented.', 'eligibility' => 'eligible']], 'The mechanism is documented.');
+
+        self::assertSame('EXPLANATION_PROMISE_WEAK', $result['diagnostic']);
     }
 
     private function claim(string $id, string $text, string $origin = 'neighborhood'): array
