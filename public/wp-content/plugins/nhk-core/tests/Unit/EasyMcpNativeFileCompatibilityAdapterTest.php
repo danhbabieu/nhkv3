@@ -38,6 +38,51 @@ final class EasyMcpNativeFileCompatibilityAdapterTest extends TestCase
         self::assertFalse($structured['items']['additionalProperties']);
     }
 
+    public function test_r2_relationship_endpoint_schema_survives_catalog_ability_and_final_tools_list(): void
+    {
+        $catalog = array_column(McpToolCatalog::tools(), null, 'name');
+        $catalogSchema = $catalog['nhk.capture.ingest']['inputSchema'];
+        $catalogEndpoint = $catalogSchema['properties']['relationship_operations']['items']['properties']['source'];
+
+        $abilitySchema = McpAbilityRegistration::inputSchemaForTool('nhk.capture.ingest');
+        $abilityEndpoint = $abilitySchema['properties']['relationship_operations']['items']['properties']['source'];
+
+        $projected = EasyMcpNativeFileCompatibilityAdapter::projectTools([[
+            'name' => self::TARGET,
+            'inputSchema' => $abilitySchema,
+        ]])[0];
+        $connectorEndpoint = $projected['inputSchema']['properties']['relationship_operations']['items']['properties']['source'];
+
+        $request = new class {
+            public function get_route(): string { return '/easy-mcp-ai/v1/mcp/'; }
+            public function get_json_params(): array { return ['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/list']; }
+        };
+        $final = EasyMcpNativeFileCompatibilityAdapter::projectFinalToolsListDescriptor([
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'result' => ['tools' => [$projected]],
+        ], null, $request);
+        $finalEndpoint = $final['result']['tools'][0]['inputSchema']['properties']['relationship_operations']['items']['properties']['source'];
+
+        foreach ([$catalogEndpoint, $abilityEndpoint, $connectorEndpoint, $finalEndpoint] as $endpoint) {
+            self::assertSame('object', $endpoint['type']);
+            self::assertSame(['type', 'id'], array_keys($endpoint['properties']));
+            self::assertSame('string', $endpoint['properties']['type']['type']);
+            self::assertSame('string', $endpoint['properties']['id']['type']);
+            self::assertSame('uuid', $endpoint['properties']['id']['format']);
+            self::assertSame(['type', 'id'], $endpoint['required']);
+            self::assertFalse($endpoint['additionalProperties']);
+        }
+        self::assertSame($catalogEndpoint, $abilityEndpoint);
+        self::assertSame($catalogEndpoint, $connectorEndpoint);
+        self::assertSame($catalogEndpoint, $finalEndpoint);
+
+        self::assertStrictConnectorValueAccepted(
+            ['type' => 'Video', 'id' => '11111111-1111-4111-8111-111111111111'],
+            $connectorEndpoint,
+        );
+    }
+
     public function test_projection_does_not_change_unrelated_tools(): void
     {
         $tool = ['name' => 'wp_ability_nhk_v3_media_ingest', 'inputSchema' => ['type' => 'object']];
@@ -442,6 +487,23 @@ final class EasyMcpNativeFileCompatibilityAdapterTest extends TestCase
         }
         if (is_array($schema)) {
             foreach ($schema as $child) self::assertValidJsonSchemaNode($child, $toolName);
+        }
+    }
+
+    /** @param array<string,mixed> $value @param array<string,mixed> $schema */
+    private static function assertStrictConnectorValueAccepted(array $value, array $schema): void
+    {
+        self::assertSame('object', $schema['type']);
+        foreach ($schema['required'] as $property) self::assertArrayHasKey($property, $value);
+        if (($schema['additionalProperties'] ?? true) === false) {
+            self::assertSame([], array_diff(array_keys($value), array_keys($schema['properties'])));
+        }
+        foreach ($schema['properties'] as $property => $propertySchema) {
+            if (!array_key_exists($property, $value)) continue;
+            self::assertSame($propertySchema['type'], is_string($value[$property]) ? 'string' : gettype($value[$property]));
+            if (($propertySchema['format'] ?? null) === 'uuid') {
+                self::assertMatchesRegularExpression('/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i', $value[$property]);
+            }
         }
     }
 

@@ -169,6 +169,23 @@ final class CompletionConvergenceTest extends TestCase
         self::assertSame('NOT_APPLICABLE', $packet['frontend_state']);
     }
 
+    public function test_public_semantic_dependency_uses_internal_completion_role_not_public_projection(): void
+    {
+        $packet = (new CompletionCoordinator())->finalize('knowledge', 'claim-public-1', [
+            'canonical_readback' => ['canonical_id' => 'claim-public-1'],
+            'dependency_state' => 'COMPLETE',
+            'relation_or_usage_state' => 'COMPLETE',
+            'owner_role' => 'semantic_dependency',
+            'public_projection_owner' => false,
+            'public_eligible' => true,
+            'frontend_verified' => true,
+        ]);
+
+        self::assertTrue($packet['complete']);
+        self::assertSame('NOT_APPLICABLE', $packet['public_state']);
+        self::assertSame('NOT_APPLICABLE', $packet['frontend_state']);
+    }
+
     public function test_real_semantic_dependency_failure_still_blocks_completion(): void
     {
         $packet = (new CompletionCoordinator())->finalize('evidence', 'evidence-1', [

@@ -18,12 +18,7 @@ final class McpSchemaParityTest extends TestCase
             $catalogSchema = $tool['inputSchema'];
             $abilitySchema = McpAbilityRegistration::inputSchemaForTool($toolName);
             if ($toolName === 'nhk.media.ingest') foreach (['file', 'filename', 'max_width', 'max_height', 'quality'] as $property) unset($catalogSchema['properties'][$property]);
-            self::assertSame(array_keys($catalogSchema['properties'] ?? []), array_keys($abilitySchema['properties'] ?? []), $toolName);
-            self::assertSame($catalogSchema['required'] ?? [], $abilitySchema['required'] ?? [], $toolName);
-            foreach (array_keys($catalogSchema['properties'] ?? []) as $property) {
-                if ($toolName === 'nhk.capture.ingest' && $property === 'files') continue;
-                self::assertSame($catalogSchema['properties'][$property], $abilitySchema['properties'][$property], $toolName . '.' . $property);
-            }
+            self::assertSchemaParity($catalogSchema, $abilitySchema, $toolName, $toolName === 'nhk.capture.ingest' ? ['nhk.capture.ingest.properties.files'] : []);
         }
     }
 
@@ -59,5 +54,41 @@ final class McpSchemaParityTest extends TestCase
         self::assertSame(count(McpToolCatalog::names()), count($hashes));
         self::assertMatchesRegularExpression('/^[a-f0-9]{64}$/', $hashes['nhk.capture.ingest']);
         self::assertSame($hashes['nhk.capture.ingest'], McpToolCatalog::schemaHash('nhk.capture.ingest'));
+    }
+
+    /** @param array<string,mixed> $expected @param array<string,mixed> $actual @param list<string> $ignored */
+    private static function assertSchemaParity(array $expected, array $actual, string $path, array $ignored): void
+    {
+        if (in_array($path, $ignored, true)) return;
+
+        $keys = array_values(array_unique(array_merge(array_keys($expected), array_keys($actual))));
+        foreach ($keys as $key) {
+            $childPath = $path . '.' . $key;
+            if ($key === 'properties' || $key === 'patternProperties' || $key === '$defs' || $key === 'definitions') {
+                $expectedProperties = $expected[$key] ?? [];
+                $actualProperties = $actual[$key] ?? [];
+                self::assertSame(array_keys($expectedProperties), array_keys($actualProperties), $childPath);
+                foreach (array_keys($expectedProperties) as $property) {
+                    self::assertSchemaParity($expectedProperties[$property], $actualProperties[$property], $childPath . '.' . $property, $ignored);
+                }
+                continue;
+            }
+            if (in_array($key, ['items', 'additionalProperties', 'contains', 'propertyNames', 'not'], true)) {
+                if (is_array($expected[$key] ?? null) && is_array($actual[$key] ?? null)) {
+                    self::assertSchemaParity($expected[$key], $actual[$key], $childPath, $ignored);
+                } else {
+                    self::assertSame($expected[$key] ?? null, $actual[$key] ?? null, $childPath);
+                }
+                continue;
+            }
+            if (in_array($key, ['allOf', 'anyOf', 'oneOf', 'prefixItems'], true)) {
+                self::assertCount(count($expected[$key] ?? []), $actual[$key] ?? [], $childPath);
+                foreach (array_keys($expected[$key] ?? []) as $index) {
+                    self::assertSchemaParity($expected[$key][$index], $actual[$key][$index], $childPath . '.' . $index, $ignored);
+                }
+                continue;
+            }
+            self::assertSame($expected[$key] ?? null, $actual[$key] ?? null, $childPath);
+        }
     }
 }

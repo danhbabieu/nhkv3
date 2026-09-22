@@ -6,7 +6,9 @@ namespace NHK\Tests\Unit;
 use NHK\Core\Application\Capture\{EditorialCaptureContinuationService, EditorialCaptureCoordinator};
 use NHK\Core\Application\Mcp\{McpDocumentationRegistry, McpGovernanceHandler, McpReadHandler, McpTransport};
 use NHK\Core\Application\Governance\GovernanceService;
+use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
 use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, SubjectResolutionService, TextInputInterpreter};
+use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim, Source};
 use NHK\Core\Contracts\Capture\{CaptureAddendumRepository, CaptureRepository};
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
@@ -205,6 +207,99 @@ final class EditorialCaptureContinuationTest extends TestCase
         self::assertSame(2, $events['video_verifier']);
         self::assertFalse($converged['retry']['eligible']);
         self::assertSame('CAPTURE_RETRY_NOT_ALLOWED', $converged['retry']['reason']);
+    }
+
+    public function test_video_retry_refreshes_private_hidden_dependencies_from_internal_canonical_readback(): void
+    {
+        $captures = new ContinuationCaptureRepository();
+        $addenda = new ContinuationAddendumRepository();
+        $sourceId = UuidCodec::newV7();
+        $claimId = UuidCodec::newV7();
+        $evidenceId = UuidCodec::newV7();
+        $videoId = UuidCodec::newV7();
+        $source = new Source($sourceId, 'source:private', 'Private source', metadata: ['visibility' => 'PRIVATE']);
+        $claim = new KnowledgeClaim($claimId, 'claim:private', 'Verified private claim', provenance: ['metadata' => ['verification_status' => 'PRIVATE']]);
+        $evidence = new Evidence($evidenceId, $claimId, $sourceId, excerpt: 'Hidden supporting excerpt', metadata: ['visibility' => 'HIDDEN']);
+        $claims = $this->createMock(KnowledgeRepository::class);
+        $claims->method('findByCanonicalId')->with($claimId)->willReturn($claim);
+        $sources = $this->createMock(SourceRepository::class);
+        $sources->method('findByCanonicalId')->with($sourceId)->willReturn($source);
+        $evidenceRepository = $this->createMock(EvidenceRepository::class);
+        $evidenceRepository->method('findByCanonicalId')->with($evidenceId)->willReturn($evidence);
+        $validator = new CanonicalDependencyValidator($claims, $sources, $evidenceRepository);
+        $capture = new CaptureRecord(
+            UuidCodec::newV7(),
+            'capture-internal-dependency-readback',
+            hash('sha256', 'internal-dependency-readback'),
+            CaptureStage::SEMANTICS_RECONCILED->value,
+            'PARTIAL',
+            null,
+            null,
+            [['kind' => 'video', 'video_id' => $videoId, 'video_proposal' => ['payload' => ['canonical_id' => $videoId]]]],
+            ['purpose' => 'EDITORIAL', 'content_intent' => ['intent' => 'VIDEO', 'article_required' => false]],
+            [
+                'completion' => ['status' => 'PARTIAL', 'blockers' => ['CANONICAL_READBACK_UNVERIFIED'], 'children' => []],
+                'semantic_write_back' => ['status' => 'APPLIED', 'canonical_readback' => ['canonical_id' => $videoId], 'writes' => [
+                    ['entity_type' => 'source', 'canonical_id' => $sourceId, 'completion' => ['owner_type' => 'source', 'owner_id' => $sourceId, 'canonical_state' => 'BLOCKED', 'canonical_readback_verified' => false, 'dependency_state' => 'COMPLETE', 'relation_or_usage_state' => 'COMPLETE', 'blockers' => ['CANONICAL_READBACK_UNVERIFIED']]],
+                    ['entity_type' => 'knowledge', 'canonical_id' => $claimId, 'completion' => ['owner_type' => 'knowledge', 'owner_id' => $claimId, 'canonical_state' => 'BLOCKED', 'canonical_readback_verified' => false, 'dependency_state' => 'COMPLETE', 'relation_or_usage_state' => 'COMPLETE', 'blockers' => ['CANONICAL_READBACK_UNVERIFIED']]],
+                    ['entity_type' => 'evidence', 'canonical_id' => $evidenceId, 'completion' => ['owner_type' => 'evidence', 'owner_id' => $evidenceId, 'canonical_state' => 'BLOCKED', 'canonical_readback_verified' => false, 'dependency_state' => 'COMPLETE', 'relation_or_usage_state' => 'COMPLETE', 'blockers' => ['CANONICAL_READBACK_UNVERIFIED']]],
+                ]],
+            ],
+            [],
+        );
+        $captures->create($capture);
+        $events = [];
+        $service = new EditorialCaptureContinuationService($captures, $addenda, $this->coordinator($captures, $events, null, static fn (array $context): array => ['status' => 'verified', 'items' => [['video_id' => $videoId, 'completion' => ['owner_type' => 'video', 'owner_id' => $videoId, 'canonical_state' => 'COMPLETE', 'canonical_readback_verified' => true, 'dependency_state' => 'COMPLETE', 'relation_or_usage_state' => 'COMPLETE', 'content_state' => 'CONTENT_COMPLETE', 'public_state' => 'READY', 'frontend_state' => 'VERIFIED', 'complete' => true, 'status' => 'COMPLETE', 'blockers' => []]]], 'blockers' => []], $validator));
+
+        $result = $service->retry(['capture_id' => $capture->captureId, 'resume_mode' => 'RETRY']);
+        $children = $result['capture']['diagnostics']['completion']['children'];
+        $byType = [];
+        foreach ($children as $child) $byType[(string) ($child['owner_type'] ?? '')] = $child;
+
+        self::assertSame('COMPLETE', $result['capture']['status']);
+        self::assertSame('COMPLETE', $byType['source']['status']);
+        self::assertSame('COMPLETE', $byType['knowledge']['status']);
+        self::assertSame('COMPLETE', $byType['evidence']['status']);
+        self::assertSame('COMPLETE', $byType['video']['status']);
+        self::assertNotContains('CANONICAL_READBACK_UNVERIFIED', $result['capture']['diagnostics']['completion']['blockers']);
+        self::assertFalse($result['retry']['eligible']);
+    }
+
+    public function test_missing_internal_dependency_remains_blocked(): void
+    {
+        $claims = $this->createMock(KnowledgeRepository::class);
+        $claims->method('findByCanonicalId')->willReturn(null);
+        $validator = new CanonicalDependencyValidator($claims, $this->createMock(SourceRepository::class), $this->createMock(EvidenceRepository::class));
+        $captures = new ContinuationCaptureRepository();
+        $events = [];
+        $coordinator = $this->coordinator($captures, $events, null, null, $validator);
+        $method = new \ReflectionMethod($coordinator, 'refreshVideoDependencyWrites');
+        $method->setAccessible(true);
+        $claimId = UuidCodec::newV7();
+        $result = $method->invoke($coordinator, ['writes' => [['entity_type' => 'knowledge', 'canonical_id' => $claimId, 'completion' => ['owner_type' => 'knowledge', 'owner_id' => $claimId, 'canonical_readback' => ['canonical_id' => $claimId, 'revision' => 1], 'dependency_state' => 'COMPLETE', 'relation_or_usage_state' => 'COMPLETE']]]]);
+
+        self::assertSame('BLOCKED', $result['writes'][0]['completion']['canonical_state']);
+        self::assertContains('CANONICAL_CLAIM_REQUIRED', $result['writes'][0]['completion']['blockers']);
+        self::assertFalse($result['writes'][0]['completion']['complete']);
+    }
+
+    public function test_internal_dependency_revision_drift_remains_blocked(): void
+    {
+        $claimId = UuidCodec::newV7();
+        $claim = new KnowledgeClaim($claimId, 'claim:drift', 'Current claim', revision: 2);
+        $claims = $this->createMock(KnowledgeRepository::class);
+        $claims->method('findByCanonicalId')->with($claimId)->willReturn($claim);
+        $validator = new CanonicalDependencyValidator($claims, $this->createMock(SourceRepository::class), $this->createMock(EvidenceRepository::class));
+        $captures = new ContinuationCaptureRepository();
+        $events = [];
+        $coordinator = $this->coordinator($captures, $events, null, null, $validator);
+        $method = new \ReflectionMethod($coordinator, 'refreshVideoDependencyWrites');
+        $method->setAccessible(true);
+        $result = $method->invoke($coordinator, ['writes' => [['entity_type' => 'knowledge', 'canonical_id' => $claimId, 'completion' => ['owner_type' => 'knowledge', 'owner_id' => $claimId, 'canonical_readback' => ['canonical_id' => $claimId, 'revision' => 1], 'dependency_state' => 'COMPLETE', 'relation_or_usage_state' => 'COMPLETE']]]]);
+
+        self::assertSame('BLOCKED', $result['writes'][0]['completion']['canonical_state']);
+        self::assertContains('CANONICAL_DEPENDENCY_REVISION_MISMATCH', $result['writes'][0]['completion']['blockers']);
+        self::assertFalse($result['writes'][0]['completion']['complete']);
     }
 
     public function test_complete_capture_without_missing_owner_is_read_only_no_op(): void
@@ -855,7 +950,7 @@ final class EditorialCaptureContinuationTest extends TestCase
     }
 
     /** @param array<string,int|string> $events */
-    private function coordinator(ContinuationCaptureRepository $captures, array &$events, ?callable $semantic = null, ?callable $videoVerifier = null): EditorialCaptureCoordinator
+    private function coordinator(ContinuationCaptureRepository $captures, array &$events, ?callable $semantic = null, ?callable $videoVerifier = null, ?CanonicalDependencyValidator $canonicalDependencies = null): EditorialCaptureCoordinator
     {
         return new EditorialCaptureCoordinator(
             $captures,
@@ -875,6 +970,7 @@ final class EditorialCaptureContinuationTest extends TestCase
             null,
             null,
             $videoVerifier,
+            canonicalDependencies: $canonicalDependencies,
         );
     }
 }

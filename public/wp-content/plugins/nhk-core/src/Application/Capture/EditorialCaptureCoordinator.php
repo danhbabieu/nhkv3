@@ -13,6 +13,8 @@ use NHK\Core\Domain\Capture\CapturePurpose;
 use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Core\Application\Mcp\McpDocumentationRegistry;
 use NHK\Core\Application\Governance\StagingAcceptanceScopeVerifier;
+use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
+use NHK\Core\Domain\Knowledge\DependencyValidationException;
 use NHK\Core\Governance\Exception\{GovernanceException, ProposalIdempotencyConflict, ProposalIdempotencyStaleBinding, ProposalSubjectBindingInvalid};
 use NHK\Core\Domain\Video\VideoRelationEvidenceRequired;
 
@@ -53,6 +55,7 @@ final class EditorialCaptureCoordinator
         private ?\NHK\Core\Application\Media\VisualSupportRequirementService $visualSupportRequirements = null,
         private ?MediaBindingPort $mediaBindingService = null,
         private ?StagingAcceptanceScopeVerifier $stagingScopeVerifier = null,
+        private ?CanonicalDependencyValidator $canonicalDependencies = null,
     ) { $this->completion = $completion ?? new CompletionCoordinator(); }
 
     /** @param array<string,mixed> $input */
@@ -122,6 +125,7 @@ final class EditorialCaptureCoordinator
         $intent = is_array($record->context['content_intent'] ?? null) ? $record->context['content_intent'] : [];
         if (strtoupper(trim((string) ($intent['intent'] ?? ''))) !== 'VIDEO') throw new \RuntimeException('CAPTURE_VIDEO_COMPLETION_RETRY_NOT_SUPPORTED');
         $writes = is_array($record->diagnostics['semantic_write_back'] ?? null) ? $record->diagnostics['semantic_write_back'] : [];
+        $writes = $this->refreshVideoDependencyWrites($writes);
         if (!in_array(strtoupper(trim((string) ($writes['status'] ?? ''))), ['APPLIED', 'IDEMPOTENT', 'REUSED', 'REUSED_VERIFIED', 'ALREADY_APPLIED'], true)) {
             throw new \RuntimeException('CAPTURE_VIDEO_COMPLETION_RETRY_CANONICAL_READBACK_REQUIRED');
         }
@@ -150,6 +154,57 @@ final class EditorialCaptureCoordinator
             'at' => gmdate('c'),
         ];
         return $this->finishNonArticleIntent($record, $record->assets, $diagnostics, $record->phaseReceipts, $intent, $retrieved, $writes, $videoPublication, $resolution, $media);
+    }
+
+    /** @param array<string,mixed> $writes @return array<string,mixed> */
+    private function refreshVideoDependencyWrites(array $writes): array
+    {
+        if ($this->canonicalDependencies === null) return $writes;
+        $items = is_array($writes['writes'] ?? null) ? $writes['writes'] : [];
+        foreach ($items as $index => $write) {
+            if (!is_array($write) || !is_array($write['completion'] ?? null)) continue;
+            $completion = $write['completion'];
+            $ownerType = strtolower(trim((string) ($completion['owner_type'] ?? $write['entity_type'] ?? '')));
+            $ownerId = trim((string) ($completion['owner_id'] ?? $write['canonical_id'] ?? ''));
+            $kind = $ownerType === 'knowledge' ? 'claim' : $ownerType;
+            if (!in_array($kind, ['source', 'claim', 'evidence'], true) || $ownerId === '') continue;
+            $recordedReadback = is_array($completion['canonical_readback'] ?? null)
+                ? $completion['canonical_readback']
+                : (is_array($write['canonical_readback'] ?? null) ? $write['canonical_readback'] : []);
+            $recordedRevision = (int) ($recordedReadback['revision'] ?? 0);
+            try {
+                $entity = match ($kind) {
+                    'source' => $this->canonicalDependencies->source($ownerId),
+                    'claim' => $this->canonicalDependencies->claim($ownerId),
+                    'evidence' => $this->canonicalDependencies->evidence($ownerId),
+                };
+                $currentReadback = ['canonical_id' => $ownerId, 'entity_type' => $kind === 'claim' ? 'knowledge' : $kind, 'active' => $entity->active, 'revision' => $entity->revision];
+                $revisionDrift = $recordedRevision > 0 && $recordedRevision !== $entity->revision;
+                $blockers = array_values(array_filter(array_map('strval', (array) ($completion['blockers'] ?? [])), static fn (string $blocker): bool => !in_array($blocker, ['CANONICAL_READBACK_UNVERIFIED', 'PUBLIC_ELIGIBILITY_NOT_VERIFIED', 'FRONTEND_READBACK_NOT_VERIFIED'], true)));
+                if ($revisionDrift) $blockers[] = 'CANONICAL_DEPENDENCY_REVISION_MISMATCH';
+                $items[$index]['completion'] = $this->completion->finalize($ownerType, $ownerId, [
+                    'canonical_state' => $revisionDrift ? 'BLOCKED' : 'COMPLETE',
+                    'canonical_readback' => $currentReadback,
+                    'dependency_state' => $completion['dependency_state'] ?? 'COMPLETE',
+                    'relation_or_usage_state' => $completion['relation_or_usage_state'] ?? 'COMPLETE',
+                    'blockers' => $blockers,
+                    'owner_role' => 'semantic_dependency',
+                    'public_projection_owner' => false,
+                ]);
+            } catch (\Throwable $error) {
+                $code = $error instanceof DependencyValidationException ? $error->errorCode : 'CANONICAL_DEPENDENCY_READBACK_UNAVAILABLE';
+                $items[$index]['completion'] = $this->completion->finalize($ownerType, $ownerId, [
+                    'canonical_state' => 'BLOCKED',
+                    'dependency_state' => 'BLOCKED',
+                    'relation_or_usage_state' => $completion['relation_or_usage_state'] ?? 'PARTIAL',
+                    'blockers' => [$code],
+                    'owner_role' => 'semantic_dependency',
+                    'public_projection_owner' => false,
+                ]);
+            }
+        }
+        $writes['writes'] = $items;
+        return $writes;
     }
 
     /** Continue an existing Capture without repeating physical or draft creation. */

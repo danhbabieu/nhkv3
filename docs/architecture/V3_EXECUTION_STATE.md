@@ -16337,3 +16337,31 @@ performed.
 STATUS=`CAPTURE_COMPLETION_CURRENT_OWNER_CONVERGENCE_FIXED_LOCALLY / FULL_UNIT_PASS / NO_LIVE_MUTATION`.
 
 NEXT_EXACT_ACTION: `USER_PUSH_PULL_BUILD; THEN RETRY EXISTING CAPTURE ON @v38 AND VERIFY FINAL CONVERGENCE`.
+
+# Checkpoint — 2026-09-22 — Internal canonical dependency readback (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE_CONFIRMED: Video dependency completion could retain
+`CANONICAL_READBACK_UNVERIFIED` when a public Knowledge read surface suppressed
+a PRIVATE/HIDDEN Source, Claim or Evidence object. The bounded completion retry
+was correctly re-running Video/public readiness, but dependency projections did
+not refresh from the internal canonical repository boundary.
+
+FIXED_BOUNDARIES: Completion-only Video retry now refreshes Source/Claim/Evidence
+through the existing `CanonicalDependencyValidator`, validating canonical UUID,
+active lifecycle and recorded revision before recomputing dependency completion.
+Public MCP visibility is not used as canonical existence. Missing, inactive or
+revision-drifted dependencies remain fail-closed. The governed dependency
+runner's readback predicate also prefers the same internal validator when
+available. Existing current-owner convergence, Video public readiness and
+retry orchestration are unchanged.
+
+REGRESSION: Private Source, private Claim and hidden Evidence converge through
+internal readback without public visibility changes. Missing dependency and
+revision drift remain blocked. Focused retry/completion/read suites pass 50
+tests / 232 assertions. PHP lint and `git diff --check` pass. Full Unit suite
+passes 2,090 tests / 12,339 assertions with existing warnings and deprecations.
+No schema, migration, deployment, push or live mutation was performed.
+
+STATUS=`VIDEO_CAPTURE_INTERNAL_DEPENDENCY_READBACK_FIXED_LOCALLY / FULL_UNIT_PASS / NO_LIVE_MUTATION`.
+
+NEXT_EXACT_ACTION: `USER_PUSH_PULL_BUILD; THEN RETRY EXISTING CAPTURE ON @v39 AND VERIFY COMPLETE`.

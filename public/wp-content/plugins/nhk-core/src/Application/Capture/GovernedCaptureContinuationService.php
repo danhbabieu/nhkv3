@@ -1035,6 +1035,21 @@ final class GovernedCaptureContinuationService
 
     private function dependencyReadback(array $plan, string $kind, string $expectedId): bool
     {
+        if ($this->canonicalDependencies !== null) {
+            try {
+                $entity = match ($kind) {
+                    'source' => $this->canonicalDependencies->source($expectedId),
+                    'claim' => $this->canonicalDependencies->claim($expectedId),
+                    'evidence' => $this->canonicalDependencies->evidence($expectedId),
+                    default => null,
+                };
+                if ($entity === null || !$entity->active) return false;
+                $expectedRevision = (int) (($plan['payload']['expected_revision'] ?? $plan['expected_revision'] ?? 0));
+                return $expectedRevision < 1 || $entity->revision === $expectedRevision;
+            } catch (\Throwable) {
+                return false;
+            }
+        }
         if ($this->videoDependencyState === null) return true;
         try {
             $state = ($this->videoDependencyState)($plan);

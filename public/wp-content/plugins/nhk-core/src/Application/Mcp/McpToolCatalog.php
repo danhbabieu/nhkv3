@@ -26,7 +26,7 @@ final class McpToolCatalog
             self::tool('nhk.relationship.registry', 'Read-only projection of the executable endpoint and predicate registries.', [], []),
             self::tool('nhk.relationship.list', 'Read-only bounded relationship listing across the canonical Graph owner.', ['filters' => ['type' => 'object'], 'limit' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 200], 'after' => ['type' => 'string']], []),
             self::tool('nhk.relationship.get', 'Read one canonical Graph relationship without mutation.', ['id' => self::uuidField()], ['id']),
-            self::tool('nhk.relationship.preview', 'Read-only deterministic relationship transition preview for ADD, REPLACE, REMOVE or REACTIVATE.', ['operation' => ['type' => 'string', 'enum' => ['ADD', 'REPLACE', 'REMOVE', 'REACTIVATE']], 'relationship_kind' => ['type' => 'string', 'enum' => ['graph', 'media_usage', 'evidence']], 'source' => ['type' => 'object'], 'target' => ['type' => 'object'], 'predicate' => ['type' => 'string'], 'current_relation_id' => self::uuidField(true), 'expected_revision' => ['type' => 'integer', 'minimum' => 1], 'provenance' => ['type' => 'string'], 'evidence_refs' => ['type' => 'array', 'items' => ['type' => 'object']], 'reason' => ['type' => 'string']], ['operation', 'source', 'target', 'predicate']),
+            self::tool('nhk.relationship.preview', 'Read-only deterministic relationship transition preview for ADD, REPLACE, REMOVE or REACTIVATE.', ['operation' => ['type' => 'string', 'enum' => ['ADD', 'REPLACE', 'REMOVE', 'REACTIVATE']], 'relationship_kind' => ['type' => 'string', 'enum' => ['graph', 'media_usage', 'evidence']], 'source' => self::endpointReferenceField(), 'target' => self::endpointReferenceField(), 'predicate' => ['type' => 'string'], 'current_relation_id' => self::uuidField(true), 'expected_revision' => ['type' => 'integer', 'minimum' => 1], 'provenance' => ['type' => 'string'], 'evidence_refs' => ['type' => 'array', 'items' => ['type' => 'object']], 'reason' => ['type' => 'string']], ['operation', 'source', 'target', 'predicate']),
             self::tool('nhk.relation.backfill.dry_run', 'Read-only relation backfill scan with fail-closed machine-readable statuses.', ['records' => ['type' => 'array', 'items' => ['type' => 'object']]], ['records']),
             self::tool('nhk.relation.backfill.apply', 'Apply an authenticated, explicitly confirmed batch of deterministic relation candidates through Governance.', ['candidates' => ['type' => 'array', 'items' => ['type' => 'object']], 'approval_confirmed' => ['type' => 'boolean']], ['candidates', 'approval_confirmed'], true),
             self::tool('nhk.semantic.resolve', 'Resolve read-only Authority context by UUID, stable key or exact name/alias; ambiguous matches remain candidates.', ['context' => ['type' => 'object']], ['context']),
@@ -52,9 +52,9 @@ final class McpToolCatalog
                     'items' => ['type' => 'object', 'additionalProperties' => false, 'properties' => [
                         'operation' => ['type' => 'string', 'enum' => ['ADD', 'REPLACE', 'REMOVE', 'REACTIVATE']],
                         'relationship_kind' => ['type' => 'string', 'enum' => ['graph']],
-                        'source' => ['type' => 'object', 'required' => ['type', 'id'], 'additionalProperties' => false],
+                        'source' => self::endpointReferenceField(),
                         'predicate' => ['type' => 'string', 'minLength' => 1],
-                        'target' => ['type' => 'object', 'required' => ['type', 'id'], 'additionalProperties' => false],
+                        'target' => self::endpointReferenceField(),
                         'current_relation_id' => self::uuidField(true),
                         'expected_edge_revision' => ['type' => 'integer', 'minimum' => 1],
                         'provenance' => ['type' => 'string'],
@@ -502,6 +502,20 @@ final class McpToolCatalog
     private static function uuidField(bool $nullable = false): array
     {
         return ['type' => $nullable ? ['string', 'null'] : 'string', 'format' => 'uuid', 'pattern' => '^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[1-8][0-9A-Fa-f]{3}-[89ABab][0-9A-Fa-f]{3}-[0-9A-Fa-f]{12}$'];
+    }
+
+    /** @return array{type:string,properties:array<string,array>,required:list<string>,additionalProperties:bool} */
+    private static function endpointReferenceField(): array
+    {
+        return [
+            'type' => 'object',
+            'properties' => [
+                'type' => ['type' => 'string', 'minLength' => 1],
+                'id' => self::uuidField(),
+            ],
+            'required' => ['type', 'id'],
+            'additionalProperties' => false,
+        ];
     }
 
     private static function mediaAssetField(): array

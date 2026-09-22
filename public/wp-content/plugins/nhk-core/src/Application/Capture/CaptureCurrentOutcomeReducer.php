@@ -40,6 +40,7 @@ final class CaptureCurrentOutcomeReducer
         if ($hints === [] && self::supportsCanonicalVideoCompletionRetry($capture)) $hints = ['video'];
         if ($requested === [] && self::supportsCanonicalVideoCompletionRetry($capture)) $requested = ['video'];
         if ($hints === [] || $requested === [] || array_diff($requested, $hints) !== []) return ['eligible' => false, 'reason' => 'CAPTURE_RETRY_NOT_ALLOWED'];
+        if (self::supportsCanonicalVideoCompletionRetry($capture) && $requested === ['video']) return ['eligible' => true, 'reason' => null];
 
         $missing = (array) ($completion['missing_required_owners'] ?? []);
         $children = (array) ($completion['children'] ?? []);
