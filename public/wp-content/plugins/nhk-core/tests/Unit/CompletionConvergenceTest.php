@@ -181,6 +181,62 @@ final class CompletionConvergenceTest extends TestCase
         self::assertTrue($packet['complete']);
     }
 
+    public function test_persisted_capture_path_keeps_current_dependency_over_later_historical_projection(): void
+    {
+        $captureId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+        $sourceId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+        $coordinator = (new \ReflectionClass(EditorialCaptureCoordinator::class))->newInstanceWithoutConstructor();
+        $childrenMethod = new \ReflectionMethod($coordinator, 'completionChildren');
+        $childrenMethod->setAccessible(true);
+        $children = $childrenMethod->invoke($coordinator, new CaptureRecord($captureId, 'capture-current-precedence', hash('sha256', 'capture-current-precedence'), 'SEMANTICS_RECONCILED', 'PARTIAL'), [
+            'writes' => [
+                ['entity_type' => 'source', 'canonical_id' => $sourceId, 'completion' => [
+                    'owner_type' => 'source', 'owner_id' => $sourceId, 'status' => 'COMPLETE', 'complete' => true,
+                    'canonical_state' => 'COMPLETE', 'canonical_readback' => ['canonical_id' => $sourceId],
+                    'canonical_readback_verified' => true, 'dependency_state' => 'COMPLETE',
+                    'relation_or_usage_state' => 'COMPLETE', 'blockers' => [],
+                ]],
+            ],
+        ], [], [], [], [], false);
+
+        self::assertTrue($children[0]['current_outcome']);
+        // Historical data is deliberately later in the persisted aggregate input.
+        $children[] = ['completion' => [
+            'owner_type' => 'source', 'owner_id' => $sourceId, 'status' => 'PARTIAL', 'complete' => false,
+            'canonical_state' => 'BLOCKED', 'blockers' => ['HISTORICAL_FAILURE'],
+        ]];
+        $completion = (new CompletionCoordinator())->aggregateCapture($captureId, $children, [
+            'canonical_state' => 'COMPLETE', 'canonical_readback' => ['canonical_id' => $captureId],
+            'required_owners' => [['owner_type' => 'source', 'owner_id' => $sourceId]],
+            'semantic_dependency_owner_types' => ['source'],
+        ]);
+
+        $row = json_decode(json_encode(['diagnostics' => ['completion' => $completion]], JSON_THROW_ON_ERROR), true, 512, JSON_THROW_ON_ERROR);
+        $reloaded = new CaptureRecord($captureId, 'capture-current-precedence', hash('sha256', 'capture-current-precedence'), 'SEMANTICS_RECONCILED', 'COMPLETE', diagnostics: $row['diagnostics']);
+        $repository = new class($reloaded) implements \NHK\Core\Contracts\Capture\CaptureRepository {
+            public function __construct(private CaptureRecord $record) {}
+            public function findByIdempotencyKey(string $key): ?CaptureRecord { return null; }
+            public function findById(string $captureId): ?CaptureRecord { return $captureId === $this->record->captureId ? $this->record : null; }
+            public function create(CaptureRecord $record): CaptureRecord { return $record; }
+            public function save(CaptureRecord $record): CaptureRecord { return $record; }
+        };
+        $read = new \NHK\Core\Application\Mcp\McpReadHandler(
+            $this->createMock(\NHK\Core\Contracts\Authority\AuthorityRepository::class),
+            new \NHK\Core\Domain\Authority\EntityTypeRegistry(),
+            $this->createMock(\NHK\Core\Contracts\Media\MediaRepository::class),
+            $this->createMock(\NHK\Core\Contracts\Media\MediaAssetRepository::class),
+            $this->createMock(\NHK\Core\Contracts\Media\MediaUsageRepository::class),
+            $this->createMock(\NHK\Core\Contracts\Video\VideoRepository::class),
+            $this->createMock(\NHK\Core\Contracts\Knowledge\KnowledgeRepository::class),
+            $this->createMock(\NHK\Core\Contracts\Knowledge\EvidenceRepository::class),
+            captures: $repository,
+        );
+
+        self::assertSame('COMPLETE', $completion['children'][0]['status']);
+        self::assertSame('COMPLETE', $reloaded->diagnostics['completion']['children'][0]['status']);
+        self::assertSame('COMPLETE', $read->captureGet($captureId)['owners'][0]['status']);
+    }
+
     public function test_semantic_video_dependencies_do_not_require_public_frontend_routes(): void
     {
         $packet = (new CompletionCoordinator())->finalize('knowledge', 'claim-1', [

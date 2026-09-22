@@ -1373,7 +1373,10 @@ final class EditorialCaptureCoordinator
             if (!is_array($write) || !isset($write['completion']) && trim((string) ($write['canonical_id'] ?? '')) === '') continue;
             $type = trim((string) ($write['entity_type'] ?? 'knowledge')) ?: 'knowledge';
             $children[] = is_array($write['completion'] ?? null)
-                ? ['completion' => $write['completion']]
+                // These writes are the freshly recomputed current outcome.
+                // Mark them explicitly so a historical projection for the
+                // same owner cannot overwrite them during aggregation.
+                ? ['completion' => $write['completion'], 'current_outcome' => true]
                 : ['owner_type' => $type, 'owner_id' => (string) ($write['canonical_id'] ?? ''), 'canonical_readback' => $write['canonical_readback'] ?? null, 'dependency_state' => ($write['status'] ?? '') === 'APPLIED' ? 'COMPLETE' : 'PARTIAL', 'blockers' => (array) ($write['blockers'] ?? [])];
         }
         foreach ((array) ($videoPublication['items'] ?? []) as $video) if (is_array($video) && is_array($video['completion'] ?? null)) $children[] = ['completion' => $video['completion'], 'current_outcome' => true];

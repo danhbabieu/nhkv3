@@ -1,5 +1,29 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-22 — Final live v41 Capture convergence precedence (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE_CONFIRMED: `EditorialCaptureCoordinator::completionChildren()` did
+not mark freshly recomputed semantic dependency completions as current outcomes.
+When a historical projection for the same `owner_type + owner_id` appeared
+later in the aggregate input, `CompletionCoordinator::effectiveChildren()` was
+allowed to select that historical PARTIAL/BLOCKED packet. The repository JSON
+round-trip preserved the selected packet correctly; `capture_get` then exposed
+the stale projection faithfully.
+
+FIXED_BOUNDARY: Current semantic dependency writes now carry
+`current_outcome=true` into Capture aggregation. Historical receipts remain
+immutable and current failures still win over historical success; no validator,
+dependency reconstruction, Governance, Controlled Apply, Graph, Video writer,
+retry routing or semantic writer was changed.
+
+PROOF: Production-shaped completionChildren → aggregate → JSON persistence /
+rehydration → `McpReadHandler::captureGet` test proves Source remains COMPLETE
+when a later historical projection is PARTIAL. Focused Capture convergence /
+continuation/read suite passes 58 tests / 284 assertions. PHP lint and
+`git diff --check` pass. No deployment, live read or semantic mutation occurred.
+
+STATUS: `CAPTURE_V41_CURRENT_OUTCOME_PRECEDENCE_FIXED_LOCAL / FOCUSED_PASS / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-22 — NHK Image Upload MCP App v2 fixed resource (LOCAL / NO LIVE MUTATION)
 
 FIXED_GAP: Easy MCP's final `tools/list` projection now publishes the canonical
