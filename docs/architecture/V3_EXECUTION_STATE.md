@@ -17026,3 +17026,26 @@ and `git diff --check` pass. No schema/migration, live Article, Knowledge,
 Evidence, Media, Video, staging, production or deployment mutation occurred.
 
 STATUS=`ARTICLE_SHARED_EDITORIAL_INTEGRATION_FIXED_LOCALLY / FULL_UNIT_PASS / NO_LIVE_MUTATION`.
+
+# Checkpoint — 2026-09-22 — Video integration with shared grounded editorial core (LOCAL / NO LIVE MUTATION)
+
+SCOPE: Existing Video intake and explicit Video resume now consume the shared
+retrieval → selection → reader journey → VIDEO-profile draft → semantic SEO →
+quality gate pipeline through `VideoEditorialAdapter`. Existing Video UUID,
+external platform identity, source metadata, Governance update path, resume
+fingerprint and canonical read-back boundaries remain owner-controlled.
+
+QUALITY BOUNDARY: With the shared adapter wired, `BLOCKED` fails closed before
+Video proposal/update mutation; it cannot fall back to legacy Video prose.
+`INCOMPLETE` remains subject to existing Video completeness/readiness behavior;
+`READY` maps the transient shared draft into the existing editorial/SEO package.
+Claim IDs/revisions participate through the existing resume fingerprint. No
+Context Pack, Plan, Draft or QualityReport persistence table was introduced.
+
+VERIFICATION: Video adapter focused tests pass 3 tests / 9 assertions. Focused
+Video/resume/Governance suite passes 188 tests / 921 assertions. Full Unit
+passes 2,195 tests / 13,140 assertions with existing warnings/deprecations.
+PHP lint and `git diff --check` pass. No schema/migration, Video, Capture,
+staging, production, deployment or live Odo 36 mutation occurred.
+
+STATUS=`VIDEO_SHARED_EDITORIAL_INTEGRATION_FIXED_LOCALLY / FULL_UNIT_PASS / NO_LIVE_MUTATION`.

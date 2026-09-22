@@ -20,6 +20,7 @@ final class VideoEditorialResumePlanner
         private ?PublicEditorialCopyGuard $publicCopyGuard = null,
         /** @var callable(array<string,mixed>):array<string,mixed>|null */
         private $knowledgeEnrichment = null,
+        private ?VideoEditorialAdapter $sharedEditorial = null,
     ) {
     }
 
@@ -61,19 +62,33 @@ final class VideoEditorialResumePlanner
         $existingFingerprint = trim((string) ($metadata['editorial_input_fingerprint'] ?? ''));
         $desired = null;
         $staleEditorialReplay = false;
-        if ($existingFingerprint !== '' && hash_equals($existingFingerprint, $fingerprint)) {
-            $desired = $this->desiredPackage($video, $source, $subject, $delta, $proposalMetadata);
-            if ($this->canonicalEditorialPayloadMatches($video, $desired, $fingerprint)) {
-                return $this->reuse($video, $fingerprint, $desired);
-            }
-            $staleEditorialReplay = true;
+        if ($this->sharedEditorial !== null && $existingFingerprint !== '' && hash_equals($existingFingerprint, $fingerprint)) {
+            // The persisted canonical package is sufficient for an exact
+            // fingerprint replay. Do not invoke the shared composer merely
+            // because the resume endpoint was called again.
+            if (is_array($metadata['editorial'] ?? null)
+                && is_array($metadata['seo'] ?? null)
+                && is_array($metadata['seo_projection'] ?? null)
+            ) return $this->reuse($video, $fingerprint);
         }
         // Legacy Videos may not carry a fingerprint. An explicit resume with
         // no editorial input is still a no-op; do not mint an unnecessary
         // revision merely to add bookkeeping.
         if ($existingFingerprint === '' && $delta === '') return $this->reuse($video, $fingerprint);
 
-        $desired ??= $this->desiredPackage($video, $source, $subject, $delta);
+        $shared = $this->shared($source, $subject, $delta, $context, $metadata);
+        if ($shared !== null) {
+            $claims = $shared['fingerprint_claims'];
+            $fingerprint = $this->fingerprint($video, $source, $subject, $claims, $delta);
+            if ($existingFingerprint !== '' && hash_equals($existingFingerprint, $fingerprint)
+                && $this->sharedEditorial !== null
+                && is_array($metadata['editorial'] ?? null)
+                && is_array($metadata['seo'] ?? null)
+                && is_array($metadata['seo_projection'] ?? null)
+            ) return $this->reuse($video, $fingerprint);
+        }
+
+        $desired ??= $this->desiredPackage($video, $source, $subject, $delta, null, $shared);
         $enrichment = $desired['enrichment'];
         $editorial = $desired['editorial'];
         $seo = $desired['seo'];
@@ -142,6 +157,7 @@ final class VideoEditorialResumePlanner
             'canonical_source_url' => (string) ($source['canonical_source_url'] ?? $external['canonical_source_url']),
         ]);
         $subject = $this->subject($context, $persistedMetadata);
+        $shared = $this->shared($source, $subject, trim((string) ($context['continuation_delta_text'] ?? $context['user_hint'] ?? '')), $context, $persistedMetadata);
         $userHint = trim((string) ($context['user_hint'] ?? ($persistedMetadata['provenance']['user_hint']['value'] ?? '')));
         $enrichmentContext = [
             'source_facts' => trim((string) ($source['source_title'] ?? '')) !== '' ? [['text' => (string) $source['source_title']]] : [],
@@ -162,7 +178,8 @@ final class VideoEditorialResumePlanner
         $metadata = array_filter($metadata, static fn (mixed $value): bool => $value !== null && $value !== []);
         $metadata['subject_resolution_packet'] = $subject;
         $metadata = $this->refreshDerivedEnrichment($metadata, $external, $context);
-        $editorial = $this->editorial->generate(
+        $desired = $shared !== null ? $this->sharedPackage($shared, $source, $subject, $videoId) : null;
+        $editorial = $desired['editorial'] ?? $this->editorial->generate(
             $source,
             $userHint,
             trim((string) ($context['editorial_instruction'] ?? '')),
@@ -300,7 +317,7 @@ final class VideoEditorialResumePlanner
     }
 
     /** @return array<string,mixed> */
-    private function desiredPackage(Video $video, array $source, ?array $subject, string $delta, ?array $proposalMetadata = null): array
+    private function desiredPackage(Video $video, array $source, ?array $subject, string $delta, ?array $proposalMetadata = null, ?array $shared = null): array
     {
         $enrichment = [
             'source_facts' => trim((string) ($source['source_title'] ?? '')) !== '' ? [['text' => (string) $source['source_title']]] : [],
@@ -319,6 +336,10 @@ final class VideoEditorialResumePlanner
             $package['editorial'] = $editorial;
             $package['seo'] = $seo;
             $package['subject_resolution_packet'] = $subject;
+        } elseif ($shared !== null) {
+            $package = $this->sharedPackage($shared, $source, $subject, $video->canonicalId);
+            $editorial = $package['editorial'];
+            $seo = $package['seo'];
         } else {
             $editorial = $this->editorial->generate($source, $delta, '', $subject, '', '', $enrichment);
             ($this->publicCopyGuard ?? new PublicEditorialCopyGuard())->assertEditorialPackage($editorial);
@@ -343,6 +364,64 @@ final class VideoEditorialResumePlanner
             'package' => $package,
             'subject_resolution_packet' => $subject,
             'seo_projection' => $seoProjection,
+        ];
+    }
+
+    /** @param array<string,mixed> $source @param array<string,mixed>|null $subject @param array<string,mixed> $context @param array<string,mixed> $metadata @return array<string,mixed>|null */
+    private function shared(array $source, ?array $subject, string $delta, array $context, array $metadata): ?array
+    {
+        if ($this->sharedEditorial === null) return null;
+        try {
+            $identity = is_array($context['public_identity'] ?? null) ? $context['public_identity'] : (is_array($metadata['public_identity'] ?? null) ? $metadata['public_identity'] : []);
+            if ($identity === [] && is_array($metadata['seo_projection'] ?? null)) {
+                $canonical = trim((string) ($metadata['seo_projection']['canonical'] ?? ''));
+                if ($canonical !== '') $identity = ['canonical_url' => $canonical, 'canonical_identity' => true, 'public_eligible' => true];
+            }
+            $result = $this->sharedEditorial->prepare([
+                'source' => $source,
+                'raw_input' => $delta !== '' ? $delta : (string) ($source['source_title'] ?? ''),
+                'user_hint' => $delta,
+                'editorial_instruction' => (string) ($context['editorial_instruction'] ?? ''),
+                'subject_resolution' => ['primary' => $subject],
+                'public_identity' => $identity,
+            ]);
+            if (strtoupper((string) ($result['status'] ?? '')) === 'BLOCKED') throw new \RuntimeException('VIDEO_EDITORIAL_QUALITY_BLOCKED');
+            return $result;
+        } catch (\Throwable $error) {
+            if ($error->getMessage() === 'VIDEO_EDITORIAL_QUALITY_BLOCKED') throw $error;
+            throw new \RuntimeException('VIDEO_SHARED_EDITORIAL_UNAVAILABLE', 0, $error);
+        }
+    }
+
+    /** @param array<string,mixed> $shared @param array<string,mixed> $source @param array<string,mixed>|null $subject @return array<string,mixed> */
+    private function sharedPackage(array $shared, array $source, ?array $subject, string $videoId): array
+    {
+        $draft = $shared['draft'];
+        $seo = $shared['seo_plan'];
+        $editorial = [
+            'title' => $draft->title,
+            'summary' => $draft->summary,
+            'body' => $draft->body,
+            'claim_trace' => $draft->claimTrace,
+            'why_this_matters' => 'Giúp người xem bắt đầu từ video và nhận biết đúng chủ đề đang được trình bày.',
+            'context' => trim((string) ($source['source_title'] ?? '')) !== '' ? [['text' => (string) $source['source_title'], 'provenance' => 'SOURCE_FACT']] : [],
+            'facts' => [],
+            'related_knowledge' => [],
+            'compliance_context' => ['source' => 'shared_editorial_quality_gate'],
+        ];
+        $package = ['canonical_id' => $videoId, 'source' => $source, 'editorial' => $editorial, 'seo' => ['title' => $seo->title, 'description' => $seo->metaDescription], 'subject_resolution_packet' => $subject, 'semantic_claim_trace' => $draft->claimTrace, 'content_quality' => ['status' => $shared['quality_report']->readiness === 'READY' ? 'CONTENT_COMPLETE' : 'NEEDS_REVIEW', 'blockers' => $shared['quality_report']->blockers, 'warnings' => $shared['quality_report']->warnings]];
+        return [
+            'editorial' => $editorial,
+            'seo' => $package['seo'],
+            'package' => $package,
+            'enrichment' => [
+                'source_facts' => $editorial['context'],
+                'canonical_context' => $subject === null ? [] : [[
+                    'text' => (string) ($subject['name'] ?? ''),
+                    'entity_id' => (string) ($subject['id'] ?? ''),
+                    'entity_type' => (string) ($subject['type'] ?? ''),
+                ]],
+            ],
         ];
     }
 

@@ -67,6 +67,11 @@ final class GovernedCaptureContinuationService
         $this->completion = $completion ?? new CompletionCoordinator();
     }
 
+    public function setVideoEditorialResume(?VideoEditorialResumePlanner $planner): void
+    {
+        $this->videoEditorialResume = $planner;
+    }
+
     /** @return array<string,mixed> */
     public function execute(string $captureId, string $continuationKey, array $context, array $control = []): array
     {

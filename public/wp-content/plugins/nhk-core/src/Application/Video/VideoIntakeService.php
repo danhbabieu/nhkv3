@@ -22,6 +22,7 @@ final class VideoIntakeService
         private ?VideoInternalSemanticResearcher $researcher = null,
         /** @var callable(array<string,mixed>):list<\NHK\Core\Domain\Knowledge\KnowledgeEnrichmentCandidate>|null */
         private $knowledgeEnrichment = null,
+        private ?VideoEditorialAdapter $sharedEditorial = null,
     ) {
     }
 
@@ -79,9 +80,38 @@ final class VideoIntakeService
             'source_facts' => trim((string) ($snapshot['source_title'] ?? '')) !== '' ? [['text' => (string) $snapshot['source_title']]] : [],
             'canonical_context' => is_array($effectiveSubject) && trim((string) ($effectiveSubject['name'] ?? '')) !== '' ? [['text' => (string) $effectiveSubject['name'], 'entity_id' => (string) ($effectiveSubject['id'] ?? ''), 'entity_type' => (string) ($effectiveSubject['type'] ?? '')]] : [],
         ];
-        $editorial = $this->editorial->generate($snapshot, $userHint, $editorialInstruction, $effectiveSubject, $editorialTitle, $complianceNote, $enrichmentContext);
-        $contentQuality = (new VideoEditorialQualityPolicy())->evaluate($editorial, VideoEditorialEnrichmentContext::fromArray($enrichmentContext));
-        $seoData = ['title' => $editorial['title'], 'description' => $editorial['summary']];
+        $shared = null;
+        if ($this->sharedEditorial !== null) {
+            $publicIdentity = is_array($existing?->metadata['public_identity'] ?? null) ? $existing->metadata['public_identity'] : [];
+            $shared = $this->sharedEditorial->prepare([
+                'source' => $snapshot,
+                'raw_input' => $userHint !== '' ? $userHint : (string) ($snapshot['source_title'] ?? ''),
+                'user_hint' => $userHint,
+                'editorial_instruction' => $editorialInstruction,
+                'editorial_title' => $editorialTitle,
+                'subject_resolution' => ['primary' => $effectiveSubject],
+                'public_identity' => $publicIdentity,
+            ]);
+            if (strtoupper((string) ($shared['status'] ?? '')) === 'BLOCKED') throw new VideoException('VIDEO_EDITORIAL_QUALITY_BLOCKED');
+            $draft = $shared['draft'];
+            $editorial = [
+                'title' => $draft->title,
+                'summary' => $draft->summary,
+                'body' => $draft->body,
+                'claim_trace' => $draft->claimTrace,
+                'why_this_matters' => 'Giúp người xem bắt đầu từ video và nhận biết đúng chủ đề đang được trình bày.',
+                'context' => $enrichmentContext['source_facts'],
+                'facts' => [],
+                'related_knowledge' => [],
+                'compliance_context' => ['source' => 'shared_editorial_quality_gate'],
+            ];
+            $contentQuality = ['status' => $shared['quality_report']->readiness === 'READY' ? 'CONTENT_COMPLETE' : 'NEEDS_REVIEW', 'blockers' => $shared['quality_report']->blockers, 'warnings' => $shared['quality_report']->warnings];
+            $seoData = ['title' => $shared['seo_plan']->title, 'description' => $shared['seo_plan']->metaDescription];
+        } else {
+            $editorial = $this->editorial->generate($snapshot, $userHint, $editorialInstruction, $effectiveSubject, $editorialTitle, $complianceNote, $enrichmentContext);
+            $contentQuality = (new VideoEditorialQualityPolicy())->evaluate($editorial, VideoEditorialEnrichmentContext::fromArray($enrichmentContext));
+            $seoData = ['title' => $editorial['title'], 'description' => $editorial['summary']];
+        }
         $package = [
             'intake_version' => 1,
             'source' => array_merge($snapshot, ['identity_valid' => true, 'provenance' => ['kind' => 'YOUTUBE_SOURCE', 'locator' => $snapshot['canonical_source_url']]]),
@@ -91,12 +121,16 @@ final class VideoIntakeService
             'semantic_attachments' => $candidatePayloads,
             'subject_resolution_packet' => $effectiveSubject,
             'seo' => $seoData,
-            'content_quality' => $contentQuality->toArray(),
+            'content_quality' => is_object($contentQuality) ? $contentQuality->toArray() : $contentQuality,
             'embed_url' => 'https://www.youtube-nocookie.com/embed/' . $snapshot['external_video_id'],
             'provenance' => ['source_url' => $snapshot['canonical_source_url'], 'user_hint' => $userHint !== '' ? ['value' => $userHint, 'kind' => 'USER_HINT'] : null],
             'source_rights' => VideoSourceRights::PUBLIC_EXTERNAL_REFERENCE,
             'chapters' => $chapters,
         ];
+        if (is_array($shared)) {
+            $package['content_quality'] = $contentQuality;
+            $package['editorial_claim_dependencies'] = $shared['fingerprint_claims'];
+        }
         $package['knowledge_enrichment'] = $this->knowledgeEnrichmentPacket($research, $snapshot, $resolution, $userHint, $intendedTargets);
         if ($resolution->diagnostic !== null) $package['source_diagnostic'] = $resolution->diagnostic;
         $complete = $this->completeness->evaluate($package);

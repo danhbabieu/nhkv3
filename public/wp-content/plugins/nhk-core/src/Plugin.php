@@ -70,7 +70,7 @@ use NHK\Core\Infrastructure\Governance\WpdbDependencyRepository;
 use NHK\Core\Infrastructure\Governance\GovernanceRuntimeFactory;
 use NHK\Core\Application\Entity\{ComparisonPageQuery, EntityMediaProjection, EntityPageQuery, EntityProfileAdminProjection, PublicEndpointEligibilityResolver, PublicEntityCollectionQuery, PublicEntityEligibilityPolicy, PublicIdentityContract, PublicRouteResolver, RelatedContentQuery};
 use NHK\Core\Application\Media\{ArticleMediaCoordinator, ArticleMediaSeoProjection, MediaEnrichmentFrontendReadbackVerifier, MediaIngestGateway, MediaService, MediaVideoPageQuery, PublicMediaGalleryQuery, VisualOpportunityDetector, VisualSupportRequirementService};
-use NHK\Core\Application\Video\{VideoCompletenessPolicy, VideoEditorialGenerator, VideoHubClassifier, VideoIntakeService, VideoInternalSemanticResearcher, VideoKnowledgeEnrichmentPlanner, VideoRelationCandidatePlanner, VideoSeoProjection, VideoService, VideoSourceRefreshCommand, YouTubeDataApiClient, YouTubeSourceAdapter};
+use NHK\Core\Application\Video\{VideoCompletenessPolicy, VideoEditorialAdapter, VideoEditorialGenerator, VideoHubClassifier, VideoIntakeService, VideoInternalSemanticResearcher, VideoKnowledgeEnrichmentPlanner, VideoRelationCandidatePlanner, VideoSeoProjection, VideoService, VideoSourceRefreshCommand, YouTubeDataApiClient, YouTubeSourceAdapter};
 use NHK\Core\Application\Home\HomeSemanticQuery;
 use NHK\Core\Application\Search\SearchSemanticQuery;
 use NHK\Core\Application\Knowledge\{EntityKnowledgeProjection, KnowledgePageQuery};
@@ -730,7 +730,7 @@ final class Plugin {
                 return $matches;
             });
             $videoKnowledgeEnrichment = new VideoKnowledgeEnrichmentPlanner(new \NHK\Core\Application\Knowledge\KnowledgeEnrichmentPlanner($claims, $evidence, $sources));
-            $videoEditorialResume = new \NHK\Core\Application\Video\VideoEditorialResumePlanner($videos, new VideoEditorialGenerator(), new VideoSeoProjection(), null, $videoKnowledgeEnrichment);
+            $videoEditorialResume = null;
             $canonicalDependencies = new CanonicalDependencyValidator($claims, $sources, $evidence);
             $knowledgeRepairPreview = new \NHK\Core\Application\Knowledge\KnowledgeRepairPreviewService($claims, $evidence, $graphService);
             $videoRelationCandidates = new VideoRelationCandidatePlanner(new PredicateRegistry(), $evidence, $claims, $sources, $canonicalDependencies);
@@ -983,7 +983,10 @@ final class Plugin {
             );
             $youtubeConfiguration = new \NHK\Core\Application\Video\YouTubeApiConfiguration();
             $youtubeClient = static fn (object $identity): array => (new YouTubeDataApiClient(null, null, $youtubeConfiguration))->fetch($identity);
-            $videoIntake = new VideoIntakeService(new YouTubeSourceAdapter($youtubeClient), $videos, new VideoHubClassifier(), $videoRelationCandidates, new VideoEditorialGenerator(), new VideoCompletenessPolicy(), new VideoSeoProjection(), new VideoInternalSemanticResearcher($authority, $types), $videoKnowledgeEnrichment);
+            $videoEditorialAdapter = VideoEditorialAdapter::fromEngine($captureClaims);
+            $videoEditorialResume = new \NHK\Core\Application\Video\VideoEditorialResumePlanner($videos, new VideoEditorialGenerator(), new VideoSeoProjection(), null, $videoKnowledgeEnrichment, $videoEditorialAdapter);
+            $captureGovernance->setVideoEditorialResume($videoEditorialResume);
+            $videoIntake = new VideoIntakeService(new YouTubeSourceAdapter($youtubeClient), $videos, new VideoHubClassifier(), $videoRelationCandidates, new VideoEditorialGenerator(), new VideoCompletenessPolicy(), new VideoSeoProjection(), new VideoInternalSemanticResearcher($authority, $types), $videoKnowledgeEnrichment, $videoEditorialAdapter);
             $videoSourceRefresh = new VideoSourceRefreshCommand($videos, $governance, $youtubeClient, $stagingScopeVerifier);
             $videoFrontendReader = new MediaVideoPageQuery($media, $assets, $usages, $videos, new MigrationStatus(), null, null, null, $claims, $evidence, $sources);
             $videoPublicationVerifier = new CaptureVideoPublicationVerifier(
