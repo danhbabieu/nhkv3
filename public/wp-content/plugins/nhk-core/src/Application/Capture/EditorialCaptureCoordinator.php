@@ -415,13 +415,7 @@ final class EditorialCaptureCoordinator
             // selected identity, but contradictory explicit text must stop
             // the workflow fail-closed.
             $persistedPacket = $this->persistedSubjectPacket($record);
-            $preflightResolution = $persistedPacket?->toResolution() ?? $this->subjects->resolve(array_values(array_unique(array_merge(
-                (array) ($interpretation['primary_subject_hints'] ?? []),
-                (array) ($interpretation['secondary_subject_hints'] ?? []),
-                (array) ($interpretation['entity_mentions'] ?? []),
-                [trim((string) ($input['title'] ?? ''))],
-                $this->videoSubjectHints($videoInput),
-            ))));
+            $preflightResolution = $persistedPacket?->toResolution() ?? $this->subjects->resolveSources($this->subjectResolutionSources($input, $interpretation, $videoInput));
             if (($preflightResolution['status'] ?? '') === 'conflict') {
                 $diagnostics['subjects'] = $preflightResolution;
                 $diagnostics['failure_code'] = 'SUBJECT_CONFLICT_REVIEW_REQUIRED';
@@ -505,13 +499,7 @@ final class EditorialCaptureCoordinator
                 $record = $this->save($record, CaptureStage::MEDIA_ADOPTED, $assets, $diagnostics, $receipts, 'MEDIA_ADOPTED', $record->articleId, $record->articleStateToken);
             }
             $this->beginPhase('SUBJECTS_RESOLVED');
-            $resolution = $persistedPacket?->toResolution() ?? $this->subjects->resolve(array_values(array_unique(array_merge(
-                (array) ($interpretation['primary_subject_hints'] ?? []),
-                (array) ($interpretation['secondary_subject_hints'] ?? []),
-                (array) ($interpretation['entity_mentions'] ?? []),
-                [trim((string) ($input['title'] ?? ''))],
-                $this->videoSubjectHints($videoInput),
-            ))));
+            $resolution = $persistedPacket?->toResolution() ?? $this->subjects->resolveSources($this->subjectResolutionSources($input, $interpretation, $videoInput));
             if ($this->isVideoOnlyResume($input)) {
                 $locked = is_array($record->diagnostics['subjects'] ?? null) ? $record->diagnostics['subjects'] : [];
                 $lockedPrimary = is_array($locked['primary'] ?? null) ? $locked['primary'] : [];
@@ -1235,6 +1223,28 @@ final class EditorialCaptureCoordinator
             if ($packet !== null) return $packet;
         }
         return null;
+    }
+
+    /** @param array<string,mixed> $input @param array<string,mixed> $interpretation @param array<string,mixed> $videoInput @return array<string,mixed> */
+    private function subjectResolutionSources(array $input, array $interpretation, array $videoInput): array
+    {
+        $canonicalUuid = trim((string) ($input['canonical_uuid'] ?? $input['subject_uuid'] ?? ''));
+        $stableKey = trim((string) ($input['stable_key'] ?? $input['subject_stable_key'] ?? ''));
+        $explicitHints = (array) ($interpretation['primary_subject_hints'] ?? []);
+        if ($explicitHints === [] && is_array($input['subject_hints'] ?? null)) $explicitHints = $input['subject_hints'];
+        return [
+            'canonical_uuid' => $canonicalUuid === '' ? [] : [$canonicalUuid],
+            'stable_key' => $stableKey === '' ? [] : [$stableKey],
+            'subject_hints' => array_values(array_filter(array_map('strval', $explicitHints), static fn (string $hint): bool => trim($hint) !== '')),
+            'title_subject' => array_values(array_filter([
+                trim((string) ($input['title'] ?? '')),
+                ...$this->videoSubjectHints($videoInput),
+            ], static fn (string $hint): bool => $hint !== '')),
+            'body_mentions' => array_values(array_filter(array_map('strval', array_merge(
+                (array) ($interpretation['secondary_subject_hints'] ?? []),
+                (array) ($interpretation['entity_mentions'] ?? []),
+            )), static fn (string $hint): bool => trim($hint) !== '')),
+        ];
     }
 
     private function beginPhase(string $phase): void

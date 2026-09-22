@@ -220,10 +220,10 @@ final class EditorialCaptureSemanticCoreTest extends TestCase
         $resolution = (new SubjectResolutionService($resolver))->resolve(['Odo 36', 'Odo 36/8', '36/8']);
 
         self::assertSame('resolved', $resolution['status']);
-        self::assertSame($variantId, $resolution['primary']['id']);
-        self::assertSame('nhk:variant:odo.36.8', $resolution['primary']['stable_key']);
+        self::assertSame($modelId, $resolution['primary']['id']);
+        self::assertSame('nhk:model:odo.36', $resolution['primary']['stable_key']);
         self::assertSame([], $resolution['unresolved']);
-        self::assertSame([$variantId, $modelId], array_column($resolution['subjects'], 'id'));
+        self::assertSame([$modelId, $variantId], array_column($resolution['subjects'], 'id'));
         self::assertSame($variantId, $resolver->resolve('36/8')[0]['id']);
     }
 
@@ -238,6 +238,73 @@ final class EditorialCaptureSemanticCoreTest extends TestCase
 
         self::assertSame($variantId, $resolution['primary']['id']);
         self::assertSame([$variantId], array_column($resolution['subjects'], 'id'));
+    }
+
+    public function test_source_ranked_resolution_keeps_explicit_model_primary_over_body_music_mention(): void
+    {
+        $modelId = '11111111-1111-4111-8111-111111111111';
+        $musicId = '22222222-2222-4222-8222-222222222222';
+        $resolution = (new SubjectResolutionService(static fn (string $hint): array => match ($hint) {
+            'Explicit Model' => [['id' => $modelId, 'type' => 'model', 'name' => 'Explicit Model', 'revision' => 2]],
+            'Known Music' => [['id' => $musicId, 'type' => 'music', 'name' => 'Known Music', 'revision' => 3]],
+            default => [],
+        }))->resolveSources([
+            'subject_hints' => ['Explicit Model'],
+            'body_mentions' => ['Known Music'],
+        ]);
+
+        self::assertSame('resolved', $resolution['status']);
+        self::assertSame($modelId, $resolution['primary']['id']);
+        self::assertSame('explicit_subject_hint', $resolution['primary_source']);
+    }
+
+    public function test_source_ranked_resolution_does_not_promote_body_entity_when_explicit_hint_is_unknown(): void
+    {
+        $musicId = '33333333-3333-4333-8333-333333333333';
+        $resolution = (new SubjectResolutionService(static fn (string $hint): array => $hint === 'Known Music'
+            ? [['id' => $musicId, 'type' => 'music', 'name' => 'Known Music', 'revision' => 1]]
+            : []))->resolveSources([
+                'subject_hints' => ['Unknown Explicit Subject'],
+                'body_mentions' => ['Known Music'],
+            ]);
+
+        self::assertSame('unresolved', $resolution['status']);
+        self::assertNull($resolution['primary']);
+        self::assertContains('SUBJECT_EXPLICIT_HINT_UNRESOLVED', $resolution['diagnostics']);
+        self::assertSame([], $resolution['subjects']);
+    }
+
+    public function test_source_ranked_resolution_preserves_explicit_hint_order(): void
+    {
+        $firstId = '44444444-4444-4444-8444-444444444444';
+        $secondId = '55555555-5555-4555-8555-555555555555';
+        $resolution = (new SubjectResolutionService(static fn (string $hint): array => match ($hint) {
+            'First Subject' => [['id' => $firstId, 'type' => 'model', 'name' => 'First Subject', 'revision' => 1]],
+            'Second Subject' => [['id' => $secondId, 'type' => 'model', 'name' => 'Second Subject', 'revision' => 1]],
+            default => [],
+        }))->resolveSources(['subject_hints' => ['First Subject', 'Second Subject']]);
+
+        self::assertSame($firstId, $resolution['primary']['id']);
+        self::assertSame([$firstId, $secondId], array_column($resolution['subjects'], 'id'));
+    }
+
+    public function test_source_ranked_resolution_packet_round_trips_without_reselecting_subject(): void
+    {
+        $subjectId = '66666666-6666-4666-8666-666666666666';
+        $resolution = (new SubjectResolutionService(static fn (string $hint): array => $hint === 'Stable Subject'
+            ? [['id' => $subjectId, 'type' => 'variant', 'name' => 'Stable Subject', 'stable_key' => 'nhk:variant:stable.subject', 'revision' => 4]]
+            : []))->resolveSources(['stable_key' => 'Stable Subject']);
+
+        $packet = \NHK\Core\Domain\Capture\SubjectResolutionPacket::fromResolution($resolution);
+        $rehydrated = \NHK\Core\Domain\Capture\SubjectResolutionPacket::fromArray($packet->toArray());
+
+        self::assertNotNull($rehydrated);
+        self::assertSame($packet->canonicalSubjectId, $rehydrated->canonicalSubjectId);
+        self::assertSame($packet->entityType, $rehydrated->entityType);
+        self::assertSame($packet->stableKey, $rehydrated->stableKey);
+        self::assertSame('stable_key', $packet->primarySource);
+        self::assertSame($packet->primarySource, $rehydrated->primarySource);
+        self::assertSame('stable_key', $resolution['primary_source']);
     }
 
     public function test_explicit_uuid_conflicting_classification_fails_closed_without_replacing_selected_identity(): void

@@ -18,6 +18,7 @@ final readonly class SubjectResolutionPacket
         public int $revision,
         public string $matchReason,
         public array $diagnostics = [],
+        public string $primarySource = '',
     ) {
         if (!in_array($status, ['resolved', 'ambiguous', 'unresolved', 'conflict'], true)) throw new \InvalidArgumentException('Subject resolution packet status is invalid.');
         if ($status === 'resolved' && (!UuidCodec::isValid($canonicalSubjectId) || $entityType === '' || $revision < 1)) throw new \InvalidArgumentException('Resolved subject packet is incomplete.');
@@ -46,6 +47,7 @@ final readonly class SubjectResolutionPacket
                 'conflicts' => is_array($resolution['conflicts'] ?? null) ? $resolution['conflicts'] : [],
                 'diagnostics' => array_values(array_map('strval', (array) ($resolution['diagnostics'] ?? []))),
             ],
+            $status === 'resolved' ? trim((string) ($resolution['primary_source'] ?? '')) : '',
         );
     }
 
@@ -64,6 +66,7 @@ final readonly class SubjectResolutionPacket
                 max(1, (int) ($value['revision'] ?? 1)),
                 trim((string) ($value['match_reason'] ?? $value['match'] ?? '')),
                 is_array($value['diagnostics'] ?? null) ? $value['diagnostics'] : [],
+                trim((string) ($value['primary_source'] ?? '')),
             );
             return $packet;
         } catch (\Throwable) {
@@ -90,6 +93,7 @@ final readonly class SubjectResolutionPacket
             'type' => $this->entityType,
             'name' => $this->canonicalName,
             'match' => $this->matchReason,
+            'primary_source' => $this->primarySource,
             'diagnostics' => $this->diagnostics,
         ];
     }
@@ -114,6 +118,7 @@ final readonly class SubjectResolutionPacket
             'unresolved' => $this->diagnostics['unresolved'] ?? [],
             'conflicts' => $this->diagnostics['conflicts'] ?? [],
             'diagnostics' => $this->diagnostics['diagnostics'] ?? [],
+            'primary_source' => $this->primarySource,
         ];
     }
 }

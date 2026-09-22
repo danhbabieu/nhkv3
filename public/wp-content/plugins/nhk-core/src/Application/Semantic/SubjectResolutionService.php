@@ -14,67 +14,142 @@ final class SubjectResolutionService
     /** @param list<string> $hints @return array<string,mixed> */
     public function resolve(array $hints): array
     {
+        $values = $this->sourceValues($hints);
+        $uuids = array_values(array_filter($values, static fn (string $value): bool => UuidCodec::isValid($value)));
+        return $this->resolveSources([
+            'canonical_uuid' => $uuids,
+            'subject_hints' => array_values(array_diff($values, $uuids)),
+        ]);
+    }
+
+    /**
+     * Resolve typed Capture sources in one deterministic precedence policy.
+     *
+     * @param array<string,mixed> $sources
+     * @return array<string,mixed>
+     */
+    public function resolveSources(array $sources): array
+    {
+        $uuid = $this->sourceValues($sources['canonical_uuid'] ?? []);
+        $stableKey = $this->sourceValues($sources['stable_key'] ?? []);
+        $hints = $this->sourceValues($sources['subject_hints'] ?? []);
+        $title = $this->sourceValues($sources['title_subject'] ?? $sources['topic_subject'] ?? []);
+        $body = $this->sourceValues($sources['body_mentions'] ?? []);
+
+        foreach ([
+            ['values' => $uuid, 'source' => 'canonical_uuid'],
+            ['values' => $stableKey, 'source' => 'stable_key'],
+        ] as $bucket) {
+            $result = $this->resolveBucket($bucket['values'], $bucket['source'], false);
+            if ($result['resolved'] !== []) {
+                $conflicts = $this->explicitConflicts($result['resolved'][0], array_merge($stableKey, $hints));
+                if ($conflicts !== []) {
+                    $result['conflicts'] = $conflicts;
+                    $result['diagnostics'][] = 'SUBJECT_CONFLICT_REVIEW_REQUIRED';
+                    return $this->finalize($result, 'conflict');
+                }
+                return $result;
+            }
+        }
+
+        if ($hints !== []) {
+            $result = $this->resolveBucket($hints, 'explicit_subject_hint', true);
+            if ($result['resolved'] !== []) return $result;
+            $result['diagnostics'][] = 'SUBJECT_EXPLICIT_HINT_UNRESOLVED';
+            return $this->finalize($result, 'unresolved');
+        }
+
+        foreach ([
+            ['values' => $title, 'source' => 'title_subject'],
+            ['values' => $body, 'source' => 'body_mention'],
+        ] as $bucket) {
+            $result = $this->resolveBucket($bucket['values'], $bucket['source'], true);
+            if ($result['resolved'] !== []) return $result;
+        }
+
+        return $this->finalize([
+            'resolved' => [], 'candidates' => [], 'unresolved' => [], 'conflicts' => [],
+            'diagnostics' => ['SUBJECT_NOT_FOUND'], 'primary_source' => '',
+        ], 'unresolved');
+    }
+
+    /** @param mixed $values @return list<string> */
+    private function sourceValues(mixed $values): array
+    {
+        if (is_string($values)) $values = [$values];
+        return array_values(array_unique(array_filter(array_map(static fn (mixed $value): string => trim((string) $value), (array) $values), static fn (string $value): bool => $value !== '')));
+    }
+
+    /** @param list<string> $values @return array<string,mixed> */
+    private function resolveBucket(array $values, string $source, bool $preserveOrder): array
+    {
         $resolved = [];
         $candidates = [];
         $unresolved = [];
-        $hints = array_values(array_unique(array_filter(array_map('trim', $hints), static fn (string $hint): bool => $hint !== '')));
-        $explicitUuid = array_values(array_filter($hints, static fn (string $hint): bool => UuidCodec::isValid($hint)));
-        // An exact UUID is authoritative for identity, but the remaining
-        // explicit hints are still checked for contradiction. Previously they
-        // were discarded, allowing a stale UUID plus a conflicting name to
-        // pass as a successful resolution.
-        foreach ($hints as $hint) {
-            $matches = ($this->resolver)($hint);
+        foreach ($values as $value) {
+            $matches = ($this->resolver)($value);
             $matches = is_array($matches) ? array_values(array_filter($matches, 'is_array')) : [];
-            if (count($matches) === 1) {
-                $item = $matches[0];
-                if (in_array($hint, $explicitUuid, true)) $item['match'] = 'uuid_exact';
-                $key = (string) (($item['type'] ?? '') . ':' . ($item['id'] ?? ''));
-                if (($item['type'] ?? '') !== '' && ($item['id'] ?? '') !== '') {
-                    if (!isset($resolved[$key]) || $this->matchRank($item) > $this->matchRank($resolved[$key])) $resolved[$key] = $item;
-                }
-            } elseif (count($matches) > 1) {
-                $candidates[$hint] = $matches;
-            } else {
-                $unresolved[] = $hint;
+            foreach ($matches as &$match) {
+                if (UuidCodec::isValid($value)) $match['match'] = 'uuid_exact';
+                elseif (($source === 'stable_key') && (($match['stable_key'] ?? '') === $value)) $match['match'] = 'stable_key_exact';
+            }
+            unset($match);
+            if (count($matches) > 1) $candidates[$value] = $matches;
+            if ($matches === []) {
+                $unresolved[] = $value;
+                continue;
+            }
+            usort($matches, fn (array $left, array $right): int => $this->matchRank($right) <=> $this->matchRank($left));
+            foreach ($matches as $match) {
+                $key = (string) (($match['type'] ?? '') . ':' . ($match['id'] ?? ''));
+                if (($match['type'] ?? '') === '' || ($match['id'] ?? '') === '' || isset($resolved[$key])) continue;
+                $resolved[$key] = $match;
+                if (!$preserveOrder) break;
             }
         }
         $ordered = array_values($resolved);
-        usort($ordered, function (array $left, array $right): int {
-            $score = $this->primaryRank($right) <=> $this->primaryRank($left);
-            return $score !== 0 ? $score : strcmp((string) ($left['id'] ?? ''), (string) ($right['id'] ?? ''));
-        });
-        $exact = null;
-        foreach ($ordered as $subject) {
-            if (($subject['match'] ?? '') === 'uuid_exact') {
-                $exact = $subject;
-                break;
-            }
-        }
-        $conflicts = $exact !== null ? $this->contradictions($exact, $ordered, $candidates) : [];
-        $status = $conflicts !== []
-            ? 'conflict'
-            : ($candidates !== [] ? 'ambiguous' : ($ordered !== [] ? 'resolved' : 'unresolved'));
-        $diagnostics = [];
-        if ($conflicts !== []) $diagnostics[] = 'SUBJECT_CONFLICT_REVIEW_REQUIRED';
-        if ($candidates !== []) $diagnostics[] = 'AMBIGUOUS_SUBJECT_REVIEW';
-        if ($unresolved !== []) $diagnostics[] = 'SUBJECT_NOT_FOUND';
+        if (!$preserveOrder) usort($ordered, fn (array $left, array $right): int => $this->primaryRank($right) <=> $this->primaryRank($left));
+        return $this->finalize([
+            'resolved' => $ordered, 'candidates' => $candidates, 'unresolved' => $unresolved,
+            'conflicts' => [], 'diagnostics' => $candidates === [] ? [] : ['AMBIGUOUS_SUBJECT_REVIEW'],
+            'primary_source' => $ordered === [] ? '' : $source,
+        ], $ordered === [] ? 'unresolved' : ($candidates === [] ? 'resolved' : 'ambiguous'));
+    }
 
-        // Preserve the exact UUID as the only selected subject. Other exact
-        // hints are diagnostic candidates until a governed correction is
-        // explicitly approved.
-        $selected = $exact !== null ? [$exact] : $ordered;
+    /** @param array<string,mixed> $result @return array<string,mixed> */
+    private function finalize(array $result, string $status): array
+    {
+        $subjects = $result['resolved'] ?? [];
+        $diagnostics = array_values(array_unique(array_merge((array) ($result['diagnostics'] ?? []), ($result['unresolved'] ?? []) !== [] ? ['SUBJECT_NOT_FOUND'] : [])));
         return [
             'status' => $status,
-            'primary' => $exact ?? ($ordered[0] ?? null),
-            'subjects' => $selected,
-            'resolved' => $selected,
-            'candidates' => $candidates,
-            'unresolved' => $unresolved,
-            'conflicts' => $conflicts,
-            'compatibility_candidates' => $exact !== null ? $ordered : [],
-            'diagnostics' => array_values(array_unique($diagnostics)),
+            'primary' => $subjects[0] ?? null,
+            'primary_source' => (string) ($result['primary_source'] ?? ''),
+            'subjects' => $subjects,
+            'resolved' => $subjects,
+            'candidates' => (array) ($result['candidates'] ?? []),
+            'unresolved' => array_values((array) ($result['unresolved'] ?? [])),
+            'conflicts' => array_values((array) ($result['conflicts'] ?? [])),
+            'compatibility_candidates' => [],
+            'diagnostics' => $diagnostics,
         ];
+    }
+
+    /** @param array<string,mixed> $primary @param list<string> $values @return list<array<string,mixed>> */
+    private function explicitConflicts(array $primary, array $values): array
+    {
+        $conflicts = [];
+        foreach (array_values(array_unique($values)) as $value) {
+            $matches = ($this->resolver)($value);
+            $matches = is_array($matches) ? array_values(array_filter($matches, 'is_array')) : [];
+            foreach ($matches as $candidate) {
+                if (($candidate['id'] ?? '') === ($primary['id'] ?? '')) continue;
+                if (($candidate['type'] ?? '') === ($primary['type'] ?? '')) {
+                    $conflicts[] = ['kind' => 'same_type_identity', 'expected' => $primary, 'candidate' => $candidate];
+                }
+            }
+        }
+        return $conflicts;
     }
 
     /** @return list<array<string,mixed>> */
