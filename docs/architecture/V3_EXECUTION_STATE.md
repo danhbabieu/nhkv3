@@ -1,5 +1,42 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-22 — Authority Proposal Apply staging-scope recovery (LOCAL / DEPLOYMENT PENDING)
+
+ROOT_CAUSE: `OperationScopedStagingGuard::assertAllowed()` raised
+`STAGING_SCOPE_REQUIRED` when an approved Authority proposal had the exact
+Capture/project-build binding but its signed `staging_acceptance` packet was
+not present in the persisted proposal payload. Authority Capture already owns
+the canonical issuer: `StagingAcceptanceScopeVerifier::issueForAuthorityPlan()`.
+
+FIXED_BOUNDARY: The staging guard now resolves a missing Authority packet from
+the persisted Capture by exact UUID, plan fingerprint and candidate ID, then
+runs the same signed issuer and verifier. Registered Authority types only are
+accepted; unresolved or invalid scope remains fail-closed. Existing approval
+fingerprints, expected revisions, dependencies, idempotency and governed
+executor/read-back are unchanged. No semantic data was mutated.
+
+VERIFICATION: Focused staging/Authority/Governance/MCP suite passes 67 tests /
+319 assertions; PHP lint and `git diff --check` pass. Live MCP/runtime
+acceptance, deployment and canonical read-back remain pending.
+
+STATUS: `AUTHORITY_APPLY_SCOPE_RECOVERY_LOCAL_READY / DEPLOYMENT_PENDING / SEMANTIC_MUTATION_NONE`
+
+# Checkpoint — 2026-09-22 — NHK Image Upload MCP App v3 cache-busting URI (LOCAL / NO SEMANTIC CHANGE)
+
+FIXED_BOUNDARY: Bumped the fixed MCP App resource URI from
+`ui://nhk/image-upload/v2.html` to `ui://nhk/image-upload/v3.html` across the
+catalog metadata, Easy MCP projection, resources/list, resources/read, widget
+open result, bundled widget bootstrap and active MCP documentation. The
+bundled file path, tool names, Media ownership, Capture flow and upload
+semantics remain unchanged.
+
+VERIFICATION: TDD red run failed on the stale v2 URI; the focused PHP MCP App /
+Easy MCP suite passes 46 tests / 881 assertions. Widget tests (33), build and
+typecheck pass. Full Unit, PHP lint, deployment and fresh ChatGPT rendering
+remain pending for this checkpoint.
+
+STATUS: `NHK_IMAGE_UPLOAD_MCP_APP_V3_URI_LOCAL / SEMANTIC_BOUNDARY_PRESERVED / DEPLOYMENT_PENDING`.
+
 # Checkpoint — 2026-09-22 — Easy MCP AI 1.7.18 compatibility split fixed (LOCAL / LIVE SOURCE VERIFIED)
 
 ROOT_CAUSE_CONFIRMED: One Easy MCP version gate incorrectly controlled both
@@ -16,7 +53,7 @@ No Media/Capture semantic path changed.
 FIXED_BOUNDARY: UI/resource projection compatibility is explicit for 1.7.16,
 1.7.17 and 1.7.18; legacy native multipart proxy compatibility is explicit for
 1.7.16 and 1.7.17 only. 1.7.18 keeps tools/list metadata projection, exact
-`ui://nhk/image-upload/v2.html`, MCP App MIME, resources/list and resources/read
+`ui://nhk/image-upload/v3.html`, MCP App MIME, resources/list and resources/read
 while `shouldHandle()`, `interceptMultipartCapture()` and old `$_FILES`
 normalization remain disabled. No Media/Capture semantic path changed.
 

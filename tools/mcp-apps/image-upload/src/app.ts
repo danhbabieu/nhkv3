@@ -7,7 +7,7 @@ import { assertUploadManifestCounts, buildWidgetState, extractUploadManifest, in
 const SERVER_TOOL_NAME = "wp_ability_nhk_v3_media_widget_upload";
 const CAPTURE_TOOL_NAME = "wp_ability_nhk_v3_capture_ingest";
 const DOCUMENTATION_TOOL_NAME = "wp_ability_nhk_v3_documentation_bootstrap";
-const RESOURCE_URI = "ui://nhk/image-upload/v2.html";
+const RESOURCE_URI = "ui://nhk/image-upload/v3.html";
 const IMAGE_TYPES = /^(image\/jpeg|image\/png|image\/gif|image\/webp)$/;
 const IMAGE_ACCEPT = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 const STATES = ["CONNECTING", "READY", "UPLOADING", "SUCCESS", "PARTIAL", "ERROR"] as const;

@@ -297,7 +297,7 @@ final class McpToolCatalog
                     'additionalProperties' => false,
                 ]],
             ], ['idempotency_key', 'files'], true),
-            self::tool('nhk.media.upload-widget.open', 'Open the NHK image uploader UI. Upload results remain physical Media records until a canonical Capture flow reuses their Media IDs.', [], [], false, ['ui' => ['resourceUri' => 'ui://nhk/image-upload/v2.html', 'visibility' => ['model', 'app']], 'openai/outputTemplate' => 'ui://nhk/image-upload/v2.html']),
+            self::tool('nhk.media.upload-widget.open', 'Open the NHK image uploader UI. Upload results remain physical Media records until a canonical Capture flow reuses their Media IDs.', [], [], false, ['ui' => ['resourceUri' => 'ui://nhk/image-upload/v3.html', 'visibility' => ['model', 'app']], 'openai/outputTemplate' => 'ui://nhk/image-upload/v3.html']),
             self::tool('nhk.media.ingest', 'Ingest governed Media metadata, or bind one already-uploaded WordPress image attachment into the canonical Media lifecycle without semantic inference.', [
                 'stable_key' => ['type' => 'string', 'minLength' => 1, 'pattern' => '^[a-z0-9][a-z0-9._:-]{0,190}$'],
                 'name' => ['type' => 'string', 'minLength' => 1],

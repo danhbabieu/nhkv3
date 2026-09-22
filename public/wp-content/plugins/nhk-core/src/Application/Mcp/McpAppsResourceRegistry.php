@@ -5,7 +5,7 @@ namespace NHK\Core\Application\Mcp;
 
 final class McpAppsResourceRegistry
 {
-    public const IMAGE_UPLOAD_URI = 'ui://nhk/image-upload/v2.html';
+    public const IMAGE_UPLOAD_URI = 'ui://nhk/image-upload/v3.html';
     private const RESOURCE_META = ['ui' => ['prefersBorder' => true]];
 
     /** @return array{resources:list<array<string,mixed>>} */

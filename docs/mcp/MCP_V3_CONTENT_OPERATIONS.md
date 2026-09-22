@@ -754,7 +754,7 @@ annotations, while its MCP transport accepts `application/json` only. NHK
 therefore keeps two independent compatibility gates: UI/resource projection
 supports Easy MCP 1.7.16, 1.7.17 and 1.7.18 for `tools/list`, MCP Apps
 metadata, `resources/list`, `resources/read` and
-`ui://nhk/image-upload/v2.html`; the legacy native multipart proxy supports
+`ui://nhk/image-upload/v3.html`; the legacy native multipart proxy supports
 only 1.7.16 and 1.7.17. Easy MCP 1.7.18 remains upstream-owned for native AI
 client file transport, so `shouldHandle()`, `interceptMultipartCapture()` and
 old `$_FILES` normalization are disabled for that version. Easy MCP remains

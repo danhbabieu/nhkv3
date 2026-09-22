@@ -43,7 +43,7 @@ test("maps one widget-upload result without exposing its signed URL", () => {
     stage: "MEDIA_READBACK_DONE",
     status: "DONE",
     code: "MEDIA_READBACK_VERIFIED",
-    uri: "ui://nhk/image-upload/v2.html",
+    uri: "ui://nhk/image-upload/v3.html",
     tool: "nhk.media.widget-upload",
     }]), {
     modelContent: {
@@ -64,7 +64,7 @@ test("maps one widget-upload result without exposing its signed URL", () => {
         stage: "MEDIA_READBACK_DONE",
         status: "DONE",
         code: "MEDIA_READBACK_VERIFIED",
-        uri: "ui://nhk/image-upload/v2.html",
+        uri: "ui://nhk/image-upload/v3.html",
         tool: "nhk.media.widget-upload",
       }],
     },
@@ -146,7 +146,7 @@ test("keeps diagnostic error messages safe and never persists signed URLs", () =
     status: "ERROR",
     code: "SERVER_TOOL_ERROR",
     error: "https://files.openai.test/signed/secret?token=redacted",
-    uri: "ui://nhk/image-upload/v2.html",
+    uri: "ui://nhk/image-upload/v3.html",
     tool: "nhk.media.widget-upload",
   }]);
 
