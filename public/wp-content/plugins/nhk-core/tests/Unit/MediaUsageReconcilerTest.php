@@ -36,4 +36,14 @@ final class MediaUsageReconcilerTest extends TestCase
         self::assertSame('CONFLICT', $result['actions'][0]['action']);
         self::assertSame('OWNER_REVIEW_REQUIRED', $result['actions'][1]['action']);
     }
+
+    public function test_explicit_current_media_replaces_stale_active_slot(): void
+    {
+        $oldMedia = UuidCodec::newV7();
+        $newMedia = UuidCodec::newV7();
+        $current = new MediaUsage(UuidCodec::newV7(), $oldMedia, 'wp_post', '1:301', 'featured_primary');
+        $result = (new MediaUsageReconciler())->plan('wp_post', '1:301', [$current], [['role' => 'featured_primary', 'media_id' => $newMedia, 'selection_source' => 'USER_EXPLICIT', 'selection_policy' => 'PINNED']]);
+        self::assertSame('REPLACE', $result['actions'][0]['action']);
+        self::assertSame($newMedia, $result['actions'][0]['media_id']);
+    }
 }

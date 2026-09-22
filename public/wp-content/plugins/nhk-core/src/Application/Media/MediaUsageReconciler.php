@@ -96,7 +96,7 @@ final class MediaUsageReconciler
                 && $existing->keywordGroups === $wanted->keywordGroups
                 && $existing->title === $wanted->title;
             $currentValid = ($currentAssessmentByIdentity[$identity]['valid_for_completeness'] ?? true) === true;
-            $actions[] = ['action' => $same && $currentValid ? 'KEEP' : 'UPDATE', 'role' => $wanted->role, 'placement_key' => $wanted->placementKey, 'usage_id' => $existing->usageId, 'media_id' => $wanted->mediaId]
+            $actions[] = ['action' => $same && $currentValid ? 'KEEP' : ($existing->mediaId !== $wanted->mediaId ? 'REPLACE' : 'UPDATE'), 'role' => $wanted->role, 'placement_key' => $wanted->placementKey, 'usage_id' => $existing->usageId, 'media_id' => $wanted->mediaId]
                 + ($currentValid ? [] : ['reason' => (string) ($currentAssessmentByIdentity[$identity]['diagnostic'] ?? 'MEDIA_USAGE_SEMANTIC_MISMATCH')]);
         }
         foreach ($currentByIdentity as $identity => $existing) {

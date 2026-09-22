@@ -17383,3 +17383,22 @@ Graph REMOVE packet with valid UUIDs; the registered Ability schema reports
 mutation was performed; live acceptance and deployment remain pending.
 
 STATUS=`P0_CAPTURE_GRAPH_RUNTIME_BOUNDARIES_FIXED_LOCAL / DEPLOYMENT_PENDING / LIVE_ACCEPTANCE_NOT_RUN / SEMANTIC_MUTATION_NONE`.
+
+# Checkpoint — 2026-09-23 — Generic Article reconciliation boundary (LOCAL / DEPLOYMENT BLOCKED)
+
+IMPLEMENTED: Added the generic `ArticleReconciliationOrchestrator`,
+machine-actionable `ArticleRemediationAction`/planner, bounded repeated-blocker
+handling, batch classification through the same single-Article path, and the
+explicit-current-Media `REPLACE` planner rule. The composition root exposes the
+orchestrator through the existing Article, Capture, Media, editorial and
+publication owners; no new semantic writer or direct database mutation was
+introduced.
+
+VERIFICATION: Focused Article/Media/publication/boot tests pass (34 tests / 124
+assertions). Full Unit passes (2,251 tests / 13,238 assertions), with existing
+warnings/deprecations. Integration is blocked by the mandatory
+`NHK_WP_TEST_PATH=public` environment guard (14 bootstrap failures, 119 skips),
+and deployment preflight is blocked by WordPress bootstrap failure. No staging,
+production, Article, Media or canary mutation was performed.
+
+STATUS=`GENERIC_ARTICLE_RECONCILIATION_IMPLEMENTED_LOCAL / DEPLOYMENT_BLOCKED_WORDPRESS_BOOTSTRAP / CANARY_NOT_RUN / SEMANTIC_MUTATION_NONE`.

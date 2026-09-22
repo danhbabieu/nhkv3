@@ -873,6 +873,58 @@ final class Plugin {
                 return ['frontend_available' => $published, 'public_url' => (string) ($result['public_url'] ?? ''), 'publication' => $result, 'canonical_readback' => $applied['canonical_readback'] ?? null];
             });
             $draftGateway = new EditorialDraftGateway($editorialPosts, $articleReceipts, $ownerPublication);
+            // One generic recovery boundary for existing Capture-owned Articles.
+            // The orchestrator plans and bounds work; existing owner adapters
+            // remain responsible for every durable mutation.
+            add_filter('nhk_v3_article_reconciliation_orchestrator', static function (mixed $current) use ($articleEditorial, $captureRepository, $articleMedia, $canonicalPublicationContext, $draftGateway, $editorialPosts): mixed {
+                if ($current instanceof \NHK\Core\Application\Article\ArticleReconciliationOrchestrator) return $current;
+                return new \NHK\Core\Application\Article\ArticleReconciliationOrchestrator(
+                    static function (array $input) use ($articleEditorial, $captureRepository): array {
+                        $postId = (int) ($input['post_id'] ?? 0);
+                        $state = $articleEditorial->read($postId);
+                        if ($state === null) throw new \RuntimeException('WP_POST_UNAVAILABLE');
+                        $capture = $captureRepository->findByArticleId($postId);
+                        return ['post_id' => $postId, 'state' => $state, 'capture' => $capture, 'slug' => $state->slug, 'permalink' => $state->permalink];
+                    },
+                    static fn (array $state): array => is_object($state['capture'] ?? null) && is_array($state['capture']->context['content_intent'] ?? null) ? $state['capture']->context['content_intent'] : ['intent' => 'TEXT_ARTICLE'],
+                    static function (array $state): array {
+                        $capture = $state['capture'] ?? null;
+                        $packet = is_object($capture) && is_array($capture->context['subject_resolution_packet'] ?? null) ? $capture->context['subject_resolution_packet'] : [];
+                        return $packet;
+                    },
+                    static function (array $state) use ($canonicalPublicationContext): array {
+                        $owner = $state['state'] ?? null;
+                        if (!$owner instanceof \NHK\Core\Domain\Article\EditorialPostState) return ['diagnostics' => ['WP_POST_UNAVAILABLE']];
+                        $evidence = $canonicalPublicationContext($owner, []);
+                        $gate = (new \NHK\Core\Application\Article\ArticlePublicationGate())->check($owner, $evidence, $owner->token);
+                        return ['diagnostics' => $gate->blockers, 'evidence' => $evidence, 'state_token' => $owner->token, 'media' => $evidence['media_snapshot'] ?? []];
+                    },
+                    static function (array $state, array $actions) use ($articleMedia, $editorialPosts): array {
+                        $postId = (int) ($state['post_id'] ?? 0);
+                        foreach ($actions as $action) {
+                            if ($action->owner === 'media') $articleMedia->ensureForPost($postId, ['subject' => (string) (($state['state']->title ?? '')), 'force_inline_reconcile' => true], (array) (($state['desired_media'] ?? [])));
+                            if ($action->action === 'ALLOCATE_SLUG' && isset($state['state'])) $editorialPosts->update($postId, ['post_name' => sanitize_title((string) $state['state']->title)]);
+                        }
+                        $fresh = $editorialPosts->read($postId);
+                        return $fresh === null ? [] : ['state' => $fresh, 'slug' => $fresh->slug, 'permalink' => $fresh->permalink];
+                    },
+                    static function (array $state) use ($draftGateway): array {
+                        $owner = $state['state'] ?? null;
+                        $evidence = is_array($state['inspection']['evidence'] ?? null) ? $state['inspection']['evidence'] : [];
+                        if (!$owner instanceof \NHK\Core\Domain\Article\EditorialPostState) return ['outcome' => 'SYSTEM_BLOCKED'];
+                        return $draftGateway->reviewPublication($owner->postId, $owner->token, $evidence, 'article-reconciliation-review:' . $owner->postId);
+                    },
+                    static function (array $state) use ($draftGateway): array {
+                        $owner = $state['state'] ?? null;
+                        if (!$owner instanceof \NHK\Core\Domain\Article\EditorialPostState) return ['status' => 'blocked'];
+                        return $draftGateway->publish($owner->postId, $owner->token, (array) ($state['inspection']['evidence'] ?? []), 'article-reconciliation-publish:' . $owner->postId);
+                    },
+                    static function (array $state) use ($articleEditorial): array {
+                        $owner = $articleEditorial->read((int) ($state['post_id'] ?? 0));
+                        return $owner !== null && $owner->status === 'publish' && $owner->permalink !== '' ? ['status' => 'verified', 'permalink' => $owner->permalink] : ['status' => 'blocked'];
+                    },
+                );
+            }, 10, 1);
             $semanticWritePolicy = new SemanticWritePolicyResolver();
             $documentation = new McpDocumentationRegistry(null, null, $semanticWritePolicy);
             $authorityPolicyStorage = new \NHK\Core\Infrastructure\Governance\WpOptionConversationalAuthorityPolicyStorage();
