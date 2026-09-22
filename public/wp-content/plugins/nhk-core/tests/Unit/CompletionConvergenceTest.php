@@ -266,6 +266,31 @@ final class CompletionConvergenceTest extends TestCase
         self::assertContains('CANONICAL_READBACK_UNVERIFIED', $packet['blockers']);
     }
 
+    public function test_relation_only_capture_converges_from_verified_relation_child_readback(): void
+    {
+        $packet = (new CompletionCoordinator())->aggregateCapture('capture-1', [
+            ['owner_type' => 'relation', 'owner_id' => 'edge-1', 'canonical_readback' => ['canonical_id' => 'edge-1'], 'dependency_state' => 'COMPLETE', 'relation_or_usage_state' => 'COMPLETE'],
+        ]);
+
+        self::assertSame('COMPLETE', $packet['canonical_state']);
+        self::assertTrue($packet['canonical_readback_verified']);
+        self::assertTrue($packet['complete']);
+        self::assertSame([], $packet['missing_required_owners']);
+        self::assertNotContains('CANONICAL_READBACK_UNVERIFIED', $packet['blockers']);
+    }
+
+    public function test_relation_only_capture_stays_blocked_when_relation_readback_is_missing(): void
+    {
+        $packet = (new CompletionCoordinator())->aggregateCapture('capture-1', [
+            ['owner_type' => 'relation', 'owner_id' => 'edge-1', 'dependency_state' => 'COMPLETE', 'relation_or_usage_state' => 'COMPLETE'],
+        ]);
+
+        self::assertSame('BLOCKED', $packet['canonical_state']);
+        self::assertFalse($packet['canonical_readback_verified']);
+        self::assertFalse($packet['complete']);
+        self::assertContains('CANONICAL_READBACK_UNVERIFIED', $packet['blockers']);
+    }
+
     public function test_empty_required_owner_id_never_matches_a_verified_child(): void
     {
         $packet = (new CompletionCoordinator())->aggregateCapture('capture-1', [

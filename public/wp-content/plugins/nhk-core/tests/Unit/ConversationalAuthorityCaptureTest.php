@@ -143,7 +143,8 @@ final class ConversationalAuthorityCaptureTest extends TestCase
                 static fn (CaptureRecord $capture, array $plan, array $ids): array => [
                     'status' => 'APPLIED',
                     'proposal_ids' => ['proposal-' . $ordinal],
-                    'canonical_readback' => ['relation' => 'verified'],
+                    'apply_results' => [['canonical_id' => 'edge-' . $ordinal, 'canonical_readback' => ['canonical_id' => 'edge-' . $ordinal, 'revision' => 1]]],
+                    'canonical_readback' => ['canonical_id' => 'edge-' . $ordinal, 'revision' => 1],
                 ],
                 static function () use (&$mixedContinuationCalls): array {
                     ++$mixedContinuationCalls;
@@ -170,6 +171,9 @@ final class ConversationalAuthorityCaptureTest extends TestCase
             self::assertSame('APPLIED', $applied->status);
             self::assertSame(0, $editorialCalls);
             self::assertSame(0, $mixedContinuationCalls);
+            self::assertSame('COMPLETE', $applied->context['authority_result']['result']['completion']['canonical_state']);
+            self::assertTrue($applied->context['authority_result']['result']['completion']['canonical_readback_verified']);
+            self::assertTrue($applied->context['authority_result']['result']['completion']['complete']);
         }
     }
 

@@ -108,6 +108,7 @@ final class CompletionCoordinator
             'owner_id' => $ownerId,
             'proposal_state' => $evidence['proposal_state'] ?? null,
             'canonical_state' => $canonical,
+            'canonical_readback' => is_array($evidence['canonical_readback'] ?? null) ? $evidence['canonical_readback'] : null,
             'canonical_readback_verified' => $canonicalReadbackVerified,
             'dependency_state' => $dependencies,
             'relation_or_usage_state' => $relations,
@@ -147,7 +148,16 @@ final class CompletionCoordinator
             return true;
         }));
         if ($missingRequiredOwners !== []) $blockers[] = 'REQUIRED_OWNER_READBACK_UNVERIFIED';
-        $canonicalReadbackVerified = $this->readBack($evidence['canonical_readback'] ?? null);
+        $relationOnlyReadbackVerified = $requiredOwners === []
+            && $packets !== []
+            && array_reduce($packets, static function (bool $verified, array $packet): bool {
+                return $verified
+                    && strtolower((string) ($packet['owner_type'] ?? '')) === 'relation'
+                    && ($packet['complete'] ?? false) === true
+                    && ($packet['canonical_readback_verified'] ?? false) === true;
+            }, true);
+        $canonicalReadbackVerified = $this->readBack($evidence['canonical_readback'] ?? null)
+            || $relationOnlyReadbackVerified;
         $canonical = ($evidence['canonical_state'] ?? null) === 'BLOCKED' || !$canonicalReadbackVerified ? 'BLOCKED' : 'COMPLETE';
         if (!$canonicalReadbackVerified) $blockers[] = 'CANONICAL_READBACK_UNVERIFIED';
         $complete = $canonical === 'COMPLETE' && $packets !== [] && $blockers === [] && array_reduce($packets, static fn (bool $ok, array $packet): bool => $ok && ($packet['complete'] ?? false) === true, true);
