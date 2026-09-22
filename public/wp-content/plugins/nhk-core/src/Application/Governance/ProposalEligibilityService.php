@@ -12,12 +12,15 @@ final class ProposalEligibilityService
 {
     /** @var callable(\NHK\Core\Domain\Governance\Proposal):bool|string|null */
     private $stagingScopeVerifier = null;
+    /** @var callable(\NHK\Core\Domain\Governance\Proposal):array<string,mixed>|null|null */
+    private $stagingScopeResolver = null;
     /** @var callable(array<string,mixed>,\NHK\Core\Domain\Governance\Proposal):array<string,mixed>|null */
     private $stagingScopeDiagnosticProvider = null;
     public function __construct(private ProposalRepository $proposals, private DependencyGraph $dependencies, private EligibilityReader $reader, private ?VideoProposalEligibilityEvaluator $video = null, private ?ClassifiedAsPolicy $classifiedAs = null, private ?MediaUsageRepository $mediaUsages = null) {}
 
     /** Connect the existing server-issued staging verifier after runtime bootstrap. */
     public function setStagingScopeVerifier(callable $verifier): void { $this->stagingScopeVerifier = $verifier; }
+    public function setStagingScopeResolver(callable $resolver): void { $this->stagingScopeResolver = $resolver; }
     public function setStagingScopeDiagnosticProvider(callable $provider): void { $this->stagingScopeDiagnosticProvider = $provider; }
 
     public function check(string $proposalId): EligibilityResult
@@ -36,9 +39,27 @@ final class ProposalEligibilityService
         }
         $reasons = [];
         $diagnostics = [];
-        if ($this->stagingScopeVerifier !== null && (($proposal->entityType === 'video' && in_array($proposal->operation, ['ingest', 'update'], true)) || ($proposal->entityType === 'knowledge' && in_array($proposal->operation, ['update', 'retire'], true))) && array_key_exists('capture_id', $proposal->payload)) {
+        $authorityTypes = ['brand', 'model', 'variant', 'movement', 'music', 'component', 'classification', 'specimen', 'product'];
+        $authorityScoped = in_array($proposal->entityType, $authorityTypes, true)
+            && in_array($proposal->operation, ['create', 'ingest', 'update', 'rename', 'rekey', 'merge', 'retire', 'reactivate'], true);
+        $captureBound = array_key_exists('capture_id', $proposal->payload)
+            || is_array($proposal->payload['project_build_audit'] ?? null)
+            || $authorityScoped;
+        if ($this->stagingScopeVerifier !== null && (($proposal->entityType === 'video' && in_array($proposal->operation, ['ingest', 'update'], true)) || ($proposal->entityType === 'knowledge' && in_array($proposal->operation, ['update', 'retire'], true)) || $authorityScoped) && $captureBound) {
             $scope = $proposal->payload['staging_acceptance'] ?? null;
-            if (!is_array($scope)) $reasons[] = 'STAGING_SCOPE_REQUIRED';
+            if (!is_array($scope) && is_callable($this->stagingScopeResolver)) {
+                try { $scope = ($this->stagingScopeResolver)($proposal); }
+                catch (\Throwable) { $scope = null; }
+            }
+            if (!is_array($scope)) {
+                $reasons[] = 'STAGING_SCOPE_REQUIRED';
+                $diagnostics['staging_scope'] = [
+                    'status' => 'MISSING',
+                    'resolution' => 'PERSISTED_CAPTURE_AUTHORITY_CONTEXT',
+                    'capture_id_present' => $captureBound,
+                    'candidate_id_present' => trim((string) ($proposal->payload['candidate_id'] ?? '')) !== '',
+                ];
+            }
             else {
                 $verification = ($this->stagingScopeVerifier)($proposal);
                 if ($this->stagingScopeDiagnosticProvider !== null) $diagnostics = ($this->stagingScopeDiagnosticProvider)($scope, $proposal);

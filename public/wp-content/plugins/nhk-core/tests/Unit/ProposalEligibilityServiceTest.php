@@ -71,6 +71,44 @@ final class ProposalEligibilityServiceTest extends TestCase
         self::assertArrayHasKey('DESCRIPTOR_DIFF', $result->diagnostics);
     }
 
+    public function test_authority_apply_scope_is_checked_by_eligibility_with_the_same_semantics_as_apply(): void
+    {
+        $proposal = new Proposal(self::ID, self::SUBJECT, 'rename', [
+            'capture_id' => '01a0b2e0-1888-7038-9811-2dd7e7073a27',
+            'candidate_id' => 'candidate-authority-rename',
+            'project_build_audit' => [
+                'capture_id' => '01a0b2e0-1888-7038-9811-2dd7e7073a27',
+                'plan_fingerprint' => str_repeat('a', 64),
+            ],
+        ], 'authority-content', 1, 'authority-dependency', ProposalState::APPROVED, idempotencyKey: 'authority-scope', targetUuid: self::SUBJECT, entityType: 'classification');
+        $service = $this->service($proposal);
+        $service->setStagingScopeVerifier(static fn (Proposal $checked): string => 'STAGING_SCOPE_REQUIRED');
+        $service->setStagingScopeResolver(static fn (Proposal $checked): ?array => null);
+
+        $result = $service->check($proposal->id);
+
+        self::assertFalse($result->ready);
+        self::assertContains('STAGING_SCOPE_REQUIRED', $result->reasons);
+        self::assertSame('PERSISTED_CAPTURE_AUTHORITY_CONTEXT', $result->diagnostics['staging_scope']['resolution']);
+    }
+
+    public function test_authority_scope_resolver_can_make_eligibility_match_apply(): void
+    {
+        $proposal = new Proposal(self::ID, self::SUBJECT, 'rename', [
+            'capture_id' => '01a0b2e0-1888-7038-9811-2dd7e7073a27',
+            'candidate_id' => 'candidate-authority-rename',
+            'project_build_audit' => [
+                'capture_id' => '01a0b2e0-1888-7038-9811-2dd7e7073a27',
+                'plan_fingerprint' => str_repeat('a', 64),
+            ],
+        ], 'authority-content', 1, 'authority-dependency', ProposalState::APPROVED, idempotencyKey: 'authority-scope-resolved', targetUuid: self::SUBJECT, entityType: 'classification');
+        $service = $this->service($proposal);
+        $service->setStagingScopeResolver(static fn (Proposal $checked): array => ['approved' => true]);
+        $service->setStagingScopeVerifier(static fn (Proposal $checked): bool => true);
+
+        self::assertTrue($service->check($proposal->id)->ready);
+    }
+
     public function test_explicit_video_subject_packet_is_authoritative_over_unresolved_title_hint(): void
     {
         $proposal = $this->proposal([

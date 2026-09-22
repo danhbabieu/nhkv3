@@ -29,6 +29,34 @@ final class EditorialDraftGatewayTest extends TestCase
         self::assertSame('RESEARCH_PREFLIGHT_BLOCKED', $gateway->create(['idempotency_key' => 'draft-3', 'research' => ['ready_for_draft' => false]])['reason']);
     }
 
+    public function test_trash_transitions_a_draft_and_confirms_canonical_readback(): void
+    {
+        $posts = new FakeEditorialStore();
+        $gateway = new EditorialDraftGateway($posts, new FakeReceiptRepo());
+        $created = $gateway->create(['idempotency_key' => 'trash-draft', 'title' => 'Draft', 'content' => 'Body']);
+
+        $result = $gateway->trash(1, (string) $created['state_token'], 'trash-draft-op');
+
+        self::assertTrue($result['ok']);
+        self::assertSame('trash', $result['post']['status']);
+        self::assertSame('COMPLETED', $result['receipt']['outcome']);
+    }
+
+    public function test_trash_never_reports_completed_when_canonical_readback_is_not_trash(): void
+    {
+        $posts = new FakeEditorialStore(null, false);
+        $gateway = new EditorialDraftGateway($posts, new FakeReceiptRepo());
+        $created = $gateway->create(['idempotency_key' => 'trash-no-readback', 'title' => 'Draft', 'content' => 'Body']);
+
+        $result = $gateway->trash(1, (string) $created['state_token'], 'trash-no-readback-op');
+
+        self::assertFalse($result['ok']);
+        self::assertSame('EDITORIAL_TRASH_READBACK_FAILED', $result['reason']);
+        self::assertSame('VERIFICATION_FAILED', $result['receipt']['outcome']);
+        self::assertSame('trash', $result['receipt']['diagnostics']['expected_status']);
+        self::assertSame('draft', $result['receipt']['diagnostics']['observed_status']);
+    }
+
     public function test_state_token_match_is_exact_and_uses_the_current_snapshot_as_the_comparison_side(): void
     {
         $state = new EditorialPostState(1, '1:1', 'post', 'draft', 'A', 'B', 'C', 'a', '/?p=1', 7, 3, '2026-09-16 00:00:00');
@@ -161,12 +189,12 @@ final class EditorialDraftGatewayTest extends TestCase
 final class FakeEditorialStore implements EditorialPostStore
 {
     /** @var array<int,EditorialPostState> */ public array $rows = []; public int $creates = 0;
-    public function __construct(private $onCreate = null) {}
+    public function __construct(private $onCreate = null, private bool $trashPersists = true) {}
     public function read(int $postId): ?EditorialPostState { return $this->rows[$postId] ?? null; }
     public function createDraft(array $fields): EditorialPostState { $this->creates++; if (is_callable($this->onCreate)) ($this->onCreate)($fields); return $this->rows[1] = new EditorialPostState(1, '1:1', 'post', 'draft', (string) ($fields['post_title'] ?? ''), (string) ($fields['post_content'] ?? ''), '', '', '/?p=1', 0, 0); }
     public function update(int $postId, array $fields): EditorialPostState { if (is_callable($this->onCreate)) ($this->onCreate)($fields); $old = $this->rows[$postId]; return $this->rows[$postId] = new EditorialPostState($postId, $old->endpointKey, $old->postType, 'draft', (string) ($fields['post_title'] ?? $old->title), (string) ($fields['post_content'] ?? $old->content), $old->excerpt, $old->slug, $old->permalink, $old->latestRevisionId, $old->revisionCount + 1); }
     public function publish(int $postId): EditorialPostState { return $this->rows[$postId] = $this->withStatus($this->rows[$postId], 'publish'); }
-    public function trash(int $postId): EditorialPostState { return $this->rows[$postId] = $this->withStatus($this->rows[$postId], 'trash'); }
+    public function trash(int $postId): EditorialPostState { return $this->trashPersists ? $this->rows[$postId] = $this->withStatus($this->rows[$postId], 'trash') : $this->rows[$postId]; }
     public function restore(int $postId): EditorialPostState { return $this->rows[$postId] = $this->withStatus($this->rows[$postId], 'draft'); }
     private function withStatus(EditorialPostState $old, string $status): EditorialPostState { return new EditorialPostState($old->postId, $old->endpointKey, $old->postType, $status, $old->title, $old->content, $old->excerpt, $old->slug ?: 'title', $old->permalink, $old->latestRevisionId + 1, $old->revisionCount + 1); }
 }

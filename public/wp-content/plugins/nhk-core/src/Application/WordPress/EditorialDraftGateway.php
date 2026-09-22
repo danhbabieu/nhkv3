@@ -127,7 +127,13 @@ final class EditorialDraftGateway
         if ($existing !== null) {
             if (!hash_equals($existing->requestFingerprint, $fingerprint)) return ['ok' => false, 'reason' => 'IDEMPOTENCY_CONFLICT', 'receipt' => $existing->toArray()];
             $state = $existing->wpPostId === null ? null : $this->posts->read($existing->wpPostId);
-            return ['ok' => $state !== null && ($intent !== 'publish' || $state->status === 'publish'), 'post' => $state?->snapshot(), 'receipt' => $existing->toArray()];
+            $expectedStatus = match ($intent) {
+                'publish' => 'publish',
+                'trash' => 'trash',
+                'restore' => 'draft',
+                default => null,
+            };
+            return ['ok' => $state !== null && ($expectedStatus === null || $state->status === $expectedStatus), 'post' => $state?->snapshot(), 'receipt' => $existing->toArray()];
         }
         $current = $this->posts->read($postId);
         if ($current === null) return ['ok' => false, 'reason' => 'WP_POST_UNAVAILABLE'];
@@ -151,7 +157,13 @@ final class EditorialDraftGateway
                 }
             }
         } elseif ($intent === 'trash') {
-            if ($current->status === 'publish') $state = $this->posts->trash($postId); else $state = $current;
+            $state = $current->status === 'trash' ? $current : $this->posts->trash($postId);
+            $readBack = $this->posts->read($postId);
+            if ($readBack === null || $readBack->status !== 'trash') {
+                $receipt = $this->receipts->create(new ArticleOperationReceipt(UuidCodec::newV7(), $idempotencyKey, $fingerprint, $intent, $current->endpointKey, $current->postId, 'editorial', ArticleIngestOutcome::VERIFICATION_FAILED, true, [], [], ['code' => 'EDITORIAL_TRASH_READBACK_FAILED'], 1, null, null, $readBack?->token ?? $current->token, [], [], [], ['expected_status' => 'trash', 'observed_status' => $readBack?->status ?? 'unavailable']));
+                return ['ok' => false, 'reason' => 'EDITORIAL_TRASH_READBACK_FAILED', 'post' => $readBack?->snapshot(), 'state_token' => $readBack?->token ?? $current->token, 'receipt' => $receipt->toArray()];
+            }
+            $state = $readBack;
         } else {
             if ($current->status === 'trash') $state = $this->posts->restore($postId); else $state = $current;
         }

@@ -6,6 +6,7 @@ namespace NHK\Tests\Unit;
 use NHK\Core\Application\Authority\AuthorityIntentPlanner;
 use NHK\Core\Application\Capture\AuthorityCaptureService;
 use NHK\Core\Application\Graph\ExplicitRelationIntentPlanner;
+use NHK\Core\Application\Graph\ClassifiedAsPolicy;
 use NHK\Core\Contracts\Capture\CaptureRepository;
 use NHK\Core\Contracts\Graph\EndpointRevisionReader;
 use NHK\Core\Domain\Authority\{AuthorityEntity, AuthorityState, CanonicalEntityTypeCatalog, EntityTypeRegistry};
@@ -50,7 +51,7 @@ final class CaptureClassifiedAsRuntimeIntegrationTest extends TestCase
             $record = $authority->findByCanonicalId($reference->endpoint_key);
             return $record === null ? null : ['active' => $record->active(), 'revision' => $record->revision, 'family' => $record->payload['family'] ?? null];
         };
-        $relations = new ExplicitRelationIntentPlanner($endpoints, new PredicateRegistry(), $state, static fn (): array => []);
+        $relations = new ExplicitRelationIntentPlanner($endpoints, new PredicateRegistry(), $state, static fn (): array => [], new ClassifiedAsPolicy());
         $authorityPlanner = new AuthorityIntentPlanner($authority, $types, relationIntents: $relations);
         $captures = new class implements CaptureRepository {
             /** @var array<string,CaptureRecord> */

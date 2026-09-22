@@ -37,7 +37,7 @@ final class AuthorityProposalStagingScopeRecoveryTest extends TestCase
 
     public function test_classification_rename_and_generic_authority_update_use_the_same_registry_scope(): void
     {
-        foreach ([['classification', 'rename'], ['brand', 'update']] as [$type, $operation]) {
+        foreach ([['classification', 'rename'], ['brand', 'update'], ['classification', 'retire'], ['component', 'retire']] as [$type, $operation]) {
             $proposal = $this->proposal($type, $operation, 'candidate-' . $type . '-' . $operation);
             $capture = $this->capture($proposal);
             $verifier = new StagingAcceptanceScopeVerifier(static fn (): string => 'staging', 'scope-secret', static fn (): bool => true);

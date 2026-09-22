@@ -17140,3 +17140,37 @@ PHP lint and `git diff --check` pass. No schema/migration, Video, Capture,
 staging, production, deployment or live Odo 36 mutation occurred.
 
 STATUS=`VIDEO_SHARED_EDITORIAL_INTEGRATION_FIXED_LOCALLY / FULL_UNIT_PASS / NO_LIVE_MUTATION`.
+# Checkpoint — 2026-09-22 — Authority scope eligibility parity, Article trash read-back and classified_as runtime wiring (LOCAL / DEPLOYMENT PENDING)
+
+ROOT_CAUSE_CONFIRMED: Proposal eligibility checked staging scope only for
+Video/Knowledge, so approved Authority proposals could report `ready=true`
+while Controlled Apply still failed at `OperationScopedStagingGuard`. The
+Authority scope resolver existed only on the Apply guard path. Article trash
+also skipped the native writer for draft posts and marked the unchanged draft
+as `COMPLETED` without canonical status read-back. Finally, the production
+Capture composition instantiated `ExplicitRelationIntentPlanner` without the
+registered `ClassifiedAsPolicy`, so the live Capture path did not enforce the
+same `classified_as` family/scope policy covered by isolated planner tests.
+
+FIXED_BOUNDARIES: Eligibility now applies the Authority operation family and
+uses the same persisted-Capture scope resolver as Apply; missing scope remains
+fail-closed with bounded diagnostic evidence. Article trash transitions every
+non-trash status, performs canonical read-back, and persists
+`VERIFICATION_FAILED` with expected/observed status when read-back is not
+`trash`; idempotent retries also validate the expected terminal status. Plugin
+runtime wiring now injects the registered `ClassifiedAsPolicy` into the
+Capture relation planner. No UUID/entity-specific authorization or bypass was
+added.
+
+REGRESSION: Added Authority eligibility/apply parity and missing-scope
+diagnostic tests, draft-trash/read-back failure tests, and runtime
+`classified_as` policy wiring coverage. Existing wrong-plan/candidate,
+revision, replay and policy-negative tests remain active.
+
+VERIFICATION: Targeted suite passes 38 tests / 129 assertions. Full NHK Unit
+passes 2,206 tests / 13,222 assertions with existing warnings/deprecations.
+Changed PHP lint and `git diff --check` pass. Live MCP acceptance is blocked
+by unavailable connected runtime/deployment read-back; no staging, production,
+V2, WordPress semantic or article mutation was performed.
+
+STATUS: `AUTHORITY_ELIGIBILITY_APPLY_PARITY_ARTICLE_TRASH_READBACK_CLASSIFIED_AS_RUNTIME_FIXED_LOCAL / DEPLOYMENT_PENDING / LIVE_ACCEPTANCE_BLOCKED_BY_RUNTIME / SEMANTIC_MUTATION_NONE`

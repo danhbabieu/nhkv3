@@ -117,36 +117,35 @@ final class GovernanceRuntimeFactory
             can: static fn (string $capability): bool => function_exists('current_user_can') && current_user_can($capability),
             videos: $videos,
         );
+        $authorityScopeResolver = static function (\NHK\Core\Domain\Governance\Proposal $proposal) use ($captureRepository, $stagingScopeVerifier): ?array {
+            $authorityTypes = ['brand', 'model', 'variant', 'movement', 'music', 'component', 'classification', 'specimen', 'product'];
+            if (!in_array($proposal->entityType, $authorityTypes, true)) return null;
+            $audit = is_array($proposal->payload['project_build_audit'] ?? null) ? $proposal->payload['project_build_audit'] : [];
+            $captureId = trim((string) ($audit['capture_id'] ?? $proposal->payload['capture_id'] ?? ''));
+            $candidateId = trim((string) ($proposal->payload['candidate_id'] ?? ''));
+            if ($captureId === '' || $candidateId === '' || !\NHK\Core\Shared\Uuid\UuidCodec::isValid($captureId)) return null;
+            $capture = $captureRepository->findById($captureId);
+            if (!$capture instanceof \NHK\Core\Domain\Capture\CaptureRecord) return null;
+            $plan = is_array($capture->context['authority_plan'] ?? null) ? $capture->context['authority_plan'] : [];
+            $planFingerprint = trim((string) ($audit['plan_fingerprint'] ?? $plan['plan_fingerprint'] ?? ''));
+            if (!preg_match('/^[a-f0-9]{64}$/i', $planFingerprint)) return null;
+            $plan['plan_fingerprint'] = $planFingerprint;
+            try { return $stagingScopeVerifier->issueForAuthorityPlan($capture, $plan, [$candidateId]); }
+            catch (\Throwable) { return null; }
+        };
         $eligibility->setStagingScopeVerifier(static function (\NHK\Core\Domain\Governance\Proposal $proposal) use ($stagingScopeVerifier, $environment): bool|string {
             if (strtolower(trim($environment())) !== 'staging') return true;
             $scope = $proposal->payload['staging_acceptance'] ?? null;
             return is_array($scope) ? ($stagingScopeVerifier->proposalFailureReason($scope, $proposal) ?? true) : 'STAGING_SCOPE_REQUIRED';
         });
+        $eligibility->setStagingScopeResolver($authorityScopeResolver);
         $eligibility->setStagingScopeDiagnosticProvider([$stagingScopeVerifier, 'proposalDescriptorDiagnostic']);
         $mediaBinding = new MediaBindingService($media, $assets, $usages, $authority, $types, new \NHK\Core\Infrastructure\Media\WpdbMediaBindingOperationRepository($wpdb), stagingGuard: new MediaBindingStagingGuard($environment, [$stagingScopeVerifier, 'verifyBindingRequest'], static fn (string $capability): bool => function_exists('current_user_can') && current_user_can($capability)));
         $stagingGuard = new OperationScopedStagingGuard(
             $environment,
             static fn (string $capability): bool => function_exists('current_user_can') && current_user_can($capability),
             scopeVerifier: [$stagingScopeVerifier, 'proposalFailureReason'],
-            scopeResolver: static function (\NHK\Core\Domain\Governance\Proposal $proposal) use ($captureRepository, $stagingScopeVerifier): ?array {
-                $authorityTypes = ['brand', 'model', 'variant', 'movement', 'music', 'component', 'classification', 'specimen', 'product'];
-                if (!in_array($proposal->entityType, $authorityTypes, true)) return null;
-                $audit = is_array($proposal->payload['project_build_audit'] ?? null) ? $proposal->payload['project_build_audit'] : [];
-                $captureId = trim((string) ($audit['capture_id'] ?? $proposal->payload['capture_id'] ?? ''));
-                $candidateId = trim((string) ($proposal->payload['candidate_id'] ?? ''));
-                if ($captureId === '' || $candidateId === '' || !\NHK\Core\Shared\Uuid\UuidCodec::isValid($captureId)) return null;
-                $capture = $captureRepository->findById($captureId);
-                if (!$capture instanceof \NHK\Core\Domain\Capture\CaptureRecord) return null;
-                $plan = is_array($capture->context['authority_plan'] ?? null) ? $capture->context['authority_plan'] : [];
-                $planFingerprint = trim((string) ($audit['plan_fingerprint'] ?? $plan['plan_fingerprint'] ?? ''));
-                if (!preg_match('/^[a-f0-9]{64}$/i', $planFingerprint)) return null;
-                $plan['plan_fingerprint'] = $planFingerprint;
-                try {
-                    return $stagingScopeVerifier->issueForAuthorityPlan($capture, $plan, [$candidateId]);
-                } catch (\Throwable) {
-                    return null;
-                }
-            },
+            scopeResolver: $authorityScopeResolver,
         );
         $controlledApply = new ControlledApplyService(
             $proposalRepository,

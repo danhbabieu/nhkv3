@@ -685,7 +685,7 @@ final class Plugin {
                     return [];
                 }
             };
-            $explicitRelationIntentPlanner = new \NHK\Core\Application\Graph\ExplicitRelationIntentPlanner($endpoints, $predicates, $relationIntentEndpointState, $relationIntentState);
+            $explicitRelationIntentPlanner = new \NHK\Core\Application\Graph\ExplicitRelationIntentPlanner($endpoints, $predicates, $relationIntentEndpointState, $relationIntentState, $classifiedAsPolicy);
             $relationProposalReconciliation = new RelationProposalReconciliationService(
                 $mcpGovernance,
                 $governance,
