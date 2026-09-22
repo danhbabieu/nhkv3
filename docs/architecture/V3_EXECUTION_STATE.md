@@ -1,3 +1,25 @@
+# Checkpoint — 2026-09-22 — P0 Task 6 generic IMAGE_ARTICLE orchestration (LOCAL / DEPLOYMENT PENDING)
+
+ROOT_CAUSE_CONFIRMED: The generic full-path acceptance fixture did not provide
+the coordinator's canonical publisher success shape (`ok=true` plus published
+post read-back), so the flow stopped at `COMPOSED`; this was an adapter-contract
+fixture gap, not a production Article-specific branch.
+
+FIXED_BOUNDARY: Added a generic `IMAGE_ARTICLE` orchestration proof using an
+explicit registered subject hint, explicit Media, stale reusable Media input,
+semantic/media/publication/final callbacks and publish/read-back. The test
+records the SubjectResolutionPacket ID at each downstream boundary and proves
+one Article, one explicit Media usage, stale Media exclusion, native permalink
+and rendered read-back. No historical canary identifiers or production logic
+were added.
+
+VERIFICATION: Focused orchestration and prior P0 regression suite passes 127
+tests / 509 assertions. `git diff --check` passes. Existing unrelated working
+tree edits remain untouched. No schema, direct DB, semantic mutation or live
+acceptance was performed.
+
+STATUS: `P0_TASK6_GENERIC_IMAGE_ARTICLE_LOCAL_READY / DEPLOYMENT_PENDING / SEMANTIC_MUTATION_NONE`.
+
 # Checkpoint — 2026-09-22 — P0 Task 5 native WordPress Article route/publication lifecycle (LOCAL / DEPLOYMENT PENDING)
 
 ROOT_CAUSE_CONFIRMED: Native Article publication readiness still used the

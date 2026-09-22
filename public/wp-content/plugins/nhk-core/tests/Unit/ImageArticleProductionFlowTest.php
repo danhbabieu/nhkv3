@@ -11,6 +11,33 @@ use PHPUnit\Framework\TestCase;
 
 final class ImageArticleProductionFlowTest extends TestCase
 {
+    public function test_generic_image_article_reuses_one_subject_packet_through_publish_and_ignores_stale_media_binding(): void
+    {
+        $flow = new ImageArticleFlowFixture([
+            ['media_id' => 'media-explicit', 'attachment_id' => 712, 'upload_status' => 'REUSED', 'sort_order' => 0],
+        ], fullPath: true);
+
+        $result = $flow->run([
+            'idempotency_key' => 'generic-image-article-full-path',
+            'subject_hints' => ['subject-explicit'],
+            'article_media_bindings' => [
+                ['media_id' => 'media-stale', 'role' => 'inline_primary', 'selection_source' => 'SYSTEM_REUSABLE'],
+            ],
+            'publish' => true,
+        ]);
+
+        self::assertSame(1, $result->articleId);
+        self::assertSame('PUBLISHED', $result->stage);
+        self::assertSame(1, $flow->draftCalls);
+        self::assertSame(['media-explicit'], array_column($flow->usages, 'media_id'));
+        self::assertSame('/anh-kiem-thu/', $result->diagnostics['final_read_back']['permalink']);
+        self::assertSame('verified', $result->diagnostics['final_read_back']['status']);
+        $packetIds = array_values(array_filter($flow->packetIds));
+        self::assertNotEmpty($packetIds);
+        self::assertSame(1, count(array_unique($packetIds)));
+        self::assertSame('subject-explicit', $flow->subjectHintSeen);
+    }
+
     public function test_one_existing_image_creates_one_article_and_one_usage_without_upload_or_duplicate(): void
     {
         $flow = new ImageArticleFlowFixture([
@@ -68,12 +95,14 @@ final class ImageArticleFlowFixture
     public int $uploadCalls = 0;
     /** @var list<array<string,mixed>> */
     public array $usages = [];
+    public array $packetIds = [];
+    public string $subjectHintSeen = '';
     private ImageArticleTestCaptureRepository $captures;
     private bool $failMediaOnce;
     private EditorialCaptureCoordinator $coordinator;
 
     /** @param list<array<string,mixed>> $assets */
-    public function __construct(private array $assets, bool $failMediaOnce = false)
+    public function __construct(private array $assets, bool $failMediaOnce = false, private bool $fullPath = false)
     {
         $this->failMediaOnce = $failMediaOnce;
         $this->captures = new ImageArticleTestCaptureRepository();
@@ -82,11 +111,21 @@ final class ImageArticleFlowFixture
             function (array $input): array { $this->physicalCalls++; return ['items' => $this->assets]; },
             function (array $input): array { $this->draftCalls++; return ['post_id' => 1, 'state_token' => 'article-state-1', 'post' => ['post_id' => 1, 'post_modified_gmt' => '2026-09-19 00:00:01']]; },
             new TextInputInterpreter(),
-            new SubjectResolutionService(static fn (string $hint): array => []),
+            new SubjectResolutionService(function (string $hint): array {
+                if ($this->fullPath && $hint === 'subject-explicit') {
+                    $this->subjectHintSeen = $hint;
+                    return [['id' => '11111111-1111-4111-8111-111111111111', 'type' => 'model', 'canonical_name' => 'Generic Model', 'revision' => 1]];
+                }
+                return [];
+            }),
             new ClaimRetrievalEngine(static fn (array $subject): array => ['status' => 'available', 'items' => []], static fn (array $subject, array $neighborhood): array => []),
-            static fn (array $context): array => ['status' => 'COMPLETED', 'writes' => []],
+            function (array $context): array {
+                $this->packetIds[] = (string) (($context['subject_resolution_packet']['id'] ?? ''));
+                return ['status' => 'COMPLETED', 'writes' => []];
+            },
             new ArticleComposer(),
             function (array $context): array {
+                $this->packetIds[] = (string) (($context['subject_resolution_packet']['id'] ?? ''));
                 if ($this->failMediaOnce) { $this->failMediaOnce = false; throw new \RuntimeException('IMAGE_ARTICLE_MEDIA_TEST_FAILURE'); }
                 $this->usages = [];
                 foreach ((array) ($context['assets'] ?? []) as $asset) {
@@ -97,14 +136,24 @@ final class ImageArticleFlowFixture
                 usort($this->usages, static fn (array $left, array $right): int => $left['sort_order'] <=> $right['sort_order']);
                 return ['status' => 'RECONCILED', 'media_ids' => array_column($this->usages, 'media_id'), 'media_complete' => true, 'media_usage' => $this->usages];
             },
-            static fn (array $context): array => ['eligible' => false, 'blockers' => ['OWNER_PUBLICATION_REQUIRED']],
-            static fn (array $context): array => ['status' => 'verified'],
+            function (array $context): array {
+                $this->packetIds[] = (string) (($context['subject_resolution_packet']['id'] ?? ''));
+                return $this->fullPath ? ['eligible' => true, 'blockers' => [], 'state_token' => 'article-state-1'] : ['eligible' => false, 'blockers' => ['OWNER_PUBLICATION_REQUIRED']];
+            },
+            function (array $context): array {
+                $this->packetIds[] = (string) (($context['subject_resolution_packet']['id'] ?? ''));
+                return $this->fullPath ? ['status' => 'verified', 'permalink' => '/anh-kiem-thu/', 'rendered_public_verification' => 'verified'] : ['status' => 'verified'];
+            },
+            publisher: function (array $context): array {
+                $this->packetIds[] = (string) (($context['subject_resolution_packet']['id'] ?? ''));
+                return ['ok' => true, 'status' => 'publish', 'post' => ['status' => 'publish', 'permalink' => '/anh-kiem-thu/'], 'state_token' => 'published-token'];
+            },
         );
     }
 
-    public function run(): CaptureRecord
+    public function run(array $overrides = []): CaptureRecord
     {
-        return $this->coordinator->execute(['idempotency_key' => 'image-flow-test', 'intent' => 'IMAGE_ARTICLE', 'title' => 'Ảnh kiểm thử', 'text' => 'Bài viết kiểm thử IMAGE_ARTICLE.']);
+        return $this->coordinator->execute(array_replace(['idempotency_key' => 'image-flow-test', 'intent' => 'IMAGE_ARTICLE', 'title' => 'Ảnh kiểm thử', 'text' => 'Bài viết kiểm thử IMAGE_ARTICLE.'], $overrides));
     }
 }
 
