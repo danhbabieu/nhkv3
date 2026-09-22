@@ -24,7 +24,9 @@ final class SemanticSeoPlannerTest extends TestCase
         self::assertStringContainsString('vách máy', $plan->title);
         self::assertStringContainsString('vách máy', $plan->h1);
         self::assertLessThanOrEqual(160, mb_strlen($plan->metaDescription));
-        self::assertContains('Odo', $plan->semanticCluster);
+        self::assertTrue(array_reduce($plan->semanticCluster, static fn (bool $found, string $phrase): bool => $found || str_contains($phrase, 'Odo'), false));
+        self::assertNotContains('3', $plan->semanticCluster);
+        self::assertNotContains('phiên', $plan->semanticCluster);
         self::assertSame(['core-1', 'explain-1'], array_column($plan->claimTrace, 'claim_id'));
         self::assertSame('Article', $plan->structuredData['type']);
     }
@@ -89,6 +91,17 @@ final class SemanticSeoPlannerTest extends TestCase
             foreach (['canonical UUID', 'stable key', 'Graph', 'Governance', 'MCP', 'Evidence', 'Claim revision'] as $forbidden) self::assertStringNotContainsStringIgnoringCase($forbidden, $copy);
         }
         self::assertArrayNotHasKey('evidence', $plan->toArray());
+    }
+
+    public function test_h2_seo_copy_is_differentiated_and_cluster_uses_meaningful_phrases(): void
+    {
+        $plan = $this->planner()->plan($this->pack(), $this->editorialPlan(), $this->draft(), [
+            'public_identity' => ['canonical_url' => '/mau/odo36/', 'public_eligible' => true, 'canonical_identity' => true],
+        ]);
+
+        self::assertStringNotContainsString('Odo 36 có ba phiên bản vách máy — Odo 36 có ba phiên bản vách máy', $plan->metaDescription);
+        self::assertNotSame($plan->title . ' — ' . $plan->metaDescription, $plan->openGraph['description']);
+        foreach ($plan->semanticCluster as $phrase) self::assertGreaterThanOrEqual(2, count(preg_split('/\s+/u', $phrase) ?: []), $phrase);
     }
 
     private function planner(): SemanticSeoPlanner { return new SemanticSeoPlanner(); }

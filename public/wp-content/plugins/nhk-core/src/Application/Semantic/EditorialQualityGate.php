@@ -73,6 +73,9 @@ final class EditorialQualityGate
         if ($coreIndex !== null && $coreIndex > 2) $add('reader_journey', 'WARN', 'CORE_TOPIC_BURIED');
         if ($this->hasRedundancy($draft->body)) $add('redundancy', 'WARN', 'EXCESSIVE_REDUNDANCY');
         if ($this->hasBoilerplate($draft->body)) $add('template_boilerplate', 'WARN', 'TEMPLATE_BOILERPLATE_EXPOSED');
+        if ($this->hasPlanningLabels($draft->body)) $add('template_boilerplate', 'WARN', 'VISIBLE_PLANNING_LABEL');
+        if ($this->hasMalformedJoin($draft->body)) $add('template_boilerplate', 'WARN', 'MALFORMED_SENTENCE_JOIN');
+        if ($this->hasGenericFiller($draft->body)) $add('template_boilerplate', 'WARN', 'GENERIC_EDITORIAL_FILLER');
 
         try { (new PublicEditorialCopyGuard())->assertEditorialPackage(['title' => $draft->title, 'summary' => $draft->summary, 'body' => $draft->body, 'seo' => ['title' => $seo->title, 'description' => $seo->metaDescription]]); }
         catch (\Throwable) { $add('public_language', 'BLOCK', 'PUBLIC_INTERNAL_JARGON_LEAK'); }
@@ -151,6 +154,22 @@ final class EditorialQualityGate
         return false;
     }
 
+    private function hasPlanningLabels(string $body): bool
+    {
+        return preg_match('/(?:Điểm chính của chủ đề|Bối cảnh hữu ích|Điều cần hiểu thêm|Cách nhận biết|Những khác biệt đáng chú ý|Bước tìm hiểu tiếp theo)\s*:/iu', $body) === 1;
+    }
+
+    private function hasMalformedJoin(string $body): bool
+    {
+        return preg_match('/(?:\.\.\.|\b(?:đồng hồ|Odo\s+\d+)\b)[ \t]+(?:Video|Hình ảnh|Nội dung)\s+là/iu', $body) === 1
+            || preg_match('/[.!?][ \t]+[a-zà-ỹ]/u', $body) === 1;
+    }
+
+    private function hasGenericFiller(string $body): bool
+    {
+        return preg_match('/(?:Video|Hình ảnh)\s+là điểm bắt đầu để (?:theo dõi|quan sát)/iu', $body) === 1;
+    }
+
     /** @param array<string,array<string,mixed>> $selected @param array<string,bool> $traceIds @param callable(string,string,string):void $add */
     private function assertFactualGrounding(EditorialContextPack $pack, EditorialDraft $draft, array $selected, array $traceIds, callable $add): void
     {
@@ -158,8 +177,9 @@ final class EditorialQualityGate
         foreach ($selected as $id => $claim) if (isset($traceIds[$id])) $support[] = (string) ($claim['text'] ?? $claim['claim_text'] ?? '');
         foreach ($this->sentences($draft->body) as $sentence) {
             $sourceInput = trim((string) ($draft->diagnostics['source_input'] ?? ''));
-            if ($sourceInput !== '' && str_starts_with($sentence, $sourceInput)) continue;
-            if (!$this->looksFactual($sentence) || $this->supportedBy($sentence, $support)) continue;
+            if ($sourceInput !== '' && str_contains($sentence, $sourceInput)) continue;
+            $factualSentence = (string) (preg_replace('/^(?:Điểm chính của chủ đề|Bối cảnh hữu ích|Điều cần hiểu thêm|Cách nhận biết|Những khác biệt đáng chú ý|Bước tìm hiểu tiếp theo)\s*:\s*/iu', '', $sentence) ?? $sentence);
+            if (!$this->looksFactual($factualSentence) || $this->supportedBy($factualSentence, $support)) continue;
             $add('factual_grounding', 'BLOCK', 'UNTRACEABLE_FACTUAL_ASSERTION');
             return;
         }

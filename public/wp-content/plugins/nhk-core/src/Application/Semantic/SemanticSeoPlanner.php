@@ -68,24 +68,74 @@ final class SemanticSeoPlanner
     private function meta(string $topic, array $claims): string
     {
         $extra = '';
-        foreach ($claims as $claim) if (is_array($claim) && trim((string) ($claim['text'] ?? '')) !== '') { $extra = ' ' . trim((string) $claim['text']); break; }
-        $text = trim($topic) . ' — ' . trim($extra, " .!?\t\n\r\0\x0B");
+        $topicKey = $this->phraseKey($topic);
+        foreach ($claims as $claim) {
+            if (!is_array($claim) || ($claim['eligibility'] ?? 'eligible') !== 'eligible') continue;
+            $candidate = trim((string) ($claim['text'] ?? ''));
+            if ($candidate === '' || $this->phraseKey($candidate) === $topicKey || $this->overlap($topic, $candidate) >= 0.45) continue;
+            $extra = $candidate;
+            break;
+        }
+        $text = trim($topic) . ($extra !== '' ? ' — ' . trim($extra, " .!?\t\n\r\0\x0B") : '');
         return function_exists('mb_substr') ? mb_substr($text, 0, 155) : substr($text, 0, 155);
     }
 
     private function cluster(string $topic, array $claims, array $dictionary): array
     {
-        $values = [$topic];
-        foreach ($claims as $claim) if (is_array($claim)) $values[] = (string) ($claim['text'] ?? '');
+        $subjectPhrase = $this->subjectPhrase($topic);
+        $values = $subjectPhrase !== '' ? [$subjectPhrase] : [];
         foreach ($dictionary as $term) if (is_array($term)) $values[] = (string) ($term['term'] ?? '');
+        foreach ($claims as $claim) if (is_array($claim) && ($claim['eligibility'] ?? 'eligible') === 'eligible') $values[] = (string) ($claim['text'] ?? '');
+        $values[] = $topic;
         $result = []; $seen = [];
-        foreach ($values as $value) foreach (preg_split('/[^\p{L}\p{N}]+/u', trim($value)) ?: [] as $word) {
-            $key = function_exists('mb_strtolower') ? mb_strtolower($word) : strtolower($word);
-            if ($key === '' || in_array($key, ['của', 'và', 'là', 'có', 'đây', 'một', 'những'], true) || isset($seen[$key])) continue;
-            $seen[$key] = true; $result[] = $word;
-            if (count($result) >= 16) return $result;
+        if ($subjectPhrase !== '' && count(preg_split('/\s+/u', $subjectPhrase) ?: []) >= 2) {
+            $result[] = $subjectPhrase;
+            $seen[$this->phraseKey($subjectPhrase)] = true;
+        }
+        foreach ($values as $value) {
+            $tokens = $this->phraseTokens($value);
+            for ($size = min(5, count($tokens)); $size >= 2; $size--) {
+                for ($offset = 0; $offset + $size <= count($tokens); $offset++) {
+                    $phrase = implode(' ', array_slice($tokens, $offset, $size));
+                    $key = $this->phraseKey($phrase);
+                    if ($key === '' || isset($seen[$key])) continue;
+                    $seen[$key] = true; $result[] = $phrase;
+                    if (count($result) >= 16) return $result;
+                }
+            }
         }
         return $result;
+    }
+
+    /** @return list<string> */
+    private function phraseTokens(string $value): array
+    {
+        $stop = ['của', 'và', 'là', 'có', 'đây', 'một', 'những', 'được', 'giúp', 'cho', 'theo', 'trong', 'này', 'ba', 'bốn', 'hai'];
+        $tokens = preg_split('/[^\p{L}\p{N}]+/u', trim($value)) ?: [];
+        return array_values(array_filter($tokens, static function (string $token) use ($stop): bool {
+            $key = function_exists('mb_strtolower') ? mb_strtolower($token) : strtolower($token);
+            return $key !== '' && !in_array($key, $stop, true) && !preg_match('/^\d+$/', $key);
+        }));
+    }
+
+    private function phraseKey(string $phrase): string
+    {
+        $key = function_exists('mb_strtolower') ? mb_strtolower($phrase) : strtolower($phrase);
+        $key = (string) (preg_replace('/[^\p{L}\p{N}]+/u', ' ', $key) ?? $key);
+        return trim((string) (preg_replace('/\b(?:ba|bốn|hai)\b/u', '3', $key) ?? $key));
+    }
+
+    private function subjectPhrase(string $topic): string
+    {
+        if (preg_match('/\b([A-ZÀ-Ý][\p{L}]+(?:\s+\d+)?)\b/u', $topic, $match) !== 1) return '';
+        return trim($match[1]);
+    }
+
+    private function overlap(string $left, string $right): float
+    {
+        $leftTokens = array_values(array_unique($this->phraseTokens($left)));
+        $rightTokens = array_values(array_unique($this->phraseTokens($right)));
+        return $rightTokens === [] ? 0.0 : count(array_intersect($leftTokens, $rightTokens)) / count($rightTokens);
     }
 
     private function dictionary(array $items): array

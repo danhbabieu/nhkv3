@@ -22,6 +22,20 @@ final class EditorialQualityGateTest extends TestCase
         self::assertArrayNotHasKey('score', $report->toArray());
     }
 
+    public function test_h1_mechanical_composition_is_incomplete_with_explainable_warnings(): void
+    {
+        $draft = new EditorialDraft('available', 'video', $this->topic(), 'Đây là 3 phiên bản máy của dòng đồng hồ Odo 36 Video là điểm bắt đầu để theo dõi.', "Đây là 3 phiên bản máy của dòng đồng hồ Odo 36 Video là điểm bắt đầu để theo dõi.\n\nĐiểm chính của chủ đề: Odo 36 có ba phiên bản vách máy.\n\nBối cảnh hữu ích: Vách xoáy giúp nhận biết cấu hình máy Odo 36.", [
+            ['claim_id' => 'core-1', 'claim_revision' => 2],
+        ], ['source_input' => 'Đây là 3 phiên bản máy của dòng đồng hồ Odo 36 Video là điểm bắt đầu để theo dõi.']);
+
+        $report = $this->gate()->evaluate($this->pack($this->claims(), [], 'video'), $this->plan('video'), $draft, $this->seo('video'));
+
+        self::assertNotSame('READY', $report->readiness);
+        self::assertContains('VISIBLE_PLANNING_LABEL', $report->warnings);
+        self::assertContains('MALFORMED_SENTENCE_JOIN', $report->warnings);
+        self::assertContains('GENERIC_EDITORIAL_FILLER', $report->warnings);
+    }
+
     public function test_stale_revision_and_ineligible_claim_usage_block_public_readiness(): void
     {
         $claims = $this->claims();

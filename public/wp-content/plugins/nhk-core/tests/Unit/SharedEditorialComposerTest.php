@@ -77,6 +77,58 @@ final class SharedEditorialComposerTest extends TestCase
         self::assertStringNotContainsString('Kích thước tủ', $draft->body);
     }
 
+    public function test_h2_keeps_planning_roles_internal_and_removes_profile_filler(): void
+    {
+        $plan = (new ReaderJourneyPlanner())->plan($this->pack('video', [
+            $this->claim('core', 'Một dấu hiệu dễ nhận ra là vách cam.', 'IDENTIFICATION', 'direct'),
+            $this->claim('explain', 'Cấu hình này có ba phiên bản.', 'EXPLANATION', 'direct'),
+        ], ['raw_input' => 'Video giới thiệu mẫu đồng hồ A.']));
+
+        $draft = (new SharedEditorialComposer())->compose($plan);
+
+        self::assertStringNotContainsString('Điểm chính của chủ đề:', $draft->body);
+        self::assertStringNotContainsString('Điều cần hiểu thêm:', $draft->body);
+        self::assertStringNotContainsString('Video là điểm bắt đầu', $draft->body);
+        self::assertStringContainsString('Video giới thiệu mẫu đồng hồ A.', $draft->body);
+        self::assertStringContainsString('vách cam', $draft->body);
+        self::assertSame(['core', 'explain'], array_column($draft->claimTrace, 'claim_id'));
+    }
+
+    public function test_h2_normalizes_source_punctuation_and_joins_claims_deterministically(): void
+    {
+        $pack = $this->pack('video', [
+            $this->claim('core', 'Mẫu A có vách cam.', 'CORE', 'direct'),
+            $this->claim('second', 'Vách này giúp nhận biết cấu hình.', 'IDENTIFICATION', 'direct'),
+        ], ['raw_input' => 'Video giới thiệu mẫu A...']);
+        $planner = new ReaderJourneyPlanner();
+        $composer = new SharedEditorialComposer();
+
+        $first = $composer->compose($planner->plan($pack));
+        $second = $composer->compose($planner->plan($pack));
+
+        self::assertSame($first->body, $second->body);
+        self::assertStringNotContainsString('... ', $first->body);
+        self::assertStringNotContainsString('. Mẫu', $first->body);
+        self::assertStringNotContainsString('A... ', $first->body);
+        self::assertStringContainsString('Mẫu A có vách cam.', $first->body);
+    }
+
+    public function test_h2_combines_only_contiguous_related_claims_and_retains_all_traces(): void
+    {
+        $claims = [
+            $this->claim('a', 'Mẫu A có vách cam.', 'CORE', 'direct'),
+            $this->claim('b', 'Mẫu A có vách xanh.', 'CORE', 'direct'),
+            $this->claim('c', 'Âm nhạc của bộ sưu tập được ghi nhận riêng.', 'CONTEXT', 'direct'),
+        ];
+        $draft = (new SharedEditorialComposer())->compose((new ReaderJourneyPlanner())->plan($this->pack('article', $claims)));
+
+        self::assertCount(3, $draft->claimTrace);
+        self::assertStringContainsString('Mẫu A có vách cam.', $draft->body);
+        self::assertStringContainsString('Mẫu A có vách xanh.', $draft->body);
+        self::assertStringContainsString('âm nhạc của bộ sưu tập được ghi nhận riêng.', $draft->body);
+        self::assertStringNotContainsString('Mẫu A có vách cam. Mẫu A có vách xanh.', $draft->body);
+    }
+
     private function pack(string $profile, array $claims, array $input = [], array $visual = []): EditorialContextPack
     {
         return new EditorialContextPack('available', ['id' => self::SUBJECT, 'type' => 'model'], '3 phiên bản vách máy Odo 36', ['profile' => $profile], 'available', $claims, [], $input, $visual, [], ['policy_version' => 'test']);

@@ -1,5 +1,35 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-22 — H.2 editorial naturalness and semantic phrase quality (NO PERSISTENCE)
+
+FIXED_BOUNDARY: Refined the existing shared `SharedEditorialComposer` seam to
+keep Reader Journey role names internal, normalize source sentence/paragraph
+boundaries, remove generic profile filler, realize eligible Claims with
+deterministic role-aware transitions, suppress duplicate emitted text and keep
+all selected Claim trace entries. Video/Image profiles retain concise source
+markers without creating profile-specific factual composers.
+
+SEO_BOUNDARY: `SemanticSeoPlanner` now produces bounded multi-word semantic
+phrases from eligible topic/Claim/Dictionary inputs, removes standalone token
+accumulation and numeric-word duplicates, and avoids mechanically repeating the
+topic as the first meta-description fact. No new semantic vocabulary or
+Dictionary state was created.
+
+QUALITY_BOUNDARY: `EditorialQualityGate` now warns on exposed planning labels,
+malformed joins and generic editorial filler while preserving factual grounding,
+scope, evidence and traceability checks. The old H.1 mechanical fixture is no
+longer accepted as clean `READY`; the improved shared fixtures remain accepted.
+
+VERIFICATION: Focused H.2 composer/SEO/quality plus Article/Video adapter suite
+passes 54 tests / 224 assertions. Complete Unit suite passes 2,202 tests /
+13,208 assertions with repository warnings/deprecations. `composer lint` and
+`git diff --check` pass. The repository-wide PHPUnit command still has the
+pre-existing environment-gated integration/contract errors and failures when
+run without `NHK_WP_TEST_PATH=public` and the guarded WPDB runtime; no data or
+runtime mutation was performed.
+
+STATUS: `H2_EDITORIAL_NATURALNESS_SEMANTIC_PHRASES_LOCAL_READY / NO_PERSISTENCE / CHECKPOINT_I_NOT_STARTED`.
+
 # Checkpoint — 2026-09-22 — Easy MCP 1.7.18 native MCP App resource registration (LOCAL / DEPLOYMENT PENDING)
 
 ROOT_CAUSE_CONFIRMED: Easy MCP 1.7.18 creates one private
