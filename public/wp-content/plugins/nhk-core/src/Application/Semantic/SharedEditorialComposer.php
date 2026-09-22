@@ -46,7 +46,7 @@ final class SharedEditorialComposer
         $guard->assertSafe($title); $guard->assertSafe($body);
         $status = $traceFailure ? 'review' : ($trace === [] ? ($input !== '' ? 'sparse_input' : 'review') : 'available');
         $novelty = $this->informationGain($claimTexts, $plan->inputContext);
-        return new EditorialDraft($status, $plan->profile, $title, $this->summary($paragraphs[0]), $body, $trace, ['mode' => $trace === [] ? ($input !== '' ? 'sparse_input' : 'no_selected_knowledge') : 'selected_knowledge', 'information_gain' => $novelty, 'visual_support' => $plan->visualSupport, 'traceability' => $traceFailure ? 'FAILED' : 'PASSED']);
+        return new EditorialDraft($status, $plan->profile, $title, $this->summary($paragraphs[0]), $body, $trace, ['mode' => $trace === [] ? ($input !== '' ? 'sparse_input' : 'no_selected_knowledge') : 'selected_knowledge', 'information_gain' => $novelty, 'visual_support' => $plan->visualSupport, 'traceability' => $traceFailure ? 'FAILED' : 'PASSED', 'source_input' => $input]);
     }
 
     private function openingText(string $profile, string $input): string

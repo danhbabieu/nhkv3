@@ -5,6 +5,7 @@ namespace NHK\Core\Application\Capture;
 
 use NHK\Core\Application\Completion\CompletionCoordinator;
 use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, SubjectResolutionService, TextInputInterpreter};
+use NHK\Core\Application\Article\ArticleEditorialAdapter;
 use NHK\Core\Contracts\Capture\CaptureRepository;
 use NHK\Core\Contracts\Media\MediaBindingPort;
 use NHK\Core\Domain\Capture\{CaptureRecord, CaptureStage, SubjectResolutionPacket};
@@ -56,6 +57,7 @@ final class EditorialCaptureCoordinator
         private ?MediaBindingPort $mediaBindingService = null,
         private ?StagingAcceptanceScopeVerifier $stagingScopeVerifier = null,
         private ?CanonicalDependencyValidator $canonicalDependencies = null,
+        private ?ArticleEditorialAdapter $articleEditorialAdapter = null,
     ) { $this->completion = $completion ?? new CompletionCoordinator(); }
 
     /** @param array<string,mixed> $input */
@@ -628,9 +630,38 @@ final class EditorialCaptureCoordinator
                 $diagnostics['video_publication'] = $videoPublication;
                 $diagnostics['deep_enrichment'] = ['status' => 'NOT_REQUESTED', 'visual_support' => ['status' => 'not_requested', 'requirements' => []], 'knowledge_reuse' => [], 'article_reuse_internal_link' => [], 'new_deep_content_opportunity' => null];
             } else {
+                $sharedEditorial = null;
                 $this->beginPhase('KNOWLEDGE_RETRIEVED');
-                $retrieved = $this->claims->retrieve($semanticContext);
+                if ($articleRequired && $this->articleEditorialAdapter !== null) {
+                    $draftSnapshot = is_array($diagnostics['draft']['post'] ?? null) ? $diagnostics['draft']['post'] : [];
+                    $permalink = trim((string) ($draftSnapshot['permalink'] ?? ''));
+                    try {
+                        $sharedEditorial = $this->articleEditorialAdapter->prepare($semanticContext + [
+                            'public_identity' => [
+                                'canonical_url' => $permalink,
+                                'canonical_identity' => $permalink !== '',
+                                'public_eligible' => $permalink !== '',
+                            ],
+                        ]);
+                        $retrieved = (array) ($sharedEditorial['retrieval'] ?? []);
+                    } catch (\Throwable $error) {
+                        $sharedEditorial = ['status' => 'FALLBACK', 'failure_code' => 'SHARED_EDITORIAL_UNAVAILABLE', 'error' => $error->getMessage()];
+                        $retrieved = $this->claims->retrieve($semanticContext);
+                    }
+                } else {
+                    $retrieved = $this->claims->retrieve($semanticContext);
+                }
                 $diagnostics['claim_retrieval'] = $retrieved;
+                if (is_array($sharedEditorial)) {
+                    $quality = $sharedEditorial['quality_report'] ?? null;
+                    $diagnostics['shared_editorial'] = [
+                        'status' => (string) ($sharedEditorial['status'] ?? 'FALLBACK'),
+                        'failure_code' => (string) ($sharedEditorial['failure_code'] ?? ''),
+                        'quality_readiness' => is_object($quality) ? (string) ($quality->readiness ?? '') : '',
+                        'quality_blockers' => is_object($quality) ? array_values((array) ($quality->blockers ?? [])) : [],
+                        'quality_warnings' => is_object($quality) ? array_values((array) ($quality->warnings ?? [])) : [],
+                    ];
+                }
                 $record = $this->save($record, CaptureStage::KNOWLEDGE_RETRIEVED, $assets, $diagnostics, $receipts, 'KNOWLEDGE_RETRIEVED', $record->articleId, $record->articleStateToken);
 
                 $this->beginPhase('SEMANTICS_RECONCILED');
@@ -655,6 +686,11 @@ final class EditorialCaptureCoordinator
                 $receipts = $record->phaseReceipts;
                 if (in_array((string) ($writes['status'] ?? ''), ['FAILED_RETRYABLE', 'SYSTEM_BLOCKED'], true)) {
                     return $this->save($record, CaptureStage::SEMANTICS_RECONCILED, $assets, $diagnostics, $receipts, 'SEMANTICS_RECONCILED', $record->articleId, $record->articleStateToken, (string) $writes['status']);
+                }
+
+                if (is_array($sharedEditorial) && strtoupper((string) ($sharedEditorial['status'] ?? '')) === 'BLOCKED') {
+                    $diagnostics['failure_code'] = 'ARTICLE_QUALITY_BLOCKED';
+                    return $this->save($record, CaptureStage::SEMANTICS_RECONCILED, $assets, $diagnostics, $receipts, 'SEMANTICS_RECONCILED', $record->articleId, $record->articleStateToken, 'ARTICLE_QUALITY_BLOCKED');
                 }
 
                 $videoPublication = is_callable($this->videoPublicationVerifier)
@@ -696,7 +732,11 @@ final class EditorialCaptureCoordinator
 
             $observations = array_merge($semanticContext['observations'], is_array($interpretation['media_observations'] ?? null) ? $interpretation['media_observations'] : []);
             $this->beginPhase('COMPOSED');
-            $composition = $this->composer->compose($text, $observations, $retrieved['selected_claims'] ?? [], ['title' => (string) ($input['title'] ?? ''), 'excerpt' => (string) ($input['excerpt'] ?? ''), 'asset_count' => count($assets), 'assets' => $assets, 'visual_opportunities' => $visualOpportunities, 'prior_composition' => is_array($diagnostics['composition'] ?? null) ? $diagnostics['composition'] : []]);
+            $sharedDraft = is_array($sharedEditorial['draft'] ?? null) ? $sharedEditorial['draft'] : null;
+            if ($sharedDraft !== null && is_object($sharedEditorial['draft'])) $sharedDraft = $sharedEditorial['draft'];
+            $composition = is_object($sharedDraft)
+                ? ['title' => $sharedDraft->title, 'excerpt' => $sharedDraft->summary, 'content' => $sharedDraft->body, 'claim_trace' => $sharedDraft->claimTrace, 'research_snapshot' => ['source' => 'shared_editorial_pipeline', 'profile' => $sharedDraft->profile], 'managed_sections' => [], 'seo_projection' => is_object($sharedEditorial['seo_plan'] ?? null) ? $sharedEditorial['seo_plan']->toArray() : []]
+                : $this->composer->compose($text, $observations, $retrieved['selected_claims'] ?? [], ['title' => (string) ($input['title'] ?? ''), 'excerpt' => (string) ($input['excerpt'] ?? ''), 'asset_count' => count($assets), 'assets' => $assets, 'visual_opportunities' => $visualOpportunities, 'prior_composition' => is_array($diagnostics['composition'] ?? null) ? $diagnostics['composition'] : []]);
             $diagnostics['composition'] = ['title' => $composition['title'], 'claim_trace' => $composition['claim_trace'], 'research_snapshot' => $composition['research_snapshot'], 'managed_sections' => $composition['managed_sections'] ?? []];
             $diagnostics['article_draft'] = ['title' => $composition['title'], 'excerpt' => $composition['excerpt'], 'content_available' => true];
             if (is_callable($this->draftUpdater) && $record->articleId !== null && $record->articleStateToken !== null) {
@@ -733,7 +773,7 @@ final class EditorialCaptureCoordinator
             $assets = $record->assets;
             $diagnostics = $record->diagnostics;
             $receipts = $record->phaseReceipts;
-            $publicationContext = ['capture' => $record->toArray(), 'article_id' => $record->articleId, 'content_intent' => $intent, 'composition' => $this->withoutBody($composition), 'media' => $media, 'semantic' => $retrieved, 'semantic_write_back' => $writes, 'subject_resolution' => $resolution, 'subject_resolution_packet' => $subjectPacket->toArray()];
+            $publicationContext = ['capture' => $record->toArray(), 'article_id' => $record->articleId, 'content_intent' => $intent, 'composition' => $this->withoutBody($composition), 'seo_projection' => $composition['seo_projection'] ?? [], 'quality_gate' => $diagnostics['shared_editorial'] ?? [], 'media' => $media, 'semantic' => $retrieved, 'semantic_write_back' => $writes, 'subject_resolution' => $resolution, 'subject_resolution_packet' => $subjectPacket->toArray()];
             $publication = ($this->publicationGate)($publicationContext);
             // A native media/editorial write may rotate the token between the
             // first gate read and review. Refresh once, then continue with the

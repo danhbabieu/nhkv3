@@ -28,7 +28,7 @@ use NHK\Core\Application\Mcp\{McpAbilityRegistration, McpArticleIngestHandler, M
 use NHK\Core\Application\Media\{ImageIngestEntrypoint, MediaBatchUploadService, MediaBindingService};
 use NHK\Core\Application\Capture\{CaptureArticlePreflightHandoff, CaptureEditorialWriteGuard, CapturePhaseReceiptReducer, CaptureVideoProvenancePlanner, CaptureVideoPublicationVerifier, ClockTypeShadowClassifier, EditorialCaptureContinuationService, EditorialCaptureCoordinator, GovernedCaptureContinuationService, RelationProposalReconciliationService};
 use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, ClaimReusePolicy, SubjectResolutionService, TextInputInterpreter};
-use NHK\Core\Application\Article\{ArticleIngestCoordinator, ArticleIngestPreflight, ArticleResearchPreflight, ArticleVerificationReader, SemanticProposalPlanner, OwnerPublicationApplicationService};
+use NHK\Core\Application\Article\{ArticleEditorialAdapter, ArticleIngestCoordinator, ArticleIngestPreflight, ArticleResearchPreflight, ArticleVerificationReader, SemanticProposalPlanner, OwnerPublicationApplicationService};
 use NHK\Core\Infrastructure\Http\ReadApi;
 use NHK\Core\Infrastructure\Http\AdminWorkbenchReadApi;
 use NHK\Core\Infrastructure\Http\AdminMediaUsageApi;
@@ -1029,6 +1029,7 @@ final class Plugin {
                 },
             );
             $publicUrlMaintenance = (new \NHK\Core\Infrastructure\PublicIdentity\WordPressPublicUrlMaintenanceRuntime($wpdb, $authority, $types, $publicContexts, $videos, $media, $assets, $publicIdentityRepository))->service();
+            $articleEditorialAdapter = ArticleEditorialAdapter::fromEngine($captureClaims);
             $capture = new EditorialCaptureCoordinator(
                 $captureRepository,
                 static function (array $input) use ($imageIngest, $existingMediaResolver, $existingAttachmentUrlResolver, $wordpressAttachments, $mediaBindingService, $assets): array {
@@ -1661,6 +1662,7 @@ final class Plugin {
                 $mediaBindingService,
                 $stagingScopeVerifier,
                 $canonicalDependencies,
+                $articleEditorialAdapter,
             );
             $captureContinuation = new EditorialCaptureContinuationService($captureRepository, $captureAddendumRepository, $capture, static function (array $input) use ($imageIngest, $existingMediaResolver): array {
                 $mediaIds = is_array($input['media_ids'] ?? null) ? array_values($input['media_ids']) : [];

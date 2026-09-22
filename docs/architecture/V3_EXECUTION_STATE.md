@@ -16976,3 +16976,53 @@ staging, production, V2, Capture, SQL, deployment, push or semantic data
 mutation was performed.
 
 STATUS=`EDITORIAL_QUALITY_GATE_FIXED_LOCALLY / FULL_UNIT_PASS / NO_LIVE_MUTATION`.
+
+# Checkpoint — 2026-09-22 — Temporary Easy MCP App wire diagnostics (LOCAL)
+
+SCOPE: Add one temporary read-only administrator Ability, `nhk-v3/mcp-app-diagnostics`,
+and a process-local ring buffer of the latest 20 sanitized events observed at
+the real `/wp-json/easy-mcp-ai/v1/mcp` response boundary. No canonical NHK MCP
+tool, resource URI, resource projection, capability, widget JS, auth behavior,
+Media or Capture behavior was changed.
+
+FIXED_BOUNDARY: Only allowlisted wire metadata is retained: method, request ID,
+authentication/status, resource URI, sanitized JSON-RPC error metadata, byte
+lengths, top-level keys, extension names and MCP Apps contents metadata. Request
+and response bodies, headers, cookies, credentials, tokens and content text are
+never retained or returned. The Ability is explicitly Easy MCP-enabled,
+administrator-only through `manage_options`, read-only and non-destructive.
+
+REGRESSION: Focused MCP diagnostics/contract suite passes 46 tests / 669
+assertions. The Unit suite passes 2,192 tests / 13,126 assertions except one
+pre-existing EditorialQuality-related failure in the user-owned uncommitted
+worktree changes; the full suite also has existing WordPress/MySQL bootstrap
+errors when the integration runtime is unavailable. PHP lint and diff checks
+pass for the checkpoint files. No schema/migration, semantic data, staging,
+production, V2, Capture, SQL or live deployment mutation was performed at this
+checkpoint.
+
+STATUS=`MCP_APP_DIAGNOSTICS_FIXED_LOCALLY / DEPLOYMENT_PENDING / NO_LIVE_MUTATION`.
+
+# Checkpoint — 2026-09-22 — Article integration with shared grounded editorial core (LOCAL / NO LIVE MUTATION)
+
+SCOPE: Article Capture now has an Article-owned adapter over the shared
+Subject → Claim Retrieval → Eligibility/Selection → Reader Journey → Draft →
+Semantic SEO → Quality Gate pipeline. The adapter is transient and maps only
+the resulting Article draft into the existing native WordPress title/body/
+excerpt update path. Existing ArticleComposer remains the explicit fallback
+when shared preparation is unavailable; Video, Image and Media integration are
+not changed.
+
+QUALITY BOUNDARY: A shared `BLOCKED` report returns
+`ARTICLE_QUALITY_BLOCKED` before Article draft update, Media reconciliation or
+publication. `READY` and `INCOMPLETE` continue through the existing Article
+CAS, publication gate and final read-back path. SEO projection is passed as
+read-only publication evidence; it never creates or changes a slug.
+
+VERIFICATION: Adapter focused tests pass 2 tests / 9 assertions. Article and
+Capture regression selection passes 97 tests / 393 assertions. Full Unit passes
+2,192 tests / 13,131 assertions with existing warnings/deprecations. PHP lint
+and `git diff --check` pass. No schema/migration, live Article, Knowledge,
+Evidence, Media, Video, staging, production or deployment mutation occurred.
+
+STATUS=`ARTICLE_SHARED_EDITORIAL_INTEGRATION_FIXED_LOCALLY / FULL_UNIT_PASS / NO_LIVE_MUTATION`.

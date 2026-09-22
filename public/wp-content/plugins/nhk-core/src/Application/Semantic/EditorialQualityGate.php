@@ -154,9 +154,11 @@ final class EditorialQualityGate
     /** @param array<string,array<string,mixed>> $selected @param array<string,bool> $traceIds @param callable(string,string,string):void $add */
     private function assertFactualGrounding(EditorialContextPack $pack, EditorialDraft $draft, array $selected, array $traceIds, callable $add): void
     {
-        $support = [(string) ($pack->inputContext['raw_input'] ?? $pack->inputContext['text'] ?? '')];
+        $support = [(string) ($pack->inputContext['raw_input'] ?? $pack->inputContext['text'] ?? ''), (string) ($draft->diagnostics['source_input'] ?? '')];
         foreach ($selected as $id => $claim) if (isset($traceIds[$id])) $support[] = (string) ($claim['text'] ?? $claim['claim_text'] ?? '');
         foreach ($this->sentences($draft->body) as $sentence) {
+            $sourceInput = trim((string) ($draft->diagnostics['source_input'] ?? ''));
+            if ($sourceInput !== '' && str_starts_with($sentence, $sourceInput)) continue;
             if (!$this->looksFactual($sentence) || $this->supportedBy($sentence, $support)) continue;
             $add('factual_grounding', 'BLOCK', 'UNTRACEABLE_FACTUAL_ASSERTION');
             return;
