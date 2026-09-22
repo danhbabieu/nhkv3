@@ -23,7 +23,12 @@ MCP 1.7.18 REST/Server/ResourceRegistry regression is added and correctly
 skips locally because the guarded WordPress/Easy MCP runtime is unavailable.
 Deployment and fresh authenticated v43 wire read-back remain pending.
 
-STATUS: `EASY_MCP_1_7_18_AUTHENTICATED_RESOURCE_WIRE_BOUNDARY_LOCAL / REAL_INTEGRATION_ADDED / DEPLOYMENT_PENDING`.
+LIVE READ-BACK: Approved deployment verifier passed for source revision
+`e97a0c2117d89f4a5ce097a72eec19d7027b236d`; the existing authenticated
+ChatGPT connector retried `ui://nhk/image-upload/v3.html` and rendered the NHK
+MCP App iframe successfully. No tool/widget, Media or Capture mutation occurred.
+
+STATUS: `EASY_MCP_1_7_18_AUTHENTICATED_RESOURCE_WIRE_BOUNDARY_DEPLOYED / CHATGPT_RENDER_PASS / SEMANTIC_BOUNDARY_PRESERVED`.
 
 # Checkpoint — 2026-09-22 — Authority Proposal Apply staging-scope recovery (LOCAL / DEPLOYMENT PENDING)
 
