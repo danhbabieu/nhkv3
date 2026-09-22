@@ -200,13 +200,20 @@ final class EditorialCaptureCoordinator
                 $revisionDrift = $recordedRevision > 0 && $recordedRevision !== $entity->revision;
                 $blockers = array_values(array_filter(array_map('strval', (array) ($completion['blockers'] ?? [])), static fn (string $blocker): bool => !in_array($blocker, ['CANONICAL_READBACK_UNVERIFIED', 'PUBLIC_ELIGIBILITY_NOT_VERIFIED', 'FRONTEND_READBACK_NOT_VERIFIED'], true)));
                 if ($revisionDrift) $blockers[] = 'CANONICAL_DEPENDENCY_REVISION_MISMATCH';
+                $governedReadbackVerified = is_array($binding) && ($binding['verified'] ?? false) === true;
+                $dependencyState = $completion['dependency_state'] ?? 'COMPLETE';
+                $relationState = $completion['relation_or_usage_state'] ?? 'COMPLETE';
+                if ($governedReadbackVerified && !$revisionDrift && $blockers === []) {
+                    $dependencyState = 'COMPLETE';
+                    $relationState = 'COMPLETE';
+                }
                 $items[$index]['entity_type'] = $canonicalOwnerType;
                 $items[$index]['canonical_readback'] = $currentReadback;
                 $items[$index]['completion'] = $this->completion->finalize($canonicalOwnerType, $ownerId, [
                     'canonical_state' => $revisionDrift ? 'BLOCKED' : 'COMPLETE',
                     'canonical_readback' => $currentReadback,
-                    'dependency_state' => $completion['dependency_state'] ?? 'COMPLETE',
-                    'relation_or_usage_state' => $completion['relation_or_usage_state'] ?? 'COMPLETE',
+                    'dependency_state' => $dependencyState,
+                    'relation_or_usage_state' => $relationState,
                     'blockers' => $blockers,
                     'owner_role' => 'semantic_dependency',
                     'public_projection_owner' => false,
@@ -228,7 +235,7 @@ final class EditorialCaptureCoordinator
         return $writes;
     }
 
-    /** @param array<string,mixed> $phaseReceipts @return array<string,array{kind:string,revision:int}> */
+    /** @param array<string,mixed> $phaseReceipts @return array<string,array{kind:string,revision:int,verified:bool}> */
     private function historicalDependencyBindings(array $phaseReceipts): array
     {
         $bindings = [];
@@ -242,7 +249,13 @@ final class EditorialCaptureCoordinator
             $readback = is_array($receipt['canonical_readback'] ?? null) ? $receipt['canonical_readback'] : [];
             $id = trim((string) ($receipt['canonical_id'] ?? $readback['canonical_id'] ?? ''));
             if ($id === '') continue;
-            $bindings[$id] = ['kind' => $kind, 'revision' => (int) ($receipt['revision'] ?? $readback['revision'] ?? 0)];
+            $status = strtoupper(trim((string) ($receipt['status'] ?? '')));
+            $result = strtoupper(trim((string) ($receipt['result'] ?? '')));
+            $bindings[$id] = [
+                'kind' => $kind,
+                'revision' => (int) ($receipt['revision'] ?? $readback['revision'] ?? 0),
+                'verified' => in_array($status, ['COMPLETED', 'VERIFIED'], true) && in_array($result, ['APPLIED', 'REUSED_VERIFIED', 'ALREADY_APPLIED', 'IDEMPOTENT', 'REUSED'], true),
+            ];
         }
         return $bindings;
     }

@@ -357,7 +357,7 @@ final class EditorialCaptureContinuationTest extends TestCase
         foreach ([['id' => $sourceId, 'phase' => 'VIDEO_SOURCE_GOVERNANCE'], ['id' => $claimId, 'phase' => 'VIDEO_CLAIM_GOVERNANCE'], ['id' => $evidenceId, 'phase' => 'VIDEO_EVIDENCE_GOVERNANCE']] as $dependency) {
             $writes[] = ['entity_type' => 'knowledge', 'canonical_id' => $dependency['id'], 'completion' => [
                 'owner_type' => 'knowledge', 'owner_id' => $dependency['id'], 'canonical_state' => 'BLOCKED',
-                'canonical_readback_verified' => false, 'dependency_state' => 'COMPLETE', 'relation_or_usage_state' => 'COMPLETE',
+                'canonical_readback_verified' => false, 'dependency_state' => 'PARTIAL', 'relation_or_usage_state' => 'PARTIAL',
                 'blockers' => ['CANONICAL_READBACK_UNVERIFIED'],
             ]];
         }
