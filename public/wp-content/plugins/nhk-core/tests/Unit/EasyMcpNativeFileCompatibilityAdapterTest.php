@@ -12,6 +12,29 @@ final class EasyMcpNativeFileCompatibilityAdapterTest extends TestCase
 {
     private const TARGET = 'wp_ability_nhk_v3_capture_ingest';
 
+    public function test_easy_mcp_1718_uses_native_resource_registration_and_not_response_replacement(): void
+    {
+        $source = (string) file_get_contents(__DIR__ . '/../../src/Infrastructure/Mcp/EasyMcpNativeFileCompatibilityAdapter.php');
+
+        self::assertStringContainsString("add_action('rest_api_init', [self::class, 'registerNativeResource'], 11);", $source);
+        self::assertStringContainsString('Easy_MCP_AI\\Resources\\Resource_Registry', $source);
+        self::assertStringContainsString('Easy_MCP_AI\\Resources\\Base_Resource', $source);
+        self::assertStringContainsString("new \\ReflectionProperty('Easy_MCP_AI\\\\Plugin', 'resource_registry')", $source);
+        self::assertStringContainsString("$registry->register(new class extends \\Easy_MCP_AI\\Resources\\Base_Resource", $source);
+        self::assertStringContainsString('nativeResourceRegistrationActive()', $source);
+        self::assertStringContainsString('if (self::nativeResourceRegistrationActive() && in_array(($rpc[\'method\'] ?? null), [\'resources/list\', \'resources/read\'], true)) return $response;', $source);
+        self::assertStringContainsString('if (self::nativeResourceRegistrationActive() && in_array(($rpc[\'method\'] ?? null), [\'resources/list\', \'resources/read\'], true)) return $data;', $source);
+    }
+
+    public function test_native_resource_contract_is_exact_and_bundled_html_is_non_empty(): void
+    {
+        $source = (string) file_get_contents(__DIR__ . '/../../src/Infrastructure/Mcp/EasyMcpNativeFileCompatibilityAdapter.php');
+        self::assertStringContainsString("return 'ui://nhk/image-upload/v3.html';", $source);
+        self::assertStringContainsString("return 'NHK image uploader';", $source);
+        self::assertStringContainsString("return 'text/html;profile=mcp-app';", $source);
+        self::assertStringContainsString("dirname(__DIR__, 3) . '/resources/ui/image-upload.html'", $source);
+    }
+
     public function test_stripped_capture_descriptor_is_projected_from_canonical_catalog(): void
     {
         $tools = [[

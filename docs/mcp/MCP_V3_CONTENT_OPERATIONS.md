@@ -803,7 +803,7 @@ semantic identity.
 
 The MCP Apps image widget is a presentation/transport adapter, not a Media or
 Capture owner. `nhk.media.upload-widget.open` renders
-`ui://nhk/image-upload.html`; the resource uses the ChatGPT host file APIs to
+`ui://nhk/image-upload/v3.html`; the resource uses the ChatGPT host file APIs to
 obtain a temporary `download_url` and `file_id`, then calls the internal
 `nhk.media.widget-upload` transport tool. Each item must be the structured
 provided-file object with `download_url` and `file_id` (plus optional
@@ -850,7 +850,12 @@ The same widget tools are also registered on the WordPress Ability surface as
 `nhk-v3/media-widget-upload` and `nhk-v3/media-upload-widget-open`. The upload
 Ability remains `internal_admin_only` and delegates to the existing
 `/nhk/v1/mcp` transport; the open Ability is read-only and points to the same
-UI resource. The Easy MCP compatibility boundary projects the open Ability's
+UI resource. For Easy MCP 1.7.18, NHK registers a native `Base_Resource` into
+the exact `Resource_Registry` instance owned by `Easy_MCP_AI\\MCP\\Server`, so
+Easy MCP owns both resource discovery and resource-read serialization. The
+legacy 1.7.16/1.7.17 response projection remains only as a compatibility
+fallback. The Easy MCP compatibility boundary projects the open Ability's
+serialized `tools/list` descriptor with `_meta.ui.resourceUri` and the
 serialized `tools/list` descriptor with `_meta.ui.resourceUri` and the
 `openai/outputTemplate` compatibility alias; `resources/list` and
 `resources/read` expose the same URI as `text/html;profile=mcp-app`. The

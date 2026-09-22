@@ -1,5 +1,66 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-22 — Easy MCP 1.7.18 native MCP App resource registration (LOCAL / DEPLOYMENT PENDING)
+
+ROOT_CAUSE_CONFIRMED: Easy MCP 1.7.18 creates one private
+`Resources\\Resource_Registry`, passes that same instance to `MCP\\Server`, and
+serializes `resources/list`/`resources/read` from it. NHK previously owned a
+detached static resource registry and replaced the wire result at
+`rest_post_dispatch`, so Easy MCP itself returned `Resource not found` before
+the NHK projection.
+
+FIXED_BOUNDARY: At `rest_api_init` priority 11, NHK reflects only the already
+constructed Easy MCP plugin registry and registers a native `Base_Resource`
+whose URI is `ui://nhk/image-upload/v3.html`, MIME is
+`text/html;profile=mcp-app`, and `read()` returns the existing non-empty widget
+bundle. When that native 1.7.18 registration is active, NHK bypasses its
+resource response replacement at both WordPress response boundaries. The
+1.7.16/1.7.17 fallback remains version-gated. Authentication, permissions,
+Media/Capture semantics, widget bundle and native 1.7.18 file transport are
+unchanged.
+
+VERIFICATION: TDD RED reproduced the missing native-registration wiring; GREEN
+focused MCP App/Easy MCP unit coverage passes. The guarded integration test
+now proves registry identity against Easy MCP `Server`, resolution before the
+priority-10 NHK filter, legacy 2025-11-25 shape, modern 2026-07-28
+`resultType`/`ttlMs`/`cacheScope`, tools/list URI parity and unknown-URI
+fail-closed behavior. Local integration remains skipped because the guarded
+WordPress/MySQL/Easy MCP runtime is unavailable. Deployment and real ChatGPT
+render verification remain pending.
+
+STATUS: `EASY_MCP_1_7_18_NATIVE_RESOURCE_LOCAL_READY / DEPLOYMENT_PENDING / CHATGPT_RENDER_UNVERIFIED`
+
+# Checkpoint — 2026-09-22 — H.1 runtime-independent editorial acceptance (NO PERSISTENCE)
+
+VALIDATION_CLASS: `RUNTIME_INDEPENDENT_ACCEPTANCE`.
+
+PRODUCTION_PATH: The real `VideoEditorialAdapter::prepare()` orchestration
+executed Claim retrieval/eligibility, `EditorialKnowledgeSelector`,
+`EditorialContextPack`, `ReaderJourneyPlanner`, `SharedEditorialComposer`,
+`SemanticSeoPlanner` and `EditorialQualityGate`. The current production
+composer output was captured without manual draft/SEO/report construction.
+
+FIXTURE_TRANSPARENCY: Deterministic repository-owned Unit fixture content was
+used only at infrastructure boundaries: Odo 36 model, Máy Odo 36 movement,
+three supported Claims, registered `variant_of → uses_movement` Graph path,
+CATALOG_SUPPORTED provenance, SUPPORTED_WITHIN_SCOPE evidence and no visual
+support record. The historical canonical Video/runtime was not used.
+
+RESULT: The runtime-independent Video path selected 3 eligible Claims, placed
+the core topic in the second reader section, generated public Vietnamese copy,
+returned SEO `READY`, and returned Quality `READY`. The exact generated body
+was accepted as the baseline; no composer change was made. The negative
+control was `BLOCKED` for ineligible trace usage, missing trace, untraceable
+factual assertion and public internal-jargon leakage, with warnings for
+underused Knowledge, low information gain and weak Video topic spine.
+
+VERIFICATION: Focused retrieval/selector/composer/SEO/quality/video suite
+passes 55 tests / 200 assertions. `git diff --check` passes. No application
+code, semantic data, schema or migration was changed. Canonical runtime golden
+validation remains unperformed.
+
+STATUS: `H1_RUNTIME_INDEPENDENT_ACCEPTANCE_PASS / CANONICAL_RUNTIME_GOLDEN_NOT_VALIDATED / NO_PERSISTENCE`.
+
 # Checkpoint — 2026-09-22 — Easy MCP 1.7.18 MCP Apps capability negotiation (LOCAL / DEPLOYMENT PENDING)
 
 ROOT_CAUSE_CONFIRMED: The Easy MCP/NHK compatibility boundary projected the

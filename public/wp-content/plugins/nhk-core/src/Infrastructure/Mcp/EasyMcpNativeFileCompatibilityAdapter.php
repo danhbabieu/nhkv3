@@ -32,6 +32,7 @@ final class EasyMcpNativeFileCompatibilityAdapter
     private static bool $registered = false;
     private static bool $proxyDispatch = false;
     private static bool $authenticatedWireResponse = false;
+    private static ?object $nativeResourceRegistry = null;
 
     public static function register(): void
     {
@@ -40,6 +41,11 @@ final class EasyMcpNativeFileCompatibilityAdapter
         add_filter('rest_request_before_callbacks', [self::class, 'interceptMultipartCapture'], 10, 3);
         add_filter('wp_ability_normalize_input', [self::class, 'normalizeAbilityInput'], 10, 3);
         add_filter('wp_ability_validate_input', [self::class, 'validateAbilityInput'], 10, 3);
+        // Easy MCP creates its Resource_Registry during rest_api_init. Register
+        // after that construction so the native Server receives this exact
+        // registry instance, while the legacy response fallback remains
+        // available for older Easy MCP versions.
+        add_action('rest_api_init', [self::class, 'registerNativeResource'], 11);
         // Easy MCP versions differ in whether their Streamable HTTP response
         // is finalized before or after WordPress serializes the REST response.
         // Project at both canonical WordPress boundaries so the connector
@@ -50,6 +56,32 @@ final class EasyMcpNativeFileCompatibilityAdapter
         // final echo boundary so Easy MCP/WordPress cannot serve a descriptor
         // different from the one we verified here.
         add_filter('rest_pre_echo_response', [self::class, 'projectFinalToolsListDescriptor'], 10, 3);
+    }
+
+    public static function registerNativeResource(): void
+    {
+        if (!defined('EASY_MCP_AI_VERSION') || (string) constant('EASY_MCP_AI_VERSION') !== '1.7.18') return;
+        if (!class_exists('Easy_MCP_AI\\Plugin') || !class_exists('Easy_MCP_AI\\Resources\\Resource_Registry')) return;
+
+        $plugin = \Easy_MCP_AI\Plugin::instance();
+        $property = new \ReflectionProperty('Easy_MCP_AI\\Plugin', 'resource_registry');
+        $property->setAccessible(true);
+        $registry = $property->getValue($plugin);
+        if (!$registry instanceof \Easy_MCP_AI\Resources\Resource_Registry) return;
+
+        $registry->register(new class extends \Easy_MCP_AI\Resources\Base_Resource {
+            public function get_uri() { return 'ui://nhk/image-upload/v3.html'; }
+            public function get_name() { return 'NHK image uploader'; }
+            public function get_description() { return 'NHK image uploader MCP App template.'; }
+            public function get_mime_type() { return 'text/html;profile=mcp-app'; }
+            public function read() {
+                $path = dirname(__DIR__, 3) . '/resources/ui/image-upload.html';
+                $text = is_file($path) ? file_get_contents($path) : false;
+                if (!is_string($text) || trim($text) === '') throw new \RuntimeException('MCP_UI_RESOURCE_UNAVAILABLE');
+                return $text;
+            }
+        });
+        self::$nativeResourceRegistry = $registry;
     }
 
     public static function isSupportedVersion(string $version): bool
@@ -182,6 +214,7 @@ final class EasyMcpNativeFileCompatibilityAdapter
         if (!is_object($request) || !method_exists($request, 'get_route') || rtrim((string) $request->get_route(), '/') !== rtrim(self::ENDPOINT, '/')) return $response;
         $rpc = self::requestRpc($request);
         if ($rpc !== null && !in_array(($rpc['method'] ?? null), ['initialize', 'server/discover', 'tools/list', 'tools/call', 'resources/list', 'resources/read'], true)) return $response;
+        if (self::nativeResourceRegistrationActive() && in_array(($rpc['method'] ?? null), ['resources/list', 'resources/read'], true)) return $response;
         if (!is_object($response) || !method_exists($response, 'get_data') || !method_exists($response, 'set_data')) return $response;
         $status = method_exists($response, 'get_status') ? (int) $response->get_status() : 200;
         $data = $response->get_data();
@@ -321,6 +354,7 @@ final class EasyMcpNativeFileCompatibilityAdapter
         if (defined('EASY_MCP_AI_VERSION') && !self::$authenticatedWireResponse) return $data;
         if (!is_object($request) || !method_exists($request, 'get_route') || rtrim((string) $request->get_route(), '/') !== rtrim(self::ENDPOINT, '/')) return $data;
         $rpc = self::requestRpc($request);
+        if (self::nativeResourceRegistrationActive() && in_array(($rpc['method'] ?? null), ['resources/list', 'resources/read'], true)) return $data;
         return match ($rpc['method'] ?? 'tools/list') {
             'initialize', 'server/discover' => self::projectProtocolCapabilities($data),
             'resources/list' => self::projectResourceListData($data),
@@ -402,6 +436,11 @@ final class EasyMcpNativeFileCompatibilityAdapter
     private static function isLegacyNativeMultipartProxyInstalled(): bool
     {
         return self::isLegacyNativeMultipartCompatibleVersion(self::installedVersion());
+    }
+
+    private static function nativeResourceRegistrationActive(): bool
+    {
+        return self::$nativeResourceRegistry !== null;
     }
 
     private static function uiResourceProjectionEnabled(): bool

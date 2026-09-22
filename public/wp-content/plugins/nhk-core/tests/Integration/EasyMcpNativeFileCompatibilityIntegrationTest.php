@@ -128,7 +128,7 @@ final class EasyMcpNativeFileCompatibilityIntegrationTest extends TestCase
         self::assertSame([], $errors, (string) wp_json_encode($errors));
     }
 
-    public function test_easy_mcp_1718_authenticated_rest_wire_projects_resources_list_and_read_after_native_registry(): void
+    public function test_easy_mcp_1718_authenticated_rest_wire_uses_native_resource_registry_before_nhk_filter(): void
     {
         if (!defined('EASY_MCP_AI_VERSION') || EASY_MCP_AI_VERSION !== '1.7.18') {
             self::markTestSkipped('Easy MCP AI 1.7.18 is required for the authenticated wire regression.');
@@ -141,6 +141,19 @@ final class EasyMcpNativeFileCompatibilityIntegrationTest extends TestCase
         self::assertIsArray($token);
         $rawToken = (string) ($token['raw_token'] ?? '');
         self::assertNotSame('', $rawToken);
+
+        $plugin = \Easy_MCP_AI\Plugin::instance();
+        $registryProperty = new \ReflectionProperty(\Easy_MCP_AI\Plugin::class, 'resource_registry');
+        $registryProperty->setAccessible(true);
+        $registry = $registryProperty->getValue($plugin);
+        self::assertInstanceOf(\Easy_MCP_AI\Resources\Resource_Registry::class, $registry);
+        self::assertNotNull($registry->get_resource('ui://nhk/image-upload/v3.html'));
+        $serverProperty = new \ReflectionProperty(\Easy_MCP_AI\Plugin::class, 'server');
+        $serverProperty->setAccessible(true);
+        $server = $serverProperty->getValue($plugin);
+        $serverRegistryProperty = new \ReflectionProperty(\Easy_MCP_AI\MCP\Server::class, 'resource_registry');
+        $serverRegistryProperty->setAccessible(true);
+        self::assertSame($registry, $serverRegistryProperty->getValue($server));
 
         $preProjection = [];
         $captureNative = static function (mixed $response, mixed $server, mixed $request) use (&$preProjection): mixed {
@@ -165,6 +178,10 @@ final class EasyMcpNativeFileCompatibilityIntegrationTest extends TestCase
             self::assertSame('2026-07-28', $initializeWire['result']['protocolVersion']);
             self::assertSame(['mimeTypes' => ['text/html;profile=mcp-app']], $initializeWire['result']['capabilities']['extensions']['io.modelcontextprotocol/ui'] ?? null);
 
+            $toolsWire = $this->wireBody($this->dispatchAuthenticatedWire($rawToken, 'tools/list', 400, null));
+            $tools = array_column($toolsWire['result']['tools'] ?? [], null, 'name');
+            self::assertSame('ui://nhk/image-upload/v3.html', $tools['wp_ability_nhk_v3_media_upload_widget_open']['_meta']['ui']['resourceUri'] ?? null);
+
             $listResponse = $this->dispatchAuthenticatedWire($rawToken, 'resources/list', 401, null);
             $listWire = $this->wireBody($listResponse);
             self::assertSame('2.0', $listWire['jsonrpc']);
@@ -180,8 +197,10 @@ final class EasyMcpNativeFileCompatibilityIntegrationTest extends TestCase
             self::assertSame('ui://nhk/image-upload/v3.html', $readWire['result']['contents'][0]['uri']);
             self::assertSame('text/html;profile=mcp-app', $readWire['result']['contents'][0]['mimeType']);
             self::assertNotSame('', trim((string) ($readWire['result']['contents'][0]['text'] ?? '')));
-            self::assertArrayHasKey('error', $preProjection, 'Easy MCP must produce its native Resource not found error before NHK post-dispatch projection.');
-            self::assertSame('Resource not found', $preProjection['error']['message'] ?? null);
+            self::assertSame('complete', $preProjection['resultType'] ?? null, 'The priority-9 boundary must already contain Easy MCP native resource content.');
+            self::assertSame(0, $preProjection['ttlMs'] ?? null);
+            self::assertSame('private', $preProjection['cacheScope'] ?? null);
+            self::assertSame('ui://nhk/image-upload/v3.html', $preProjection['contents'][0]['uri'] ?? null);
 
             $unknownResponse = $this->dispatchAuthenticatedWire($rawToken, 'resources/read', 403, 'ui://nhk/image-upload/unknown.html');
             $unknownWire = $this->wireBody($unknownResponse);
@@ -193,12 +212,42 @@ final class EasyMcpNativeFileCompatibilityIntegrationTest extends TestCase
         }
     }
 
-    private function dispatchAuthenticatedWire(string $rawToken, string $method, int $id, ?string $uri): mixed
+    public function test_easy_mcp_1718_legacy_protocol_keeps_native_resource_shape(): void
+    {
+        if (!defined('EASY_MCP_AI_VERSION') || EASY_MCP_AI_VERSION !== '1.7.18') {
+            self::markTestSkipped('Easy MCP AI 1.7.18 is required for the native-file compatibility integration assertion.');
+        }
+
+        $users = get_users(['role' => 'administrator', 'number' => 1]);
+        self::assertNotEmpty($users);
+        $tokenManager = new \Easy_MCP_AI\Auth\Token_Manager();
+        $token = $tokenManager->create_token('nhk-resource-legacy-regression', (int) $users[0]->ID, ['*']);
+        self::assertIsArray($token);
+        $rawToken = (string) ($token['raw_token'] ?? '');
+        self::assertNotSame('', $rawToken);
+
+        try {
+            $listWire = $this->wireBody($this->dispatchAuthenticatedWire($rawToken, 'resources/list', 501, null, '2025-11-25'));
+            $resources = array_column($listWire['result']['resources'] ?? [], null, 'uri');
+            self::assertSame('NHK image uploader', $resources['ui://nhk/image-upload/v3.html']['name'] ?? null);
+            self::assertSame('text/html;profile=mcp-app', $resources['ui://nhk/image-upload/v3.html']['mimeType'] ?? null);
+
+            $readWire = $this->wireBody($this->dispatchAuthenticatedWire($rawToken, 'resources/read', 502, 'ui://nhk/image-upload/v3.html', '2025-11-25'));
+            self::assertArrayNotHasKey('error', $readWire);
+            self::assertArrayNotHasKey('resultType', $readWire['result']);
+            self::assertSame('ui://nhk/image-upload/v3.html', $readWire['result']['contents'][0]['uri']);
+            self::assertNotSame('', trim((string) ($readWire['result']['contents'][0]['text'] ?? '')));
+        } finally {
+            $tokenManager->delete_token((int) ($token['id'] ?? 0));
+        }
+    }
+
+    private function dispatchAuthenticatedWire(string $rawToken, string $method, int $id, ?string $uri, string $protocolVersion = '2026-07-28'): mixed
     {
         $request = new \WP_REST_Request('POST', '/easy-mcp-ai/v1/mcp');
         $params = [
             '_meta' => [
-                'io.modelcontextprotocol/protocolVersion' => '2026-07-28',
+                'io.modelcontextprotocol/protocolVersion' => $protocolVersion,
                 'io.modelcontextprotocol/clientCapabilities' => new \stdClass(),
             ],
         ];
@@ -206,7 +255,7 @@ final class EasyMcpNativeFileCompatibilityIntegrationTest extends TestCase
         $request->set_header('Authorization', 'Bearer ' . $rawToken);
         $request->set_header('Content-Type', 'application/json');
         $request->set_header('Accept', 'application/json');
-        $request->set_header('MCP-Protocol-Version', '2026-07-28');
+        $request->set_header('MCP-Protocol-Version', $protocolVersion);
         $request->set_header('Mcp-Method', $method);
         if ($uri !== null) $request->set_header('Mcp-Name', $uri);
         $request->set_body((string) wp_json_encode(['jsonrpc' => '2.0', 'id' => $id, 'method' => $method, 'params' => $params]));
