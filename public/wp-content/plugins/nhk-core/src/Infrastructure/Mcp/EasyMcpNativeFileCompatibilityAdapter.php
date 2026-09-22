@@ -22,7 +22,7 @@ final class EasyMcpNativeFileCompatibilityAdapter
     private const WIDGET_UPLOAD_TOOL = 'wp_ability_nhk_v3_media_widget_upload';
 
     /** @var list<string> */
-    private const SUPPORTED_VERSIONS = ['1.7.16', '1.7.17'];
+    private const SUPPORTED_VERSIONS = ['1.7.16', '1.7.17', '1.7.18'];
 
     private static bool $registered = false;
     private static bool $proxyDispatch = false;

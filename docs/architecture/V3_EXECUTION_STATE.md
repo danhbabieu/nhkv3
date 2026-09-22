@@ -1,5 +1,28 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-22 — Easy MCP AI 1.7.18 compatibility gate fixed (LOCAL / LIVE SOURCE VERIFIED)
+
+ROOT_CAUSE_CONFIRMED: Easy MCP AI 1.7.18 changed its transport to add modern
+MCP 2026-07-28 request/auth handling, but its dynamic Ability projection and
+permission boundary remain compatible with the NHK adapter. The adapter's
+explicit version gate still fail-closed on 1.7.18, so the live widget reached
+an unsupported-version boundary while the template fetch used the Easy MCP
+resource path.
+
+LIVE_SOURCE_DIFF: Target source was read-only inspected and compared with the
+official 1.7.17 package. Relevant dynamic registrar, resource dispatch,
+authentication/permission boundary and Ability projection remain usable; the
+1.7.18 changes are bounded to modern protocol/auth, audit and registry additions.
+No Media/Capture semantic path changed.
+
+FIXED_BOUNDARY: Add only Easy MCP 1.7.18 to the explicit supported-version
+allowlist. Modern Easy MCP response envelopes keep NHK tools/list/resource
+projection, exact `ui://nhk/image-upload/v2.html`, MCP App MIME and fail-closed
+unknown resource behavior. Regression coverage preserves 1.7.16/1.7.17 and
+locks 1.7.18 modern tools/list/resources/read behavior.
+
+STATUS: `EASY_MCP_1_7_18_COMPATIBILITY_FIXED_LOCAL / SOURCE_DIFF_VERIFIED / LIVE_PROBE_PENDING_DEPLOYMENT`.
+
 # Checkpoint — 2026-09-22 — Final live v41 Capture convergence precedence (LOCAL / NO LIVE MUTATION)
 
 ROOT_CAUSE_CONFIRMED: `EditorialCaptureCoordinator::completionChildren()` did
