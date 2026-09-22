@@ -474,8 +474,12 @@ final class McpTransport
         }
         ($this->documentation ?? new McpDocumentationRegistry())->assertCheckpoint((array) ($arguments['documentation_checkpoint'] ?? []));
         if (($arguments['dry_run'] ?? false) === true) {
-            if (strtoupper(trim((string) ($arguments['intent'] ?? ''))) !== 'KNOWLEDGE_REPAIR' || $this->knowledgeRepairPreview === null) throw new \InvalidArgumentException('KNOWLEDGE_REPAIR_PREVIEW_REQUIRED');
-            return ['status' => 'PREVIEW', 'preview' => $this->knowledgeRepairPreview->preview((array) ($arguments['knowledge_repair'] ?? []))];
+            if ($this->isKnowledgeRepairPreviewRequest($arguments)) {
+                if ($this->knowledgeRepairPreview === null) throw new \InvalidArgumentException('KNOWLEDGE_REPAIR_PREVIEW_REQUIRED');
+                return ['status' => 'PREVIEW', 'preview' => $this->knowledgeRepairPreview->preview((array) $arguments['knowledge_repair'])];
+            }
+            if ($this->hasRelationshipOperations($arguments)) return $this->previewRelationshipOperations($arguments);
+            throw new \InvalidArgumentException('KNOWLEDGE_REPAIR_PREVIEW_REQUIRED');
         }
         unset($arguments['files']);
         if ($files !== []) {
@@ -500,6 +504,31 @@ final class McpTransport
             return $this->captureContinuation->execute($arguments);
         }
         return $this->capture->execute($arguments)->toArray();
+    }
+
+    /** @param array<string,mixed> $arguments */
+    private function isKnowledgeRepairPreviewRequest(array $arguments): bool
+    {
+        return strtoupper(trim((string) ($arguments['intent'] ?? ''))) === 'KNOWLEDGE_REPAIR'
+            && is_array($arguments['knowledge_repair'] ?? null)
+            && $arguments['knowledge_repair'] !== [];
+    }
+
+    /** @param array<string,mixed> $arguments */
+    private function hasRelationshipOperations(array $arguments): bool
+    {
+        return is_array($arguments['relationship_operations'] ?? null) && $arguments['relationship_operations'] !== [];
+    }
+
+    /** @param array<string,mixed> $arguments */
+    private function previewRelationshipOperations(array $arguments): array
+    {
+        $previews = [];
+        foreach ($arguments['relationship_operations'] as $operation) {
+            if (!is_array($operation)) throw new \InvalidArgumentException('RELATION_OPERATION_MALFORMED');
+            $previews[] = $this->read->relationshipPreview($operation);
+        }
+        return ['status' => 'PREVIEW', 'preview' => ['relationship_operations' => $previews]];
     }
 
     private function assertAuthoritySemanticWriteAllowed(): void

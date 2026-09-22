@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Authority\{AuthorityIntentPlanner, AuthorityPlanFingerprint};
+use NHK\Core\Application\Graph\RelationshipReadService;
 use NHK\Core\Application\Capture\AuthorityCaptureService;
 use NHK\Core\Application\Mcp\{McpAbilityRegistration, McpDocumentationRegistry, McpGovernanceHandler, McpReadHandler, McpToolCatalog, McpTransport};
 use NHK\Core\Application\Governance\GovernanceService;
@@ -14,6 +15,8 @@ use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository, MediaUsageR
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Authority\{AuthorityEntity, AuthorityState, CanonicalEntityTypeCatalog, EntityTypeRegistry};
 use NHK\Core\Domain\Capture\CaptureRecord;
+use NHK\Core\Domain\Graph\{EndpointTypeRegistry, FakeEndpointResolver, NodeReference, PredicateRegistry};
+use NHK\Tests\Support\InMemoryGraphRepository;
 use NHK\Core\Shared\Uuid\UuidCodec;
 use PHPUnit\Framework\TestCase;
 
@@ -264,9 +267,81 @@ final class ConversationalAuthorityMcpTest extends TestCase
         self::assertSame(-32003, $result['body']['error']['code']);
     }
 
-    private function readHandler(): McpReadHandler
+    public function test_relationship_operations_only_dry_run_routes_to_shared_preview_for_all_purposes(): void
     {
-        return new McpReadHandler($this->createMock(AuthorityRepository::class), new EntityTypeRegistry(), $this->createMock(MediaRepository::class), $this->createMock(MediaAssetRepository::class), $this->createMock(MediaUsageRepository::class), $this->createMock(VideoRepository::class), $this->createMock(KnowledgeRepository::class), $this->createMock(EvidenceRepository::class), null, $this->createMock(SourceRepository::class));
+        $documentation = new McpDocumentationRegistry();
+        $checkpoint = $documentation->bootstrap();
+        $read = $this->readHandler($this->relationshipReadService());
+        $transport = new McpTransport(
+            $read,
+            new McpGovernanceHandler(new GovernanceService(new \NHK\Tests\Support\InMemoryProposalRepository())),
+            static fn (string $capability): bool => in_array($capability, ['nhk_ingest_articles', 'read'], true),
+            documentation: $documentation,
+        );
+
+        foreach ([null, 'AUTHORITY', 'MIXED'] as $ordinal => $purpose) {
+            $arguments = [
+                'idempotency_key' => 'relationship-dry-run-' . $ordinal,
+                'dry_run' => true,
+                'relationship_operations' => [[
+                    'operation' => 'ADD',
+                    'relationship_kind' => 'graph',
+                    'source' => ['type' => 'model', 'id' => '11111111-1111-4111-8111-111111111111'],
+                    'predicate' => 'model_of',
+                    'target' => ['type' => 'brand', 'id' => '22222222-2222-4222-8222-222222222222'],
+                ]],
+                'documentation_checkpoint' => ['documentation_version' => $checkpoint['documentation_version'], 'manifest_hash' => $checkpoint['manifest_hash']],
+            ];
+            if ($purpose !== null) $arguments['purpose'] = $purpose;
+
+            $result = $transport->dispatch(['jsonrpc' => '2.0', 'id' => $ordinal, 'method' => 'tools/call', 'params' => ['name' => 'nhk.capture.ingest', 'arguments' => $arguments]], []);
+
+            self::assertSame(200, $result['status']);
+            self::assertFalse($result['body']['result']['isError'] ?? false);
+            self::assertSame('PREVIEW', $result['body']['result']['structuredContent']['status']);
+            self::assertSame('RELATION_NO_OP', $result['body']['result']['structuredContent']['preview']['relationship_operations'][0]['planned_transition'][0]['action']);
+        }
+    }
+
+    public function test_knowledge_repair_dry_run_still_requires_its_own_preview_service(): void
+    {
+        $documentation = new McpDocumentationRegistry();
+        $checkpoint = $documentation->bootstrap();
+        $transport = new McpTransport(
+            $this->readHandler(),
+            new McpGovernanceHandler(new GovernanceService(new \NHK\Tests\Support\InMemoryProposalRepository())),
+            static fn (string $capability): bool => in_array($capability, ['nhk_ingest_articles', 'read'], true),
+            documentation: $documentation,
+        );
+
+        $result = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 5, 'method' => 'tools/call', 'params' => ['name' => 'nhk.capture.ingest', 'arguments' => [
+            'idempotency_key' => 'knowledge-repair-preview-required',
+            'dry_run' => true,
+            'intent' => 'KNOWLEDGE_REPAIR',
+            'knowledge_repair' => ['canonical_knowledge_uuid' => '11111111-1111-4111-8111-111111111111', 'expected_revision' => 1, 'operation' => 'update', 'reason' => 'cleanup', 'provenance' => ['origin' => 'test'], 'cleanup_class' => 'PROCESS_CONTAMINATION', 'delta' => ['text' => 'clean']],
+            'documentation_checkpoint' => ['documentation_version' => $checkpoint['documentation_version'], 'manifest_hash' => $checkpoint['manifest_hash']],
+        ]]], []);
+
+        self::assertSame(400, $result['status']);
+        self::assertSame('KNOWLEDGE_REPAIR_PREVIEW_REQUIRED', $result['body']['error']['message']);
+    }
+
+    private function readHandler(?RelationshipReadService $relationships = null): McpReadHandler
+    {
+        return new McpReadHandler($this->createMock(AuthorityRepository::class), new EntityTypeRegistry(), $this->createMock(MediaRepository::class), $this->createMock(MediaAssetRepository::class), $this->createMock(MediaUsageRepository::class), $this->createMock(VideoRepository::class), $this->createMock(KnowledgeRepository::class), $this->createMock(EvidenceRepository::class), null, $this->createMock(SourceRepository::class), relationships: $relationships);
+    }
+
+    private function relationshipReadService(): RelationshipReadService
+    {
+        $source = '11111111-1111-4111-8111-111111111111';
+        $target = '22222222-2222-4222-8222-222222222222';
+        $endpoints = new EndpointTypeRegistry();
+        $endpoints->register('model', new FakeEndpointResolver('model', [$source]));
+        $endpoints->register('brand', new FakeEndpointResolver('brand', [$target]));
+        $graph = new InMemoryGraphRepository();
+        $predicates = new PredicateRegistry();
+        $graph->createEdge($graph->resolveNode(new NodeReference('model', $source)), $predicates->get('model_of'), $graph->resolveNode(new NodeReference('brand', $target)));
+        return new RelationshipReadService($endpoints, $predicates, $graph, static fn (NodeReference $reference): array => ['exists' => true, 'active' => true, 'revision' => 1]);
     }
 }
 

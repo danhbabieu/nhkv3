@@ -16365,3 +16365,56 @@ No schema, migration, deployment, push or live mutation was performed.
 STATUS=`VIDEO_CAPTURE_INTERNAL_DEPENDENCY_READBACK_FIXED_LOCALLY / FULL_UNIT_PASS / NO_LIVE_MUTATION`.
 
 NEXT_EXACT_ACTION: `USER_PUSH_PULL_BUILD; THEN RETRY EXISTING CAPTURE ON @v39 AND VERIFY COMPLETE`.
+
+# Checkpoint — 2026-09-22 — Capture dry-run intent routing (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE_CONFIRMED: `McpTransport::captureIngest()` applied the Knowledge
+Repair dry-run requirement before classifying Capture intent, so every dry run
+without `intent=KNOWLEDGE_REPAIR` inherited `KNOWLEDGE_REPAIR_PREVIEW_REQUIRED`.
+
+FIXED_BOUNDARY: A top-level `relationship_operations[]` dry run now routes
+directly to the existing read-only `RelationshipReadService` preview for
+omitted, `AUTHORITY` and `MIXED` purposes. Knowledge Repair preview remains
+scoped to `intent=KNOWLEDGE_REPAIR` plus its own packet. No Graph R2 semantics,
+connector schema, Proposal path or mutation path changed.
+
+REGRESSION: Relationship-only dry runs return shared `RELATION_NO_OP` /
+`ALREADY_ACTIVE` for an exact active ADD, with no Capture, Proposal or Graph
+mutation. Existing ADD/REMOVE/REACTIVATE/REPLACE semantics remain covered by
+the relationship preview suite. Focused transport/relationship/authority
+tests pass 73 tests / 779 assertions; full Unit passes 2,093 tests / 12,356
+assertions with existing warnings/deprecations; Contract passes 6 tests / 48
+assertions; schema parity remains green. PHP lint, `git diff --check`, and
+changed-scope secret review pass. No schema, migration, deployment, R3 work,
+live read or semantic mutation was performed.
+
+STATUS=`CAPTURE_DRY_RUN_INTENT_ROUTING_FIXED_LOCALLY / FULL_UNIT_PASS / NO_LIVE_MUTATION`.
+
+NEXT_EXACT_ACTION: `USER_PUSH_PULL_BUILD; THEN VERIFY @v40 READ-ONLY CAPTURE DRY-RUN`.
+
+# Verification — 2026-09-22 — Internal canonical dependency readback final checkpoint (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE: The completion retry previously treated public Source/Claim/Evidence
+visibility as canonical dependency readback, so PRIVATE/HIDDEN dependencies
+could retain `CANONICAL_READBACK_UNVERIFIED` even when their internal canonical
+records were active and revision-matched.
+
+REPAIRED_BOUNDARY: Video completion-only retry and governed dependency
+readback use the internal `CanonicalDependencyValidator` for Source, Claim and
+Evidence canonical UUID, active lifecycle and revision verification. Public
+getters remain projection/visibility surfaces only. Missing dependencies and
+revision drift remain fail-closed; no public visibility is changed and no
+second Video semantic apply or staging re-entry occurs.
+
+VERIFICATION: Focused continuation/completion/dependency/video persistence
+selection passes 97 tests / 503 assertions. Full `NHK Unit` passes 2,091 tests
+/ 12,342 assertions with 17 warnings, 36 deprecations and 27 PHPUnit
+deprecations only. PHP lint passes for all PHP files changed by the checkpoint;
+`git diff --check HEAD^ HEAD` passes. Secret/credential scan and prohibited
+live-ID scan pass with no matches. No schema or migration change is present or
+required. No deployment, push, pull, live read, Capture, SQL, visibility
+mutation or semantic data mutation was performed.
+
+STATUS=`VIDEO_CAPTURE_INTERNAL_DEPENDENCY_READBACK_VERIFIED_LOCALLY / FULL_UNIT_PASS / NO_LIVE_MUTATION`.
+
+NEXT_EXACT_ACTION: `USER_PUSH_PULL_BUILD; THEN RETRY EXISTING CAPTURE ON @v39 AND VERIFY COMPLETE`.
