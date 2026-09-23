@@ -1050,6 +1050,7 @@ final class EditorialCaptureCoordinator
                 ['status' => 'blocked', 'failure_code' => 'REQUIRED_OWNER_READBACK_UNVERIFIED'],
             );
         }
+        $diagnostics = $this->settleHistoricalFailure($diagnostics, $receipts);
         $semanticStatus = strtoupper(trim((string) ($writes['status'] ?? '')));
         $status = ($completion['complete'] ?? false) === true
             ? 'COMPLETE'

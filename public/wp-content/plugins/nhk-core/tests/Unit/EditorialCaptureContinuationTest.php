@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Tests\Unit;
 
-use NHK\Core\Application\Capture\{EditorialCaptureContinuationService, EditorialCaptureCoordinator};
+use NHK\Core\Application\Capture\{ContentPreparationOrchestrator, EditorialCaptureContinuationService, EditorialCaptureCoordinator};
 use NHK\Core\Application\Mcp\{McpDocumentationRegistry, McpGovernanceHandler, McpReadHandler, McpTransport};
 use NHK\Core\Application\Governance\GovernanceService;
 use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
@@ -24,6 +24,44 @@ use PHPUnit\Framework\TestCase;
 
 final class EditorialCaptureContinuationTest extends TestCase
 {
+    public function test_rev18_review_reaches_production_transport_retry_boundary_before_downstream_gates(): void
+    {
+        $captures = new ContinuationCaptureRepository();
+        $addenda = new ContinuationAddendumRepository();
+        $events = [];
+        $subjectId = '11111111-1111-4111-8111-111111111111';
+        $videoId = '22222222-2222-4222-8222-222222222222';
+        $packet = ['packet_version' => 1, 'status' => 'resolved', 'canonical_subject_id' => $subjectId, 'entity_type' => 'model', 'stable_key' => 'nhk:model:generic', 'canonical_name' => 'Generic Model', 'revision' => 3, 'match_reason' => 'user_confirmed', 'primary_source' => 'USER_CONFIRMED_SUBJECT_RECONCILIATION'];
+        $capture = new CaptureRecord(
+            '01a0cb8d-31a5-700b-8780-3793df5d0969', 'rev18-production-retry', hash('sha256', 'rev18-production-retry'), CaptureStage::SEMANTICS_RECONCILED->value, 'REVIEW_REQUIRED', null, null, [],
+            ['purpose' => 'EDITORIAL', 'raw_input' => 'Legacy ambiguous hint.', 'content_intent' => ['intent' => 'VIDEO', 'article_required' => false], 'original_request' => ['intent' => 'VIDEO', 'video' => ['url' => 'https://example.test/video']], 'subject_resolution_packet' => $packet],
+            ['subjects' => ['status' => 'resolved', 'primary' => ['id' => $subjectId, 'type' => 'model', 'revision' => 3]], 'content_preparation' => ['status' => 'REVIEW_REQUIRED', 'preparation_fingerprint' => hash('sha256', 'legacy'), 'quality_decision' => 'READY', 'review_reasons' => ['PRIMARY_SUBJECT_AMBIGUOUS']], 'completion' => ['status' => 'REVIEW_REQUIRED', 'blockers' => [], 'resume_hints' => ['resume_children' => ['video']]], 'failure' => ['code' => 'VIDEO_EDITORIAL_QUALITY_BLOCKED', 'classification' => 'REVIEW_REQUIRED']],
+            ['VIDEO_ENRICHED' => ['status' => 'FAILED', 'result' => 'FAILED_RETRYABLE', 'failure_code' => 'VIDEO_EDITORIAL_QUALITY_BLOCKED'], 'CONTENT_PREPARATION' => ['status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'failure_code' => 'VIDEO_EDITORIAL_QUALITY_BLOCKED']], revision: 18,
+        );
+        $captures->create($capture);
+        $resolver = new SubjectResolutionService(static function (): array { throw new \RuntimeException('WEAKER_SUBJECT_RESOLUTION_MUST_NOT_RUN'); });
+        $coordinator = $this->coordinator($captures, $events, semantic: static function () use (&$events, $videoId): array { $events['semantic'] = ($events['semantic'] ?? 0) + 1; return ['status' => 'APPLIED', 'writes' => [['entity_type' => 'video', 'canonical_id' => $videoId, 'canonical_readback' => ['canonical_id' => $videoId]]]]; }, videoPublication: static fn (): array => ['status' => 'verified', 'items' => [['video_id' => '22222222-2222-4222-8222-222222222222', 'completion' => ['owner_type' => 'video', 'owner_id' => '22222222-2222-4222-8222-222222222222', 'status' => 'COMPLETE', 'complete' => true, 'canonical_readback' => ['canonical_id' => '22222222-2222-4222-8222-222222222222'], 'content_state' => 'CONTENT_COMPLETE', 'dependency_state' => 'COMPLETE', 'relation_or_usage_state' => 'COMPLETE', 'public_state' => 'READY', 'frontend_state' => 'VERIFIED', 'blockers' => []]]], 'blockers' => []], videoEnrichment: static fn (): array => ['items' => [['kind' => 'video', 'video_id' => '22222222-2222-4222-8222-222222222222', 'video_proposal' => ['payload' => ['canonical_id' => '22222222-2222-4222-8222-222222222222']]]]], preparation: new ContentPreparationOrchestrator($resolver));
+        $documentation = new McpDocumentationRegistry();
+        $checkpoint = $documentation->bootstrap();
+        $transport = new McpTransport(new McpReadHandler($this->createMock(AuthorityRepository::class), new EntityTypeRegistry(), $this->createMock(MediaRepository::class), $this->createMock(MediaAssetRepository::class), $this->createMock(MediaUsageRepository::class), $this->createMock(VideoRepository::class), $this->createMock(KnowledgeRepository::class), $this->createMock(EvidenceRepository::class), null, $this->createMock(SourceRepository::class)), new McpGovernanceHandler(new GovernanceService(new InMemoryProposalRepository())), static fn (string $capability): bool => true, documentation: $documentation, capture: $coordinator, captureContinuation: new EditorialCaptureContinuationService($captures, new ContinuationAddendumRepository(), $coordinator));
+        $response = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/call', 'params' => ['name' => 'nhk.capture.ingest', 'arguments' => ['capture_id' => $capture->captureId, 'idempotency_key' => $capture->idempotencyKey, 'resume_mode' => 'RETRY', 'resume_children' => ['video'], 'documentation_checkpoint' => ['manifest_hash' => $checkpoint['manifest_hash'], 'documentation_version' => $checkpoint['documentation_version']]]]]);
+        $structured = $response['body']['result']['structuredContent'];
+        self::assertNotSame('CAPTURE_RETRY_NOT_ALLOWED', $structured['retry']['code'] ?? null);
+        self::assertSame($capture->captureId, $structured['capture']['capture_id']);
+        self::assertSame('COMPLETE', $structured['capture']['status']);
+        self::assertSame('CONTENT_COMPLETE', $structured['capture']['diagnostics']['completion']['children'][0]['content_state']);
+        self::assertArrayNotHasKey('failure', $structured['capture']['diagnostics']);
+        self::assertContains('VIDEO_EDITORIAL_QUALITY_BLOCKED', $structured['capture']['phase_receipts']['VIDEO_ENRICHED']['superseded_failure_codes']);
+        self::assertSame('COMPLETED', $structured['capture']['phase_receipts']['VIDEO_ENRICHED']['latest']['status']);
+        self::assertSame($subjectId, $structured['capture']['context']['subject_resolution_packet']['canonical_subject_id']);
+        self::assertSame(1, $events['semantic'] ?? 0);
+
+        $replay = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 2, 'method' => 'tools/call', 'params' => ['name' => 'nhk.capture.ingest', 'arguments' => ['capture_id' => $capture->captureId, 'idempotency_key' => $capture->idempotencyKey, 'resume_mode' => 'RETRY', 'resume_children' => ['video'], 'documentation_checkpoint' => ['manifest_hash' => $checkpoint['manifest_hash'], 'documentation_version' => $checkpoint['documentation_version']]]]]);
+        $replayed = $replay['body']['result']['structuredContent'];
+        self::assertSame($capture->captureId, $replayed['capture']['capture_id']);
+        self::assertCount(1, array_values(array_filter($replayed['capture']['assets'], static fn (array $asset): bool => ($asset['kind'] ?? '') === 'video')));
+    }
+
     public function test_retry_resumes_original_capture_key_without_creating_addendum_or_replaying_physical_phases(): void
     {
         $captures = new ContinuationCaptureRepository();
@@ -206,7 +244,7 @@ final class EditorialCaptureContinuationTest extends TestCase
         self::assertNotContains('PUBLIC_ELIGIBILITY_NOT_VERIFIED', $converged['capture']['diagnostics']['completion']['blockers']);
         self::assertSame(2, $events['video_verifier']);
         self::assertFalse($converged['retry']['eligible']);
-        self::assertSame('CAPTURE_RETRY_NOT_ALLOWED', $converged['retry']['reason']);
+        self::assertNull($converged['retry']['reason']);
     }
 
     public function test_video_retry_refreshes_private_hidden_dependencies_from_internal_canonical_readback(): void
@@ -317,10 +355,10 @@ final class EditorialCaptureContinuationTest extends TestCase
 
         self::assertSame('COMPLETE', $result['capture']['status']);
         self::assertSame([], $result['capture']['diagnostics']['completion']['blockers']);
-        self::assertSame('CAPTURE_RETRY_NOT_ALLOWED', $result['retry']['code']);
+        self::assertNull($result['retry']['code']);
         self::assertSame('COMPLETE', $result['retry']['status']);
         self::assertFalse($result['retry']['eligible']);
-        self::assertSame('CAPTURE_RETRY_NOT_ALLOWED', $result['retry']['reason']);
+        self::assertNull($result['retry']['reason']);
         self::assertArrayNotHasKey('semantic', $events);
 
         $read = new McpReadHandler(
@@ -1226,7 +1264,7 @@ final class EditorialCaptureContinuationTest extends TestCase
     }
 
     /** @param array<string,int|string> $events */
-    private function coordinator(ContinuationCaptureRepository $captures, array &$events, ?callable $semantic = null, ?callable $videoVerifier = null, ?CanonicalDependencyValidator $canonicalDependencies = null): EditorialCaptureCoordinator
+    private function coordinator(ContinuationCaptureRepository $captures, array &$events, ?callable $semantic = null, ?callable $videoVerifier = null, ?CanonicalDependencyValidator $canonicalDependencies = null, ?callable $videoPublication = null, ?ContentPreparationOrchestrator $preparation = null, ?callable $videoEnrichment = null): EditorialCaptureCoordinator
     {
         return new EditorialCaptureCoordinator(
             $captures,
@@ -1240,13 +1278,14 @@ final class EditorialCaptureContinuationTest extends TestCase
             static function (array $context) use (&$events): array { $events['media'] = ($events['media'] ?? 0) + 1; return ['status' => 'RECONCILED']; },
             static fn (array $context): array => ['eligible' => false, 'blockers' => ['OWNER_PUBLICATION_REQUIRED']],
             static fn (array $context): array => ['status' => 'verified'],
-            static function (array $context): array { return ['ok' => true, 'state_token' => $context['expected_state_token'] ?? 'state-342']; },
-            null,
-            null,
-            null,
-            null,
-            $videoVerifier,
+            draftUpdater: static function (array $context): array { return ['ok' => true, 'state_token' => $context['expected_state_token'] ?? 'state-342']; },
+            mediaAdoption: null,
+            publisher: null,
+            documentation: null,
+            videoEnrichment: $videoEnrichment,
             canonicalDependencies: $canonicalDependencies,
+            videoPublicationVerifier: $videoVerifier ?? $videoPublication,
+            contentPreparation: $preparation,
         );
     }
 }

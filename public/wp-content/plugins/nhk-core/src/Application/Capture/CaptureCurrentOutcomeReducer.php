@@ -110,6 +110,9 @@ final class CaptureCurrentOutcomeReducer
                 if ($code !== '') return $code;
             }
         }
+        // Append-only receipts retain historical attempts, but only the
+        // latest attempt in each phase can represent the current outcome.
+        // A completed current attempt therefore clears an older failure code.
         $completion = is_array($capture->diagnostics['completion'] ?? null) ? $capture->diagnostics['completion'] : [];
         $blockers = array_values(array_filter(array_map('strval', (array) ($completion['blockers'] ?? [])), static fn (string $code): bool => trim($code) !== ''));
         return $blockers[0] ?? null;

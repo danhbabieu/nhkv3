@@ -48,6 +48,9 @@ final class EditorialCaptureContinuationService
                 // terminal no-retry response. This keeps retry admission and
                 // capture.get on the same current Capture projection.
                 $continued = $this->coordinator->retryVideoCompletion($capture, $retryInput);
+                if ($this->isCompleteOutcome($continued)) {
+                    return ['capture' => $continued->toArray(), 'retry' => ['mode' => 'RETRY', 'status' => $continued->status, 'code' => null, 'eligible' => false, 'reason' => null]];
+                }
                 $decision = CaptureCurrentOutcomeReducer::retryEligibility($continued);
                 $terminalCode = $decision['eligible'] ? CaptureCurrentOutcomeReducer::failureCode($continued) : $decision['reason'];
                 return ['capture' => $continued->toArray(), 'retry' => ['mode' => 'RETRY', 'status' => $continued->status, 'code' => $terminalCode, 'eligible' => $decision['eligible'], 'reason' => $decision['reason']]];
@@ -65,6 +68,9 @@ final class EditorialCaptureContinuationService
         $retryInput = $this->rehydrateRetryInput($capture, $input);
         try {
             $continued = $this->coordinator->retry($capture, $retryInput);
+            if ($this->isCompleteOutcome($continued)) {
+                return ['capture' => $continued->toArray(), 'retry' => ['mode' => 'RETRY', 'status' => $continued->status, 'code' => null, 'eligible' => false, 'reason' => null]];
+            }
             $decision = CaptureCurrentOutcomeReducer::retryEligibility($continued);
             $retryCode = $decision['eligible'] ? CaptureCurrentOutcomeReducer::failureCode($continued) : $decision['reason'];
             return ['capture' => $continued->toArray(), 'retry' => ['mode' => 'RETRY', 'status' => $continued->status, 'code' => $retryCode, 'eligible' => $decision['eligible'], 'reason' => $decision['reason']]];
@@ -256,6 +262,12 @@ final class EditorialCaptureContinuationService
             'existing_capture_continuation' => true,
             'continuation_idempotency_key' => $capture->idempotencyKey,
         ];
+    }
+
+    private function isCompleteOutcome(CaptureRecord $capture): bool
+    {
+        return $capture->status === 'COMPLETE'
+            && (($capture->diagnostics['completion']['complete'] ?? false) === true);
     }
 
     /** @return array{0:CaptureRecord,1:?string} */

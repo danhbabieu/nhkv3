@@ -33,6 +33,25 @@ final class CaptureCurrentOutcomeReducerTest extends TestCase
         self::assertSame('SEMANTIC_READBACK_UNAVAILABLE', CaptureCurrentOutcomeReducer::failureCode($capture));
     }
 
+    public function test_historical_failure_is_not_current_after_new_phase_attempt_completes(): void
+    {
+        $capture = new CaptureRecord(
+            UuidCodec::newV7(), 'historical-then-complete', hash('sha256', 'historical-then-complete'), CaptureStage::SEMANTICS_RECONCILED->value, 'COMPLETE', null, null, [], [],
+            ['completion' => ['complete' => true, 'blockers' => []]],
+            ['CONTENT_PREPARATION' => [
+                'status' => 'COMPLETED',
+                'result' => 'VERIFIED',
+                'latest' => ['status' => 'COMPLETED', 'result' => 'VERIFIED', 'current_outcome' => 'CURRENT'],
+                'attempts' => [
+                    ['status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'failure_code' => 'VIDEO_EDITORIAL_QUALITY_BLOCKED'],
+                    ['status' => 'COMPLETED', 'result' => 'VERIFIED'],
+                ],
+            ]],
+        );
+
+        self::assertNull(CaptureCurrentOutcomeReducer::failureCode($capture));
+    }
+
     public function test_unresolved_video_category_is_not_retryable_when_only_owner_is_missing(): void
     {
         $capture = new CaptureRecord(
