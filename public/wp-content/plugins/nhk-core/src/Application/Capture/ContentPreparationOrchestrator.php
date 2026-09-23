@@ -26,14 +26,22 @@ final class ContentPreparationOrchestrator
     public function prepare(array $input, array $interpretation, array $assets = [], array $context = []): ContentPreparationResult
     {
         $fingerprint = $this->fingerprint($input, $interpretation, $assets, $context);
-        $sources = $this->sources($input, $interpretation);
-        $candidates = $this->candidateList($sources, $interpretation);
-        $resolution = $this->subjects->resolveSources($sources);
+        [$authorityPacket, $subjectPrecedence] = $this->authoritativePacket($context);
+        if ($authorityPacket !== null) {
+            $sources = ['canonical_uuid' => [$authorityPacket->canonicalSubjectId], 'stable_key' => $authorityPacket->stableKey];
+            $candidates = [];
+            $resolution = $authorityPacket->toResolution();
+        } else {
+            $sources = $this->sources($input, $interpretation);
+            $candidates = $this->candidateList($sources, $interpretation);
+            $resolution = $this->subjects->resolveSources($sources);
+        }
         $gaps = $this->gaps($resolution, $candidates);
         $diagnostics = [
             'phase' => 'DISCOVER',
             'source_precedence' => ['canonical_uuid', 'stable_key', 'explicit_subject_hint', 'title_subject', 'body_mention'],
             'media_video' => $this->mediaVideoDiagnostics($input, $assets),
+            'subject_precedence' => $subjectPrecedence,
         ];
         $statementDecision = $this->statementDecisions ??= new VideoStatementDecisionEngine();
         $statementResult = $statementDecision->evaluate(
@@ -65,14 +73,14 @@ final class ContentPreparationOrchestrator
             if (($enrichment['status'] ?? '') === 'REVIEW_REQUIRED') $reviewReasons = array_values(array_unique(array_merge($reviewReasons, array_map('strval', (array) ($enrichment['review_reasons'] ?? [])))));
             if (($enrichment['status'] ?? '') === 'VERIFIED') {
                 $diagnostics['phase'] = 'RE_RESOLVE';
-                $resolution = $this->subjects->resolveSources($sources);
+                if ($authorityPacket === null) $resolution = $this->subjects->resolveSources($sources);
                 $gaps = $this->gaps($resolution, $candidates);
             }
         }
 
         $inventory = $this->inventory($resolution, $input, $interpretation);
         if (($inventory['status'] ?? 'available') === 'unavailable') $blockers[] = 'CANONICAL_INVENTORY_UNAVAILABLE';
-        $related = array_values(array_merge($gaps['related_entities'], (array) ($inventory['candidates'] ?? [])));
+        $related = $this->relatedEntities($gaps['related_entities'], $inventory['candidates'] ?? [], $resolution, $enrichment);
         $plan = [
             'primary_subject_candidate' => $resolution['primary'] ?? null,
             'related_entities' => $related,
@@ -222,6 +230,57 @@ final class ContentPreparationOrchestrator
         return is_array($result) ? $result : ['status' => 'unavailable', 'candidates' => []];
     }
 
+    /** @param list<array<string,mixed>> $gaps @param mixed $inventoryCandidates @param array<string,mixed> $resolution @param array<string,mixed> $enrichment @return list<array<string,mixed>> */
+    private function relatedEntities(array $gaps, mixed $inventoryCandidates, array $resolution, array $enrichment): array
+    {
+        $primary = is_array($resolution['primary'] ?? null) ? $resolution['primary'] : [];
+        $primaryKeys = array_values(array_filter([
+            (string) ($primary['id'] ?? ''),
+            (string) ($primary['stable_key'] ?? ''),
+            (string) ($primary['name'] ?? ''),
+        ]));
+        $related = [];
+        foreach ($gaps as $candidate) {
+            if (!is_array($candidate)) continue;
+            $value = trim((string) ($candidate['value'] ?? $candidate['name'] ?? ''));
+            if ($value === '' || in_array($value, $primaryKeys, true)) continue;
+            $related[] = $candidate;
+        }
+        $allowed = array_fill_keys(array_values(array_filter(array_map(
+            static fn (array $candidate): string => trim((string) ($candidate['value'] ?? $candidate['name'] ?? $candidate['id'] ?? '')),
+            $related,
+        ))), true);
+        foreach ((array) ($resolution['resolved'] ?? []) as $resolved) {
+            if (!is_array($resolved)) continue;
+            if ((string) ($resolved['id'] ?? '') === (string) ($primary['id'] ?? '')) continue;
+            foreach ([(string) ($resolved['id'] ?? ''), (string) ($resolved['stable_key'] ?? ''), (string) ($resolved['name'] ?? '')] as $key) {
+                if ($key !== '') $allowed[$key] = true;
+            }
+        }
+        foreach ((array) $inventoryCandidates as $candidate) {
+            if (!is_array($candidate)) continue;
+            $keys = array_values(array_filter([
+                (string) ($candidate['id'] ?? ''),
+                (string) ($candidate['stable_key'] ?? ''),
+                (string) ($candidate['name'] ?? $candidate['value'] ?? ''),
+            ]));
+            if (array_intersect($keys, array_keys($allowed)) === []) continue;
+            $related[] = $candidate;
+        }
+        foreach ((array) ($enrichment['items'] ?? []) as $item) {
+            foreach ((array) (($item['result']['related_entities'] ?? [])) as $candidate) {
+                if (is_array($candidate)) $related[] = $candidate;
+            }
+        }
+        $unique = [];
+        foreach ($related as $candidate) {
+            $identity = trim((string) ($candidate['name'] ?? $candidate['value'] ?? ''));
+            $key = $identity !== '' ? $identity : ((string) ($candidate['id'] ?? '') . '|' . (string) ($candidate['stable_key'] ?? ''));
+            if ($key !== '|') $unique[$key] = $candidate;
+        }
+        return array_values($unique);
+    }
+
     /** @param array<string,mixed> $enrichment @return list<array<string,mixed>> */
     private function semanticOwnerRelations(array $enrichment): array
     {
@@ -246,6 +305,43 @@ final class ContentPreparationOrchestrator
         foreach ($findings as $finding) if (($finding['severity'] ?? '') === 'HARD_BLOCK') return 'HARD_BLOCK';
         foreach ($findings as $finding) if (($finding['severity'] ?? '') === 'REVIEW_REQUIRED') return 'REVIEW_REQUIRED';
         return 'READY';
+    }
+
+    /** @return array{0:?SubjectResolutionPacket,1:list<string>} */
+    private function authoritativePacket(array $context): array
+    {
+        $precedence = [];
+        $reconciliation = is_array($context['subject_reconciliation'] ?? null) ? $context['subject_reconciliation'] : [];
+        $authority = strtoupper(trim((string) ($reconciliation['authority'] ?? '')));
+        $explicit = $authority !== '' && in_array($authority, ['USER_CONFIRMED_SUBJECT_RECONCILIATION', 'GOVERNED_SUBJECT_RECONCILIATION'], true)
+            ? (is_array($reconciliation['packet'] ?? null) ? SubjectResolutionPacket::fromArray($reconciliation['packet']) : null)
+            : null;
+        if ($explicit !== null && $explicit->status === 'resolved') {
+            return [$explicit, ['EXPLICIT_SUBJECT_RECONCILIATION_APPLIED']];
+        }
+        if ($authority !== '') $precedence[] = 'EXPLICIT_SUBJECT_RECONCILIATION_INVALID';
+
+        $persisted = is_array($context['persisted_subject_resolution_packet'] ?? null)
+            ? SubjectResolutionPacket::fromArray($context['persisted_subject_resolution_packet'])
+            : null;
+        if ($persisted !== null && $persisted->status === 'resolved') {
+            if ($this->packetIsCurrent($persisted, $context)) return [$persisted, ['PERSISTED_RESOLVED_SUBJECT_REUSED']];
+            $precedence[] = 'PERSISTED_SUBJECT_REOPENED';
+        }
+        return [null, $precedence];
+    }
+
+    private function packetIsCurrent(SubjectResolutionPacket $packet, array $context): bool
+    {
+        if (($context['canonical_subject_retired'] ?? false) === true || ($context['subject_resolution_revision_valid'] ?? true) !== true) return false;
+        $readback = is_array($context['canonical_subject_readback'] ?? null) ? $context['canonical_subject_readback'] : [];
+        if ($readback === []) return true;
+        $status = strtolower(trim((string) ($readback['status'] ?? 'active')));
+        if (in_array($status, ['retired', 'missing', 'inactive'], true)) return false;
+        if (isset($readback['canonical_id']) && strtolower((string) $readback['canonical_id']) !== strtolower($packet->canonicalSubjectId)) return false;
+        if (isset($readback['entity_type']) && strtolower((string) $readback['entity_type']) !== strtolower($packet->entityType)) return false;
+        if (isset($readback['revision']) && (int) $readback['revision'] !== $packet->revision) return false;
+        return true;
     }
 
     private function withoutBodies(mixed $value): mixed

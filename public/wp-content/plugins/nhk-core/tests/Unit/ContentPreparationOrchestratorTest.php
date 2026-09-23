@@ -57,6 +57,77 @@ final class ContentPreparationOrchestratorTest extends TestCase
         self::assertSame(0, $enrichmentCalls);
     }
 
+    public function test_persisted_user_confirmed_subject_wins_over_ambiguous_raw_hint(): void
+    {
+        $subjectId = '5f6c98ca-869a-4418-a8a4-1a32eb931c5e';
+        $resolverCalls = 0;
+        $resolver = new SubjectResolutionService(static function (string $value) use (&$resolverCalls): array {
+            $resolverCalls++;
+            return $value === 'Ambiguous raw hint' ? [
+                ['id' => '33333333-3333-4333-8333-333333333333', 'type' => 'variant', 'name' => 'Candidate A', 'revision' => 1],
+                ['id' => '44444444-4444-4444-8444-444444444444', 'type' => 'variant', 'name' => 'Candidate B', 'revision' => 1],
+            ] : [];
+        });
+        $packet = new SubjectResolutionPacket('resolved', $subjectId, 'variant', 'nhk:variant:confirmed', 'Confirmed Subject', 7, 'user_confirmed', [], 'USER_CONFIRMED_SUBJECT_RECONCILIATION');
+
+        $result = (new ContentPreparationOrchestrator($resolver))->prepare(
+            ['subject_hints' => ['Ambiguous raw hint']],
+            [],
+            [],
+            ['persisted_subject_resolution_packet' => $packet->toArray()],
+        );
+
+        self::assertSame('PREPARED', $result->status);
+        self::assertSame($subjectId, $result->subjectResolutionPacket?->canonicalSubjectId);
+        self::assertSame(0, $resolverCalls);
+        self::assertContains('PERSISTED_RESOLVED_SUBJECT_REUSED', $result->diagnostics['subject_precedence'] ?? []);
+    }
+
+    public function test_persisted_auto_resolved_subject_also_beats_weaker_candidates(): void
+    {
+        $subjectId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+        $packet = new SubjectResolutionPacket('resolved', $subjectId, 'model', 'nhk:model:auto', 'Auto Subject', 3, 'semantic_auto_resolution', [], 'SEMANTIC_AUTO_RESOLUTION');
+        $result = (new ContentPreparationOrchestrator(new SubjectResolutionService(static fn (): array => throw new \LogicException('weaker candidates must not resolve'))))->prepare(
+            ['subject_hints' => ['Weaker title candidate']],
+            [],
+            [],
+            ['persisted_subject_resolution_packet' => $packet->toArray()],
+        );
+
+        self::assertSame('PREPARED', $result->status);
+        self::assertSame($subjectId, $result->subjectResolutionPacket?->canonicalSubjectId);
+    }
+
+    public function test_invalid_or_retired_persisted_subject_reopens_resolution(): void
+    {
+        $subjectId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+        $packet = new SubjectResolutionPacket('resolved', $subjectId, 'variant', 'nhk:variant:retired', 'Retired Subject', 4, 'user_confirmed', [], 'USER_CONFIRMED_SUBJECT_RECONCILIATION');
+        $result = (new ContentPreparationOrchestrator(new SubjectResolutionService(static fn (string $value): array => $value === 'Replacement' ? [['id' => 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', 'type' => 'variant', 'name' => 'Replacement', 'revision' => 5]] : [])))->prepare(
+            ['subject_hints' => ['Replacement']], [], [],
+            ['persisted_subject_resolution_packet' => $packet->toArray(), 'canonical_subject_readback' => ['status' => 'retired', 'canonical_id' => $subjectId, 'revision' => 4]],
+        );
+
+        self::assertSame('PREPARED', $result->status);
+        self::assertSame('cccccccc-cccc-4ccc-8ccc-cccccccccccc', $result->subjectResolutionPacket?->canonicalSubjectId);
+        self::assertContains('PERSISTED_SUBJECT_REOPENED', $result->diagnostics['subject_precedence'] ?? []);
+    }
+
+    public function test_explicit_higher_authority_reconciliation_replaces_persisted_subject(): void
+    {
+        $oldId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+        $newId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+        $old = new SubjectResolutionPacket('resolved', $oldId, 'model', 'nhk:model:old', 'Old', 2, 'semantic_auto_resolution', [], 'SEMANTIC_AUTO_RESOLUTION');
+        $new = new SubjectResolutionPacket('resolved', $newId, 'variant', 'nhk:variant:new', 'New', 6, 'user_confirmed', [], 'USER_CONFIRMED_SUBJECT_RECONCILIATION');
+        $result = (new ContentPreparationOrchestrator(new SubjectResolutionService(static fn (): array => throw new \LogicException('explicit reconciliation must not re-resolve'))))->prepare(
+            ['subject_hints' => ['conflicting weaker hint']], [], [],
+            ['persisted_subject_resolution_packet' => $old->toArray(), 'subject_reconciliation' => ['authority' => 'USER_CONFIRMED_SUBJECT_RECONCILIATION', 'packet' => $new->toArray()]],
+        );
+
+        self::assertSame('PREPARED', $result->status);
+        self::assertSame($newId, $result->subjectResolutionPacket?->canonicalSubjectId);
+        self::assertContains('EXPLICIT_SUBJECT_RECONCILIATION_APPLIED', $result->diagnostics['subject_precedence'] ?? []);
+    }
+
     public function test_missing_candidate_without_supported_evidence_does_not_create_semantic_truth(): void
     {
         $enrichmentCalls = 0;
@@ -152,6 +223,36 @@ final class ContentPreparationOrchestratorTest extends TestCase
         self::assertSame('PREPARED', $result->status);
         self::assertSame('candidate_input', $result->diagnostics['media_video']['status']);
         self::assertSame([], $result->plan['article_owned_relations']);
+    }
+
+    public function test_preparation_plan_excludes_unrelated_canonical_inventory_candidates(): void
+    {
+        $modelId = '11111111-1111-4111-8111-111111111111';
+        $musicId = '22222222-2222-4222-8222-222222222222';
+        $resolver = new SubjectResolutionService(static fn (string $value): array => match ($value) {
+            $modelId => [['id' => $modelId, 'type' => 'model', 'name' => 'Model A', 'revision' => 1]],
+            'Music B' => [['id' => $musicId, 'type' => 'music', 'name' => 'Music B', 'revision' => 1]],
+            default => [],
+        });
+        $orchestrator = new ContentPreparationOrchestrator($resolver, static fn (): array => [
+            'status' => 'available',
+            'candidates' => [
+                ['id' => 'video-c', 'type' => 'video', 'name' => 'Variant C Video'],
+                ['id' => 'unrelated', 'type' => 'brand', 'name' => 'Unrelated Brand'],
+                ['id' => $musicId, 'type' => 'music', 'name' => 'Music B'],
+            ],
+        ]);
+
+        $result = $orchestrator->prepare(
+            ['canonical_uuid' => $modelId],
+            ['entity_mentions' => ['Music B']],
+        );
+
+        self::assertSame('PREPARED', $result->status);
+        self::assertSame(['Music B'], array_values(array_map(
+            static fn (array $entity): string => (string) ($entity['name'] ?? $entity['value'] ?? ''),
+            $result->plan['related_entities'],
+        )));
     }
 
     public function test_second_capture_reuses_newly_available_canonical_candidate_without_duplicate_enrichment(): void

@@ -412,6 +412,7 @@ final class EditorialCaptureCoordinator
             }
             $articleRequired = ($intent['article_required'] ?? false) === true;
             $videoInput = is_array($input['video'] ?? null) ? $input['video'] : [];
+            $persistedPacket = $this->persistedSubjectPacket($record);
             $preparationResult = null;
             if ($this->contentPreparation !== null) {
                 $storedPreparation = is_array($record->context['content_preparation'] ?? null) ? $record->context['content_preparation'] : [];
@@ -419,6 +420,8 @@ final class EditorialCaptureCoordinator
                 $preparationContext = is_array($input['content_preparation'] ?? null) ? $input['content_preparation'] : [];
                 $preparationContext['capture_id'] = $record->captureId;
                 $preparationContext['governance'] = is_array($input['governance'] ?? null) ? $input['governance'] : [];
+                if ($persistedPacket?->status === 'resolved') $preparationContext['persisted_subject_resolution_packet'] = $persistedPacket->toArray();
+                if (is_array($input['subject_reconciliation'] ?? null)) $preparationContext['subject_reconciliation'] = $input['subject_reconciliation'];
                 $preparationResult = $storedResult?->status === 'PREPARED'
                     ? $storedResult
                     : $this->contentPreparation->prepare($input, $interpretation, $assets, $preparationContext);
@@ -432,7 +435,6 @@ final class EditorialCaptureCoordinator
             // Resolve before any draft/media writer. A UUID remains the
             // selected identity, but contradictory explicit text must stop
             // the workflow fail-closed.
-            $persistedPacket = $this->persistedSubjectPacket($record);
             $preflightResolution = $preparationResult?->subjectResolutionPacket?->toResolution()
                 ?? $persistedPacket?->toResolution()
                 ?? $this->subjects->resolveSources($this->subjectResolutionSources($input, $interpretation, $videoInput));
@@ -653,6 +655,12 @@ final class EditorialCaptureCoordinator
                     $permalink = trim((string) ($draftSnapshot['permalink'] ?? ''));
                     try {
                         $sharedEditorial = $this->articleEditorialAdapter->prepare($semanticContext + [
+                            'prepared_context' => [
+                                'subject_resolution_packet' => $preparationResult?->subjectResolutionPacket?->toArray() ?? $subjectPacket->toArray(),
+                                'selected_related_entities' => $preparationResult?->plan['related_entities'] ?? [],
+                                'selected_knowledge' => $preparationResult?->enrichment['selected_knowledge'] ?? [],
+                                'governed_enrichment_readback' => $preparationResult?->enrichment ?? [],
+                            ],
                             'public_identity' => [
                                 'canonical_url' => $permalink,
                                 'canonical_identity' => $permalink !== '',

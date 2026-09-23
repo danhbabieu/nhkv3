@@ -49,6 +49,26 @@ final class ArticleEditorialAdapterTest extends TestCase
         self::assertSame('article', $result['profile']);
     }
 
+    public function test_prepared_context_blocks_unselected_video_knowledge_from_article_composer(): void
+    {
+        $adapter = $this->adapter([
+            ['id' => 'model-claim', 'subject_id' => self::SUBJECT, 'subject_type' => 'model', 'text' => 'Odo 36 là một mẫu đồng hồ cơ.', 'scope' => 'model', 'provenance' => 'CATALOG_SUPPORTED', 'evidence_status' => 'SUPPORTED_WITHIN_SCOPE'],
+            ['id' => 'video-claim', 'subject_id' => 'video-c', 'subject_type' => 'video', 'text' => 'Video này xác nhận Variant C có mặt số đặc biệt.', 'scope' => 'model', 'provenance' => 'CATALOG_SUPPORTED', 'evidence_status' => 'SUPPORTED_WITHIN_SCOPE', 'relation_path' => [['source' => 'model:' . self::SUBJECT, 'predicate' => 'has_video', 'target' => 'video:video-c']]],
+        ]);
+
+        $result = $adapter->prepare([
+            'raw_input' => 'Bài viết về Odo 36 có nhắc Music B',
+            'subject_resolution' => ['primary' => ['id' => self::SUBJECT, 'type' => 'model']],
+            'prepared_context' => [
+                'subject_resolution_packet' => ['canonical_subject_id' => self::SUBJECT, 'entity_type' => 'model'],
+                'selected_related_entities' => [['id' => 'music-b', 'type' => 'music', 'name' => 'Music B']],
+            ],
+        ]);
+
+        self::assertNotContains('video-claim', array_column($result['draft']->claimTrace, 'claim_id'));
+        self::assertStringNotContainsString('Variant C', $result['draft']->body);
+    }
+
     private function adapter(array $rows): ArticleEditorialAdapter
     {
         $engine = new ClaimRetrievalEngine(

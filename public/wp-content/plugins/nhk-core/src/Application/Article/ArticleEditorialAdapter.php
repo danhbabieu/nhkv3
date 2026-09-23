@@ -48,6 +48,7 @@ final class ArticleEditorialAdapter
         ];
         $profile = ['profile' => 'article', 'selection_limit' => 8, 'result_limit' => 50];
         $retrieved = $this->retrieval->retrieve($subject, $topic, (array) ($context['hints'] ?? []), $profile);
+        $retrieved = $this->boundToPreparedContext($retrieved, is_array($context['prepared_context'] ?? null) ? $context['prepared_context'] : [], $subject);
         $pack = $this->selector->select($retrieved, $topic, $subject, $profile, $inputContext);
         $plan = $this->journey->plan($pack);
         $draft = $this->composer->compose($plan);
@@ -71,5 +72,37 @@ final class ArticleEditorialAdapter
             'seo_plan' => $seo,
             'quality_report' => $quality,
         ];
+    }
+
+    /** @param array<string,mixed> $retrieved @param array<string,mixed> $prepared @param array<string,mixed> $subject @return array<string,mixed> */
+    private function boundToPreparedContext(array $retrieved, array $prepared, array $subject): array
+    {
+        if ($prepared === []) return $retrieved;
+        $packet = is_array($prepared['subject_resolution_packet'] ?? null) ? $prepared['subject_resolution_packet'] : [];
+        $primaryId = trim((string) ($packet['canonical_subject_id'] ?? $subject['id'] ?? ''));
+        $selected = [];
+        foreach ((array) ($prepared['selected_related_entities'] ?? []) as $entity) {
+            if (!is_array($entity)) continue;
+            foreach ([(string) ($entity['id'] ?? ''), (string) ($entity['stable_key'] ?? ''), (string) ($entity['name'] ?? $entity['value'] ?? '')] as $key) {
+                if ($key !== '') $selected[$key] = true;
+            }
+        }
+        foreach ((array) ($prepared['selected_knowledge'] ?? []) as $claim) {
+            if (is_array($claim) && trim((string) ($claim['claim_id'] ?? $claim['id'] ?? '')) !== '') $selected[(string) ($claim['claim_id'] ?? $claim['id'])] = true;
+        }
+        $filter = static function (mixed $claim) use ($primaryId, $selected): bool {
+            if (!is_array($claim) || ($claim['eligibility'] ?? '') !== 'eligible') return false;
+            $claimId = (string) ($claim['claim_id'] ?? $claim['id'] ?? '');
+            $subjectId = (string) ($claim['subject_id'] ?? '');
+            $subjectName = (string) ($claim['subject_name'] ?? $claim['name'] ?? '');
+            $subjectType = strtolower(trim((string) ($claim['subject_type'] ?? '')));
+            if ($subjectType === 'video' && !isset($selected[$subjectId])) return false;
+            return $subjectId === $primaryId || isset($selected[$claimId]) || isset($selected[$subjectId]) || ($subjectName !== '' && isset($selected[$subjectName]));
+        };
+        $retrieved['items'] = array_values(array_filter((array) ($retrieved['items'] ?? []), $filter));
+        $retrieved['eligible_claims'] = array_values(array_filter((array) ($retrieved['eligible_claims'] ?? []), $filter));
+        $retrieved['selected_claims'] = $retrieved['eligible_claims'];
+        $retrieved['diagnostics']['prepared_context_bound'] = true;
+        return $retrieved;
     }
 }
