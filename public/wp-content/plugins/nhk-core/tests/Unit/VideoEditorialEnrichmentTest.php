@@ -25,7 +25,7 @@ final class VideoEditorialEnrichmentTest extends TestCase
         );
 
         self::assertSame(VideoEditorialQuality::COMPLETE, $result['content_quality']['status']);
-        self::assertStringContainsString('chính hiện vật', $result['editorial']['body']);
+        self::assertStringContainsString('đúng hiện vật', $result['editorial']['body']);
         self::assertStringContainsString('Trong bối cảnh tri thức NHK', $result['editorial']['body']);
         self::assertSame('SPECIMEN', $result['editorial']['facts'][0]['provenance']);
         self::assertSame('SOURCE_FACT', $result['editorial']['facts'][1]['provenance']);
@@ -46,6 +46,37 @@ final class VideoEditorialEnrichmentTest extends TestCase
         self::assertCount(1, $result['editorial']['related_knowledge']);
         self::assertSame(self::KNOWLEDGE, $result['editorial']['related_knowledge'][0]['id']);
         self::assertArrayNotHasKey('create_knowledge', $result);
+        self::assertArrayNotHasKey('knowledge_mutation', $result);
+    }
+
+    public function test_sparse_knowledge_does_not_create_a_claim_or_block_scoped_editorial_enrichment(): void
+    {
+        $result = (new VideoEditorialEnrichmentService())->enrich(
+            ['title' => 'Video không có dữ liệu bổ sung'],
+            VideoEditorialEnrichmentContext::fromArray([
+                'canonical_context' => [['text' => 'Mẫu đồng hồ đang được quan sát', 'id' => self::VARIANT]],
+                'related_knowledge' => [],
+            ])
+        );
+
+        self::assertSame([], $result['editorial']['related_knowledge']);
+        self::assertArrayNotHasKey('create_knowledge', $result);
+        self::assertArrayNotHasKey('knowledge_mutation', $result);
+        self::assertStringContainsString('đúng hiện vật', $result['editorial']['body']);
+    }
+
+    public function test_canonical_subject_layer_remains_distinct_from_secondary_title_wording(): void
+    {
+        $result = (new VideoEditorialEnrichmentService())->enrich(
+            ['title' => 'Một mẫu khác xuất hiện trong tiêu đề'],
+            VideoEditorialEnrichmentContext::fromArray([
+                'canonical_context' => [['text' => 'Mẫu chính đã được xác định', 'id' => self::VARIANT]],
+                'related_knowledge' => [['id' => self::KNOWLEDGE, 'title' => 'Bối cảnh đã có']],
+            ])
+        );
+
+        self::assertSame(self::VARIANT, $result['editorial']['context'][0]['id']);
+        self::assertSame(self::KNOWLEDGE, $result['editorial']['related_knowledge'][0]['id']);
         self::assertArrayNotHasKey('knowledge_mutation', $result);
     }
 
