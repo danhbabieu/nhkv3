@@ -10,6 +10,7 @@
 - Task 4 finding: existing MediaUsage policy tests cover canonical identity, featured/inline roles, retry and native read-back adapters; the requested staging/generalized WordPress path is not runtime-proven. Status: `TEST_VERIFIED` / `STAGING_UNVERIFIED`.
 - Tasks 5–7: focused tests provide code/test evidence for alias normalization/read-back, state-token rehydration, publication/route/completion gates; runtime evidence remains `UNVERIFIED`.
 - Six-intent regression focused suite: 146 tests / 658 assertions passed. No staging/live mutation.
+- Boundary blocker: after the audit commit, `HEAD` advanced with `87fb6b48`, `da43ed84` and `d4607dd9`, which add hierarchical subject-resolution implementation/tests/docs outside the approved Capture convergence plan. Focused subject/convergence tests pass (72 tests / 323 assertions), but the deviation is not accepted as part of this task. Do not rewrite or remove it autonomously; request scope resolution before completion.
 
 - Execution mode: subagent-driven, sequential.
 - Workspace: current repository fallback because native worktree scratch writes were denied by sandbox; user explicitly authorized implementation.

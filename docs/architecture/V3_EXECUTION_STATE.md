@@ -1,4 +1,8 @@
-# Checkpoint — 2026-09-23 — Post-implementation adversarial audit (OPEN / NOT COMPLETE)
+# Checkpoint — 2026-09-23 — Post-implementation adversarial audit (OPEN / BLOCKED)
+
+ARCHITECTURAL_DEVIATION: After the audit commit, `HEAD` advanced with `87fb6b48`, `da43ed84` and `d4607dd9`, adding hierarchical subject-resolution code, tests and documents outside the approved Capture convergence plan. The code currently passes its focused subject/convergence tests, but this does not authorize the deviation. Per the execution rule, no further architectural change or completion claim is made until the user resolves whether that separate scope belongs in this task. The restored hierarchy documents are present; no deletion remains for those paths.
+
+CURRENT_HEAD: `d4607dd960133df7d72f1b26bf990a259f113633`.
 
 TASK_RESULT: The audit of commit `270eb65c6604d931219aa08fd8f9fd6c5722f0db` found that the commit itself is documentation-only, while unrelated hierarchical-subject files had been deleted earlier in the convergence history. The two approved hierarchy documents were restored in the worktree; unrelated hierarchy source/test scratch was excluded. No production or staging mutation occurred.
 
