@@ -147,7 +147,7 @@ final class SubjectResolutionService
                 if ($key !== ':') $candidateMap[$key] = $match;
             }
         }
-        if (is_callable($this->compositeResolver) && count($hints) > 1) foreach ((array) ($this->compositeResolver)($hints) as $match) {
+        if (is_callable($this->compositeResolver) && $hints !== []) foreach ((array) ($this->compositeResolver)($hints) as $match) {
             if (!is_array($match)) continue;
             $key = (string) (($match['type'] ?? '') . ':' . ($match['id'] ?? ''));
             if ($key !== ':') $candidateMap[$key] = $match + ['match' => 'composite_explicit_hint'];
@@ -196,7 +196,7 @@ final class SubjectResolutionService
     {
         $conflicts = [];
         foreach ($candidates as $index => $left) foreach (array_slice($candidates, $index + 1) as $right) {
-            if (($left['type'] ?? '') === ($right['type'] ?? '') && ($left['id'] ?? '') !== ($right['id'] ?? '')) $conflicts[] = ['kind' => 'same_type_identity', 'expected' => $left, 'candidate' => $right];
+            if (($left['type'] ?? '') === ($right['type'] ?? '') && ($left['id'] ?? '') !== ($right['id'] ?? '')) continue;
             elseif (!$this->isAncestorOf($left, $right, $contexts) && !$this->isAncestorOf($right, $left, $contexts) && ($left['type'] ?? '') !== ($right['type'] ?? '')) {
                 $reference = in_array((string) ($left['match'] ?? ''), ['exact_variant_reference', 'exact_variant_name_reference'], true) || in_array((string) ($right['match'] ?? ''), ['exact_variant_reference', 'exact_variant_name_reference'], true);
                 if (!$reference) $conflicts[] = ['kind' => 'incompatible_hierarchy', 'expected' => $left, 'candidate' => $right];
