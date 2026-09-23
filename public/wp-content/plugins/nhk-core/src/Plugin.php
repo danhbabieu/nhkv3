@@ -26,7 +26,7 @@ use NHK\Core\Application\Governance\{AuthorityStagingAdmission, CaptureChildRela
 use NHK\Core\Application\Runtime\SemanticWritePolicyResolver;
 use NHK\Core\Application\Mcp\{McpAbilityRegistration, McpArticleIngestHandler, McpGovernanceHandler, McpReadHandler, McpSemanticContextResolver, McpToolCatalog, McpTransport, McpDocumentationRegistry};
 use NHK\Core\Application\Media\{ImageIngestEntrypoint, MediaBatchUploadService, MediaBindingService};
-use NHK\Core\Application\Capture\{CaptureArticlePreflightHandoff, CaptureEditorialWriteGuard, CapturePhaseReceiptReducer, CaptureVideoProvenancePlanner, CaptureVideoPublicationVerifier, ClockTypeShadowClassifier, EditorialCaptureContinuationService, EditorialCaptureCoordinator, GovernedCaptureContinuationService, RelationProposalReconciliationService};
+use NHK\Core\Application\Capture\{CaptureArticlePreflightHandoff, CaptureEditorialWriteGuard, CapturePhaseReceiptReducer, CaptureVideoProvenancePlanner, CaptureVideoPublicationVerifier, ClockTypeShadowClassifier, ContentPreparationOrchestrator, EditorialCaptureContinuationService, EditorialCaptureCoordinator, GovernedCaptureContinuationService, RelationProposalReconciliationService};
 use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, ClaimReusePolicy, SubjectResolutionService, TextInputInterpreter};
 use NHK\Core\Application\Article\{ArticleEditorialAdapter, ArticleIngestCoordinator, ArticleIngestPreflight, ArticleResearchPreflight, ArticleVerificationReader, SemanticProposalPlanner, OwnerPublicationApplicationService};
 use NHK\Core\Infrastructure\Http\ReadApi;
@@ -1100,6 +1100,22 @@ final class Plugin {
             );
             $publicUrlMaintenance = (new \NHK\Core\Infrastructure\PublicIdentity\WordPressPublicUrlMaintenanceRuntime($wpdb, $authority, $types, $publicContexts, $videos, $media, $assets, $publicIdentityRepository))->service();
             $articleEditorialAdapter = ArticleEditorialAdapter::fromEngine($captureClaims);
+            $contentPreparation = new ContentPreparationOrchestrator(
+                $captureSubjectResolver,
+                null,
+                static function (array $context) use ($captureGovernance): array {
+                    $captureId = (string) ($context['capture_id'] ?? '');
+                    $fingerprint = (string) ($context['preparation_fingerprint'] ?? '');
+                    $request = is_array($context['request'] ?? null) ? $context['request'] : [];
+                    $governed = $captureGovernance->execute(
+                        $captureId,
+                        $captureId . ':preparation:' . $fingerprint,
+                        $context + ['preparation_request' => $request],
+                        is_array($context['governance'] ?? null) ? $context['governance'] : [],
+                    );
+                    return is_array($governed) ? $governed : ['status' => 'REVIEW_REQUIRED'];
+                },
+            );
             $capture = new EditorialCaptureCoordinator(
                 $captureRepository,
                 static function (array $input) use ($imageIngest, $existingMediaResolver, $existingAttachmentUrlResolver, $wordpressAttachments, $mediaBindingService, $assets): array {
@@ -1733,6 +1749,7 @@ final class Plugin {
                 $stagingScopeVerifier,
                 $canonicalDependencies,
                 $articleEditorialAdapter,
+                $contentPreparation,
             );
             $captureContinuation = new EditorialCaptureContinuationService($captureRepository, $captureAddendumRepository, $capture, static function (array $input) use ($imageIngest, $existingMediaResolver): array {
                 $mediaIds = is_array($input['media_ids'] ?? null) ? array_values($input['media_ids']) : [];

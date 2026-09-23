@@ -58,6 +58,7 @@ final class EditorialCaptureCoordinator
         private ?StagingAcceptanceScopeVerifier $stagingScopeVerifier = null,
         private ?CanonicalDependencyValidator $canonicalDependencies = null,
         private ?ArticleEditorialAdapter $articleEditorialAdapter = null,
+        private ?ContentPreparationOrchestrator $contentPreparation = null,
     ) { $this->completion = $completion ?? new CompletionCoordinator(); }
 
     /** @param array<string,mixed> $input */
@@ -411,11 +412,30 @@ final class EditorialCaptureCoordinator
             }
             $articleRequired = ($intent['article_required'] ?? false) === true;
             $videoInput = is_array($input['video'] ?? null) ? $input['video'] : [];
+            $preparationResult = null;
+            if ($this->contentPreparation !== null) {
+                $storedPreparation = is_array($record->context['content_preparation'] ?? null) ? $record->context['content_preparation'] : [];
+                $storedResult = ContentPreparationResult::fromArray($storedPreparation);
+                $preparationContext = is_array($input['content_preparation'] ?? null) ? $input['content_preparation'] : [];
+                $preparationContext['capture_id'] = $record->captureId;
+                $preparationContext['governance'] = is_array($input['governance'] ?? null) ? $input['governance'] : [];
+                $preparationResult = $storedResult?->status === 'PREPARED'
+                    ? $storedResult
+                    : $this->contentPreparation->prepare($input, $interpretation, $assets, $preparationContext);
+                $preparationArray = $preparationResult->toArray();
+                $diagnostics['content_preparation'] = $this->withoutBody($preparationArray);
+                $preparationContext['content_preparation'] = $this->withoutBody($preparationArray);
+                $preparationContext['preparation_fingerprint'] = $preparationResult->preparationFingerprint;
+                $record = $this->save($record, CaptureStage::INTERPRETED, $assets, $diagnostics, $receipts, 'CONTENT_PREPARATION', $record->articleId, $record->articleStateToken, $preparationResult->status === 'PREPARED' ? 'IN_PROGRESS' : $preparationResult->status, null, $record->context + $preparationContext);
+                if ($preparationResult->status !== 'PREPARED') return $record;
+            }
             // Resolve before any draft/media writer. A UUID remains the
             // selected identity, but contradictory explicit text must stop
             // the workflow fail-closed.
             $persistedPacket = $this->persistedSubjectPacket($record);
-            $preflightResolution = $persistedPacket?->toResolution() ?? $this->subjects->resolveSources($this->subjectResolutionSources($input, $interpretation, $videoInput));
+            $preflightResolution = $preparationResult?->subjectResolutionPacket?->toResolution()
+                ?? $persistedPacket?->toResolution()
+                ?? $this->subjects->resolveSources($this->subjectResolutionSources($input, $interpretation, $videoInput));
             if (($preflightResolution['status'] ?? '') === 'conflict') {
                 $diagnostics['subjects'] = $preflightResolution;
                 $diagnostics['failure_code'] = 'SUBJECT_CONFLICT_REVIEW_REQUIRED';
@@ -499,7 +519,9 @@ final class EditorialCaptureCoordinator
                 $record = $this->save($record, CaptureStage::MEDIA_ADOPTED, $assets, $diagnostics, $receipts, 'MEDIA_ADOPTED', $record->articleId, $record->articleStateToken);
             }
             $this->beginPhase('SUBJECTS_RESOLVED');
-            $resolution = $persistedPacket?->toResolution() ?? $this->subjects->resolveSources($this->subjectResolutionSources($input, $interpretation, $videoInput));
+            $resolution = $preparationResult?->subjectResolutionPacket?->toResolution()
+                ?? $persistedPacket?->toResolution()
+                ?? $this->subjects->resolveSources($this->subjectResolutionSources($input, $interpretation, $videoInput));
             if ($this->isVideoOnlyResume($input)) {
                 $locked = is_array($record->diagnostics['subjects'] ?? null) ? $record->diagnostics['subjects'] : [];
                 $lockedPrimary = is_array($locked['primary'] ?? null) ? $locked['primary'] : [];

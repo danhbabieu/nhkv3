@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Tests\Unit;
 
-use NHK\Core\Application\Capture\EditorialCaptureCoordinator;
+use NHK\Core\Application\Capture\{ContentPreparationOrchestrator, EditorialCaptureCoordinator};
 use NHK\Core\Application\Completion\CompletionCoordinator;
 use NHK\Core\Application\Capture\ContentIntentRouter;
 use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, SubjectResolutionService, TextInputInterpreter};
@@ -18,6 +18,109 @@ use PHPUnit\Framework\TestCase;
  */
 final class EditorialCaptureConvergenceE2ETest extends TestCase
 {
+    public function test_preparation_happens_before_draft_and_review_stops_before_article_side_effects(): void
+    {
+        $captures = new Pr5CaptureRepository();
+        $events = [];
+        $calls = ['draft' => 0, 'semantic' => 0, 'media' => 0, 'publication' => 0, 'final' => 0];
+        $modelId = '11111111-1111-4111-8111-111111111111';
+        $resolver = new SubjectResolutionService(static fn (string $value): array => $value === $modelId
+            ? [['id' => $modelId, 'type' => 'model', 'name' => 'Generic Model', 'revision' => 2]]
+            : []);
+        $coordinator = $this->coordinator(
+            $captures,
+            $calls,
+            $events,
+            subjectResolver: $resolver,
+            preparation: new ContentPreparationOrchestrator($resolver),
+        );
+
+        $prepared = $coordinator->execute([
+            'idempotency_key' => 'preparation-before-draft',
+            'intent' => 'TEXT_ARTICLE',
+            'text' => 'Generic Model có một quan sát biên tập.',
+            'canonical_uuid' => $modelId,
+        ]);
+
+        self::assertSame('PREPARED', $prepared->diagnostics['content_preparation']['status']);
+        self::assertSame(['physical', 'draft', 'semantic', 'media', 'publication', 'final'], $events);
+        self::assertSame(1001, $prepared->articleId);
+
+        $reviewCalls = ['draft' => 0, 'semantic' => 0, 'media' => 0, 'publication' => 0, 'final' => 0];
+        $reviewEvents = [];
+        $ambiguousResolver = new SubjectResolutionService(static fn (string $value): array => $value === 'Ambiguous'
+            ? [
+                ['id' => '33333333-3333-4333-8333-333333333333', 'type' => 'model', 'name' => 'Model A', 'revision' => 1],
+                ['id' => '44444444-4444-4444-8444-444444444444', 'type' => 'model', 'name' => 'Model B', 'revision' => 1],
+            ]
+            : []);
+        $reviewCoordinator = $this->coordinator(
+            new Pr5CaptureRepository(),
+            $reviewCalls,
+            $reviewEvents,
+            subjectResolver: $ambiguousResolver,
+            preparation: new ContentPreparationOrchestrator($ambiguousResolver),
+        );
+
+        $review = $reviewCoordinator->execute([
+            'idempotency_key' => 'preparation-review-before-draft',
+            'intent' => 'TEXT_ARTICLE',
+            'text' => 'Ambiguous input.',
+            'subject_hints' => ['Ambiguous'],
+        ]);
+
+        self::assertSame('REVIEW_REQUIRED', $review->status);
+        self::assertSame(0, $reviewCalls['draft']);
+        self::assertSame(['physical'], $reviewEvents);
+    }
+
+    public function test_interrupted_prepared_capture_reuses_enrichment_and_article_on_retry(): void
+    {
+        $captures = new Pr5CaptureRepository();
+        $events = [];
+        $calls = ['draft' => 0, 'semantic' => 0, 'media' => 0, 'publication' => 0, 'final' => 0];
+        $enrichmentCalls = 0;
+        $draftAttempts = 0;
+        $modelId = '11111111-1111-4111-8111-111111111111';
+        $resolver = new SubjectResolutionService(static fn (string $value): array => $value === $modelId
+            ? [['id' => $modelId, 'type' => 'model', 'name' => 'Generic Model', 'revision' => 2]]
+            : []);
+        $preparation = new ContentPreparationOrchestrator($resolver, null, static function () use (&$enrichmentCalls): array {
+            ++$enrichmentCalls;
+            return ['status' => 'APPLIED', 'canonical_readback' => ['canonical_id' => 'classification-1', 'revision' => 2]];
+        });
+        $coordinator = $this->coordinator(
+            $captures,
+            $calls,
+            $events,
+            draft: static function (array $input) use (&$draftAttempts, &$events): array {
+                ++$draftAttempts;
+                $events[] = 'draft';
+                if ($draftAttempts === 1) throw new \RuntimeException('INTERRUPTED_AFTER_PREPARATION');
+                return ['post_id' => 1001, 'state_token' => 'article-token'];
+            },
+            subjectResolver: $resolver,
+            preparation: $preparation,
+        );
+        $input = [
+            'idempotency_key' => 'preparation-resume-same-capture',
+            'intent' => 'TEXT_ARTICLE',
+            'text' => 'Generic Model with a governed classification.',
+            'canonical_uuid' => $modelId,
+            'content_preparation' => ['enrichment_requests' => [['locator' => 'classification-1', 'evidence_supported' => true]]],
+        ];
+
+        $first = $coordinator->execute($input);
+        $second = $coordinator->execute($input);
+
+        self::assertNotSame('COMPLETE', $first->status);
+        self::assertSame($first->captureId, $second->captureId);
+        self::assertSame('READY_FOR_PUBLICATION', $second->stage);
+        self::assertSame(1, $enrichmentCalls);
+        self::assertSame(2, $draftAttempts);
+        self::assertSame('PREPARED', $second->diagnostics['content_preparation']['status']);
+    }
+
     public function test_text_article_pipeline_replays_same_capture_and_owner_writes(): void
     {
         $captures = new Pr5CaptureRepository();
@@ -265,13 +368,16 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
         ?callable $videoPublication = null,
         ?callable $media = null,
         array $semanticExtra = [],
+        ?SubjectResolutionService $subjectResolver = null,
+        ?ContentPreparationOrchestrator $preparation = null,
+        ?callable $draft = null,
     ): EditorialCaptureCoordinator {
         return new EditorialCaptureCoordinator(
             $captures,
             static function (array $input) use (&$events): array { $events[] = 'physical'; return ['items' => []]; },
-            static function (array $input) use (&$calls, &$events): array { ++$calls['draft']; $events[] = 'draft'; return ['post_id' => 1001, 'state_token' => 'article-token']; },
+            $draft ?? static function (array $input) use (&$calls, &$events): array { ++$calls['draft']; $events[] = 'draft'; return ['post_id' => 1001, 'state_token' => 'article-token']; },
             new TextInputInterpreter(),
-            new SubjectResolutionService(static fn (string $hint): array => []),
+            $subjectResolver ?? new SubjectResolutionService(static fn (string $hint): array => []),
             new ClaimRetrievalEngine(static fn (array $subject): array => ['status' => 'available', 'items' => []], static fn (array $subject, array $neighborhood): array => []),
             static function (array $context) use (&$calls, &$events, $semanticStatus, $semanticExtra): array { ++$calls['semantic']; $events[] = 'semantic'; return array_merge(['status' => $semanticStatus, 'writes' => []], $semanticExtra); },
             new ArticleComposer(),
@@ -286,6 +392,14 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
             $videoPublication,
             null,
             null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            $preparation,
         );
     }
 }

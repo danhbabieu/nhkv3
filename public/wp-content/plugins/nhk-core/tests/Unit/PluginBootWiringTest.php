@@ -165,6 +165,15 @@ final class PluginBootWiringTest extends TestCase
         self::assertStringContainsString("'subject_resolved' =>", $plugin);
     }
 
+    public function test_capture_composition_injects_content_preparation_before_normal_article_flow(): void
+    {
+        $plugin = (string) file_get_contents(__DIR__ . '/../../src/Plugin.php');
+
+        self::assertStringContainsString('new ContentPreparationOrchestrator(', $plugin);
+        self::assertStringContainsString('$captureSubjectResolver,', $plugin);
+        self::assertStringContainsString('$contentPreparation,', $plugin);
+    }
+
     public function test_capture_media_adoption_updates_the_canonical_media_object(): void
     {
         $plugin = (string) file_get_contents(__DIR__ . '/../../src/Plugin.php');
