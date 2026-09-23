@@ -28,6 +28,9 @@ final class ArticleReconciliationOrchestrator
             $passActions = array_map(static fn ($action): array => $action->toArray(), $planned);
             $actions = array_merge($actions, $passActions);
             $passes[] = ['pass' => $pass, 'diagnostics' => $diagnostics, 'actions' => $passActions];
+            if (($input['plan_only'] ?? false) === true) {
+                return ['status' => 'PLANNED', 'passes' => $passes, 'actions' => $actions, 'review' => ['outcome' => $diagnostics === [] ? 'PASS' : 'REPAIR_REQUIRED', 'blockers' => $diagnostics], 'state' => $state];
+            }
             if ($diagnostics === []) {
                 $review = ($this->review)($state + $input);
                 $outcome = strtoupper((string) ($review['outcome'] ?? 'SYSTEM_BLOCKED'));

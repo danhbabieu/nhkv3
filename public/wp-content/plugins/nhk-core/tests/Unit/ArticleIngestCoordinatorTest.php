@@ -21,6 +21,19 @@ use PHPUnit\Framework\TestCase;
 
 final class ArticleIngestCoordinatorTest extends TestCase
 {
+    public function test_structured_current_media_selection_is_not_stringified_before_execution(): void
+    {
+        $coordinator = new ArticleIngestCoordinator(new class implements ArticleOperationReceiptRepository {
+            public function findByIdempotencyKey(string $key): ?ArticleOperationReceipt { return null; }
+            public function create(ArticleOperationReceipt $receipt): ArticleOperationReceipt { return $receipt; }
+            public function save(ArticleOperationReceipt $receipt): ArticleOperationReceipt { return $receipt; }
+        });
+        $method = new \ReflectionMethod($coordinator, 'selectedMediaBySlot');
+        $method->setAccessible(true);
+        $selection = ['media_id' => 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'role' => 'featured_primary', 'selection_source' => 'USER_EXPLICIT', 'selection_policy' => 'PINNED'];
+        self::assertSame(['featured_primary' => $selection], $method->invoke($coordinator, $selection));
+    }
+
     public function test_bounded_update_requires_cas_then_mutates_and_verifies_native_readback(): void
     {
         $receipts = new class implements ArticleOperationReceiptRepository {

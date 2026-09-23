@@ -135,8 +135,13 @@ final class ArticleIngestCoordinator
             try {
                 $mediaContext = is_array($input['media_context'] ?? null) ? $input['media_context'] : ['subject' => $state->title, 'planned_title' => $state->title];
                 if ($editorialUpdate !== []) $mediaContext['force_inline_reconcile'] = true;
-                $selected = is_array($input['article_media']['selected'] ?? null) ? array_map('strval', $input['article_media']['selected']) : [];
+                $selected = $this->selectedMediaBySlot(is_array($input['article_media']['selected'] ?? null) ? $input['article_media']['selected'] : []);
                 $supporting = is_array($input['article_media']['supporting_media_ids'] ?? null) ? array_values(array_map('strval', $input['article_media']['supporting_media_ids'])) : [];
+                if ($selected !== []) {
+                    $mediaContext['allow_historical_reuse'] = false;
+                    $mediaContext['allow_scoped_reuse'] = false;
+                    $mediaContext['force_inline_reconcile'] = true;
+                }
                 $mediaResult = $this->articleMedia->ensureForPost($postId, $mediaContext, $selected, $supporting)->toArray();
                 if (isset($this->mediaDiagnostics['state_recovery'])) $mediaResult['state_recovery'] = $this->mediaDiagnostics['state_recovery'];
                 $this->mediaDiagnostics = $mediaResult;
@@ -313,5 +318,17 @@ final class ArticleIngestCoordinator
             if (array_key_exists($field, $fields)) $values[$field] = is_array($fields[$field]) ? array_values(array_map('intval', $fields[$field])) : (string) $fields[$field];
         }
         return hash('sha256', CommandCanonicalizer::canonicalize($values));
+    }
+
+    /** @param array<string,mixed> $selected @return array<string,array<string,mixed>> */
+    private function selectedMediaBySlot(array $selected): array
+    {
+        if (isset($selected['media_id'])) {
+            $role = trim((string) ($selected['role'] ?? 'featured_primary')) ?: 'featured_primary';
+            return [$role => $selected];
+        }
+        $normalized = [];
+        foreach ($selected as $slot => $value) $normalized[(string) $slot] = is_array($value) ? $value : ['media_id' => (string) $value];
+        return $normalized;
     }
 }

@@ -8,6 +8,7 @@ use NHK\Core\Application\Article\ArticleIngestPreflight;
 use NHK\Core\Contracts\Article\EditorialStateReader;
 use NHK\Core\Application\Media\ArticleMediaCoordinator;
 use NHK\Core\Application\Article\ArticleResearchPreflight;
+use NHK\Core\Application\Article\ArticleReconciliationOrchestrator;
 
 class McpArticleIngestHandler
 {
@@ -17,11 +18,13 @@ class McpArticleIngestHandler
         private EditorialStateReader $editorial,
         private ?ArticleMediaCoordinator $articleMedia = null,
         private ?ArticleResearchPreflight $research = null,
+        private $reconciliationFactory = null,
     ) {}
 
     /** @return array<string,mixed> */
     public function preflight(array $input): array
     {
+        $reconciliation = $this->planReconciliation($input);
         if ($this->research !== null && trim((string) ($input['research_topic'] ?? '')) !== '') {
             $target = is_array($input['target_wp_post'] ?? null) ? $input['target_wp_post'] : [];
             $postId = preg_match('/^[1-9][0-9]*:([1-9][0-9]*)$/', (string) ($target['endpoint_key'] ?? ''), $matches) === 1 ? (int) $matches[1] : 0;
@@ -34,7 +37,7 @@ class McpArticleIngestHandler
             if ($postId > 0) $articleContext['post_id'] = $postId;
             if (is_array($input['article_media'] ?? null)) $articleContext['article_media'] = $input['article_media'];
             if (is_array($input['media_context'] ?? null)) $articleContext = array_replace_recursive($articleContext, $input['media_context']);
-            return $this->research->research((string) $input['research_topic'], is_array($input['research_subject'] ?? null) ? $input['research_subject'] : [], $articleContext)->toArray();
+            return array_replace($this->research->research((string) $input['research_topic'], is_array($input['research_subject'] ?? null) ? $input['research_subject'] : [], $articleContext)->toArray(), ['reconciliation' => $reconciliation]);
         }
         $target = is_array($input['target_wp_post'] ?? null) ? $input['target_wp_post'] : [];
         $endpoint = trim((string) ($target['endpoint_key'] ?? ''));
@@ -69,14 +72,37 @@ class McpArticleIngestHandler
             'category_plan' => null,
             'readiness' => ['accepted' => $result->accepted, 'media_state' => $media['state'] ?? null],
             'state_token' => (string) ($details['wp_state_token'] ?? ''),
+            'reconciliation' => $reconciliation,
         ];
     }
 
     /** @return array<string,mixed> */
     public function ingest(array $input): array
     {
+        $reconciliation = $this->planReconciliation($input);
+        $input['article_reconciliation'] = $reconciliation;
         $result = $this->coordinator->execute($input)->toArray();
-        if ($this->articleMedia !== null && isset($result['wp_post_id']) && (int) $result['wp_post_id'] > 0) $result['media'] = $this->articleMedia->diagnoseForPost((int) $result['wp_post_id'], is_array($input['media_context'] ?? null) ? $input['media_context'] : [])->toArray();
+        $result['reconciliation'] = $reconciliation;
+        if ($this->articleMedia !== null && isset($result['wp_post_id']) && (int) $result['wp_post_id'] > 0) {
+            $mediaContext = is_array($input['media_context'] ?? null) ? $input['media_context'] : [];
+            if (is_array($input['article_media'] ?? null)) $mediaContext['article_media'] = $input['article_media'];
+            $result['media'] = $this->articleMedia->diagnoseForPost((int) $result['wp_post_id'], $mediaContext)->toArray();
+        }
         return $result;
+    }
+
+    /** @return array<string,mixed> */
+    private function planReconciliation(array $input): array
+    {
+        if (!is_callable($this->reconciliationFactory)) return [];
+        $target = is_array($input['target_wp_post'] ?? null) ? $input['target_wp_post'] : [];
+        $endpoint = trim((string) ($target['endpoint_key'] ?? ''));
+        if (preg_match('/^[1-9][0-9]*:([1-9][0-9]*)$/', $endpoint, $matches) !== 1) return [];
+        $request = $input;
+        $request['post_id'] = (int) $matches[1];
+        $request['plan_only'] = true;
+        $factory = $this->reconciliationFactory;
+        $orchestrator = $factory();
+        return $orchestrator instanceof ArticleReconciliationOrchestrator ? $orchestrator->reconcile($request) : [];
     }
 }

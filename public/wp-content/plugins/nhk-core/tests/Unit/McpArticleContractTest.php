@@ -7,10 +7,12 @@ use NHK\Core\Application\Article\{ArticleIngestCoordinator, ArticleIngestPreflig
 use NHK\Core\Application\Governance\GovernanceCapabilities;
 use NHK\Core\Application\Article\ArticleResearchPreflight;
 use NHK\Core\Application\Mcp\{McpArticleIngestHandler, McpToolCatalog};
+use NHK\Core\Application\Article\ArticleReconciliationOrchestrator;
 use NHK\Core\Contracts\Article\{ArticleOperationReceiptRepository, EditorialStateReader};
 use NHK\Core\Domain\Article\{ArticleIngestOutcome, ArticleOperationReceipt, EditorialPostState};
 use NHK\Core\Domain\Authority\{CanonicalEntityTypeCatalog, EntityTypeRegistry};
 use NHK\Core\Domain\Graph\{EndpointTypeRegistry, FakeEndpointResolver, PredicateRegistry};
+use NHK\Core\Shared\Uuid\UuidCodec;
 use PHPUnit\Framework\TestCase;
 
 final class McpArticleContractTest extends TestCase
@@ -113,6 +115,35 @@ final class McpArticleContractTest extends TestCase
         self::assertSame($mediaId, $capturedContext['article_media']['selected']['media_id']);
         self::assertSame($mediaId, $result['media_plan']['featured_primary']['media_id']);
         self::assertFalse($result['media_plan']['featured_primary']['placeholder']);
+    }
+
+    public function test_preflight_and_ingest_share_the_same_reconciliation_plan_and_structured_media_request(): void
+    {
+        $types = new EntityTypeRegistry(); CanonicalEntityTypeCatalog::registerInto($types);
+        $endpoints = new EndpointTypeRegistry(); $endpoints->register('wp_post', new FakeEndpointResolver('wp_post', ['1:55']));
+        $reader = new class implements EditorialStateReader { public function read(int $postId): ?EditorialPostState { return new EditorialPostState($postId, '1:' . $postId, 'post', 'draft', 'Existing', '', '', 'existing', 'https://example.test/existing/', 0, 0); } };
+        $receipts = new class implements ArticleOperationReceiptRepository { public function findByIdempotencyKey(string $key): ?ArticleOperationReceipt { return null; } public function create(ArticleOperationReceipt $receipt): ArticleOperationReceipt { return $receipt; } public function save(ArticleOperationReceipt $receipt): ArticleOperationReceipt { return $receipt; } };
+        $receipt = new ArticleOperationReceipt(UuidCodec::newV7(), 'reconcile-runtime', hash('sha256', 'request'), 'reconcile', '1:55', 55, 'complete', ArticleIngestOutcome::COMPLETED, false);
+        $coordinator = new ArticleIngestCoordinator($receipts);
+        $seen = [];
+        $orchestrator = new ArticleReconciliationOrchestrator(
+            static fn (array $input): array => ['post_id' => $input['post_id'], 'desired_media' => $input['article_media'] ?? []],
+            static fn (array $state): array => ['intent' => 'IMAGE_ARTICLE'],
+            static fn (array $state): array => ['canonical_subject_id' => 'subject'],
+            static function (array $state) use (&$seen): array { $seen[] = $state['desired_media']; return ['diagnostics' => ['MEDIA_USAGE_SEMANTIC_MISMATCH']]; },
+            static fn (array $state, array $actions): array => [], static fn (array $state): array => ['outcome' => 'PASS'],
+            static fn (array $state): array => [], static fn (array $state): array => ['status' => 'verified'],
+        );
+        $handler = new McpArticleIngestHandler($coordinator, new ArticleIngestPreflight($endpoints, new PredicateRegistry(), $types), $reader, reconciliationFactory: static fn (): ArticleReconciliationOrchestrator => $orchestrator);
+        $input = ['intent' => 'reconcile', 'idempotency_key' => 'reconcile-runtime', 'target_wp_post' => ['endpoint_type' => 'wp_post', 'endpoint_key' => '1:55'], 'article_media' => ['selected' => ['media_id' => 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'role' => 'featured_primary', 'selection_source' => 'USER_EXPLICIT', 'selection_policy' => 'PINNED']]];
+
+        $preflight = $handler->preflight($input);
+        $ingest = $handler->ingest($input);
+
+        self::assertSame('REPLACE_FEATURED_MEDIA', $preflight['reconciliation']['actions'][0]['action']);
+        self::assertSame($preflight['reconciliation']['actions'], $ingest['reconciliation']['actions']);
+        self::assertSame($input['article_media'], $seen[0]);
+        self::assertSame($input['article_media'], $seen[1]);
     }
 
 }

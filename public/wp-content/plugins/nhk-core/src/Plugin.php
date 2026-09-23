@@ -544,7 +544,7 @@ final class Plugin {
                 },
                 [$articlePublicEligibility, 'evaluate'],
             );
-            $articleHandler = new McpArticleIngestHandler($articleCoordinator, $articlePreflight, $articleEditorial, $articleMedia, $articleResearch);
+            $articleHandler = new McpArticleIngestHandler($articleCoordinator, $articlePreflight, $articleEditorial, $articleMedia, $articleResearch, static fn (): mixed => function_exists('apply_filters') ? apply_filters('nhk_v3_article_reconciliation_orchestrator', null) : null);
             $articlePreflightHandoff = new CaptureArticlePreflightHandoff();
             (new GovernanceApi($governance, $eligibility, $controlledApply, $endpoints))->register();
             $videoRelationAdmin = new \NHK\Core\Application\Video\VideoRelationAdminService($governance, $proposalRepository, $videos, $authority, $knowledgeService, $claims, $sources, $evidence);
@@ -884,25 +884,36 @@ final class Plugin {
                         $state = $articleEditorial->read($postId);
                         if ($state === null) throw new \RuntimeException('WP_POST_UNAVAILABLE');
                         $capture = $captureRepository->findByArticleId($postId);
-                        return ['post_id' => $postId, 'state' => $state, 'capture' => $capture, 'slug' => $state->slug, 'permalink' => $state->permalink];
+                        $packet = is_array($input['subject_resolution_packet'] ?? null)
+                            ? $input['subject_resolution_packet']
+                            : (is_object($capture) && is_array($capture->context['subject_resolution_packet'] ?? null) ? $capture->context['subject_resolution_packet'] : []);
+                        return ['post_id' => $postId, 'state' => $state, 'capture' => $capture, 'slug' => $state->slug, 'permalink' => $state->permalink, 'subject_resolution_packet' => $packet, 'desired_media' => is_array($input['article_media'] ?? null) ? $input['article_media'] : [], 'media_context' => is_array($input['media_context'] ?? null) ? $input['media_context'] : []];
                     },
                     static fn (array $state): array => is_object($state['capture'] ?? null) && is_array($state['capture']->context['content_intent'] ?? null) ? $state['capture']->context['content_intent'] : ['intent' => 'TEXT_ARTICLE'],
                     static function (array $state): array {
-                        $capture = $state['capture'] ?? null;
-                        $packet = is_object($capture) && is_array($capture->context['subject_resolution_packet'] ?? null) ? $capture->context['subject_resolution_packet'] : [];
-                        return $packet;
+                        return is_array($state['subject_resolution_packet'] ?? null) ? $state['subject_resolution_packet'] : [];
                     },
-                    static function (array $state) use ($canonicalPublicationContext): array {
+                    static function (array $state) use ($canonicalPublicationContext, $articleMedia): array {
                         $owner = $state['state'] ?? null;
                         if (!$owner instanceof \NHK\Core\Domain\Article\EditorialPostState) return ['diagnostics' => ['WP_POST_UNAVAILABLE']];
                         $evidence = $canonicalPublicationContext($owner, []);
+                        $mediaContext = is_array($state['media_context'] ?? null) ? $state['media_context'] : [];
+                        if (($state['desired_media'] ?? []) !== []) $mediaContext['article_media'] = $state['desired_media'];
+                        if (($state['subject_resolution_packet'] ?? []) !== []) $mediaContext['subject_resolution_packet'] = $state['subject_resolution_packet'];
+                        $media = $articleMedia->diagnoseForPost($owner->postId, $mediaContext)->toArray();
+                        $evidence['media_snapshot'] = $media;
                         $gate = (new \NHK\Core\Application\Article\ArticlePublicationGate())->check($owner, $evidence, $owner->token);
-                        return ['diagnostics' => $gate->blockers, 'evidence' => $evidence, 'state_token' => $owner->token, 'media' => $evidence['media_snapshot'] ?? []];
+                        $mediaDiagnostics = array_values(array_filter(array_map(static fn (array $item): string => (string) ($item['code'] ?? ''), (array) ($media['diagnostics'] ?? [])), static fn (string $code): bool => $code !== ''));
+                        return ['diagnostics' => array_values(array_unique(array_merge($gate->blockers, $mediaDiagnostics))), 'evidence' => $evidence, 'state_token' => $owner->token, 'media' => $media];
                     },
                     static function (array $state, array $actions) use ($articleMedia, $editorialPosts): array {
                         $postId = (int) ($state['post_id'] ?? 0);
                         foreach ($actions as $action) {
-                            if ($action->owner === 'media') $articleMedia->ensureForPost($postId, ['subject' => (string) (($state['state']->title ?? '')), 'force_inline_reconcile' => true], (array) (($state['desired_media'] ?? [])));
+                            if ($action->owner === 'media') {
+                                $desired = is_array($state['desired_media']['selected'] ?? null) ? $state['desired_media']['selected'] : [];
+                                if (isset($desired['media_id'])) $desired = [(string) ($desired['role'] ?? 'featured_primary') => $desired];
+                                $articleMedia->ensureForPost($postId, ['subject' => (string) (($state['state']->title ?? '')), 'force_inline_reconcile' => true, 'allow_historical_reuse' => false, 'allow_scoped_reuse' => false], $desired);
+                            }
                             if ($action->action === 'ALLOCATE_SLUG' && isset($state['state'])) $editorialPosts->update($postId, ['post_name' => sanitize_title((string) $state['state']->title)]);
                         }
                         $fresh = $editorialPosts->read($postId);
