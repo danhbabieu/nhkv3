@@ -1,3 +1,5 @@
+# NHK V3 Execution State
+
 # Checkpoint — 2026-09-23 — Capture pipeline convergence Task 7 publication/URL/completion (LOCAL / NO LIVE MUTATION)
 
 TASK_RESULT: No product-code change was required. Existing publication gates derive blockers from current Article/Media/semantic evidence, require concrete owner IDs, reserve/read back native routes through the existing WordPress lifecycle, and keep completion false for incomplete or uncertain owners.

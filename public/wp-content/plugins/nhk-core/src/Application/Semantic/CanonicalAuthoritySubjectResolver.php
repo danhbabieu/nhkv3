@@ -46,24 +46,6 @@ final class CanonicalAuthoritySubjectResolver
         return array_values($matches);
     }
 
-    /** @param list<string> $hints @return list<array<string,mixed>> */
-    public function resolveComposite(array $hints): array
-    {
-        $hints = array_values(array_unique(array_filter(array_map(fn (mixed $hint): string => $this->normalize((string) $hint), $hints))));
-        if ($hints === []) return [];
-        $matches = [];
-        foreach ($this->types->all() as $definition) foreach ($this->authority->listByType($definition->type) as $entity) {
-            if (!$entity instanceof AuthorityEntity || !$entity->active()) continue;
-            $fields = [$this->normalize($entity->canonicalName), $this->normalize($entity->stableKey)];
-            foreach ((array) ($entity->payload['aliases'] ?? []) as $alias) if (is_string($alias)) $fields[] = $this->normalize($alias);
-            foreach (['reference', 'designation'] as $field) if (trim((string) ($entity->payload[$field] ?? '')) !== '') $fields[] = $this->normalize((string) $entity->payload[$field]);
-            $valid = true;
-            foreach ($hints as $hint) { $found = false; foreach ($fields as $field) if ($field !== '' && ($field === $hint || str_contains($field, $hint))) { $found = true; break; } if (!$found) { $valid = false; break; } }
-            if ($valid) $matches[$entity->canonicalId] = $this->packet($entity, 'composite_explicit_hint');
-        }
-        return array_values($matches);
-    }
-
     /** @return list<array<string,mixed>> */
     public function resolveForType(string $type, array $query): array
     {
