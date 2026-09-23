@@ -42,6 +42,9 @@ final class EditorialClaimRetrievalService
             'contextual_hints' => array_slice($hints, 0, 12, true),
             'profile' => $profile,
             'result_limit' => $limit,
+            'coverage_gaps' => array_values((array) ($profile['coverage_gaps'] ?? [])),
+            'max_expansion_rounds' => max(0, (int) ($profile['max_expansion_rounds'] ?? 0)),
+            'expansion_budget' => max(0, (int) ($profile['expansion_budget'] ?? 50)),
         ]);
 
         $items = [];
@@ -83,6 +86,7 @@ final class EditorialClaimRetrievalService
                 'eligible_count' => count($eligible),
                 'profile' => $profile,
                 'bounded_hints' => count(array_slice($hints, 0, 12, true)),
+                'retrieval_diagnostics' => (array) ($raw['retrieval_diagnostics'] ?? []),
             ],
         ];
     }

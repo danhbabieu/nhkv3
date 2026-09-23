@@ -9,7 +9,7 @@ use NHK\Core\Domain\Graph\PredicateRegistry;
 final class ClaimRetrievalEngine
 {
     /** @param callable(array<string,mixed>):array $neighborhood @param callable(array<string,mixed>,array<string,mixed>):array $claims */
-    public function __construct(private $neighborhood, private $claims, private int $maxHops = 2, private int $limit = 50, private ?PredicateRegistry $predicates = null) {}
+    public function __construct(private $neighborhood, private $claims, private int $maxHops = 2, private int $limit = 50, private ?PredicateRegistry $predicates = null, private $expansion = null) {}
 
     /** @param array<string,mixed> $context @return array<string,mixed> */
     public function retrieve(array $context): array
@@ -19,6 +19,10 @@ final class ClaimRetrievalEngine
         $intent = strtolower((string) ($context['raw_input'] ?? $context['interpretation']['article_intent'] ?? ''));
         $all = [];
         $blockers = [];
+        $diagnostics = ['initial_candidates' => 0, 'rounds' => [], 'expansion_depth' => 0, 'expansion_budget' => 0, 'stop_reason' => 'coverage_sufficient'];
+        $gaps = array_values(array_filter((array) ($context['coverage_gaps'] ?? []), static fn (mixed $gap): bool => is_string($gap) && trim($gap) !== ''));
+        $maxExpansionRounds = max(0, min($this->maxHops, (int) ($context['max_expansion_rounds'] ?? 0)));
+        $expansionBudget = max(0, min(200, (int) ($context['expansion_budget'] ?? 50)));
         foreach ($subjects as $subject) {
             if (!is_array($subject)) continue;
             $neighborhood = ($this->neighborhood)($subject);
@@ -36,6 +40,31 @@ final class ClaimRetrievalEngine
                 if (!isset($all[$key]) || $candidate['score'] > $all[$key]['score']) $all[$key] = $candidate;
             }
         }
+        $diagnostics['initial_candidates'] = count($all);
+        if ($gaps !== [] && $maxExpansionRounds > 0 && is_callable($this->expansion)) {
+            for ($round = 1; $round <= $maxExpansionRounds && $expansionBudget > 0; $round++) {
+                $reason = (string) ($gaps[0] ?? 'coverage_gap');
+                $subject = is_array($subjects[0] ?? null) ? $subjects[0] : [];
+                $expanded = ($this->expansion)($subject, ['reason' => $reason, 'depth' => $round, 'budget' => $expansionBudget]);
+                if (!is_array($expanded)) $expanded = [];
+                $considered = array_slice($expanded, 0, $expansionBudget);
+                foreach ($considered as $row) {
+                    if (!is_array($row)) continue;
+                    $candidate = $this->candidate($row, $subject, ['items' => $considered], $intent);
+                    $key = $candidate['claim_id'] . ':' . $candidate['claim_revision'];
+                    if (!isset($all[$key]) || $candidate['score'] > $all[$key]['score']) $all[$key] = $candidate;
+                }
+                $expansionBudget -= count($considered);
+                $diagnostics['expansion_depth'] = $round;
+                $diagnostics['expansion_budget'] = $expansionBudget;
+                $diagnostics['rounds'][] = ['reason' => $reason, 'depth' => $round, 'budget' => $expansionBudget, 'candidates_considered' => count($considered), 'units_formed' => 0, 'selected_units' => 0];
+                if ($considered === []) break;
+                $gaps = array_slice($gaps, 1);
+            }
+            $diagnostics['stop_reason'] = $expansionBudget <= 0 ? 'expansion_budget' : ($diagnostics['rounds'] !== [] ? 'coverage_saturated' : 'coverage_sufficient');
+        } elseif ($gaps !== []) {
+            $diagnostics['stop_reason'] = 'expansion_not_registered_or_budget_zero';
+        }
         $items = array_values($all);
         usort($items, static function (array $left, array $right): int {
             $score = $right['score'] <=> $left['score'];
@@ -43,7 +72,10 @@ final class ClaimRetrievalEngine
         });
         $items = array_slice($items, 0, min($this->limit, max(1, (int) ($context['result_limit'] ?? $this->limit)), 200));
         $selected = array_values(array_filter($items, static fn (array $item): bool => $item['decision'] === 'include'));
-        return ['status' => $blockers === [] ? 'available' : 'partial', 'items' => $items, 'selected_claims' => $selected, 'blockers' => array_values(array_unique($blockers))];
+        $diagnostics['candidates_considered'] = count($items);
+        $diagnostics['units_formed'] = 0;
+        $diagnostics['selected_units'] = count($selected);
+        return ['status' => $blockers === [] ? 'available' : 'partial', 'items' => $items, 'selected_claims' => $selected, 'blockers' => array_values(array_unique($blockers)), 'retrieval_diagnostics' => $diagnostics];
     }
 
     /** @param array<string,mixed> $row @param array<string,mixed> $subject @param array<string,mixed> $neighborhood @return array<string,mixed> */
