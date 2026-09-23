@@ -24,11 +24,8 @@ final class EditorialCaptureContinuationService
         $capture = $this->captures->findById($captureId);
         if (!$capture instanceof CaptureRecord) return $this->retryFailure($captureId, 'CAPTURE_NOT_FOUND');
         if ($key !== '' && !hash_equals($capture->idempotencyKey, $key)) return $this->retryFailure($captureId, 'CAPTURE_RETRY_IDEMPOTENCY_KEY_MISMATCH', $capture);
-        foreach (['text', 'content', 'title', 'excerpt', 'subject_hints', 'observations', 'metadata', 'media', 'items', 'media_ids', 'existing_media_urls', 'media_bindings', 'media_operations', 'publish', 'video', 'files', 'followup_mode'] as $field) {
-            if (!array_key_exists($field, $input)) continue;
-            $value = $input[$field];
-            if (is_array($value) ? $value !== [] : ($value === true || trim((string) $value) !== '')) return $this->retryFailure($captureId, 'CAPTURE_RETRY_PAYLOAD_NOT_ALLOWED', $capture);
-        }
+        $payloadError = $this->retryPayloadError($capture, $input);
+        if ($payloadError !== null) return $this->retryFailure($captureId, $payloadError, $capture);
         $intent = strtoupper(trim((string) ($input['intent'] ?? '')));
         $storedIntent = is_array($capture->context['content_intent'] ?? null) ? strtoupper(trim((string) ($capture->context['content_intent']['intent'] ?? ''))) : '';
         if ($intent !== '' && $storedIntent !== '' && $intent !== $storedIntent) return $this->retryFailure($captureId, 'CAPTURE_RETRY_INTENT_MISMATCH', $capture);
@@ -414,6 +411,61 @@ final class EditorialCaptureContinuationService
         $payload = $this->payload($input);
         if ($existing !== null && ($payload['followup_mode'] ?? '') === 'ATTACH_ASSETS' && ($payload['asset_fingerprints'] ?? []) === []) $payload['asset_fingerprints'] = $existing->payload['asset_fingerprints'] ?? [];
         return hash('sha256', CommandCanonicalizer::canonicalize($payload));
+    }
+
+    private function retryPayloadError(CaptureRecord $capture, array $input): ?string
+    {
+        $context = $capture->context;
+        $original = is_array($context['original_request'] ?? null) ? $context['original_request'] : [];
+        $expected = [
+            'text' => (string) ($context['raw_input'] ?? ''),
+            'content' => (string) ($context['raw_input'] ?? ''),
+            'title' => (string) ($context['title'] ?? ''),
+            'excerpt' => (string) ($context['excerpt'] ?? ''),
+            'subject_hints' => is_array($context['subject_hints'] ?? null) ? $context['subject_hints'] : [],
+            'observations' => is_array($context['observations'] ?? null) ? $context['observations'] : [],
+            'metadata' => is_array($context['metadata'] ?? null) ? $context['metadata'] : [],
+            'video' => is_array($original['video'] ?? null) ? $original['video'] : [],
+        ];
+        foreach ($expected as $field => $canonical) {
+            if (!array_key_exists($field, $input) || $this->retryValueEmpty($input[$field])) continue;
+            if ($field === 'text' && array_key_exists('content', $input) && !$this->retryValueEmpty($input['content'])) continue;
+            if ($field === 'content' && array_key_exists('text', $input) && !$this->retryValueEmpty($input['text'])) continue;
+            if ($field === 'video') {
+                if (!$this->sameVideoIdentity($input[$field], $canonical)) return 'CAPTURE_RETRY_PAYLOAD_NOT_ALLOWED';
+                continue;
+            }
+            if (!$this->sameCanonicalValue($input[$field], $canonical)) return 'CAPTURE_RETRY_PAYLOAD_NOT_ALLOWED';
+        }
+        foreach (['media', 'items', 'media_ids', 'existing_media_urls', 'media_bindings', 'media_operations', 'publish', 'files', 'followup_mode'] as $field) {
+            if (array_key_exists($field, $input) && !$this->retryValueEmpty($input[$field])) return 'CAPTURE_RETRY_PAYLOAD_NOT_ALLOWED';
+        }
+        return null;
+    }
+
+    private function retryValueEmpty(mixed $value): bool
+    {
+        return is_array($value) ? $value === [] : ($value === false || $value === null || trim((string) $value) === '');
+    }
+
+    private function sameCanonicalValue(mixed $left, mixed $right): bool
+    {
+        if (is_array($left) && is_array($right)) return CommandCanonicalizer::canonicalize($left) === CommandCanonicalizer::canonicalize($right);
+        return trim((string) $left) === trim((string) $right);
+    }
+
+    private function sameVideoIdentity(mixed $left, mixed $right): bool
+    {
+        $leftUrl = is_array($left) ? trim((string) ($left['url'] ?? $left['canonical_source_url'] ?? '')) : trim((string) $left);
+        $rightUrl = is_array($right) ? trim((string) ($right['url'] ?? $right['canonical_source_url'] ?? '')) : trim((string) $right);
+        if ($leftUrl === '' || $rightUrl === '') return $this->sameCanonicalValue($left, $right);
+        try {
+            $leftIdentity = \NHK\Core\Application\Video\YouTubeUrlNormalizer::normalize($leftUrl);
+            $rightIdentity = \NHK\Core\Application\Video\YouTubeUrlNormalizer::normalize($rightUrl);
+            return $leftIdentity->platform === $rightIdentity->platform && $leftIdentity->videoId === $rightIdentity->videoId;
+        } catch (\Throwable) {
+            return $this->sameCanonicalValue($left, $right);
+        }
     }
 
     private function isGovernanceOnlyReplay(array $input): bool

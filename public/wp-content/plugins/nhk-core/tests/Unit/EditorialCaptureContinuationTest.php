@@ -148,6 +148,85 @@ final class EditorialCaptureContinuationTest extends TestCase
         self::assertArrayNotHasKey('semantic', $events);
     }
 
+    public function test_retry_rehydrates_same_persisted_payload_while_accepting_current_execution_checkpoint(): void
+    {
+        $captures = new ContinuationCaptureRepository();
+        $addenda = new ContinuationAddendumRepository();
+        $capture = new CaptureRecord(
+            UuidCodec::newV7(),
+            'capture-fresh-checkpoint',
+            hash('sha256', 'fresh-checkpoint'),
+            CaptureStage::SEMANTICS_RECONCILED->value,
+            'FAILED_RETRYABLE',
+            null,
+            null,
+            [],
+            [
+                'raw_input' => 'Video nguồn gốc.',
+                'title' => 'Video nguồn gốc',
+                'excerpt' => 'Tóm tắt nguồn gốc.',
+                'subject_hints' => ['chủ thể nguồn'],
+                'observations' => ['quan sát nguồn'],
+                'metadata' => ['source' => ['platform' => 'youtube']],
+                'documentation_checkpoint' => ['documentation_version' => 'old', 'manifest_hash' => 'old'],
+                'content_intent' => ['intent' => 'TEXT_ARTICLE', 'article_required' => true],
+                'original_request' => ['intent' => 'TEXT_ARTICLE', 'video' => []],
+            ],
+            ['failure' => ['code' => 'CAPTURE_GOVERNANCE_FAILED']],
+            [],
+        );
+        $captures->create($capture);
+        $events = [];
+        $service = new EditorialCaptureContinuationService($captures, $addenda, $this->coordinator($captures, $events));
+
+        $result = $service->retry([
+            'capture_id' => $capture->captureId,
+            'idempotency_key' => $capture->idempotencyKey,
+            'resume_mode' => 'RETRY',
+            'documentation_checkpoint' => ['documentation_version' => 'new', 'manifest_hash' => 'new'],
+            'text' => 'Video nguồn gốc.',
+            'title' => 'Video nguồn gốc',
+            'excerpt' => 'Tóm tắt nguồn gốc.',
+            'subject_hints' => ['chủ thể nguồn'],
+            'observations' => ['quan sát nguồn'],
+            'metadata' => ['source' => ['platform' => 'youtube']],
+        ]);
+
+        self::assertNotSame('CAPTURE_RETRY_PAYLOAD_NOT_ALLOWED', $result['retry']['code'] ?? null);
+        self::assertSame($capture->captureId, $result['capture']['capture_id']);
+    }
+
+    public function test_retry_accepts_equivalent_video_url_but_rejects_changed_external_identity(): void
+    {
+        $capture = new CaptureRecord(
+            UuidCodec::newV7(),
+            'capture-video-identity-retry',
+            hash('sha256', 'video-identity-retry'),
+            CaptureStage::SEMANTICS_RECONCILED->value,
+            'FAILED_RETRYABLE',
+            null,
+            null,
+            [],
+            [
+                'raw_input' => 'Video gốc.',
+                'content_intent' => ['intent' => 'VIDEO', 'article_required' => false],
+                'original_request' => ['intent' => 'VIDEO', 'video' => ['url' => 'https://www.youtube.com/watch?v=AbCdEfGhI12']],
+            ],
+            ['failure' => ['code' => 'CAPTURE_GOVERNANCE_FAILED']],
+            [],
+        );
+        $captures = new ContinuationCaptureRepository();
+        $captures->create($capture);
+        $events = [];
+        $service = new EditorialCaptureContinuationService($captures, new ContinuationAddendumRepository(), $this->coordinator($captures, $events));
+
+        $equivalent = $service->retry(['capture_id' => $capture->captureId, 'idempotency_key' => $capture->idempotencyKey, 'resume_mode' => 'RETRY', 'video' => ['url' => 'https://youtu.be/AbCdEfGhI12']]);
+        self::assertNotSame('CAPTURE_RETRY_PAYLOAD_NOT_ALLOWED', $equivalent['retry']['code'] ?? null);
+
+        $changed = $service->retry(['capture_id' => $capture->captureId, 'idempotency_key' => $capture->idempotencyKey, 'resume_mode' => 'RETRY', 'video' => ['url' => 'https://youtu.be/ZzCdEfGhI12']]);
+        self::assertSame('CAPTURE_RETRY_PAYLOAD_NOT_ALLOWED', $changed['retry']['code'] ?? null);
+    }
+
     public function test_partial_completion_with_video_resume_hint_allows_retry_even_when_capture_status_is_review_required(): void
     {
         $captures = new ContinuationCaptureRepository();

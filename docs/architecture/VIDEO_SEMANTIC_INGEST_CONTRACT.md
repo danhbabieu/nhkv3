@@ -24,6 +24,20 @@ Composition repair is bounded: compose, full quality, structured findings,
 repair, regenerate dependent projections and full revalidation. The next
 quality pass reads the repaired package, not a stale pre-repair package.
 
+Public enrichment accepts only rows whose semantic role is reader-safe. Roles
+`EDITORIAL_CONTEXT`, `INTERNAL_ORCHESTRATION`, `INTERNAL_IDENTIFIER`,
+`PROVENANCE_METADATA` and `COMPLIANCE_METADATA` remain machine context and are
+excluded before title, summary, body or SEO composition; factual content and
+legitimate technical-domain language remain eligible. This boundary is
+generic and is not a phrase blacklist.
+
+Existing-Capture retry rehydrates the persisted source/request identity. A
+caller may supply an equivalent source payload for compatibility, including a
+normalized equivalent YouTube URL, but a changed semantic text, metadata or
+external Video identity remains `CAPTURE_RETRY_PAYLOAD_NOT_ALLOWED`. The
+current documentation checkpoint, retry mode and child selection are
+execution context and do not rewrite the historical Capture request.
+
 Workflow: `YouTube URL + user hint → source resolution → snapshot → transcript
 policy → NHK lookup → relation candidates → optional Knowledge enrichment
 planning → optional Dictionary lexical preview → Hub classification → editorial

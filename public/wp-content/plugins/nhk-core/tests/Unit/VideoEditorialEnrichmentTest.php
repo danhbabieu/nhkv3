@@ -80,6 +80,24 @@ final class VideoEditorialEnrichmentTest extends TestCase
         self::assertArrayNotHasKey('knowledge_mutation', $result);
     }
 
+    public function test_internal_orchestration_context_never_enters_public_editorial_or_seo_projection(): void
+    {
+        $internal = 'SYNTHETIC_INTERNAL_ORCHESTRATION_VALUE_9f31';
+        $result = (new VideoEditorialEnrichmentService())->enrich(
+            ['title' => 'Video về một hiện vật'],
+            VideoEditorialEnrichmentContext::fromArray([
+                'canonical_context' => [
+                    ['text' => $internal, 'id' => self::VARIANT, 'semantic_role' => 'INTERNAL_ORCHESTRATION'],
+                    ['text' => 'Thuật ngữ kỹ thuật hợp lệ', 'semantic_role' => 'TECHNICAL_DOMAIN_LANGUAGE'],
+                ],
+            ])
+        );
+
+        $public = json_encode([$result['editorial'], $result['seo']], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+        self::assertStringNotContainsString($internal, $public);
+        self::assertStringContainsString('Thuật ngữ kỹ thuật hợp lệ', $public);
+    }
+
     public function test_content_quality_rejects_trivial_or_cut_off_body(): void
     {
         $quality = (new VideoEditorialQualityPolicy())->evaluate([

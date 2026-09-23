@@ -1,3 +1,24 @@
+# Checkpoint — 2026-09-23 — Runtime retry and public-copy convergence (LOCAL / NO SERVER ACTION)
+
+TASK_RESULT: The local runtime seam now excludes explicit internal semantic
+roles from Video public enrichment before title/summary/body/SEO composition.
+Existing-Capture retry now rehydrates persisted source/request identity,
+accepts only canonically equivalent repeated payloads (including normalized
+YouTube URL variants), and keeps fresh documentation checkpoints in mutable
+execution context. Changed semantic source text, metadata or external Video
+identity remains fail-closed.
+
+VERIFICATION: RED tests reproduced both synthetic public leakage and
+`CAPTURE_RETRY_PAYLOAD_NOT_ALLOWED`; focused Video/Capture matrix passed 811
+tests / 3,735 assertions. Full Unit passed 2,381 tests / 13,753 assertions;
+Contract passed 6 tests / 48 assertions; PHP lint and `git diff --check` passed.
+The full repository command is infrastructure-gated by missing
+`NHK_WP_TEST_PATH` and `NHK_WP_TEST_DB` (21 integration/P4 failures, 119
+skips); no database, staging, production, publication, push or pull action was
+performed.
+
+STATUS: `LOCAL_FIX_READY_FOR_USER_DEPLOY / INTEGRATION_ENVIRONMENT_GATED / NO_SERVER_ACTION`.
+
 # Checkpoint — 2026-09-23 — End-to-end acceptance and architectural hardening (LOCAL / GUARDED TEST DB / NO LIVE MUTATION)
 
 TASK_RESULT: Checkpoint 6 exercised the real Capture-to-completion lifecycle

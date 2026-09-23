@@ -20,10 +20,13 @@ final class VideoEditorialEnrichmentService
         $copy = new PublicClaimCopyPolicy();
         $title = trim((string) ($base['title'] ?? ''));
         $title = $copy->safe($title, 'Video tham chiếu NHK');
-        $subject = $this->firstText($context->canonicalContext) ?: $title;
-        $specimen = $this->texts($context->specimenFacts);
-        $source = $this->texts($context->sourceFacts);
-        $canonical = $this->texts($context->canonicalContext);
+        $specimenFacts = $this->publicRows($context->specimenFacts);
+        $sourceFacts = $this->publicRows($context->sourceFacts);
+        $canonicalContext = $this->publicRows($context->canonicalContext);
+        $subject = $this->firstText($canonicalContext) ?: $title;
+        $specimen = $this->texts($specimenFacts);
+        $source = $this->texts($sourceFacts);
+        $canonical = $this->texts($canonicalContext);
         $paragraphs = ['Video này ghi lại đúng hiện vật được nêu trong nguồn tham chiếu; các mô tả dưới đây chỉ áp dụng cho phạm vi của bản ghi này.'];
         if ($specimen !== []) $paragraphs[] = 'Trên chính hiện vật, nguồn mô tả: ' . implode('; ', $specimen) . '. Đây là thông tin quan sát/nhận diện của chiếc xuất hiện trong video, không phải đặc tính mặc định của toàn bộ dòng sản phẩm.';
         if ($source !== []) $paragraphs[] = 'Theo thông tin đi kèm nguồn tham chiếu, video được giới thiệu với các chi tiết: ' . implode('; ', $source) . '. NHK giữ các chi tiết này trong đúng phạm vi của nguồn và không biến cách diễn đạt marketing thành kết luận phổ quát.';
@@ -38,7 +41,7 @@ final class VideoEditorialEnrichmentService
             'title' => $title,
             'summary' => $summary,
             'body' => $body,
-            'context' => array_merge((array) ($base['context'] ?? []), $this->tagged($context->canonicalContext, 'CANONICAL_CONTEXT')),
+            'context' => array_merge($this->publicRows((array) ($base['context'] ?? [])), $this->tagged($canonicalContext, 'CANONICAL_CONTEXT')),
             'facts' => array_merge((array) ($base['facts'] ?? []), $facts),
             'why_this_matters' => 'Video tạo một điểm đối chiếu cụ thể giữa hiện vật, nguồn tham chiếu và tri thức canonical; nhờ đó người đọc có thể nhận diện đúng phạm vi thông tin trước khi đi sâu vào các tri thức liên quan.',
             'related_knowledge' => $this->identityRows($context->relatedKnowledge),
@@ -56,6 +59,18 @@ final class VideoEditorialEnrichmentService
     private function tagged(array $rows, string $provenance): array { return array_map(static fn (array $row): array => array_merge($row, ['provenance' => $provenance]), $rows); }
     /** @param list<array<string,mixed>> $rows @return list<array<string,mixed>> */
     private function identityRows(array $rows): array { return array_values(array_map(static fn (array $row): array => array_filter($row, static fn (mixed $value): bool => $value !== null && $value !== ''), $rows)); }
+
+    /** @param list<array<string,mixed>> $rows @return list<array<string,mixed>> */
+    private function publicRows(array $rows): array
+    {
+        $internalRoles = ['EDITORIAL_CONTEXT', 'INTERNAL_ORCHESTRATION', 'INTERNAL_IDENTIFIER', 'PROVENANCE_METADATA', 'COMPLIANCE_METADATA'];
+        return array_values(array_filter($rows, static function (array $row) use ($internalRoles): bool {
+            foreach (['semantic_role', 'role', 'context_role', 'source_role'] as $field) {
+                if (in_array(strtoupper(trim((string) ($row[$field] ?? ''))), $internalRoles, true)) return false;
+            }
+            return true;
+        }));
+    }
     /** @return array<string,mixed> */
     private function contextArray(VideoEditorialEnrichmentContext $context): array { return ['specimen_facts' => $context->specimenFacts, 'source_facts' => $context->sourceFacts, 'canonical_context' => $context->canonicalContext, 'related_knowledge' => $context->relatedKnowledge, 'related_entities' => $context->relatedEntities]; }
 }

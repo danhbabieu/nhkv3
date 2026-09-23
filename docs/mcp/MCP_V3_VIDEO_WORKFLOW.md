@@ -17,6 +17,13 @@ public composer accepts only reader-safe context and must not expose internal
 identifiers or workflow jargon. Publication is complete only after canonical
 and public read-back.
 
+Retry rehydrates the canonical original request from the persisted Capture.
+The caller supplies only retry controls and the current documentation
+checkpoint; an equivalent repeated source payload is accepted for compatibility
+after canonical comparison, while semantic source changes remain fail-closed.
+Historical provenance retains the original checkpoint and the current attempt
+uses the fresh checkpoint.
+
 New Video submissions use the registered Video adapter inside
 `nhk.capture.ingest`, not a standalone operator writer. The Video identity and
 external-reference boundary remain distinct, while Capture owns the submission
