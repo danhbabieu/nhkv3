@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Semantic\ClaimRetrievalEngine;
-use NHK\Core\Application\Video\{VideoEditorialAdapter, VideoEditorialGenerator, VideoEditorialResumePlanner, VideoSeoProjection};
+use NHK\Core\Application\Video\{VideoEditorialAdapter, VideoEditorialGenerator, VideoEditorialOutcome, VideoEditorialResumePlanner, VideoSeoProjection};
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Video\Video;
 use PHPUnit\Framework\TestCase;
@@ -49,6 +49,21 @@ final class VideoEditorialAdapterTest extends TestCase
         self::assertSame('BLOCKED', $result['quality_report']->readiness);
         self::assertContains('SEO_NOT_READY', $result['quality_report']->blockers);
         self::assertContains('MISSING_PUBLIC_IDENTITY', $result['seo_plan']->blockers);
+    }
+
+    public function test_ready_quality_does_not_emit_generic_quality_block_receipt_code(): void
+    {
+        self::assertSame('PRIMARY_SUBJECT_AMBIGUOUS', VideoEditorialOutcome::failureCode([
+            'status' => 'BLOCKED',
+            'quality_report' => (object) ['readiness' => 'READY', 'blockers' => []],
+            'quality_decision' => 'READY',
+            'constraint_findings' => [['code' => 'PRIMARY_SUBJECT_AMBIGUOUS']],
+        ]));
+        self::assertSame('VIDEO_EDITORIAL_REVIEW_REQUIRED', VideoEditorialOutcome::failureCode([
+            'status' => 'BLOCKED',
+            'quality_report' => (object) ['readiness' => 'READY', 'blockers' => []],
+            'quality_decision' => 'READY',
+        ]));
     }
 
     public function test_subject_reconciled_video_scopes_user_hint_to_specimen_and_keeps_variant_context_separate(): void

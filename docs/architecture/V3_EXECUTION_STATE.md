@@ -1,5 +1,34 @@
 # P0 Checkpoints — 2026-09-22 (LOCAL / DEPLOYMENT PENDING)
 
+# Checkpoint — 2026-09-23 — Generic persisted subject-authority integration (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE_CONFIRMED: `EditorialCaptureCoordinator` persisted a resolved
+`SubjectResolutionPacket`, but Content Preparation rebuilt subject competition
+from weaker raw hints because the packet was not passed across the owner
+boundary. This could downgrade an authoritative resolved subject to
+`PRIMARY_SUBJECT_AMBIGUOUS`.
+
+FIXED_BOUNDARY: Content Preparation now hydrates a current persisted resolved
+packet and consumes it without candidate competition. Explicit governed/user
+confirmed reconciliation may replace it; retired, missing or revision-invalid
+subjects reopen resolution. Canonical UUID/stable key and semantic resolution
+remain below the persisted authority, while hints/facets remain enrichment and
+classification inputs only. No identity-specific branch was added.
+
+RECEIPT_BOUNDARY: Shared Video failures now preserve a concrete constraint code
+when the quality report is READY and never emit the generic quality-block code
+for that READY result. Truly blocked quality retains
+`VIDEO_EDITORIAL_QUALITY_BLOCKED`.
+
+VERIFICATION: Focused subject/Video/Capture suite passes 29 tests / 126
+assertions. Full NHK Unit passes 2,293 tests / 13,409 assertions with 18
+warnings, 39 deprecations and 28 PHPUnit deprecations. Changed-file PHP lint
+and `git diff --check` pass. Golden remains a normal regression path; no
+Golden/Odo/UUID/YouTube production special-case and no MCP/live canonical
+mutation occurred.
+
+STATUS: `GENERIC_SUBJECT_AUTHORITY_LOCAL_READY / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-23 — Video Intake Intelligent Constraints (LOCAL / NO LIVE MUTATION)
 
 ARCHITECTURE: Video Intake now exposes a pure decision pipeline of interpret →

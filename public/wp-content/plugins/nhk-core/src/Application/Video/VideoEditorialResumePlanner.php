@@ -392,10 +392,15 @@ final class VideoEditorialResumePlanner
                 'subject_resolution' => ['primary' => $subject],
                 'public_identity' => $identity,
             ]);
-            if (strtoupper((string) ($result['status'] ?? '')) === 'BLOCKED') throw new \RuntimeException('VIDEO_EDITORIAL_QUALITY_BLOCKED');
+            if (strtoupper((string) ($result['status'] ?? '')) === 'BLOCKED') {
+                throw new \RuntimeException(VideoEditorialOutcome::failureCode($result));
+            }
             return $result;
         } catch (\Throwable $error) {
-            if ($error->getMessage() === 'VIDEO_EDITORIAL_QUALITY_BLOCKED') throw $error;
+            if (in_array($error->getMessage(), ['VIDEO_EDITORIAL_QUALITY_BLOCKED', 'VIDEO_EDITORIAL_REVIEW_REQUIRED'], true)
+                || str_starts_with($error->getMessage(), 'VISUAL_SUPPORT_')
+                || $error->getMessage() === 'FACTUAL_CONFLICT'
+            ) throw $error;
             throw new \RuntimeException('VIDEO_SHARED_EDITORIAL_UNAVAILABLE', 0, $error);
         }
     }
