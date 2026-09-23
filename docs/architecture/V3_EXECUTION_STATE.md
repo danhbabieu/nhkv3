@@ -1,3 +1,11 @@
+# Checkpoint — 2026-09-23 — Capture pipeline convergence Task 10 staging verification (BLOCKED / FAIL-CLOSED)
+
+TASK_RESULT: Staging verification was not executed. Required runtime identity, staging endpoint/credentials, exact signed `STAGING_ACCEPTANCE_SCOPE`, `NHK_WP_TEST_PATH` and `NHK_WP_TEST_DB` were unset. Per Constitution and the approved plan, the run stopped before any external or semantic mutation.
+
+LOCAL_VERIFICATION: Full NHK Unit passed 2,313 tests / 13,500 assertions with 18 warnings, 39 deprecations and 29 PHPUnit deprecations. NHK Contract passed 6 tests / 48 assertions. Changed-file PHP lint and `git diff --check` passed. Build/lint beyond PHP is `UNVERIFIED` because no applicable frontend/build target was identified for this backend-only checkpoint.
+
+STATUS: `CAPTURE_PIPELINE_TASK_10_STAGING_E2E_UNVERIFIED / REQUIRED_RUNTIME_IDENTITY_AND_SCOPE_MISSING / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-23 — Capture pipeline convergence Task 9 documentation (LOCAL / NO LIVE MUTATION)
 
 TASK_RESULT: Documentation review PASS. Existing Article ingest, Media model, MCP operation and public URL contracts already describe the verified intent-owned dependencies, canonical MediaUsage/read-back, state-token CAS and fail-closed publication boundaries. Only behavior-backed execution evidence was updated; no normative vocabulary or Constitution text changed.
