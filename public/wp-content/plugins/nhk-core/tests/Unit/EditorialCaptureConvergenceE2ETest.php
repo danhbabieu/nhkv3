@@ -7,8 +7,9 @@ use NHK\Core\Application\Capture\{ContentPreparationOrchestrator, EditorialCaptu
 use NHK\Core\Application\Completion\CompletionCoordinator;
 use NHK\Core\Application\Capture\ContentIntentRouter;
 use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, SubjectResolutionService, TextInputInterpreter};
-use NHK\Core\Contracts\Capture\CaptureRepository;
-use NHK\Core\Domain\Capture\CaptureRecord;
+use NHK\Core\Contracts\Capture\{CaptureAddendumRepository, CaptureRepository};
+use NHK\Core\Domain\Capture\CaptureAddendumRecord;
+use NHK\Core\Domain\Capture\{CaptureRecord, CaptureStage, SubjectResolutionPacket};
 use NHK\Core\Shared\Uuid\UuidCodec;
 use PHPUnit\Framework\TestCase;
 
@@ -121,6 +122,49 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
         self::assertSame(2, $draftAttempts);
         self::assertSame('PREPARED', $second->diagnostics['content_preparation']['status']);
         self::assertLessThan(array_search('draft', $events, true), array_search('enrichment', $events, true));
+    }
+
+    public function test_legacy_review_is_re_evaluated_by_new_content_preparation_without_new_capture(): void
+    {
+        $captures = new Pr5CaptureRepository();
+        $events = [];
+        $calls = ['draft' => 0, 'semantic' => 0, 'media' => 0, 'publication' => 0, 'final' => 0];
+        $subjectId = '11111111-1111-4111-8111-111111111111';
+        $packet = new SubjectResolutionPacket('resolved', $subjectId, 'model', 'nhk:model:generic', 'Generic Model', 3, 'persisted', [], 'USER_CONFIRMED_SUBJECT_RECONCILIATION');
+        $resolver = new SubjectResolutionService(static function (): array {
+            throw new \RuntimeException('WEAKER_RESOLUTION_MUST_NOT_RUN');
+        });
+        $capture = new CaptureRecord(
+            '01a0cb8d-31a5-700b-8780-3793df5d0969', 'legacy-review-re-evaluate', hash('sha256', 'legacy-review-re-evaluate'),
+            CaptureStage::SEMANTICS_RECONCILED->value, 'REVIEW_REQUIRED', null, null, [],
+            ['raw_input' => 'Ambiguous raw hint.', 'content_intent' => ['intent' => 'TEXT_ARTICLE', 'article_required' => true], 'subject_resolution_packet' => $packet->toArray()],
+            [
+                'content_preparation' => ['status' => 'REVIEW_REQUIRED', 'preparation_fingerprint' => hash('sha256', 'old'), 'quality_decision' => 'READY', 'review_reasons' => ['PRIMARY_SUBJECT_AMBIGUOUS']],
+                'completion' => ['status' => 'REVIEW_REQUIRED', 'blockers' => []],
+            ],
+            ['CONTENT_PREPARATION' => ['status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'failure_code' => 'VIDEO_EDITORIAL_QUALITY_BLOCKED']],
+            revision: 18,
+        );
+        $captures->create($capture);
+        $coordinator = $this->coordinator($captures, $calls, $events, subjectResolver: $resolver, preparation: new ContentPreparationOrchestrator($resolver));
+        $addenda = new class implements CaptureAddendumRepository {
+            /** @var array<string,CaptureAddendumRecord> */
+            public array $records = [];
+            public function findByIdempotencyKey(string $key): ?CaptureAddendumRecord { return $this->records[$key] ?? null; }
+            public function create(CaptureAddendumRecord $record): CaptureAddendumRecord { return $this->records[$record->idempotencyKey] = $record; }
+            public function save(CaptureAddendumRecord $record): CaptureAddendumRecord { return $this->records[$record->idempotencyKey] = $record; }
+        };
+        $service = new \NHK\Core\Application\Capture\EditorialCaptureContinuationService($captures, $addenda, $coordinator);
+
+        $result = $service->retry(['capture_id' => $capture->captureId, 'idempotency_key' => $capture->idempotencyKey, 'resume_mode' => 'RETRY']);
+
+        self::assertSame($capture->captureId, $result['capture']['capture_id']);
+        self::assertGreaterThan(18, $result['capture']['revision']);
+        self::assertSame('PREPARED', $result['capture']['diagnostics']['content_preparation']['status']);
+        self::assertSame($subjectId, $result['capture']['context']['subject_resolution_packet']['canonical_subject_id']);
+        self::assertSame('COMPLETED', $result['capture']['phase_receipts']['CONTENT_PREPARATION']['status']);
+        self::assertContains('VIDEO_EDITORIAL_QUALITY_BLOCKED', $result['capture']['phase_receipts']['CONTENT_PREPARATION']['superseded_failure_codes']);
+        self::assertNotSame('STALE_REVIEW_REEVALUATABLE', $result['retry']['code']);
     }
 
     public function test_text_article_pipeline_replays_same_capture_and_owner_writes(): void

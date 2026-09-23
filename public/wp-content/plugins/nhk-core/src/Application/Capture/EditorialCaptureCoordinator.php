@@ -383,6 +383,7 @@ final class EditorialCaptureCoordinator
                 null,
                 $record->context + ['content_intent' => $intent] + ($stagingScope !== null ? ['staging_acceptance' => $stagingScope] : []),
             );
+            $receipts = $record->phaseReceipts;
             if (($intent['status'] ?? '') !== 'resolved') {
                 return $this->save($record, CaptureStage::INTERPRETED, $assets, $diagnostics, $receipts, 'INTERPRETED', $record->articleId, $record->articleStateToken, 'REVIEW_REQUIRED');
             }
@@ -430,6 +431,7 @@ final class EditorialCaptureCoordinator
                 $preparationContext['content_preparation'] = $this->withoutBody($preparationArray);
                 $preparationContext['preparation_fingerprint'] = $preparationResult->preparationFingerprint;
                 $record = $this->save($record, CaptureStage::INTERPRETED, $assets, $diagnostics, $receipts, 'CONTENT_PREPARATION', $record->articleId, $record->articleStateToken, $preparationResult->status === 'PREPARED' ? 'IN_PROGRESS' : $preparationResult->status, null, $record->context + $preparationContext);
+                $receipts = $record->phaseReceipts;
                 if ($preparationResult->status !== 'PREPARED') return $record;
             }
             // Resolve before any draft/media writer. A UUID remains the
@@ -1217,6 +1219,19 @@ final class EditorialCaptureCoordinator
     /** @param list<array<string,mixed>> $assets @param array<string,mixed> $diagnostics @param array<string,mixed> $receipts */
     private function save(CaptureRecord $record, CaptureStage|string $stage, array $assets, array $diagnostics, array $receipts, string $receiptStage, ?int $articleId = null, ?string $token = null, string $status = 'IN_PROGRESS', ?string $receiptResult = null, ?array $context = null): CaptureRecord
     {
+        // Callers carry a local receipt snapshot through the phase pipeline;
+        // the persisted record is authoritative when a prior save already
+        // appended an attempt. Merge it first so historical attempts cannot
+        // be lost when a later phase still holds an older snapshot.
+        $receipts = array_replace($receipts, $record->phaseReceipts);
+        $nextContext = $context ?? $record->context;
+        if ($status === 'REVIEW_REQUIRED') {
+            $diagnostics['decision_dependency_fingerprint'] = CaptureDecisionDependencyFingerprint::forState(
+                $record->requestFingerprint,
+                $nextContext,
+                $diagnostics,
+            );
+        }
         $stage = $stage instanceof CaptureStage ? $stage->value : $stage;
         $completedAt = microtime(true);
         $startedEpoch = $this->phaseStartedAt[$receiptStage] ?? $completedAt;
@@ -1243,7 +1258,7 @@ final class EditorialCaptureCoordinator
         $failureCode = trim((string) ($diagnostics['failure']['code'] ?? ($semanticDiagnostics['blockers'][0] ?? '')));
         if ($failureCode !== '' && $receiptStatus !== 'COMPLETED') $attempt['failure_code'] = $failureCode;
         $receipts = CapturePhaseReceiptReducer::append($receipts, $receiptStage, $attempt);
-        return $this->captures->save(new CaptureRecord($record->captureId, $record->idempotencyKey, $record->requestFingerprint, $stage, $status, $articleId ?? $record->articleId, $token ?? $record->articleStateToken, $assets, $context ?? $record->context, $diagnostics, $receipts, $record->revision + 1, $record->createdAt, gmdate('Y-m-d H:i:s.u')));
+        return $this->captures->save(new CaptureRecord($record->captureId, $record->idempotencyKey, $record->requestFingerprint, $stage, $status, $articleId ?? $record->articleId, $token ?? $record->articleStateToken, $assets, $nextContext, $diagnostics, $receipts, $record->revision + 1, $record->createdAt, gmdate('Y-m-d H:i:s.u')));
     }
 
     private function persistedSubjectPacket(CaptureRecord $record): ?SubjectResolutionPacket

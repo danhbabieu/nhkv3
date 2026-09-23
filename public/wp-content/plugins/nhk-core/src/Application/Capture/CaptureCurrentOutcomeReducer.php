@@ -27,6 +27,14 @@ final class CaptureCurrentOutcomeReducer
         if (in_array('CATEGORY_UNRESOLVED', $completionBlockers, true) || self::failureCode($capture) === 'CATEGORY_UNRESOLVED') {
             return ['eligible' => false, 'reason' => 'CAPTURE_RETRY_NOT_ALLOWED'];
         }
+        if ($capture->status === 'REVIEW_REQUIRED') {
+            if (self::isHardBlockedReview($capture)) return ['eligible' => false, 'reason' => 'CAPTURE_RETRY_NOT_ALLOWED'];
+            $persisted = trim((string) ($capture->diagnostics['decision_dependency_fingerprint'] ?? $capture->context['decision_dependency_fingerprint'] ?? ''));
+            $current = CaptureDecisionDependencyFingerprint::current($capture, $input);
+            if ($persisted === '' || !hash_equals($persisted, $current)) {
+                return ['eligible' => true, 'reason' => 'STALE_REVIEW_REEVALUATABLE'];
+            }
+        }
         $hintPacket = is_array($capture->diagnostics['resume_hints'] ?? null)
             ? $capture->diagnostics['resume_hints']
             : (is_array($completion['resume_hints'] ?? null) ? $completion['resume_hints'] : []);
@@ -54,6 +62,15 @@ final class CaptureCurrentOutcomeReducer
             }
         }
         return ['eligible' => false, 'reason' => 'CAPTURE_RETRY_NOT_ALLOWED'];
+    }
+
+    private static function isHardBlockedReview(CaptureRecord $capture): bool
+    {
+        $failure = is_array($capture->diagnostics['failure'] ?? null) ? $capture->diagnostics['failure'] : [];
+        $preparation = is_array($capture->diagnostics['content_preparation'] ?? null) ? $capture->diagnostics['content_preparation'] : [];
+        if (strtoupper(trim((string) ($failure['classification'] ?? ''))) === 'HARD_BLOCK') return true;
+        if (strtoupper(trim((string) ($preparation['quality_decision'] ?? ''))) === 'HARD_BLOCK') return true;
+        return in_array('HARD_BLOCK', array_map('strval', (array) ($preparation['blockers'] ?? [])), true);
     }
 
     public static function supportsCanonicalVideoCompletionRetry(CaptureRecord $capture): bool

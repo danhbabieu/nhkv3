@@ -1,5 +1,34 @@
 # P0 Checkpoints — 2026-09-22 (LOCAL / DEPLOYMENT PENDING)
 
+# Checkpoint — 2026-09-23 — Stale REVIEW_REQUIRED re-evaluation (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE_CONFIRMED: retry admission treated every `REVIEW_REQUIRED` Capture
+as permanently terminal unless an incomplete owner already exposed a resume
+hint. Legacy review receipts therefore stopped before the new subject-authority
+and decision engines could re-evaluate them.
+
+FIXED_BOUNDARY: Added a generic decision-dependency fingerprint containing
+engine/policy version, persisted subject packet/revision, canonical dependency
+revisions and stable Capture input/decision context. Missing fingerprints allow
+one bounded legacy re-evaluation; changed fingerprints reopen the same Capture;
+unchanged fingerprints remain active human review and are denied without a
+loop. HARD_BLOCK and existing governance/category guards remain fail-closed.
+Explicit resolved subject reconciliation is accepted only with a registered
+authority source and remains bound to the existing Capture.
+
+RECEIPT_BOUNDARY: Receipt attempts remain append-only. The historical
+`VIDEO_EDITORIAL_QUALITY_BLOCKED` is preserved in superseded failure codes and
+does not represent the current re-evaluated outcome. Receipt snapshot merging
+now preserves earlier phase attempts across later coordinator saves.
+
+VERIFICATION: Focused stale-review/Capture/subject suite passes 50 tests / 278
+assertions. Full NHK Unit passes 2,298 tests / 13,420 assertions with 18
+warnings, 39 deprecations and 28 PHPUnit deprecations. Changed-file PHP lint
+and `git diff --check` pass. No Golden/Odo/UUID special-case and no MCP/live
+canonical mutation occurred.
+
+STATUS: `STALE_REVIEW_REEVALUATION_LOCAL_READY / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-23 — Generic persisted subject-authority integration (LOCAL / NO LIVE MUTATION)
 
 ROOT_CAUSE_CONFIRMED: `EditorialCaptureCoordinator` persisted a resolved

@@ -261,10 +261,18 @@ final class EditorialCaptureContinuationService
     /** @return array{0:CaptureRecord,1:?string} */
     private function reconcileSubject(CaptureRecord $capture, mixed $selection): array
     {
-        if ($capture->status !== 'FAILED_RETRYABLE') return [$capture, 'CAPTURE_SUBJECT_RECONCILIATION_STATUS_NOT_ALLOWED'];
+        if (!in_array($capture->status, ['FAILED_RETRYABLE', 'REVIEW_REQUIRED'], true)) return [$capture, 'CAPTURE_SUBJECT_RECONCILIATION_STATUS_NOT_ALLOWED'];
         $intent = strtoupper(trim((string) (($capture->context['content_intent']['intent'] ?? ''))));
         if ($intent !== 'VIDEO') return [$capture, 'CAPTURE_SUBJECT_RECONCILIATION_VIDEO_REQUIRED'];
         if (!is_array($selection) || ($selection['confirmed'] ?? false) !== true) return [$capture, 'CAPTURE_SUBJECT_RECONCILIATION_CONFIRMATION_REQUIRED'];
+        $authority = strtoupper(trim((string) ($selection['authority'] ?? $selection['source'] ?? '')));
+        $explicitPacket = SubjectResolutionPacket::fromArray(is_array($selection['packet'] ?? null) ? $selection['packet'] : (is_array($selection['subject_resolution_packet'] ?? null) ? $selection['subject_resolution_packet'] : []));
+        if ($capture->status === 'REVIEW_REQUIRED' && $explicitPacket instanceof SubjectResolutionPacket
+            && $explicitPacket->status === 'resolved'
+            && in_array($authority, ['USER_CONFIRMED_SUBJECT_RECONCILIATION', 'GOVERNED_SUBJECT_RECONCILIATION'], true)
+        ) {
+            return [$this->persistResolvedReconciliation($capture, $explicitPacket), null];
+        }
         $candidateId = trim((string) ($selection['candidate_uuid'] ?? ''));
         if (!UuidCodec::isValid($candidateId)) return [$capture, 'CAPTURE_SUBJECT_RECONCILIATION_CANDIDATE_NOT_ALLOWED'];
         $rawPacket = is_array($capture->context['subject_resolution_packet'] ?? null)
@@ -318,6 +326,33 @@ final class EditorialCaptureContinuationService
             gmdate('Y-m-d H:i:s.u'),
         );
         return [$this->captures->save($persisted), null];
+    }
+
+    private function persistResolvedReconciliation(CaptureRecord $capture, SubjectResolutionPacket $resolved): CaptureRecord
+    {
+        $resolvedArray = $resolved->toArray();
+        $context = $capture->context;
+        $context['subject_resolution_packet'] = $resolvedArray;
+        $diagnostics = $capture->diagnostics;
+        $diagnostics['subject_resolution_packet'] = $resolvedArray;
+        $diagnostics['subjects'] = $resolved->toResolution();
+        $diagnostics['subject_reconciliation'] = ['status' => 'CONFIRMED', 'source' => $resolved->primarySource];
+        return $this->captures->save(new CaptureRecord(
+            $capture->captureId,
+            $capture->idempotencyKey,
+            $capture->requestFingerprint,
+            $capture->stage,
+            $capture->status,
+            $capture->articleId,
+            $capture->articleStateToken,
+            $capture->assets,
+            $context,
+            $diagnostics,
+            $capture->phaseReceipts,
+            $capture->revision + 1,
+            $capture->createdAt,
+            gmdate('Y-m-d H:i:s.u'),
+        ));
     }
 
     /** @param array<string,mixed> $buckets */

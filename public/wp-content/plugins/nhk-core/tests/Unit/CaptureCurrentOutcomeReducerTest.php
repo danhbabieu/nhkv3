@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Tests\Unit;
 
-use NHK\Core\Application\Capture\CaptureCurrentOutcomeReducer;
+use NHK\Core\Application\Capture\{CaptureCurrentOutcomeReducer, CaptureDecisionDependencyFingerprint};
 use NHK\Core\Domain\Capture\{CaptureRecord, CaptureStage};
 use NHK\Core\Shared\Uuid\UuidCodec;
 use PHPUnit\Framework\TestCase;
@@ -47,5 +47,65 @@ final class CaptureCurrentOutcomeReducerTest extends TestCase
         );
 
         self::assertSame(['eligible' => false, 'reason' => 'CAPTURE_RETRY_NOT_ALLOWED'], CaptureCurrentOutcomeReducer::retryEligibility($capture, ['resume_children' => ['video']]));
+    }
+
+    public function test_legacy_review_without_dependency_fingerprint_gets_one_bounded_reevaluation(): void
+    {
+        $capture = $this->reviewCapture(['content_preparation' => ['quality_decision' => 'READY']]);
+
+        self::assertSame(['eligible' => true, 'reason' => 'STALE_REVIEW_REEVALUATABLE'], CaptureCurrentOutcomeReducer::retryEligibility($capture));
+    }
+
+    public function test_review_with_same_dependency_fingerprint_is_active_and_not_retryable(): void
+    {
+        $capture = $this->reviewCapture(['content_preparation' => ['quality_decision' => 'READY']]);
+        $fingerprint = CaptureDecisionDependencyFingerprint::current($capture);
+        $persisted = new CaptureRecord(
+            $capture->captureId, $capture->idempotencyKey, $capture->requestFingerprint, $capture->stage, $capture->status,
+            $capture->articleId, $capture->articleStateToken, $capture->assets, $capture->context,
+            $capture->diagnostics + ['decision_dependency_fingerprint' => $fingerprint], $capture->phaseReceipts,
+        );
+
+        self::assertSame(['eligible' => false, 'reason' => 'CAPTURE_RETRY_NOT_ALLOWED'], CaptureCurrentOutcomeReducer::retryEligibility($persisted));
+    }
+
+    public function test_changed_canonical_dependency_revision_reopens_review(): void
+    {
+        $capture = $this->reviewCapture([
+            'canonical_context' => [['id' => 'claim-1', 'revision' => 1]],
+            'content_preparation' => ['quality_decision' => 'READY'],
+        ]);
+        $fingerprint = CaptureDecisionDependencyFingerprint::current($capture);
+        $changed = new CaptureRecord(
+            $capture->captureId, $capture->idempotencyKey, $capture->requestFingerprint, $capture->stage, $capture->status,
+            $capture->articleId, $capture->articleStateToken, $capture->assets,
+            $capture->context + ['canonical_context' => [['id' => 'claim-1', 'revision' => 2]]],
+            $capture->diagnostics + ['decision_dependency_fingerprint' => $fingerprint], $capture->phaseReceipts,
+        );
+
+        self::assertSame(['eligible' => true, 'reason' => 'STALE_REVIEW_REEVALUATABLE'], CaptureCurrentOutcomeReducer::retryEligibility($changed));
+    }
+
+    public function test_hard_block_review_cannot_be_reopened_by_dependency_change(): void
+    {
+        $capture = $this->reviewCapture([
+            'content_preparation' => ['quality_decision' => 'HARD_BLOCK', 'blockers' => ['HARD_BLOCK']],
+        ]);
+
+        self::assertSame(['eligible' => false, 'reason' => 'CAPTURE_RETRY_NOT_ALLOWED'], CaptureCurrentOutcomeReducer::retryEligibility($capture));
+    }
+
+    /** @param array<string,mixed> $diagnosticParts */
+    private function reviewCapture(array $diagnosticParts): CaptureRecord
+    {
+        return new CaptureRecord(
+            UuidCodec::newV7(), 'review-' . bin2hex(random_bytes(3)), hash('sha256', 'review-' . bin2hex(random_bytes(3))),
+            CaptureStage::SEMANTICS_RECONCILED->value, 'REVIEW_REQUIRED', null, null, [],
+            ['raw_input' => 'Short subject input.', 'content_intent' => ['intent' => 'VIDEO']],
+            array_replace_recursive([
+                'completion' => ['status' => 'REVIEW_REQUIRED', 'blockers' => [], 'resume_hints' => []],
+            ], $diagnosticParts),
+            ['CONTENT_PREPARATION' => ['status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'latest' => ['status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'failure_code' => 'VIDEO_EDITORIAL_QUALITY_BLOCKED']]],
+        );
     }
 }
