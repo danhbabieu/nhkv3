@@ -47,6 +47,7 @@ final class McpPublicUrlMaintenanceContractTest extends TestCase
             'nhk-v3/article-publish-approve',
             'nhk-v3/article-publish',
             $ability,
+            'nhk-v3/video-frontend-reconcile',
             'nhk-v3/media-widget-upload',
             'nhk-v3/media-update',
             'nhk-v3/media-bind',

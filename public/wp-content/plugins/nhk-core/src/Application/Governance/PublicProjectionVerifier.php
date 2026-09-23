@@ -9,7 +9,7 @@ namespace NHK\Core\Application\Governance;
  */
 final class PublicProjectionVerifier
 {
-    /** @param callable(string,string):mixed $canonicalReader @param callable(string,mixed):?string $routeReader */
+    /** @param callable(string,string):mixed $canonicalReader @param callable(string,mixed):mixed $routeReader */
     public function __construct(private $canonicalReader, private $routeReader)
     {
     }
@@ -26,10 +26,10 @@ final class PublicProjectionVerifier
 
         $route = ($this->routeReader)($ownerType, $owner);
         if ($ownerType === 'video') {
-            if (!is_object($owner) || !method_exists($owner, 'hasValidPublicReference') || !$owner->hasValidPublicReference() || !is_string($route) || trim($route) === '') {
+            if (!is_object($owner) || !method_exists($owner, 'hasValidPublicReference') || !$owner->hasValidPublicReference() || !is_array($route) || ($route['frontend_available'] ?? false) !== true || ($route['projection_readback'] ?? false) !== true) {
                 throw new \RuntimeException('PUBLIC_PROJECTION_NOT_AVAILABLE');
             }
-            return ['projection_available' => true, 'frontend_available' => true, 'public_eligible' => true, 'route' => $route, 'canonical_readback' => $readBack, 'status' => 'VERIFIED'];
+            return $route + ['projection_available' => true, 'frontend_available' => true, 'public_eligible' => true, 'canonical_readback' => $readBack, 'status' => 'VERIFIED'];
         }
 
         if (is_string($route) && trim($route) !== '') {

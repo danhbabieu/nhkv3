@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Video;
 
+use NHK\Core\Contracts\PublicIdentity\PublicIdentityRepository;
 use NHK\Core\Domain\Video\Video;
 
 /**
@@ -13,10 +14,12 @@ use NHK\Core\Domain\Video\Video;
  */
 final class VideoFrontendProjection
 {
+    public function __construct(private ?PublicIdentityRepository $publicIdentities = null) {}
+
     /** @return array{item:?array<string,mixed>,frontend_available:bool,public_eligible:bool,blockers:list<string>} */
     public function project(Video $video): array
     {
-        $url = (new VideoUrlPolicy())->project($video, new VideoPublicContextSelector());
+        $url = (new VideoUrlPolicy($this->publicIdentities))->project($video, new VideoPublicContextSelector());
         $blockers = array_values(array_unique(array_map('strval', (array) ($url['blockers'] ?? []))));
         if (($url['eligible'] ?? false) !== true || !is_string($url['path'] ?? null) || trim((string) $url['path']) === '') {
             return ['item' => null, 'frontend_available' => false, 'public_eligible' => false, 'blockers' => $blockers ?: ['VIDEO_FRONTEND_PROJECTION_UNAVAILABLE']];

@@ -38,6 +38,7 @@ final class SingleEntryPointPolicy
         'nhk.media.usage',
         'nhk.video.ingest',
         'nhk.video.source.refresh',
+        'nhk.video.frontend.reconcile',
         'nhk.knowledge.ingest',
         'nhk.source.ingest',
         'nhk.evidence.ingest',

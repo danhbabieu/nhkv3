@@ -6,6 +6,7 @@ namespace NHK\Core\Application\Mcp;
 use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Core\Application\Video\VideoIntakeService;
 use NHK\Core\Application\Video\VideoSourceRefreshCommand;
+use NHK\Core\Application\Video\VideoFrontendReconciliationService;
 use NHK\Core\Contracts\Media\WordPressMediaAttachmentIngestor;
 use NHK\Core\Application\Media\{ImageIngestEntrypoint, MediaBatchUploadService, MediaBindingService};
 use NHK\Core\Application\WordPress\{CategoryGateway, EditorialDraftGateway};
@@ -50,6 +51,7 @@ final class McpTransport
         private ?MediaBindingService $mediaBinding = null,
         private ?VideoSourceRefreshCommand $videoSourceRefresh = null,
         private ?KnowledgeRepairPreviewService $knowledgeRepairPreview = null,
+        private ?VideoFrontendReconciliationService $videoFrontendReconciliation = null,
     ) {}
 
     /** @return array{status:int,body:?array} */
@@ -159,6 +161,7 @@ final class McpTransport
             'nhk.media.widget-upload' => 'upload_files',
             'nhk.video.ingest' => 'nhk_create_proposals',
             'nhk.video.source.refresh' => 'nhk_create_proposals',
+            'nhk.video.frontend.reconcile' => 'nhk_manage_public_urls',
             'nhk.knowledge.ingest', 'nhk.source.ingest', 'nhk.evidence.ingest' => 'nhk_create_proposals',
             'nhk.proposal.submit' => 'nhk_submit_proposals',
             'nhk.proposal.review' => 'nhk_view_governance',
@@ -227,6 +230,7 @@ final class McpTransport
             'nhk.video.ingest' => $this->videoIngest($arguments),
             'nhk.video.source.refresh' => $this->videoSourceRefresh?->prepare((string) ($arguments['video_id'] ?? ''), (int) ($arguments['expected_revision'] ?? 0), array_key_exists('expected_source_revision', $arguments) ? (int) $arguments['expected_source_revision'] : null, (string) ($arguments['idempotency_key'] ?? '')) ?? throw new \RuntimeException('VIDEO_SOURCE_REFRESH_UNAVAILABLE'),
             'nhk.video.get' => $this->read->videoGet((string) ($arguments['id'] ?? '')),
+            'nhk.video.frontend.reconcile' => $this->videoFrontendReconciliation?->reconcile((string) ($arguments['video_owner_id'] ?? ''), (string) ($arguments['idempotency_key'] ?? ''), (bool) ($arguments['confirmed'] ?? false)) ?? throw new \RuntimeException('VIDEO_FRONTEND_RECONCILIATION_UNAVAILABLE'),
             'nhk.knowledge.get' => $this->read->knowledgeGet((string) ($arguments['id'] ?? '')),
             'nhk.source.get' => $this->read->sourceGet((string) ($arguments['id'] ?? '')),
             'nhk.evidence.get' => $this->read->evidenceGet((string) ($arguments['id'] ?? '')),

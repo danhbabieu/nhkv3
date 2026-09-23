@@ -52,6 +52,7 @@ final class HomeSemanticQueryTest extends TestCase
 
         self::assertStringContainsString('/anh/front.webp', (string) ($modules['media'][0]['image_url'] ?? ''));
         self::assertArrayNotHasKey('url', $modules['media'][0]);
+        self::assertSame($video->canonicalId, $modules['videos'][0]['canonical_id'] ?? null);
         self::assertSame('https://img.example.test/video.jpg', $modules['videos'][0]['thumbnail_url'] ?? null);
     }
 

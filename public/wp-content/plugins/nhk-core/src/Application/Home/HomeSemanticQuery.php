@@ -128,6 +128,7 @@ final class HomeSemanticQuery
                 $modules['videos_total']++;
                 if (count($modules['videos']) >= 6) continue;
                 $modules['videos'][] = [
+                    'canonical_id' => $item->canonicalId,
                     'title' => (string) (($projection['item']['title'] ?? '') ?: $title),
                     'platform' => $item->platform,
                     'url' => $projection['item']['public_url'] ?? null,

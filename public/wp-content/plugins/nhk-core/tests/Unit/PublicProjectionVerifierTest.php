@@ -14,7 +14,7 @@ final class PublicProjectionVerifierTest extends TestCase
         $video = Video::fromUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'Public Clock');
         $verifier = new PublicProjectionVerifier(
             static fn (string $type, string $id): Video => $video,
-            static fn (string $type, object $owner): string => '/video/public-clock/',
+            static fn (string $type, object $owner): array => ['frontend_available' => true, 'projection_readback' => true, 'route' => '/video/public-clock/'],
         );
 
         $result = $verifier->verify([
@@ -24,6 +24,18 @@ final class PublicProjectionVerifierTest extends TestCase
         self::assertSame('VERIFIED', $result['status']);
         self::assertTrue($result['projection_available']);
         self::assertSame('/video/public-clock/', $result['route']);
+    }
+
+    public function test_video_detail_only_readback_cannot_claim_frontend_verified(): void
+    {
+        $video = Video::fromUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'Public Clock');
+        $verifier = new PublicProjectionVerifier(
+            static fn (string $type, string $id): Video => $video,
+            static fn (string $type, object $owner): array => ['frontend_available' => true, 'projection_readback' => false, 'route' => '/video/public-clock/'],
+        );
+
+        $this->expectExceptionMessage('PUBLIC_PROJECTION_NOT_AVAILABLE');
+        $verifier->verify(['canonical_readback' => ['canonical_id' => $video->canonicalId]], 'video', $video->canonicalId);
     }
 
     public function test_supporting_owner_is_verified_without_inventing_a_public_route(): void

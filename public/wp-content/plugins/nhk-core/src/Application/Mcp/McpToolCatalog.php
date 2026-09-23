@@ -365,6 +365,11 @@ final class McpToolCatalog
                 'idempotency_key' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 191],
             ], ['video_id', 'expected_revision', 'idempotency_key'], true),
             self::tool('nhk.video.get', 'Read one active canonical external Video reference.', ['id' => self::uuidField()], ['id']),
+            self::tool('nhk.video.frontend.reconcile', 'Reconcile one existing canonical Video against the frontend projection and the exact archive/detail/home read sources. This never ingests, retries Capture or creates a Video/Public Identity.', [
+                'video_owner_id' => self::uuidField(),
+                'idempotency_key' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 191],
+                'confirmed' => ['type' => 'boolean'],
+            ], ['video_owner_id', 'idempotency_key', 'confirmed'], true),
             self::tool('nhk.knowledge.get', 'Read one active Knowledge claim with public evidence.', ['id' => self::uuidField()], ['id']),
             self::tool('nhk.source.get', 'Read one active public Knowledge source with public evidence.', ['id' => self::uuidField()], ['id']),
             self::tool('nhk.evidence.get', 'Read one active public Knowledge evidence citation.', ['id' => self::uuidField()], ['id']),

@@ -143,3 +143,27 @@ and VideoObject description must not contain structured workflow tokens,
 canonical identifiers or diagnostic packets. Such output fails closed with
 `PUBLIC_INTERNAL_JARGON_LEAK`; provenance and resolution context remain
 machine-readable metadata only.
+
+## Existing canonical Video frontend reconciliation — 2026-09-24
+
+`Canonical read-back ≠ Frontend read-back`. The frontend contract is satisfied
+only when the exact existing Video owner has a current `video` Public Identity,
+the derived `VideoFrontendProjection` is valid, the detail route and archive
+read back that owner from `MediaVideoPageQuery`, and the homepage read-back
+comes from the `HomeSemanticQuery` source used by the homepage filter. A
+canonical owner or Capture completion alone never yields `Frontend VERIFIED`.
+
+The bounded internal/admin operation `nhk.video.frontend.reconcile` accepts
+only the exact `video_owner_id`, an `idempotency_key` and explicit confirmation.
+It performs no ingest, Capture retry, owner creation, Public Identity
+allocation, editorial/SEO mutation or direct database write. It returns the
+owner-bound projection, detail/archive/home read-back and blockers. Homepage
+selection can be `NOT_APPLICABLE` when the current bounded homepage policy
+does not select the eligible item; this is distinct from a verified detail or
+archive source.
+
+Existing canonical owners may be re-reconciled without re-ingest or creating a
+new Video. The operation is deterministic and retry-safe. If the frontend
+projection is absent or invalid, readiness remains `REVIEW_REQUIRED` until a
+canonical lifecycle-owned projection becomes readable from the same source
+queried by `/video/` and the homepage.

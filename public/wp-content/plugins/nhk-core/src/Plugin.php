@@ -585,6 +585,8 @@ final class Plugin {
             // its typed Governance plan is a relation.
             $automationTypes = \NHK\Core\Application\Governance\GovernanceAutomationTypeRegistry::all($types);
             $automationResolver = new \NHK\Core\Application\Governance\GovernanceAutomationPolicyResolver($automationTypes, new \NHK\Core\Infrastructure\Governance\WpOptionAutomationPolicyStorage($automationTypes, registeredKeys: \NHK\Core\Application\Governance\GovernanceAutomationPolicyRegistry::keys($automationTypes)));
+            $publicIdentityRepository = new \NHK\Core\Infrastructure\PublicIdentity\WpdbPublicIdentityRepository($wpdb);
+            $publicVideoFrontendReader = new \NHK\Core\Application\Media\MediaVideoPageQuery($media, $assets, $usages, $videos, new MigrationStatus(), null, null, null, $claims, $evidence, $sources);
             $publicProjectionVerifier = new \NHK\Core\Application\Governance\PublicProjectionVerifier(
                 static function (string $ownerType, string $id) use ($types, $authority, $media, $videos, $claims, $sources, $evidence): mixed {
                     return match ($ownerType) {
@@ -596,8 +598,22 @@ final class Plugin {
                         default => $types->has($ownerType) ? $authority->findByCanonicalId($id) : null,
                     };
                 },
-                static function (string $ownerType, mixed $owner) use ($publicEligibility, $publicRoutes): ?string {
-                    if ($ownerType === 'video' && is_object($owner)) return PublicRouteResolver::videoPath((string) ($owner->title ?? ''), (string) ($owner->externalVideoId ?? ''));
+                static function (string $ownerType, mixed $owner) use ($publicEligibility, $publicRoutes, $publicIdentityRepository, $publicVideoFrontendReader): mixed {
+                    if ($ownerType === 'video' && $owner instanceof \NHK\Core\Domain\Video\Video) {
+                        $projection = (new \NHK\Core\Application\Video\VideoFrontendProjection($publicIdentityRepository))->project($owner);
+                        $path = is_array($projection['item'] ?? null) ? (string) ($projection['item']['public_url'] ?? '') : '';
+                        $detail = $publicVideoFrontendReader->videoDetail($owner->canonicalId);
+                        $route = preg_match('#^/video/([^/]+)/$#', $path, $matches) === 1 ? $publicVideoFrontendReader->videoBySlug(rawurldecode((string) $matches[1])) : null;
+                        $archive = $publicVideoFrontendReader->videoArchive(1, 100);
+                        $archiveItems = array_values(array_filter((array) ($archive['items'] ?? []), static fn (mixed $item): bool => is_array($item) && (string) ($item['canonical_id'] ?? '') === $owner->canonicalId && (string) ($item['public_url'] ?? '') === $path));
+                        $home = function_exists('apply_filters') ? (array) apply_filters('nhk_v3_home_semantic_modules', ['entities' => [], 'media' => [], 'videos' => [], 'knowledge' => [], 'hubs' => [], 'clock_groups' => [], 'explore_next' => [], 'latest_feed' => []]) : [];
+                        $homeItems = array_values(array_filter((array) ($home['videos'] ?? []), static fn (mixed $item): bool => is_array($item) && (string) ($item['canonical_id'] ?? '') === $owner->canonicalId && (string) ($item['url'] ?? '') === $path));
+                        $homeApplicable = (int) ($home['videos_total'] ?? 0) > 0 || count($homeItems) === 1;
+                        $detailOk = is_array($detail) && (string) ($detail['canonical_id'] ?? '') === $owner->canonicalId && (string) ($detail['public_url'] ?? '') === $path;
+                        $routeOk = is_array($route) && (string) ($route['canonical_id'] ?? '') === $owner->canonicalId && (string) ($route['public_url'] ?? '') === $path;
+                        $ok = ($projection['frontend_available'] ?? false) === true && $detailOk && $routeOk && count($archiveItems) === 1 && $homeApplicable;
+                        return ['frontend_available' => $ok, 'projection_readback' => $ok, 'public_eligible' => $ok, 'route' => $path, 'blockers' => $ok ? [] : ['VIDEO_FRONTEND_READBACK_INCOMPLETE']];
+                    }
                     if ($owner instanceof \NHK\Core\Domain\Authority\AuthorityEntity) return $publicEligibility->evaluate($owner)->eligible ? $publicRoutes->path($owner) : null;
                     return null;
                 },
@@ -1851,10 +1867,20 @@ final class Plugin {
             });
             $origin = static function (string $value): string { $parts = wp_parse_url($value); if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) return ''; return strtolower((string) $parts['scheme']) . '://' . strtolower((string) $parts['host']) . (isset($parts['port']) ? ':' . (int) $parts['port'] : ''); };
             $allowedOrigins = array_values(array_filter(array_unique([$origin((string) site_url()), $origin((string) home_url())])));
+            $videoFrontendReconciliation = new \NHK\Core\Application\Video\VideoFrontendReconciliationService(
+                $videos,
+                $publicIdentityRepository,
+                $videoFrontendReader->videoDetail(...),
+                $videoFrontendReader->videoBySlug(...),
+                $videoFrontendReader->videoArchive(...),
+                static function () use ($homeSemanticQuery): array {
+                    return $homeSemanticQuery->extend(['entities' => [], 'media' => [], 'videos' => [], 'knowledge' => [], 'hubs' => [], 'clock_groups' => [], 'explore_next' => [], 'latest_feed' => []]);
+                },
+            );
             $recoveryBinding = defined('NHK_RUNTIME_MODE') && strtolower((string) NHK_RUNTIME_MODE) === 'recovery'
                 ? new \NHK\Core\Application\Mcp\RecoveryMcpRuntimeBinding($wpdb)
                 : null;
-            (new McpApi(new McpTransport($mcpRead, $mcpGovernance, static fn (string $capability): bool => current_user_can($capability), static fn (string $value): bool => in_array($value, $allowedOrigins, true), $articleHandler, $videoIntake, $wordpressAttachments, $categoryGateway, $draftGateway, new CanonicalDependencyValidator($claims, $sources, $evidence), $publicUrlMaintenance, $mediaBatchUpload, $documentation, $capture, $captureContinuation, $authorityCapture, static function (): bool { return (new MigrationStatus())->runtimeSchemaReady(); }, $imageIngest, semanticWritePolicy: $semanticWritePolicy, mediaBinding: $mediaBindingService, videoSourceRefresh: $videoSourceRefresh, knowledgeRepairPreview: $knowledgeRepairPreview), $recoveryBinding))->register();
+            (new McpApi(new McpTransport($mcpRead, $mcpGovernance, static fn (string $capability): bool => current_user_can($capability), static fn (string $value): bool => in_array($value, $allowedOrigins, true), $articleHandler, $videoIntake, $wordpressAttachments, $categoryGateway, $draftGateway, new CanonicalDependencyValidator($claims, $sources, $evidence), $publicUrlMaintenance, $mediaBatchUpload, $documentation, $capture, $captureContinuation, $authorityCapture, static function (): bool { return (new MigrationStatus())->runtimeSchemaReady(); }, $imageIngest, semanticWritePolicy: $semanticWritePolicy, mediaBinding: $mediaBindingService, videoSourceRefresh: $videoSourceRefresh, knowledgeRepairPreview: $knowledgeRepairPreview, videoFrontendReconciliation: $videoFrontendReconciliation), $recoveryBinding))->register();
             do_action('nhk_mcp_register_tools', McpToolCatalog::tools(), $mcpRead, $mcpGovernance);
         });
         add_action('admin_menu', [AdminPage::class, 'register']);

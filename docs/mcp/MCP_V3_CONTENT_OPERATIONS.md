@@ -527,6 +527,7 @@ availability; local HTTP wire smoke remains an environment check.
 | `nhk.media.attachment.get` | WordPress image attachment | READ | No | N/A | No semantic inference | READY for read-back |
 | `nhk.video.ingest` | Video external reference + semantic intake preview | WRITE / INTERNAL | Yes | Apply creates revision | Approved attachment candidates apply through Graph | Internal/admin compatibility boundary; new submissions use Capture; optional Knowledge output is planning-only |
 | `nhk.video.get` | Video | READ | No | N/A | No raw edge | READY for active valid public reference |
+| `nhk.video.frontend.reconcile` | Existing canonical Video → frontend read-back | WRITE / INTERNAL lifecycle check | Yes | No owner, identity, editorial or SEO write; exact owner-bound read-back only | `MediaVideoPageQuery` detail/archive + `HomeSemanticQuery` homepage source | READY only when projection, route and required listing read-backs pass; otherwise `REVIEW_REQUIRED` |
 | `nhk.knowledge.get` | Knowledge + public evidence | READ | No | N/A | No raw edge | READY for active/public chain |
 | `nhk.source.get` | Source + public evidence | READ | No | N/A | No raw edge | READY for active/public chain |
 | `nhk.evidence.get` | Evidence + public endpoints | READ | No | N/A | No raw edge | READY for active/public chain |
@@ -1160,6 +1161,15 @@ provenance and embed references only. Public-safe knowledge may be returned
 when its canonical projection passes policy and contains only the registered
 safe fields; raw PRIVATE Source/Evidence and private metadata/IDs remain
 excluded. Relations still require Graph/public eligibility independently.
+
+`Canonical read-back ≠ Frontend read-back`. `Frontend VERIFIED` requires a
+valid derived `VideoFrontendProjection` plus read-back from the exact source
+queried by `/video/` and the homepage. Existing canonical owners may be
+re-reconciled through `nhk.video.frontend.reconcile`; the operation is
+deterministic and does not re-ingest, retry Capture, allocate a new Public
+Identity, create a WP Post or write directly to the database. Missing or
+invalid projection remains `REVIEW_REQUIRED`, never a false-positive
+`VERIFIED`.
 
 ### Visual support post-ingest sequence — 2026-09-11
 

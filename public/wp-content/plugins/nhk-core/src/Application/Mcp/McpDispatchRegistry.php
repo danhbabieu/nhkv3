@@ -63,6 +63,7 @@ final class McpDispatchRegistry
         'nhk.video.ingest' => 'nhk.video.ingest',
         'nhk.video.source.refresh' => 'nhk.video.source.refresh',
         'nhk.video.get' => 'nhk.video.get',
+        'nhk.video.frontend.reconcile' => 'nhk.video.frontend.reconcile',
         'nhk.knowledge.get' => 'nhk.knowledge.get',
         'nhk.source.get' => 'nhk.source.get',
         'nhk.evidence.get' => 'nhk.evidence.get',
