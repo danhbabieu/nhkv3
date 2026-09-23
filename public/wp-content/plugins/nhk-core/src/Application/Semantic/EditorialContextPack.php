@@ -16,6 +16,10 @@ final readonly class EditorialContextPack
     public array $specimenContext;
     /** @var list<array<string,mixed>> */
     public array $controlProvenance;
+    /** @var list<KnowledgeUnit> */
+    public array $knowledgeUnits;
+    /** @var list<array<string,mixed>> */
+    public array $coverageAspects;
 
     /** @param list<array<string,mixed>> $selectedClaims @param list<array<string,mixed>> $excludedCandidates @param list<array<string,mixed>> $visualSupport */
     public function __construct(
@@ -41,6 +45,10 @@ final readonly class EditorialContextPack
         array $specimenContext = [],
         /** @var list<array<string,mixed>> */
         array $controlProvenance = [],
+        /** @var list<KnowledgeUnit> */
+        array $knowledgeUnits = [],
+        /** @var list<array<string,mixed>> */
+        array $coverageAspects = [],
     ) {
         $groundingBucket = $grounding;
         $readerFactsBucket = $readerFacts;
@@ -62,6 +70,8 @@ final readonly class EditorialContextPack
         $this->supportingContext = array_values($supportingContextBucket);
         $this->specimenContext = array_values($specimenContextBucket);
         $this->controlProvenance = array_values($controlProvenanceBucket);
+        $this->knowledgeUnits = array_values($knowledgeUnits);
+        $this->coverageAspects = array_values($coverageAspects);
     }
 
     /** @return array<string,mixed> */
@@ -85,6 +95,8 @@ final readonly class EditorialContextPack
             'supporting_context' => $this->supportingContext,
             'specimen_context' => $this->specimenContext,
             'control_provenance' => $this->controlProvenance,
+            'knowledge_units' => array_map(static fn (KnowledgeUnit $unit): array => $unit->toArray(), $this->knowledgeUnits),
+            'coverage_aspects' => $this->coverageAspects,
         ];
     }
 }
