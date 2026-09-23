@@ -93,6 +93,93 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
         self::assertSame(1, $calls['semantic']);
     }
 
+    public function test_video_retry_rehydrates_original_request_and_admits_owner_after_semantic_noop(): void
+    {
+        $captures = new Pr5CaptureRepository();
+        $calls = ['draft' => 0, 'semantic' => 0, 'media' => 0, 'publication' => 0, 'final' => 0];
+        $events = [];
+        $videoId = UuidCodec::newV7();
+        $subjectId = UuidCodec::newV7();
+        $coordinator = $this->coordinator(
+            $captures,
+            $calls,
+            $events,
+            semanticStatus: 'SKIPPED',
+            videoEnrichment: static function (array $context) use (&$events, $videoId): array {
+                $events['video_request'] = $context['video'] ?? [];
+                return ['items' => [['kind' => 'video', 'video_id' => $videoId]]];
+            },
+            videoPublication: static fn (array $context): array => [
+                'status' => 'verified',
+                'items' => [[
+                    'video_id' => $videoId,
+                    'completion' => [
+                        'owner_type' => 'video', 'owner_id' => $videoId, 'status' => 'COMPLETE', 'complete' => true,
+                        'canonical_readback' => ['canonical_id' => $videoId], 'content_state' => 'CONTENT_COMPLETE',
+                        'dependency_state' => 'COMPLETE', 'relation_or_usage_state' => 'COMPLETE', 'public_state' => 'READY',
+                        'frontend_state' => 'VERIFIED', 'blockers' => [],
+                    ],
+                ]],
+                'blockers' => [],
+            ],
+        );
+        $packet = [
+            'status' => 'resolved',
+            'canonical_subject_id' => $subjectId,
+            'entity_type' => 'variant',
+            'stable_key' => 'nhk:variant:test',
+            'canonical_name' => 'Retry Variant',
+            'revision' => 2,
+            'primary_source' => 'USER_CONFIRMED_SUBJECT_RECONCILIATION',
+        ];
+        $capture = new CaptureRecord(
+            UuidCodec::newV7(),
+            'video-owner-admission-retry',
+            hash('sha256', 'video-owner-admission-retry'),
+            CaptureStage::SEMANTICS_RECONCILED->value,
+            'PARTIAL',
+            null,
+            null,
+            [],
+            [
+                'raw_input' => 'Video retry without caller payload.',
+                'title' => 'Persisted Video title',
+                'metadata' => ['compliance_note' => 'Persisted compliance note.'],
+                'content_intent' => ['intent' => 'VIDEO', 'article_required' => false, 'semantic_delta' => ['status' => 'NONE']],
+                'original_request' => [
+                    'intent' => 'VIDEO',
+                    'video' => ['url' => 'https://youtu.be/dQw4w9WgXcQ', 'user_hint' => 'Persisted Video hint'],
+                ],
+                'subject_resolution_packet' => $packet,
+            ],
+            [
+                'subjects' => ['status' => 'resolved', 'primary' => ['id' => $subjectId, 'type' => 'variant', 'revision' => 2], 'resolved' => [['id' => $subjectId, 'type' => 'variant', 'revision' => 2]]],
+                'content_preparation' => ['status' => 'PREPARED', 'subject_resolution_packet' => $packet],
+                'semantic_write_back' => ['status' => 'SKIPPED', 'writes' => [], 'blockers' => []],
+                'completion' => ['status' => 'PARTIAL', 'missing_required_owners' => [['owner_type' => 'video', 'owner_id' => '']], 'blockers' => ['REQUIRED_OWNER_READBACK_UNVERIFIED']],
+                'resume_hints' => ['resume_children' => ['video']],
+            ],
+            ['SEMANTICS_RECONCILED' => ['status' => 'PARTIAL', 'result' => 'PARTIAL']],
+        );
+        $captures->create($capture);
+
+        $result = $coordinator->retry($capture, ['resume_children' => ['video']]);
+
+        self::assertSame(['url' => 'https://youtu.be/dQw4w9WgXcQ', 'user_hint' => 'Persisted Video hint'], $events['video_request']);
+        self::assertCount(1, array_filter($result->assets, static fn (array $asset): bool => ($asset['kind'] ?? '') === 'video'));
+        self::assertSame('SKIPPED', $result->diagnostics['semantic_write_back']['status']);
+        self::assertSame($videoId, $result->diagnostics['completion']['required_owners'][0]['owner_id']);
+        self::assertSame([], $result->diagnostics['completion']['missing_required_owners']);
+        self::assertNotContains('REQUIRED_OWNER_READBACK_UNVERIFIED', $result->diagnostics['completion']['blockers']);
+        self::assertSame('verified', $result->diagnostics['final_read_back']['status']);
+
+        $replay = $coordinator->retry($result, ['resume_children' => ['video']]);
+        $videoAssets = array_values(array_filter($replay->assets, static fn (array $asset): bool => ($asset['kind'] ?? '') === 'video'));
+        self::assertCount(1, $videoAssets);
+        self::assertSame($videoId, $videoAssets[0]['video_id']);
+        self::assertSame($videoId, $replay->diagnostics['completion']['required_owners'][0]['owner_id']);
+    }
+
     /** @dataProvider nonVideoIntentProvider */
     public function test_non_video_intent_never_enters_video_callbacks(string $intent, array $input, array $physicalItems): void
     {

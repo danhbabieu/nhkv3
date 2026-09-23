@@ -115,6 +115,7 @@ final class EditorialCaptureCoordinator
     public function retry(CaptureRecord $record, array $input): CaptureRecord
     {
         $this->documentation?->assertCheckpoint((array) ($input['documentation_checkpoint'] ?? []));
+        $input = $this->rehydrateRetryInput($record, $input);
         return $this->run($record, $input);
     }
 
@@ -924,6 +925,35 @@ final class EditorialCaptureCoordinator
             $diagnostics['resume_hints'] = $partialCompletion['resume_hints'] ?? ['resume_children' => []];
             return $this->save($record, $record->stage, $assets, $diagnostics, $receipts, $this->activeReceiptPhase ?? $status, $record->articleId, $record->articleStateToken, $status);
         }
+    }
+
+    /** @param array<string,mixed> $input @return array<string,mixed> */
+    private function rehydrateRetryInput(CaptureRecord $record, array $input): array
+    {
+        $context = $record->context;
+        $original = is_array($context['original_request'] ?? null) ? $context['original_request'] : [];
+        $intent = is_array($context['content_intent'] ?? null) ? $context['content_intent'] : [];
+        $defaults = [
+            'text' => (string) ($context['raw_input'] ?? ''),
+            'title' => (string) ($context['title'] ?? ''),
+            'excerpt' => (string) ($context['excerpt'] ?? ''),
+            'subject_hints' => is_array($context['subject_hints'] ?? null) ? array_values($context['subject_hints']) : [],
+            'observations' => is_array($context['observations'] ?? null) ? $context['observations'] : [],
+            'metadata' => is_array($context['metadata'] ?? null) ? $context['metadata'] : [],
+            'intent' => (string) ($intent['intent'] ?? ($original['intent'] ?? '')),
+            'publish' => ($original['publish'] ?? false) === true,
+            'video' => is_array($original['video'] ?? null) ? $original['video'] : [],
+        ];
+        foreach ($defaults as $key => $value) {
+            $current = $input[$key] ?? null;
+            $empty = is_array($value)
+                ? $current === null || $current === []
+                : $current === null || trim((string) $current) === '';
+            if ($empty) $input[$key] = $value;
+        }
+        $input['existing_capture_retry'] = true;
+        $input['existing_capture_continuation'] = true;
+        return $input;
     }
 
     /** @param list<array<string,mixed>> $assets @param array<string,mixed> $diagnostics @param array<string,mixed> $receipts */
