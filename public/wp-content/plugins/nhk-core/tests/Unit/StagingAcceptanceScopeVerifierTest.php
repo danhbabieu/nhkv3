@@ -85,6 +85,61 @@ final class StagingAcceptanceScopeVerifierTest extends TestCase
         $guard->assertAllowed($proposal);
     }
 
+    public function test_media_usage_mutation_without_exact_reference_fails_closed_with_guard_exact_target_reason(): void
+    {
+        $captureId = UuidCodec::newV7();
+        $mediaId = UuidCodec::newV7();
+        $guard = new MediaBindingStagingGuard(
+            static fn (): string => 'staging',
+            static fn (array $scope, array $request): bool => true,
+            static fn (): bool => true,
+        );
+
+        // The direct binding guard has its own established vocabulary. The
+        // server-issued Capture packet path below uses the scope-specific
+        // STAGING_SCOPE_EXACT_REFERENCE_REQUIRED diagnostic.
+        $this->expectExceptionMessage('STAGING_EXACT_TARGET_REQUIRED');
+        $guard([
+            'capture_id' => $captureId,
+            'media' => ['id' => $mediaId],
+            'target' => ['type' => 'model', 'id' => 'guessed-target'],
+            'operation' => 'replace',
+            'staging_acceptance' => [
+                'approved' => true,
+                'capture_id' => $captureId,
+                'operation_family' => 'media_usage_reconciliation',
+                'entity_type' => 'media',
+                'operation' => 'replace',
+                'writer' => 'canonical_governed',
+                'media_ids' => [$mediaId],
+                'target' => ['type' => 'model', 'id' => 'guessed-target'],
+            ],
+        ]);
+    }
+
+    public function test_capture_scope_issuer_rejects_noncanonical_binding_reference(): void
+    {
+        [$capture, $input, $assets] = $this->fixture();
+        $input['media_bindings'][0]['media_ref']['media_id'] = 'guessed-media-id';
+        $verifier = $this->verifier();
+
+        $this->expectExceptionMessage('STAGING_SCOPE_EXACT_REFERENCE_REQUIRED');
+        $verifier->issueForCapture($capture, $input, $assets);
+    }
+
+    public function test_media_usage_scope_issuer_rejects_missing_exact_media_or_target_reference(): void
+    {
+        $capture = new CaptureRecord(UuidCodec::newV7(), 'exact-reference', hash('sha256', 'exact-reference'), 'MEDIA_RECONCILED', 'IN_PROGRESS');
+        $verifier = new StagingAcceptanceScopeVerifier(static fn (): string => 'staging', 'test-secret', static fn (): bool => true, can: static fn (): bool => true);
+
+        $this->expectExceptionMessage('STAGING_EXACT_MEDIA_USAGE_REFERENCE_REQUIRED');
+        $verifier->issueForMediaUsageOperation($capture, [
+            'operation' => 'replace',
+            'media' => ['id' => 'not-a-canonical-media-id'],
+            'target' => ['type' => 'model', 'id' => UuidCodec::newV7()],
+        ]);
+    }
+
     public function test_dynamic_scope_is_derived_from_the_capture_request_without_static_media_ids(): void
     {
         [$capture, $input, $assets] = $this->fixture();

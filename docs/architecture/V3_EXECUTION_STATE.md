@@ -1,3 +1,15 @@
+# Checkpoint — 2026-09-23 — Post-implementation adversarial audit (OPEN / NOT COMPLETE)
+
+TASK_RESULT: The audit of commit `270eb65c6604d931219aa08fd8f9fd6c5722f0db` found that the commit itself is documentation-only, while unrelated hierarchical-subject files had been deleted earlier in the convergence history. The two approved hierarchy documents were restored in the worktree; unrelated hierarchy source/test scratch was excluded. No production or staging mutation occurred.
+
+TASK3_FINDING: Existing unit coverage proves Capture-derived scope propagation and fail-closed authorization, but the requested full Capture → proposal → Controlled Apply → MediaUsage runtime path is not yet proven. New adversarial tests reproduce `STAGING_SCOPE_REQUIRED`, `STAGING_SCOPE_EXACT_REFERENCE_REQUIRED` at server packet issuance, and the established direct-guard `STAGING_EXACT_TARGET_REQUIRED` vocabulary; direct MediaUsage issuer rejection is covered by `STAGING_EXACT_MEDIA_USAGE_REFERENCE_REQUIRED`.
+
+TASK4_7_FINDING: Existing focused tests verify shared convergence boundaries, but a live WordPress/staging read-back path remains unavailable. These tasks must not be promoted from local test evidence to staging PASS. Article MediaUsage integration and final publication read-back remain `UNVERIFIED` until runtime identity, credentials and bounded acceptance scope exist.
+
+VERIFICATION: Focused convergence/adversarial suite passed 146 tests / 658 assertions. The earlier first adversarial expectation was corrected to the existing contract vocabulary; no production code was changed. The two restored hierarchy documents and the adversarial test are pending commit review. Full suite, contract suite, lint, diff-check and secret review remain open in this audit.
+
+STATUS: `POST_IMPLEMENTATION_AUDIT_OPEN / TASK3_7_RUNTIME_UNVERIFIED / STAGING_UNVERIFIED / LIVE_UNVERIFIED`.
+
 # Checkpoint — 2026-09-23 — Capture pipeline convergence Task 10 staging verification (BLOCKED / FAIL-CLOSED)
 
 TASK_RESULT: Staging verification was not executed. Required runtime identity, staging endpoint/credentials, exact signed `STAGING_ACCEPTANCE_SCOPE`, `NHK_WP_TEST_PATH` and `NHK_WP_TEST_DB` were unset. Per Constitution and the approved plan, the run stopped before any external or semantic mutation.

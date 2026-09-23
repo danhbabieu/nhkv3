@@ -2,6 +2,15 @@
 
 ## Setup
 
+## Post-implementation adversarial audit — 2026-09-23
+
+- Audit target: commit `270eb65c6604d931219aa08fd8f9fd6c5722f0db`; task remains open and implementation is not declared complete.
+- Scope finding: `270eb65c` itself changes only execution-state/ledger documentation. The hierarchical-subject plan/spec deletion occurred earlier and was outside the Capture convergence plan. Both documents were restored in the worktree. Unrelated hierarchy source/test scratch was excluded from the audit diff.
+- Task 3 finding: existing tests prove server-issued Capture scope propagation and fail-closed checks, but do not prove the complete real proposal → Controlled Apply → MediaUsage runtime chain. Status remains `TEST_VERIFIED` for shared boundaries and `UNVERIFIED` for runtime integration. Added adversarial coverage for `STAGING_SCOPE_REQUIRED`, `STAGING_SCOPE_EXACT_REFERENCE_REQUIRED`, direct-guard `STAGING_EXACT_TARGET_REQUIRED`, and `STAGING_EXACT_MEDIA_USAGE_REFERENCE_REQUIRED`.
+- Task 4 finding: existing MediaUsage policy tests cover canonical identity, featured/inline roles, retry and native read-back adapters; the requested staging/generalized WordPress path is not runtime-proven. Status: `TEST_VERIFIED` / `STAGING_UNVERIFIED`.
+- Tasks 5–7: focused tests provide code/test evidence for alias normalization/read-back, state-token rehydration, publication/route/completion gates; runtime evidence remains `UNVERIFIED`.
+- Six-intent regression focused suite: 146 tests / 658 assertions passed. No staging/live mutation.
+
 - Execution mode: subagent-driven, sequential.
 - Workspace: current repository fallback because native worktree scratch writes were denied by sandbox; user explicitly authorized implementation.
 - Base commit before Task 1: `a88ab8fd08a017ef504a3f6a0d545786ed5924bb`.
