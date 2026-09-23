@@ -54,7 +54,7 @@ final class VideoEditorialAdapter
         $scope = new VideoEditorialScopeNormalizer();
         $topic = $scope->topic($userHint, $subject, trim((string) ($context['editorial_instruction'] ?? $context['topic'] ?? '')));
         $inputContext = [
-            'raw_input' => $scope->input($userHint, $subject, (string) ($context['raw_input'] ?? $source['source_title'] ?? '')),
+            'raw_input' => $scope->input($userHint, $subject, (string) ($source['source_title'] ?? '')),
             'title' => trim((string) ($context['editorial_title'] ?? '')),
             'observations' => is_array($context['observations'] ?? null) ? $context['observations'] : [],
         ];

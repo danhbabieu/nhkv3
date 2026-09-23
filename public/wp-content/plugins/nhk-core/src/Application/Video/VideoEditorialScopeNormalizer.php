@@ -18,8 +18,9 @@ final class VideoEditorialScopeNormalizer
     /** @param array<string,mixed>|null $subject */
     public function input(string $userHint, ?array $subject, string $fallback = ''): string
     {
-        $hint = trim($userHint);
-        if ($hint === '') return trim($fallback);
-        return 'Chiếc đồng hồ trong video được người dùng mô tả/xác nhận: ' . $hint;
+        // User input remains source context for topic/retrieval and provenance;
+        // it is not reader-facing prose until a separate semantic projection
+        // has classified it as factual/editorial material.
+        return trim($fallback);
     }
 }

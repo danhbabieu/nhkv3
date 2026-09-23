@@ -69,8 +69,9 @@ final class VideoEditorialAdapterTest extends TestCase
         self::assertSame('READY', $result['quality_decision']);
         self::assertSame([], $result['quality_report']->blockers);
         self::assertContains('VIDEO_PUBLIC_IDENTITY_DEFERRED_UNTIL_OWNER_CREATION', $result['quality_report']->informational);
-        self::assertStringContainsString('Nữ Hoàng Âm Thanh', $result['draft']->summary);
-        self::assertStringContainsString('chất âm xuất sắc', $result['draft']->body);
+        self::assertStringNotContainsString('Nữ Hoàng Âm Thanh', $result['draft']->summary);
+        self::assertStringNotContainsString('chất âm xuất sắc', $result['draft']->body);
+        self::assertStringContainsString('Odo 36', $result['draft']->body);
         self::assertStringNotContainsString('Nữ Hoàng Âm Thanh', json_encode($result['pack']->selectedClaims, JSON_UNESCAPED_UNICODE));
     }
 
@@ -100,11 +101,10 @@ final class VideoEditorialAdapterTest extends TestCase
             'attempt_no' => 1,
         ]);
 
-        self::assertContains('PUBLIC_INTERNAL_JARGON_LEAK', $result['quality_report']->blockers);
-        self::assertNotEmpty($result['quality_report']->diagnostics['quality_findings']);
-        self::assertSame('summary', $result['quality_report']->diagnostics['quality_findings'][0]['field']);
-        self::assertSame('capture:attempt-1', $result['quality_report']->diagnostics['quality_findings'][0]['attempt_id']);
-        self::assertContains($result['quality_report']->diagnostics['quality_findings'][0]['origin_kind'], ['USER_INPUT', 'UNKNOWN']);
+        self::assertNotContains('PUBLIC_INTERNAL_JARGON_LEAK', $result['quality_report']->blockers);
+        self::assertSame([], $result['quality_report']->diagnostics['quality_findings']);
+        self::assertSame('capture:attempt-1', $result['quality_report']->diagnostics['evaluation']['attempt_id']);
+        self::assertStringNotContainsString('semantic owner', mb_strtolower($result['draft']->body));
         self::assertArrayNotHasKey('quality_findings', $result['draft']->toArray());
         self::assertArrayNotHasKey('quality_findings', $result['seo_plan']->toArray());
         self::assertArrayNotHasKey('quality_findings', $result['shared_enrichment']);
@@ -131,7 +131,7 @@ final class VideoEditorialAdapterTest extends TestCase
         self::assertSame('READY', $result['quality_report']->readiness);
         self::assertSame('READY', $result['quality_decision']);
         self::assertSame('USER_OBSERVATION', $result['decision_trace'][0]['classification']);
-        self::assertStringContainsString('chiếc đồng hồ trong video', mb_strtolower($result['draft']->body));
+        self::assertStringNotContainsString('user_hint', mb_strtolower($result['draft']->body));
         self::assertStringContainsString('10 côn và 10 búa', $result['draft']->body);
         self::assertStringContainsString('Westminster và Gai Carillon', $result['draft']->body);
         self::assertStringContainsString('Odo 36', $result['draft']->body);

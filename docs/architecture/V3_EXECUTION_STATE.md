@@ -1,3 +1,36 @@
+# Checkpoint — 2026-09-23 — Video runtime internal-context projection fix (LOCAL / NO SERVER ACTION)
+
+ROOT_CAUSE: The runtime-equivalent Video path passed `user_hint` through
+`VideoEditorialScopeNormalizer::input()` as reader-facing prose. The wrapped
+value became `EditorialContextPack.inputContext.raw_input`, then the shared
+planner/composer used it as the opening paragraph and summary/body. The
+`EditorialQualityGate` therefore reported `PUBLIC_INTERNAL_JARGON_LEAK` for
+the exact `semantic owner` span with origin `USER_INPUT` / normalizer path.
+
+FIX: Video user input remains available for topic, retrieval and provenance,
+but is no longer projected into public opening copy. The adapter supplies only
+the source title as the public input fallback; factual/technical public copy
+continues to come from eligible canonical claims. No phrase, identity, UUID,
+Odo, Jacquemart or YouTube special case was added, and Quality Gate/repair
+semantics remain unchanged.
+
+REGRESSION: The fail-before runtime-equivalent adapter test was red with the
+expected public-language blocker. After the seam fix, the adapter and direct
+`VideoIntakeService` wiring tests pass; internal hint text is absent from
+editorial and SEO projections, while canonical factual claims remain present.
+Existing Quality Gate, repair convergence, structural hard-block, retry,
+owner optimization and Capture convergence tests remain green.
+
+VERIFICATION: Focused Video/quality/convergence matrix passed 127 tests / 486
+assertions. Full Unit passed 2,386 tests / 13,785 assertions. Contract passed
+6 tests / 48 assertions. PHP lint and `git diff --check` passed. Integration
+was attempted but remains environment-gated by missing `NHK_WP_TEST_PATH` and
+`NHK_WP_TEST_DB`; 21 guarded integration failures requested that environment.
+No database, staging, production, publication, deployment or server mutation
+occurred.
+
+STATUS: `LOCAL_FIX_READY_FOR_USER_DEPLOY / INTEGRATION_ENVIRONMENT_GATED / NO_SERVER_ACTION`.
+
 # Checkpoint — 2026-09-23 — Runtime retry and public-copy convergence (LOCAL / NO SERVER ACTION)
 
 TASK_RESULT: The local runtime seam now excludes explicit internal semantic

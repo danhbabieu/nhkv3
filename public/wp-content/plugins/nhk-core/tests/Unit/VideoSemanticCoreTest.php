@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Video\{
+    VideoEditorialAdapter,
     VideoCompletenessPolicy,
     VideoChapterParser,
     VideoEditorialGenerator,
@@ -19,6 +20,7 @@ use NHK\Core\Application\Video\{
     YouTubeSourceAdapter,
     YouTubeUrlNormalizer
 };
+use NHK\Core\Application\Semantic\ClaimRetrievalEngine;
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
 use NHK\Core\Domain\Authority\{AuthorityEntity, CanonicalEntityTypeCatalog, EntityTypeRegistry};
@@ -648,6 +650,39 @@ final class VideoSemanticCoreTest extends TestCase
         self::assertSame($brand->canonicalId, $seen[0]['id']);
         self::assertSame([], $preview->package['knowledge_enrichment']['candidates']);
         self::assertContains('USER_HINT_NOT_KNOWLEDGE', $preview->package['knowledge_enrichment']['diagnostics']);
+    }
+
+    public function test_runtime_equivalent_intake_path_keeps_internal_user_hint_out_of_public_editorial_package(): void
+    {
+        $editorial = VideoEditorialAdapter::fromEngine(new ClaimRetrievalEngine(
+            static fn (array $subject): array => ['status' => 'available', 'items' => []],
+            static fn (array $subject, array $neighborhood): array => [],
+        ));
+        $service = new VideoIntakeService(
+            new YouTubeSourceAdapter(static fn (object $identity): array => ['title' => 'Odo 36', 'availability' => 'available', 'embeddable' => true]),
+            $this->emptyVideos(),
+            new VideoHubClassifier(),
+            $this->planner(),
+            new VideoEditorialGenerator(),
+            new VideoCompletenessPolicy(),
+            new VideoSeoProjection(),
+            null,
+            null,
+            $editorial,
+        );
+
+        $preview = $service->preview(
+            'https://youtu.be/dQw4w9WgXcQ',
+            'semantic owner',
+            null,
+            [],
+            '',
+            ['id' => '4cbe5aa1-4222-46bd-a140-6ab66d2da199', 'type' => 'model', 'name' => 'Odo 36'],
+        );
+
+        self::assertStringNotContainsString('semantic owner', mb_strtolower((string) ($preview->package['editorial']['body'] ?? '')));
+        self::assertStringNotContainsString('semantic owner', mb_strtolower(json_encode($preview->package['seo'] ?? [], JSON_UNESCAPED_UNICODE)));
+        self::assertNotContains('PUBLIC_INTERNAL_JARGON_LEAK', $preview->warnings);
     }
 
     public function test_odo_36_10_preserves_intended_variant_for_about_and_knowledge_enrichment(): void
