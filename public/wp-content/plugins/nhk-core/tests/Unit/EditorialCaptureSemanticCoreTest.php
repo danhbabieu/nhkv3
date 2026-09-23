@@ -223,7 +223,7 @@ final class EditorialCaptureSemanticCoreTest extends TestCase
         self::assertSame($variantId, $resolution['primary']['id']);
         self::assertSame('nhk:variant:odo.36.8', $resolution['primary']['stable_key']);
         self::assertSame([], $resolution['unresolved']);
-        self::assertSame([$modelId, $variantId], array_column($resolution['subjects'], 'id'));
+        self::assertSame([$variantId], array_column($resolution['subjects'], 'id'));
         self::assertSame($variantId, $resolver->resolve('36/8')[0]['id']);
     }
 

@@ -144,13 +144,13 @@ final class SubjectResolutionService
             if ($matches === []) $unresolved[] = $hint;
             foreach ($matches as $match) {
                 $key = (string) (($match['type'] ?? '') . ':' . ($match['id'] ?? ''));
-                if ($key !== ':') $candidateMap[$key] = $match + ['match_source' => $hint];
+                if ($key !== ':') $candidateMap[$key] = $match;
             }
         }
         if (is_callable($this->compositeResolver) && count($hints) > 1) foreach ((array) ($this->compositeResolver)($hints) as $match) {
             if (!is_array($match)) continue;
             $key = (string) (($match['type'] ?? '') . ':' . ($match['id'] ?? ''));
-            if ($key !== ':') $candidateMap[$key] = $match + ['match' => 'composite_explicit_hint', 'match_source' => implode(' | ', $hints)];
+            if ($key !== ':') $candidateMap[$key] = $match + ['match' => 'composite_explicit_hint'];
         }
         $candidates = array_values($candidateMap);
         if ($candidates === []) return $this->finalize(['resolved' => [], 'candidates' => [], 'unresolved' => $unresolved, 'conflicts' => [], 'diagnostics' => [], 'primary_source' => 'explicit_subject_hint'], 'unresolved');
@@ -167,7 +167,11 @@ final class SubjectResolutionService
         $byType = [];
         foreach ($narrowest as $candidate) $byType[(string) ($candidate['type'] ?? '')][] = $candidate;
         $unique = array_values(array_filter($narrowest, static fn (array $candidate): bool => count($byType[(string) ($candidate['type'] ?? '')] ?? []) === 1));
-        if (count($unique) !== 1) return $this->finalize(['resolved' => $narrowest, 'candidates' => ['explicit' => $candidates], 'unresolved' => $unresolved, 'conflicts' => [], 'diagnostics' => ['SUBJECT_AMBIGUOUS'], 'primary_source' => 'explicit_subject_hint'], 'ambiguous');
+        if (count($unique) !== 1) {
+            $reference = array_values(array_filter($narrowest, static fn (array $candidate): bool => in_array((string) ($candidate['match'] ?? ''), ['exact_variant_reference', 'exact_variant_name_reference'], true)));
+            if (count($reference) === 1) $unique = $reference;
+            else return $this->finalize(['resolved' => $narrowest, 'candidates' => ['explicit' => $candidates], 'unresolved' => $unresolved, 'conflicts' => [], 'diagnostics' => ['SUBJECT_AMBIGUOUS'], 'primary_source' => 'explicit_subject_hint'], 'ambiguous');
+        }
         $primary = $unique[0];
         $compatible = [];
         foreach ($candidates as $candidate) if ((string) ($candidate['id'] ?? '') !== (string) ($primary['id'] ?? '') && $this->isAncestorOf($candidate, $primary, $contexts)) $compatible[] = $candidate;
