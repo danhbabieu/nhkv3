@@ -3,17 +3,21 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Semantic;
 
-/** Deterministic selection of eligible Claims into a transient editorial pack. */
+/** Deterministic adaptive selection of applicable Claims into a transient editorial pack. */
 final class EditorialKnowledgeSelector
 {
     private const SUPPORTED_PROFILES = ['article', 'video', 'image', 'media'];
-    private TopicFulfillment $topicFulfillment;
-    private EditorialSemanticRolePolicy $rolePolicy;
 
-    public function __construct(?TopicFulfillment $topicFulfillment = null, ?EditorialSemanticRolePolicy $rolePolicy = null)
-    {
-        $this->topicFulfillment = $topicFulfillment ?? new TopicFulfillment();
-        $this->rolePolicy = $rolePolicy ?? new EditorialSemanticRolePolicy();
+    public function __construct(
+        private ?TopicFulfillment $topicFulfillment = null,
+        private ?EditorialSemanticRolePolicy $rolePolicy = null,
+        private ?KnowledgeUnitBuilder $unitBuilder = null,
+        private ?EditorialCoveragePolicy $coveragePolicy = null,
+    ) {
+        $this->topicFulfillment ??= new TopicFulfillment();
+        $this->rolePolicy ??= new EditorialSemanticRolePolicy();
+        $this->unitBuilder ??= new KnowledgeUnitBuilder();
+        $this->coveragePolicy ??= new EditorialCoveragePolicy();
     }
 
     /** @param array<string,mixed> $retrieval @param array<string,mixed> $primarySubject @param array<string,mixed> $profile @param array<string,mixed> $inputContext */
@@ -21,169 +25,158 @@ final class EditorialKnowledgeSelector
     {
         $profileName = strtolower(trim((string) ($profile['profile'] ?? 'article')));
         $retrievalStatus = (string) ($retrieval['status'] ?? 'unavailable');
-        if (!in_array($profileName, self::SUPPORTED_PROFILES, true)) {
-            return $this->pack('review', $primarySubject, $topic, $profile, $retrievalStatus, [], [], ['PROFILE_UNSUPPORTED'], ['profile' => $profileName]);
-        }
-        if ($retrievalStatus === 'unavailable') {
-            return $this->pack('unavailable', $primarySubject, $topic, $profile, $retrievalStatus, [], [], (array) ($retrieval['blockers'] ?? []), ['profile' => $profileName]);
-        }
+        if (!in_array($profileName, self::SUPPORTED_PROFILES, true)) return $this->pack('review', $primarySubject, $topic, $profile, $retrievalStatus, [], [], ['PROFILE_UNSUPPORTED'], ['profile' => $profileName]);
+        if ($retrievalStatus === 'unavailable') return $this->pack('unavailable', $primarySubject, $topic, $profile, $retrievalStatus, [], [], (array) ($retrieval['blockers'] ?? []), ['profile' => $profileName]);
 
-        $limit = max(1, min(20, (int) ($profile['selection_limit'] ?? ['article' => 8, 'video' => 6, 'image' => 6, 'media' => 6][$profileName])));
-        $promise = $this->topicFulfillment->promise($topic);
-        if ($promise['kind'] === 'enumeration') $limit = max($limit, min(20, (int) $promise['required_count']));
-        $all = array_values(array_filter((array) ($retrieval['items'] ?? []), 'is_array'));
-        $eligible = array_values(array_filter((array) ($retrieval['eligible_claims'] ?? []), static fn (mixed $candidate): bool => is_array($candidate) && ($candidate['eligibility'] ?? '') === 'eligible'));
-        $inputTokens = $this->tokens((string) ($inputContext['raw_input'] ?? ''));
-        $topicTokens = $this->tokens($topic);
-        $ranked = [];
+        $all = [];
+        foreach (array_merge((array) ($retrieval['items'] ?? []), (array) ($retrieval['eligible_claims'] ?? [])) as $candidate) {
+            if (!is_array($candidate)) continue;
+            $id = (string) ($candidate['claim_id'] ?? $candidate['id'] ?? spl_object_id((object) $candidate));
+            $all[$id] ??= $candidate;
+        }
+        $all = array_values($all);
+        $eligible = [];
         $excluded = [];
-        $grounding = [];
-        $readerFacts = [];
-        $supportingContext = [];
-        $specimenContext = [];
-        $controlProvenance = [];
-        foreach ($eligible as $order => $candidate) {
-            $candidate = $this->rolePolicy->classify($candidate, $primarySubject, ['profile' => $profileName, 'topic' => $topic, 'input' => $inputContext]);
-            $role = (string) ($candidate['semantic_role'] ?? 'READER_FACT');
-            if (in_array($role, ['GROUNDING', 'PROVENANCE_ONLY'], true)) $grounding[] = $candidate;
-            elseif ($role === 'SUPPORTING_CONTEXT') $supportingContext[] = $candidate;
-            elseif ($role === 'SPECIMEN_CONTEXT') $specimenContext[] = $candidate;
-            elseif ($role === 'CONTROL_ONLY') $controlProvenance[] = $candidate;
-            else $readerFacts[] = $candidate;
-            if (($candidate['publicly_composable'] ?? false) !== true) {
-                $candidate['exclusion_reasons'] = array_values(array_unique(array_merge((array) ($candidate['exclusion_reasons'] ?? []), ['NOT_PUBLICLY_COMPOSABLE'])));
-                $excluded[] = $candidate;
+        foreach ($all as $order => $candidate) {
+            $classified = $this->rolePolicy->classify($candidate, $primarySubject, ['profile' => $profileName, 'topic' => $topic, 'input' => $inputContext]);
+            if (($classified['eligibility'] ?? '') !== 'eligible' || ($classified['applicability'] ?? '') !== 'applicable') {
+                $classified['exclusion_reasons'] = array_values(array_unique(array_merge((array) ($classified['exclusion_reasons'] ?? []), [($classified['applicability'] ?? '') !== 'applicable' ? 'INAPPLICABLE' : 'INELIGIBLE'])));
+                $excluded[] = $classified;
                 continue;
             }
-            $utility = $this->utility($candidate, $topicTokens, $inputTokens, $profileName);
-            $candidate['utility'] = $utility;
-            $candidate['editorial_role'] = 'CONTEXT';
-            $candidate['_selection_order'] = $order;
-            $ranked[] = $candidate;
+            $classified['_selection_order'] = $order;
+            $eligible[] = $classified;
         }
-        usort($ranked, static function (array $left, array $right): int {
-            $utility = $right['utility']['total'] <=> $left['utility']['total'];
-            return $utility !== 0 ? $utility : (($left['_selection_order'] ?? 0) <=> ($right['_selection_order'] ?? 0));
+
+        $build = $this->unitBuilder->build($eligible, $primarySubject, $topic, ['profile' => $profileName] + $profile, $inputContext);
+        $policy = $this->coveragePolicy->for($profileName, $topic, $inputContext);
+        $explicitCeiling = array_key_exists('selection_limit', $profile) ? max(1, min(20, (int) $profile['selection_limit'])) : null;
+        $units = $build->units;
+        $excluded = array_merge($excluded, $build->excluded);
+        foreach ($units as $unit) {
+            foreach (array_slice($unit->toArray()['supporting_claims'] ?? [], 1) as $duplicate) {
+                $duplicate['exclusion_reasons'] = ['REDUNDANT_INFORMATION'];
+                $excluded[] = $duplicate;
+            }
+        }
+
+        $promise = $this->topicFulfillment->promise($topic);
+        usort($units, function (KnowledgeUnit $left, KnowledgeUnit $right) use ($topic, $inputContext, $promise): int {
+            if (($promise['kind'] ?? 'none') === 'enumeration') {
+                $order = ((int) ($left->claim()['_selection_order'] ?? 0)) <=> ((int) ($right->claim()['_selection_order'] ?? 0));
+                if ($order !== 0) return $order;
+            }
+            $directLeft = ($left->claim()['retrieval_origin'] ?? '') === 'direct' ? 1 : 0;
+            $directRight = ($right->claim()['retrieval_origin'] ?? '') === 'direct' ? 1 : 0;
+            if ($directLeft !== $directRight) return $directRight <=> $directLeft;
+            $score = $this->score($left->claim(), $topic, $inputContext) <=> $this->score($right->claim(), $topic, $inputContext);
+            if ($score !== 0) return -$score;
+            return strcmp((string) ($left->claim()['claim_id'] ?? ''), (string) ($right->claim()['claim_id'] ?? ''));
         });
 
         $selected = [];
-        $excluded = [];
-        foreach ($all as $candidate) {
-            if (($candidate['eligibility'] ?? '') !== 'eligible') {
-                unset($candidate['_selection_order']);
-                $excluded[] = $candidate;
-            }
-        }
-        foreach ($ranked as $candidate) {
-            if (count($selected) >= $limit) {
-                $candidate['exclusion_reasons'] = ['SELECTION_BUDGET_EXHAUSTED'];
-                unset($candidate['_selection_order']);
-                $excluded[] = $candidate;
+        $covered = [];
+        $usedTokens = 0;
+        $gains = [];
+        $stopReason = 'no_applicable_reader_knowledge';
+        foreach ($units as $unit) {
+            $data = $unit->toArray();
+            $aspects = array_values(array_diff((array) ($data['coverage_aspects'] ?? []), $covered));
+            $claim = $unit->claim();
+            if ($aspects === [] && (($claim['retrieval_origin'] ?? '') === 'neighborhood' || $explicitCeiling !== null)) $aspects = ['context:' . (string) ($claim['claim_id'] ?? count($selected))];
+            $tokenCost = count($this->tokens((string) ($claim['text'] ?? '')));
+            $gain = count($aspects) + (($claim['retrieval_origin'] ?? '') === 'direct' ? 0.75 : 0.5) + min(0.25, $this->score($claim, $topic, $inputContext) / 40.0);
+            if ($aspects === [] || $gain < (float) $policy['minimum_gain']) {
+                $claim['exclusion_reasons'] = ['LOW_MARGINAL_INFORMATION_GAIN'];
+                $excluded[] = $claim;
+                $stopReason = 'marginal_gain_low';
                 continue;
             }
-            $duplicate = false;
-            foreach ($selected as $prior) {
-                if ($this->redundant((string) ($candidate['text'] ?? ''), (string) ($prior['text'] ?? '')) && !$this->isTopicCompletion($candidate, $selected, $topic)) {
-                    $duplicate = true;
-                    break;
-                }
+            if ($usedTokens + $tokenCost > (int) $policy['token_budget']) {
+                $claim['exclusion_reasons'] = ['CONTEXT_BUDGET_EXCEEDED'];
+                $excluded[] = $claim;
+                $stopReason = 'context_budget';
+                break;
             }
-            if ($duplicate) {
-                $candidate['exclusion_reasons'] = ['REDUNDANT_INFORMATION'];
-                $excluded[] = $candidate;
-                continue;
+            $claim['knowledge_unit'] = $data;
+            $claim['utility'] = ['information_gain' => $this->novelty($claim, $inputContext), 'reader_value' => round($this->score($claim, $topic, $inputContext), 6), 'semantic_coverage' => $aspects, 'total' => round($this->score($claim, $topic, $inputContext) + count($aspects), 6)];
+            $claim['editorial_role'] = $this->role($claim, $selected);
+            $claim['selection_reason'] = 'applicable KnowledgeUnit adds uncovered reader coverage';
+            $claim['state'] = EditorialSemanticRolePolicy::SELECTED;
+            $claim['publicly_composable'] = true;
+            $selected[] = $claim;
+            $covered = array_values(array_unique(array_merge($covered, (array) ($data['coverage_aspects'] ?? []))));
+            $usedTokens += $tokenCost;
+            $gains[] = round((float) $gain, 6);
+            if ($explicitCeiling !== null && count($selected) >= $explicitCeiling) {
+                $stopReason = 'context_budget';
+                break;
             }
-            $candidate['editorial_role'] = $this->role($candidate, $selected);
-            $candidate['selection_reason'] = $this->selectionReason($candidate);
-            if ($this->isTopicCompletion($candidate, $selected, $topic)) $candidate['selection_reason'] = 'eligible Claim completes a detected topic promise';
-            unset($candidate['_selection_order']);
-            $selected[] = $candidate;
+            if (count($covered) >= (int) $policy['aspect_target']) {
+                $stopReason = 'coverage_sufficient';
+                break;
+            }
         }
+        if ($selected === [] && $units !== []) $stopReason = 'marginal_gain_low';
+        if ($selected !== [] && $stopReason === 'no_applicable_reader_knowledge') $stopReason = 'no_more_applicable_units';
 
-        $visualSupport = $this->visualSupport($selected);
-        $status = $selected !== [] ? 'available' : ($eligible === [] ? 'no_eligible_claims' : 'no_useful_claims');
-        foreach ($selected as &$candidate) {
-            $candidate['state'] = EditorialSemanticRolePolicy::SELECTED;
-            $candidate['publicly_composable'] = true;
-        }
-        unset($candidate);
-        $readerFacts = array_values(array_filter($readerFacts, static fn (array $candidate): bool => ($candidate['publicly_composable'] ?? false) === true));
-        $supportingContext = array_values(array_filter($supportingContext, static fn (array $candidate): bool => ($candidate['publicly_composable'] ?? false) === true));
-        $specimenContext = array_values(array_filter($specimenContext, static fn (array $candidate): bool => ($candidate['publicly_composable'] ?? false) === true));
-        return $this->pack($status, $primarySubject, $topic, $profile, $retrievalStatus, $selected, $excluded, [], [
+        $grounding = array_values($build->grounding);
+        $readerFacts = array_values($selected);
+        $coverageStatus = $selected === [] ? 'THIN' : (count($covered) >= (int) $policy['aspect_target'] ? 'SUFFICIENT' : 'PARTIAL');
+        $status = $selected === [] ? ($eligible === [] ? 'no_eligible_claims' : 'no_useful_claims') : 'available';
+        $diagnostics = [
             'profile' => $profileName,
-            'selection_limit' => $limit,
+            'candidate_count' => count($all),
             'eligible_count' => count($eligible),
+            'knowledge_unit_count' => count($units),
+            'selected_unit_count' => count($selected),
             'selected_count' => count($selected),
             'excluded_count' => count($excluded),
-            'policy_version' => 'editorial-selection-v1',
-            'information_gain' => array_sum(array_map(static fn (array $item): float => (float) ($item['utility']['information_gain'] ?? 0.0), $selected)),
-        ], $visualSupport, $inputContext, $grounding, $readerFacts, $supportingContext, $specimenContext, $controlProvenance);
+            'coverage_achieved' => $covered,
+            'coverage_status' => $coverageStatus,
+            'stop_reason' => $stopReason,
+            'context_budget' => (int) $policy['token_budget'],
+            'context_budget_used' => $usedTokens,
+            'marginal_gains' => $gains,
+            'policy_version' => 'adaptive-knowledge-selection-v1',
+            'information_gain' => array_sum($gains),
+        ];
+        return $this->pack($status, $primarySubject, $topic, $profile, $retrievalStatus, $selected, $excluded, [], $diagnostics, $this->visualSupport($selected), $inputContext, $grounding, $readerFacts, $units);
     }
 
-    private function pack(string $status, array $subject, string $topic, array $profile, string $retrievalStatus, array $selected, array $excluded, array $blockers, array $diagnostics, array $visualSupport = [], array $inputContext = [], array $grounding = [], array $readerFacts = [], array $supportingContext = [], array $specimenContext = [], array $controlProvenance = []): EditorialContextPack
+    private function pack(string $status, array $subject, string $topic, array $profile, string $retrievalStatus, array $selected, array $excluded, array $blockers, array $diagnostics, array $visualSupport = [], array $inputContext = [], array $grounding = [], array $readerFacts = [], array $knowledgeUnits = []): EditorialContextPack
     {
-        return new EditorialContextPack($status, $subject, trim($topic), $profile, $retrievalStatus, array_values($selected), array_values($excluded), $inputContext, array_values($visualSupport), array_values($blockers), $diagnostics, 1, array_values($grounding), array_values($readerFacts), array_values($supportingContext), array_values($specimenContext), array_values($controlProvenance));
+        $coverage = [];
+        foreach ($selected as $claim) if (is_array($claim['knowledge_unit'] ?? null)) $coverage = array_values(array_unique(array_merge($coverage, (array) ($claim['knowledge_unit']['coverage_aspects'] ?? []))));
+        return new EditorialContextPack($status, $subject, trim($topic), $profile, $retrievalStatus, array_values($selected), array_values($excluded), $inputContext, array_values($visualSupport), array_values($blockers), $diagnostics, 1, array_values($grounding), array_values($readerFacts), [], [], [], array_values($knowledgeUnits), $coverage);
     }
 
-    private function utility(array $candidate, array $topicTokens, array $inputTokens, string $profile): array
+    private function score(array $candidate, string $topic, array $inputContext): float
     {
-        $claimTokens = $this->tokens((string) ($candidate['text'] ?? ''));
-        $topicRelevance = $this->overlap($topicTokens, $claimTokens);
-        $informationGain = $inputTokens === [] ? 1.0 : count(array_diff($claimTokens, $inputTokens)) / max(1, count($claimTokens));
-        $direct = ($candidate['retrieval_origin'] ?? '') === 'direct' ? 2.0 : 0.0;
+        $text = $this->tokens((string) ($candidate['text'] ?? ''));
+        $topicTokens = $this->tokens($topic);
+        $overlap = $topicTokens === [] ? 0.0 : count(array_intersect($text, $topicTokens)) / count($topicTokens);
         $evidence = (($candidate['evidence']['status'] ?? '') === 'eligible') ? 1.0 : 0.0;
-        $profileBias = $profile === 'image' || $profile === 'media' ? (($candidate['retrieval_origin'] ?? '') === 'direct' ? 0.5 : 0.0) : 0.0;
-        return ['topic_relevance' => round($topicRelevance, 6), 'information_gain' => round($informationGain, 6), 'reader_value' => round($informationGain + $direct, 6), 'semantic_coverage' => round($topicRelevance + $informationGain, 6), 'total' => round(($topicRelevance * 10.0) + ($informationGain * 4.0) + $direct + $evidence + $profileBias, 6)];
+        $direct = (($candidate['retrieval_origin'] ?? '') === 'direct') ? 2.0 : 0.0;
+        return round(($overlap * 5.0) + $evidence + $direct + (float) ($candidate['score'] ?? 0.0), 6);
     }
 
-    private function role(array $candidate, array $selected): string
+    private function novelty(array $candidate, array $inputContext): float
     {
-        if ($selected === []) return 'CORE';
-        return ($candidate['retrieval_origin'] ?? '') === 'neighborhood' ? 'EXPLANATION' : 'CONTEXT';
+        $claim = $this->tokens((string) ($candidate['text'] ?? ''));
+        $input = $this->tokens((string) ($inputContext['raw_input'] ?? $inputContext['text'] ?? ''));
+        return round($input === [] ? 1.0 : count(array_diff($claim, $input)) / max(1, count($claim)), 6);
     }
 
-    private function selectionReason(array $candidate): string
-    {
-        return ($candidate['retrieval_origin'] ?? '') === 'direct'
-            ? 'direct eligible Claim adds topic coverage and reader context'
-            : 'bounded eligible neighbor adds explainable contextual information';
-    }
-
-    private function isTopicCompletion(array $candidate, array $selected, string $topic): bool
-    {
-        $promise = $this->topicFulfillment->promise($topic);
-        if ($promise['kind'] !== 'enumeration') return false;
-        $concepts = array_map(fn (string $value): string => $this->conceptKey($value), $this->topicFulfillment->candidateConcepts($candidate));
-        if ($concepts === []) return false;
-        $known = [];
-        foreach ($selected as $prior) foreach ($this->topicFulfillment->candidateConcepts($prior) as $concept) $known[$this->conceptKey($concept)] = true;
-        $new = array_values(array_filter($concepts, static fn (string $concept): bool => $concept !== '' && !isset($known[$concept])));
-        return $new !== [] && count($known) < (int) $promise['required_count'];
-    }
-
-    private function conceptKey(string $value): string
-    {
-        return trim((string) (preg_replace('/[^\p{L}\p{N}]+/u', ' ', mb_strtolower($value)) ?? $value));
-    }
-
-    private function redundant(string $left, string $right): bool
-    {
-        $a = $this->tokens($left); $b = $this->tokens($right);
-        if ($a === [] || $b === []) return false;
-        return count(array_intersect($a, $b)) / max(1, min(count($a), count($b))) >= 0.8;
-    }
+    private function role(array $candidate, array $selected): string { return $selected === [] ? 'CORE' : (($candidate['retrieval_origin'] ?? '') === 'neighborhood' ? 'EXPLANATION' : 'CONTEXT'); }
 
     /** @return list<array<string,mixed>> */
     private function visualSupport(array $selected): array
     {
         $requirements = [];
         foreach ($selected as $candidate) {
-            if (is_array($candidate['visual_support'] ?? null)) {
-                $requirements[] = $candidate['visual_support'] + ['claim_id' => $candidate['claim_id']];
-            } elseif (($candidate['visual_support_required'] ?? false) === true) {
-                $requirements[] = ['claim_id' => $candidate['claim_id'], 'status' => 'UNRESOLVED', 'reason' => 'FEATURE_SUPPORT_REQUIRED', 'representative_media' => $candidate['representative_media'] ?? null];
-            }
+            if (is_array($candidate['visual_support'] ?? null)) $requirements[] = $candidate['visual_support'] + ['claim_id' => $candidate['claim_id']];
+            elseif (($candidate['visual_support_required'] ?? false) === true) $requirements[] = ['claim_id' => $candidate['claim_id'], 'status' => 'UNRESOLVED', 'reason' => 'FEATURE_SUPPORT_REQUIRED', 'representative_media' => $candidate['representative_media'] ?? null];
         }
         return $requirements;
     }
@@ -191,11 +184,7 @@ final class EditorialKnowledgeSelector
     /** @return list<string> */
     private function tokens(string $value): array
     {
-        return array_values(array_unique(array_filter(preg_split('/[^\p{L}\p{N}]+/u', function_exists('mb_strtolower') ? mb_strtolower($value) : strtolower($value)) ?: [])));
-    }
-
-    private function overlap(array $left, array $right): float
-    {
-        return $left === [] || $right === [] ? 0.0 : count(array_intersect($left, $right)) / max(1, count($left));
+        $lower = function_exists('mb_strtolower') ? mb_strtolower($value) : strtolower($value);
+        return array_values(array_unique(array_filter(preg_split('/[^\p{L}\p{N}]+/u', $lower) ?: [])));
     }
 }
