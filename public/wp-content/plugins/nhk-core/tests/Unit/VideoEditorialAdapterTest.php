@@ -67,7 +67,7 @@ final class VideoEditorialAdapterTest extends TestCase
             'public_identity' => ['canonical_url' => '/video/odo-36-10/', 'canonical_identity' => true, 'public_eligible' => true],
         ]);
 
-        self::assertSame('READY', $result['quality_report']->readiness, json_encode(['blockers' => $result['quality_report']->blockers, 'warnings' => $result['quality_report']->warnings], JSON_UNESCAPED_UNICODE));
+        self::assertSame('READY', $result['quality_report']->readiness);
         self::assertStringContainsString('chiếc đồng hồ trong video', mb_strtolower($result['draft']->body));
         self::assertStringContainsString('10 côn và 10 búa', $result['draft']->body);
         self::assertStringContainsString('Westminster và Gai Carillon', $result['draft']->body);

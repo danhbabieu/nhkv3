@@ -694,12 +694,8 @@ final class VideoSemanticCoreTest extends TestCase
         self::assertSame('variant', $preview->package['semantic_attachments'][0]['target_type']);
         self::assertSame($variantId, $preview->package['knowledge_enrichment']['subject']['id']);
         self::assertSame('variant', $preview->package['knowledge_enrichment']['subject']['type']);
-        self::assertSame($variantId, $preview->package['knowledge_enrichment']['candidates'][0]['subject_id']);
-        self::assertSame('variant', $preview->package['knowledge_enrichment']['candidates'][0]['scope']);
-        self::assertSame([], array_values(array_filter(
-            $preview->package['knowledge_enrichment']['candidates'],
-            static fn (array $candidate): bool => in_array($candidate['scope'], ['model', 'brand'], true),
-        )));
+        self::assertSame([], $preview->package['knowledge_enrichment']['candidates']);
+        self::assertContains('USER_HINT_NOT_KNOWLEDGE', $preview->package['knowledge_enrichment']['diagnostics']);
     }
 
     public function test_capture_subject_handoff_keeps_variant_scope_even_without_relation_evidence(): void
@@ -801,9 +797,8 @@ final class VideoSemanticCoreTest extends TestCase
             'user_hint' => ['value' => 'Đây là Odo 36/10.', 'kind' => 'USER_HINT'],
         ]);
 
-        self::assertCount(1, $result['candidates']);
-        self::assertSame('55555555-5555-4555-8555-555555555555', $result['candidates'][0]['subject_id']);
-        self::assertSame('variant', $result['candidates'][0]['scope']);
+        self::assertSame([], $result['candidates']);
+        self::assertContains('USER_HINT_NOT_KNOWLEDGE', $result['diagnostics']);
     }
 
     public function test_classification_subject_is_preserved_through_video_enrichment(): void
@@ -823,8 +818,8 @@ final class VideoSemanticCoreTest extends TestCase
         self::assertSame($classificationId, $result['subject']['id']);
         self::assertSame('classification', $result['subject']['type']);
         self::assertNotContains('NO_SUPPORTED_SUBJECT', $result['diagnostics']);
-        self::assertNotEmpty($result['candidates']);
-        self::assertSame('entity', $result['candidates'][0]['scope']);
+        self::assertSame([], $result['candidates']);
+        self::assertContains('USER_HINT_NOT_KNOWLEDGE', $result['diagnostics']);
     }
 
     public function test_video_knowledge_planner_marks_equally_plausible_variants_ambiguous(): void
@@ -855,8 +850,8 @@ final class VideoSemanticCoreTest extends TestCase
             'user_hint' => ['value' => 'Đây là âm thanh Sonodo trên máy 24.', 'kind' => 'USER_HINT'],
         ]);
 
-        self::assertCount(1, $result['candidates']);
-        self::assertSame('55555555-5555-4555-8555-555555555555', $result['candidates'][0]['subject_id']);
+        self::assertSame([], $result['candidates']);
+        self::assertContains('USER_HINT_NOT_KNOWLEDGE', $result['diagnostics']);
     }
 
     public function test_transcript_uses_bounded_extracted_observations_and_never_whole_text(): void

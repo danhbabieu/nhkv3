@@ -215,8 +215,9 @@ final class VideoIntakeService
                 return array_merge(['status' => 'available', 'subject' => null, 'diagnostics' => [], 'proposal_ready' => false, 'unresolved_reasons' => []], $result);
             }
             $candidates = array_values(array_map($this->serializeKnowledgeCandidate(...), $result));
-            $candidates = $this->removeUserHintKnowledgeCandidates($candidates, $result);
-            return ['status' => 'available', 'subject' => null, 'candidates' => $candidates, 'diagnostics' => [], 'proposal_ready' => (bool) array_filter($candidates, static fn (array $candidate): bool => ($candidate['proposal_ready'] ?? false) === true), 'unresolved_reasons' => $candidates === [] ? [] : ['GOVERNED_REVIEW_REQUIRED']];
+            $packet = ['diagnostics' => []];
+            $candidates = $this->removeUserHintKnowledgeCandidates($candidates, $packet);
+            return ['status' => 'available', 'subject' => null, 'candidates' => $candidates, 'diagnostics' => $packet['diagnostics'], 'proposal_ready' => (bool) array_filter($candidates, static fn (array $candidate): bool => ($candidate['proposal_ready'] ?? false) === true), 'unresolved_reasons' => $candidates === [] ? [] : ['GOVERNED_REVIEW_REQUIRED']];
         } catch (\Throwable $error) {
             return ['status' => 'unavailable', 'subject' => null, 'candidates' => [], 'diagnostics' => ['KNOWLEDGE_ENRICHMENT_PLANNER_FAILED:' . $error->getMessage()], 'proposal_ready' => false, 'unresolved_reasons' => ['ENRICHMENT_UNAVAILABLE']];
         }

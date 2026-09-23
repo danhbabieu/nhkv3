@@ -1034,10 +1034,11 @@ final class EditorialCaptureContinuationTest extends TestCase
             $events['subject_resolution'] = $context['subject_resolution'] ?? null;
             $events['video_payload'] = $context['assets'][0]['video_proposal']['payload'] ?? null;
             $events['semantic'] = ($events['semantic'] ?? 0) + 1;
-            return ['status' => 'REVIEW_REQUIRED', 'writes' => []];
+            return ['status' => 'APPLIED', 'writes' => []];
         }, static function (array $context) use (&$videoPipelineCalls): array {
             $videoPipelineCalls++;
-            return ['status' => 'READY', 'quality' => 'READY', 'blockers' => []];
+            $videoId = (string) ($context['assets'][0]['video_id'] ?? '');
+            return ['status' => 'READY', 'quality' => 'READY', 'blockers' => [], 'items' => [['video_id' => $videoId, 'completion' => ['owner_type' => 'video', 'owner_id' => $videoId, 'status' => 'COMPLETE', 'complete' => true, 'canonical_readback' => ['canonical_id' => $videoId], 'dependency_state' => 'COMPLETE', 'relation_or_usage_state' => 'COMPLETE', 'content_state' => 'CONTENT_COMPLETE', 'public_state' => 'READY', 'frontend_state' => 'VERIFIED', 'blockers' => []]]]];
         }));
 
         $result = $service->retry([
@@ -1060,6 +1061,8 @@ final class EditorialCaptureContinuationTest extends TestCase
         self::assertSame(1, $events['semantic']);
         self::assertSame(1, $videoPipelineCalls);
         self::assertSame('READY', $result['capture']['diagnostics']['video_publication']['quality']);
+        self::assertSame('CONTENT_COMPLETE', $result['capture']['diagnostics']['completion']['children'][0]['content_state']);
+        self::assertSame('COMPLETE', $result['capture']['status']);
         self::assertCount(0, $addenda->records);
     }
 
