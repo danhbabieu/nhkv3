@@ -876,10 +876,10 @@ final class Plugin {
             // One generic recovery boundary for existing Capture-owned Articles.
             // The orchestrator plans and bounds work; existing owner adapters
             // remain responsible for every durable mutation.
-            add_filter('nhk_v3_article_reconciliation_orchestrator', static function (mixed $current) use ($articleEditorial, $captureRepository, $articleMedia, $canonicalPublicationContext, $draftGateway, $editorialPosts, $graphService, $articleCoordinator): mixed {
+            add_filter('nhk_v3_article_reconciliation_orchestrator', static function (mixed $current) use ($articleEditorial, $captureRepository, $articleMedia, $canonicalPublicationContext, $draftGateway, $editorialPosts, $graphService, $articleCoordinator, $authority, $types): mixed {
                 if ($current instanceof \NHK\Core\Application\Article\ArticleReconciliationOrchestrator) return $current;
                 return new \NHK\Core\Application\Article\ArticleReconciliationOrchestrator(
-                    static function (array $input) use ($articleEditorial, $captureRepository): array {
+                    static function (array $input) use ($articleEditorial, $captureRepository, $authority, $types): array {
                         $postId = (int) ($input['post_id'] ?? 0);
                         $state = $articleEditorial->read($postId);
                         if ($state === null) throw new \RuntimeException('WP_POST_UNAVAILABLE');
@@ -887,7 +887,25 @@ final class Plugin {
                         $packet = is_array($input['subject_resolution_packet'] ?? null)
                             ? $input['subject_resolution_packet']
                             : (is_object($capture) && is_array($capture->context['subject_resolution_packet'] ?? null) ? $capture->context['subject_resolution_packet'] : []);
-                        return ['post_id' => $postId, 'state' => $state, 'capture' => $capture, 'slug' => $state->slug, 'permalink' => $state->permalink, 'subject_resolution_packet' => $packet, 'desired_media' => is_array($input['article_media'] ?? null) ? $input['article_media'] : [], 'media_context' => is_array($input['media_context'] ?? null) ? $input['media_context'] : []];
+                        if ($packet === []) {
+                            $subject = is_array($input['research_subject'] ?? null) ? $input['research_subject'] : [];
+                            $exact = is_array($subject['exact'] ?? null) ? $subject['exact'] : $subject;
+                            $uuid = trim((string) ($input['canonical_uuid'] ?? $input['subject_uuid'] ?? $exact['canonical_uuid'] ?? $exact['id'] ?? ''));
+                            $stableKey = trim((string) ($input['stable_key'] ?? $input['subject_stable_key'] ?? $exact['stable_key'] ?? ''));
+                            $hints = array_values(array_filter([(string) ($exact['name'] ?? ''), (string) ($exact['value'] ?? '')], static fn (string $value): bool => trim($value) !== ''));
+                            $resolution = (new \NHK\Core\Application\Semantic\SubjectResolutionService(new \NHK\Core\Application\Semantic\CanonicalAuthoritySubjectResolver($authority, $types)))->resolveSources(['canonical_uuid' => $uuid === '' ? [] : [$uuid], 'stable_key' => $stableKey === '' ? [] : [$stableKey], 'subject_hints' => $hints]);
+                            $primary = is_array($resolution['primary'] ?? null) ? $resolution['primary'] : [];
+                            if (($resolution['status'] ?? '') === 'resolved' && trim((string) ($primary['id'] ?? '')) !== '') {
+                                $packet = array_replace($primary, ['status' => 'resolved', 'canonical_subject_id' => (string) $primary['id'], 'entity_type' => (string) ($primary['type'] ?? ''), 'canonical_name' => (string) ($primary['name'] ?? ''), 'match_reason' => (string) ($primary['match'] ?? ''), 'primary_source' => (string) ($resolution['primary_source'] ?? '')]);
+                            }
+                        }
+                        $desiredMedia = is_array($input['article_media'] ?? null) ? $input['article_media'] : [];
+                        $intent = strtoupper((string) (($capture?->context['content_intent']['intent'] ?? $input['intent'] ?? '')));
+                        $selected = is_array($desiredMedia['selected'] ?? null) ? $desiredMedia['selected'] : [];
+                        if ($intent === 'IMAGE_ARTICLE' && isset($selected['media_id'])) {
+                            $desiredMedia['selected']['inline_primary'] = $selected + ['role' => 'inline_primary'];
+                        }
+                        return ['post_id' => $postId, 'state' => $state, 'capture' => $capture, 'slug' => $state->slug, 'permalink' => $state->permalink, 'subject_resolution_packet' => $packet, 'desired_media' => $desiredMedia, 'media_context' => is_array($input['media_context'] ?? null) ? $input['media_context'] : []];
                     },
                     static fn (array $state): array => is_object($state['capture'] ?? null) && is_array($state['capture']->context['content_intent'] ?? null) ? $state['capture']->context['content_intent'] : ['intent' => 'TEXT_ARTICLE'],
                     static function (array $state): array {
