@@ -13,11 +13,13 @@ final class EditorialKnowledgeSelector
         private ?EditorialSemanticRolePolicy $rolePolicy = null,
         private ?KnowledgeUnitBuilder $unitBuilder = null,
         private ?EditorialCoveragePolicy $coveragePolicy = null,
+        private ?EditorialUsageMemory $usageMemory = null,
     ) {
         $this->topicFulfillment ??= new TopicFulfillment();
         $this->rolePolicy ??= new EditorialSemanticRolePolicy();
         $this->unitBuilder ??= new KnowledgeUnitBuilder();
         $this->coveragePolicy ??= new EditorialCoveragePolicy();
+        $this->usageMemory ??= new EditorialUsageMemory();
     }
 
     /** @param array<string,mixed> $retrieval @param array<string,mixed> $primarySubject @param array<string,mixed> $profile @param array<string,mixed> $inputContext */
@@ -61,7 +63,7 @@ final class EditorialKnowledgeSelector
         }
 
         $promise = $this->topicFulfillment->promise($topic);
-        usort($units, function (KnowledgeUnit $left, KnowledgeUnit $right) use ($topic, $inputContext, $promise): int {
+        usort($units, function (KnowledgeUnit $left, KnowledgeUnit $right) use ($topic, $inputContext, $promise, $primarySubject, $profileName): int {
             if (($promise['kind'] ?? 'none') === 'enumeration') {
                 $order = ((int) ($left->claim()['_selection_order'] ?? 0)) <=> ((int) ($right->claim()['_selection_order'] ?? 0));
                 if ($order !== 0) return $order;
@@ -71,6 +73,12 @@ final class EditorialKnowledgeSelector
             if ($directLeft !== $directRight) return $directRight <=> $directLeft;
             $score = $this->score($left->claim(), $topic, $inputContext) <=> $this->score($right->claim(), $topic, $inputContext);
             if ($score !== 0) return -$score;
+            $leftUsage = $this->usageMemory->counts((string) ($left->claim()['claim_id'] ?? ''), (string) ($primarySubject['id'] ?? ''), $profileName);
+            $rightUsage = $this->usageMemory->counts((string) ($right->claim()['claim_id'] ?? ''), (string) ($primarySubject['id'] ?? ''), $profileName);
+            $usage = ($leftUsage['recent'] + $leftUsage['same_subject']) <=> ($rightUsage['recent'] + $rightUsage['same_subject']);
+            if ($usage !== 0) return $usage;
+            $order = ((int) ($left->claim()['_selection_order'] ?? 0)) <=> ((int) ($right->claim()['_selection_order'] ?? 0));
+            if ($order !== 0) return $order;
             return strcmp((string) ($left->claim()['claim_id'] ?? ''), (string) ($right->claim()['claim_id'] ?? ''));
         });
 

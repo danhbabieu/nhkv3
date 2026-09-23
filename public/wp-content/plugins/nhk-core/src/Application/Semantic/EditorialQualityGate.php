@@ -32,12 +32,22 @@ final class EditorialQualityGate
         };
         foreach (self::DIMENSIONS as $dimension) $dimensions[$dimension] = ['status' => 'READY', 'severity' => 'INFO', 'reasons' => []];
 
+        $selectionDiagnostics = $pack->diagnostics;
+        if (in_array((string) ($selectionDiagnostics['coverage_status'] ?? ''), ['THIN', 'PARTIAL'], true)) $add('knowledge_utilization', 'WARN', 'INSUFFICIENT_READER_COVERAGE');
+        if (($selectionDiagnostics['stop_reason'] ?? '') === 'marginal_gain_low') $add('information_gain', 'WARN', 'LOW_MARGINAL_INFORMATION_GAIN');
+        if (($selectionDiagnostics['stop_reason'] ?? '') === 'context_budget') $add('information_gain', 'WARN', 'CONTEXT_BUDGET_EXCEEDED');
+        if (($selectionDiagnostics['provenance_dominated'] ?? false) === true) $add('knowledge_utilization', 'WARN', 'PROVENANCE_DOMINATED_SELECTION');
+        if (($selectionDiagnostics['duplicate_dominated'] ?? false) === true) $add('redundancy', 'WARN', 'DUPLICATE_KNOWLEDGE_DOMINATION');
+        if ((int) ($selectionDiagnostics['knowledge_unit_count'] ?? 0) > (int) ($selectionDiagnostics['selected_unit_count'] ?? 0) && (int) ($selectionDiagnostics['selected_unit_count'] ?? 0) > 0) $add('knowledge_utilization', 'INFO', 'SELECTED_KNOWLEDGE_DISCARDED');
+
         $selected = [];
         foreach ($this->publicClaims($pack) as $claim) {
             $id = trim((string) ($claim['claim_id'] ?? ''));
             if ($id !== '') $selected[$id] = $claim;
             if (($claim['eligibility'] ?? '') !== 'eligible') $add('evidence', 'BLOCK', 'INELIGIBLE_SELECTED_CLAIM');
             if (($claim['evidence']['status'] ?? 'eligible') !== 'eligible' && ($claim['evidence']['status'] ?? 'eligible') !== 'not_required') $add('evidence', 'BLOCK', 'CLAIM_EVIDENCE_NOT_ELIGIBLE');
+            if (in_array(strtoupper((string) ($claim['semantic_role'] ?? '')), ['GROUNDING', 'PROVENANCE_ONLY', 'CONTROL_ONLY'], true)) $add('knowledge_utilization', 'BLOCK', 'PUBLIC_ROLE_VIOLATION');
+            if (($claim['retrieval_origin'] ?? '') === 'neighborhood' && ($claim['applicability'] ?? 'applicable') !== 'applicable') $add('scope', 'BLOCK', 'INAPPLICABLE_NEIGHBOR_SELECTED');
         }
 
         $traceIds = [];
@@ -129,6 +139,8 @@ final class EditorialQualityGate
             elseif (!$this->containsAnyTopicTerm((string) ($link['title'] ?? '') . ' ' . $url, $topic)) $add('internal_link_quality', 'WARN', 'IRRELEVANT_INTERNAL_LINK');
         }
         if (($seo->diagnostics['cannibalization']['status'] ?? '') === 'review') $add('internal_link_quality', 'WARN', 'DUPLICATE_INTENT_REVIEW');
+        $selectedIds = array_keys($selected);
+        foreach ($seo->claimTrace as $trace) if (($trace['claim_id'] ?? '') !== '' && !in_array((string) $trace['claim_id'], $selectedIds, true)) $add('seo_readiness', 'BLOCK', 'SEO_NON_PUBLIC_KNOWLEDGE');
         if (!in_array($profile, ['article', 'video', 'image', 'media'], true)) $add('profile_fit', 'BLOCK', 'UNKNOWN_EDITORIAL_PROFILE');
         if ($profile === 'video' && (!$this->containsTopic($body, $topic) || !$this->hasCoreSpine($body, $selected))) $add('profile_fit', 'WARN', 'VIDEO_TOPIC_SPINE_WEAK');
         if (in_array($profile, ['image', 'media'], true) && !preg_match('/\b(?:hình ảnh|ảnh)\b/iu', $body)) $add('profile_fit', 'WARN', 'IMAGE_PROFILE_MARKER_MISSING');
