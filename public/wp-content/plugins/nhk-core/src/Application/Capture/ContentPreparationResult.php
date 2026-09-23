@@ -22,6 +22,7 @@ final readonly class ContentPreparationResult
      * @param list<string> $warnings
      * @param list<array<string,mixed>> $decisionTrace
      * @param list<array<string,mixed>> $constraintFindings
+     * @param list<array<string,mixed>> $dependencyFindings
      */
     public function __construct(
         public string $status,
@@ -39,6 +40,7 @@ final readonly class ContentPreparationResult
         public array $constraintFindings = [],
         public string $qualityDecision = 'READY',
         public int $repairRounds = 0,
+        public array $dependencyFindings = [],
     ) {
         if (!in_array($status, ['PREPARED', 'REVIEW_REQUIRED', 'BLOCKED'], true)) {
             throw new \InvalidArgumentException('Content preparation status is invalid.');
@@ -77,6 +79,7 @@ final readonly class ContentPreparationResult
                 is_array($value['constraint_findings'] ?? null) ? $value['constraint_findings'] : [],
                 trim((string) ($value['quality_decision'] ?? 'READY')),
                 max(0, min(3, (int) ($value['repair_rounds'] ?? 0))),
+                is_array($value['dependency_findings'] ?? null) ? $value['dependency_findings'] : [],
             );
         } catch (\Throwable) {
             return null;
@@ -102,6 +105,7 @@ final readonly class ContentPreparationResult
             'constraint_findings' => $this->constraintFindings,
             'quality_decision' => $this->qualityDecision,
             'repair_rounds' => $this->repairRounds,
+            'dependency_findings' => $this->dependencyFindings,
         ];
     }
 }

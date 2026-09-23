@@ -267,7 +267,7 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
         self::assertSame(['draft' => 1, 'semantic' => 1, 'media' => 1, 'publication' => 1, 'final' => 1], $calls);
         self::assertSame(['physical', 'draft', 'semantic', 'media', 'publication', 'final'], $events);
         self::assertSame('TEXT_ARTICLE', $first->diagnostics['content_intent']['intent']);
-        self::assertSame([['owner_type' => 'wp_post', 'owner_id' => '']], $first->diagnostics['completion']['required_owners']);
+        self::assertSame([['owner_type' => 'wp_post', 'owner_id' => '1001']], $first->diagnostics['completion']['required_owners']);
         self::assertContains('ARTICLE_NOT_PUBLISHED', $first->diagnostics['completion']['blockers']);
         self::assertNotContains('MEDIA_REQUIRED', $first->diagnostics['completion']['blockers']);
     }

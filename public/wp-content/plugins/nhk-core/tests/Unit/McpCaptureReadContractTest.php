@@ -10,11 +10,94 @@ use NHK\Core\Domain\Authority\EntityTypeRegistry;
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
 use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository, MediaUsageRepository};
+use NHK\Core\Domain\Media\{Media, MediaAsset, MediaUsage};
+use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Core\Contracts\Video\VideoRepository;
 use PHPUnit\Framework\TestCase;
 
 final class McpCaptureReadContractTest extends TestCase
 {
+    public function test_capture_readback_reconciles_current_post_and_media_usage_over_stale_receipt(): void
+    {
+        $id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+        $mediaId = UuidCodec::newV7();
+        $assetId = UuidCodec::newV7();
+        $media = new Media($mediaId, 'capture-readback-media', 'Current image', 'ready');
+        $asset = new MediaAsset($assetId, $mediaId, 'original', 'uploads/current.jpg', hash('sha256', 'current'), 'image/jpeg', 12, 1200, 800, 'PUBLIC');
+        $usage = new MediaUsage(UuidCodec::newV7(), $mediaId, 'wp_post', '1:690', 'featured_primary');
+        $record = new CaptureRecord(
+            $id,
+            'capture-current-canonical-state',
+            hash('sha256', 'capture-current-canonical-state'),
+            'FINAL_READBACK',
+            'PARTIAL',
+            690,
+            null,
+            [['kind' => 'image', 'media_id' => $mediaId, 'attachment_id' => 686, 'attachment_readback_status' => 'verified']],
+            ['content_intent' => ['intent' => 'IMAGE_ARTICLE']],
+            ['completion' => [
+                'required_owners' => [['owner_type' => 'wp_post', 'owner_id' => '']],
+                'children' => [
+                    ['completion' => [
+                        'owner_type' => 'wp_post', 'owner_id' => '', 'status' => 'PARTIAL', 'complete' => false,
+                        'canonical_state' => 'BLOCKED', 'canonical_readback' => null, 'dependency_state' => 'COMPLETE',
+                        'relation_or_usage_state' => 'PARTIAL', 'public_state' => 'NOT_APPLICABLE', 'frontend_state' => 'NOT_APPLICABLE',
+                        'blockers' => ['MEDIAUSAGE_INCOMPLETE', 'ARTICLE_MEDIA_FEATURED_MISSING', 'REQUIRED_OWNER_READBACK_UNVERIFIED'],
+                    ]],
+                    ['completion' => [
+                        'owner_type' => 'media', 'owner_id' => $mediaId, 'status' => 'PARTIAL', 'complete' => false,
+                        'canonical_state' => 'COMPLETE', 'canonical_readback' => ['canonical_id' => $mediaId],
+                        'dependency_state' => 'COMPLETE', 'relation_or_usage_state' => 'PARTIAL', 'public_state' => 'READY',
+                        'frontend_state' => 'VERIFIED', 'blockers' => ['MEDIAUSAGE_INCOMPLETE'],
+                    ]],
+                ],
+            ]],
+            [],
+            2,
+        );
+        $captures = new class($record) implements CaptureRepository {
+            public function __construct(private CaptureRecord $record) {}
+            public function findByIdempotencyKey(string $key): ?CaptureRecord { return null; }
+            public function findById(string $captureId): ?CaptureRecord { return $captureId === $this->record->captureId ? $this->record : null; }
+            public function create(CaptureRecord $record): CaptureRecord { return $record; }
+            public function save(CaptureRecord $record): CaptureRecord { return $record; }
+        };
+        $mediaRepository = new class($media) implements MediaRepository {
+            public function __construct(private Media $media) {}
+            public function findByCanonicalId(string $id): ?Media { return $id === $this->media->canonicalId ? $this->media : null; }
+            public function findByStableKey(string $key): ?Media { return null; }
+            public function create(Media $media): Media { return $media; }
+            public function update(Media $media, int $expectedRevision): Media { return $media; }
+            public function list(bool $includeRetired = false): array { return [$this->media]; }
+        };
+        $assetRepository = new class($asset) implements MediaAssetRepository {
+            public function __construct(private MediaAsset $asset) {}
+            public function findByAssetId(string $id): ?MediaAsset { return $id === $this->asset->assetId ? $this->asset : null; }
+            public function create(MediaAsset $asset): MediaAsset { return $asset; }
+            public function update(MediaAsset $asset, int $expectedRevision = 1): MediaAsset { return $asset; }
+            public function listByMediaId(string $mediaId): array { return $mediaId === $this->asset->mediaId ? [$this->asset] : []; }
+            public function findByChecksum(string $checksum): array { return []; }
+        };
+        $usageRepository = new class($usage) implements MediaUsageRepository {
+            public function __construct(private MediaUsage $usage) {}
+            public function create(MediaUsage $usage): MediaUsage { return $usage; }
+            public function listByMediaId(string $mediaId, ?string $role = null): array { return $mediaId === $this->usage->mediaId && ($role === null || $role === $this->usage->role) ? [$this->usage] : []; }
+            public function listByEndpoint(string $endpointType, string $endpointKey, ?string $role = null): array { return $endpointType === $this->usage->endpointType && $endpointKey === $this->usage->endpointKey && ($role === null || $role === $this->usage->role) ? [$this->usage] : []; }
+        };
+        $read = new McpReadHandler(
+            $this->createMock(AuthorityRepository::class), new EntityTypeRegistry(), $mediaRepository, $assetRepository, $usageRepository,
+            $this->createMock(VideoRepository::class), $this->createMock(KnowledgeRepository::class), $this->createMock(EvidenceRepository::class), captures: $captures,
+        );
+
+        $projection = $read->captureGet($id);
+
+        self::assertSame([['owner_type' => 'wp_post', 'owner_id' => '690'], ['owner_type' => 'media', 'owner_id' => $mediaId]], $projection['required_owners']);
+        self::assertSame([], $projection['missing_required_owners']);
+        self::assertNotContains('MEDIAUSAGE_INCOMPLETE', $projection['blockers']);
+        self::assertNotContains('ARTICLE_MEDIA_FEATURED_MISSING', $projection['blockers']);
+        self::assertNotContains('REQUIRED_OWNER_READBACK_UNVERIFIED', $projection['blockers']);
+    }
+
     public function test_capture_readback_is_bounded_and_does_not_expose_request_secrets(): void
     {
         $id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';

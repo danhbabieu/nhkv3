@@ -97,9 +97,12 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
                     $content = $this->replaceManagedBlock($content, $image, $attachmentId, $placementAnchor);
                 } elseif (($result['force_inline_reconcile'] ?? false) === true && $inlineIds !== []) {
                     $content = $this->replaceFirstImageBlock($content, $image, $attachmentId, $placementAnchor);
-                } elseif ($this->hasMappedInlineMedia($inlineIds, (string) ($current['featured_media_id'] ?? ''))) {
-                    // A human-selected, mapped inline image already satisfies
-                    // the mandatory editorial role. Never reorder it.
+                } elseif (!$this->hasMappedInlineMedia($inlineIds, $inlineMediaId) && $inlineIds !== []) {
+                    // The canonical MediaUsage target owns the inline slot.
+                    // A mapped legacy image is not evidence for the current
+                    // target; replace the first existing image block so the
+                    // canonical attachment is what the article renders.
+                    $content = $this->replaceFirstImageBlock($content, $image, $attachmentId, $placementAnchor);
                 } else {
                     $content = rtrim($content) . ($content === '' ? '' : "\n\n") . $this->managedBlock($attachmentId, $image, $placementAnchor);
                 }
@@ -632,9 +635,11 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
         return '';
     }
 
-    private function hasMappedInlineMedia(array $inlineIds, string $featuredMediaId): bool
+    private function hasMappedInlineMedia(array $inlineIds, string $expectedMediaId): bool
     {
-        foreach ($inlineIds as $id) { $mediaId = $this->mediaIdForAttachment((int) $id); if ($mediaId !== null && $mediaId !== $featuredMediaId) return true; }
+        foreach ($inlineIds as $id) {
+            if ($this->mediaIdForAttachment((int) $id) === trim($expectedMediaId)) return true;
+        }
         return false;
     }
 

@@ -10,6 +10,28 @@ use PHPUnit\Framework\TestCase;
 
 final class MediaServiceCompletionTest extends TestCase
 {
+    public function test_inline_reconciliation_does_not_treat_old_mapped_media_as_canonical_target(): void
+    {
+        $oldMediaId = \NHK\Core\Shared\Uuid\UuidCodec::newV7();
+        $canonicalMediaId = \NHK\Core\Shared\Uuid\UuidCodec::newV7();
+        $database = new class($oldMediaId) {
+            public string $prefix = 'wp_';
+            public function __construct(private string $oldMediaId) {}
+            public function prepare(string $query, mixed ...$args): string { return $query . ' attachment_id=' . (string) ($args[0] ?? ''); }
+            public function get_var(string $query): string { return str_contains($query, '572') ? \NHK\Core\Shared\Uuid\UuidCodec::toBinary($this->oldMediaId) : ''; }
+        };
+        $bridge = new \NHK\Core\Infrastructure\Media\WordPressMediaAttachmentBridge(
+            $database,
+            (new \ReflectionClass(MediaService::class))->newInstanceWithoutConstructor(),
+            $this->createMock(MediaRepository::class),
+            $this->createMock(MediaAssetRepository::class),
+        );
+        $method = (new \ReflectionClass($bridge))->getMethod('hasMappedInlineMedia');
+        $method->setAccessible(true);
+
+        self::assertFalse($method->invoke($bridge, [572], $canonicalMediaId));
+    }
+
     public function test_wordpress_bridge_delegates_completion_to_canonical_media_service(): void
     {
         $bridge = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Media/WordPressMediaAttachmentBridge.php');

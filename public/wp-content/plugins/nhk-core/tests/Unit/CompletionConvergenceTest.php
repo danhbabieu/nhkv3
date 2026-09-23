@@ -10,6 +10,26 @@ use PHPUnit\Framework\TestCase;
 
 final class CompletionConvergenceTest extends TestCase
 {
+    public function test_article_required_owner_uses_current_native_post_id(): void
+    {
+        $coordinator = (new \ReflectionClass(EditorialCaptureCoordinator::class))->newInstanceWithoutConstructor();
+        $method = new \ReflectionMethod($coordinator, 'requiredOwners');
+        $method->setAccessible(true);
+        $capture = new CaptureRecord(
+            'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+            'capture-owner-readback',
+            hash('sha256', 'capture-owner-readback'),
+            'ARTICLE_COMPOSED',
+            'PARTIAL',
+            690,
+        );
+
+        self::assertSame(
+            [['owner_type' => 'wp_post', 'owner_id' => '690']],
+            $method->invoke($coordinator, ['intent' => 'IMAGE_ARTICLE'], $capture, [], [], [], []),
+        );
+    }
+
     public function test_proposal_apply_is_not_public_completion(): void
     {
         $packet = (new CompletionCoordinator())->finalize('video', 'video-1', [

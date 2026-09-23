@@ -14,6 +14,22 @@ use PHPUnit\Framework\TestCase;
 
 final class EditorialCaptureSemanticCoreTest extends TestCase
 {
+    public function test_composer_projects_markdown_headings_as_wordpress_heading_blocks(): void
+    {
+        $result = (new ArticleComposer())->compose(
+            "Mở đầu.\n\n## Thông số chính\n\nNội dung chi tiết.\n\n### Ghi chú\n\nKết luận.",
+            [],
+            [],
+        );
+
+        self::assertStringContainsString('<!-- wp:heading {"level":2} -->', $result['content']);
+        self::assertStringContainsString('<h2>Thông số chính</h2>', $result['content']);
+        self::assertStringContainsString('<!-- wp:heading {"level":3} -->', $result['content']);
+        self::assertStringContainsString('<h3>Ghi chú</h3>', $result['content']);
+        self::assertStringNotContainsString('## Thông số chính', $result['content']);
+        self::assertStringNotContainsString('### Ghi chú', $result['content']);
+    }
+
     public function test_text_interpretation_resolution_and_claim_retrieval_are_deterministic_and_explainable(): void
     {
         $interpreter = new TextInputInterpreter();

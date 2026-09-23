@@ -1102,7 +1102,7 @@ final class EditorialCaptureCoordinator
         $required = match (strtoupper(trim((string) ($intent['intent'] ?? '')))) {
             'VIDEO' => [['owner_type' => 'video', 'owner_id' => $videoOwnerId]],
             'KNOWLEDGE_DELTA' => [['owner_type' => 'knowledge']],
-            'IMAGE_ARTICLE', 'TEXT_ARTICLE' => [['owner_type' => 'wp_post']],
+            'IMAGE_ARTICLE', 'TEXT_ARTICLE' => [['owner_type' => 'wp_post', 'owner_id' => $record->articleId === null ? '' : (string) $record->articleId]],
             'MEDIA_ENRICHMENT' => $mediaOwners !== [] ? $mediaOwners : [['owner_type' => 'media', 'owner_id' => '']],
             default => [],
         };

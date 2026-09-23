@@ -21,6 +21,7 @@ final class ArticleComposer
         // manifest, while preserving every user-authored paragraph.
         $userInput = $sectionParser->reconcileStale($userInput, $priorSections);
         $userInput = $sectionParser->removeOwned($userInput, $priorSections);
+        $userInput = EditorialContentProjection::toWordPressBlocks($userInput);
         $title = trim((string) ($context['title'] ?? ''));
         if ($title === '') $title = $this->title($userInput);
         $guard = $this->publicCopyGuard ?? new PublicEditorialCopyGuard();

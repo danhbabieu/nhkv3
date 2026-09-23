@@ -80,6 +80,7 @@ final class McpReadHandler
             ? $context['subject_resolution_packet']
             : (is_array($diagnostics['subject_resolution_packet'] ?? null) ? $diagnostics['subject_resolution_packet'] : null);
         $completion = is_array($diagnostics['completion'] ?? null) ? $diagnostics['completion'] : [];
+        $completion = $this->reconcileCurrentCaptureCompletion($capture, $completion);
         $children = \NHK\Core\Application\Completion\CompletionCoordinator::effectiveChildren(
             array_values(array_filter((array) ($completion['children'] ?? []), 'is_array')),
         );
@@ -131,6 +132,137 @@ final class McpReadHandler
             'enrichment' => ['complete' => ($completion['complete'] ?? false) === true, 'deep_enrichment' => $diagnostics['deep_enrichment']['status'] ?? null, 'missing' => $completion['missing_required_owners'] ?? []],
             'retry' => ['eligible' => $retry['eligible'], 'reason' => $retry['reason'], 'capture_id' => $capture->captureId],
         ];
+    }
+
+    /**
+     * Rebuild the read projection from current canonical owner/usage state.
+     * Persisted phase receipts remain audit history; they are not a source of
+     * truth for an Article or its MediaUsage after a later owner update.
+     *
+     * @param array<string,mixed> $completion
+     * @return array<string,mixed>
+     */
+    private function reconcileCurrentCaptureCompletion(\NHK\Core\Domain\Capture\CaptureRecord $capture, array $completion): array
+    {
+        $intent = strtoupper(trim((string) (($capture->context['content_intent']['intent'] ?? ''))));
+        $articleId = $capture->articleId;
+        if ($articleId === null || !in_array($intent, ['IMAGE_ARTICLE', 'TEXT_ARTICLE'], true)) return $completion;
+
+        $children = \NHK\Core\Application\Completion\CompletionCoordinator::effectiveChildren(
+            array_values(array_filter((array) ($completion['children'] ?? []), 'is_array')),
+        );
+        $blogId = function_exists('get_current_blog_id') ? max(1, (int) get_current_blog_id()) : 1;
+        $postKey = $blogId . ':' . $articleId;
+        $currentUsages = array_values(array_filter(
+            $this->usages->listByEndpoint('wp_post', $postKey),
+            static fn (\NHK\Core\Domain\Media\MediaUsage $usage): bool => $usage->activeSlot !== 'retired',
+        ));
+        $hasEmptyPostOwner = false;
+        foreach ((array) ($completion['required_owners'] ?? []) as $required) {
+            if (is_array($required) && strtolower(trim((string) ($required['owner_type'] ?? $required['type'] ?? ''))) === 'wp_post' && trim((string) ($required['owner_id'] ?? $required['id'] ?? '')) === '') {
+                $hasEmptyPostOwner = true;
+                break;
+            }
+        }
+        if ($currentUsages === [] && !$hasEmptyPostOwner) return $completion;
+        $activeMediaIds = [];
+        $activeRoles = [];
+        foreach ($currentUsages as $usage) {
+            $activeMediaIds[$usage->mediaId] = true;
+            $activeRoles[$usage->role] = true;
+        }
+
+        $requiredOwners = [];
+        foreach ((array) ($completion['required_owners'] ?? []) as $required) {
+            if (!is_array($required)) continue;
+            $type = strtolower(trim((string) ($required['owner_type'] ?? $required['type'] ?? '')));
+            if ($type === '') continue;
+            $id = trim((string) ($required['owner_id'] ?? $required['id'] ?? ''));
+            if ($type === 'wp_post') $id = (string) $articleId;
+            $requiredOwners[] = ['owner_type' => $type, 'owner_id' => $id];
+        }
+        if (!array_filter($requiredOwners, static fn (array $owner): bool => $owner['owner_type'] === 'wp_post')) {
+            $requiredOwners[] = ['owner_type' => 'wp_post', 'owner_id' => (string) $articleId];
+        }
+        if ($intent === 'IMAGE_ARTICLE') {
+            foreach ($capture->assets as $asset) {
+                if (!is_array($asset)) continue;
+                $mediaId = trim((string) ($asset['media_id'] ?? ''));
+                if ($mediaId === '' || !isset($activeMediaIds[$mediaId])) continue;
+                $requiredOwners[] = ['owner_type' => 'media', 'owner_id' => $mediaId];
+            }
+        }
+        $requiredOwners = array_values(array_unique($requiredOwners, SORT_REGULAR));
+
+        foreach ($children as $index => $child) {
+            $wrapped = is_array($child['completion'] ?? null);
+            $packet = $wrapped ? $child['completion'] : $child;
+            if (!is_array($packet)) continue;
+            $type = strtolower(trim((string) ($packet['owner_type'] ?? '')));
+            $ownerId = trim((string) ($packet['owner_id'] ?? ''));
+            if ($type === 'wp_post' && ($ownerId === '' || $ownerId === (string) $articleId)) {
+                $packet['owner_id'] = (string) $articleId;
+                $packet['canonical_readback'] = ['id' => $articleId];
+                $packet['current_outcome'] = true;
+                if ($activeRoles !== []) {
+                    $packet['relation_or_usage_state'] = 'COMPLETE';
+                    $packet['blockers'] = $this->withoutStaleArticleMediaBlockers((array) ($packet['blockers'] ?? []));
+                }
+            } elseif ($type === 'media' && $ownerId !== '' && isset($activeMediaIds[$ownerId])) {
+                $packet['canonical_readback'] = ['canonical_id' => $ownerId];
+                $packet['relation_or_usage_state'] = 'COMPLETE';
+                $packet['current_outcome'] = true;
+                $packet['blockers'] = $this->withoutStaleArticleMediaBlockers((array) ($packet['blockers'] ?? []));
+            }
+            $children[$index] = $wrapped ? ['completion' => $packet, 'current_outcome' => true] : $packet;
+        }
+        $childMediaIds = [];
+        foreach ($children as $child) {
+            $packet = is_array($child['completion'] ?? null) ? $child['completion'] : $child;
+            if (is_array($packet) && strtolower(trim((string) ($packet['owner_type'] ?? ''))) === 'media') {
+                $childMediaIds[trim((string) ($packet['owner_id'] ?? ''))] = true;
+            }
+        }
+        foreach (array_keys($activeMediaIds) as $mediaId) {
+            if (isset($childMediaIds[$mediaId])) continue;
+            $currentMedia = $this->media->findByCanonicalId($mediaId);
+            $publicReady = $currentMedia instanceof \NHK\Core\Domain\Media\Media
+                && $currentMedia->active
+                && $currentMedia->readiness === 'ready'
+                && array_filter($this->assets->listByMediaId($mediaId), static fn (\NHK\Core\Domain\Media\MediaAsset $asset): bool => $asset->visibility === 'PUBLIC') !== [];
+            $children[] = [
+                'owner_type' => 'media',
+                'owner_id' => $mediaId,
+                'canonical_readback' => ['canonical_id' => $mediaId],
+                'dependency_state' => 'COMPLETE',
+                'relation_or_usage_state' => 'COMPLETE',
+                'public_eligible' => $publicReady,
+                'frontend_verified' => $publicReady,
+                'current_outcome' => true,
+            ];
+        }
+
+        $aggregate = (new \NHK\Core\Application\Completion\CompletionCoordinator())->aggregateCapture(
+            $capture->captureId,
+            $children,
+            [
+                'canonical_readback' => ['canonical_id' => $capture->captureId],
+                'required_owners' => $requiredOwners,
+                'blockers' => $this->withoutStaleArticleMediaBlockers((array) ($completion['blockers'] ?? [])),
+            ],
+        );
+        return $aggregate;
+    }
+
+    /** @param list<mixed> $blockers @return list<string> */
+    private function withoutStaleArticleMediaBlockers(array $blockers): array
+    {
+        return array_values(array_unique(array_filter(array_map('strval', $blockers), static fn (string $blocker): bool => !in_array($blocker, [
+            'MEDIAUSAGE_INCOMPLETE',
+            'ARTICLE_MEDIA_FEATURED_MISSING',
+            'ARTICLE_MEDIA_INLINE_MISSING',
+            'REQUIRED_OWNER_READBACK_UNVERIFIED',
+        ], true))));
     }
 
     public function mediaAttachmentGet(int $attachmentId): ?array

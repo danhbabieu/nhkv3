@@ -1,3 +1,26 @@
+# Checkpoint — 2026-09-23 — Preparation dependency classification/local readiness (LOCAL / NO LIVE MUTATION)
+
+TASK_RESULT: Checkpoint 1 implementation is bounded to the preparation/readiness
+seam. `PreparationDependencyPolicy` classifies contextual findings as
+`CRITICAL_IDENTITY`, `REQUIRED_FACTUAL_DEPENDENCY`, `OPTIONAL_ENRICHMENT` or
+`PUBLICATION_ONLY`; `PreparationDependencyFinding` records existing readiness
+vocabulary and explicit escalation. `ContentPreparationResult` now exposes the
+body-free dependency findings. Owner ordering, downstream editorial engines,
+Governance authority, Media fast path and canonical identity ownership were not
+changed.
+
+VERIFICATION: Focused preparation/convergence/Video/Knowledge/Living Knowledge
+suite passed 142 tests / 632 assertions with 7 deprecations and 2 PHPUnit
+deprecations. Full Unit passed 2,332 tests / 13,550 assertions with 18 warnings,
+41 deprecations and 29 PHPUnit deprecations. Changed-file PHP lint and
+`git diff --check` passed. The full repository suite reached 2,479 tests with
+21 environment-gated integration failures requiring `NHK_WP_TEST_PATH=public`;
+no product regression was asserted and no live mutation was attempted. No
+schema migration, data mutation, staging/live mutation, publication, push or
+deployment occurred.
+
+STATUS: `CHECKPOINT_1_LOCAL_READY / FULL_UNIT_PASS / INTEGRATION_ENVIRONMENT_GATED / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-23 — Hierarchical resolver exact-base precedence (LOCAL / NO LIVE MUTATION)
 
 ROOT_CAUSE: `CanonicalAuthoritySubjectResolver::resolveComposite()` returned

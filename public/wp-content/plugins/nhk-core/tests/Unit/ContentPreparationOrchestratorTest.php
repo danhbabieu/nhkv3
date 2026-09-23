@@ -57,6 +57,93 @@ final class ContentPreparationOrchestratorTest extends TestCase
         self::assertSame(0, $enrichmentCalls);
     }
 
+    public function test_optional_ambiguous_related_subject_is_local_incomplete_and_preparation_continues(): void
+    {
+        $modelId = '11111111-1111-4111-8111-111111111111';
+        $resolver = new SubjectResolutionService(static fn (string $value): array => match ($value) {
+            'Known Model', $modelId => [['id' => $modelId, 'type' => 'model', 'stable_key' => 'nhk:model:known', 'name' => 'Known Model', 'revision' => 2]],
+            'Related Variant' => [
+                ['id' => '22222222-2222-4222-8222-222222222222', 'type' => 'variant', 'name' => 'Related Variant', 'revision' => 1],
+                ['id' => '33333333-3333-4333-8333-333333333333', 'type' => 'variant', 'name' => 'Related Variant', 'revision' => 1],
+            ],
+            default => [],
+        });
+
+        $result = (new ContentPreparationOrchestrator($resolver))->prepare(
+            ['intent' => 'VIDEO', 'canonical_uuid' => $modelId, 'subject_hints' => ['Known Model']],
+            [],
+            [],
+            [
+                'trusted_dependency_requirements' => [[
+                    'code' => 'RELATED_VARIANT_CONTEXT',
+                    'kind' => 'OPTIONAL_ENRICHMENT',
+                    'readiness' => 'INCOMPLETE',
+                    'reason' => 'Related Variant remains ambiguous and is not used by the current output.',
+                ]],
+            ],
+        );
+
+        self::assertSame('PREPARED', $result->status);
+        self::assertNotNull($result->subjectResolutionPacket);
+        self::assertSame('OPTIONAL_ENRICHMENT', $result->dependencyFindings[0]['dependency_class']);
+        self::assertSame('INCOMPLETE', $result->dependencyFindings[0]['readiness']);
+        self::assertFalse($result->dependencyFindings[0]['escalates']);
+        self::assertSame([], $result->reviewReasons);
+    }
+
+    public function test_required_factual_dependency_still_escalates_when_exact_subject_is_needed(): void
+    {
+        $modelId = '44444444-4444-4444-8444-444444444444';
+        $resolver = new SubjectResolutionService(static fn (string $value): array => $value === $modelId
+            ? [['id' => $modelId, 'type' => 'model', 'stable_key' => 'nhk:model:known', 'name' => 'Known Model', 'revision' => 2]]
+            : []);
+
+        $result = (new ContentPreparationOrchestrator($resolver))->prepare(
+            ['intent' => 'VIDEO', 'canonical_uuid' => $modelId],
+            [],
+            [],
+            [
+                'trusted_dependency_requirements' => [[
+                    'code' => 'VARIANT_TECHNICAL_FACT',
+                    'kind' => 'REQUIRED_FACTUAL_DEPENDENCY',
+                    'readiness' => 'BLOCKED',
+                    'reason' => 'The planned technical statement requires an exact Variant.',
+                ]],
+            ],
+        );
+
+        self::assertContains($result->status, ['REVIEW_REQUIRED', 'BLOCKED']);
+        self::assertSame('REQUIRED_FACTUAL_DEPENDENCY', $result->dependencyFindings[0]['dependency_class']);
+        self::assertTrue($result->dependencyFindings[0]['escalates']);
+        self::assertContains('VARIANT_TECHNICAL_FACT', array_merge($result->reviewReasons, $result->blockers));
+    }
+
+    public function test_hard_block_dependency_remains_blocked(): void
+    {
+        $modelId = '55555555-5555-4555-8555-555555555555';
+        $resolver = new SubjectResolutionService(static fn (string $value): array => $value === $modelId
+            ? [['id' => $modelId, 'type' => 'model', 'stable_key' => 'nhk:model:known', 'name' => 'Known Model', 'revision' => 2]]
+            : []);
+
+        $result = (new ContentPreparationOrchestrator($resolver))->prepare(
+            ['intent' => 'VIDEO', 'canonical_uuid' => $modelId],
+            [],
+            [],
+            [
+                'trusted_dependency_requirements' => [[
+                    'code' => 'REQUIRED_EVIDENCE_MISSING',
+                    'kind' => 'REQUIRED_FACTUAL_DEPENDENCY',
+                    'readiness' => 'BLOCKED',
+                    'escalation' => 'BLOCKED',
+                    'reason' => 'Required evidence is unavailable.',
+                ]],
+            ],
+        );
+
+        self::assertSame('BLOCKED', $result->status);
+        self::assertContains('REQUIRED_EVIDENCE_MISSING', $result->blockers);
+    }
+
     public function test_persisted_user_confirmed_subject_wins_over_ambiguous_raw_hint(): void
     {
         $subjectId = '5f6c98ca-869a-4418-a8a4-1a32eb931c5e';
