@@ -35,6 +35,64 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
         self::assertSame(['article'], $seen);
     }
 
+    public function test_retry_rehydrates_persisted_confirmation_before_weaker_subject_resolution(): void
+    {
+        $captures = new Pr5CaptureRepository();
+        $subjectId = '8f6c98ca-869a-4418-a8a4-1a32eb931c5e';
+        $resolverCalls = [];
+        $resolver = new SubjectResolutionService(static function (string $value) use (&$resolverCalls, $subjectId): array {
+            $resolverCalls[] = $value;
+            if ($value === $subjectId) return [['id' => $subjectId, 'type' => 'model', 'name' => 'Confirmed Model', 'stable_key' => 'nhk:model:confirmed', 'revision' => 4]];
+            if ($value === 'Weak ambiguous title') return [
+                ['id' => '83333333-3333-4333-8333-333333333333', 'type' => 'model', 'name' => 'Weak A', 'revision' => 1],
+                ['id' => '84444444-4444-4444-8444-444444444444', 'type' => 'model', 'name' => 'Weak B', 'revision' => 1],
+            ];
+            return [];
+        });
+        $calls = ['draft' => 0, 'semantic' => 0, 'media' => 0, 'publication' => 0, 'final' => 0];
+        $events = [];
+        $coordinator = $this->coordinator($captures, $calls, $events, subjectResolver: $resolver, preparation: new ContentPreparationOrchestrator($resolver));
+        $capture = new CaptureRecord(
+            UuidCodec::newV7(),
+            'persisted-confirmation-retry',
+            hash('sha256', 'persisted-confirmation-retry'),
+            CaptureStage::SEMANTICS_RECONCILED->value,
+            'REVIEW_REQUIRED',
+            null,
+            null,
+            [],
+            [
+                'raw_input' => 'Retry the same capture.',
+                'title' => 'Weak ambiguous title',
+                'subject_hints' => ['Weak ambiguous title'],
+                'content_intent' => ['intent' => 'TEXT_ARTICLE', 'article_required' => true],
+                'content_preparation' => ['status' => 'REVIEW_REQUIRED', 'preparation_fingerprint' => hash('sha256', 'old'), 'subject_resolution_packet' => null, 'review_reasons' => ['PRIMARY_SUBJECT_AMBIGUOUS']],
+            ],
+            [
+                'subject_reconciliation' => ['status' => 'CONFIRMED', 'candidate_uuid' => $subjectId, 'source' => 'USER_CONFIRMED_SUBJECT_RECONCILIATION'],
+                'subjects' => ['status' => 'ambiguous', 'primary' => null],
+            ],
+            [],
+        );
+        $captures->create($capture);
+
+        $result = $coordinator->retry($capture, [
+            'existing_capture_retry' => true,
+            'intent' => 'TEXT_ARTICLE',
+            'text' => 'Retry the same capture.',
+            'title' => 'Weak ambiguous title',
+            'subject_hints' => ['Weak ambiguous title'],
+        ]);
+
+        self::assertSame('PREPARED', $result->diagnostics['content_preparation']['status']);
+        self::assertSame($subjectId, $result->diagnostics['content_preparation']['subject_resolution_packet']['canonical_subject_id']);
+        self::assertSame('USER_CONFIRMED_SUBJECT_RECONCILIATION', $result->diagnostics['content_preparation']['subject_resolution_packet']['primary_source']);
+        self::assertNotContains('SUBJECT_CONFLICT_REVIEW_REQUIRED', $result->diagnostics['content_preparation']['review_reasons'] ?? []);
+        self::assertSame([$subjectId], $resolverCalls);
+        self::assertSame(1, $calls['draft']);
+        self::assertSame(1, $calls['semantic']);
+    }
+
     /** @dataProvider nonVideoIntentProvider */
     public function test_non_video_intent_never_enters_video_callbacks(string $intent, array $input, array $physicalItems): void
     {

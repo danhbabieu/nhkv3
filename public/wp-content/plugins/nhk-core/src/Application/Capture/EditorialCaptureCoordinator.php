@@ -431,6 +431,7 @@ final class EditorialCaptureCoordinator
                 $preparationContext['governance'] = is_array($input['governance'] ?? null) ? $input['governance'] : [];
                 if ($persistedPacket?->status === 'resolved') $preparationContext['persisted_subject_resolution_packet'] = $persistedPacket->toArray();
                 if (is_array($input['subject_reconciliation'] ?? null)) $preparationContext['subject_reconciliation'] = $input['subject_reconciliation'];
+                elseif (is_array($record->diagnostics['subject_reconciliation'] ?? null)) $preparationContext['subject_reconciliation'] = $record->diagnostics['subject_reconciliation'];
                 $preparationResult = $storedResult?->status === 'PREPARED'
                     ? $storedResult
                     : $this->contentPreparation->prepare($input, $interpretation, $assets, $preparationContext);

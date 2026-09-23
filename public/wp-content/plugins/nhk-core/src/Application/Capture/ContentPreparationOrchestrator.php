@@ -26,8 +26,22 @@ final class ContentPreparationOrchestrator
     public function prepare(array $input, array $interpretation, array $assets = [], array $context = []): ContentPreparationResult
     {
         $fingerprint = $this->fingerprint($input, $interpretation, $assets, $context);
-        [$authorityPacket, $subjectPrecedence] = $this->authoritativePacket($context);
-        if ($authorityPacket !== null) {
+        [$authorityPacket, $subjectPrecedence, $authorityFailure] = $this->authoritativePacket($context);
+        if ($authorityFailure) {
+            $sources = [];
+            $candidates = [];
+            $resolution = [
+                'status' => 'conflict',
+                'primary' => null,
+                'resolved' => [],
+                'subjects' => [],
+                'candidates' => [],
+                'unresolved' => [],
+                'conflicts' => [],
+                'diagnostics' => ['SUBJECT_RECONCILIATION_TARGET_INVALID'],
+                'primary_source' => 'USER_CONFIRMED_SUBJECT_RECONCILIATION',
+            ];
+        } elseif ($authorityPacket !== null) {
             $sources = ['canonical_uuid' => [$authorityPacket->canonicalSubjectId], 'stable_key' => $authorityPacket->stableKey];
             $candidates = [];
             $resolution = $authorityPacket->toResolution();
@@ -317,7 +331,7 @@ final class ContentPreparationOrchestrator
         return 'READY';
     }
 
-    /** @return array{0:?SubjectResolutionPacket,1:list<string>} */
+    /** @return array{0:?SubjectResolutionPacket,1:list<string>,2:bool} */
     private function authoritativePacket(array $context): array
     {
         $precedence = [];
@@ -327,18 +341,57 @@ final class ContentPreparationOrchestrator
             ? (is_array($reconciliation['packet'] ?? null) ? SubjectResolutionPacket::fromArray($reconciliation['packet']) : null)
             : null;
         if ($explicit !== null && $explicit->status === 'resolved') {
-            return [$explicit, ['EXPLICIT_SUBJECT_RECONCILIATION_APPLIED']];
+            if ($this->packetIsCurrent($explicit, $context)) return [$explicit, ['EXPLICIT_SUBJECT_RECONCILIATION_APPLIED'], false];
+            return [null, ['EXPLICIT_SUBJECT_RECONCILIATION_INVALID'], true];
         }
         if ($authority !== '') $precedence[] = 'EXPLICIT_SUBJECT_RECONCILIATION_INVALID';
+
+        $confirmed = ($reconciliation['confirmed'] ?? false) === true
+            || strtoupper(trim((string) ($reconciliation['status'] ?? ''))) === 'CONFIRMED';
+        $candidateId = trim((string) ($reconciliation['candidate_uuid'] ?? ''));
+        if ($confirmed) {
+            if (!\NHK\Core\Shared\Uuid\UuidCodec::isValid($candidateId)) return [null, ['CONFIRMED_SUBJECT_RECONCILIATION_INVALID'], true];
+            $persisted = is_array($context['persisted_subject_resolution_packet'] ?? null)
+                ? SubjectResolutionPacket::fromArray($context['persisted_subject_resolution_packet'])
+                : null;
+            if ($persisted !== null
+                && $persisted->status === 'resolved'
+                && hash_equals(strtolower($candidateId), strtolower($persisted->canonicalSubjectId))
+                && $this->packetIsCurrent($persisted, $context)) {
+                return [$persisted, ['PERSISTED_SUBJECT_RECONCILIATION_REUSED'], false];
+            }
+            $validated = $this->subjects->resolveSources(['canonical_uuid' => [$candidateId]]);
+            $validatedPacket = SubjectResolutionPacket::fromResolution($validated);
+            if ($validatedPacket === null
+                || $validatedPacket->status !== 'resolved'
+                || !hash_equals(strtolower($candidateId), strtolower($validatedPacket->canonicalSubjectId))
+                || !$this->packetIsCurrent($validatedPacket, $context)
+                || (isset($reconciliation['entity_type']) && strtolower((string) $reconciliation['entity_type']) !== strtolower($validatedPacket->entityType))
+                || (isset($context['required_subject_type']) && strtolower((string) $context['required_subject_type']) !== strtolower($validatedPacket->entityType))) {
+                return [null, ['CONFIRMED_SUBJECT_RECONCILIATION_INVALID'], true];
+            }
+            $confirmedPacket = new SubjectResolutionPacket(
+                'resolved',
+                $validatedPacket->canonicalSubjectId,
+                $validatedPacket->entityType,
+                $validatedPacket->stableKey,
+                $validatedPacket->canonicalName,
+                $validatedPacket->revision,
+                'user_confirmed_reconciliation',
+                array_replace($validatedPacket->diagnostics, ['diagnostics' => ['USER_CONFIRMED_SUBJECT_RECONCILIATION']]),
+                'USER_CONFIRMED_SUBJECT_RECONCILIATION',
+            );
+            return [$confirmedPacket, ['PERSISTED_SUBJECT_RECONCILIATION_HYDRATED'], false];
+        }
 
         $persisted = is_array($context['persisted_subject_resolution_packet'] ?? null)
             ? SubjectResolutionPacket::fromArray($context['persisted_subject_resolution_packet'])
             : null;
         if ($persisted !== null && $persisted->status === 'resolved') {
-            if ($this->packetIsCurrent($persisted, $context)) return [$persisted, ['PERSISTED_RESOLVED_SUBJECT_REUSED']];
+            if ($this->packetIsCurrent($persisted, $context)) return [$persisted, ['PERSISTED_RESOLVED_SUBJECT_REUSED'], false];
             $precedence[] = 'PERSISTED_SUBJECT_REOPENED';
         }
-        return [null, $precedence];
+        return [null, $precedence, false];
     }
 
     private function packetIsCurrent(SubjectResolutionPacket $packet, array $context): bool

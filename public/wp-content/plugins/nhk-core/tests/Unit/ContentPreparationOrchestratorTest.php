@@ -173,6 +173,76 @@ final class ContentPreparationOrchestratorTest extends TestCase
         self::assertTrue($result->continuationDecision?->mayContinue);
     }
 
+    public function test_persisted_confirmed_reconciliation_hydrates_packet_before_weaker_resolution(): void
+    {
+        $subjectId = '6f6c98ca-869a-4418-a8a4-1a32eb931c5e';
+        $resolverCalls = [];
+        $resolver = new SubjectResolutionService(static function (string $value) use (&$resolverCalls, $subjectId): array {
+            $resolverCalls[] = $value;
+            if ($value === $subjectId) return [['id' => $subjectId, 'type' => 'variant', 'stable_key' => 'nhk:variant:confirmed', 'name' => 'Confirmed Variant', 'revision' => 7]];
+            if ($value === 'Weak ambiguous title') return [
+                ['id' => '73333333-3333-4333-8333-333333333333', 'type' => 'variant', 'name' => 'Candidate A', 'revision' => 1],
+                ['id' => '74444444-4444-4444-8444-444444444444', 'type' => 'variant', 'name' => 'Candidate B', 'revision' => 1],
+            ];
+            return [];
+        });
+
+        $result = (new ContentPreparationOrchestrator($resolver))->prepare(
+            ['subject_hints' => ['Weak ambiguous title']],
+            [],
+            [],
+            ['subject_reconciliation' => [
+                'status' => 'CONFIRMED',
+                'candidate_uuid' => $subjectId,
+                'source' => 'USER_CONFIRMED_SUBJECT_RECONCILIATION',
+            ]],
+        );
+
+        self::assertSame('PREPARED', $result->status);
+        self::assertSame($subjectId, $result->subjectResolutionPacket?->canonicalSubjectId);
+        self::assertSame('USER_CONFIRMED_SUBJECT_RECONCILIATION', $result->subjectResolutionPacket?->primarySource);
+        self::assertContains('PERSISTED_SUBJECT_RECONCILIATION_HYDRATED', $result->diagnostics['subject_precedence'] ?? []);
+        self::assertSame([$subjectId], $resolverCalls);
+        self::assertTrue($result->continuationDecision?->mayContinue);
+    }
+
+    public function test_persisted_confirmed_reconciliation_fails_closed_when_target_is_missing(): void
+    {
+        $subjectId = '7f6c98ca-869a-4418-a8a4-1a32eb931c5e';
+        $result = (new ContentPreparationOrchestrator(new SubjectResolutionService(static fn (string $value): array => [])))->prepare(
+            ['subject_hints' => ['Weak fallback']],
+            [],
+            [],
+            ['subject_reconciliation' => ['status' => 'CONFIRMED', 'candidate_uuid' => $subjectId]],
+        );
+
+        self::assertSame('REVIEW_REQUIRED', $result->status);
+        self::assertNull($result->subjectResolutionPacket);
+        self::assertContains('SUBJECT_CONFLICT_REVIEW_REQUIRED', $result->reviewReasons);
+        self::assertContains('CONFIRMED_SUBJECT_RECONCILIATION_INVALID', $result->diagnostics['subject_precedence'] ?? []);
+    }
+
+    public function test_persisted_confirmed_reconciliation_fails_closed_when_required_type_is_invalid(): void
+    {
+        $subjectId = '8f6c98ca-869a-4418-a8a4-1a32eb931c5e';
+        $result = (new ContentPreparationOrchestrator(new SubjectResolutionService(static fn (string $value): array => [
+            ['id' => $value, 'type' => 'variant', 'stable_key' => 'nhk:variant:confirmed', 'name' => 'Confirmed Variant', 'revision' => 7],
+        ])))->prepare(
+            ['subject_hints' => ['Weak fallback']],
+            [],
+            [],
+            [
+                'required_subject_type' => 'model',
+                'subject_reconciliation' => ['status' => 'CONFIRMED', 'candidate_uuid' => $subjectId],
+            ],
+        );
+
+        self::assertSame('REVIEW_REQUIRED', $result->status);
+        self::assertNull($result->subjectResolutionPacket);
+        self::assertContains('SUBJECT_CONFLICT_REVIEW_REQUIRED', $result->reviewReasons);
+        self::assertContains('CONFIRMED_SUBJECT_RECONCILIATION_INVALID', $result->diagnostics['subject_precedence'] ?? []);
+    }
+
     public function test_persisted_auto_resolved_subject_also_beats_weaker_candidates(): void
     {
         $subjectId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
