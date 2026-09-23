@@ -17966,3 +17966,20 @@ PHP lint and `git diff --check` remain required final gates. No staging,
 production, publication, deployment or semantic mutation was performed.
 
 STATUS=`VIDEO_PUBLIC_COPY_REPAIR_IMPLEMENTED_LOCAL / FULL_UNIT_PASS / INTEGRATION_RUNTIME_BLOCKED / NO_LIVE_MUTATION`.
+
+# Checkpoint — 2026-09-23 — Video public-copy repair deployed (DEMO VERIFIED)
+
+DEPLOYMENT: Commit `90032601f790e4bc6c02685eed2a85c658dc25d9` was published to
+`origin/main` and deployed to the allowlisted `demo.1945.vn` target through the
+canonical SSH/rsync deployment wrapper. The wrapper transferred the NHK Core
+plugin, MU plugin and theme artifact; no server-side Git pull was used.
+
+READBACK: Direct MCP documentation bootstrap/list verification passed with
+source revision `90032601f790e4bc6c02685eed2a85c658dc25d9`, 50 documentation
+files, manifest hash `e079e60f03080c3c976abe1d2de0d5cd3f020c7e88c2c7a4683b1c9180787678`,
+and build identity `648014d7b7432316129051402457c648832b9456631f9605bc864b3d7284deb4`.
+Only PHP 8.5 `curl_close()` deprecation notices were emitted; deployment and
+read-back completed successfully. No semantic mutation or publication action
+was performed.
+
+STATUS=`VIDEO_PUBLIC_COPY_REPAIR_DEPLOYED / MCP_READBACK_PASS / NO_SEMANTIC_MUTATION`.
