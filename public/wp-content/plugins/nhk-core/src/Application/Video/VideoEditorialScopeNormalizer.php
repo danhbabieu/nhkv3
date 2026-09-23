@@ -7,6 +7,13 @@ namespace NHK\Core\Application\Video;
 final class VideoEditorialScopeNormalizer
 {
     /** @param array<string,mixed>|null $subject */
+    public function publicTopic(?array $subject, string $fallback = ''): string
+    {
+        $subjectName = trim((string) ($subject['name'] ?? ''));
+        return $subjectName !== '' ? $subjectName : trim($fallback);
+    }
+
+    /** @param array<string,mixed>|null $subject */
     public function topic(string $userHint, ?array $subject, string $instruction = ''): string
     {
         $instruction = trim($instruction);

@@ -45,9 +45,10 @@ final class SharedEnrichmentBoundary
         $resolution = is_array($request['subject_resolution'] ?? null) ? $request['subject_resolution'] : [];
         $subject = is_array($resolution['primary'] ?? null) ? $resolution['primary'] : (is_array($request['subject'] ?? null) ? $request['subject'] : []);
         $topic = trim((string) ($request['topic'] ?? $request['raw_input'] ?? $request['title'] ?? ''));
+        $retrievalTopic = trim((string) ($request['retrieval_topic'] ?? $topic));
         $selectionLimit = $profile === 'video' ? 6 : 8;
         $profileData = ['profile' => $profile, 'selection_limit' => $selectionLimit, 'result_limit' => 50];
-        $retrieved = $this->retrieval->retrieve($subject, $topic, (array) ($request['hints'] ?? []), $profileData);
+        $retrieved = $this->retrieval->retrieve($subject, $retrievalTopic, (array) ($request['hints'] ?? []), $profileData);
         $retrieved = $this->boundToPreparedContext($retrieved, is_array($request['prepared_context'] ?? null) ? $request['prepared_context'] : [], $subject);
         $inputContext = [
             'raw_input' => trim((string) ($request['raw_input'] ?? '')),

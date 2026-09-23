@@ -52,7 +52,12 @@ final class VideoEditorialAdapter
         $source = is_array($context['source'] ?? null) ? $context['source'] : [];
         $userHint = trim((string) ($context['user_hint'] ?? $context['raw_input'] ?? ''));
         $scope = new VideoEditorialScopeNormalizer();
-        $topic = $scope->topic($userHint, $subject, trim((string) ($context['editorial_instruction'] ?? $context['topic'] ?? '')));
+        $topic = $scope->publicTopic($subject, (string) ($source['source_title'] ?? ''));
+        $retrievalTopic = trim(implode(' ', array_filter([
+            $topic,
+            $userHint,
+            trim((string) ($context['editorial_instruction'] ?? $context['topic'] ?? '')),
+        ], static fn (string $value): bool => $value !== '')));
         $inputContext = [
             'raw_input' => $scope->input($userHint, $subject, (string) ($source['source_title'] ?? '')),
             'title' => trim((string) ($context['editorial_title'] ?? '')),
@@ -61,7 +66,7 @@ final class VideoEditorialAdapter
         $profile = ['profile' => 'video', 'selection_limit' => 6, 'result_limit' => 50];
         $shared = $this->shared?->enrich([
             'profile' => 'video', 'subject_resolution' => $resolution, 'subject' => $subject,
-            'topic' => $topic, 'raw_input' => $inputContext['raw_input'], 'title' => $inputContext['title'],
+            'topic' => $topic, 'retrieval_topic' => $retrievalTopic, 'raw_input' => $inputContext['raw_input'], 'title' => $inputContext['title'],
             'observations' => $inputContext['observations'], 'hints' => (array) ($context['hints'] ?? []),
             'relations' => is_array($context['relations'] ?? null) ? $context['relations'] : [],
         ]);

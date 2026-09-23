@@ -685,6 +685,71 @@ final class VideoSemanticCoreTest extends TestCase
         self::assertNotContains('PUBLIC_INTERNAL_JARGON_LEAK', $preview->warnings);
     }
 
+    public function test_runtime_equivalent_retry_attempt_eight_keeps_hint_and_instruction_out_of_all_public_surfaces(): void
+    {
+        $editorial = VideoEditorialAdapter::fromEngine(new ClaimRetrievalEngine(
+            static fn (array $subject): array => ['status' => 'available', 'items' => []],
+            static fn (array $subject, array $neighborhood): array => [[
+                'id' => 'claim-odo-36',
+                'subject_id' => '4cbe5aa1-4222-46bd-a140-6ab66d2da199',
+                'subject_type' => 'model',
+                'text' => 'Odo 36 có cơ cấu phát âm cơ học được dùng để minh họa cách nhận biết chuyển động.',
+                'scope' => 'model',
+                'provenance' => 'CATALOG_SUPPORTED',
+                'evidence_status' => 'SUPPORTED_WITHIN_SCOPE',
+                'decision' => 'include',
+            ]],
+        ));
+        $service = new VideoIntakeService(
+            new YouTubeSourceAdapter(static fn (object $identity): array => ['title' => 'Odo 36', 'availability' => 'available', 'embeddable' => true]),
+            $this->emptyVideos(),
+            new VideoHubClassifier(),
+            $this->planner(),
+            new VideoEditorialGenerator(),
+            new VideoCompletenessPolicy(),
+            new VideoSeoProjection(),
+            null,
+            null,
+            $editorial,
+        );
+
+        $preview = $service->preview(
+            'https://youtu.be/dQw4w9WgXcQ',
+            'semantic owner',
+            null,
+            [],
+            'semantic owner — governance reconciliation diagnostics',
+            ['id' => '4cbe5aa1-4222-46bd-a140-6ab66d2da199', 'type' => 'model', 'name' => 'Odo 36'],
+            '',
+            '',
+            false,
+            'capture:attempt-8',
+            8,
+        );
+
+        $public = $preview->package['editorial'] + [
+            'seo_title' => $preview->package['seo']['title'] ?? '',
+            'seo_description' => $preview->package['seo']['description'] ?? '',
+        ];
+        foreach (['title', 'summary', 'body', 'seo_title', 'seo_description'] as $field) {
+            self::assertStringNotContainsString('semantic owner', mb_strtolower((string) ($public[$field] ?? '')), $field);
+            self::assertStringNotContainsString('governance reconciliation diagnostics', mb_strtolower((string) ($public[$field] ?? '')), $field);
+        }
+        foreach ([
+            $preview->package['seo_projection']['title'] ?? '',
+            $preview->package['seo_projection']['description'] ?? '',
+            $preview->package['seo_projection']['open_graph']['title'] ?? '',
+            $preview->package['seo_projection']['open_graph']['description'] ?? '',
+            $preview->package['seo_projection']['video_object']['name'] ?? '',
+            $preview->package['seo_projection']['video_object']['description'] ?? '',
+        ] as $projectionCopy) {
+            self::assertStringNotContainsString('semantic owner', mb_strtolower((string) $projectionCopy));
+            self::assertStringNotContainsString('governance reconciliation diagnostics', mb_strtolower((string) $projectionCopy));
+        }
+        self::assertSame('CONTENT_COMPLETE', $preview->package['content_quality']['status']);
+        self::assertSame([], $preview->package['shared_enrichment']['diagnostics']['quality_findings'] ?? []);
+    }
+
     public function test_odo_36_10_preserves_intended_variant_for_about_and_knowledge_enrichment(): void
     {
         $types = new EntityTypeRegistry();

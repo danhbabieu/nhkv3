@@ -1,3 +1,15 @@
+# NHK V3 Execution State
+
+# Checkpoint — 2026-09-23 — Video public-topic boundary repair (LOCAL / NO SERVER ACTION)
+
+ROOT_CAUSE: Attempt 8 reproduced through `VideoIntakeService → VideoEditorialAdapter → SharedEnrichmentBoundary → ReaderJourneyPlanner → SharedEditorialComposer → EditorialQualityGate`. The persisted `editorial_instruction` value `semantic owner — governance reconciliation diagnostics` was selected by `VideoEditorialScopeNormalizer::topic()`, stored as `EditorialContextPack.topic`, then emitted by `SharedEditorialComposer::title()` and `SemanticSeoPlanner` into the title and SEO description. The exact failing spans were `semantic owner`, `governance` and `reconciliation diagnostics`; Quality Gate classified each as `PUBLIC_INTERNAL_JARGON_LEAK` from `EDITORIAL_QUALITY_GATE`.
+
+FIX: Separate retrieval direction from public topic at the Video editorial boundary. User hint and editorial instruction remain bounded retrieval context together with the canonical subject, while public composition receives only the canonical subject name or source title fallback. Shared enrichment retrieves with `retrieval_topic` but selects/composes with the reader-safe `topic`. No blacklist, phrase replacement, special case or Quality Gate change was added.
+
+REGRESSION: The new runtime-equivalent attempt-8 test was red before the fix with `VIDEO_EDITORIAL_QUALITY_BLOCKED`; after the fix it passes through the actual intake path. It verifies title, summary, body, SEO title/description and downstream SEO projection contain neither internal input nor instruction wording, while the canonical claim is selected and content quality reaches `CONTENT_COMPLETE`. Existing subject resolution, governed owner lifecycle, idempotency, convergence and generated-prose Knowledge protections remain covered by focused tests.
+
+STATUS: `LOCAL_FIX_READY_FOR_USER_DEPLOY / NO_SERVER_ACTION`.
+
 # Checkpoint — 2026-09-23 — Video runtime internal-context projection fix (LOCAL / NO SERVER ACTION)
 
 ROOT_CAUSE: The runtime-equivalent Video path passed `user_hint` through
