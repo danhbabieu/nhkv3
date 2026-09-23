@@ -903,7 +903,10 @@ final class Plugin {
                         $intent = strtoupper((string) (($capture?->context['content_intent']['intent'] ?? $input['intent'] ?? '')));
                         $selected = is_array($desiredMedia['selected'] ?? null) ? $desiredMedia['selected'] : [];
                         if ($intent === 'IMAGE_ARTICLE' && isset($selected['media_id'])) {
-                            $desiredMedia['selected']['inline_primary'] = $selected + ['role' => 'inline_primary'];
+                            $desiredMedia['selected'] = [
+                                'featured_primary' => $selected + ['role' => 'featured_primary'],
+                                'inline_primary' => $selected + ['role' => 'inline_primary'],
+                            ];
                         }
                         return ['post_id' => $postId, 'state' => $state, 'capture' => $capture, 'slug' => $state->slug, 'permalink' => $state->permalink, 'subject_resolution_packet' => $packet, 'desired_media' => $desiredMedia, 'media_context' => is_array($input['media_context'] ?? null) ? $input['media_context'] : []];
                     },
@@ -955,6 +958,8 @@ final class Plugin {
                             }
                             if ($action->action === 'CONVERGE_PRIMARY_ABOUT' && $capture instanceof \NHK\Core\Domain\Capture\CaptureRecord) {
                                 $sourceKey = (string) ($state['state']->endpointKey ?? '');
+                                $freshOwner = $editorialPosts->read($postId);
+                                $freshToken = $freshOwner?->token ?? (string) ($state['state_token'] ?? $state['state']->token);
                                 $targetId = trim((string) ($packet['canonical_subject_id'] ?? $packet['id'] ?? ''));
                                 $targetType = trim((string) ($packet['entity_type'] ?? $packet['type'] ?? ''));
                                 $commands = [];
@@ -964,7 +969,7 @@ final class Plugin {
                                     $commands[] = ['slot' => 'retire-about-' . $edge->edge_uuid, 'operation' => 'relation_retire', 'entity_type' => 'relation', 'subject_id' => $edge->edge_uuid, 'target_uuid' => $edge->edge_uuid, 'expected_revision' => $edge->revision, 'payload' => ['source_type' => 'wp_post', 'source_key' => $sourceKey, 'target_type' => $edge->target->reference->endpoint_type, 'target_key' => $edge->target->reference->endpoint_key, 'predicate' => 'about', 'capture_id' => $capture->captureId]];
                                 }
                                 $create = $targetId !== '' && $targetType !== '' ? ['slot' => 'create-about-' . $targetId, 'operation' => 'relation_create', 'entity_type' => 'relation', 'subject_id' => $sourceKey, 'target_uuid' => $targetId, 'expected_revision' => 1, 'payload' => ['source_type' => 'wp_post', 'source_key' => $sourceKey, 'target_type' => $targetType, 'target_key' => $targetId, 'predicate' => 'about', 'capture_id' => $capture->captureId, 'provenance' => 'CURRENT_EXPLICIT_SUBJECT_RECONCILIATION', 'reason' => 'Current exact canonical subject supersedes stale Article binding.']]: null;
-                                $base = ['intent' => 'reconcile', 'capture_id' => $capture->captureId, 'target_wp_post' => ['endpoint_type' => 'wp_post', 'endpoint_key' => $sourceKey], 'expected_editorial_state' => ['state_token' => (string) ($state['state_token'] ?? $state['state']->token)]];
+                                $base = ['intent' => 'reconcile', 'capture_id' => $capture->captureId, 'target_wp_post' => ['endpoint_type' => 'wp_post', 'endpoint_key' => $sourceKey], 'expected_editorial_state' => ['state_token' => $freshToken]];
                                 if ($commands !== []) {
                                     $retireResult = $articleCoordinator->execute($base + ['idempotency_key' => $capture->captureId . ':article-about-retire:' . hash('sha256', json_encode($commands, JSON_THROW_ON_ERROR)), 'semantic_bundle' => ['commands' => $commands]]);
                                     if (($retireResult->outcome ?? null) === \NHK\Core\Domain\Article\ArticleIngestOutcome::COMPLETED) {
@@ -1001,6 +1006,7 @@ final class Plugin {
                     },
                     static function (array $state) use ($articleEditorial): array {
                         $owner = $articleEditorial->read((int) ($state['post_id'] ?? 0));
+                        if (($state['publish_requested'] ?? false) !== true) return $owner !== null ? ['status' => 'verified', 'state_token' => $owner->token] : ['status' => 'blocked'];
                         return $owner !== null && $owner->status === 'publish' && $owner->permalink !== '' ? ['status' => 'verified', 'permalink' => $owner->permalink] : ['status' => 'blocked'];
                     },
                 );

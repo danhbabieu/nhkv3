@@ -101,12 +101,19 @@ class McpArticleIngestHandler
         $packet = is_array($state['subject_packet'] ?? null) ? $state['subject_packet'] : [];
         if ($packet !== []) $input['subject_resolution_packet'] = $packet;
         $desiredMedia = is_array($state['desired_media'] ?? null) ? $state['desired_media'] : [];
+        $selected = is_array($desiredMedia['selected'] ?? null) ? $desiredMedia['selected'] : [];
+        if (isset($selected['media_id'], $selected['inline_primary']) && is_array($selected['inline_primary'])) {
+            $desiredMedia['selected'] = [
+                'featured_primary' => $selected + ['role' => 'featured_primary'],
+                'inline_primary' => $selected['inline_primary'],
+            ];
+        }
         if ($desiredMedia !== []) $input['article_media'] = $desiredMedia;
         return $input;
     }
 
     /** @return array<string,mixed> */
-    private function executeReconciliation(array $input): array
+    private function executeReconciliation(array &$input): array
     {
         if (strtolower(trim((string) ($input['intent'] ?? ''))) !== 'reconcile' || !is_callable($this->reconciliationFactory)) return [];
         $target = is_array($input['target_wp_post'] ?? null) ? $input['target_wp_post'] : [];
@@ -118,7 +125,12 @@ class McpArticleIngestHandler
         $request = $input;
         $request['post_id'] = (int) $matches[1];
         $request['plan_only'] = false;
-        return $orchestrator->reconcile($request);
+        $result = $orchestrator->reconcile($request);
+        if (($result['status'] ?? '') === 'PASS' && is_array($result['state']['inspection'] ?? null)) {
+            $token = trim((string) ($result['state']['inspection']['state_token'] ?? ''));
+            if ($token !== '') $input['expected_editorial_state'] = ['state_token' => $token];
+        }
+        return $result;
     }
 
     /** @return array<string,mixed> */
