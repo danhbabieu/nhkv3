@@ -240,6 +240,23 @@ final class EditorialCaptureSemanticCoreTest extends TestCase
         self::assertSame([$variantId], array_column($resolution['subjects'], 'id'));
     }
 
+    public function test_unresolved_explicit_uuid_does_not_fall_back_to_a_weaker_subject_hint(): void
+    {
+        $explicitId = '7b9e1f7a-4b44-4a4a-9a26-0b665f41a5f0';
+        $hintId = '8c0f2e8b-5c55-4b5b-8b37-1c776f52b6a1';
+        $resolution = (new SubjectResolutionService(static fn (string $value): array => $value === 'Fallback Subject'
+            ? [['id' => $hintId, 'type' => 'model', 'name' => 'Fallback Subject', 'revision' => 1]]
+            : []))->resolveSources([
+                'canonical_uuid' => [$explicitId],
+                'subject_hints' => ['Fallback Subject'],
+            ]);
+
+        self::assertSame('unresolved', $resolution['status']);
+        self::assertNull($resolution['primary']);
+        self::assertSame([], $resolution['subjects']);
+        self::assertContains('SUBJECT_NOT_FOUND', $resolution['diagnostics']);
+    }
+
     public function test_source_ranked_resolution_keeps_explicit_model_primary_over_body_music_mention(): void
     {
         $modelId = '11111111-1111-4111-8111-111111111111';

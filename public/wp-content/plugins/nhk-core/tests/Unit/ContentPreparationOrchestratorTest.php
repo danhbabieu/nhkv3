@@ -156,7 +156,7 @@ final class ContentPreparationOrchestratorTest extends TestCase
         $enrichmentCalls = 0;
         $available = false;
         $resolver = new SubjectResolutionService(static function (string $value) use (&$available, $classificationId): array {
-            if ($value === 'Generic Model') return [['id' => '11111111-1111-4111-8111-111111111111', 'type' => 'model', 'name' => 'Generic Model', 'revision' => 3]];
+            if (in_array($value, ['11111111-1111-4111-8111-111111111111', 'Generic Model'], true)) return [['id' => '11111111-1111-4111-8111-111111111111', 'type' => 'model', 'name' => 'Generic Model', 'revision' => 3]];
             if ($value === 'Missing Classification' && $available) return [['id' => $classificationId, 'type' => 'classification', 'name' => 'Missing Classification', 'revision' => 2]];
             return [];
         });
@@ -261,7 +261,7 @@ final class ContentPreparationOrchestratorTest extends TestCase
         $enrichmentCalls = 0;
         $classificationId = '55555555-5555-4555-8555-555555555555';
         $resolver = new SubjectResolutionService(static function (string $value) use (&$available, $classificationId): array {
-            if ($value === 'Generic Model') return [['id' => '11111111-1111-4111-8111-111111111111', 'type' => 'model', 'name' => 'Generic Model', 'revision' => 1]];
+            if (in_array($value, ['11111111-1111-4111-8111-111111111111', 'Generic Model'], true)) return [['id' => '11111111-1111-4111-8111-111111111111', 'type' => 'model', 'name' => 'Generic Model', 'revision' => 1]];
             if ($value === 'New Classification' && $available) return [['id' => $classificationId, 'type' => 'classification', 'name' => 'New Classification', 'revision' => 2]];
             return [];
         });

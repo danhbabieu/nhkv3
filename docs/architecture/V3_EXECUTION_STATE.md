@@ -1,3 +1,13 @@
+# Checkpoint — 2026-09-23 — Capture pipeline convergence Task 2 subject packet/continuation (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE: `SubjectResolutionService` attempted weaker stable-key or prose-hint resolution after an explicit canonical UUID failed to resolve. This could replace an unresolved exact identity with a different subject. Existing preparation fixtures also assumed an unresolvable UUID could fall back to a prose hint, which contradicted the canonical identity contract.
+
+FIXED_BOUNDARY: Explicit canonical UUID and stable-key sources are now authoritative and fail closed when unresolved; weaker hints/title/body sources are only consulted when stronger identity sources are absent. Existing packet precedence, continuation and rehydration paths remain unchanged.
+
+VERIFICATION: Task 2 focused suite passed 110 tests / 539 assertions. Full NHK Unit passed 2,314 tests / 13,505 assertions with 18 warnings, 39 deprecations and 29 PHPUnit deprecations. The red-first regression failed before the fix and passed after it. Changed-file PHP lint and `git diff --check` passed. No database, staging, V2 or production mutation occurred.
+
+STATUS: `CAPTURE_PIPELINE_TASK_2_SUBJECT_PACKET_CONTINUATION_LOCAL_READY / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-23 — Capture pipeline convergence Task 1 intent isolation (LOCAL / NO LIVE MUTATION)
 
 ROOT_CAUSE: The shared Capture coordinator invoked Video enrichment from the presence of a Video input and invoked `videoPublicationVerifier` unconditionally after semantic reconciliation. Explicit non-VIDEO intents could therefore acquire an unrequested Video child or blocker; Video subject hints also entered non-VIDEO resolution.
