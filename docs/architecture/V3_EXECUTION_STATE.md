@@ -1,3 +1,11 @@
+# Checkpoint — 2026-09-23 — Capture pipeline convergence Task 6 state-token rehydration (LOCAL / NO LIVE MUTATION)
+
+TASK_RESULT: No product-code change was required. Existing retry boundaries rehydrate current Article state, enforce expected state tokens/CAS, persist token rotation after MediaUsage/publication read-back, and retain append-only receipts while reducing the current outcome.
+
+VERIFICATION: State/retry-focused suite passed 53 tests / 256 assertions. Coverage includes stale token rejection, retry after owner mutation, receipt continuation and current-outcome convergence. No database, staging, V2 or production mutation occurred.
+
+STATUS: `CAPTURE_PIPELINE_TASK_6_STATE_TOKEN_REHYDRATION_LOCAL_READY / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-23 — Capture pipeline convergence Task 5 Article fields/read-back (LOCAL / NO LIVE MUTATION)
 
 TASK_RESULT: No product-code change was required. The existing Article ingest boundary normalizes documented aliases to native `post_*`/category/featured fields, rejects unknown fields, applies CAS/idempotency and compares every requested field against canonical native read-back with field-level mismatch reasons.
