@@ -8,10 +8,12 @@ final class EditorialKnowledgeSelector
 {
     private const SUPPORTED_PROFILES = ['article', 'video', 'image', 'media'];
     private TopicFulfillment $topicFulfillment;
+    private EditorialSemanticRolePolicy $rolePolicy;
 
-    public function __construct(?TopicFulfillment $topicFulfillment = null)
+    public function __construct(?TopicFulfillment $topicFulfillment = null, ?EditorialSemanticRolePolicy $rolePolicy = null)
     {
         $this->topicFulfillment = $topicFulfillment ?? new TopicFulfillment();
+        $this->rolePolicy = $rolePolicy ?? new EditorialSemanticRolePolicy();
     }
 
     /** @param array<string,mixed> $retrieval @param array<string,mixed> $primarySubject @param array<string,mixed> $profile @param array<string,mixed> $inputContext */
@@ -34,7 +36,25 @@ final class EditorialKnowledgeSelector
         $inputTokens = $this->tokens((string) ($inputContext['raw_input'] ?? ''));
         $topicTokens = $this->tokens($topic);
         $ranked = [];
+        $excluded = [];
+        $grounding = [];
+        $readerFacts = [];
+        $supportingContext = [];
+        $specimenContext = [];
+        $controlProvenance = [];
         foreach ($eligible as $order => $candidate) {
+            $candidate = $this->rolePolicy->classify($candidate, $primarySubject, ['profile' => $profileName, 'topic' => $topic, 'input' => $inputContext]);
+            $role = (string) ($candidate['semantic_role'] ?? 'READER_FACT');
+            if (in_array($role, ['GROUNDING', 'PROVENANCE_ONLY'], true)) $grounding[] = $candidate;
+            elseif ($role === 'SUPPORTING_CONTEXT') $supportingContext[] = $candidate;
+            elseif ($role === 'SPECIMEN_CONTEXT') $specimenContext[] = $candidate;
+            elseif ($role === 'CONTROL_ONLY') $controlProvenance[] = $candidate;
+            else $readerFacts[] = $candidate;
+            if (($candidate['publicly_composable'] ?? false) !== true) {
+                $candidate['exclusion_reasons'] = array_values(array_unique(array_merge((array) ($candidate['exclusion_reasons'] ?? []), ['NOT_PUBLICLY_COMPOSABLE'])));
+                $excluded[] = $candidate;
+                continue;
+            }
             $utility = $this->utility($candidate, $topicTokens, $inputTokens, $profileName);
             $candidate['utility'] = $utility;
             $candidate['editorial_role'] = 'CONTEXT';
@@ -82,6 +102,14 @@ final class EditorialKnowledgeSelector
 
         $visualSupport = $this->visualSupport($selected);
         $status = $selected !== [] ? 'available' : ($eligible === [] ? 'no_eligible_claims' : 'no_useful_claims');
+        foreach ($selected as &$candidate) {
+            $candidate['state'] = EditorialSemanticRolePolicy::SELECTED;
+            $candidate['publicly_composable'] = true;
+        }
+        unset($candidate);
+        $readerFacts = array_values(array_filter($readerFacts, static fn (array $candidate): bool => ($candidate['publicly_composable'] ?? false) === true));
+        $supportingContext = array_values(array_filter($supportingContext, static fn (array $candidate): bool => ($candidate['publicly_composable'] ?? false) === true));
+        $specimenContext = array_values(array_filter($specimenContext, static fn (array $candidate): bool => ($candidate['publicly_composable'] ?? false) === true));
         return $this->pack($status, $primarySubject, $topic, $profile, $retrievalStatus, $selected, $excluded, [], [
             'profile' => $profileName,
             'selection_limit' => $limit,
@@ -90,12 +118,12 @@ final class EditorialKnowledgeSelector
             'excluded_count' => count($excluded),
             'policy_version' => 'editorial-selection-v1',
             'information_gain' => array_sum(array_map(static fn (array $item): float => (float) ($item['utility']['information_gain'] ?? 0.0), $selected)),
-        ], $visualSupport, $inputContext);
+        ], $visualSupport, $inputContext, $grounding, $readerFacts, $supportingContext, $specimenContext, $controlProvenance);
     }
 
-    private function pack(string $status, array $subject, string $topic, array $profile, string $retrievalStatus, array $selected, array $excluded, array $blockers, array $diagnostics, array $visualSupport = [], array $inputContext = []): EditorialContextPack
+    private function pack(string $status, array $subject, string $topic, array $profile, string $retrievalStatus, array $selected, array $excluded, array $blockers, array $diagnostics, array $visualSupport = [], array $inputContext = [], array $grounding = [], array $readerFacts = [], array $supportingContext = [], array $specimenContext = [], array $controlProvenance = []): EditorialContextPack
     {
-        return new EditorialContextPack($status, $subject, trim($topic), $profile, $retrievalStatus, array_values($selected), array_values($excluded), $inputContext, array_values($visualSupport), array_values($blockers), $diagnostics);
+        return new EditorialContextPack($status, $subject, trim($topic), $profile, $retrievalStatus, array_values($selected), array_values($excluded), $inputContext, array_values($visualSupport), array_values($blockers), $diagnostics, 1, array_values($grounding), array_values($readerFacts), array_values($supportingContext), array_values($specimenContext), array_values($controlProvenance));
     }
 
     private function utility(array $candidate, array $topicTokens, array $inputTokens, string $profile): array

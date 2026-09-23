@@ -410,6 +410,9 @@ final class VideoEditorialResumePlanner
     {
         $draft = $shared['draft'];
         $seo = $shared['seo_plan'];
+        $knowledgeMapping = ($shared['pack'] ?? null) instanceof \NHK\Core\Application\Semantic\EditorialContextPack
+            ? (new VideoEditorialKnowledgeMapper())->map($shared['pack'])
+            : ['facts' => [], 'related_knowledge' => [], 'claim_dependencies' => []];
         $editorial = [
             'title' => $draft->title,
             'summary' => $draft->summary,
@@ -417,11 +420,11 @@ final class VideoEditorialResumePlanner
             'claim_trace' => $draft->claimTrace,
             'why_this_matters' => 'Giúp người xem bắt đầu từ video và nhận biết đúng chủ đề đang được trình bày.',
             'context' => trim((string) ($source['source_title'] ?? '')) !== '' ? [['text' => (string) $source['source_title'], 'provenance' => 'SOURCE_FACT']] : [],
-            'facts' => [],
-            'related_knowledge' => [],
+            'facts' => $knowledgeMapping['facts'],
+            'related_knowledge' => $knowledgeMapping['related_knowledge'],
             'compliance_context' => ['source' => 'shared_editorial_quality_gate'],
         ];
-        $package = ['canonical_id' => $videoId, 'source' => $source, 'editorial' => $editorial, 'seo' => ['title' => $seo->title, 'description' => $seo->metaDescription], 'subject_resolution_packet' => $subject, 'semantic_claim_trace' => $draft->claimTrace, 'content_quality' => ['status' => $shared['quality_report']->readiness === 'READY' ? 'CONTENT_COMPLETE' : 'NEEDS_REVIEW', 'blockers' => $shared['quality_report']->blockers, 'warnings' => $shared['quality_report']->warnings]];
+        $package = ['canonical_id' => $videoId, 'source' => $source, 'editorial' => $editorial, 'seo' => ['title' => $seo->title, 'description' => $seo->metaDescription], 'subject_resolution_packet' => $subject, 'semantic_claim_trace' => $draft->claimTrace, 'editorial_claim_dependencies' => $knowledgeMapping['claim_dependencies'], 'content_quality' => ['status' => $shared['quality_report']->readiness === 'READY' ? 'CONTENT_COMPLETE' : 'NEEDS_REVIEW', 'blockers' => $shared['quality_report']->blockers, 'warnings' => $shared['quality_report']->warnings]];
         return [
             'editorial' => $editorial,
             'seo' => $package['seo'],

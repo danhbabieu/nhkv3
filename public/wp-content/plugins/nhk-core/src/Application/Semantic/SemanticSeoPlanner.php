@@ -20,12 +20,13 @@ final class SemanticSeoPlanner
         $canonical = trim((string) ($identity['canonical_url'] ?? ''));
         $canonicalIdentity = ($identity['canonical_identity'] ?? $canonical !== '') === true;
         $publicEligible = ($identity['public_eligible'] ?? true) === true;
-        $fulfillment = (new TopicFulfillment())->evaluate($pack->topic, $pack->selectedClaims, $draft->body);
+        $claims = $this->publicClaims($pack);
+        $fulfillment = (new TopicFulfillment())->evaluate($pack->topic, $claims, $draft->body);
         $topic = $fulfillment['fulfilled'] ? $pack->topic : $this->narrowTopic($pack->topic);
-        $intent = $this->intent($topic, $pack->selectedClaims);
+        $intent = $this->intent($topic, $claims);
         $title = $this->title($topic, $profile);
         $h1 = trim($topic);
-        $meta = $this->meta($topic, $pack->selectedClaims);
+        $meta = $this->meta($topic, $claims, $draft);
         (new PublicEditorialCopyGuard())->assertSafe($title);
         (new PublicEditorialCopyGuard())->assertSafe($h1);
         (new PublicEditorialCopyGuard())->assertSafe($meta);
@@ -42,13 +43,13 @@ final class SemanticSeoPlanner
             'structured_data_applicable' => ($context['structured_data_applicable'] ?? true) === true,
         ]);
         $canonicalUrl = $readinessResult->status() === SeoReadinessResult::READY ? $canonical : null;
-        $cluster = $this->cluster($topic, $pack->selectedClaims, (array) ($context['dictionary_terms'] ?? []));
+        $cluster = $this->cluster($topic, $claims, (array) ($context['dictionary_terms'] ?? []));
         $dictionary = $this->dictionary((array) ($context['dictionary_terms'] ?? []));
         $links = $this->links((array) ($context['internal_link_candidates'] ?? []), $canonicalUrl);
         $cannibalization = $this->cannibalization($pack->primarySubject, $intent, (array) ($context['competing_pages'] ?? []));
-        $structured = $this->structured($context['structured_data'] ?? null, $canonicalUrl, $title, $pack->selectedClaims);
-        $trace = array_values(array_map(static fn (array $claim): array => ['claim_id' => (string) ($claim['claim_id'] ?? ''), 'claim_revision' => max(1, (int) ($claim['claim_revision'] ?? 1)), 'original_subject' => $claim['original_subject'] ?? [], 'editorial_role' => (string) ($claim['editorial_role'] ?? '')], array_filter($pack->selectedClaims, 'is_array')));
-        $diagnostics = ['cannibalization' => $cannibalization, 'profile' => $profile, 'selected_claim_count' => count($trace), 'projection_only' => true, 'policy_version' => 'semantic-seo-v1', 'topic_fulfillment' => $fulfillment, 'title_narrowed' => $topic !== $pack->topic, 'semantic_cluster_sources' => $this->clusterSources($cluster, $topic, $pack->selectedClaims, (array) ($context['dictionary_terms'] ?? []))];
+        $structured = $this->structured($context['structured_data'] ?? null, $canonicalUrl, $title, $claims);
+        $trace = array_values(array_map(static fn (array $claim): array => ['claim_id' => (string) ($claim['claim_id'] ?? ''), 'claim_revision' => max(1, (int) ($claim['claim_revision'] ?? 1)), 'original_subject' => $claim['original_subject'] ?? [], 'editorial_role' => (string) ($claim['editorial_role'] ?? '')], array_filter($claims, 'is_array')));
+        $diagnostics = ['cannibalization' => $cannibalization, 'profile' => $profile, 'selected_claim_count' => count($trace), 'projection_only' => true, 'policy_version' => 'semantic-seo-v1', 'topic_fulfillment' => $fulfillment, 'title_narrowed' => $topic !== $pack->topic, 'semantic_cluster_sources' => $this->clusterSources($cluster, $topic, $claims, (array) ($context['dictionary_terms'] ?? []))];
         if ($profile === '' || !in_array($profile, self::PROFILES, true)) $readinessResult = new \NHK\Core\Domain\Seo\SeoReadinessResult(SeoReadinessResult::NOT_APPLICABLE, ['PROFILE_UNSUPPORTED']);
         return new SemanticSeoPlan($readinessResult->status(), $profile, $intent, $pack->primarySubject, $pack->topic, $cluster, $title, $h1, $meta, $canonicalUrl, ['title' => $title, 'description' => $meta, 'canonical' => $canonicalUrl], $links, $dictionary, $structured, $trace, $diagnostics, $readinessResult->reasons());
     }
@@ -67,7 +68,7 @@ final class SemanticSeoPlanner
         return trim($topic) . $suffix;
     }
 
-    private function meta(string $topic, array $claims): string
+    private function meta(string $topic, array $claims, EditorialDraft $draft): string
     {
         $extra = '';
         $topicKey = $this->phraseKey($topic);
@@ -78,8 +79,27 @@ final class SemanticSeoPlanner
             $extra = $candidate;
             break;
         }
+        $readerCopy = trim($draft->summary . ' ' . $draft->body);
+        if ($extra === '' && $readerCopy !== '') $extra = $this->readerSentence($readerCopy, $topic);
         $text = trim($topic) . ($extra !== '' ? ' — ' . trim($extra, " .!?\t\n\r\0\x0B") : '');
         return function_exists('mb_substr') ? mb_substr($text, 0, 155) : substr($text, 0, 155);
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function publicClaims(EditorialContextPack $pack): array
+    {
+        $buckets = array_merge($pack->readerFacts, $pack->supportingContext, $pack->specimenContext);
+        $claims = $buckets !== [] ? $buckets : $pack->selectedClaims;
+        return array_values(array_filter($claims, static fn (mixed $claim): bool => is_array($claim) && ($claim['eligibility'] ?? 'eligible') === 'eligible' && ($claim['publicly_composable'] ?? true) === true));
+    }
+
+    private function readerSentence(string $copy, string $topic): string
+    {
+        foreach (preg_split('/(?<=[.!?])\s+/u', $copy) ?: [] as $sentence) {
+            $sentence = trim((string) $sentence, " .!?\t\n\r\0\x0B");
+            if ($sentence !== '' && $this->phraseKey($sentence) !== $this->phraseKey($topic) && $this->overlap($topic, $sentence) < 0.8) return $sentence;
+        }
+        return '';
     }
 
     private function cluster(string $topic, array $claims, array $dictionary): array

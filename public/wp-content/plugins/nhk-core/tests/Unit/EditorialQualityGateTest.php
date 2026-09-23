@@ -245,6 +245,19 @@ final class EditorialQualityGateTest extends TestCase
         self::assertNotContains('INELIGIBLE_CLAIM_USED', $report->blockers);
     }
 
+    public function test_provenance_dominated_public_copy_is_reported_without_promoting_provenance_to_reader_fact(): void
+    {
+        $provenance = ['claim_id' => 'source-1', 'claim_revision' => 1, 'text' => 'Nguồn xác nhận phạm vi của đối tượng.', 'eligibility' => 'eligible', 'semantic_role' => 'PROVENANCE_ONLY', 'publicly_composable' => false, 'editorial_role' => 'CONTEXT', 'original_subject' => ['id' => self::SUBJECT, 'type' => 'model']];
+        $fact = ['claim_id' => 'fact-1', 'claim_revision' => 1, 'text' => 'Odo 36 có ba phiên bản vách máy.', 'eligibility' => 'eligible', 'semantic_role' => 'READER_FACT', 'publicly_composable' => true, 'editorial_role' => 'CORE', 'original_subject' => ['id' => self::SUBJECT, 'type' => 'model']];
+        $pack = new EditorialContextPack('available', ['id' => self::SUBJECT, 'type' => 'model'], $this->topic(), ['profile' => 'article'], 'available', [$provenance, $fact], [], ['raw_input' => 'Odo 36'], [], [], [], 1, [$provenance], [$fact]);
+        $draft = new EditorialDraft('available', 'article', $this->topic(), 'Odo 36 có ba phiên bản.', 'Odo 36 có ba phiên bản. Nguồn xác nhận phạm vi của đối tượng.', [['claim_id' => 'fact-1', 'claim_revision' => 1]], ['information_gain' => 0.7]);
+
+        $report = $this->gate()->evaluate($pack, $this->plan(), $draft, $this->seo());
+
+        self::assertContains('PROVENANCE_DOMINATED_PUBLIC_CONTENT', $report->warnings);
+        self::assertNotContains('source-1', array_column($pack->readerFacts, 'claim_id'));
+    }
+
     public function test_coherent_reader_journey_is_not_buried(): void
     {
         $report = $this->gate()->evaluate($this->pack(), $this->plan(), $this->draft(), $this->seo());

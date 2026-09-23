@@ -3,7 +3,8 @@ declare(strict_types=1);
 
 namespace NHK\Tests\Unit;
 
-use NHK\Core\Application\Video\{VideoCompletenessPolicy, VideoEditorialEnrichmentService, VideoEditorialQualityPolicy};
+use NHK\Core\Application\Semantic\EditorialContextPack;
+use NHK\Core\Application\Video\{VideoCompletenessPolicy, VideoEditorialEnrichmentService, VideoEditorialKnowledgeMapper, VideoEditorialQualityPolicy};
 use NHK\Core\Domain\Video\{VideoEditorialEnrichmentContext, VideoEditorialQuality};
 use PHPUnit\Framework\TestCase;
 
@@ -110,6 +111,22 @@ final class VideoEditorialEnrichmentTest extends TestCase
         self::assertSame(VideoEditorialQuality::NEEDS_REVIEW, $quality->status);
         self::assertContains('EDITORIAL_BODY_TRIVIAL', $quality->blockers);
         self::assertContains('EDITORIAL_SUMMARY_TRIVIAL', $quality->blockers);
+    }
+
+    public function test_shared_pack_maps_reader_claims_but_not_provenance_into_video_package_fields(): void
+    {
+        $pack = new EditorialContextPack('available', ['id' => self::VARIANT, 'type' => 'variant'], 'Odo 36/8', ['profile' => 'video'], 'available', [
+            ['claim_id' => 'fact-1', 'claim_revision' => 2, 'text' => 'Odo 36/8 dùng máy ba vách.', 'semantic_role' => 'READER_FACT', 'publicly_composable' => true, 'eligibility' => 'eligible'],
+            ['claim_id' => 'support-1', 'claim_revision' => 1, 'text' => 'Cấu hình này giúp nhận biết mẫu.', 'semantic_role' => 'SUPPORTING_CONTEXT', 'publicly_composable' => true, 'eligibility' => 'eligible'],
+            ['claim_id' => 'prov-1', 'claim_revision' => 1, 'text' => 'Nguồn xác nhận subject canonical.', 'semantic_role' => 'PROVENANCE_ONLY', 'publicly_composable' => false, 'eligibility' => 'eligible'],
+        ], [], ['raw_input' => 'Video Odo 36/8']);
+
+        $mapped = (new VideoEditorialKnowledgeMapper())->map($pack);
+
+        self::assertSame(['fact-1', 'support-1'], array_column($mapped['facts'], 'claim_id'));
+        self::assertSame(['fact-1', 'support-1'], array_column($mapped['related_knowledge'], 'claim_id'));
+        self::assertSame(['fact-1', 'support-1'], array_column($mapped['claim_dependencies'], 'id'));
+        self::assertNotContains('prov-1', array_column($mapped['facts'], 'claim_id'));
     }
 
     public function test_content_quality_accepts_context_rich_scoped_body(): void

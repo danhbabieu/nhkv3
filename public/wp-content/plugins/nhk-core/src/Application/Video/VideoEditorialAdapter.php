@@ -74,14 +74,15 @@ final class VideoEditorialAdapter
         $pack = $shared['content']['pack'] ?? $this->selector->select($retrieved, $topic, $subject, $profile, $inputContext);
         $plan = $this->journey->plan($pack);
         $draft = $this->composer->compose($plan);
-        $seo = $this->seo->plan($pack, $plan, $draft, [
+        $seoContext = [
             'public_identity' => is_array($context['public_identity'] ?? null) ? $context['public_identity'] : [],
             'runtime_available' => ($context['runtime_available'] ?? true) === true,
             'internal_link_candidates' => is_array($context['internal_link_candidates'] ?? null) ? $context['internal_link_candidates'] : [],
             'dictionary_terms' => is_array($context['dictionary_terms'] ?? null) ? $context['dictionary_terms'] : [],
             'competing_pages' => is_array($context['competing_pages'] ?? null) ? $context['competing_pages'] : [],
             'structured_data' => ['type' => 'VideoObject'],
-        ]);
+        ];
+        $seo = $this->seo->plan($pack, $plan, $draft, $seoContext);
         $attemptId = trim((string) ($context['attempt_id'] ?? ''));
         $attemptNo = max(0, (int) ($context['attempt_no'] ?? 0));
         $qualityPackage = ['title' => $draft->title, 'summary' => $draft->summary, 'body' => $draft->body, 'seo_title' => $seo->title, 'seo_description' => $seo->metaDescription];
@@ -105,8 +106,7 @@ final class VideoEditorialAdapter
                 'claims' => $pack->selectedClaims,
             ],
             ['statement_decision' => $statementDecision->toArray()],
-            static fn (array $package): array => $package,
-            function (array $package, array $decisionContext, int $round) use ($copyGuard, $pack, $plan, $seo, $draft, $context, $attemptId, $attemptNo, &$qualityReevaluations): array {
+            function (array $package, array $decisionContext, int $round) use ($pack, $plan, $draft, $seoContext): array {
                 $currentDraft = new EditorialDraft(
                     $draft->status,
                     $draft->profile,
@@ -116,25 +116,20 @@ final class VideoEditorialAdapter
                     $draft->claimTrace,
                     $draft->diagnostics,
                 );
-                $currentSeo = new SemanticSeoPlan(
-                    $seo->readiness,
-                    $seo->profile,
-                    $seo->searchIntent,
-                    $seo->primarySubject,
-                    $seo->topicFocus,
-                    $seo->semanticCluster,
-                    (string) ($package['seo_title'] ?? $seo->title),
-                    $seo->h1,
-                    (string) ($package['seo_description'] ?? $seo->metaDescription),
-                    $seo->canonicalUrl,
-                    $seo->openGraph,
-                    $seo->internalLinks,
-                    $seo->dictionaryContext,
-                    $seo->structuredData,
-                    $seo->claimTrace,
-                    $seo->diagnostics,
-                    $seo->blockers,
+                $currentSeo = $this->seo->plan($pack, $plan, $currentDraft, $seoContext);
+                return ['seo_title' => $currentSeo->title, 'seo_description' => $currentSeo->metaDescription];
+            },
+            function (array $package, array $decisionContext, int $round) use ($copyGuard, $pack, $plan, $seoContext, $draft, $context, $attemptId, $attemptNo, &$qualityReevaluations): array {
+                $currentDraft = new EditorialDraft(
+                    $draft->status,
+                    $draft->profile,
+                    (string) ($package['title'] ?? $draft->title),
+                    (string) ($package['summary'] ?? $draft->summary),
+                    (string) ($package['body'] ?? $draft->body),
+                    $draft->claimTrace,
+                    $draft->diagnostics,
                 );
+                $currentSeo = $this->seo->plan($pack, $plan, $currentDraft, $seoContext);
                 $currentPackage = ['title' => $currentDraft->title, 'summary' => $currentDraft->summary, 'body' => $currentDraft->body, 'seo_title' => $currentSeo->title, 'seo_description' => $currentSeo->metaDescription];
                 $currentFingerprint = hash('sha256', (string) json_encode($currentPackage, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
                 $qualityReevaluations[] = $this->quality->evaluate($pack, $plan, $currentDraft, $currentSeo, ($context['public_identity_deferred'] ?? false) === true, $round, $currentFingerprint, $attemptId, $attemptNo)->toArray();
@@ -145,7 +140,7 @@ final class VideoEditorialAdapter
         );
 
         $finalDraft = new EditorialDraft($draft->status, $draft->profile, (string) ($decision['editorial_package']['title'] ?? $draft->title), (string) ($decision['editorial_package']['summary'] ?? $draft->summary), (string) ($decision['editorial_package']['body'] ?? $draft->body), $draft->claimTrace, $draft->diagnostics);
-        $finalSeo = new SemanticSeoPlan($seo->readiness, $seo->profile, $seo->searchIntent, $seo->primarySubject, $seo->topicFocus, $seo->semanticCluster, (string) ($decision['editorial_package']['seo_title'] ?? $seo->title), $seo->h1, (string) ($decision['editorial_package']['seo_description'] ?? $seo->metaDescription), $seo->canonicalUrl, $seo->openGraph, $seo->internalLinks, $seo->dictionaryContext, $seo->structuredData, $seo->claimTrace, $seo->diagnostics, $seo->blockers);
+        $finalSeo = $this->seo->plan($pack, $plan, $finalDraft, $seoContext);
         $finalPackage = ['title' => $finalDraft->title, 'summary' => $finalDraft->summary, 'body' => $finalDraft->body, 'seo_title' => $finalSeo->title, 'seo_description' => $finalSeo->metaDescription];
         $finalFingerprint = hash('sha256', (string) json_encode($finalPackage, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
         $quality = $this->quality->evaluate($pack, $plan, $finalDraft, $finalSeo, ($context['public_identity_deferred'] ?? false) === true, (int) ($decision['rounds'] ?? 0), $finalFingerprint, $attemptId, $attemptNo);

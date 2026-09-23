@@ -88,6 +88,24 @@ final class EditorialKnowledgeSelectorTest extends TestCase
         self::assertSame([], $pack->selectedClaims);
     }
 
+    public function test_provenance_claim_cannot_become_core_when_useful_domain_knowledge_is_available(): void
+    {
+        $provenance = $this->claim('provenance', 'The source identifies the video as concerning Odo 36/8.', 1, 'direct');
+        $provenance['claim_type'] = 'provenance';
+        $provenance['provenance'] = 'EXTERNAL_RESEARCH';
+        $domain = $this->claim('domain', 'Odo 36/8 dùng máy ba vách với cấu hình chuông.', 1, 'direct');
+        $retrieval = ['status' => 'available', 'eligible_claims' => [$provenance, $domain], 'items' => [$provenance, $domain]];
+
+        $pack = $this->selector()->select($retrieval, 'Odo 36/8', ['id' => self::SUBJECT, 'type' => 'model', 'name' => 'Odo 36/8'], ['profile' => 'video']);
+
+        self::assertSame('domain', $pack->selectedClaims[0]['claim_id']);
+        self::assertSame('CORE', $pack->selectedClaims[0]['editorial_role']);
+        self::assertSame('provenance', $pack->grounding[0]['claim_id']);
+        self::assertSame('PROVENANCE_ONLY', $pack->grounding[0]['semantic_role']);
+        self::assertFalse($pack->grounding[0]['publicly_composable']);
+        self::assertSame('domain', $pack->readerFacts[0]['claim_id']);
+    }
+
     private function selector(): EditorialKnowledgeSelector
     {
         return new EditorialKnowledgeSelector();

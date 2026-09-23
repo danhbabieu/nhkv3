@@ -93,6 +93,18 @@ final class SemanticSeoPlannerTest extends TestCase
         self::assertArrayNotHasKey('evidence', $plan->toArray());
     }
 
+    public function test_provenance_only_claim_is_not_used_as_reader_facing_meta_support(): void
+    {
+        $provenance = ['claim_id' => 'provenance', 'claim_revision' => 1, 'text' => 'Nguồn xác nhận phạm vi của đối tượng.', 'eligibility' => 'eligible', 'semantic_role' => 'PROVENANCE_ONLY', 'publicly_composable' => false, 'editorial_role' => 'CORE'];
+        $fact = ['claim_id' => 'fact', 'claim_revision' => 1, 'text' => 'Odo 36/8 dùng máy ba vách.', 'eligibility' => 'eligible', 'semantic_role' => 'READER_FACT', 'publicly_composable' => true, 'editorial_role' => 'CORE'];
+        $pack = new EditorialContextPack('available', ['id' => self::SUBJECT, 'type' => 'variant'], 'Odo 36/8', ['profile' => 'video'], 'available', [$provenance, $fact], [], ['raw_input' => 'Video Odo 36/8']);
+        $plan = $this->planner()->plan($pack, new EditorialPlan('available', 'video', ['id' => self::SUBJECT, 'type' => 'variant'], 'Odo 36/8', []), new EditorialDraft('available', 'video', 'Odo 36/8', 'Odo 36/8 dùng máy ba vách.', 'Odo 36/8 dùng máy ba vách.', [['claim_id' => 'fact']], []), ['public_identity' => ['canonical_url' => '/video/odo-36-8/', 'public_eligible' => true, 'canonical_identity' => true], 'structured_data' => ['type' => 'VideoObject']]);
+
+        self::assertStringNotContainsString('Nguồn xác nhận', $plan->metaDescription);
+        self::assertStringContainsString('máy ba vách', $plan->metaDescription);
+        self::assertNotContains('provenance', array_column($plan->claimTrace, 'claim_id'));
+    }
+
     public function test_h2_seo_copy_is_differentiated_and_cluster_uses_meaningful_phrases(): void
     {
         $plan = $this->planner()->plan($this->pack(), $this->editorialPlan(), $this->draft(), [

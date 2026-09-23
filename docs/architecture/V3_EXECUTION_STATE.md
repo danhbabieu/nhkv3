@@ -1,5 +1,47 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-24 — Existing canonical Video frontend reconciliation (LOCAL / NO SERVER ACTION)
+
+SOURCE_PROOF: `/video/` is served by `PublicMediaVideoRoutes` through
+`MediaVideoPageQuery::videoArchive`, `videoDetail` and `videoBySlug`. The
+homepage video cards are produced by `HomeSemanticQuery::extend` through the
+`nhk_v3_home_semantic_modules` filter consumed by the theme homepage. Both
+surfaces derive the same `VideoFrontendProjection`; neither reads a WP Post,
+the canonical repository directly as a listing, or the search `post_total`.
+
+FIRST_MISSING_TRANSITION: The previous completion path treated a canonical
+detail/route read as sufficient. It did not expose a bounded runtime operation
+that re-read the existing owner, its persisted Public Identity, the shared
+frontend projection, archive/home source and exact detail route as one
+owner-bound contract. A detail-only callback could therefore be accepted while
+the listing source was absent.
+
+FIX: Added `VideoFrontendReconciliationService` and the internal/admin MCP /
+Ability boundary `nhk.video.frontend.reconcile`. It accepts only an exact
+existing `video_owner_id`, an idempotency key and explicit confirmation. It
+never ingests, retries Capture, allocates identity, creates a WP Post or writes
+directly to the database. `Frontend VERIFIED` now requires projection validity,
+identity-path agreement, detail route, archive exact-owner read-back and the
+homepage source read-back (or explicit bounded `NOT_APPLICABLE`). Missing
+projection/listing state remains `REVIEW_REQUIRED`.
+
+VERIFICATION: Fail-before test reproduced the absent runtime entry point. After
+the fix, focused reconciliation tests cover existing-owner reuse, public
+identity/projection/detail/archive/home read-back, detail-only false-positive
+rejection, invalid projection readiness, idempotent retry and zero owner
+creation/duplicates. No supplied runtime evidence identifier is present in the
+implementation or tests.
+
+STATUS: `LOCAL_EXISTING_VIDEO_RECONCILIATION_IN_PROGRESS / NO_SERVER_ACTION`.
+
+# Checkpoint — 2026-09-24 — Generic Editorial Enrichment + Semantic SEO role boundary (LOCAL / NO SERVER ACTION)
+
+TASK_RESULT: The shared transient editorial path now classifies retrieved Claims into grounding/provenance, reader facts, supporting context, specimen context and control provenance. Only applicable, eligible, publicly composable Claims enter ReaderJourney, shared composition, Semantic SEO and Video knowledge mapping; provenance remains trace/control evidence. Video initial and resume packages consume the same shared mapped knowledge, and Semantic SEO is regenerated after each bounded repair/recomposition round. Quality diagnostics report provenance-dominated public copy without introducing phrase/entity special cases.
+
+VERIFICATION: Focused role/selector/journey/video/SEO/quality matrix passed 97 tests / 382 assertions; Contract passed 6 tests / 48 assertions. Full Unit reached 2,404 tests / 13,941 assertions with one pre-existing failure in `McpPublicUrlMaintenanceContractTest` caused by the unrelated `nhk-v3/video-frontend-reconcile` capability already present in the working tree. Integration remains environment-gated: 21 failures require `NHK_WP_TEST_PATH=public` and `NHK_WP_TEST_DB=nhk_v3_test`, with 119 skips. Changed-file PHP lint and `git diff --check` are required before commit. No schema migration, database mutation, staging/production action, publication, deployment or push occurred.
+
+STATUS: `LOCAL_EDITORIAL_ENRICHMENT_FIX_READY_PENDING_FOCUSED_COMMIT / FULL_UNIT_BASELINE_FAILURE_UNRELATED / INTEGRATION_ENVIRONMENT_GATED / NO_SERVER_ACTION`.
+
 # Checkpoint — 2026-09-23 — Video public-topic boundary repair (LOCAL / NO SERVER ACTION)
 
 ROOT_CAUSE: Attempt 8 reproduced through `VideoIntakeService → VideoEditorialAdapter → SharedEnrichmentBoundary → ReaderJourneyPlanner → SharedEditorialComposer → EditorialQualityGate`. The persisted `editorial_instruction` value `semantic owner — governance reconciliation diagnostics` was selected by `VideoEditorialScopeNormalizer::topic()`, stored as `EditorialContextPack.topic`, then emitted by `SharedEditorialComposer::title()` and `SemanticSeoPlanner` into the title and SEO description. The exact failing spans were `semantic owner`, `governance` and `reconciliation diagnostics`; Quality Gate classified each as `PUBLIC_INTERNAL_JARGON_LEAK` from `EDITORIAL_QUALITY_GATE`.

@@ -33,7 +33,7 @@ final class EditorialQualityGate
         foreach (self::DIMENSIONS as $dimension) $dimensions[$dimension] = ['status' => 'READY', 'severity' => 'INFO', 'reasons' => []];
 
         $selected = [];
-        foreach ($pack->selectedClaims as $claim) {
+        foreach ($this->publicClaims($pack) as $claim) {
             $id = trim((string) ($claim['claim_id'] ?? ''));
             if ($id !== '') $selected[$id] = $claim;
             if (($claim['eligibility'] ?? '') !== 'eligible') $add('evidence', 'BLOCK', 'INELIGIBLE_SELECTED_CLAIM');
@@ -53,6 +53,15 @@ final class EditorialQualityGate
         $requiresTrace = array_filter($selected, static fn (array $claim): bool => in_array((string) ($claim['editorial_role'] ?? ''), ['CORE', 'IDENTIFICATION', 'EXPLANATION'], true));
         if ($requiresTrace !== [] && $traceIds === []) $add('traceability', 'BLOCK', 'MISSING_CLAIM_TRACE');
         $this->assertFactualGrounding($pack, $draft, $selected, $traceIds, $add);
+        foreach ($pack->grounding as $claim) {
+            if (($claim['publicly_composable'] ?? true) === false && strtoupper((string) ($claim['semantic_role'] ?? '')) === 'PROVENANCE_ONLY') {
+                $claimText = trim((string) ($claim['text'] ?? $claim['claim_text'] ?? ''));
+                if ($claimText !== '' && $this->supportedBy($claimText, [$draft->title, $draft->summary, $draft->body])) {
+                    $add('knowledge_utilization', 'WARN', 'PROVENANCE_DOMINATED_PUBLIC_CONTENT');
+                    break;
+                }
+            }
+        }
         $usedCore = false;
         foreach ($selected as $id => $claim) if (in_array((string) ($claim['editorial_role'] ?? ''), ['CORE', 'IDENTIFICATION'], true) && isset($traceIds[$id])) $usedCore = true;
         if ($selected === []) $add('knowledge_utilization', 'INFO', 'SPARSE_KNOWLEDGE_INPUT');
@@ -63,7 +72,7 @@ final class EditorialQualityGate
         $body = trim($draft->title . ' ' . $draft->summary . ' ' . $draft->body);
         $topic = trim($pack->topic);
         if ($topic !== '' && !$this->containsTopic($body, $topic)) $add('topic_centrality', 'WARN', 'TOPIC_CENTRALITY_WEAK');
-        $fulfillment = (new TopicFulfillment())->evaluate($topic, $pack->selectedClaims, $draft->body);
+        $fulfillment = (new TopicFulfillment())->evaluate($topic, array_values($selected), $draft->body);
         if (!$fulfillment['fulfilled'] && $fulfillment['diagnostic'] !== null) $add('topic_centrality', 'WARN', (string) $fulfillment['diagnostic']);
         if ($topic !== '' && $draft->title !== '' && !$this->containsTopic($draft->title, $topic)) $add('topic_centrality', 'WARN', 'TITLE_BODY_COVERAGE_GAP');
         $knownClaimText = implode(' ', array_map(static fn (array $claim): string => (string) ($claim['text'] ?? ''), array_values($selected)));
@@ -138,6 +147,20 @@ final class EditorialQualityGate
     {
         foreach ([$draft->profile, $plan->profile, $seo->profile, (string) ($pack->profile['profile'] ?? '')] as $profile) if ($profile !== '') return $profile;
         return 'article';
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function publicClaims(EditorialContextPack $pack): array
+    {
+        $bucketed = array_merge($pack->readerFacts, $pack->supportingContext, $pack->specimenContext);
+        $claims = $pack->selectedClaims !== [] ? $pack->selectedClaims : $bucketed;
+        $result = [];
+        foreach ($claims as $claim) {
+            if (!is_array($claim) || (($claim['publicly_composable'] ?? true) !== true) || (($claim['eligibility'] ?? 'eligible') !== 'eligible')) continue;
+            $id = trim((string) ($claim['claim_id'] ?? ''));
+            if ($id !== '') $result[$id] = $claim;
+        }
+        return array_values($result);
     }
 
     private function containsTopic(string $copy, string $topic): bool

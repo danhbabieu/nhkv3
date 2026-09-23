@@ -15,7 +15,9 @@ final class ReaderJourneyPlanner
             return new EditorialPlan('review', $profile, $pack->primarySubject, $pack->topic, [], $pack->inputContext, $pack->visualSupport, ['PROFILE_UNSUPPORTED'], []);
         }
         $sections = [$this->opening($profile, $pack->topic)];
-        $selected = array_values(array_filter($pack->selectedClaims, static fn (mixed $claim): bool => is_array($claim) && ($claim['eligibility'] ?? '') === 'eligible'));
+        $bucketed = array_merge($pack->readerFacts, $pack->supportingContext, $pack->specimenContext);
+        $sourceClaims = $bucketed !== [] ? $bucketed : $pack->selectedClaims;
+        $selected = array_values(array_filter($sourceClaims, static fn (mixed $claim): bool => is_array($claim) && ($claim['eligibility'] ?? '') === 'eligible' && ($claim['publicly_composable'] ?? true) === true));
         $maxSections = $profile === 'article' ? 8 : 5;
         $roleCounts = [];
         foreach (array_slice($selected, 0, max(0, $maxSections - 1)) as $index => $claim) {

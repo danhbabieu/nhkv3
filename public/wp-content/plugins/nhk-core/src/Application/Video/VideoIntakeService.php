@@ -5,6 +5,7 @@ namespace NHK\Core\Application\Video;
 
 use NHK\Core\Application\Entity\PublicRouteResolver;
 use NHK\Core\Contracts\Video\VideoRepository;
+use NHK\Core\Application\Semantic\EditorialContextPack;
 use NHK\Core\Domain\Video\{VideoEditorialEnrichmentContext, VideoIntakePreview, VideoSourceRights};
 use NHK\Core\Domain\Video\VideoException;
 use NHK\Core\Shared\Uuid\UuidCodec;
@@ -100,6 +101,9 @@ final class VideoIntakeService
             $sharedResult = is_array($shared['shared_result'] ?? null) ? $shared['shared_result'] : [];
             if (is_array($sharedResult['relations']['candidates'] ?? null) && $sharedResult['relations']['candidates'] !== []) $candidatePayloads = array_values(array_filter($sharedResult['relations']['candidates'], 'is_array'));
             $draft = $shared['draft'];
+            $knowledgeMapping = ($sharedResult['pack'] ?? null) instanceof EditorialContextPack
+                ? (new VideoEditorialKnowledgeMapper())->map($sharedResult['pack'])
+                : ['facts' => [], 'related_knowledge' => [], 'claim_dependencies' => []];
             $editorial = [
                 'title' => $draft->title,
                 'summary' => $draft->summary,
@@ -107,8 +111,8 @@ final class VideoIntakeService
                 'claim_trace' => $draft->claimTrace,
                 'why_this_matters' => 'Giúp người xem bắt đầu từ video và nhận biết đúng chủ đề đang được trình bày.',
                 'context' => $enrichmentContext['source_facts'],
-                'facts' => [],
-                'related_knowledge' => [],
+                'facts' => $knowledgeMapping['facts'],
+                'related_knowledge' => $knowledgeMapping['related_knowledge'],
                 'compliance_context' => ['source' => 'shared_editorial_quality_gate'],
             ];
             $contentQuality = ['status' => $shared['quality_report']->readiness === 'READY' ? 'CONTENT_COMPLETE' : 'NEEDS_REVIEW', 'blockers' => $shared['quality_report']->blockers, 'warnings' => $shared['quality_report']->warnings];
