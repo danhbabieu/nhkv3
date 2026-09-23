@@ -1091,7 +1091,12 @@ final class Plugin {
                 }
             );
             $captureAddendumRepository = new WpdbCaptureAddendumRepository($wpdb);
-            $captureSubjectResolver = new SubjectResolutionService(new \NHK\Core\Application\Semantic\CanonicalAuthoritySubjectResolver($authority, $types));
+            $captureAuthorityResolver = new \NHK\Core\Application\Semantic\CanonicalAuthoritySubjectResolver($authority, $types);
+            $captureSubjectResolver = new SubjectResolutionService(
+                $captureAuthorityResolver,
+                new \NHK\Core\Application\Semantic\CanonicalSubjectStructuralContextReader(new StructuralContextQuery($graphService, $authority)),
+                [$captureAuthorityResolver, 'resolveComposite']
+            );
             $clockTypeMembershipReader = new GraphClockTypeCanonicalMembershipReader($graphService, $authority);
             $clockTypeShadowClassifier = new ClockTypeShadowClassifier($authority, new \NHK\Core\Application\Entity\EntityProfileResolver(), $clockTypeMembershipReader);
             $captureNeighborhood = $mcpNeighborhood;
