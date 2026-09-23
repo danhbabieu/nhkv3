@@ -668,6 +668,8 @@ final class McpContractTest extends TestCase
             'maxItems' => 1,
             'items' => ['type' => 'string', 'enum' => ['video']],
         ], $tool['inputSchema']['properties']['resume_children']);
+        self::assertSame(['confirmed', 'candidate_uuid'], $tool['inputSchema']['properties']['subject_reconciliation']['required']);
+        self::assertFalse($tool['inputSchema']['properties']['subject_reconciliation']['additionalProperties']);
         self::assertSame('array', $tool['inputSchema']['properties']['files']['type']);
         self::assertSame(['download_url', 'file_id'], $tool['inputSchema']['properties']['files']['items']['required']);
         self::assertSame(['download_url', 'file_id', 'mime_type', 'file_name'], array_keys($tool['inputSchema']['properties']['files']['items']['properties']));

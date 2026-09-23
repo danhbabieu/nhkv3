@@ -994,6 +994,104 @@ final class EditorialCaptureContinuationTest extends TestCase
         self::assertSame('variant', $seenResolution['primary']['type']);
     }
 
+    public function test_ambiguous_video_retry_accepts_only_confirmed_candidate_on_same_capture_and_preserves_video_payload(): void
+    {
+        $captures = new ContinuationCaptureRepository();
+        $addenda = new ContinuationAddendumRepository();
+        $captureId = '01a0cb8d-31a5-700b-8780-3793df5d0969';
+        $videoId = '01a06815-1e51-7964-b004-1ba79e488ad1';
+        $selected = '5f6c98ca-869a-4418-a8a4-1a32eb931c5e';
+        $other = '5f6c98ca-869a-4418-a8a4-1a32eb931c5f';
+        $candidates = [
+            'Odo 36/10' => [
+                ['id' => $selected, 'type' => 'variant', 'stable_key' => 'nhk:variant:odo.36.10.two-tune', 'name' => 'Odo 36/10 two-tune', 'revision' => 4],
+                ['id' => $other, 'type' => 'variant', 'stable_key' => 'nhk:variant:odo.36.10.other', 'name' => 'Odo 36/10 other', 'revision' => 2],
+            ],
+        ];
+        $assets = [[
+            'kind' => 'video',
+            'video_id' => $videoId,
+            'video_proposal' => ['entity_type' => 'video', 'operation' => 'ingest', 'subject_id' => '', 'payload' => ['canonical_id' => $videoId, 'metadata' => ['source' => ['platform' => 'youtube', 'external_video_id' => 'P4KaHX3LBOw', 'source_url' => 'https://youtu.be/P4KaHX3LBOw', 'source_title' => 'Golden Odo 36'], 'external_video_id' => 'P4KaHX3LBOw']]],
+        ]];
+        $packet = ['packet_version' => 1, 'status' => 'ambiguous', 'canonical_subject_id' => '', 'entity_type' => '', 'stable_key' => '', 'canonical_name' => '', 'revision' => 0, 'diagnostics' => ['candidates' => $candidates, 'diagnostics' => ['AMBIGUOUS_SUBJECT_REVIEW']]];
+        $capture = new CaptureRecord(
+            $captureId,
+            'golden-ambiguous-video',
+            hash('sha256', 'golden-ambiguous-video'),
+            CaptureStage::SEMANTICS_RECONCILED->value,
+            'FAILED_RETRYABLE',
+            null,
+            null,
+            $assets,
+            ['purpose' => 'EDITORIAL', 'raw_input' => 'Odo 36/10', 'title' => 'Golden Odo 36', 'content_intent' => ['intent' => 'VIDEO', 'article_required' => false], 'subject_resolution_packet' => $packet],
+            ['failure' => ['code' => 'AMBIGUOUS_SUBJECT_REVIEW', 'classification' => 'FAILED_RETRYABLE'], 'subjects' => ['status' => 'ambiguous', 'primary' => null, 'resolved' => [], 'candidates' => $candidates, 'diagnostics' => ['AMBIGUOUS_SUBJECT_REVIEW']]],
+            [],
+        );
+        $captures->create($capture);
+        $events = [];
+        $videoPipelineCalls = 0;
+        $service = new EditorialCaptureContinuationService($captures, $addenda, $this->coordinator($captures, $events, static function (array $context) use (&$events): array {
+            $events['subject_resolution'] = $context['subject_resolution'] ?? null;
+            $events['video_payload'] = $context['assets'][0]['video_proposal']['payload'] ?? null;
+            $events['semantic'] = ($events['semantic'] ?? 0) + 1;
+            return ['status' => 'REVIEW_REQUIRED', 'writes' => []];
+        }, static function (array $context) use (&$videoPipelineCalls): array {
+            $videoPipelineCalls++;
+            return ['status' => 'READY', 'quality' => 'READY', 'blockers' => []];
+        }));
+
+        $result = $service->retry([
+            'capture_id' => $captureId,
+            'idempotency_key' => $capture->idempotencyKey,
+            'resume_mode' => 'RETRY',
+            'resume_children' => ['video'],
+            'subject_reconciliation' => ['confirmed' => true, 'candidate_uuid' => $selected],
+        ]);
+
+        self::assertSame($captureId, $result['capture']['capture_id']);
+        self::assertSame($videoId, $result['capture']['assets'][0]['video_id']);
+        self::assertSame('P4KaHX3LBOw', $result['capture']['assets'][0]['video_proposal']['payload']['metadata']['source']['external_video_id']);
+        self::assertSame('https://youtu.be/P4KaHX3LBOw', $result['capture']['assets'][0]['video_proposal']['payload']['metadata']['source']['source_url']);
+        self::assertSame('Golden Odo 36', $result['capture']['assets'][0]['video_proposal']['payload']['metadata']['source']['source_title']);
+        self::assertSame($selected, $result['capture']['context']['subject_resolution_packet']['canonical_subject_id']);
+        self::assertSame('resolved', $result['capture']['context']['subject_resolution_packet']['status']);
+        self::assertSame($selected, $events['subject_resolution']['primary']['id']);
+        self::assertSame($assets[0]['video_proposal']['payload']['metadata']['source'], $events['video_payload']['metadata']['source']);
+        self::assertSame(1, $events['semantic']);
+        self::assertSame(1, $videoPipelineCalls);
+        self::assertSame('READY', $result['capture']['diagnostics']['video_publication']['quality']);
+        self::assertCount(0, $addenda->records);
+    }
+
+    public function test_ambiguous_video_retry_fails_closed_for_uuid_outside_candidate_set_without_persisting(): void
+    {
+        $captures = new ContinuationCaptureRepository();
+        $addenda = new ContinuationAddendumRepository();
+        $candidate = UuidCodec::newV7();
+        $capture = new CaptureRecord(
+            UuidCodec::newV7(),
+            'ambiguous-candidate-closed',
+            hash('sha256', 'ambiguous-candidate-closed'),
+            CaptureStage::SEMANTICS_RECONCILED->value,
+            'FAILED_RETRYABLE',
+            null,
+            null,
+            [],
+            ['content_intent' => ['intent' => 'VIDEO', 'article_required' => false], 'subject_resolution_packet' => ['status' => 'ambiguous', 'diagnostics' => ['candidates' => [['id' => $candidate, 'type' => 'variant', 'revision' => 1]]]]],
+            ['failure' => ['code' => 'AMBIGUOUS_SUBJECT_REVIEW']],
+            [],
+        );
+        $captures->create($capture);
+        $events = [];
+        $service = new EditorialCaptureContinuationService($captures, $addenda, $this->coordinator($captures, $events));
+
+        $result = $service->retry(['capture_id' => $capture->captureId, 'idempotency_key' => $capture->idempotencyKey, 'resume_mode' => 'RETRY', 'subject_reconciliation' => ['confirmed' => true, 'candidate_uuid' => UuidCodec::newV7()]]);
+
+        self::assertSame('CAPTURE_SUBJECT_RECONCILIATION_CANDIDATE_NOT_ALLOWED', $result['retry']['code']);
+        self::assertSame($capture->revision, $captures->findById($capture->captureId)?->revision);
+        self::assertArrayNotHasKey('semantic', $events);
+    }
+
     public function test_video_enrichment_started_receipt_survives_callback_failure(): void
     {
         $captures = new ContinuationCaptureRepository();

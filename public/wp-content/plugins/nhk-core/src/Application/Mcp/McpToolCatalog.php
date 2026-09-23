@@ -44,6 +44,15 @@ final class McpToolCatalog
                     'maxItems' => 1,
                     'items' => ['type' => 'string', 'enum' => ['video']],
                 ],
+                'subject_reconciliation' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'confirmed' => ['type' => 'boolean'],
+                        'candidate_uuid' => self::uuidField(),
+                    ],
+                    'required' => ['confirmed', 'candidate_uuid'],
+                    'additionalProperties' => false,
+                ],
                 'purpose' => ['type' => 'string', 'enum' => ['EDITORIAL', 'AUTHORITY', 'MIXED']],
                 'intent' => ['type' => 'string', 'enum' => ContentIntent::values()],
                 'dry_run' => ['type' => 'boolean'],

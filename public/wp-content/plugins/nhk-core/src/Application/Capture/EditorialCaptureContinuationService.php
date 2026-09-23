@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Capture;
 
 use NHK\Core\Contracts\Capture\{CaptureAddendumRepository, CaptureRepository};
-use NHK\Core\Domain\Capture\{CaptureAddendumRecord, CaptureRecord, CaptureStage};
+use NHK\Core\Domain\Capture\{CaptureAddendumRecord, CaptureRecord, CaptureStage, SubjectResolutionPacket};
 use NHK\Core\Domain\Governance\CommandCanonicalizer;
 use NHK\Core\Shared\Uuid\UuidCodec;
 
@@ -34,6 +34,10 @@ final class EditorialCaptureContinuationService
         if ($intent !== '' && $storedIntent !== '' && $intent !== $storedIntent) return $this->retryFailure($captureId, 'CAPTURE_RETRY_INTENT_MISMATCH', $capture);
         $purpose = strtoupper(trim((string) ($input['purpose'] ?? '')));
         if ($purpose !== '' && $purpose !== strtoupper(trim((string) ($capture->context['purpose'] ?? 'EDITORIAL')))) return $this->retryFailure($captureId, 'CAPTURE_RETRY_PURPOSE_MISMATCH', $capture);
+        if (array_key_exists('subject_reconciliation', $input)) {
+            [$capture, $reconciliationError] = $this->reconcileSubject($capture, $input['subject_reconciliation']);
+            if ($reconciliationError !== null) return $this->retryFailure($captureId, $reconciliationError, $capture);
+        }
         $requestedChildren = array_values(array_unique(array_map('strtolower', array_map('strval', (array) ($input['resume_children'] ?? [])))));
         $videoCompletionRetry = CaptureCurrentOutcomeReducer::supportsCanonicalVideoCompletionRetry($capture)
             && ($requestedChildren === [] || $requestedChildren === ['video']);
@@ -252,6 +256,83 @@ final class EditorialCaptureContinuationService
             'existing_capture_continuation' => true,
             'continuation_idempotency_key' => $capture->idempotencyKey,
         ];
+    }
+
+    /** @return array{0:CaptureRecord,1:?string} */
+    private function reconcileSubject(CaptureRecord $capture, mixed $selection): array
+    {
+        if ($capture->status !== 'FAILED_RETRYABLE') return [$capture, 'CAPTURE_SUBJECT_RECONCILIATION_STATUS_NOT_ALLOWED'];
+        $intent = strtoupper(trim((string) (($capture->context['content_intent']['intent'] ?? ''))));
+        if ($intent !== 'VIDEO') return [$capture, 'CAPTURE_SUBJECT_RECONCILIATION_VIDEO_REQUIRED'];
+        if (!is_array($selection) || ($selection['confirmed'] ?? false) !== true) return [$capture, 'CAPTURE_SUBJECT_RECONCILIATION_CONFIRMATION_REQUIRED'];
+        $candidateId = trim((string) ($selection['candidate_uuid'] ?? ''));
+        if (!UuidCodec::isValid($candidateId)) return [$capture, 'CAPTURE_SUBJECT_RECONCILIATION_CANDIDATE_NOT_ALLOWED'];
+        $rawPacket = is_array($capture->context['subject_resolution_packet'] ?? null)
+            ? $capture->context['subject_resolution_packet']
+            : (is_array($capture->diagnostics['subject_resolution_packet'] ?? null) ? $capture->diagnostics['subject_resolution_packet'] : []);
+        $packet = SubjectResolutionPacket::fromArray($rawPacket);
+        if (!$packet instanceof SubjectResolutionPacket || $packet->status !== 'ambiguous') return [$capture, 'CAPTURE_SUBJECT_RECONCILIATION_NOT_AMBIGUOUS'];
+        $candidate = $this->candidateById($packet->diagnostics['candidates'] ?? [], $candidateId);
+        if ($candidate === null) return [$capture, 'CAPTURE_SUBJECT_RECONCILIATION_CANDIDATE_NOT_ALLOWED'];
+        $type = trim((string) ($candidate['type'] ?? $candidate['entity_type'] ?? ''));
+        $revision = (int) ($candidate['revision'] ?? 0);
+        if ($type === '' || $revision < 1) return [$capture, 'CAPTURE_SUBJECT_RECONCILIATION_CANDIDATE_NOT_ALLOWED'];
+
+        $resolved = new SubjectResolutionPacket(
+            'resolved',
+            $candidateId,
+            $type,
+            trim((string) ($candidate['stable_key'] ?? '')),
+            trim((string) ($candidate['name'] ?? $candidate['canonical_name'] ?? '')),
+            $revision,
+            'user_confirmed_candidate',
+            [
+                'candidates' => $packet->diagnostics['candidates'] ?? [],
+                'unresolved' => $packet->diagnostics['unresolved'] ?? [],
+                'conflicts' => $packet->diagnostics['conflicts'] ?? [],
+                'diagnostics' => ['USER_CONFIRMED_SUBJECT_RECONCILIATION'],
+            ],
+            'USER_CONFIRMED_SUBJECT_RECONCILIATION',
+        );
+        $resolvedArray = $resolved->toArray();
+        $context = $capture->context;
+        $context['subject_resolution_packet'] = $resolvedArray;
+        $diagnostics = $capture->diagnostics;
+        $diagnostics['subject_resolution_packet'] = $resolvedArray;
+        $diagnostics['subjects'] = $resolved->toResolution();
+        $diagnostics['subject_reconciliation'] = ['status' => 'CONFIRMED', 'candidate_uuid' => $candidateId, 'source' => 'USER_CONFIRMED_SUBJECT_RECONCILIATION'];
+        $persisted = new CaptureRecord(
+            $capture->captureId,
+            $capture->idempotencyKey,
+            $capture->requestFingerprint,
+            $capture->stage,
+            $capture->status,
+            $capture->articleId,
+            $capture->articleStateToken,
+            $capture->assets,
+            $context,
+            $diagnostics,
+            $capture->phaseReceipts,
+            $capture->revision + 1,
+            $capture->createdAt,
+            gmdate('Y-m-d H:i:s.u'),
+        );
+        return [$this->captures->save($persisted), null];
+    }
+
+    /** @param array<string,mixed> $buckets */
+    private function candidateById(array $buckets, string $candidateId): ?array
+    {
+        $walk = function (mixed $value) use (&$walk, $candidateId): ?array {
+            if (!is_array($value)) return null;
+            if (isset($value['id']) && is_scalar($value['id']) && strcasecmp(trim((string) $value['id']), $candidateId) === 0) return $value;
+            foreach ($value as $item) {
+                $found = $walk($item);
+                if ($found !== null) return $found;
+            }
+            return null;
+        };
+        return $walk($buckets);
     }
 
     /** @return array{capture:array<string,mixed>,retry:array<string,mixed>} */
