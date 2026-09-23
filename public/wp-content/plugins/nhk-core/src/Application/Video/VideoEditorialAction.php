@@ -16,10 +16,11 @@ final class VideoEditorialAction
     public const RESTRUCTURE_COPY = 'RESTRUCTURE_COPY';
     public const REDUCE_SPECIFICITY = 'REDUCE_SPECIFICITY';
     public const REGENERATE_SECTION = 'REGENERATE_SECTION';
+    public const REPAIR_PUBLIC_COPY = 'REPAIR_PUBLIC_COPY';
 
     public static function all(): array
     {
-        return [self::USE_AS_IS, self::ATTRIBUTE_AND_SCOPE, self::QUALIFY_INFERENCE, self::NARROW_SCOPE, self::REMOVE_UNSUPPORTED, self::PREFER_CANONICAL, self::REPLACE_ALTERNATE_KNOWLEDGE, self::NARROW_TITLE, self::RESTRUCTURE_COPY, self::REDUCE_SPECIFICITY, self::REGENERATE_SECTION];
+        return [self::USE_AS_IS, self::ATTRIBUTE_AND_SCOPE, self::QUALIFY_INFERENCE, self::NARROW_SCOPE, self::REMOVE_UNSUPPORTED, self::PREFER_CANONICAL, self::REPLACE_ALTERNATE_KNOWLEDGE, self::NARROW_TITLE, self::RESTRUCTURE_COPY, self::REDUCE_SPECIFICITY, self::REGENERATE_SECTION, self::REPAIR_PUBLIC_COPY];
     }
 
     public static function assert(string $value): string

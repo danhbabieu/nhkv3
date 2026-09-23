@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Video;
 
+use NHK\Core\Application\Compliance\PublicEditorialCopyGuard;
+
 final class VideoEditorialRepairPlanner
 {
     public function plan(array $findings, array $package, int $round): array
@@ -13,7 +15,7 @@ final class VideoEditorialRepairPlanner
             if (!is_array($finding) || ($finding['severity'] ?? '') !== VideoConstraintSeverity::REPAIRABLE) continue;
             $repair = (string) ($finding['repair'] ?? '');
             if (!in_array($repair, VideoEditorialAction::all(), true)) continue;
-            $operations[] = ['action' => $repair, 'claim_id' => $finding['claim_id'] ?? null, 'code' => $finding['code'] ?? '', 'reason' => $finding['reason'] ?? ''];
+            $operations[] = ['action' => $repair, 'claim_id' => $finding['claim_id'] ?? null, 'field' => $finding['field'] ?? null, 'code' => $finding['code'] ?? '', 'reason' => $finding['reason'] ?? ''];
         }
         return $operations;
     }
@@ -23,7 +25,11 @@ final class VideoEditorialRepairPlanner
         $package['repair_log'] = array_values((array) ($package['repair_log'] ?? []));
         foreach ($operations as $operation) {
             $action = (string) ($operation['action'] ?? '');
-            if ($action === VideoEditorialAction::REMOVE_UNSUPPORTED) {
+            if ($action === VideoEditorialAction::REPAIR_PUBLIC_COPY) {
+                $guard = new PublicEditorialCopyGuard();
+                $field = (string) ($operation['field'] ?? '');
+                $package[$field] = $guard->repair((string) ($package[$field] ?? ''));
+            } elseif ($action === VideoEditorialAction::REMOVE_UNSUPPORTED) {
                 $claimId = (string) ($operation['claim_id'] ?? '');
                 foreach ((array) ($package['claims'] ?? []) as $claim) {
                     if (!is_array($claim) || (string) ($claim['id'] ?? $claim['claim_id'] ?? '') !== $claimId) continue;

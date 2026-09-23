@@ -17940,3 +17940,29 @@ WordPress runtime. Deployment preflight PASS (11/11). No staging/live semantic
 mutation has been performed in this checkpoint.
 
 STATUS=`LOCAL_FULL_SUITE_PASS / DEPLOYMENT_PREFLIGHT_PASS / DEPLOYMENT_PENDING / LIVE_CAPTURE_PENDING`.
+
+# Checkpoint — 2026-09-23 — Video public-copy jargon convergence (LOCAL / NO DEPLOY)
+
+ROOT_CAUSE: Fresh Video editorial quality detected generated workflow phrasing
+(`Trong bối cảnh tri thức NHK` and `nguồn tham chiếu cụ thể`) through the shared
+public-language boundary, but the existing bounded Video repair pipeline only
+processed statement findings. The structural UUID guard also accepted no UUIDv7
+because its pattern stopped at version 5.
+
+IMPLEMENTED: Shared public-copy findings now report exact field and phrase,
+classify known generated editorial phrasing as REPAIRABLE, and leave structural
+internal data fail-closed. The existing bounded Video repair planner rewrites
+only the approved phrases, then the shared EditorialQualityGate is re-evaluated
+after every repair round and on the final draft/SEO projection. Reader-facing
+clock terminology remains allowed; no subject, claim, evidence or owner data is
+created or changed by the repair.
+
+VERIFICATION: Focused Video/public-copy tests pass (56 tests / 141 assertions).
+NHK Unit passes 2,360 tests / 13,685 assertions with existing warnings and
+deprecations. Full repository run has no Unit/Contract regressions but remains
+blocked by 21 guarded Integration/P4 failures because the documented WordPress
+runtime/database bootstrap returns “Error establishing a database connection”.
+PHP lint and `git diff --check` remain required final gates. No staging,
+production, publication, deployment or semantic mutation was performed.
+
+STATUS=`VIDEO_PUBLIC_COPY_REPAIR_IMPLEMENTED_LOCAL / FULL_UNIT_PASS / INTEGRATION_RUNTIME_BLOCKED / NO_LIVE_MUTATION`.

@@ -100,7 +100,7 @@ final class EditorialQualityGate
         if ($topic !== '' && !$this->containsTopic($seo->title . ' ' . $seo->h1 . ' ' . $seo->topicFocus, $topic)) $add('seo_readiness', 'WARN', 'SEO_TOPIC_MISMATCH');
         foreach ($seo->internalLinks as $link) {
             $url = trim((string) ($link['url'] ?? ''));
-            if ($url === '' || !str_starts_with($url, '/') || preg_match('/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i', $url) === 1) $add('internal_link_quality', 'BLOCK', 'INVALID_PUBLIC_INTERNAL_LINK');
+            if ($url === '' || !str_starts_with($url, '/') || preg_match('/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i', $url) === 1) $add('internal_link_quality', 'BLOCK', 'INVALID_PUBLIC_INTERNAL_LINK');
             elseif (!$this->containsAnyTopicTerm((string) ($link['title'] ?? '') . ' ' . $url, $topic)) $add('internal_link_quality', 'WARN', 'IRRELEVANT_INTERNAL_LINK');
         }
         if (($seo->diagnostics['cannibalization']['status'] ?? '') === 'review') $add('internal_link_quality', 'WARN', 'DUPLICATE_INTENT_REVIEW');

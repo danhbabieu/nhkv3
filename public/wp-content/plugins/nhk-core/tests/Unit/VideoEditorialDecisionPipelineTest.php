@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Video\VideoEditorialDecisionPipeline;
+use NHK\Core\Application\Compliance\PublicEditorialCopyGuard;
 use PHPUnit\Framework\TestCase;
 
 final class VideoEditorialDecisionPipelineTest extends TestCase
@@ -50,5 +51,59 @@ final class VideoEditorialDecisionPipelineTest extends TestCase
         ]]);
         self::assertSame('REVIEW_REQUIRED', $result['quality']);
         self::assertLessThanOrEqual(3, $result['rounds']);
+    }
+
+    public function test_repairable_public_jargon_is_rewritten_and_critique_runs_again(): void
+    {
+        $rounds = [];
+        $guard = new PublicEditorialCopyGuard();
+        $result = (new VideoEditorialDecisionPipeline())->run(
+            [
+                'title' => 'Đồng hồ công cộng',
+                'summary' => 'Video này ghi lại một hiện vật qua nguồn tham chiếu cụ thể.',
+                'body' => 'Trong bối cảnh tri thức NHK, chủ thể liên quan được nhận diện là đồng hồ công cộng. Bộ máy và mặt số vẫn được giữ nguyên.',
+                'seo_description' => 'Đồng hồ công cộng qua một nguồn tham chiếu cụ thể.',
+                'claims' => [],
+            ],
+            [],
+            static fn (array $package): array => $package,
+            static function (array $package, array $context, int $round) use (&$rounds, $guard): array {
+                $rounds[] = $round;
+                $findings = $guard->findings($package);
+                return array_map(static fn (array $finding): array => [
+                    'code' => $finding['code'],
+                    'severity' => $finding['severity'],
+                    'scope' => 'artifact',
+                    'claim_id' => null,
+                    'repair' => $finding['repair'],
+                    'reason' => $finding['reason'],
+                    'field' => $finding['field'],
+                ], $findings);
+            },
+        );
+
+        self::assertSame('READY', $result['quality']);
+        self::assertSame([0, 1], $rounds);
+        self::assertSame(1, $result['rounds']);
+        self::assertStringNotContainsString('tri thức NHK', $result['editorial_package']['body']);
+        self::assertStringContainsString('Bộ máy và mặt số', $result['editorial_package']['body']);
+        self::assertNotEmpty($result['editorial_package']['repair_log']);
+    }
+
+    public function test_structural_public_leak_remains_hard_blocked(): void
+    {
+        $guard = new PublicEditorialCopyGuard();
+        $result = (new VideoEditorialDecisionPipeline())->run(
+            ['title' => 'Đồng hồ công cộng', 'body' => 'Bản ghi 01a09e44-539a-7f1a-938a-d7d91bb689a3.', 'claims' => []],
+            [],
+            static fn (array $package): array => $package,
+            static fn (array $package) => array_map(static fn (array $finding): array => [
+                'code' => $finding['code'], 'severity' => $finding['severity'], 'scope' => 'artifact',
+                'claim_id' => null, 'repair' => $finding['repair'], 'reason' => $finding['reason'],
+            ], $guard->findings($package)),
+        );
+
+        self::assertSame('HARD_BLOCK', $result['quality']);
+        self::assertSame([], $result['editorial_package']['repair_log'] ?? []);
     }
 }

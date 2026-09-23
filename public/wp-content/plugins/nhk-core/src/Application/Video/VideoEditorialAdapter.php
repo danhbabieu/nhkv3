@@ -3,7 +3,9 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Video;
 
+use NHK\Core\Application\Compliance\PublicEditorialCopyGuard;
 use NHK\Core\Application\Semantic\{ClaimRetrievalEngine, EditorialClaimRetrievalService, EditorialKnowledgeSelector, EditorialQualityGate, ReaderJourneyPlanner, SemanticSeoPlanner, SharedEditorialComposer, SharedEnrichmentBoundary};
+use NHK\Core\Application\Semantic\{EditorialDraft, SemanticSeoPlan};
 
 /**
  * Video-owned boundary over the shared transient editorial pipeline.
@@ -82,12 +84,58 @@ final class VideoEditorialAdapter
             is_array($context['evidence_context'] ?? null) ? $context['evidence_context'] : [],
             is_array($context['visual_context'] ?? null) ? $context['visual_context'] : [],
         );
+        $copyGuard = new PublicEditorialCopyGuard();
+        $qualityReevaluations = [];
         $decision = ($this->decisionPipeline ??= new VideoEditorialDecisionPipeline())->run(
-            ['title' => $draft->title, 'body' => $draft->body, 'claims' => $pack->selectedClaims],
+            [
+                'title' => $draft->title,
+                'summary' => $draft->summary,
+                'body' => $draft->body,
+                'seo_title' => $seo->title,
+                'seo_description' => $seo->metaDescription,
+                'claims' => $pack->selectedClaims,
+            ],
             ['statement_decision' => $statementDecision->toArray()],
             static fn (array $package): array => $package,
-            static fn (array $package, array $decisionContext, int $round): array => $round === 0 ? $decisionContext['statement_decision']['findings'] : [],
+            function (array $package, array $decisionContext, int $round) use ($copyGuard, $pack, $plan, $seo, $draft, $context, &$qualityReevaluations): array {
+                $currentDraft = new EditorialDraft(
+                    $draft->status,
+                    $draft->profile,
+                    (string) ($package['title'] ?? $draft->title),
+                    (string) ($package['summary'] ?? $draft->summary),
+                    (string) ($package['body'] ?? $draft->body),
+                    $draft->claimTrace,
+                    $draft->diagnostics,
+                );
+                $currentSeo = new SemanticSeoPlan(
+                    $seo->readiness,
+                    $seo->profile,
+                    $seo->searchIntent,
+                    $seo->primarySubject,
+                    $seo->topicFocus,
+                    $seo->semanticCluster,
+                    (string) ($package['seo_title'] ?? $seo->title),
+                    $seo->h1,
+                    (string) ($package['seo_description'] ?? $seo->metaDescription),
+                    $seo->canonicalUrl,
+                    $seo->openGraph,
+                    $seo->internalLinks,
+                    $seo->dictionaryContext,
+                    $seo->structuredData,
+                    $seo->claimTrace,
+                    $seo->diagnostics,
+                    $seo->blockers,
+                );
+                $qualityReevaluations[] = $this->quality->evaluate($pack, $plan, $currentDraft, $currentSeo, ($context['public_identity_deferred'] ?? false) === true)->toArray();
+                $findings = $copyGuard->findings($package);
+                if ($round === 0) $findings = array_merge($findings, $decisionContext['statement_decision']['findings'] ?? []);
+                return $findings;
+            },
         );
+
+        $finalDraft = new EditorialDraft($draft->status, $draft->profile, (string) ($decision['editorial_package']['title'] ?? $draft->title), (string) ($decision['editorial_package']['summary'] ?? $draft->summary), (string) ($decision['editorial_package']['body'] ?? $draft->body), $draft->claimTrace, $draft->diagnostics);
+        $finalSeo = new SemanticSeoPlan($seo->readiness, $seo->profile, $seo->searchIntent, $seo->primarySubject, $seo->topicFocus, $seo->semanticCluster, (string) ($decision['editorial_package']['seo_title'] ?? $seo->title), $seo->h1, (string) ($decision['editorial_package']['seo_description'] ?? $seo->metaDescription), $seo->canonicalUrl, $seo->openGraph, $seo->internalLinks, $seo->dictionaryContext, $seo->structuredData, $seo->claimTrace, $seo->diagnostics, $seo->blockers);
+        $quality = $this->quality->evaluate($pack, $plan, $finalDraft, $finalSeo, ($context['public_identity_deferred'] ?? false) === true);
 
         return [
             'status' => $quality->readiness,
@@ -95,13 +143,14 @@ final class VideoEditorialAdapter
             'retrieval' => $retrieved,
             'pack' => $pack,
             'plan' => $plan,
-            'draft' => $draft,
-            'seo_plan' => $seo,
+            'draft' => $finalDraft,
+            'seo_plan' => $finalSeo,
             'quality_report' => $quality,
             'decision_trace' => $statementDecision->items(),
             'constraint_findings' => $decision['findings'],
             'quality_decision' => $decision['quality'],
             'repair_rounds' => $decision['rounds'],
+            'quality_re_evaluations' => $qualityReevaluations,
             'fingerprint_claims' => array_values(array_map(static fn (array $claim): array => [
                 'id' => (string) ($claim['claim_id'] ?? ''),
                 'revision' => max(1, (int) ($claim['claim_revision'] ?? 1)),
