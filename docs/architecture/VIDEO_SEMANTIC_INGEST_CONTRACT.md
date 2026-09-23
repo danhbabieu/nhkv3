@@ -3,6 +3,27 @@
 > Non-normative implementation contract under the sole Constitution. The
 > Constitution controls if any text conflicts.
 
+## Generic lifecycle and uncertain mutation law — 2026-09-23
+
+Transport outcome is not canonical outcome. A mutation response is
+`SUCCESS_WITH_READBACK`, `FAILED_CONFIRMED` or `OUTCOME_UNKNOWN`; an empty or
+malformed response after dispatch remains `OUTCOME_UNKNOWN` until canonical
+reconciliation. Recovery reuses the original idempotency identity, Capture,
+normalized external Video identity and owner when present; it never creates a
+second Capture or idempotency key merely because transport lost the response.
+
+Owner creation, canonical owner read-back, editorial optimization, SEO/public
+identity and publication are distinct phases. Optimization consumes the
+canonical owner after read-back and controlled update, and publication requires
+canonical plus public read-back. Optional enrichment is not a universal owner
+gate. The public composer consumes reader-safe context; internal identifiers,
+diagnostics and workflow vocabulary remain machine context. Generated
+editorial prose never becomes Knowledge automatically.
+
+Composition repair is bounded: compose, full quality, structured findings,
+repair, regenerate dependent projections and full revalidation. The next
+quality pass reads the repaired package, not a stale pre-repair package.
+
 Workflow: `YouTube URL + user hint → source resolution → snapshot → transcript
 policy → NHK lookup → relation candidates → optional Knowledge enrichment
 planning → optional Dictionary lexical preview → Hub classification → editorial

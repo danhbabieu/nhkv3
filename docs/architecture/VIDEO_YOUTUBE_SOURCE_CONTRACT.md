@@ -1,5 +1,15 @@
 # YouTube Video Source Contract
 
+## Generic external identity and transport outcome — 2026-09-23
+
+Watch, short, Shorts and embed URL forms resolve to one normalized external
+Video identity. The normalized identity is used for idempotency and canonical
+reconciliation; it is not a second semantic owner. Transport outcome remains
+distinct from canonical outcome: an empty or malformed mutation response is
+`OUTCOME_UNKNOWN` and must reconcile with the original request identity before
+any replay. A replay uses the same idempotency identity and never silently
+creates a duplicate owner.
+
 > Non-normative implementation contract under the sole NHK V3 Constitution.
 
 YouTube is an external source adapter, not the NHK semantic authority. The

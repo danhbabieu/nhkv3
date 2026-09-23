@@ -1,5 +1,22 @@
 # MCP V3 Video Workflow
 
+## Generic creation, enrichment and recovery contract — 2026-09-23
+
+The canonical lifecycle is source → understand → core → strategy → enrich →
+compose → validate → bounded repair/revalidate → Governance/apply → canonical
+owner read-back → optimize → final validate → project/publish → public
+read-back. Owner existence is not publication success. Optional enrichment may
+be sparse or unavailable without blocking a valid owner, while identity,
+unsupported required facts and Governance integrity remain fail-closed.
+
+`OUTCOME_UNKNOWN` is a transport state, not proof that nothing was written.
+Capture/Video reconciliation must inspect the original Capture, owner and
+normalized external identity and resume the missing phase with the same
+idempotency identity. Generated editorial prose never becomes Knowledge; the
+public composer accepts only reader-safe context and must not expose internal
+identifiers or workflow jargon. Publication is complete only after canonical
+and public read-back.
+
 New Video submissions use the registered Video adapter inside
 `nhk.capture.ingest`, not a standalone operator writer. The Video identity and
 external-reference boundary remain distinct, while Capture owns the submission

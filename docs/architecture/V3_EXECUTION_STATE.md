@@ -17983,3 +17983,24 @@ read-back completed successfully. No semantic mutation or publication action
 was performed.
 
 STATUS=`VIDEO_PUBLIC_COPY_REPAIR_DEPLOYED / MCP_READBACK_PASS / NO_SEMANTIC_MUTATION`.
+# Checkpoint — 2026-09-23 — Generic Video creation/enrichment/optimization local verification (NO SERVER ACTION)
+
+TASK_RESULT: The generic Video contract was verified locally across typed
+uncertain transport outcomes, normalized external identity replay, authoritative
+subject/Knowledge direction, public-copy repair convergence, owner/read-back
+optimization and publication readiness. Existing production boundaries already
+contained the subject, enrichment, repair and owner lifecycle behavior; this
+slice adds generic regression coverage and a transport envelope that exposes
+`OUTCOME_UNKNOWN` with original-identity reconciliation hints when a mutation
+would otherwise serialize as an empty result.
+
+VERIFICATION: Task-focused suites passed: Task 1 13 tests / 40 assertions;
+Task 2 48 tests / 179 assertions; Task 3 105 tests / 515 assertions; Task 4
+32 tests / 173 assertions; Task 5 101 tests / 475 assertions; documentation
+contract 1 test / 9 assertions. PHP lint and `git diff --check` passed for
+changed files. Guarded Integration/P4 was not run because the exact
+`NHK_WP_TEST_PATH=public` and `NHK_WP_TEST_DB=nhk_v3_test` environment was not
+available. No database, staging, production, push, pull, deployment or public
+publication was performed.
+
+STATUS: `LOCAL_GENERIC_VIDEO_CONTRACT_READY / INTEGRATION_ENVIRONMENT_GATED / NO_SERVER_ACTION`.

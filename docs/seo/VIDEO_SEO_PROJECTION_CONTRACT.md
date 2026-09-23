@@ -1,5 +1,15 @@
 # Video SEO Projection Contract
 
+## Owner/read-back and public projection law — 2026-09-23
+
+SEO optimization is distinct from Video owner creation. Durable SEO/public
+identity is finalized only after canonical Video owner read-back, then applied
+through the controlled update boundary and read back again. A successful
+transport response alone is not enough. Public publication additionally
+requires public route/read-back verification; otherwise the result remains
+publication-only incomplete. Repair must regenerate stale SEO, Open Graph and
+VideoObject projections from the repaired reader-safe package.
+
 SEO is generated from the canonical Video read/projection package after
 semantic correctness and editorial completeness. The shared SEO Core and
 Sitemap/Indexability contracts supply common readiness and indexability; this
