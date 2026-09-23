@@ -1,3 +1,11 @@
+# Checkpoint — 2026-09-23 — Capture pipeline convergence Task 9 documentation (LOCAL / NO LIVE MUTATION)
+
+TASK_RESULT: Documentation review PASS. Existing Article ingest, Media model, MCP operation and public URL contracts already describe the verified intent-owned dependencies, canonical MediaUsage/read-back, state-token CAS and fail-closed publication boundaries. Only behavior-backed execution evidence was updated; no normative vocabulary or Constitution text changed.
+
+VERIFICATION: Full Unit and Contract suites remain green after documentation and scope cleanup. No database, staging, V2 or production mutation occurred.
+
+STATUS: `CAPTURE_PIPELINE_TASK_9_DOCUMENTATION_LOCAL_READY / NO_LIVE_MUTATION`.
+
 # NHK V3 Execution State
 
 # Checkpoint — 2026-09-23 — Capture pipeline convergence Task 7 publication/URL/completion (LOCAL / NO LIVE MUTATION)
