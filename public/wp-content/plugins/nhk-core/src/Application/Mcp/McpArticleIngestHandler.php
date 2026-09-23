@@ -80,15 +80,45 @@ class McpArticleIngestHandler
     public function ingest(array $input): array
     {
         $reconciliation = $this->planReconciliation($input);
+        $input = $this->applyReconciliationDesiredState($input, $reconciliation);
+        $execution = $this->executeReconciliation($input);
         $input['article_reconciliation'] = $reconciliation;
         $result = $this->coordinator->execute($input)->toArray();
         $result['reconciliation'] = $reconciliation;
+        if ($execution !== []) $result['reconciliation_execution'] = $execution;
         if ($this->articleMedia !== null && isset($result['wp_post_id']) && (int) $result['wp_post_id'] > 0) {
             $mediaContext = is_array($input['media_context'] ?? null) ? $input['media_context'] : [];
             if (is_array($input['article_media'] ?? null)) $mediaContext['article_media'] = $input['article_media'];
             $result['media'] = $this->articleMedia->diagnoseForPost((int) $result['wp_post_id'], $mediaContext)->toArray();
         }
         return $result;
+    }
+
+    /** @param array<string,mixed> $input @param array<string,mixed> $plan @return array<string,mixed> */
+    private function applyReconciliationDesiredState(array $input, array $plan): array
+    {
+        $state = is_array($plan['state'] ?? null) ? $plan['state'] : [];
+        $packet = is_array($state['subject_packet'] ?? null) ? $state['subject_packet'] : [];
+        if ($packet !== []) $input['subject_resolution_packet'] = $packet;
+        $desiredMedia = is_array($state['desired_media'] ?? null) ? $state['desired_media'] : [];
+        if ($desiredMedia !== []) $input['article_media'] = $desiredMedia;
+        return $input;
+    }
+
+    /** @return array<string,mixed> */
+    private function executeReconciliation(array $input): array
+    {
+        if (strtolower(trim((string) ($input['intent'] ?? ''))) !== 'reconcile' || !is_callable($this->reconciliationFactory)) return [];
+        $target = is_array($input['target_wp_post'] ?? null) ? $input['target_wp_post'] : [];
+        $endpoint = trim((string) ($target['endpoint_key'] ?? ''));
+        if (preg_match('/^[1-9][0-9]*:([1-9][0-9]*)$/', $endpoint, $matches) !== 1) return [];
+        $factory = $this->reconciliationFactory;
+        $orchestrator = $factory();
+        if (!$orchestrator instanceof ArticleReconciliationOrchestrator) return [];
+        $request = $input;
+        $request['post_id'] = (int) $matches[1];
+        $request['plan_only'] = false;
+        return $orchestrator->reconcile($request);
     }
 
     /** @return array<string,mixed> */

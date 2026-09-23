@@ -146,4 +146,37 @@ final class McpArticleContractTest extends TestCase
         self::assertSame($input['article_media'], $seen[1]);
     }
 
+    public function test_ingest_executes_the_planned_current_subject_and_inline_media_at_handler_boundary(): void
+    {
+        $types = new EntityTypeRegistry(); CanonicalEntityTypeCatalog::registerInto($types);
+        $endpoints = new EndpointTypeRegistry(); $endpoints->register('wp_post', new FakeEndpointResolver('wp_post', ['1:55']));
+        $reader = new class implements EditorialStateReader { public function read(int $postId): ?EditorialPostState { return new EditorialPostState($postId, '1:' . $postId, 'post', 'draft', 'Existing', '', '', 'existing', 'https://example.test/existing/', 0, 0); } };
+        $receipts = new class implements ArticleOperationReceiptRepository { public function findByIdempotencyKey(string $key): ?ArticleOperationReceipt { return null; } public function create(ArticleOperationReceipt $receipt): ArticleOperationReceipt { return $receipt; } public function save(ArticleOperationReceipt $receipt): ArticleOperationReceipt { return $receipt; } };
+        $old = ['status' => 'resolved', 'canonical_subject_id' => 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'entity_type' => 'music', 'stable_key' => 'music:old', 'revision' => 1];
+        $current = ['status' => 'resolved', 'canonical_subject_id' => 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'entity_type' => 'model', 'stable_key' => 'model:current', 'revision' => 2];
+        $executionInputs = [];
+        $orchestrator = new ArticleReconciliationOrchestrator(
+            static function (array $input) use ($old): array {
+                $desired = $input['article_media'] ?? [];
+                if (isset($desired['selected']['media_id'])) $desired['selected']['inline_primary'] = $desired['selected'] + ['role' => 'inline_primary'];
+                return ['post_id' => 55, 'subject_resolution_packet' => $old, 'desired_media' => $desired];
+            },
+            static fn (array $state): array => ['intent' => 'IMAGE_ARTICLE'],
+            static fn (array $state): array => $current,
+            static function (array $state) use (&$executionInputs): array { if (($state['plan_only'] ?? false) === false) $executionInputs[] = $state; return ['diagnostics' => []]; },
+            static fn (array $state, array $actions): array => ['subject_resolution_packet' => $state['subject_packet'], 'desired_media' => $state['desired_media']],
+            static fn (array $state): array => ['outcome' => 'PASS'],
+            static fn (array $state): array => [],
+            static fn (array $state): array => ['status' => 'verified'],
+        );
+        $handler = new McpArticleIngestHandler(new ArticleIngestCoordinator($receipts), new ArticleIngestPreflight($endpoints, new PredicateRegistry(), $types), $reader, reconciliationFactory: static fn (): ArticleReconciliationOrchestrator => $orchestrator);
+        $mediaId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+        $result = $handler->ingest(['intent' => 'reconcile', 'idempotency_key' => 'handler-execution-boundary', 'target_wp_post' => ['endpoint_type' => 'wp_post', 'endpoint_key' => '1:55'], 'research_subject' => ['exact' => ['id' => $current['canonical_subject_id'], 'type' => 'model']], 'article_media' => ['selected' => ['media_id' => $mediaId, 'role' => 'featured_primary', 'selection_source' => 'USER_EXPLICIT', 'selection_policy' => 'PINNED']]]);
+
+        self::assertSame('PASS', $result['reconciliation_execution']['status']);
+        self::assertNotEmpty($executionInputs);
+        self::assertSame($current, $executionInputs[0]['subject_packet']);
+        self::assertSame($mediaId, $executionInputs[0]['desired_media']['selected']['inline_primary']['media_id']);
+    }
+
 }
