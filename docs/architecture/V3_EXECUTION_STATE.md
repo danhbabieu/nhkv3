@@ -1,3 +1,21 @@
+# Checkpoint — 2026-09-23 — Capture pipeline convergence implementation plan (PLAN READY / NO CODE MUTATION)
+
+PLAN_STATUS: The implementation plan is recorded at
+`docs/superpowers/plans/2026-09-23-capture-pipeline-convergence.md` and follows
+the approved design in
+`docs/superpowers/specs/2026-09-23-capture-pipeline-convergence-design.md`.
+The ordered tasks cover intent isolation, subject packet/continuation, staging
+scope propagation, MediaUsage convergence, Article field normalization and
+read-back, state-token rehydration, publication/public URL/completion,
+regression coverage, documentation and bounded staging verification.
+
+VERIFICATION: Plan self-review confirms coverage of all six registered intents,
+shared-boundary scope, dependency ordering, test gates, regression risks and
+fail-closed external verification. `git diff --check` passes. No product code,
+semantic data, staging data or live runtime was mutated.
+
+STATUS: `PIPELINE_CONVERGENCE_PLAN_READY / AWAITING_USER_PLAN_REVIEW_AND_EXECUTION_METHOD / NO_CODE_MUTATION`.
+
 # Checkpoint — 2026-09-23 — Capture pipeline convergence design (SPEC DRAFT / NO CODE MUTATION)
 
 DESIGN_STATUS: The approved architectural direction is recorded in
