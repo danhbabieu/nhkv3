@@ -1,3 +1,44 @@
+# Checkpoint — 2026-09-23 — Hierarchical resolver exact-base precedence (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE: `CanonicalAuthoritySubjectResolver::resolveComposite()` returned
+canonical identities whose names merely contained every explicit hint with the
+same effective match strength as an exact composite identity. `SubjectResolutionService`
+then applied descendant narrowness before match quality, so an expanded
+specialized Variant could displace an exact base Variant and surface
+`PRIMARY_SUBJECT_AMBIGUOUS`.
+
+FIX: Composite lookup now classifies `EXACT_COMPOSITE_IDENTITY` separately from
+`PARTIAL_OR_EXPANDED_MATCH`. The shared resolver filters expanded candidates
+whenever an exact canonical/stable/name/alias/composite identity exists, then
+applies deterministic hierarchy specificity. Compatible ancestors remain
+context; same-type contradictory explicit identities fail closed. UUID
+resolution now accepts a compatible ancestor hint for an exact specialized
+UUID while rejecting an explicit specialized identity against an exact base
+UUID. No entity, predicate, fixture identity or runtime data was hard-coded.
+
+REGRESSION: `HierarchicalSubjectResolutionVerificationTest` passes 9 tests / 20
+assertions, covering exact base composite, explicit specialized designation,
+exact base name, multiple expanded ambiguity, specialized UUID plus base hint,
+and base UUID conflict. The pre-fix regression was observed RED (`ambiguous`;
+expected `resolved`) before implementation.
+
+CAPTURE_HANDOFF: Capture/Video handoff tests pass 5 tests / 19 assertions;
+the locked subject packet remains the same canonical packet consumed by Video,
+and mismatches fail closed without re-resolution or downgrade. Existing
+hierarchical/Capture/Video regression group passes 137 tests / 631 assertions.
+
+VERIFICATION: NHK Contract passes 6 tests / 48 assertions. Full NHK Unit reaches
+2,329 tests / 13,536 assertions with one unrelated pre-existing failure in
+`EditorialCaptureConvergenceE2ETest::test_text_article_pipeline_replays_same_capture_and_owner_writes`
+(`owner_id` expected empty, actual `1001`); no resolver assertion fails. Changed
+PHP lint and `git diff --check` pass. Changed production-source fixture audit
+finds zero Odo, 36/10, fixture UUID, Ave Maria or YouTube hard-codes.
+
+RUNTIME_VERIFICATION: `PENDING_DEPLOYMENT`. No deployment, staging/live
+mutation, failed-Capture repair or manual Video creation was performed.
+
+STATUS: `LOCAL_RESOLVER_FIX_READY / FULL_UNIT_PRE_EXISTING_FAILURE / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-23 — Post-implementation adversarial audit (OPEN / BLOCKED)
 
 ARCHITECTURAL_DEVIATION: After the audit commit, `HEAD` advanced with `87fb6b48`, `da43ed84` and `d4607dd9`, adding hierarchical subject-resolution code, tests and documents outside the approved Capture convergence plan. The code currently passes its focused subject/convergence tests, but this does not authorize the deviation. Per the execution rule, no further architectural change or completion claim is made until the user resolves whether that separate scope belongs in this task. The restored hierarchy documents are present; no deletion remains for those paths.

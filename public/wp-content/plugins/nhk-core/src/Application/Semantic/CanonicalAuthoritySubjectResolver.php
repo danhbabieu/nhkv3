@@ -59,7 +59,14 @@ final class CanonicalAuthoritySubjectResolver
             foreach (['reference', 'designation'] as $field) if (trim((string) ($entity->payload[$field] ?? '')) !== '') $fields[] = $this->normalize((string) $entity->payload[$field]);
             $valid = true;
             foreach ($hints as $hint) { $found = false; foreach ($fields as $field) if ($field !== '' && ($field === $hint || str_contains($field, $hint))) { $found = true; break; } if (!$found) { $valid = false; break; } }
-            if ($valid) $matches[$entity->canonicalId] = $this->packet($entity, 'composite_explicit_hint');
+            if ($valid) {
+                $combined = $this->normalize(implode(' ', $hints));
+                $exact = $combined !== '' && (
+                    $this->normalize($entity->canonicalName) === $combined
+                    || in_array($combined, $fields, true)
+                );
+                $matches[$entity->canonicalId] = $this->packet($entity, $exact ? 'composite_exact_identity' : 'composite_expanded_match');
+            }
         }
         return array_values($matches);
     }
@@ -133,6 +140,14 @@ final class CanonicalAuthoritySubjectResolver
             'name' => $entity->canonicalName,
             'revision' => $entity->revision,
             'match' => $match,
+            'match_class' => match ($match) {
+                'uuid_exact' => 'EXACT_CANONICAL_IDENTITY',
+                'stable_key_exact' => 'EXACT_STABLE_KEY',
+                'exact_name_or_alias', 'exact_variant_reference', 'exact_variant_name_reference' => 'EXACT_NORMALIZED_NAME_OR_ALIAS',
+                'composite_exact_identity' => 'EXACT_COMPOSITE_IDENTITY',
+                'composite_expanded_match' => 'PARTIAL_OR_EXPANDED_MATCH',
+                default => 'STRUCTURAL_COMPATIBLE_CONTEXT',
+            },
             'compatibility' => [
                 'parent_ids' => array_values(array_unique($parentIds)),
                 'family' => trim((string) ($entity->payload['family'] ?? $entity->payload['classification_family'] ?? '')),
@@ -149,4 +164,3 @@ final class CanonicalAuthoritySubjectResolver
         return function_exists('mb_strtolower') ? mb_strtolower($value) : strtolower($value);
     }
 }
-

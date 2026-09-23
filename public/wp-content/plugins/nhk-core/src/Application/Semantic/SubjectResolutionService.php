@@ -153,14 +153,14 @@ final class SubjectResolutionService
             if ($key !== ':') $candidateMap[$key] = $match + ['match' => 'composite_explicit_hint'];
         }
         $candidates = array_values($candidateMap);
+        $identityMatches = array_values(array_filter($candidates, fn (array $candidate): bool => $this->matchClassRank($candidate) >= 3));
+        if ($identityMatches !== []) $candidates = $identityMatches;
         if ($candidates === []) return $this->finalize(['resolved' => [], 'candidates' => [], 'unresolved' => $unresolved, 'conflicts' => [], 'diagnostics' => [], 'primary_source' => 'explicit_subject_hint'], 'unresolved');
         $contexts = [];
         foreach ($candidates as $candidate) {
             $context = $this->structuralContext?->contextFor($candidate) ?? $this->compatibilityContext($candidate);
             $contexts[(string) $candidate['id']] = $context;
-            $candidateMap[(string) $candidate['type'] . ':' . (string) $candidate['id']] = $candidate;
         }
-        $candidates = array_values($candidateMap);
         $conflicts = $this->hierarchicalConflicts($candidates, $contexts);
         if ($conflicts !== []) return $this->finalize(['resolved' => $candidates, 'candidates' => ['explicit' => $candidates], 'unresolved' => $unresolved, 'conflicts' => $conflicts, 'diagnostics' => ['SUBJECT_CONFLICT_REVIEW_REQUIRED'], 'primary_source' => 'explicit_subject_hint'], 'conflict');
         $narrowest = array_values(array_filter($candidates, fn (array $candidate): bool => !$this->hasNarrowerCompatibleCandidate($candidate, $candidates, $contexts)));
@@ -242,13 +242,20 @@ final class SubjectResolutionService
     private function explicitConflicts(array $primary, array $values): array
     {
         $conflicts = [];
+        $contexts = [(string) ($primary['id'] ?? '') => $this->structuralContext?->contextFor($primary) ?? $this->compatibilityContext($primary)];
         foreach (array_values(array_unique($values)) as $value) {
-            $matches = ($this->resolver)($value);
-            $matches = is_array($matches) ? array_values(array_filter($matches, 'is_array')) : [];
+            $matches = $this->lookup($value);
             foreach ($matches as $candidate) {
                 if (($candidate['id'] ?? '') === ($primary['id'] ?? '')) continue;
-                if (($candidate['type'] ?? '') === ($primary['type'] ?? '')) {
-                    $conflicts[] = ['kind' => 'same_type_identity', 'expected' => $primary, 'candidate' => $candidate];
+                $contexts[(string) ($candidate['id'] ?? '')] = $this->structuralContext?->contextFor($candidate) ?? $this->compatibilityContext($candidate);
+                $primaryIsAncestor = $this->isAncestorOf($primary, $candidate, $contexts);
+                $candidateIsAncestor = $this->isAncestorOf($candidate, $primary, $contexts);
+                if ($candidateIsAncestor) continue;
+                $primaryContext = $contexts[(string) ($primary['id'] ?? '')] ?? [];
+                $candidateContext = $contexts[(string) ($candidate['id'] ?? '')] ?? [];
+                $hasStructuralPath = (array) ($primaryContext['relation_path'] ?? []) !== [] || (array) ($candidateContext['relation_path'] ?? []) !== [];
+                if (($candidate['type'] ?? '') === ($primary['type'] ?? '') || ($hasStructuralPath && !$primaryIsAncestor)) {
+                    $conflicts[] = ['kind' => 'identity_conflict', 'expected' => $primary, 'candidate' => $candidate];
                 }
             }
         }
@@ -309,6 +316,18 @@ final class SubjectResolutionService
             'uuid_exact' => 3,
             'stable_key_exact' => 2,
             default => 1,
+        };
+    }
+
+    private function matchClassRank(array $subject): int
+    {
+        return match ((string) ($subject['match_class'] ?? $subject['match'] ?? '')) {
+            'EXACT_CANONICAL_IDENTITY', 'uuid_exact' => 5,
+            'EXACT_STABLE_KEY', 'stable_key_exact' => 4,
+            'EXACT_NORMALIZED_NAME_OR_ALIAS', 'exact_name_or_alias', 'EXACT_COMPOSITE_IDENTITY', 'composite_exact_identity', 'exact_variant_reference', 'exact_variant_name_reference' => 3,
+            'STRUCTURAL_COMPATIBLE_CONTEXT' => 2,
+            'PARTIAL_OR_EXPANDED_MATCH', 'composite_expanded_match' => 1,
+            default => 0,
         };
     }
 }
