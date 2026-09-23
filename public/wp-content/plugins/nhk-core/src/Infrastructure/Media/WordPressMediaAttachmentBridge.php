@@ -326,17 +326,20 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
             $createdPublic = false;
             $this->adoptionPhase($attachmentId, 'WEBP_DERIVATIVE_GENERATION_STARTED', $media->canonicalId);
             if (!is_file($publicPath) || @getimagesize($publicPath) === false) {
-                $editor = wp_get_image_editor($filePath);
-                if (is_wp_error($editor)) throw new RuntimeException('WORDPRESS_MEDIA_EDITOR_UNAVAILABLE');
-                $target = PublicImageSizingPolicy::constrain((int) $info[0], (int) $info[1]);
-                if ($target['width'] !== (int) $info[0] || $target['height'] !== (int) $info[1]) {
+                $normalizedSource = $this->normalizePaletteSource($filePath);
+                try {
+                    $editor = wp_get_image_editor($normalizedSource ?? $filePath);
+                    if (is_wp_error($editor)) throw new RuntimeException('WORDPRESS_MEDIA_EDITOR_UNAVAILABLE');
+                    $target = PublicImageSizingPolicy::constrain((int) $info[0], (int) $info[1]);
                     $resized = $editor->resize($target['width'], $target['height'], false);
                     if (is_wp_error($resized)) throw new RuntimeException('WORDPRESS_MEDIA_RESIZE_FAILED');
+                    if ($editor->set_quality(PublicMediaAssetSelector::DEFAULT_WEBP_QUALITY) === false) throw new RuntimeException('WORDPRESS_MEDIA_QUALITY_FAILED');
+                    $saved = $editor->save($publicPath, 'image/webp');
+                    if (is_wp_error($saved) || !is_array($saved) || strtolower((string) ($saved['mime-type'] ?? '')) !== 'image/webp' || (string) ($saved['path'] ?? '') !== $publicPath) throw new RuntimeException('WORDPRESS_MEDIA_WEBP_UNAVAILABLE');
+                    $createdPublic = true;
+                } finally {
+                    if ($normalizedSource !== null && is_file($normalizedSource)) @unlink($normalizedSource);
                 }
-                if ($editor->set_quality(PublicMediaAssetSelector::DEFAULT_WEBP_QUALITY) === false) throw new RuntimeException('WORDPRESS_MEDIA_QUALITY_FAILED');
-                $saved = $editor->save($publicPath, 'image/webp');
-                if (is_wp_error($saved) || !is_array($saved) || strtolower((string) ($saved['mime-type'] ?? '')) !== 'image/webp' || (string) ($saved['path'] ?? '') !== $publicPath) throw new RuntimeException('WORDPRESS_MEDIA_WEBP_UNAVAILABLE');
-                $createdPublic = true;
             }
             $publicInfo = @getimagesize($publicPath);
             if (!is_array($publicInfo) || strtolower((string) ($publicInfo['mime'] ?? '')) !== 'image/webp') throw new RuntimeException('WORDPRESS_MEDIA_PUBLIC_DERIVATIVE_INVALID');
@@ -382,6 +385,27 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
         $root = is_array($upload) ? (string) ($upload['basedir'] ?? '') : '';
         if ($root === '') throw new RuntimeException('WORDPRESS_MEDIA_PUBLIC_STORAGE_UNAVAILABLE');
         return rtrim($root, '/\\');
+    }
+
+    private function normalizePaletteSource(string $filePath): ?string
+    {
+        if (!function_exists('imagecreatefromstring') || !function_exists('imageistruecolor') || !function_exists('imagecreatetruecolor')) return null;
+        $bytes = @file_get_contents($filePath);
+        if (!is_string($bytes) || $bytes === '') return null;
+        $source = @imagecreatefromstring($bytes);
+        if (!is_object($source) && !is_resource($source)) return null;
+        if (imageistruecolor($source)) return null;
+        $normalized = imagecreatetruecolor(imagesx($source), imagesy($source));
+        if (!$normalized) return null;
+        imagealphablending($normalized, false);
+        imagesavealpha($normalized, true);
+        imagecopy($normalized, $source, 0, 0, 0, 0, imagesx($source), imagesy($source));
+        $path = tempnam(sys_get_temp_dir(), 'nhk-webp-');
+        if (!is_string($path) || !@imagepng($normalized, $path)) {
+            if (is_file((string) $path)) @unlink((string) $path);
+            return null;
+        }
+        return $path;
     }
 
     private function sourceExtension(string $mime): string

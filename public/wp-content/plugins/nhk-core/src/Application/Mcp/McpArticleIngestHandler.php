@@ -137,6 +137,10 @@ class McpArticleIngestHandler
     private function planReconciliation(array $input): array
     {
         if (!is_callable($this->reconciliationFactory)) return [];
+        if (strtolower(trim((string) ($input['intent'] ?? ''))) === 'reconcile'
+            && !array_key_exists('capture_id', $input)
+            && !is_array($input['subject_resolution_packet'] ?? null)
+            && !is_array($input['article_media'] ?? null)) return [];
         $target = is_array($input['target_wp_post'] ?? null) ? $input['target_wp_post'] : [];
         $endpoint = trim((string) ($target['endpoint_key'] ?? ''));
         if (preg_match('/^[1-9][0-9]*:([1-9][0-9]*)$/', $endpoint, $matches) !== 1) return [];

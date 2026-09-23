@@ -2,16 +2,16 @@
 declare(strict_types=1);
 
 namespace {
-    if (!function_exists('is_wp_error')) {
-        function is_wp_error(mixed $thing): bool
-        {
-            return $thing instanceof \WP_Error;
-        }
-    }
     if (!function_exists('wp_raise_memory_limit')) {
         function wp_raise_memory_limit(string $context = 'admin'): string
         {
             return ini_get('memory_limit') ?: '-1';
+        }
+    }
+    if (!function_exists('is_wp_error')) {
+        function is_wp_error(mixed $thing): bool
+        {
+            return $thing instanceof \WP_Error;
         }
     }
     if (!function_exists('wp_get_image_mime')) {
@@ -93,20 +93,6 @@ final class WordPressImageOrientationTest extends TestCase
             self::markTestSkipped('GD and EXIF are required for image orientation regression tests.');
         }
 
-        $root = dirname(__DIR__, 5) . '/';
-        if (!defined('ABSPATH')) define('ABSPATH', $root);
-        if (!defined('WPINC')) define('WPINC', 'wp-includes');
-        if (!defined('MB_IN_BYTES')) define('MB_IN_BYTES', 1048576);
-        if (!defined('KB_IN_BYTES')) define('KB_IN_BYTES', 1024);
-        if (!defined('WP_MAX_MEMORY_LIMIT')) define('WP_MAX_MEMORY_LIMIT', '256M');
-
-        require_once ABSPATH . WPINC . '/class-wp-error.php';
-        require_once ABSPATH . WPINC . '/plugin.php';
-        require_once ABSPATH . WPINC . '/l10n.php';
-        require_once ABSPATH . WPINC . '/shortcodes.php';
-        require_once ABSPATH . WPINC . '/media.php';
-        require_once ABSPATH . WPINC . '/class-wp-image-editor.php';
-        require_once ABSPATH . WPINC . '/class-wp-image-editor-gd.php';
     }
 
     #[RunInSeparateProcess]
@@ -176,6 +162,7 @@ final class WordPressImageOrientationTest extends TestCase
     /** @return array{dimensions:array{width:int,height:int},image:\GdImage,has_orientation_metadata:bool} */
     private function process(int $width, int $height, ?int $orientation, string $layout): array
     {
+        $this->bootstrapWordPressImageEditorRuntime();
         $source = $this->createJpeg($width, $height, $orientation, $layout);
         $outputBase = tempnam(sys_get_temp_dir(), 'nhk-orientation-output-');
         self::assertIsString($outputBase);
@@ -211,6 +198,23 @@ final class WordPressImageOrientationTest extends TestCase
             if (is_file($source)) unlink($source);
             if (is_file($output)) unlink($output);
         }
+    }
+
+    private function bootstrapWordPressImageEditorRuntime(): void
+    {
+        $root = dirname(__DIR__, 5) . '/';
+        if (!defined('ABSPATH')) define('ABSPATH', $root);
+        if (!defined('WPINC')) define('WPINC', 'wp-includes');
+        if (!defined('MB_IN_BYTES')) define('MB_IN_BYTES', 1048576);
+        if (!defined('KB_IN_BYTES')) define('KB_IN_BYTES', 1024);
+        if (!defined('WP_MAX_MEMORY_LIMIT')) define('WP_MAX_MEMORY_LIMIT', '256M');
+        require_once ABSPATH . WPINC . '/class-wp-error.php';
+        require_once ABSPATH . WPINC . '/plugin.php';
+        require_once ABSPATH . WPINC . '/l10n.php';
+        require_once ABSPATH . WPINC . '/shortcodes.php';
+        require_once ABSPATH . WPINC . '/media.php';
+        require_once ABSPATH . WPINC . '/class-wp-image-editor.php';
+        require_once ABSPATH . WPINC . '/class-wp-image-editor-gd.php';
     }
 
     private function createJpeg(int $width, int $height, ?int $orientation, string $layout): string

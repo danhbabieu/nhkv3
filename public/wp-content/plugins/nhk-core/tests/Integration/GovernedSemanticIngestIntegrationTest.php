@@ -59,6 +59,7 @@ final class GovernedSemanticIngestIntegrationTest extends TestCase
         }
         $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_proposals WHERE idempotency_key LIKE %s", $this->prefix . '%'));
         $ownedKeys = array_values(array_unique(array_merge($this->owned, array_map(static fn (string $id): string => 'video:' . $id, $this->owned))));
+        if ($ownedKeys === []) return;
         $placeholders = implode(',', array_fill(0, count($ownedKeys), '%s'));
         $nodeIds = $wpdb->get_col($wpdb->prepare("SELECT id FROM {$wpdb->prefix}nhk_graph_nodes WHERE endpoint_key IN ($placeholders)", ...$ownedKeys));
         if ($nodeIds !== []) $wpdb->query("DELETE FROM {$wpdb->prefix}nhk_graph_edges WHERE source_node_id IN (" . implode(',', array_map('intval', $nodeIds)) . ") OR target_node_id IN (" . implode(',', array_map('intval', $nodeIds)) . ")");

@@ -198,6 +198,7 @@ final class WordPressMediaIngestIntegrationTest extends TestCase
         $source = $this->createOrientedJpeg($orientation);
         $attachmentId = 0;
         $mediaId = '';
+        $sourceAsset = null;
         $sourceRelative = '';
         $publicPath = '';
         try {
@@ -296,6 +297,7 @@ final class WordPressMediaIngestIntegrationTest extends TestCase
                         return ['status' => 200];
                     },
                     static fn (string $host, string $url): bool => $host === 'files.example.test',
+                    static fn (string $host): array => $host === 'files.example.test' ? ['93.184.216.34'] : [],
                 ),
             );
             $manifest = $entrypoint->ingest($idempotencyKey, ['description' => 'Structured image'], [[

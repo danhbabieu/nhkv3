@@ -65,6 +65,7 @@ final class ArticlePublicationGate
         }
         if (($evidence['real_image_requirements_met'] ?? false) !== true) {
             if ($intent === 'IMAGE_ARTICLE' && ($evidence['real_image_requirements_met_status'] ?? '') === 'invalid') $blockers[] = 'REAL_IMAGE_REQUIREMENTS_UNMET';
+            elseif (in_array(($evidence['real_image_requirements_met_status'] ?? ''), ['missing', 'incomplete'], true)) { $warnings[] = 'REAL_IMAGE_INCOMPLETE'; $blockers[] = 'REAL_IMAGE_INCOMPLETE'; }
             else { $warnings[] = 'REAL_IMAGE_INCOMPLETE'; $missingEnrichments[] = 'REAL_IMAGE_SUPPORT'; }
         }
         $this->requireTrue($evidence, 'claim_compliance_acceptable', 'PUBLIC_CLAIM_COMPLIANCE_BLOCKED', $blockers);

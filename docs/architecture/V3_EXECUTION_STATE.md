@@ -17735,3 +17735,23 @@ lint` and `git diff --check` pass. No staging, production, Article, Media or
 publication mutation was performed.
 
 STATUS=`LOCAL_TEST_INTERNALS_PASS / INTEGRATION_RUNTIME_BLOCKED / DEPLOYMENT_NOT_RUN / LIVE_CAPTURE_NOT_RUN`.
+
+# Checkpoint — 2026-09-23 — Capture → Article → MediaUsage → Publication runtime convergence
+
+ROOT_CAUSES_FIXED: WordPress GD palette sources are normalized before WebP
+derivative creation; injected provided-file integration downloads now carry the
+explicit public resolver; governed relation retire/reactivate/replace proposals
+bind `expected_edge_revision`; ordinary Knowledge updates no longer enter the
+Knowledge Repair-only validation; Article reconciliation skips only unbound
+legacy preflight requests while preserving explicit media plans; publication
+review retains fail-closed Capture binding when present and preserves the
+owner-review gate for incomplete real-image evidence; MCP error envelopes and
+Ability ordering are stable. Article paths do not construct or require Video
+state.
+
+VERIFICATION: Unit + Contract PASS (2,325 tests / 13,560 assertions). Integration
+PASS (141 tests / 1,261 assertions) against `nhk_v3_test` with the repository
+WordPress runtime. Deployment preflight PASS (11/11). No staging/live semantic
+mutation has been performed in this checkpoint.
+
+STATUS=`LOCAL_FULL_SUITE_PASS / DEPLOYMENT_PREFLIGHT_PASS / DEPLOYMENT_PENDING / LIVE_CAPTURE_PENDING`.

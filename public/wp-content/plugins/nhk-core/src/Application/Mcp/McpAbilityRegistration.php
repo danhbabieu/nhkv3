@@ -398,7 +398,7 @@ final class McpAbilityRegistration
     /** @return list<string> */
     public static function abilityNames(): array
     {
-        return array_values(array_unique(array_merge(self::READ_TOOL_MAP, self::CAPABILITY_GATED_READ_TOOL_MAP, self::GOVERNED_TOOL_MAP, [self::MCP_APP_DIAGNOSTICS_ABILITY])));
+        return array_values(array_unique(array_merge([self::MCP_APP_DIAGNOSTICS_ABILITY], self::READ_TOOL_MAP, self::CAPABILITY_GATED_READ_TOOL_MAP, self::GOVERNED_TOOL_MAP)));
     }
 
     /** @return array<string,string> */

@@ -275,7 +275,7 @@ final class Plugin {
             (new ReadApi($media, $assets, $usages, $videos, $claims, $sources, $evidence, new MigrationStatus()))->register();
             $types = new EntityTypeRegistry();
             CanonicalEntityTypeCatalog::registerInto($types);
-            $endpoints = new EndpointTypeRegistry(); CoreEndpointResolverRegistrar::register($endpoints, $types, $authority, $media, $videos, $claims, $sources, $evidence); $graphRepository = new WpdbGraphRepository($wpdb); $predicates = new PredicateRegistry(); $graphService = new GraphService($graphRepository, $endpoints, $predicates, new WpdbAuditSink(), new \NHK\Core\Application\Graph\ClassificationHierarchyPolicy($authority, $graphRepository), new \NHK\Core\Application\Graph\ClassifiedAsPolicy());
+            $endpoints = new EndpointTypeRegistry(); CoreEndpointResolverRegistrar::register($endpoints, $types, $authority, $media, $videos, $claims, $sources, $evidence); $graphRepository = new WpdbGraphRepository($wpdb); $predicates = new PredicateRegistry(); $classifiedAsPolicy = new \NHK\Core\Application\Graph\ClassifiedAsPolicy(); $graphService = new GraphService($graphRepository, $endpoints, $predicates, new WpdbAuditSink(), new \NHK\Core\Application\Graph\ClassificationHierarchyPolicy($authority, $graphRepository), $classifiedAsPolicy);
             $publicStatus = new MigrationStatus();
             $publicContexts = new StructuralContextQuery($graphService, $authority);
             $publicIdentityRepository = new WpdbPublicIdentityRepository($wpdb);
@@ -815,7 +815,8 @@ final class Plugin {
             $editorialPosts = new WpEditorialPostStore($articleEditorial);
             $canonicalPublicationContext = static function (\NHK\Core\Domain\Article\EditorialPostState $state, array $callerEvidence) use ($captureRepository, $articleResearch, $articlePreflightHandoff, $articleMedia): array {
                 $capture = $captureRepository->findByArticleId($state->postId);
-                if ($capture === null || $capture->articleId !== $state->postId) throw new \RuntimeException('CAPTURE_ARTICLE_BINDING_UNAVAILABLE');
+                if ($capture === null) return $callerEvidence;
+                if ($capture->articleId !== $state->postId) throw new \RuntimeException('CAPTURE_ARTICLE_BINDING_UNAVAILABLE');
                 $persistedSubject = is_array($capture->diagnostics['subjects'] ?? null) ? $capture->diagnostics['subjects'] : [];
                 if ($persistedSubject === []) $persistedSubject = is_array($capture->context['subject_resolution'] ?? null) ? $capture->context['subject_resolution'] : [];
                 $primary = is_array($persistedSubject['primary'] ?? null) ? $persistedSubject['primary'] : [];
@@ -1083,7 +1084,7 @@ final class Plugin {
             $captureAuthorityResolver = new \NHK\Core\Application\Semantic\CanonicalAuthoritySubjectResolver($authority, $types);
             $captureSubjectResolver = new SubjectResolutionService(
                 $captureAuthorityResolver,
-                new \NHK\Core\Application\Semantic\CanonicalSubjectStructuralContextReader(new StructuralContextQuery($graphService, $authority)),
+                new \NHK\Core\Application\Semantic\CanonicalSubjectStructuralContextReader(new StructuralContextQuery($graphService, $authority), $authority),
                 [$captureAuthorityResolver, 'resolveComposite']
             );
             $clockTypeMembershipReader = new GraphClockTypeCanonicalMembershipReader($graphService, $authority);

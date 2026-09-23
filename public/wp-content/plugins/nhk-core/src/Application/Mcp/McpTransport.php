@@ -114,7 +114,7 @@ final class McpTransport
         } catch (DependencyValidationException $error) {
             return ['status' => 200, 'body' => ['jsonrpc' => '2.0', 'id' => $id, 'result' => ['isError' => true, 'structuredContent' => ['error' => $error->toStructuredError()], 'content' => [['type' => 'text', 'text' => $error->getMessage()]]]]];
         } catch (\Throwable $error) {
-            return ['status' => 200, 'body' => ['jsonrpc' => '2.0', 'id' => $id, 'result' => ['isError' => true, 'content' => [['type' => 'text', 'text' => $error->getMessage()]]]]];
+            return ['status' => 200, 'body' => ['jsonrpc' => '2.0', 'id' => $id, 'result' => ['isError' => true, 'structuredContent' => ['error' => ['code' => $error->getMessage()]], 'content' => [['type' => 'text', 'text' => $error->getMessage()]]]]];
         }
     }
 

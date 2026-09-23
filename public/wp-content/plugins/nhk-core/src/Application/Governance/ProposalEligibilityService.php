@@ -70,7 +70,7 @@ final class ProposalEligibilityService
                 elseif ($verification !== true) $reasons[] = 'STAGING_SCOPE_NOT_APPROVED';
             }
         }
-        if ($proposal->entityType === 'knowledge' && in_array($proposal->operation, ['update', 'retire'], true)) {
+        if ($proposal->entityType === 'knowledge' && in_array($proposal->operation, ['update', 'retire'], true) && is_array($proposal->payload['repair'] ?? null)) {
             $repair = is_array($proposal->payload['repair'] ?? null) ? $proposal->payload['repair'] : [];
             if (($repair['target_uuid'] ?? '') !== ($proposal->targetUuid ?: $proposal->subjectId)) $reasons[] = 'KNOWLEDGE_REPAIR_TARGET_MISMATCH';
             if ((int) ($repair['expected_revision'] ?? 0) !== $proposal->expectedRevision) $reasons[] = 'KNOWLEDGE_REPAIR_REVISION_BINDING_MISMATCH';
