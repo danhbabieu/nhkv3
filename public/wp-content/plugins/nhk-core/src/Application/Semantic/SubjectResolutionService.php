@@ -158,7 +158,6 @@ final class SubjectResolutionService
         foreach ($candidates as $candidate) {
             $context = $this->structuralContext?->contextFor($candidate) ?? $this->compatibilityContext($candidate);
             $contexts[(string) $candidate['id']] = $context;
-            $candidate['structural_context'] = $context;
             $candidateMap[(string) $candidate['type'] . ':' . (string) $candidate['id']] = $candidate;
         }
         $candidates = array_values($candidateMap);
@@ -194,7 +193,10 @@ final class SubjectResolutionService
         $conflicts = [];
         foreach ($candidates as $index => $left) foreach (array_slice($candidates, $index + 1) as $right) {
             if (($left['type'] ?? '') === ($right['type'] ?? '') && ($left['id'] ?? '') !== ($right['id'] ?? '')) $conflicts[] = ['kind' => 'same_type_identity', 'expected' => $left, 'candidate' => $right];
-            elseif (!$this->isAncestorOf($left, $right, $contexts) && !$this->isAncestorOf($right, $left, $contexts) && ($left['type'] ?? '') !== ($right['type'] ?? '')) $conflicts[] = ['kind' => 'incompatible_hierarchy', 'expected' => $left, 'candidate' => $right];
+            elseif (!$this->isAncestorOf($left, $right, $contexts) && !$this->isAncestorOf($right, $left, $contexts) && ($left['type'] ?? '') !== ($right['type'] ?? '')) {
+                $reference = in_array((string) ($left['match'] ?? ''), ['exact_variant_reference', 'exact_variant_name_reference'], true) || in_array((string) ($right['match'] ?? ''), ['exact_variant_reference', 'exact_variant_name_reference'], true);
+                if (!$reference) $conflicts[] = ['kind' => 'incompatible_hierarchy', 'expected' => $left, 'candidate' => $right];
+            }
         }
         return $conflicts;
     }
@@ -306,4 +308,3 @@ final class SubjectResolutionService
         };
     }
 }
-
