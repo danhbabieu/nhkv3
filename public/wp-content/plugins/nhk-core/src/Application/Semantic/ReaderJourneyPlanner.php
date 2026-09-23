@@ -24,19 +24,29 @@ final class ReaderJourneyPlanner
             $role = strtoupper(trim((string) ($claim['editorial_role'] ?? ($index === 0 ? 'CORE' : 'CONTEXT'))));
             $roleIndex = (int) ($roleCounts[$role] ?? 0);
             $roleCounts[$role] = $roleIndex + 1;
+            $unit = is_array($claim['knowledge_unit'] ?? null) ? $claim['knowledge_unit'] : [];
+            $unitClaims = array_values(array_filter((array) ($unit['supporting_claims'] ?? []), 'is_array'));
+            if ($unitClaims === []) $unitClaims = [$claim];
+            $unitClaims = array_map(static function (array $unitClaim) use ($claim): array {
+                return array_replace($claim, $unitClaim, ['editorial_role' => $claim['editorial_role'] ?? 'CONTEXT', 'eligibility' => $unitClaim['eligibility'] ?? ($claim['eligibility'] ?? ''), 'publicly_composable' => $unitClaim['publicly_composable'] ?? ($claim['publicly_composable'] ?? true)]);
+            }, $unitClaims);
             $sections[] = [
                 'id' => $this->sectionId($role, (string) ($claim['claim_id'] ?? $index), $roleIndex),
                 'order' => $index + 1,
                 'title' => $this->heading($role),
                 'purpose' => $this->purpose($role),
                 'transition_intent' => $this->transition($role),
-                'claim_refs' => [$this->reference($claim)],
-                'claims' => [$claim],
+                'claim_refs' => array_values(array_map(fn (array $unitClaim): array => $this->reference($unitClaim), $unitClaims)),
+                'claims' => $unitClaims,
+                'unit_id' => (string) ($unit['unit_id'] ?? ''),
+                'aspect_keys' => array_values((array) ($unit['coverage_aspects'] ?? [])),
                 'visual_support' => $this->visualFor((string) ($claim['claim_id'] ?? ''), $pack->visualSupport),
             ];
         }
         $status = $pack->status === 'available' ? 'available' : $pack->status;
-        return new EditorialPlan($status, $profile, $pack->primarySubject, $pack->topic, $sections, $pack->inputContext, $pack->visualSupport, $pack->blockers, ['selected_count' => count($selected), 'section_count' => count($sections), 'depth' => $profile === 'article' ? 'deep' : 'concise']);
+        $covered = [];
+        foreach ($sections as $section) $covered = array_values(array_unique(array_merge($covered, (array) ($section['aspect_keys'] ?? []))));
+        return new EditorialPlan($status, $profile, $pack->primarySubject, $pack->topic, $sections, $pack->inputContext, $pack->visualSupport, $pack->blockers, ['selected_count' => count($selected), 'section_count' => count($sections), 'depth' => $profile === 'article' ? 'deep' : 'concise', 'coverage_before' => $pack->diagnostics, 'coverage_after' => $covered, 'uncovered_aspects' => array_values(array_diff($pack->coverageAspects, $covered)), 'journey_depth' => count($sections) - 1]);
     }
 
     private function opening(string $profile, string $topic): array

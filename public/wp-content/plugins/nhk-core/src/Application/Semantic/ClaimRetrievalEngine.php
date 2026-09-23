@@ -23,6 +23,7 @@ final class ClaimRetrievalEngine
         $gaps = array_values(array_filter((array) ($context['coverage_gaps'] ?? []), static fn (mixed $gap): bool => is_string($gap) && trim($gap) !== ''));
         $maxExpansionRounds = max(0, min($this->maxHops, (int) ($context['max_expansion_rounds'] ?? 0)));
         $expansionBudget = max(0, min(200, (int) ($context['expansion_budget'] ?? 50)));
+        $retrievalOrder = 0;
         foreach ($subjects as $subject) {
             if (!is_array($subject)) continue;
             $neighborhood = ($this->neighborhood)($subject);
@@ -36,6 +37,7 @@ final class ClaimRetrievalEngine
             foreach (array_slice($rows, 0, $rowLimit) as $row) {
                 if (!is_array($row)) continue;
                 $candidate = $this->candidate($row, $subject, $neighborhood, $intent);
+                $candidate['_retrieval_order'] = $retrievalOrder++;
                 $key = $candidate['claim_id'] . ':' . $candidate['claim_revision'];
                 if (!isset($all[$key]) || $candidate['score'] > $all[$key]['score']) $all[$key] = $candidate;
             }
@@ -51,6 +53,7 @@ final class ClaimRetrievalEngine
                 foreach ($considered as $row) {
                     if (!is_array($row)) continue;
                     $candidate = $this->candidate($row, $subject, ['items' => $considered], $intent);
+                    $candidate['_retrieval_order'] = $retrievalOrder++;
                     $key = $candidate['claim_id'] . ':' . $candidate['claim_revision'];
                     if (!isset($all[$key]) || $candidate['score'] > $all[$key]['score']) $all[$key] = $candidate;
                 }
@@ -68,7 +71,9 @@ final class ClaimRetrievalEngine
         $items = array_values($all);
         usort($items, static function (array $left, array $right): int {
             $score = $right['score'] <=> $left['score'];
-            return $score !== 0 ? $score : strcmp($left['claim_id'], $right['claim_id']);
+            if ($score !== 0) return $score;
+            $order = ((int) ($left['_retrieval_order'] ?? 0)) <=> ((int) ($right['_retrieval_order'] ?? 0));
+            return $order !== 0 ? $order : strcmp($left['claim_id'], $right['claim_id']);
         });
         $items = array_slice($items, 0, min($this->limit, max(1, (int) ($context['result_limit'] ?? $this->limit)), 200));
         $selected = array_values(array_filter($items, static fn (array $item): bool => $item['decision'] === 'include'));
