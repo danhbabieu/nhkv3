@@ -159,11 +159,13 @@ final class CaptureVideoPublicationVerifier
                     $frontendReadback = ($this->frontendReadback)($video->canonicalId, $path);
                     if (is_array($frontendReadback)) {
                         $publicEligible = ($frontendReadback['public_eligible'] ?? false) === true;
-                        $frontendVerified = ($frontendReadback['frontend_verified'] ?? false) === true;
+                        $frontendVerified = ($frontendReadback['frontend_verified'] ?? false) === true
+                            && ($frontendReadback['projection_readback'] ?? false) === true;
                         $frontendBlockers = array_values(array_map('strval', (array) ($frontendReadback['blockers'] ?? [])));
                     } else {
-                        $publicEligible = $frontendReadback === true;
-                        $frontendVerified = $publicEligible;
+                        $publicEligible = false;
+                        $frontendVerified = false;
+                        $frontendBlockers = ['VIDEO_FRONTEND_PROJECTION_READBACK_REQUIRED'];
                     }
                 } catch (\Throwable) {
                     $publicEligible = false;

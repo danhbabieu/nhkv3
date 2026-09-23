@@ -11,12 +11,13 @@ use NHK\Core\Domain\Media\{Media, MediaAsset, MediaUsage};
 use NHK\Core\Domain\Video\Video;
 use NHK\Core\Shared\Migration\MigrationStatus;
 use NHK\Core\Shared\Uuid\UuidCodec;
-use NHK\Core\Application\Video\{VideoPublicContextSelector, VideoSeoProjection, VideoUrlPolicy};
+use NHK\Core\Application\Video\{VideoFrontendProjection, VideoPublicContextSelector, VideoSeoProjection, VideoUrlPolicy};
 use NHK\Core\Application\Presentation\LatestFirstOrder;
 
 final class MediaVideoPageQuery
 {
     private PublicMediaGalleryQuery $gallery;
+    private VideoFrontendProjection $frontendProjection;
 
     public function __construct(
         private MediaRepository $media,
@@ -33,6 +34,7 @@ final class MediaVideoPageQuery
     ) {
         $this->delivery ??= PublicMediaAssetDelivery::fromEnvironment($assets, $media);
         $this->gallery = $gallery ?? new PublicMediaGalleryQuery($media, $assets, $this->delivery, $usages, PublicMediaArticleLinkResolver::fromWordPress());
+        $this->frontendProjection = new VideoFrontendProjection();
     }
 
     public function mediaDetail(string $id): ?array
@@ -66,7 +68,11 @@ final class MediaVideoPageQuery
         if ($slug === '') return null;
         $policy = new VideoUrlPolicy();
         $selector = new VideoPublicContextSelector();
-        $matches = array_values(array_filter($this->videos->list(), fn (Video $video): bool => $video->active && ($result = $policy->project($video, $selector))['eligible'] && $result['path'] === '/video/' . $slug . '/'));
+        $matches = array_values(array_filter($this->videos->list(), function (Video $video) use ($policy, $selector, $slug): bool {
+            $result = $policy->project($video, $selector);
+            $projection = $this->frontendProjection->project($video);
+            return $video->active && $video->hasValidPublicReference() && ($projection['frontend_available'] ?? false) === true && $result['path'] === '/video/' . $slug . '/';
+        }));
         return count($matches) === 1 ? $this->video($matches[0]) : null;
     }
 
@@ -83,7 +89,7 @@ final class MediaVideoPageQuery
             $page,
             $perPage,
             fn (Video $item): array => $this->video($item),
-            fn (object $item): bool => $item instanceof Video && $item->active && $item->hasValidPublicReference() && $this->videoPublicEligible($item),
+            fn (object $item): bool => $item instanceof Video && $item->active && $this->frontendProjection->project($item)['frontend_available'] === true,
         );
     }
 
@@ -92,8 +98,7 @@ final class MediaVideoPageQuery
 
     private function videoPublicEligible(Video $video): bool
     {
-        $result = (new VideoUrlPolicy())->project($video, new VideoPublicContextSelector());
-        return $result['eligible'] && is_string($result['path']) && $result['path'] !== '';
+        return $this->frontendProjection->project($video)['frontend_available'] === true;
     }
 
     private function publishedAt(Video $video): ?string
@@ -129,8 +134,9 @@ final class MediaVideoPageQuery
         $editorial = is_array($metadata['editorial'] ?? null) ? $metadata['editorial'] : [];
         $category = is_array($metadata['category'] ?? null) ? $metadata['category'] : [];
         $sourceAvailable = !isset($source['availability']) || $source['availability'] === 'available';
+        $projection = $this->frontendProjection->project($video);
         $urlResult = (new VideoUrlPolicy())->project($video, new VideoPublicContextSelector());
-        $publicUrl = $urlResult['path'];
+        $publicUrl = is_array($projection['item'] ?? null) ? (string) ($projection['item']['public_url'] ?? '') : null;
         $seoProjection = null;
         if ($urlResult['eligible'] && $sourceAvailable && ($source['availability'] ?? 'unknown') === 'available') {
             $storedProjection = is_array($metadata['seo_projection'] ?? null) ? $metadata['seo_projection'] : null;
@@ -142,7 +148,8 @@ final class MediaVideoPageQuery
                 : (new VideoSeoProjection())->project(['source' => array_merge($source, ['external_video_id' => $video->externalVideoId]), 'editorial' => $editorial, 'seo' => is_array($metadata['seo'] ?? null) ? $metadata['seo'] : []], function_exists('home_url') ? home_url((string) $publicUrl) : (string) $publicUrl);
         }
         $result = [
-            'title' => (string) ($editorial['title'] ?? $video->title),
+            'canonical_id' => $video->canonicalId,
+            'title' => is_array($projection['item'] ?? null) ? (string) ($projection['item']['title'] ?? '') : (string) ($editorial['title'] ?? $video->title),
             'summary' => (string) ($editorial['summary'] ?? ''),
             'body' => (string) ($editorial['body'] ?? ''),
             'why_this_matters' => (string) ($editorial['why_this_matters'] ?? ''),

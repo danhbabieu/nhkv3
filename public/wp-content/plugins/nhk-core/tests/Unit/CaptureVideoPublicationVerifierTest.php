@@ -42,7 +42,7 @@ final class CaptureVideoPublicationVerifierTest extends TestCase
             $identityRepository,
             null,
             null,
-            static fn (string $id, string $path): bool => true,
+            static fn (string $id, string $path): array => ['public_eligible' => true, 'frontend_verified' => true, 'projection_readback' => true, 'blockers' => []],
         );
 
         $result = $service->verify([
@@ -117,7 +117,7 @@ final class CaptureVideoPublicationVerifierTest extends TestCase
             $identityRepository,
             null,
             null,
-            static fn (string $id, string $path): bool => $id === $videoId && $path === '/video/video-chinh-xac/',
+            static fn (string $id, string $path): array => ['public_eligible' => $id === $videoId && $path === '/video/video-chinh-xac/', 'frontend_verified' => $id === $videoId && $path === '/video/video-chinh-xac/', 'projection_readback' => true, 'blockers' => []],
         );
 
         $result = $service->verify(['capture_id' => UuidCodec::newV7(), 'assets' => [[
@@ -173,6 +173,26 @@ final class CaptureVideoPublicationVerifierTest extends TestCase
 
         self::assertSame('REVIEW_REQUIRED', $result['status']);
         self::assertContains('VIDEO_EDITORIAL_READBACK_MISMATCH', $result['blockers']);
+        self::assertFalse($result['completion']['complete']);
+    }
+
+    public function test_detail_only_boolean_frontend_readback_cannot_report_verified(): void
+    {
+        $videoId = UuidCodec::newV7();
+        $video = new Video($videoId, 'youtube', 'abcdefghijk', 'https://www.youtube.com/watch?v=abcdefghijk', 'Video A', [
+            'editorial' => ['title' => 'Video A', 'summary' => 'Tóm tắt đủ phạm vi.', 'body' => str_repeat('Nội dung đã xác minh trong phạm vi hiện vật. ', 20), 'why_this_matters' => 'Đối chiếu có phạm vi rõ ràng.'],
+            'hub' => ['primary' => '06'], 'provenance' => ['kind' => 'TEST'],
+            'semantic_attachments' => [['target_type' => 'variant', 'target_uuid' => UuidCodec::newV7(), 'predicate' => 'about', 'evidence_refs' => [['evidence_id' => UuidCodec::newV7()]]]],
+        ]);
+        $videos = $this->createMock(VideoRepository::class);
+        $videos->method('findByCanonicalId')->willReturn($video);
+        $identityRepository = new InMemoryCaptureIdentityRepository();
+        $service = new CaptureVideoPublicationVerifier($videos, new PublicIdentityService($identityRepository, static fn (string $slug): bool => false), $identityRepository, null, null, static fn (): bool => true);
+
+        $result = $service->verify(['capture_id' => UuidCodec::newV7(), 'assets' => [['kind' => 'video', 'video_id' => $videoId, 'video_proposal' => ['operation' => 'ingest']]]]);
+
+        self::assertSame('REVIEW_REQUIRED', $result['status']);
+        self::assertContains('VIDEO_FRONTEND_PROJECTION_READBACK_REQUIRED', $result['blockers']);
         self::assertFalse($result['completion']['complete']);
     }
 
@@ -244,7 +264,7 @@ final class CaptureVideoPublicationVerifierTest extends TestCase
             $identityRepository,
             null,
             null,
-            static fn (string $id, string $path): bool => true,
+            static fn (string $id, string $path): array => ['public_eligible' => true, 'frontend_verified' => true, 'projection_readback' => true, 'blockers' => []],
         );
 
         $result = $service->verify(['capture_id' => UuidCodec::newV7(), 'assets' => [['kind' => 'video', 'video_id' => $videoId, 'video_proposal' => ['operation' => 'ingest']]]]);

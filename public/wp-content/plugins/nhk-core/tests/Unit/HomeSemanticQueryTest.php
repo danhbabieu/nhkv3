@@ -43,7 +43,7 @@ final class HomeSemanticQueryTest extends TestCase
     {
         $media = new Media($mediaId = UuidCodec::newV7(), 'front', 'Ảnh mặt trước', 'ready');
         $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'derivative', 'front.jpg', hash('sha256', 'x'), 'image/jpeg', 1, 1200, 800, 'PUBLIC', ['canonical_filename' => 'front.jpg']);
-        $video = new Video(UuidCodec::newV7(), 'youtube', 'dQw4w9WgXcQ', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'Video kỹ thuật', ['source_snapshot' => ['availability' => 'available', 'thumbnail_selection' => ['url' => 'https://img.example.test/video.jpg', 'variant' => 'mqdefault', 'width' => 320, 'height' => 180]]]);
+        $video = new Video(UuidCodec::newV7(), 'youtube', 'dQw4w9WgXcQ', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'Video kỹ thuật', ['public_identity' => ['current_slug' => 'video-ky-thuat'], 'source_snapshot' => ['availability' => 'available', 'embeddable' => true, 'thumbnail_selection' => ['url' => 'https://img.example.test/video.jpg', 'variant' => 'mqdefault', 'width' => 320, 'height' => 180]], 'editorial' => ['title' => 'Video kỹ thuật', 'summary' => 'Tóm tắt'], 'hub' => ['primary' => '06'], 'provenance' => ['kind' => 'TEST'], 'semantic_attachments' => [['target_type' => 'variant', 'target_uuid' => UuidCodec::newV7(), 'predicate' => 'about', 'evidence_refs' => [['evidence_id' => UuidCodec::newV7()]]]]]);
         $mediaRepo = $this->media([$media]);
         $gallery = new PublicMediaGalleryQuery($mediaRepo, $this->assets([$asset]));
 
@@ -112,7 +112,7 @@ final class HomeSemanticQueryTest extends TestCase
             $videos[] = Video::fromUrl(
                 'https://www.youtube.com/watch?v=' . $externalId,
                 'Video ' . (string) $index,
-                ['source_snapshot' => ['availability' => 'available', 'published_at' => '2026-01-' . str_pad((string) (7 - $index), 2, '0', STR_PAD_LEFT) . ' 00:00:00']],
+                ['public_identity' => ['current_slug' => 'video-' . $index], 'source_snapshot' => ['availability' => 'available', 'embeddable' => true, 'published_at' => '2026-01-' . str_pad((string) (7 - $index), 2, '0', STR_PAD_LEFT) . ' 00:00:00'], 'editorial' => ['title' => 'Video ' . $index, 'summary' => 'Tóm tắt'], 'hub' => ['primary' => '06'], 'provenance' => ['kind' => 'TEST'], 'semantic_attachments' => [['target_type' => 'variant', 'target_uuid' => UuidCodec::newV7(), 'predicate' => 'about', 'evidence_refs' => [['evidence_id' => UuidCodec::newV7()]]]]],
             );
         }
 

@@ -18096,3 +18096,37 @@ available. No database, staging, production, push, pull, deployment or public
 publication was performed.
 
 STATUS: `LOCAL_GENERIC_VIDEO_CONTRACT_READY / INTEGRATION_ENVIRONMENT_GATED / NO_SERVER_ACTION`.
+
+# Checkpoint — 2026-09-24 — Canonical Video frontend projection/listing repair (LOCAL / NO DEPLOY)
+
+ROOT_CAUSE: `/video/` reads `MediaVideoPageQuery::videoArchive()` from the
+canonical `VideoRepository`, homepage cards read `HomeSemanticQuery` from the
+same canonical repository, and search reads `VideoSearchDocument`; no Video
+CPT, WP post, materialized listing table or separate projection owner exists.
+The first missing transition was frontend-consumable projection read-back:
+the verifier checked only detail route/canonical title/external ID, while the
+archive/home readers applied the public URL policy independently. A detail-only
+callback could therefore report `frontend_state=VERIFIED` while the listing
+source returned zero items.
+
+IMPLEMENTED: Added the generic read-only `VideoFrontendProjection` derived from
+canonical Video + persisted Public Identity + `VideoUrlPolicy`. Archive,
+homepage, search and detail lookup now use the same projection boundary. The
+Capture verifier rejects legacy boolean/detail-only read-back and requires an
+explicit projection read-back; the runtime callback verifies archive membership
+and canonical identity/path equality. No Post/CPT, direct DB write, duplicate
+Video, Knowledge/Claim, ingest or enrichment path was added. Existing canonical
+Videos are reconciled by deterministic read projection on retry; repeated reads
+are idempotent and do not create state.
+
+VERIFICATION: Focused Video/frontend suites PASS (32 tests / 118 assertions);
+Contract suite PASS (6 tests / 48 assertions); Unit suite PASS after the
+static contract assertions were restored (2,390 tests / 13,815 assertions).
+Changed PHP files lint clean and `git diff --check` passes. Guarded Integration
+was attempted but remains environment-gated because exact
+`NHK_WP_TEST_PATH=public` and `NHK_WP_TEST_DB=nhk_v3_test` were not available;
+21 setup failures are documented precondition failures, with 119 tests skipped.
+Special-case scan of the production diff is clean. No staging, production,
+database mutation, push, pull or deployment was performed.
+
+STATUS: `LOCAL_FIX_READY_FOR_USER_DEPLOY / INTEGRATION_ENVIRONMENT_GATED / NO_SERVER_ACTION`.

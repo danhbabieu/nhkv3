@@ -15,9 +15,7 @@ final class VideoSearchDocument
 
     public function isDiscoverable(Video $video): bool
     {
-        if (!$video->active || !$video->hasValidPublicReference()) return false;
-        $source = $this->source($video);
-        return !isset($source['availability']) || in_array($source['availability'], ['available', 'unknown'], true);
+        return $video->active && (new VideoFrontendProjection())->project($video)['frontend_available'] === true;
     }
 
     public function title(Video $video): string
@@ -28,9 +26,8 @@ final class VideoSearchDocument
 
     public function publicUrl(Video $video): ?string
     {
-        $result = (new VideoUrlPolicy())->project($video, new VideoPublicContextSelector());
-        $projected = (new PublicSeoProjection())->project($result, ['type' => 'VideoObject']);
-        return $projected['indexable'] ? $projected['canonical'] : null;
+        $projection = (new VideoFrontendProjection())->project($video);
+        return ($projection['frontend_available'] ?? false) === true ? (string) ($projection['item']['public_url'] ?? '') : null;
     }
 
     /** @return list<string> */

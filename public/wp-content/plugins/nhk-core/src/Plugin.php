@@ -208,7 +208,8 @@ final class Plugin {
             $publicEvidence = new WpdbEvidenceRepository($wpdb);
             $publicKnowledge = new EntityKnowledgeProjection($publicClaims, $publicEvidence, $publicSources, $publicStatus);
             $publicCollection = new PublicEntityCollectionQuery($publicAuthority, $publicTypes, new PublicIdentityContract($publicTypes), $publicEligibility, $publicRoutes, $publicAggregation, static fn (): bool => $publicStatus->authorityStorageReady(), new EntityMediaProjection($publicMedia, $publicAssets, $publicUsages), $publicKnowledge);
-            add_filter('nhk_v3_home_semantic_modules', [new HomeSemanticQuery($publicAuthority, $publicMedia, $publicVideos, $publicTypes, $publicStatus, $publicRoutes, $publicCollection, new PublicMediaGalleryQuery($publicMedia, $publicAssets), null, $publicClaims), 'extend']);
+            $homeSemanticQuery = new HomeSemanticQuery($publicAuthority, $publicMedia, $publicVideos, $publicTypes, $publicStatus, $publicRoutes, $publicCollection, new PublicMediaGalleryQuery($publicMedia, $publicAssets), null, $publicClaims);
+            add_filter('nhk_v3_home_semantic_modules', [$homeSemanticQuery, 'extend']);
             $claimOwnerUrl = static function (\NHK\Core\Domain\Knowledge\KnowledgeClaim $claim) use ($publicAuthority, $publicRoutes, $publicEligibility): ?string {
                 $metadata = $claim->provenance['metadata'] ?? [];
                 $subjectId = is_array($metadata) ? trim((string) ($metadata['subject_uuid'] ?? $metadata['subject_id'] ?? $metadata['canonical_subject_uuid'] ?? $metadata['canonical_subject_id'] ?? '')) : '';
@@ -1159,6 +1160,8 @@ final class Plugin {
                     $canonical = $videoFrontendReader->videoDetail($videoId);
                     $owner = $videos->findByCanonicalId($videoId);
                     $routeOwner = is_array($route) ? $videos->findByExternalReference('youtube', (string) ($route['external_id'] ?? '')) : null;
+                    $archive = $videoFrontendReader->videoArchive(1, 100);
+                    $archiveItems = array_values(array_filter((array) ($archive['items'] ?? []), static fn (mixed $item): bool => is_array($item) && (string) ($item['canonical_id'] ?? '') === $videoId));
                     if (!is_array($route) || !is_array($canonical) || !$owner instanceof \NHK\Core\Domain\Video\Video) {
                         return ['public_eligible' => false, 'frontend_verified' => false, 'blockers' => ['VIDEO_FRONTEND_READBACK_UNAVAILABLE']];
                     }
@@ -1172,10 +1175,12 @@ final class Plugin {
                         && (string) ($route['external_id'] ?? '') === $externalId
                         && (string) ($canonical['external_id'] ?? '') === $externalId
                         && (string) ($route['title'] ?? '') === $title
-                        && (string) ($canonical['title'] ?? '') === $title;
+                        && (string) ($canonical['title'] ?? '') === $title
+                        && count($archiveItems) === 1
+                        && (string) ($archiveItems[0]['public_url'] ?? '') === $path;
                     return $sameOwner
-                        ? ['public_eligible' => true, 'frontend_verified' => true, 'blockers' => []]
-                        : ['public_eligible' => false, 'frontend_verified' => false, 'blockers' => ['VIDEO_FRONTEND_CANONICAL_OWNER_MISMATCH']];
+                        ? ['public_eligible' => true, 'frontend_verified' => true, 'projection_readback' => true, 'blockers' => []]
+                        : ['public_eligible' => false, 'frontend_verified' => false, 'projection_readback' => true, 'blockers' => ['VIDEO_FRONTEND_PROJECTION_READBACK_MISSING']];
                 },
             );
             $publicUrlMaintenance = (new \NHK\Core\Infrastructure\PublicIdentity\WordPressPublicUrlMaintenanceRuntime($wpdb, $authority, $types, $publicContexts, $videos, $media, $assets, $publicIdentityRepository))->service();

@@ -10,7 +10,7 @@ final class PublicIdentityReadRegistry
 {
     private static ?PublicIdentityRepository $repository = null;
 
-    public static function register(PublicIdentityRepository $repository): void
+    public static function register(?PublicIdentityRepository $repository): void
     {
         self::$repository = $repository;
     }

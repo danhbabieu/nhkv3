@@ -7,7 +7,7 @@ use NHK\Core\Application\Entity\{PublicEntityCollectionQuery, PublicEntityEligib
 use NHK\Core\Application\Knowledge\KnowledgePageQuery;
 use NHK\Core\Application\Media\PublicMediaGalleryQuery;
 use NHK\Core\Application\Seo\PublicSeoProjection;
-use NHK\Core\Application\Video\{VideoPublicContextSelector, VideoUrlPolicy};
+use NHK\Core\Application\Video\VideoFrontendProjection;
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Contracts\Media\MediaRepository;
 use NHK\Core\Contracts\Video\VideoRepository;
@@ -32,6 +32,7 @@ final class HomeSemanticQuery
     /** @var array<string,array<string,mixed>|null> */
     private array $entityDetailMemo = [];
     private ?HomepageVisualPolicy $visualPolicy = null;
+    private ?VideoFrontendProjection $videoProjection = null;
 
     public function __construct(
         private AuthorityRepository $authority,
@@ -113,7 +114,8 @@ final class HomeSemanticQuery
             $modules['videos_total'] = 0;
             $videoItems = $this->videoItems();
             foreach ($videoItems as $item) {
-                if (!$item->active || !$item->hasValidPublicReference()) continue;
+                $projection = ($this->videoProjection ??= new VideoFrontendProjection())->project($item);
+                if (!$item->active || !$item->hasValidPublicReference() || ($projection['frontend_available'] ?? false) !== true) continue;
                 $metadata = is_array($item->metadata) ? $item->metadata : [];
                 $source = is_array($metadata['source_snapshot'] ?? null)
                     ? $metadata['source_snapshot']
@@ -126,9 +128,9 @@ final class HomeSemanticQuery
                 $modules['videos_total']++;
                 if (count($modules['videos']) >= 6) continue;
                 $modules['videos'][] = [
-                    'title' => $title,
+                    'title' => (string) (($projection['item']['title'] ?? '') ?: $title),
                     'platform' => $item->platform,
-                    'url' => (new PublicSeoProjection())->project((new VideoUrlPolicy())->project($item, new VideoPublicContextSelector()), ['type' => 'VideoObject'])['internal_link'] ?? null,
+                    'url' => $projection['item']['public_url'] ?? null,
                     'thumbnail_url' => $visual['image_url'] ?? null,
                     'thumbnail' => $visual['visual_kind'] === 'image' ? $thumbnail : [],
                     'visual_kind' => $visual['visual_kind'],
@@ -154,11 +156,12 @@ final class HomeSemanticQuery
     {
         $items = [];
         foreach ($this->latestCandidates($this->videos, fn (): array => $this->videoItems()) as $video) {
-            if (!$this->ready('video') || !$video->active || !$video->hasValidPublicReference()) continue;
+            $projection = ($this->videoProjection ??= new VideoFrontendProjection())->project($video);
+            if (!$this->ready('video') || !$video->active || ($projection['frontend_available'] ?? false) !== true) continue;
             $metadata = is_array($video->metadata) ? $video->metadata : [];
             $source = is_array($metadata['source_snapshot'] ?? null) ? $metadata['source_snapshot'] : (is_array($metadata['source'] ?? null) ? $metadata['source'] : []);
             $editorial = is_array($metadata['editorial'] ?? null) ? $metadata['editorial'] : [];
-            $url = (new PublicSeoProjection())->project((new VideoUrlPolicy())->project($video, new VideoPublicContextSelector()), ['type' => 'VideoObject'])['internal_link'] ?? null;
+            $url = $projection['item']['public_url'] ?? null;
             if (!is_string($url) || $url === '' || (($source['availability'] ?? 'unknown') !== 'available')) continue;
             $thumbnail = (new \NHK\Core\Application\Video\VideoThumbnailSelector())->presentationFromSource($source);
             $items[] = $this->feedItem('video', 'Video', (string) (($editorial['title'] ?? '') ?: $video->title ?: 'Video'), $url, $this->videoPublishedAt($video), $video->createdAt, (string) ($editorial['summary'] ?? ''), $thumbnail['url'] ?? null, $thumbnail['width'] ?? null, $thumbnail['height'] ?? null, $video->canonicalId);
