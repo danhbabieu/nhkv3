@@ -405,6 +405,7 @@ final class EditorialCaptureCoordinator
                 ];
                 $diagnostics['subjects'] = ['status' => 'not_requested', 'reason' => 'KNOWLEDGE_REPAIR_TARGET_BOUND'];
                 $diagnostics['claim_retrieval'] = ['status' => 'not_requested', 'items' => [], 'selected_claims' => []];
+                $diagnostics['video_publication'] = ['status' => 'not_requested', 'items' => [], 'blockers' => []];
                 $record = $this->save($record, CaptureStage::KNOWLEDGE_RETRIEVED, $assets, $diagnostics, $receipts, 'KNOWLEDGE_RETRIEVED', $record->articleId, $record->articleStateToken, 'SKIPPED');
                 $writes = ($this->semanticWriteBack)($repairContext + ['retrieval' => $diagnostics['claim_retrieval']]);
                 $diagnostics['semantic_write_back'] = $this->withoutBody($writes);
@@ -412,7 +413,8 @@ final class EditorialCaptureCoordinator
                 return $this->save($record, CaptureStage::SEMANTICS_RECONCILED, $assets, $diagnostics, $receipts, 'SEMANTICS_RECONCILED', $record->articleId, $record->articleStateToken, $status);
             }
             $articleRequired = ($intent['article_required'] ?? false) === true;
-            $videoInput = is_array($input['video'] ?? null) ? $input['video'] : [];
+            $isVideoIntent = ($intent['intent'] ?? '') === 'VIDEO';
+            $videoInput = $isVideoIntent && is_array($input['video'] ?? null) ? $input['video'] : [];
             $persistedPacket = $this->persistedSubjectPacket($record);
             $preparationResult = null;
             if ($this->contentPreparation !== null) {
@@ -526,7 +528,7 @@ final class EditorialCaptureCoordinator
             $resolution = $preparationResult?->subjectResolutionPacket?->toResolution()
                 ?? $persistedPacket?->toResolution()
                 ?? $this->subjects->resolveSources($this->subjectResolutionSources($input, $interpretation, $videoInput));
-            if ($this->isVideoOnlyResume($input)) {
+            if ($isVideoIntent && $this->isVideoOnlyResume($input)) {
                 $locked = is_array($record->diagnostics['subjects'] ?? null) ? $record->diagnostics['subjects'] : [];
                 $lockedPrimary = is_array($locked['primary'] ?? null) ? $locked['primary'] : [];
                 if (UuidCodec::isValid((string) ($lockedPrimary['id'] ?? '')) && trim((string) ($lockedPrimary['type'] ?? '')) !== '') {
@@ -544,7 +546,7 @@ final class EditorialCaptureCoordinator
             $record = $this->save($record, CaptureStage::SUBJECTS_RESOLVED, $assets, $diagnostics, $receipts, 'SUBJECTS_RESOLVED', $record->articleId, $record->articleStateToken, 'IN_PROGRESS', null, $record->context + ['subject_resolution_packet' => $subjectPacket->toArray()]);
 
             $hasVideoAsset = array_filter($assets, static fn (mixed $asset): bool => is_array($asset) && ($asset['kind'] ?? '') === 'video') !== [];
-            if (is_callable($this->videoEnrichment) && $videoInput !== [] && !$hasVideoAsset) {
+            if ($isVideoIntent && is_callable($this->videoEnrichment) && $videoInput !== [] && !$hasVideoAsset) {
                 $this->beginPhase('VIDEO_ENRICHED');
                 $record = $this->startReceipt($record, $assets, $diagnostics, $receipts, 'VIDEO_ENRICHED');
                 $assets = $record->assets;
@@ -719,7 +721,7 @@ final class EditorialCaptureCoordinator
                     return $this->save($record, CaptureStage::SEMANTICS_RECONCILED, $assets, $diagnostics, $receipts, 'SEMANTICS_RECONCILED', $record->articleId, $record->articleStateToken, 'ARTICLE_QUALITY_BLOCKED');
                 }
 
-                $videoPublication = is_callable($this->videoPublicationVerifier)
+                $videoPublication = $isVideoIntent && ($videoInput !== [] || $hasVideoAsset || $this->videoOwnerId($assets, [], $writes) !== '') && is_callable($this->videoPublicationVerifier)
                     ? ($this->videoPublicationVerifier)(['capture_id' => $record->captureId, 'assets' => $assets, 'subject_resolution' => $resolution, 'semantic_write_back' => $writes])
                     : ['status' => 'not_requested', 'items' => [], 'blockers' => []];
                 $diagnostics['video_publication'] = $this->withoutBody($videoPublication);
@@ -754,7 +756,7 @@ final class EditorialCaptureCoordinator
                 return $this->finishNonArticleIntent($record, $assets, $diagnostics, $receipts, $intent, $retrieved, $writes, $videoPublication, $resolution, $media);
             }
 
-            $videoThumbnailFallback = $this->eligibleVideoThumbnailFallback($assets, $videoPublication);
+            $videoThumbnailFallback = $isVideoIntent ? $this->eligibleVideoThumbnailFallback($assets, $videoPublication) : null;
 
             $observations = array_merge($semanticContext['observations'], is_array($interpretation['media_observations'] ?? null) ? $interpretation['media_observations'] : []);
             $this->beginPhase('COMPOSED');

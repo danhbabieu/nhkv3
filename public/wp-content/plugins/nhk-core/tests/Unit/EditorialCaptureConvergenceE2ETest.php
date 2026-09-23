@@ -4,7 +4,6 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Capture\{ContentPreparationOrchestrator, EditorialCaptureCoordinator};
-use NHK\Core\Application\Completion\CompletionCoordinator;
 use NHK\Core\Application\Capture\ContentIntentRouter;
 use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, SubjectResolutionService, TextInputInterpreter};
 use NHK\Core\Contracts\Capture\{CaptureAddendumRepository, CaptureRepository};
@@ -19,6 +18,86 @@ use PHPUnit\Framework\TestCase;
  */
 final class EditorialCaptureConvergenceE2ETest extends TestCase
 {
+    /** @dataProvider nonVideoIntentProvider */
+    public function test_non_video_intent_never_enters_video_callbacks(string $intent, array $input, array $physicalItems): void
+    {
+        $videoEnrichmentCalls = 0;
+        $videoVerificationCalls = 0;
+        $draftCalls = 0;
+        $resolvedHints = [];
+        $coordinator = new EditorialCaptureCoordinator(
+            new Pr5CaptureRepository(),
+            static fn (array $request): array => ['items' => $physicalItems],
+            static function (array $request) use (&$draftCalls): array { ++$draftCalls; return ['post_id' => 1001, 'state_token' => 'article-token']; },
+            new TextInputInterpreter(),
+            new SubjectResolutionService(static function (string $hint) use (&$resolvedHints): array { $resolvedHints[] = $hint; return []; }),
+            new ClaimRetrievalEngine(static fn (array $subject): array => ['status' => 'available', 'items' => []], static fn (array $subject, array $neighborhood): array => []),
+            static fn (array $context): array => ['status' => 'SKIPPED', 'writes' => [], 'blockers' => []],
+            new ArticleComposer(),
+            static fn (array $context): array => ['status' => 'RECONCILED', 'media_ids' => ['media-1']],
+            static fn (array $context): array => ['eligible' => false, 'blockers' => ['OWNER_PUBLICATION_REQUIRED']],
+            static fn (array $context): array => ['status' => 'verified'],
+            videoEnrichment: static function (array $context) use (&$videoEnrichmentCalls): array { ++$videoEnrichmentCalls; return ['items' => []]; },
+            videoPublicationVerifier: static function (array $context) use (&$videoVerificationCalls): array { ++$videoVerificationCalls; return ['status' => 'review_required', 'items' => [], 'blockers' => ['VIDEO_EDITORIAL_QUALITY_BLOCKED']]; },
+        );
+
+        $result = $coordinator->execute($input + ['idempotency_key' => 'intent-isolation-' . $intent, 'intent' => $intent]);
+
+        self::assertSame($intent, $result->diagnostics['content_intent']['intent']);
+        self::assertSame(0, $videoEnrichmentCalls);
+        self::assertSame(0, $videoVerificationCalls);
+        self::assertNotContains('Video only subject hint', $resolvedHints);
+        self::assertSame('not_requested', $result->diagnostics['video_publication']['status'] ?? 'not_requested');
+        self::assertSame(in_array($intent, ['TEXT_ARTICLE', 'IMAGE_ARTICLE'], true) ? 1 : 0, $draftCalls);
+        self::assertNotContains('VIDEO_EDITORIAL_QUALITY_BLOCKED', $result->diagnostics['completion']['blockers'] ?? []);
+    }
+
+    public static function nonVideoIntentProvider(): array
+    {
+        $image = ['kind' => 'image', 'media_id' => 'media-1', 'attachment_id' => 11, 'attachment_readback_status' => 'verified'];
+        return [
+            'text article with video input' => ['TEXT_ARTICLE', ['text' => 'Bài viết về đồng hồ.', 'video' => ['url' => 'https://youtu.be/dQw4w9WgXcQ', 'user_hint' => 'Video only subject hint']], []],
+            'image article' => ['IMAGE_ARTICLE', ['text' => 'Bài viết có hình ảnh.'], [$image]],
+            'media enrichment' => ['MEDIA_ENRICHMENT', ['text' => 'Bổ sung hình ảnh.'], [$image]],
+            'knowledge delta' => ['KNOWLEDGE_DELTA', ['text' => '36/4 mặt vuông.'], []],
+            'knowledge repair' => ['KNOWLEDGE_REPAIR', ['text' => 'Sửa ghi chú đã có.', 'knowledge_repair' => ['target_uuid' => '11111111-1111-4111-8111-111111111111', 'expected_revision' => 1, 'operation' => 'retire', 'reason' => 'Internal workflow text.', 'provenance' => ['source' => 'owner_review'], 'cleanup_class' => 'INTERNAL_WORKFLOW_KNOWLEDGE']], []],
+        ];
+    }
+
+    public function test_video_intent_with_video_owner_keeps_video_callbacks(): void
+    {
+        $videoEnrichmentCalls = 0;
+        $videoVerificationCalls = 0;
+        $videoId = UuidCodec::newV7();
+        $calls = ['draft' => 0, 'semantic' => 0, 'media' => 0, 'publication' => 0, 'final' => 0];
+        $events = [];
+        $coordinator = $this->coordinator(
+            new Pr5CaptureRepository(),
+            $calls,
+            $events,
+            videoEnrichment: static function (array $context) use (&$videoEnrichmentCalls, $videoId): array {
+                ++$videoEnrichmentCalls;
+                return ['items' => [['kind' => 'video', 'video_id' => $videoId]]];
+            },
+            videoPublication: static function (array $context) use (&$videoVerificationCalls, $videoId): array {
+                ++$videoVerificationCalls;
+                return ['status' => 'verified', 'items' => [['video_id' => $videoId]], 'blockers' => []];
+            },
+        );
+
+        $result = $coordinator->execute([
+            'idempotency_key' => 'video-intent-isolation',
+            'intent' => 'VIDEO',
+            'text' => 'Video về một đồng hồ.',
+            'video' => ['url' => 'https://youtu.be/dQw4w9WgXcQ'],
+        ]);
+
+        self::assertSame('VIDEO', $result->diagnostics['content_intent']['intent']);
+        self::assertSame(1, $videoEnrichmentCalls);
+        self::assertSame(1, $videoVerificationCalls);
+        self::assertSame(0, $calls['draft']);
+    }
+
     public function test_preparation_happens_before_draft_and_review_stops_before_article_side_effects(): void
     {
         $captures = new Pr5CaptureRepository();
@@ -236,25 +315,17 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
         self::assertContains('REQUIRED_OWNER_READBACK_UNVERIFIED', $result->diagnostics['completion']['blockers']);
     }
 
-    public function test_video_owner_success_and_later_article_failure_are_reported_as_partial(): void
+    public function test_article_failure_does_not_reconcile_unrequested_video_owner(): void
     {
         $captures = new Pr5CaptureRepository();
         $calls = ['draft' => 0, 'semantic' => 0, 'media' => 0, 'publication' => 0, 'final' => 0];
         $events = [];
-        $videoCompletion = (new CompletionCoordinator())->finalize('video', 'video-pr5-1', [
-            'canonical_readback' => ['canonical_id' => 'video-pr5-1'],
-            'dependency_state' => 'COMPLETE',
-            'relation_or_usage_state' => 'NOT_APPLICABLE',
-            'content_quality' => 'CONTENT_COMPLETE',
-            'public_eligible' => true,
-            'frontend_verified' => true,
-        ]);
         $coordinator = $this->coordinator(
             $captures,
             $calls,
             $events,
             videoEnrichment: static fn (array $input): array => ['items' => [['kind' => 'video', 'video_id' => 'video-pr5-1']]],
-            videoPublication: static fn (array $input): array => ['status' => 'verified', 'items' => [['completion' => $videoCompletion]], 'blockers' => []],
+            videoPublication: static fn (array $input): array => throw new \RuntimeException('UNREQUESTED_VIDEO_VERIFICATION'),
             media: static function (array $input): array { throw new \RuntimeException('ARTICLE_RECONCILIATION_FAILED'); },
         );
 
@@ -266,14 +337,14 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
         ]);
 
         $completion = $result->diagnostics['completion'];
-        $videoChild = array_values(array_filter($completion['children'], static fn (array $child): bool => ($child['owner_type'] ?? '') === 'video'))[0] ?? [];
+        $videoChildren = array_values(array_filter($completion['children'], static fn (array $child): bool => ($child['owner_type'] ?? '') === 'video'));
         self::assertSame('FAILED_RETRYABLE', $result->status);
         self::assertSame('BLOCKED', $completion['status']);
         self::assertFalse($completion['complete']);
         self::assertContains('CANONICAL_READBACK_UNVERIFIED', $completion['blockers']);
-        self::assertTrue($videoChild['complete']);
+        self::assertSame([], $videoChildren);
+        self::assertSame('not_requested', $result->diagnostics['video_publication']['status']);
         self::assertContains('article', $completion['resume_hints']['resume_children']);
-        self::assertSame('video-pr5-1', $videoChild['owner_id']);
     }
 
     public function test_existing_knowledge_and_article_are_reuse_candidates_not_new_deep_content(): void

@@ -542,7 +542,7 @@ final class EditorialCaptureSemanticCoreTest extends TestCase
         self::assertSame('video-1', $seen[0]['video_id']);
     }
 
-    public function test_video_enrichment_receives_the_capture_resolution_after_subject_lock(): void
+    public function test_text_article_subject_lock_does_not_enter_video_enrichment(): void
     {
         $repository = new InMemoryCaptureRepository();
         $events = [];
@@ -586,9 +586,7 @@ final class EditorialCaptureSemanticCoreTest extends TestCase
         ]);
 
         self::assertSame('READY_FOR_PUBLICATION', $result->stage);
-        self::assertCount(1, $events);
-        self::assertSame($variant, $events[0]['subject_resolution']['primary']);
-        self::assertSame($variant['id'], $events[0]['subject_resolution']['primary']['id']);
+        self::assertCount(0, $events);
         self::assertSame($variant, $mediaContexts[0]['subject_resolution']['primary']);
         self::assertSame($variant['id'], $mediaContexts[0]['subject_resolution_packet']['canonical_subject_id']);
         self::assertSame($variant['type'], $mediaContexts[0]['subject_resolution_packet']['entity_type']);
@@ -639,12 +637,12 @@ final class EditorialCaptureSemanticCoreTest extends TestCase
 
         $result = $coordinator->execute([
             'idempotency_key' => 'capture-video-fresh-subject-handoff',
-            'intent' => 'TEXT_ARTICLE',
+            'intent' => 'VIDEO',
             'text' => 'Bản ghi từ video.',
-            'video' => ['url' => 'https://youtu.be/fresh-handoff', 'user_hint' => 'Video ghi lại Đồng hồ Odo 36/8 đang chạy.'],
+            'video' => ['url' => 'https://youtu.be/dQw4w9WgXcQ', 'user_hint' => 'Video ghi lại Đồng hồ Odo 36/8 đang chạy.'],
         ]);
 
-        self::assertSame('READY_FOR_PUBLICATION', $result->stage);
+        self::assertNull($result->articleId);
         self::assertSame($variant['id'], $seen['semantic']['primary']['id']);
         self::assertSame($variant['id'], $seen['assets'][0]['video_proposal']['payload']['metadata']['subject_resolution_packet']['id']);
         self::assertSame($variant['id'], $result->diagnostics['subjects']['primary']['id']);

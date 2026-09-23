@@ -1,3 +1,13 @@
+# Checkpoint — 2026-09-23 — Capture pipeline convergence Task 1 intent isolation (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE: The shared Capture coordinator invoked Video enrichment from the presence of a Video input and invoked `videoPublicationVerifier` unconditionally after semantic reconciliation. Explicit non-VIDEO intents could therefore acquire an unrequested Video child or blocker; Video subject hints also entered non-VIDEO resolution.
+
+FIXED_BOUNDARY: Video enrichment, subject handoff/resume, publication verification and thumbnail fallback are gated on resolved `VIDEO` intent. Verification additionally requires actual Video input, asset or owner. Non-VIDEO paths receive a neutral `video_publication` packet. Existing Article, Media-only and Knowledge branches retain their owners and Governance boundaries.
+
+VERIFICATION: The focused ContentIntentRouter/EditorialCaptureConvergenceE2E/EditorialCaptureContinuation command passed 76 tests / 424 assertions. Full NHK Unit passed 2,312 tests / 13,498 assertions with 18 warnings, 39 deprecations and 29 PHPUnit deprecations. PHP lint of all three changed PHP files passed. Tests cover all six registered intents; Video callbacks run for `VIDEO` and are skipped for the other five. No database, staging, V2 or production mutation occurred.
+
+STATUS: `CAPTURE_PIPELINE_TASK_1_INTENT_ISOLATION_LOCAL_READY / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-23 — Capture pipeline convergence implementation plan (PLAN READY / NO CODE MUTATION)
 
 PLAN_STATUS: The implementation plan is recorded at
