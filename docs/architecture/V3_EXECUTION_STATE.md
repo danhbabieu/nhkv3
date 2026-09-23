@@ -1,3 +1,23 @@
+# Checkpoint — 2026-09-23 — Capture pipeline convergence design (SPEC DRAFT / NO CODE MUTATION)
+
+DESIGN_STATUS: The approved architectural direction is recorded in
+`docs/superpowers/specs/2026-09-23-capture-pipeline-convergence-design.md`.
+The design covers intent isolation, immutable subject handoff, canonical
+Media/MediaUsage convergence, Article field/read-back mapping, state-token
+rehydration, publication/URL lifecycle and concrete completion owners.
+
+CONFIRMED_DEFECT: The common Article branch of
+`EditorialCaptureCoordinator` invokes `videoPublicationVerifier` for non-VIDEO
+intents. This is a shared intent-boundary defect and remains unfixed pending
+written-spec review and implementation planning.
+
+VERIFICATION: Repository was clean before the design checkpoint. Focused
+Capture/subject/publication/Media tests passed 128 tests / 539 assertions.
+Spec self-review found no placeholders or Constitution changes. No product
+code, semantic data, staging data or live runtime was mutated.
+
+STATUS: `PIPELINE_CONVERGENCE_SPEC_DRAFT / AWAITING_USER_SPEC_REVIEW / NO_CODE_MUTATION`.
+
 # Checkpoint — 2026-09-23 — Confirmed-subject reconciliation replay idempotency (LOCAL / DEPLOYMENT BLOCKED)
 
 ROOT_CAUSE_CONFIRMED: After a successful bounded subject reconciliation had
