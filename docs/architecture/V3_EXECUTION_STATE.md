@@ -17705,3 +17705,14 @@ runtime errors and the guarded `NHK_WP_TEST_PATH=public` environment failures
 mutation or deployment was performed.
 
 STATUS=`CONTENT_PREPARATION_SLICE_IMPLEMENTED_LOCAL / FULL_UNIT_PASS / INTEGRATION_RUNTIME_BLOCKED / NO_LIVE_MUTATION`.
+# Checkpoint — 2026-09-23 — Hierarchical subject-resolution verification (LOCAL / NO LIVE MUTATION)
+
+IMPLEMENTATION_BASE: `4806eb72`; verification checkout was `f04f05eb`.
+SHARED_RESOLVER_VERIFICATION: PASS for canonical hierarchy, immutable packet handoff, bounded reconciliation and registered intent paths.
+REGRESSION_MATRIX: A–L PASS from semantic/Capture coverage; M PASS via external-reference deduplication; N PASS via packet/provenance handoff assertions; O/P PASS via bounded continuation tests. No staging/live mutation.
+CROSS_DOMAIN: VIDEO, TEXT_ARTICLE, IMAGE_ARTICLE, KNOWLEDGE_DELTA and MEDIA_ENRICHMENT intent isolation and owner-boundary tests PASS. Article/Knowledge consume packet projections when present.
+SHADOW_RESOLUTION_AUDIT: One Article recovery fallback re-resolved subject when packet was absent; fixed fail-closed in `Plugin.php` with `SUBJECT_PACKET_REQUIRED_FOR_ARTICLE_RECONCILIATION`. Video packet validation remains bounded conflict checking and does not replace the packet primary.
+FIXTURE_HARDCODE_AUDIT: FAIL for the whole legacy production tree because pre-existing Odo-specific public/migration policies remain outside this task; hierarchical resolver code has no fixture UUID/URL branch. No new fixture-specific production branch added.
+LOCAL_VERIFICATION: NHK Unit passed 2,316 tests / 13,505 assertions with 18 warnings, 39 deprecations and 29 PHPUnit deprecations. NHK Contract passed 6 tests / 48 assertions. Affected M–P/Capture/Video/Article/Media group passed 126 tests / 619 assertions. Post-fix Article/Capture group passed 79 tests / 313 assertions.
+QUALITY: All changed PHP files lint clean; `git diff --check` passed; final repository status is understood. Runtime deployment/read-back is unavailable.
+STATUS: `LOCAL_VERIFICATION_COMPLETE / DEPLOYMENT_NOT_READY / FIXTURE_AUDIT_OPEN / NO_LIVE_MUTATION`.

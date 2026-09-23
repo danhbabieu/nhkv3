@@ -887,18 +887,7 @@ final class Plugin {
                         $packet = is_array($input['subject_resolution_packet'] ?? null)
                             ? $input['subject_resolution_packet']
                             : (is_object($capture) && is_array($capture->context['subject_resolution_packet'] ?? null) ? $capture->context['subject_resolution_packet'] : []);
-                        if ($packet === []) {
-                            $subject = is_array($input['research_subject'] ?? null) ? $input['research_subject'] : [];
-                            $exact = is_array($subject['exact'] ?? null) ? $subject['exact'] : $subject;
-                            $uuid = trim((string) ($input['canonical_uuid'] ?? $input['subject_uuid'] ?? $exact['canonical_uuid'] ?? $exact['id'] ?? ''));
-                            $stableKey = trim((string) ($input['stable_key'] ?? $input['subject_stable_key'] ?? $exact['stable_key'] ?? ''));
-                            $hints = array_values(array_filter([(string) ($exact['name'] ?? ''), (string) ($exact['value'] ?? '')], static fn (string $value): bool => trim($value) !== ''));
-                            $resolution = (new \NHK\Core\Application\Semantic\SubjectResolutionService(new \NHK\Core\Application\Semantic\CanonicalAuthoritySubjectResolver($authority, $types)))->resolveSources(['canonical_uuid' => $uuid === '' ? [] : [$uuid], 'stable_key' => $stableKey === '' ? [] : [$stableKey], 'subject_hints' => $hints]);
-                            $primary = is_array($resolution['primary'] ?? null) ? $resolution['primary'] : [];
-                            if (($resolution['status'] ?? '') === 'resolved' && trim((string) ($primary['id'] ?? '')) !== '') {
-                                $packet = array_replace($primary, ['status' => 'resolved', 'canonical_subject_id' => (string) $primary['id'], 'entity_type' => (string) ($primary['type'] ?? ''), 'canonical_name' => (string) ($primary['name'] ?? ''), 'match_reason' => (string) ($primary['match'] ?? ''), 'primary_source' => (string) ($resolution['primary_source'] ?? '')]);
-                            }
-                        }
+                        if ($packet === []) $packet = ['status' => 'unresolved', 'diagnostics' => ['SUBJECT_PACKET_REQUIRED_FOR_ARTICLE_RECONCILIATION']];
                         $desiredMedia = is_array($input['article_media'] ?? null) ? $input['article_media'] : [];
                         $intent = strtoupper((string) (($capture?->context['content_intent']['intent'] ?? $input['intent'] ?? '')));
                         $selected = is_array($desiredMedia['selected'] ?? null) ? $desiredMedia['selected'] : [];
