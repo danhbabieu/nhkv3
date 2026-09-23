@@ -13,6 +13,7 @@ use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
 use NHK\Core\Application\Knowledge\KnowledgeRepairPreviewService;
 use NHK\Core\Application\PublicIdentity\PublicUrlMaintenanceService;
 use NHK\Core\Application\Capture\{AuthorityCaptureService, EditorialCaptureContinuationService, EditorialCaptureCoordinator, PlanReapprovalRequired};
+use NHK\Core\Application\Capture\MutationOutcomeClassifier;
 use NHK\Core\Application\Graph\RelationshipOwnerContract;
 use NHK\Core\Application\Runtime\{SemanticWritePolicyResolver, SemanticWritePolicyViolation};
 use NHK\Core\Domain\Knowledge\DependencyValidationException;
@@ -241,8 +242,30 @@ final class McpTransport
             'nhk.proposal.apply' => $this->governance->apply($this->required($arguments, 'id')),
             'nhk.relation.backfill.apply' => $this->governance->relationBatchApply((array) ($arguments['candidates'] ?? []), (bool) ($arguments['approval_confirmed'] ?? false)),
         };
+        $result = $this->normalizeMutationResult($name, $arguments, ($definition['kind'] ?? '') === 'mutation', $result);
         $text = json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
         return ['content' => [['type' => 'text', 'text' => $text]], 'structuredContent' => $result, 'isError' => false];
+    }
+
+    /** @param array<string,mixed> $arguments @param array<string,mixed> $result @return array<string,mixed> */
+    private function normalizeMutationResult(string $name, array $arguments, bool $mutation, array $result): array
+    {
+        if (!$mutation || $result !== []) return $result;
+        $outcome = (new MutationOutcomeClassifier())->classify((object) [], [
+            'dispatched' => true,
+            'idempotency_key' => (string) ($arguments['idempotency_key'] ?? ''),
+            'capture_id' => (string) ($arguments['capture_id'] ?? ''),
+            'request_fingerprint' => (string) ($arguments['request_fingerprint'] ?? ''),
+            'external_video_id' => (string) (($arguments['video']['external_video_id'] ?? $arguments['external_video_id'] ?? '')),
+        ]);
+        return [
+            'outcome' => $outcome->status(),
+            'status' => $outcome->status(),
+            'reason' => $outcome->reason(),
+            'operation' => $name,
+            'identity' => $outcome->identity(),
+            'resume_hint' => 'RECONCILE_ORIGINAL_IDENTITY',
+        ];
     }
 
     private function batchUpload(array $arguments, array $files): array

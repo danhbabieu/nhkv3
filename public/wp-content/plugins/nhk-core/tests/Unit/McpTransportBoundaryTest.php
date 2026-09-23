@@ -135,6 +135,22 @@ final class McpTransportBoundaryTest extends TestCase
         self::assertSame('CAPTURE_NOT_FOUND', $response['body']['result']['structuredContent']['reason']);
     }
 
+    public function test_empty_mutation_result_is_structured_as_unknown_and_preserves_identity(): void
+    {
+        $method = new \ReflectionMethod(McpTransport::class, 'normalizeMutationResult');
+        $result = $method->invoke($this->transport($this->read()), 'nhk.capture.ingest', [
+            'idempotency_key' => 'same-request',
+            'capture_id' => 'capture-1',
+            'request_fingerprint' => 'fingerprint-1',
+            'video' => ['external_video_id' => 'external-1'],
+        ], true, []);
+
+        self::assertSame('OUTCOME_UNKNOWN', $result['outcome']);
+        self::assertSame('RECONCILE_ORIGINAL_IDENTITY', $result['resume_hint']);
+        self::assertSame('same-request', $result['identity']['idempotency_key']);
+        self::assertSame('capture-1', $result['identity']['capture_id']);
+    }
+
     public function test_semantic_uuid_and_stable_key_are_resolved_over_tools_call(): void
     {
         $types = new EntityTypeRegistry();
