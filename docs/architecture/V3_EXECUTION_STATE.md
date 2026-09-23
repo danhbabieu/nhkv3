@@ -1,3 +1,11 @@
+# Checkpoint — 2026-09-23 — Capture pipeline convergence Task 5 Article fields/read-back (LOCAL / NO LIVE MUTATION)
+
+TASK_RESULT: No product-code change was required. The existing Article ingest boundary normalizes documented aliases to native `post_*`/category/featured fields, rejects unknown fields, applies CAS/idempotency and compares every requested field against canonical native read-back with field-level mismatch reasons.
+
+VERIFICATION: Article-focused suite passed 29 tests / 120 assertions. Coverage includes explicit field precedence, aliases, slug/category/featured mapping, CAS, native draft/update/read-back and publication writer behavior. No database, staging, V2 or production mutation occurred.
+
+STATUS: `CAPTURE_PIPELINE_TASK_5_ARTICLE_FIELDS_READBACK_LOCAL_READY / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-23 — Capture pipeline convergence Task 4 MediaUsage convergence (LOCAL / NO LIVE MUTATION)
 
 TASK_RESULT: No product-code change was required. Existing Media/MediaUsage services already separate physical Media identity from endpoint/role/placement usage, normalize desired state, preserve placement keys, reconcile stale revisions and return canonical usage/read-back receipts. Coordinator projection checks keep native attachment state subordinate to canonical usage.
