@@ -136,13 +136,24 @@ final class EditorialQualityGate
     /** @param array<string,array<string,mixed>> $selected */
     private function hasCoreSpine(string $body, array $selected): bool
     {
+        $bodyTokens = $this->tokens($body);
         foreach ($selected as $claim) {
             if (!in_array((string) ($claim['editorial_role'] ?? ''), ['CORE', 'IDENTIFICATION'], true)) continue;
             $words = array_values(array_filter(preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower((string) ($claim['text'] ?? ''))) ?: [], static fn (string $word): bool => mb_strlen($word) >= 2));
-            $needle = implode(' ', array_slice($words, 0, 4));
-            if ($needle !== '' && str_contains(mb_strtolower($body), $needle)) return true;
+            $needle = array_slice($words, 0, 4);
+            if ($needle !== [] && $this->containsTokenSequence($bodyTokens, $needle)) return true;
         }
         return $selected === [];
+    }
+
+    /** @param list<string> $haystack @param list<string> $needle */
+    private function containsTokenSequence(array $haystack, array $needle): bool
+    {
+        if ($needle === [] || count($needle) > count($haystack)) return false;
+        foreach (array_keys($haystack) as $start) {
+            if (array_slice($haystack, (int) $start, count($needle)) === $needle) return true;
+        }
+        return false;
     }
 
     private function hasRedundancy(string $body): bool

@@ -629,7 +629,7 @@ final class VideoSemanticCoreTest extends TestCase
         self::assertTrue($preview->package['completeness']['publishable']);
     }
 
-    public function test_intake_emits_optional_knowledge_enrichment_after_target_resolution(): void
+    public function test_intake_keeps_user_hint_out_of_knowledge_enrichment_after_target_resolution(): void
     {
         $types = new EntityTypeRegistry();
         CanonicalEntityTypeCatalog::registerInto($types);
@@ -646,8 +646,8 @@ final class VideoSemanticCoreTest extends TestCase
         $preview = $service->preview('https://youtu.be/dQw4w9WgXcQ', 'Odo có cọc đen.');
 
         self::assertSame($brand->canonicalId, $seen[0]['id']);
-        self::assertSame('new_claim', $preview->package['knowledge_enrichment']['candidates'][0]['classification']);
-        self::assertSame('USER_HINT', $preview->package['knowledge_enrichment']['candidates'][0]['provenance']['origin']);
+        self::assertSame([], $preview->package['knowledge_enrichment']['candidates']);
+        self::assertContains('USER_HINT_NOT_KNOWLEDGE', $preview->package['knowledge_enrichment']['diagnostics']);
     }
 
     public function test_odo_36_10_preserves_intended_variant_for_about_and_knowledge_enrichment(): void

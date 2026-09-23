@@ -29,7 +29,7 @@ final readonly class VideoKnowledgeEnrichmentPlanner
         $transcript = $context['transcript_policy'] ?? null;
         $profile = new KnowledgeFacetProfile('recognition', $this->scopeFor((string) $target['type']));
         $candidates = [];
-        if ($hint !== '') $candidates = array_merge($candidates, $this->planner->plan((string) $target['id'], $profile, $hint, ['origin' => 'USER_HINT', 'source_url' => $context['source']['canonical_source_url'] ?? null]));
+        if ($hint !== '') $diagnostics[] = 'USER_HINT_NOT_KNOWLEDGE';
 
         if (is_object($transcript) && method_exists($transcript, 'available') && $transcript->available()) {
             if ($this->extractor === null) {

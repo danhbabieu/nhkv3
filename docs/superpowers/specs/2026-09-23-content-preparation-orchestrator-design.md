@@ -1,7 +1,7 @@
 # Content Preparation Orchestrator Design
 
 **Date:** 2026-09-23  
-**Status:** Design approved in conversation; awaiting written-spec review
+**Status:** Amended after written-spec review; approved clarifications incorporated
 
 ## Goal
 
@@ -42,6 +42,11 @@ owners and does not redesign persistence.
 - `PREPARED`, `REVIEW_REQUIRED` and `BLOCKED` are transient preparation-result
   meanings only. They must not be added as a new persisted CaptureStage or
   invented runtime registry vocabulary.
+- Preparation remains resumable through the existing durable Capture boundary.
+  Capture context/diagnostics/checkpoints must retain enough phase, plan,
+  governed-enrichment read-back and packet state to resume after interruption
+  on the same Capture and idempotency key. A retry must not create a duplicate
+  Authority, Knowledge, Graph, Article or Media owner.
 
 ## Proposed design
 
@@ -90,7 +95,11 @@ The service performs the following bounded sequence:
    invoke the existing Capture-bound governed semantic write-back callback.
    The callback remains responsible for Proposal → approval/policy →
    eligibility → Controlled Apply → canonical read-back. Insufficient
-   evidence leaves the item review-required.
+   evidence leaves the item review-required. A semantic Graph relation between
+   existing canonical semantic owners may be created in this governed path
+   before final preparation, when it is required by the enrichment plan; this
+   is never a direct Graph write and is followed by canonical read-back and
+   re-resolution.
 6. Re-resolve against fresh canonical state after enrichment.
 7. Build exactly one final `SubjectResolutionPacket` and return it with the
    prepared semantic plan. Downstream code must consume this packet instead of
@@ -98,20 +107,35 @@ The service performs the following bounded sequence:
 
 The orchestrator must not call Article draft creation, Article composition,
 MediaUsage placement, publication or a direct Graph writer. Those remain later
-phases owned by the existing Capture coordinator and domain services.
+phases owned by the existing Capture coordinator and domain services. The
+preparation gate specifically prohibits Article-owned semantic relations,
+especially `wp_post → about → subject`, until `PREPARED`.
 
-### 3. Capture integration seam
+Physical/canonical Video or Media intake may occur before preparation when it
+is required to inspect or validate the supplied source. Video and Media remain
+their own owners and candidate inputs; before the final packet is locked they
+must not automatically create an `about` relation, select the primary subject,
+create Knowledge truth or create Evidence truth.
+
+### 3. Preparation durability and Capture integration seam
 
 The existing `EditorialCaptureCoordinator` will call the orchestrator after
 interpretation/physical input preparation and before the existing
 `draftCreator` branch. The first slice will:
 
+- resume an already-started preparation from the same Capture when the durable
+  phase/plan/read-back state proves the request fingerprint and idempotency
+  binding are unchanged;
 - stop before draft creation when preparation is review-required or blocked;
-- store preparation diagnostics in the existing Capture diagnostics boundary;
+- store preparation phase, plan, governed-enrichment read-back and the final
+  packet in the existing Capture context/diagnostics boundary, without adding
+  a new preparation table;
 - pass the immutable packet and prepared plan to draft/composition/semantic
   relation contexts when preparation is prepared;
-- ensure downstream relation planning uses explicit prepared candidates rather
-  than word occurrence in Article/video prose;
+- ensure Article-owned relation planning uses explicit prepared candidates
+  rather than word occurrence in Article/video prose;
+- allow governed semantic-owner enrichment relations to use their existing
+  Proposal → Apply → read-back path before final preparation;
 - preserve existing retry/idempotency behavior and legacy Article
   reconciliation paths.
 
@@ -148,6 +172,11 @@ force.
    resolution consumes the read-back state.
 6. Existing tests for the current Capture and Article reconciliation flows
    remain green; no existing legacy recovery behavior is removed.
+7. An interruption after governed enrichment but before draft creation resumes
+   on the same durable Capture and does not duplicate any owner or relation.
+8. Physical Video/Media intake may be read before preparation, but no automatic
+   primary subject, Knowledge, Evidence or `about` relation is produced from
+   that intake before packet lock.
 
 ## Files expected in the implementation slice
 
@@ -155,6 +184,9 @@ force.
 - Create: `public/wp-content/plugins/nhk-core/src/Application/Capture/ContentPreparationResult.php`
 - Modify: `public/wp-content/plugins/nhk-core/src/Application/Capture/EditorialCaptureCoordinator.php`
 - Create: `public/wp-content/plugins/nhk-core/tests/Unit/ContentPreparationOrchestratorTest.php`
+- Modify: `public/wp-content/plugins/nhk-core/tests/Unit/EditorialCaptureConvergenceE2ETest.php`
+  for the same-Capture resume/idempotency case, reusing the repository's
+  existing Capture orchestration fixture family.
 - Modify only if required by the existing composition root/tests to inject the
   new application service; no new persistence or migration files.
 

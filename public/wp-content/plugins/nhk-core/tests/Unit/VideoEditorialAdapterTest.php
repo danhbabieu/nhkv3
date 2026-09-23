@@ -50,6 +50,32 @@ final class VideoEditorialAdapterTest extends TestCase
         self::assertContains('MISSING_PUBLIC_IDENTITY', $result['seo_plan']->blockers);
     }
 
+    public function test_subject_reconciled_video_scopes_user_hint_to_specimen_and_keeps_variant_context_separate(): void
+    {
+        $variant = '5f6c98ca-869a-4418-a8a4-1a32eb931c5e';
+        $adapter = $this->adapter([
+            ['id' => 'claim-con-10-bua', 'subject_id' => $variant, 'subject_type' => 'variant', 'text' => 'Odo 36/10 có cấu hình 10 côn và 10 búa.', 'scope' => 'variant', 'provenance' => 'CATALOG_SUPPORTED', 'evidence_status' => 'SUPPORTED_WITHIN_SCOPE'],
+            ['id' => 'claim-westminster-gai', 'subject_id' => $variant, 'subject_type' => 'variant', 'text' => 'Odo 36/10 sử dụng Westminster và Gai Carillon.', 'scope' => 'variant', 'provenance' => 'CATALOG_SUPPORTED', 'evidence_status' => 'SUPPORTED_WITHIN_SCOPE'],
+            ['id' => 'claim-movement-odo-36', 'subject_id' => $variant, 'subject_type' => 'variant', 'text' => 'Odo 36/10 dùng movement Odo 36.', 'scope' => 'variant', 'provenance' => 'CATALOG_SUPPORTED', 'evidence_status' => 'SUPPORTED_WITHIN_SCOPE'],
+        ]);
+
+        $result = $adapter->prepare([
+            'source' => ['source_title' => 'Golden Odo 36/10', 'platform' => 'youtube', 'external_video_id' => 'P4KaHX3LBOw'],
+            'raw_input' => 'mặt số nổi nguyên bản',
+            'user_hint' => 'mặt số nổi nguyên bản',
+            'subject_resolution' => ['primary' => ['id' => $variant, 'type' => 'variant', 'name' => 'Odo 36/10 two-tune']],
+            'public_identity' => ['canonical_url' => '/video/odo-36-10/', 'canonical_identity' => true, 'public_eligible' => true],
+        ]);
+
+        self::assertSame('READY', $result['quality_report']->readiness, json_encode(['blockers' => $result['quality_report']->blockers, 'warnings' => $result['quality_report']->warnings], JSON_UNESCAPED_UNICODE));
+        self::assertStringContainsString('chiếc đồng hồ trong video', mb_strtolower($result['draft']->body));
+        self::assertStringContainsString('10 côn và 10 búa', $result['draft']->body);
+        self::assertStringContainsString('Westminster và Gai Carillon', $result['draft']->body);
+        self::assertStringContainsString('Odo 36', $result['draft']->body);
+        self::assertStringNotContainsString('USER_HINT', json_encode($result['pack']->selectedClaims, JSON_UNESCAPED_UNICODE));
+        self::assertSame(['claim-con-10-bua', 'claim-westminster-gai', 'claim-movement-odo-36'], array_column($result['pack']->selectedClaims, 'claim_id'));
+    }
+
     public function test_resume_planner_does_not_bypass_blocked_shared_quality_with_legacy_prose(): void
     {
         $videoId = '01a0c8f0-7b68-781f-963d-75fd2937e0cc';

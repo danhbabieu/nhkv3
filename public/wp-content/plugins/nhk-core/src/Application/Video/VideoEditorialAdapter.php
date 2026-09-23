@@ -40,9 +40,11 @@ final class VideoEditorialAdapter
         $resolution = is_array($context['subject_resolution'] ?? null) ? $context['subject_resolution'] : [];
         $subject = is_array($resolution['primary'] ?? null) ? $resolution['primary'] : [];
         $source = is_array($context['source'] ?? null) ? $context['source'] : [];
-        $topic = trim((string) ($context['topic'] ?? $context['editorial_instruction'] ?? $context['user_hint'] ?? $context['raw_input'] ?? $source['source_title'] ?? ''));
+        $userHint = trim((string) ($context['user_hint'] ?? $context['raw_input'] ?? ''));
+        $scope = new VideoEditorialScopeNormalizer();
+        $topic = $scope->topic($userHint, $subject, trim((string) ($context['editorial_instruction'] ?? $context['topic'] ?? '')));
         $inputContext = [
-            'raw_input' => trim((string) ($context['raw_input'] ?? $context['user_hint'] ?? '')),
+            'raw_input' => $scope->input($userHint, $subject, (string) ($context['raw_input'] ?? $source['source_title'] ?? '')),
             'title' => trim((string) ($context['editorial_title'] ?? '')),
             'observations' => is_array($context['observations'] ?? null) ? $context['observations'] : [],
         ];

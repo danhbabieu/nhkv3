@@ -211,9 +211,11 @@ final class VideoIntakeService
                 if (array_filter($result['candidates'], static fn (mixed $candidate): bool => $candidate instanceof \NHK\Core\Domain\Knowledge\KnowledgeEnrichmentCandidate) !== []) {
                     $result['candidates'] = array_values(array_map($this->serializeKnowledgeCandidate(...), $result['candidates']));
                 }
+                $result['candidates'] = $this->removeUserHintKnowledgeCandidates((array) $result['candidates'], $result);
                 return array_merge(['status' => 'available', 'subject' => null, 'diagnostics' => [], 'proposal_ready' => false, 'unresolved_reasons' => []], $result);
             }
             $candidates = array_values(array_map($this->serializeKnowledgeCandidate(...), $result));
+            $candidates = $this->removeUserHintKnowledgeCandidates($candidates, $result);
             return ['status' => 'available', 'subject' => null, 'candidates' => $candidates, 'diagnostics' => [], 'proposal_ready' => (bool) array_filter($candidates, static fn (array $candidate): bool => ($candidate['proposal_ready'] ?? false) === true), 'unresolved_reasons' => $candidates === [] ? [] : ['GOVERNED_REVIEW_REQUIRED']];
         } catch (\Throwable $error) {
             return ['status' => 'unavailable', 'subject' => null, 'candidates' => [], 'diagnostics' => ['KNOWLEDGE_ENRICHMENT_PLANNER_FAILED:' . $error->getMessage()], 'proposal_ready' => false, 'unresolved_reasons' => ['ENRICHMENT_UNAVAILABLE']];
@@ -227,5 +229,15 @@ final class VideoIntakeService
         $profile = $candidate->profile->toMetadata();
         $ready = $candidate->classification === 'new_claim' || ($candidate->classification === 'add_evidence' && ($candidate->provenance['source_id'] ?? '') !== '' && ($candidate->provenance['source_revision'] ?? null) !== null);
         return ['classification' => $candidate->classification, 'subject_id' => $candidate->subjectId, 'facet' => $profile['facet'], 'scope' => $profile['scope'], 'profile' => $profile, 'observation' => $candidate->observation, 'provenance' => $candidate->provenance, 'provenance_summary' => ['origin' => $candidate->provenance['origin'] ?? null, 'source_id' => $candidate->provenance['source_id'] ?? null, 'source_revision' => $candidate->provenance['source_revision'] ?? null, 'locator' => $candidate->provenance['locator'] ?? null], 'proposal_ready' => $ready, 'is_generated' => $candidate->isGenerated, 'is_evidence' => $candidate->isEvidence];
+    }
+
+    /** @param list<array<string,mixed>> $candidates @param array<string,mixed> $packet @return list<array<string,mixed>> */
+    private function removeUserHintKnowledgeCandidates(array $candidates, array &$packet): array
+    {
+        $filtered = array_values(array_filter($candidates, static fn (array $candidate): bool => strtoupper(trim((string) (($candidate['provenance']['origin'] ?? '')))) !== 'USER_HINT'));
+        if (count($filtered) !== count($candidates)) {
+            $packet['diagnostics'] = array_values(array_unique(array_merge((array) ($packet['diagnostics'] ?? []), ['USER_HINT_NOT_KNOWLEDGE'])));
+        }
+        return $filtered;
     }
 }
