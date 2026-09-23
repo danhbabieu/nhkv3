@@ -75,7 +75,7 @@ final class VideoEditorialAdapter
             'competing_pages' => is_array($context['competing_pages'] ?? null) ? $context['competing_pages'] : [],
             'structured_data' => ['type' => 'VideoObject'],
         ]);
-        $quality = $this->quality->evaluate($pack, $plan, $draft, $seo);
+        $quality = $this->quality->evaluate($pack, $plan, $draft, $seo, ($context['public_identity_deferred'] ?? false) === true);
         $statementDecision = ($this->statementDecisions ??= new VideoStatementDecisionEngine())->evaluate(
             is_array($context['statements'] ?? null) ? $context['statements'] : [],
             is_array($context['canonical_context'] ?? null) ? $context['canonical_context'] : [],

@@ -16,7 +16,7 @@ final class EditorialQualityGate
         'traceability', 'profile_fit', 'public_readiness',
     ];
 
-    public function evaluate(EditorialContextPack $pack, EditorialPlan $plan, EditorialDraft $draft, SemanticSeoPlan $seo): EditorialQualityReport
+    public function evaluate(EditorialContextPack $pack, EditorialPlan $plan, EditorialDraft $draft, SemanticSeoPlan $seo, bool $allowDeferredSeoIdentity = false): EditorialQualityReport
     {
         $profile = $this->profile($pack, $plan, $draft, $seo);
         $dimensions = [];
@@ -88,7 +88,15 @@ final class EditorialQualityGate
         $visual = array_merge($pack->visualSupport, $plan->visualSupport, (array) ($draft->diagnostics['visual_support'] ?? []));
         foreach ($visual as $item) if (is_array($item) && (strtoupper((string) ($item['status'] ?? '')) === 'UNRESOLVED' || (strtoupper((string) ($item['status'] ?? '')) === 'UNAVAILABLE' && ($item['required'] ?? true) === true) || strtolower((string) ($item['support'] ?? '')) === 'representative')) { $add('visual_support', 'BLOCK', 'VISUAL_SUPPORT_UNRESOLVED'); break; }
 
-        if (!in_array($seo->readiness, [SeoReadinessResult::READY, SeoReadinessResult::NOT_APPLICABLE], true)) $add('seo_readiness', 'BLOCK', 'SEO_NOT_READY');
+        $deferredVideoIdentity = $allowDeferredSeoIdentity
+            && $profile === 'video'
+            && $seo->canonicalUrl === null
+            && $seo->blockers !== []
+            && array_diff($seo->blockers, ['MISSING_PUBLIC_IDENTITY', 'AMBIGUOUS_CANONICAL_SUBJECT']) === [];
+        if (!in_array($seo->readiness, [SeoReadinessResult::READY, SeoReadinessResult::NOT_APPLICABLE], true)) {
+            if ($deferredVideoIdentity) $add('seo_readiness', 'INFO', 'VIDEO_PUBLIC_IDENTITY_DEFERRED_UNTIL_OWNER_CREATION');
+            else $add('seo_readiness', 'BLOCK', 'SEO_NOT_READY');
+        }
         if ($topic !== '' && !$this->containsTopic($seo->title . ' ' . $seo->h1 . ' ' . $seo->topicFocus, $topic)) $add('seo_readiness', 'WARN', 'SEO_TOPIC_MISMATCH');
         foreach ($seo->internalLinks as $link) {
             $url = trim((string) ($link['url'] ?? ''));

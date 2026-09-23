@@ -91,6 +91,7 @@ final class VideoIntakeService
                 'editorial_title' => $editorialTitle,
                 'subject_resolution' => ['primary' => $effectiveSubject],
                 'public_identity' => $publicIdentity,
+                'public_identity_deferred' => $existing === null,
                 'relations' => $relations,
             ]);
             if (strtoupper((string) ($shared['status'] ?? '')) === 'BLOCKED') throw new VideoException(VideoEditorialOutcome::failureCode($shared));

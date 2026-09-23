@@ -51,6 +51,29 @@ final class VideoEditorialAdapterTest extends TestCase
         self::assertContains('MISSING_PUBLIC_IDENTITY', $result['seo_plan']->blockers);
     }
 
+    public function test_new_video_owner_defers_public_identity_seo_until_governed_creation(): void
+    {
+        $adapter = $this->adapter([
+            ['id' => 'claim-video-fixture', 'subject_id' => self::SUBJECT, 'subject_type' => 'model', 'text' => 'Odo 36 có cơ cấu phát âm cơ học được dùng để minh họa cách nhận biết chuyển động.', 'scope' => 'model', 'provenance' => 'CATALOG_SUPPORTED', 'evidence_status' => 'SUPPORTED_WITHIN_SCOPE'],
+        ]);
+
+        $result = $adapter->prepare([
+            'raw_input' => 'Nữ Hoàng Âm Thanh — chất âm xuất sắc, hiếm gặp',
+            'user_hint' => 'Nữ Hoàng Âm Thanh — chất âm xuất sắc, hiếm gặp',
+            'subject_resolution' => ['primary' => ['id' => self::SUBJECT, 'type' => 'model', 'name' => 'Odo 36']],
+            'public_identity' => [],
+            'public_identity_deferred' => true,
+        ]);
+
+        self::assertSame('READY', $result['quality_report']->readiness);
+        self::assertSame('READY', $result['quality_decision']);
+        self::assertSame([], $result['quality_report']->blockers);
+        self::assertContains('VIDEO_PUBLIC_IDENTITY_DEFERRED_UNTIL_OWNER_CREATION', $result['quality_report']->informational);
+        self::assertStringContainsString('Nữ Hoàng Âm Thanh', $result['draft']->summary);
+        self::assertStringContainsString('chất âm xuất sắc', $result['draft']->body);
+        self::assertStringNotContainsString('Nữ Hoàng Âm Thanh', json_encode($result['pack']->selectedClaims, JSON_UNESCAPED_UNICODE));
+    }
+
     public function test_ready_quality_does_not_emit_generic_quality_block_receipt_code(): void
     {
         self::assertSame('PRIMARY_SUBJECT_AMBIGUOUS', VideoEditorialOutcome::failureCode([
