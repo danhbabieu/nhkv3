@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Semantic;
 
+use NHK\Core\Application\Video\VideoSubjectResolutionDecision;
 use NHK\Core\Shared\Uuid\UuidCodec;
 
 /** Canonical subject resolver adapter. Ambiguity and absence remain explicit. */
@@ -20,6 +21,12 @@ final class SubjectResolutionService
             'canonical_uuid' => $uuids,
             'subject_hints' => array_values(array_diff($values, $uuids)),
         ]);
+    }
+
+    /** @param list<array<string,mixed>> $candidates @return array<string,mixed> */
+    public function resolveDecision(array $input, array $candidates, array $context = []): array
+    {
+        return VideoSubjectResolutionDecision::resolve($input, $candidates, $context);
     }
 
     /**
