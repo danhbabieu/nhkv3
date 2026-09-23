@@ -294,7 +294,8 @@ final class EditorialCaptureContinuationTest extends TestCase
         $byType = [];
         foreach ($children as $child) $byType[(string) ($child['owner_type'] ?? '')] = $child;
 
-        self::assertSame('COMPLETE', $result['capture']['status']);
+        if ($result['capture']['status'] !== 'COMPLETE') throw new \RuntimeException(json_encode($result['capture']['diagnostics']['completion'] ?? []));
+        self::assertSame('COMPLETE', $result['capture']['status'], json_encode($result['capture']['diagnostics']['completion'] ?? []));
         self::assertSame('COMPLETE', $byType['source']['status']);
         self::assertSame('COMPLETE', $byType['knowledge']['status']);
         self::assertSame('COMPLETE', $byType['evidence']['status']);
@@ -353,6 +354,7 @@ final class EditorialCaptureContinuationTest extends TestCase
             'resume_children' => ['video'],
         ]);
 
+        if ($result['capture']['status'] !== 'COMPLETE') self::fail(json_encode($result['capture']['diagnostics']['completion'] ?? []));
         self::assertSame('COMPLETE', $result['capture']['status']);
         self::assertSame([], $result['capture']['diagnostics']['completion']['blockers']);
         self::assertNull($result['retry']['code']);
@@ -1131,6 +1133,146 @@ final class EditorialCaptureContinuationTest extends TestCase
         self::assertSame('CAPTURE_SUBJECT_RECONCILIATION_CANDIDATE_NOT_ALLOWED', $result['retry']['code']);
         self::assertSame($capture->revision, $captures->findById($capture->captureId)?->revision);
         self::assertArrayNotHasKey('semantic', $events);
+    }
+
+    public function test_ambiguous_video_retry_fails_closed_for_retired_candidate(): void
+    {
+        $captures = new ContinuationCaptureRepository();
+        $addenda = new ContinuationAddendumRepository();
+        $candidate = UuidCodec::newV7();
+        $capture = new CaptureRecord(
+            UuidCodec::newV7(),
+            'ambiguous-retired-candidate',
+            hash('sha256', 'ambiguous-retired-candidate'),
+            CaptureStage::SEMANTICS_RECONCILED->value,
+            'FAILED_RETRYABLE',
+            null,
+            null,
+            [],
+            ['content_intent' => ['intent' => 'VIDEO', 'article_required' => false], 'subject_resolution_packet' => [
+                'status' => 'ambiguous',
+                'diagnostics' => ['candidates' => [['id' => $candidate, 'type' => 'variant', 'revision' => 1, 'status' => 'retired']]],
+            ]],
+            ['failure' => ['code' => 'AMBIGUOUS_SUBJECT_REVIEW']],
+            [],
+        );
+        $captures->create($capture);
+        $events = [];
+        $service = new EditorialCaptureContinuationService($captures, $addenda, $this->coordinator($captures, $events));
+
+        $result = $service->retry(['capture_id' => $capture->captureId, 'idempotency_key' => $capture->idempotencyKey, 'resume_mode' => 'RETRY', 'subject_reconciliation' => ['confirmed' => true, 'candidate_uuid' => $candidate]]);
+
+        self::assertSame('CAPTURE_SUBJECT_RECONCILIATION_CANDIDATE_NOT_ALLOWED', $result['retry']['code']);
+        self::assertSame($capture->revision, $captures->findById($capture->captureId)?->revision);
+    }
+
+    public function test_confirmed_subject_reconciliation_reenters_video_pipeline_and_hydrates_authoritative_packet(): void
+    {
+        $captures = new ContinuationCaptureRepository();
+        $addenda = new ContinuationAddendumRepository();
+        $captureId = UuidCodec::newV7();
+        $videoId = UuidCodec::newV7();
+        $candidateId = UuidCodec::newV7();
+        $ambiguous = [
+            'packet_version' => 1,
+            'status' => 'ambiguous',
+            'canonical_subject_id' => '',
+            'entity_type' => '',
+            'stable_key' => '',
+            'canonical_name' => '',
+            'revision' => 0,
+            'diagnostics' => ['candidates' => [[
+                'id' => $candidateId,
+                'type' => 'variant',
+                'stable_key' => 'nhk:variant:generic.confirmed',
+                'name' => 'Confirmed Variant',
+                'revision' => 7,
+            ]]],
+        ];
+        $capture = new CaptureRecord(
+            $captureId,
+            'confirmed-subject-reenters-video',
+            hash('sha256', 'confirmed-subject-reenters-video'),
+            CaptureStage::SEMANTICS_RECONCILED->value,
+            'REVIEW_REQUIRED',
+            null,
+            null,
+            [['kind' => 'video', 'video_id' => $videoId]],
+            [
+                'raw_input' => 'Ambiguous video input.',
+                'content_intent' => ['intent' => 'VIDEO', 'article_required' => false],
+                'subject_resolution_packet' => $ambiguous,
+            ],
+            [
+                'subject_resolution_packet' => $ambiguous,
+                'content_preparation' => [
+                    'status' => 'REVIEW_REQUIRED',
+                    'subject_resolution_packet' => null,
+                    'review_reasons' => ['PRIMARY_SUBJECT_AMBIGUOUS'],
+                ],
+                'semantic_write_back' => [
+                    'status' => 'APPLIED',
+                    'canonical_readback' => ['canonical_id' => $videoId],
+                ],
+                'completion' => [
+                    'status' => 'REVIEW_REQUIRED',
+                    'complete' => false,
+                    'children' => [['owner_type' => 'video', 'owner_id' => $videoId, 'status' => 'PARTIAL', 'complete' => false]],
+                    'resume_hints' => ['resume_children' => ['video']],
+                ],
+            ],
+            [],
+            revision: 4,
+        );
+        $captures->create($capture);
+        $events = [];
+        $resolver = new SubjectResolutionService(static function (): array {
+            throw new \RuntimeException('WEAKER_SUBJECT_COMPETITION_MUST_NOT_RUN');
+        });
+        $semantic = static function (array $context) use (&$events): array {
+            $events['subject_id'] = $context['subject_resolution']['primary']['id'] ?? null;
+            return ['status' => 'APPLIED', 'canonical_readback' => ['canonical_id' => 'semantic-owner']];
+        };
+        $videoPublication = static function (array $context) use ($videoId): array {
+            return ['status' => 'READY', 'quality' => 'READY', 'blockers' => [], 'items' => [[
+                'video_id' => $videoId,
+                'completion' => [
+                    'owner_type' => 'video', 'owner_id' => $videoId, 'status' => 'COMPLETE', 'complete' => true,
+                    'canonical_readback' => ['canonical_id' => $videoId], 'content_state' => 'CONTENT_COMPLETE',
+                    'dependency_state' => 'COMPLETE', 'relation_or_usage_state' => 'COMPLETE', 'public_state' => 'READY',
+                    'frontend_state' => 'VERIFIED', 'blockers' => [],
+                ],
+            ]]];
+        };
+        $coordinator = new EditorialCaptureCoordinator(
+            $captures,
+            static fn (): array => ['items' => []],
+            static fn (): array => ['post_id' => 1, 'state_token' => 'state'],
+            new TextInputInterpreter(),
+            $resolver,
+            new ClaimRetrievalEngine(static fn (array $subject): array => ['status' => 'available', 'items' => []], static fn (array $subject, array $neighborhood): array => []),
+            $semantic,
+            new ArticleComposer(),
+            static fn (): array => ['status' => 'RECONCILED'],
+            static fn (): array => ['eligible' => false, 'blockers' => []],
+            static fn (): array => ['status' => 'verified'],
+            contentPreparation: new ContentPreparationOrchestrator($resolver),
+            videoPublicationVerifier: $videoPublication,
+        );
+        $service = new EditorialCaptureContinuationService($captures, $addenda, $coordinator);
+
+        $result = $service->retry([
+            'capture_id' => $captureId,
+            'idempotency_key' => $capture->idempotencyKey,
+            'resume_mode' => 'RETRY',
+            'subject_reconciliation' => ['confirmed' => true, 'candidate_uuid' => $candidateId],
+        ]);
+
+        self::assertSame('PREPARED', $result['capture']['diagnostics']['content_preparation']['status']);
+        self::assertSame($candidateId, $result['capture']['diagnostics']['content_preparation']['subject_resolution_packet']['canonical_subject_id']);
+        self::assertSame('USER_CONFIRMED_SUBJECT_RECONCILIATION', $result['capture']['diagnostics']['content_preparation']['subject_resolution_packet']['primary_source']);
+        self::assertNotContains('PRIMARY_SUBJECT_AMBIGUOUS', $result['capture']['diagnostics']['content_preparation']['review_reasons'] ?? []);
+        self::assertSame($candidateId, $events['subject_id']);
     }
 
     public function test_video_enrichment_started_receipt_survives_callback_failure(): void

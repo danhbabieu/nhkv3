@@ -1,5 +1,29 @@
 # P0 Checkpoints — 2026-09-22 (LOCAL / DEPLOYMENT PENDING)
 
+# Checkpoint — 2026-09-23 — Confirmed subject reconciliation normal Video continuation (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE_CONFIRMED: `EditorialCaptureContinuationService::retry()` persisted
+the confirmed subject packet, then admitted an already-applied Video Capture
+to `EditorialCaptureCoordinator::retryVideoCompletion()`. That completion-only
+path intentionally skips ContentPreparation, so the persisted packet was not
+hydrated and the prior `PRIMARY_SUBJECT_AMBIGUOUS` review projection remained.
+
+FIXED_BOUNDARY: A retry carrying `subject_reconciliation` now re-enters the
+normal same-Capture coordinator path after successful fail-closed validation.
+ContentPreparation therefore consumes the persisted
+`USER_CONFIRMED_SUBJECT_RECONCILIATION` packet without weaker competition.
+Candidate UUIDs remain bounded to the current ambiguous packet and reject
+missing, malformed, inactive/retired or otherwise invalid candidates.
+
+VERIFICATION: Focused subject/Capture/Video suite passes 97 tests / 500
+assertions. Full NHK Unit passes 2,305 tests / 13,452 assertions with 18
+warnings, 39 deprecations and 28 PHPUnit deprecations. Changed-file PHP lint
+and `git diff --check` pass. Regression proves `REVIEW_REQUIRED` with null
+packet transitions through the same Capture to prepared authoritative subject
+and Video completion. No MCP/live canonical mutation occurred.
+
+STATUS: `CONFIRMED_SUBJECT_RECONCILIATION_VIDEO_CONTINUATION_LOCAL_READY / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-23 — Stale REVIEW_REQUIRED re-evaluation (LOCAL / NO LIVE MUTATION)
 
 ROOT_CAUSE_CONFIRMED: retry admission treated every `REVIEW_REQUIRED` Capture

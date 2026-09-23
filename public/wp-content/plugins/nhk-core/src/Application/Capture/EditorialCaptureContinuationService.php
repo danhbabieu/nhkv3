@@ -39,7 +39,9 @@ final class EditorialCaptureContinuationService
             if ($reconciliationError !== null) return $this->retryFailure($captureId, $reconciliationError, $capture);
         }
         $requestedChildren = array_values(array_unique(array_map('strtolower', array_map('strval', (array) ($input['resume_children'] ?? [])))));
-        $videoCompletionRetry = CaptureCurrentOutcomeReducer::supportsCanonicalVideoCompletionRetry($capture)
+        $subjectReconciliationProvided = array_key_exists('subject_reconciliation', $input);
+        $videoCompletionRetry = !$subjectReconciliationProvided
+            && CaptureCurrentOutcomeReducer::supportsCanonicalVideoCompletionRetry($capture)
             && ($requestedChildren === [] || $requestedChildren === ['video']);
         if ($videoCompletionRetry) {
             $retryInput = $this->rehydrateRetryInput($capture, $input);
@@ -296,7 +298,10 @@ final class EditorialCaptureContinuationService
         if ($candidate === null) return [$capture, 'CAPTURE_SUBJECT_RECONCILIATION_CANDIDATE_NOT_ALLOWED'];
         $type = trim((string) ($candidate['type'] ?? $candidate['entity_type'] ?? ''));
         $revision = (int) ($candidate['revision'] ?? 0);
-        if ($type === '' || $revision < 1) return [$capture, 'CAPTURE_SUBJECT_RECONCILIATION_CANDIDATE_NOT_ALLOWED'];
+        $lifecycle = strtolower(trim((string) ($candidate['status'] ?? $candidate['state'] ?? ($candidate['canonical_readback']['status'] ?? 'active'))));
+        if ($type === '' || $revision < 1 || ($candidate['active'] ?? true) !== true || in_array($lifecycle, ['retired', 'inactive', 'missing'], true)) {
+            return [$capture, 'CAPTURE_SUBJECT_RECONCILIATION_CANDIDATE_NOT_ALLOWED'];
+        }
 
         $resolved = new SubjectResolutionPacket(
             'resolved',
