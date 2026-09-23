@@ -37,6 +37,13 @@ final class EditorialCaptureContinuationService
         if (array_key_exists('subject_reconciliation', $input)) {
             [$capture, $reconciliationError] = $this->reconcileSubject($capture, $input['subject_reconciliation']);
             if ($reconciliationError !== null) return $this->retryFailure($captureId, $reconciliationError, $capture);
+            // A completed Capture may receive the exact same confirmation
+            // again from a retried client. Reconciliation has already
+            // fail-closed checked that it matches the persisted authority;
+            // return the canonical read-back without reopening the pipeline.
+            if ($capture->status === 'COMPLETE') {
+                return ['capture' => $capture->toArray(), 'retry' => ['mode' => 'RETRY', 'status' => 'REPLAYED', 'code' => null, 'eligible' => false, 'reason' => null]];
+            }
         }
         $requestedChildren = array_values(array_unique(array_map('strtolower', array_map('strval', (array) ($input['resume_children'] ?? [])))));
         $subjectReconciliationProvided = array_key_exists('subject_reconciliation', $input);
@@ -275,6 +282,15 @@ final class EditorialCaptureContinuationService
     /** @return array{0:CaptureRecord,1:?string} */
     private function reconcileSubject(CaptureRecord $capture, mixed $selection): array
     {
+        if ($capture->status === 'COMPLETE') {
+            if (!is_array($selection) || ($selection['confirmed'] ?? false) !== true) return [$capture, 'CAPTURE_SUBJECT_RECONCILIATION_CONFIRMATION_REQUIRED'];
+            $candidateId = trim((string) ($selection['candidate_uuid'] ?? ''));
+            $persistedCandidate = trim((string) ($capture->diagnostics['subject_reconciliation']['candidate_uuid'] ?? $capture->context['subject_resolution_packet']['canonical_subject_id'] ?? ''));
+            if (!UuidCodec::isValid($candidateId) || $persistedCandidate === '' || !hash_equals(strtolower($persistedCandidate), strtolower($candidateId))) {
+                return [$capture, 'CAPTURE_SUBJECT_RECONCILIATION_CANDIDATE_NOT_ALLOWED'];
+            }
+            return [$capture, null];
+        }
         if (!in_array($capture->status, ['FAILED_RETRYABLE', 'REVIEW_REQUIRED'], true)) return [$capture, 'CAPTURE_SUBJECT_RECONCILIATION_STATUS_NOT_ALLOWED'];
         $intent = strtoupper(trim((string) (($capture->context['content_intent']['intent'] ?? ''))));
         if ($intent !== 'VIDEO') return [$capture, 'CAPTURE_SUBJECT_RECONCILIATION_VIDEO_REQUIRED'];

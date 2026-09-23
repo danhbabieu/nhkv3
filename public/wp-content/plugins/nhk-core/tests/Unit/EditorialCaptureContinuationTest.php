@@ -1275,6 +1275,60 @@ final class EditorialCaptureContinuationTest extends TestCase
         self::assertSame($candidateId, $events['subject_id']);
     }
 
+    public function test_replaying_the_same_confirmed_subject_reconciliation_is_idempotent_after_completion(): void
+    {
+        $captures = new ContinuationCaptureRepository();
+        $addenda = new ContinuationAddendumRepository();
+        $captureId = UuidCodec::newV7();
+        $videoId = UuidCodec::newV7();
+        $candidateId = UuidCodec::newV7();
+        $capture = new CaptureRecord(
+            $captureId,
+            'confirmed-subject-replay',
+            hash('sha256', 'confirmed-subject-replay'),
+            CaptureStage::SEMANTICS_RECONCILED->value,
+            'COMPLETE',
+            null,
+            null,
+            [['kind' => 'video', 'video_id' => $videoId]],
+            [
+                'raw_input' => 'Ambiguous video input.',
+                'content_intent' => ['intent' => 'VIDEO', 'article_required' => false],
+                'subject_resolution_packet' => ['status' => 'resolved', 'canonical_subject_id' => $candidateId, 'entity_type' => 'variant', 'stable_key' => 'nhk:variant:replay', 'canonical_name' => 'Replay Variant', 'revision' => 2, 'primary_source' => 'USER_CONFIRMED_SUBJECT_RECONCILIATION'],
+            ],
+            [
+                'subject_resolution_packet' => ['status' => 'resolved', 'canonical_subject_id' => $candidateId, 'entity_type' => 'variant', 'stable_key' => 'nhk:variant:replay', 'canonical_name' => 'Replay Variant', 'revision' => 2, 'primary_source' => 'USER_CONFIRMED_SUBJECT_RECONCILIATION'],
+                'subject_reconciliation' => ['status' => 'CONFIRMED', 'candidate_uuid' => $candidateId, 'source' => 'USER_CONFIRMED_SUBJECT_RECONCILIATION'],
+                'content_preparation' => ['status' => 'PREPARED'],
+                'completion' => ['status' => 'COMPLETE', 'complete' => true],
+            ],
+            [],
+            revision: 1,
+        );
+        $captures->create($capture);
+        $events = [];
+        $service = new EditorialCaptureContinuationService($captures, $addenda, $this->coordinator($captures, $events));
+        $input = [
+            'capture_id' => $captureId,
+            'idempotency_key' => $capture->idempotencyKey,
+            'resume_mode' => 'RETRY',
+            'subject_reconciliation' => ['confirmed' => true, 'candidate_uuid' => $candidateId],
+        ];
+
+        $first = $service->retry($input);
+        $replay = $service->retry($input);
+
+        self::assertSame('REPLAYED', $first['retry']['status']);
+        self::assertSame('REPLAYED', $replay['retry']['status']);
+        self::assertSame($first['capture']['capture_id'], $replay['capture']['capture_id']);
+        self::assertSame($candidateId, $replay['capture']['context']['subject_resolution_packet']['canonical_subject_id']);
+
+        $changed = $input;
+        $changed['subject_reconciliation']['candidate_uuid'] = UuidCodec::newV7();
+        $contradiction = $service->retry($changed);
+        self::assertSame('CAPTURE_SUBJECT_RECONCILIATION_CANDIDATE_NOT_ALLOWED', $contradiction['retry']['code']);
+    }
+
     public function test_video_enrichment_started_receipt_survives_callback_failure(): void
     {
         $captures = new ContinuationCaptureRepository();

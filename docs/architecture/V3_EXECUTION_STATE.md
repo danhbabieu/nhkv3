@@ -1,3 +1,30 @@
+# Checkpoint — 2026-09-23 — Confirmed-subject reconciliation replay idempotency (LOCAL / DEPLOYMENT BLOCKED)
+
+ROOT_CAUSE_CONFIRMED: After a successful bounded subject reconciliation had
+completed the same Capture, a retried request carrying the identical
+`subject_reconciliation` was rejected before the normal completed-Capture
+read-only replay boundary. The persisted authority was correct; retry
+admission treated the presence of confirmation on a `COMPLETE` Capture as an
+invalid state instead of an idempotent replay.
+
+FIXED_BOUNDARY: A completed Capture now accepts only the exact persisted
+canonical subject UUID for a repeated confirmed reconciliation and returns the
+canonical Capture read-back as `REPLAYED`. A malformed, missing or changed
+candidate remains fail-closed. No Capture, Video owner, relation or semantic
+writer is re-entered.
+
+VERIFICATION: Focused Capture/subject/preparation/retry suite passes 60 tests /
+288 assertions. Full NHK Unit passes 2,306 tests / 13,457 assertions with 18
+warnings, 39 deprecations and 28 PHPUnit deprecations. Changed-file PHP lint,
+`git diff --check` and diff secret review pass. Guarded Video recovery
+integration cannot start because `NHK_WP_TEST_PATH=public` and
+`NHK_WP_TEST_DB=nhk_v3_test` are not configured. Deployment preflight fails at
+WordPress bootstrap (`WORDPRESS_BOOTSTRAP_FAILED`); no live MCP/runtime
+mutation occurred. Remote deploy verification is blocked by the intentionally
+dirty worktree and no operational connector/credentials are configured.
+
+STATUS: `CONFIRMED_SUBJECT_RECONCILIATION_REPLAY_LOCAL_READY / DEPLOYMENT_BLOCKED / NO_LIVE_MUTATION`.
+
 # P0 Checkpoints — 2026-09-22 (LOCAL / DEPLOYMENT PENDING)
 
 # Checkpoint — 2026-09-23 — Confirmed subject reconciliation normal Video continuation (LOCAL / NO LIVE MUTATION)
