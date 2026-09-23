@@ -1,3 +1,11 @@
+# Checkpoint — 2026-09-23 — Capture pipeline convergence Task 3 staging scope propagation (LOCAL / NO LIVE MUTATION)
+
+TASK_RESULT: No product-code change was required. The shared staging boundary already issues server-signed Capture-bound packets, persists them in Capture context, propagates them through Article/MediaBinding/MediaUsage paths, and verifies exact capture fingerprint, target, revision, operation family, expiry and signature before governed mutation. Caller-supplied guessed scope remains rejected.
+
+VERIFICATION: Staging-focused suite passed 50 tests / 101 assertions. Existing coverage includes exact target/revision, payload tampering, stale-scope reissue, capture mismatch, operation mismatch, Authority dependency admission and non-Video/Knowledge intent admission. No database, staging, V2 or production mutation occurred.
+
+STATUS: `CAPTURE_PIPELINE_TASK_3_STAGING_SCOPE_PROPAGATION_LOCAL_READY / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-23 — Capture pipeline convergence Task 2 subject packet/continuation (LOCAL / NO LIVE MUTATION)
 
 ROOT_CAUSE: `SubjectResolutionService` attempted weaker stable-key or prose-hint resolution after an explicit canonical UUID failed to resolve. This could replace an unresolved exact identity with a different subject. Existing preparation fixtures also assumed an unresolvable UUID could fall back to a prose hint, which contradicted the canonical identity contract.

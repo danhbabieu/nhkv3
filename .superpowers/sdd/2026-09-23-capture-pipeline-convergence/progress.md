@@ -46,7 +46,9 @@
 - Task 2: complete — controller implementation/review PASS. The planned separate subagent/reviewer remained unavailable because the prior subagent exhausted quota; controller used red-first TDD, focused/full test gates, diff/scope review and six-intent regression review.
 - Task 2 root cause/ruling: `SubjectResolutionService::resolveSources()` fell through from an unresolved explicit canonical UUID to weaker stable-key/hint inference. It now fails closed for supplied canonical UUID or stable key when no canonical match is read back. Preparation fixtures were corrected to return the canonical entity for supplied UUIDs, preserving the contract rather than relying on fallback behavior.
 - Task 2 evidence: targeted red test failed as expected (`resolved` instead of `unresolved`) before the production fix; focused suite passed 110 tests / 539 assertions; full NHK Unit passed 2,314 tests / 13,505 assertions; changed-file PHP lint and `git diff --check` passed. IMAGE_ARTICLE, TEXT_ARTICLE and VIDEO capture paths retain subject packet behavior; MEDIA_ENRICHMENT, KNOWLEDGE_DELTA and KNOWLEDGE_REPAIR remain outside weaker fallback and passed the same regression suite. No staging/live mutation.
-- Task 3: pending.
+- Task 3: complete — implementation audit/review PASS with no product-code change. Existing shared scope propagation satisfies the approved invariant: server-issued Capture-bound packet is persisted and carried through governed proposal/read-back boundaries; missing, stale, tampered, guessed or mismatched scope fails closed. The unrelated hierarchical-subject scratch files were removed in cleanup commit `de32d339`.
+- Task 3 evidence: staging-focused suite passed 50 tests / 101 assertions; `git diff --check` passed; no database, staging/live, V2 or production mutation. Regression review: IMAGE_ARTICLE/TEXT_ARTICLE/MEDIA_ENRICHMENT Media scope paths remain exact; VIDEO scope remains separate; KNOWLEDGE_DELTA/KNOWLEDGE_REPAIR dependency admission remains Capture/intent-bound and does not receive Media scope.
+- Task 4: pending.
 - Task 3: pending.
 - Task 4: pending.
 - Task 5: pending.
