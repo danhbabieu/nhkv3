@@ -163,6 +163,23 @@ final class ContentPreparationOrchestrator
         $items = [];
         foreach ($requests as $request) {
             if (!is_array($request)) continue;
+            $locator = trim((string) ($request['locator'] ?? $request['stable_key'] ?? $request['canonical_uuid'] ?? ''));
+            if ($locator !== '') {
+                $existing = $this->subjects->resolve([$locator]);
+                $existingPrimary = is_array($existing['primary'] ?? null) ? $existing['primary'] : null;
+                if (($existing['status'] ?? '') === 'resolved' && $existingPrimary !== null) {
+                    $items[] = [
+                        'request' => $this->withoutBodies($request),
+                        'canonical_readback' => [
+                            'canonical_id' => (string) ($existingPrimary['id'] ?? ''),
+                            'revision' => max(1, (int) ($existingPrimary['revision'] ?? 1)),
+                            'status' => 'VERIFIED',
+                        ],
+                        'result' => ['status' => 'REUSED'],
+                    ];
+                    continue;
+                }
+            }
             if (($request['evidence_supported'] ?? false) !== true) return ['status' => 'REVIEW_REQUIRED', 'items' => $items, 'review_reasons' => ['INSUFFICIENT_ENRICHMENT_EVIDENCE']];
             $readback = ($this->governedEnrichment)([
                 'input' => $this->withoutBodies($input),

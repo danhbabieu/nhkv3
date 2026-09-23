@@ -17402,3 +17402,27 @@ and deployment preflight is blocked by WordPress bootstrap failure. No staging,
 production, Article, Media or canary mutation was performed.
 
 STATUS=`GENERIC_ARTICLE_RECONCILIATION_IMPLEMENTED_LOCAL / DEPLOYMENT_BLOCKED_WORDPRESS_BOOTSTRAP / CANARY_NOT_RUN / SEMANTIC_MUTATION_NONE`.
+
+# Checkpoint — 2026-09-23 — Content preparation vertical slice (LOCAL / NO DEPLOY)
+
+IMPLEMENTED: Added the generic `ContentPreparationResult` value object and
+`ContentPreparationOrchestrator`, injected before draft creation in the
+Editorial Capture coordinator, and wired the existing Resolver, Governance,
+Knowledge and Graph boundaries through the composition root. Preparation state
+is persisted and rehydrated inside the existing Capture boundary; retries reuse
+the same prepared packet and do not repeat enrichment. ARTICLE-owned semantic
+relations remain blocked until `PREPARED`; governed relations between existing
+canonical semantic owners may occur during preparation. Media/Video physical
+intake remains candidate-only until the final immutable packet is locked. No
+new semantic owner, status table, migration, direct Graph write or Article 636
+change was introduced.
+
+VERIFICATION: Focused preparation/coordinator/boot tests pass (36 tests / 150
+assertions). Full Unit passes 2,273 tests / 13,343 assertions, with existing
+warnings/deprecations. `composer lint` and `git diff --check` pass. The full
+`composer test` command remains blocked by existing integration WordPress/MySQL
+runtime errors and the guarded `NHK_WP_TEST_PATH=public` environment failures
+(34 errors, 14 failures, 119 skips). No staging, production, Article 636
+mutation or deployment was performed.
+
+STATUS=`CONTENT_PREPARATION_SLICE_IMPLEMENTED_LOCAL / FULL_UNIT_PASS / INTEGRATION_RUNTIME_BLOCKED / NO_LIVE_MUTATION`.

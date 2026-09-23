@@ -85,8 +85,9 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
         $resolver = new SubjectResolutionService(static fn (string $value): array => $value === $modelId
             ? [['id' => $modelId, 'type' => 'model', 'name' => 'Generic Model', 'revision' => 2]]
             : []);
-        $preparation = new ContentPreparationOrchestrator($resolver, null, static function () use (&$enrichmentCalls): array {
+        $preparation = new ContentPreparationOrchestrator($resolver, null, static function () use (&$enrichmentCalls, &$events): array {
             ++$enrichmentCalls;
+            $events[] = 'enrichment';
             return ['status' => 'APPLIED', 'canonical_readback' => ['canonical_id' => 'classification-1', 'revision' => 2]];
         });
         $coordinator = $this->coordinator(
@@ -119,6 +120,7 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
         self::assertSame(1, $enrichmentCalls);
         self::assertSame(2, $draftAttempts);
         self::assertSame('PREPARED', $second->diagnostics['content_preparation']['status']);
+        self::assertLessThan(array_search('draft', $events, true), array_search('enrichment', $events, true));
     }
 
     public function test_text_article_pipeline_replays_same_capture_and_owner_writes(): void

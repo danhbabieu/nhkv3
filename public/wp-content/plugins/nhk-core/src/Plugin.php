@@ -1100,9 +1100,13 @@ final class Plugin {
             );
             $publicUrlMaintenance = (new \NHK\Core\Infrastructure\PublicIdentity\WordPressPublicUrlMaintenanceRuntime($wpdb, $authority, $types, $publicContexts, $videos, $media, $assets, $publicIdentityRepository))->service();
             $articleEditorialAdapter = ArticleEditorialAdapter::fromEngine($captureClaims);
+            $captureCanonicalInventory = self::canonicalInventory($types, $authority, $media, $videos, $claims, $sources, $evidence);
             $contentPreparation = new ContentPreparationOrchestrator(
                 $captureSubjectResolver,
-                null,
+                static function (array $context) use ($captureCanonicalInventory): array {
+                    $page = $captureCanonicalInventory->inventory([], 200);
+                    return ['status' => 'available', 'candidates' => $page->items, 'total' => $page->total];
+                },
                 static function (array $context) use ($captureGovernance): array {
                     $captureId = (string) ($context['capture_id'] ?? '');
                     $fingerprint = (string) ($context['preparation_fingerprint'] ?? '');

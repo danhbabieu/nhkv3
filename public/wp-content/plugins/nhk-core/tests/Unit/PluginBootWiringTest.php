@@ -171,6 +171,7 @@ final class PluginBootWiringTest extends TestCase
 
         self::assertStringContainsString('new ContentPreparationOrchestrator(', $plugin);
         self::assertStringContainsString('$captureSubjectResolver,', $plugin);
+        self::assertStringContainsString('$captureCanonicalInventory = self::canonicalInventory($types, $authority, $media, $videos, $claims, $sources, $evidence);', $plugin);
         self::assertStringContainsString('$contentPreparation,', $plugin);
     }
 
