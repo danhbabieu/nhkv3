@@ -113,10 +113,33 @@ final class GovernedCaptureContinuationService
             }));
         }
         if ($plans === []) {
-            $semanticNotRequired = !$this->semanticDeltaRequested($context) && in_array(strtoupper(trim((string) ($context['content_intent']['intent'] ?? ''))), ['IMAGE_ARTICLE', 'TEXT_ARTICLE'], true);
+            $intent = strtoupper(trim((string) ($context['content_intent']['intent'] ?? '')));
+            $videoSubjectSatisfied = $intent === 'VIDEO' && $this->hasResolvedAuthoritativeSubject($context);
+            $semanticNotRequired = $videoSubjectSatisfied
+                || (!$this->semanticDeltaRequested($context) && in_array($intent, ['IMAGE_ARTICLE', 'TEXT_ARTICLE'], true));
             $blockers = $skippedVideoChildren !== [] ? ['VIDEO_CHILD_UNCHANGED_ON_TEXT_ADDENDUM'] : ($semanticNotRequired || $reusedClaims !== [] ? [] : ['SEMANTIC_SUBJECT_OR_DELTA_REQUIRED']);
             $status = $semanticNotRequired ? 'SKIPPED' : 'REVIEW_REQUIRED';
-            return ['status' => $status, 'writes' => $skippedVideoChildren, 'reused_claims' => $reusedClaims, 'video_children' => $videoChildren, 'blockers' => $blockers, 'requirements' => ['semantic_delta' => ['applicability' => $semanticNotRequired ? 'NOT_REQUIRED' : 'REQUIRED', 'policy' => 'VERIFY', 'state' => $semanticNotRequired ? 'SKIPPED' : 'PENDING', 'evidence' => ['intent' => strtoupper(trim((string) ($context['content_intent']['intent'] ?? ''))), 'status' => strtoupper(trim((string) ($context['content_intent']['semantic_delta']['status'] ?? 'NONE')))]]], 'governance' => $this->governanceReadback([], [], $status, $skippedVideoChildren), 'completion' => $this->completion->aggregateCapture($this->currentCaptureId, [], ['canonical_state' => 'COMPLETE', 'blockers' => $blockers])];
+            return [
+                'status' => $status,
+                'writes' => $skippedVideoChildren,
+                'reused_claims' => $reusedClaims,
+                'video_children' => $videoChildren,
+                'blockers' => $blockers,
+                'requirements' => [
+                    'semantic_delta' => [
+                        'applicability' => $semanticNotRequired ? 'NOT_REQUIRED' : 'REQUIRED',
+                        'policy' => 'VERIFY',
+                        'state' => $semanticNotRequired ? 'SKIPPED' : 'PENDING',
+                        'evidence' => [
+                            'intent' => $intent,
+                            'status' => strtoupper(trim((string) ($context['content_intent']['semantic_delta']['status'] ?? 'NONE'))),
+                            'subject_satisfied' => $videoSubjectSatisfied,
+                        ],
+                    ],
+                ],
+                'governance' => $this->governanceReadback([], [], $status, $skippedVideoChildren),
+                'completion' => $this->completion->aggregateCapture($this->currentCaptureId, [], ['canonical_state' => 'COMPLETE', 'blockers' => $blockers]),
+            ];
         }
 
         $writes = [];
@@ -746,6 +769,21 @@ final class GovernedCaptureContinuationService
         if ($intent === '' && array_filter((array) ($context['assets'] ?? []), static fn (mixed $asset): bool => is_array($asset) && ($asset['kind'] ?? '') === 'video') !== []) return false;
         if ($intent === 'KNOWLEDGE_DELTA' || $intent === '') return true;
         return $status === 'REQUIRED' && in_array($intent, ['KNOWLEDGE_DELTA', 'AUTHORITY', 'MIXED'], true);
+    }
+
+    private function hasResolvedAuthoritativeSubject(array $context): bool
+    {
+        $packet = is_array($context['subject_resolution_packet'] ?? null) ? $context['subject_resolution_packet'] : [];
+        if (strtolower(trim((string) ($packet['status'] ?? ''))) === 'resolved'
+            && UuidCodec::isValid((string) ($packet['canonical_subject_id'] ?? $packet['id'] ?? ''))
+            && trim((string) ($packet['entity_type'] ?? $packet['type'] ?? '')) !== '') return true;
+
+        $resolution = is_array($context['subject_resolution'] ?? null) ? $context['subject_resolution'] : [];
+        $primary = is_array($resolution['primary'] ?? null) ? $resolution['primary'] : [];
+        return strtolower(trim((string) ($resolution['status'] ?? ''))) === 'resolved'
+            && UuidCodec::isValid((string) ($primary['id'] ?? ''))
+            && trim((string) ($primary['type'] ?? '')) !== ''
+            && ($primary['active'] ?? true) !== false;
     }
 
     private function knowledgeScope(string $subjectType, string $candidateScope, array $candidate = []): ?string

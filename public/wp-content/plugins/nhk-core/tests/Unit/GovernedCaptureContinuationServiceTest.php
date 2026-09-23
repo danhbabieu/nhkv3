@@ -844,6 +844,72 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
         self::assertSame($videoId, $result['writes'][0]['canonical_readback']['canonical_id']);
     }
 
+    public function test_video_resolved_subject_without_semantic_delta_is_not_blocked(): void
+    {
+        $service = new GovernedCaptureContinuationService(
+            $this->createMock(GovernedLifecycle::class),
+            static fn (): array => throw new \LogicException('no Knowledge write is allowed'),
+            $this->policies(['video']),
+            static fn (): bool => true,
+        );
+
+        $result = $service->execute('capture-video-subject-only', 'capture-video-subject-only:semantic', [
+            'content_intent' => ['intent' => 'VIDEO', 'semantic_delta' => ['status' => 'NONE']],
+            'subject_resolution_packet' => [
+                'status' => 'resolved',
+                'canonical_subject_id' => UuidCodec::newV7(),
+                'entity_type' => 'variant',
+                'revision' => 3,
+            ],
+            'assets' => [],
+        ]);
+
+        self::assertSame('SKIPPED', $result['status']);
+        self::assertSame([], $result['blockers']);
+        self::assertSame([], $result['writes']);
+        self::assertSame('NOT_REQUIRED', $result['requirements']['semantic_delta']['applicability']);
+        self::assertTrue($result['requirements']['semantic_delta']['evidence']['subject_satisfied']);
+    }
+
+    public function test_video_unresolved_subject_without_semantic_delta_remains_fail_closed(): void
+    {
+        $service = new GovernedCaptureContinuationService(
+            $this->createMock(GovernedLifecycle::class),
+            static fn (): array => [],
+            $this->policies(['video']),
+            static fn (): bool => true,
+        );
+
+        $result = $service->execute('capture-video-unresolved', 'capture-video-unresolved:semantic', [
+            'content_intent' => ['intent' => 'VIDEO', 'semantic_delta' => ['status' => 'NONE']],
+            'subject_resolution' => ['status' => 'ambiguous', 'primary' => null, 'resolved' => []],
+            'assets' => [],
+        ]);
+
+        self::assertSame('REVIEW_REQUIRED', $result['status']);
+        self::assertSame(['SEMANTIC_SUBJECT_OR_DELTA_REQUIRED'], $result['blockers']);
+        self::assertFalse($result['requirements']['semantic_delta']['evidence']['subject_satisfied']);
+    }
+
+    public function test_knowledge_delta_without_semantic_delta_remains_strict(): void
+    {
+        $service = new GovernedCaptureContinuationService(
+            $this->createMock(GovernedLifecycle::class),
+            static fn (): array => [],
+            $this->policies(['knowledge']),
+            static fn (): bool => true,
+        );
+
+        $result = $service->execute('capture-knowledge-no-delta', 'capture-knowledge-no-delta:semantic', [
+            'content_intent' => ['intent' => 'KNOWLEDGE_DELTA', 'semantic_delta' => ['status' => 'NONE']],
+            'subject_resolution' => ['status' => 'resolved', 'primary' => ['id' => UuidCodec::newV7(), 'type' => 'variant'], 'resolved' => []],
+            'assets' => [],
+        ]);
+
+        self::assertSame('REVIEW_REQUIRED', $result['status']);
+        self::assertSame(['SEMANTIC_SUBJECT_OR_DELTA_REQUIRED'], $result['blockers']);
+    }
+
     public function test_capture_video_applies_when_category_is_the_only_eligibility_blocker(): void
     {
         $videoId = UuidCodec::newV7();
