@@ -1,3 +1,11 @@
+# Checkpoint — 2026-09-23 — Capture pipeline convergence Task 4 MediaUsage convergence (LOCAL / NO LIVE MUTATION)
+
+TASK_RESULT: No product-code change was required. Existing Media/MediaUsage services already separate physical Media identity from endpoint/role/placement usage, normalize desired state, preserve placement keys, reconcile stale revisions and return canonical usage/read-back receipts. Coordinator projection checks keep native attachment state subordinate to canonical usage.
+
+VERIFICATION: Media-focused suite passed 61 tests / 209 assertions. Coverage includes featured/inline usage identity, replace/remove, multi-placement identity, concurrent/idempotent retry, read-back mismatch and Article media policy boundaries. No database, staging, V2 or production mutation occurred.
+
+STATUS: `CAPTURE_PIPELINE_TASK_4_MEDIA_USAGE_LOCAL_READY / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-23 — Capture pipeline convergence Task 3 staging scope propagation (LOCAL / NO LIVE MUTATION)
 
 TASK_RESULT: No product-code change was required. The shared staging boundary already issues server-signed Capture-bound packets, persists them in Capture context, propagates them through Article/MediaBinding/MediaUsage paths, and verifies exact capture fingerprint, target, revision, operation family, expiry and signature before governed mutation. Caller-supplied guessed scope remains rejected.
