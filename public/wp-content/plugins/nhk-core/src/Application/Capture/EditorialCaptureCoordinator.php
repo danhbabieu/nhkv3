@@ -578,7 +578,7 @@ final class EditorialCaptureCoordinator
             $diagnostics['subject_resolution_packet'] = $subjectPacket->toArray();
             $record = $this->save($record, CaptureStage::SUBJECTS_RESOLVED, $assets, $diagnostics, $receipts, 'SUBJECTS_RESOLVED', $record->articleId, $record->articleStateToken, 'IN_PROGRESS', null, $record->context + ['subject_resolution_packet' => $subjectPacket->toArray()]);
 
-            $hasVideoAsset = array_filter($assets, static fn (mixed $asset): bool => is_array($asset) && ($asset['kind'] ?? '') === 'video') !== [];
+            $hasVideoAsset = $this->hasVideoAsset($assets);
             if ($isVideoIntent && is_callable($this->videoEnrichment) && $videoInput !== [] && !$hasVideoAsset) {
                 $this->beginPhase('VIDEO_ENRICHED');
                 $record = $this->startReceipt($record, $assets, $diagnostics, $receipts, 'VIDEO_ENRICHED');
@@ -1322,7 +1322,12 @@ final class EditorialCaptureCoordinator
     /** @param list<array<string,mixed>> $assets */
     private function hasVideoAsset(array $assets): bool
     {
-        return array_filter($assets, static fn (mixed $asset): bool => is_array($asset) && ($asset['kind'] ?? '') === 'video') !== [];
+        return array_filter($assets, static function (mixed $asset): bool {
+            if (!is_array($asset) || ($asset['kind'] ?? '') !== 'video') return false;
+            if (trim((string) ($asset['video_id'] ?? '')) !== '') return true;
+            $proposal = $asset['video_proposal'] ?? null;
+            return is_array($proposal) && $proposal !== [];
+        }) !== [];
     }
 
     /** @param array<string,mixed> $input */

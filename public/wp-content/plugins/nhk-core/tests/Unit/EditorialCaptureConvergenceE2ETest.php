@@ -180,6 +180,70 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
         self::assertSame($videoId, $replay->diagnostics['completion']['required_owners'][0]['owner_id']);
     }
 
+    public function test_video_retry_reenters_intake_when_historical_video_projection_has_no_owner(): void
+    {
+        $captures = new Pr5CaptureRepository();
+        $calls = ['draft' => 0, 'semantic' => 0, 'media' => 0, 'publication' => 0, 'final' => 0];
+        $events = [];
+        $videoId = UuidCodec::newV7();
+        $coordinator = $this->coordinator(
+            $captures,
+            $calls,
+            $events,
+            semanticStatus: 'SKIPPED',
+            videoEnrichment: static function (array $context) use (&$events, $videoId): array {
+                $events['video_intake'] = ($events['video_intake'] ?? 0) + 1;
+                $events['video_request'] = $context['video'] ?? [];
+                return ['items' => [['kind' => 'video', 'video_id' => $videoId]]];
+            },
+            videoPublication: static function (array $context) use (&$events, $videoId): array {
+                $videoAssets = array_values(array_filter((array) ($context['assets'] ?? []), static fn (mixed $asset): bool => is_array($asset) && ($asset['kind'] ?? '') === 'video' && trim((string) ($asset['video_id'] ?? '')) !== ''));
+                $events['video_readback_owner'] = $videoAssets[0]['video_id'] ?? '';
+                return [
+                'status' => 'verified',
+                'items' => [['video_id' => $videoId, 'completion' => ['owner_type' => 'video', 'owner_id' => $videoId, 'complete' => true, 'status' => 'COMPLETE', 'blockers' => []]]],
+                'blockers' => [],
+                ];
+            },
+        );
+        $capture = new CaptureRecord(
+            UuidCodec::newV7(),
+            'video-historical-projection-without-owner',
+            hash('sha256', 'video-historical-projection-without-owner'),
+            CaptureStage::SEMANTICS_RECONCILED->value,
+            'PARTIAL',
+            null,
+            null,
+            [['kind' => 'video', 'video_preview' => ['status' => 'REVIEW_REQUIRED']]],
+            [
+                'raw_input' => 'Historical Video retry.',
+                'title' => 'Persisted Video title',
+                'content_intent' => ['intent' => 'VIDEO', 'article_required' => false, 'semantic_delta' => ['status' => 'NONE']],
+                'original_request' => ['intent' => 'VIDEO', 'video' => ['url' => 'https://youtu.be/dQw4w9WgXcQ']],
+            ],
+            [
+                'content_preparation' => ['status' => 'PREPARED'],
+                'semantic_write_back' => ['status' => 'SKIPPED', 'writes' => [], 'blockers' => []],
+                'completion' => ['status' => 'PARTIAL', 'missing_required_owners' => [['owner_type' => 'video', 'owner_id' => '']], 'blockers' => ['REQUIRED_OWNER_READBACK_UNVERIFIED']],
+                'resume_hints' => ['resume_children' => ['video']],
+            ],
+            ['SEMANTICS_RECONCILED' => ['status' => 'PARTIAL', 'result' => 'PARTIAL']],
+        );
+        $captures->create($capture);
+
+        $result = $coordinator->retry($capture, ['resume_children' => ['video']]);
+
+        self::assertSame(1, $events['video_intake'] ?? 0);
+        self::assertSame(['url' => 'https://youtu.be/dQw4w9WgXcQ'], $events['video_request']);
+        self::assertSame($videoId, $events['video_readback_owner']);
+        self::assertSame($videoId, $result->diagnostics['completion']['required_owners'][0]['owner_id']);
+        self::assertSame([], $result->diagnostics['completion']['missing_required_owners']);
+
+        $replay = $coordinator->retry($result, ['resume_children' => ['video']]);
+        self::assertSame(1, $events['video_intake']);
+        self::assertSame($videoId, $replay->diagnostics['completion']['required_owners'][0]['owner_id']);
+    }
+
     /** @dataProvider nonVideoIntentProvider */
     public function test_non_video_intent_never_enters_video_callbacks(string $intent, array $input, array $physicalItems): void
     {
