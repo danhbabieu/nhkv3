@@ -341,6 +341,37 @@ final class EditorialQualityGateTest extends TestCase
         self::assertArrayNotHasKey('score', $report->diagnostics);
     }
 
+    public function test_internal_language_exposes_field_rule_span_package_round_and_attempt_without_changing_blocker(): void
+    {
+        $draft = new EditorialDraft('available', 'video', 'Đồng hồ công cộng', 'Nội dung có semantic owner cần được kiểm tra.', 'Mô tả công khai an toàn.', [], ['information_gain' => 0.7]);
+        $seo = new SemanticSeoPlan('READY', 'video', 'overview', ['id' => self::SUBJECT, 'type' => 'model'], 'Đồng hồ công cộng', [], 'Đồng hồ công cộng', 'Đồng hồ công cộng', 'Mô tả semantic owner.', '/video/odo/', []);
+
+        $report = $this->gate()->evaluate($this->pack([], [], 'video'), $this->plan('video'), $draft, $seo, false, 2, 'package-b', 'capture:attempt-2');
+        $findings = $report->diagnostics['quality_findings'] ?? [];
+
+        self::assertContains('PUBLIC_INTERNAL_JARGON_LEAK', $report->blockers);
+        self::assertCount(2, $findings);
+        self::assertSame(['summary', 'seo.description'], array_column($findings, 'field'));
+        self::assertSame(['EDITORIAL_QUALITY_GATE', 'EDITORIAL_QUALITY_GATE'], array_column($findings, 'finding_source'));
+        self::assertSame(['editorial_quality.internal_language', 'editorial_quality.internal_language'], array_column($findings, 'rule_id'));
+        self::assertSame(['semantic owner', 'semantic owner'], array_column($findings, 'offending_span'));
+        self::assertSame([2, 2], array_column($findings, 'round'));
+        self::assertSame(['package-b', 'package-b'], array_column($findings, 'package_fingerprint'));
+        self::assertSame(['capture:attempt-2', 'capture:attempt-2'], array_column($findings, 'attempt_id'));
+        self::assertNotSame('', $findings[0]['offending_fingerprint']);
+    }
+
+    public function test_quality_finding_package_fingerprint_is_current_evaluation_identity(): void
+    {
+        $draft = new EditorialDraft('available', 'video', 'Đồng hồ công cộng', 'semantic owner', 'An toàn.', [], ['information_gain' => 0.7]);
+        $first = $this->gate()->evaluate($this->pack([], [], 'video'), $this->plan('video'), $draft, $this->seo('video'), false, 0, 'package-a', 'attempt-a');
+        $second = $this->gate()->evaluate($this->pack([], [], 'video'), $this->plan('video'), $draft, $this->seo('video'), false, 1, 'package-b', 'attempt-b');
+
+        self::assertSame('package-a', $first->diagnostics['quality_findings'][0]['package_fingerprint']);
+        self::assertSame('package-b', $second->diagnostics['quality_findings'][0]['package_fingerprint']);
+        self::assertNotSame($first->diagnostics['quality_findings'][0]['package_fingerprint'], $second->diagnostics['quality_findings'][0]['package_fingerprint']);
+    }
+
     public function test_claim_trace_can_carry_original_subject_metadata(): void
     {
         $draft = new EditorialDraft('available', 'article', $this->topic(), 'Odo 36', 'Odo 36 có ba phiên bản vách máy. Vách xoáy giúp nhận biết cấu hình máy Odo 36.', [

@@ -540,12 +540,15 @@ final class EditorialCaptureCoordinator
                     $assets = $record->assets;
                     $diagnostics = $record->diagnostics;
                     $receipts = $record->phaseReceipts;
+                    $videoAttempt = is_array($receipts['VIDEO_ENRICHED']['latest'] ?? null) ? $receipts['VIDEO_ENRICHED']['latest'] : [];
                     $videoManifest = ($this->videoEnrichment)([
                         'capture_id' => $record->captureId,
                         'video' => $videoInput,
                         'subject_resolution' => $preflightResolution,
                         'raw_input' => $text,
                         'editorial_title' => trim((string) ($input['title'] ?? '')),
+                        'attempt_id' => (string) ($videoAttempt['attempt_id'] ?? ''),
+                        'attempt_no' => (int) ($videoAttempt['attempt_no'] ?? 0),
                     ]);
                     $videoItems = is_array($videoManifest['items'] ?? null) ? array_values(array_filter($videoManifest['items'], 'is_array')) : [];
                     if ($videoItems !== []) $assets = array_merge($assets, $videoItems);
@@ -585,6 +588,7 @@ final class EditorialCaptureCoordinator
                 $assets = $record->assets;
                 $diagnostics = $record->diagnostics;
                 $receipts = $record->phaseReceipts;
+                $videoAttempt = is_array($receipts['VIDEO_ENRICHED']['latest'] ?? null) ? $receipts['VIDEO_ENRICHED']['latest'] : [];
                 $videoManifest = ($this->videoEnrichment)([
                     'capture_id' => $record->captureId,
                     'video' => $videoInput,
@@ -592,6 +596,8 @@ final class EditorialCaptureCoordinator
                     'raw_input' => $text,
                     'editorial_title' => trim((string) ($input['title'] ?? '')),
                     'compliance_note' => trim((string) ((is_array($input['metadata'] ?? null) ? ($input['metadata']['compliance_note'] ?? '') : ''))),
+                    'attempt_id' => (string) ($videoAttempt['attempt_id'] ?? ''),
+                    'attempt_no' => (int) ($videoAttempt['attempt_no'] ?? 0),
                 ]);
                 $videoItems = is_array($videoManifest['items'] ?? null) ? array_values(array_filter($videoManifest['items'], 'is_array')) : [];
                 if ($videoItems !== []) $assets = array_merge($assets, $videoItems);

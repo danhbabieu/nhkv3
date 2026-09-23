@@ -77,7 +77,11 @@ final class VideoEditorialAdapter
             'competing_pages' => is_array($context['competing_pages'] ?? null) ? $context['competing_pages'] : [],
             'structured_data' => ['type' => 'VideoObject'],
         ]);
-        $quality = $this->quality->evaluate($pack, $plan, $draft, $seo, ($context['public_identity_deferred'] ?? false) === true);
+        $attemptId = trim((string) ($context['attempt_id'] ?? ''));
+        $attemptNo = max(0, (int) ($context['attempt_no'] ?? 0));
+        $qualityPackage = ['title' => $draft->title, 'summary' => $draft->summary, 'body' => $draft->body, 'seo_title' => $seo->title, 'seo_description' => $seo->metaDescription];
+        $qualityPackageFingerprint = hash('sha256', (string) json_encode($qualityPackage, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        $quality = $this->quality->evaluate($pack, $plan, $draft, $seo, ($context['public_identity_deferred'] ?? false) === true, 0, $qualityPackageFingerprint, $attemptId, $attemptNo);
         $statementDecision = ($this->statementDecisions ??= new VideoStatementDecisionEngine())->evaluate(
             is_array($context['statements'] ?? null) ? $context['statements'] : [],
             is_array($context['canonical_context'] ?? null) ? $context['canonical_context'] : [],
@@ -97,7 +101,7 @@ final class VideoEditorialAdapter
             ],
             ['statement_decision' => $statementDecision->toArray()],
             static fn (array $package): array => $package,
-            function (array $package, array $decisionContext, int $round) use ($copyGuard, $pack, $plan, $seo, $draft, $context, &$qualityReevaluations): array {
+            function (array $package, array $decisionContext, int $round) use ($copyGuard, $pack, $plan, $seo, $draft, $context, $attemptId, $attemptNo, &$qualityReevaluations): array {
                 $currentDraft = new EditorialDraft(
                     $draft->status,
                     $draft->profile,
@@ -126,7 +130,9 @@ final class VideoEditorialAdapter
                     $seo->diagnostics,
                     $seo->blockers,
                 );
-                $qualityReevaluations[] = $this->quality->evaluate($pack, $plan, $currentDraft, $currentSeo, ($context['public_identity_deferred'] ?? false) === true)->toArray();
+                $currentPackage = ['title' => $currentDraft->title, 'summary' => $currentDraft->summary, 'body' => $currentDraft->body, 'seo_title' => $currentSeo->title, 'seo_description' => $currentSeo->metaDescription];
+                $currentFingerprint = hash('sha256', (string) json_encode($currentPackage, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+                $qualityReevaluations[] = $this->quality->evaluate($pack, $plan, $currentDraft, $currentSeo, ($context['public_identity_deferred'] ?? false) === true, $round, $currentFingerprint, $attemptId, $attemptNo)->toArray();
                 $findings = $copyGuard->findings($package);
                 if ($round === 0) $findings = array_merge($findings, $decisionContext['statement_decision']['findings'] ?? []);
                 return $findings;
@@ -135,7 +141,9 @@ final class VideoEditorialAdapter
 
         $finalDraft = new EditorialDraft($draft->status, $draft->profile, (string) ($decision['editorial_package']['title'] ?? $draft->title), (string) ($decision['editorial_package']['summary'] ?? $draft->summary), (string) ($decision['editorial_package']['body'] ?? $draft->body), $draft->claimTrace, $draft->diagnostics);
         $finalSeo = new SemanticSeoPlan($seo->readiness, $seo->profile, $seo->searchIntent, $seo->primarySubject, $seo->topicFocus, $seo->semanticCluster, (string) ($decision['editorial_package']['seo_title'] ?? $seo->title), $seo->h1, (string) ($decision['editorial_package']['seo_description'] ?? $seo->metaDescription), $seo->canonicalUrl, $seo->openGraph, $seo->internalLinks, $seo->dictionaryContext, $seo->structuredData, $seo->claimTrace, $seo->diagnostics, $seo->blockers);
-        $quality = $this->quality->evaluate($pack, $plan, $finalDraft, $finalSeo, ($context['public_identity_deferred'] ?? false) === true);
+        $finalPackage = ['title' => $finalDraft->title, 'summary' => $finalDraft->summary, 'body' => $finalDraft->body, 'seo_title' => $finalSeo->title, 'seo_description' => $finalSeo->metaDescription];
+        $finalFingerprint = hash('sha256', (string) json_encode($finalPackage, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        $quality = $this->quality->evaluate($pack, $plan, $finalDraft, $finalSeo, ($context['public_identity_deferred'] ?? false) === true, (int) ($decision['rounds'] ?? 0), $finalFingerprint, $attemptId, $attemptNo);
 
         return [
             'status' => $quality->readiness,

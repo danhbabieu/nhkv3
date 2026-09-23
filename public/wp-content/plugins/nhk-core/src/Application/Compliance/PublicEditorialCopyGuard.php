@@ -41,7 +41,7 @@ final class PublicEditorialCopyGuard
         return $copy;
     }
 
-    /** @return list<array{field:string,phrase:string,severity:string,code:string,repair:string,reason:string}> */
+    /** @return list<array<string,mixed>> */
     public function findings(array $package): array
     {
         $findings = [];
@@ -51,11 +51,11 @@ final class PublicEditorialCopyGuard
             $visibleCopy = trim((string) (preg_replace('/<!--.*?-->/s', '', $copy) ?? $copy));
             foreach (self::STRUCTURAL_PATTERNS as $pattern) {
                 if (preg_match_all($pattern, $visibleCopy, $matches) === false || $matches[0] === []) continue;
-                foreach (array_values(array_unique($matches[0])) as $phrase) $findings[] = ['field' => $field, 'phrase' => $phrase, 'severity' => 'HARD_BLOCK', 'code' => 'PUBLIC_INTERNAL_JARGON_LEAK', 'repair' => 'USE_AS_IS', 'reason' => 'Structural internal data cannot be safely rewritten.'];
+                foreach (array_values(array_unique($matches[0])) as $phrase) $findings[] = ['field' => $field, 'phrase' => $phrase, 'offending_span' => $phrase, 'severity' => 'HARD_BLOCK', 'repairability' => 'NOT_REPAIRABLE', 'code' => 'PUBLIC_INTERNAL_JARGON_LEAK', 'repair' => 'USE_AS_IS', 'reason' => 'Structural internal data cannot be safely rewritten.', 'message' => 'Structural internal data cannot be safely rewritten.', 'rule_id' => 'public_copy.structural_internal_data', 'surface' => in_array($field, ['seo_title', 'seo_description', 'meta_description'], true) ? 'SEO' : 'VIDEO_PUBLIC_COPY', 'finding_source' => 'PUBLIC_COPY_GUARD', 'match_kind' => 'INTERNAL_IDENTIFIER', 'origin_kind' => 'UNKNOWN', 'origin_component' => self::class, 'origin_role' => 'NONE', 'offending_fingerprint' => hash('sha256', $phrase), 'round' => 0, 'package_fingerprint' => '', 'attempt_id' => '', 'attempt_no' => 0];
             }
             foreach (self::REPAIRABLE_PATTERNS as $pattern => $_replacement) {
                 if (preg_match_all($pattern, $visibleCopy, $matches) === false || $matches[0] === []) continue;
-                foreach (array_values(array_unique($matches[0])) as $phrase) $findings[] = ['field' => $field, 'phrase' => $phrase, 'severity' => 'REPAIRABLE', 'code' => 'PUBLIC_INTERNAL_JARGON_LEAK', 'repair' => 'REPAIR_PUBLIC_COPY', 'reason' => 'Generated workflow wording can be replaced without changing factual meaning.'];
+                foreach (array_values(array_unique($matches[0])) as $phrase) $findings[] = ['field' => $field, 'phrase' => $phrase, 'offending_span' => $phrase, 'severity' => 'REPAIRABLE', 'repairability' => 'REPAIRABLE', 'code' => 'PUBLIC_INTERNAL_JARGON_LEAK', 'repair' => 'REPAIR_PUBLIC_COPY', 'reason' => 'Generated workflow wording can be replaced without changing factual meaning.', 'message' => 'Generated workflow wording can be replaced without changing factual meaning.', 'rule_id' => 'public_copy.repairable_internal_language', 'surface' => in_array($field, ['seo_title', 'seo_description', 'meta_description'], true) ? 'SEO' : 'VIDEO_PUBLIC_COPY', 'finding_source' => 'PUBLIC_COPY_GUARD', 'match_kind' => 'INTERNAL_LANGUAGE', 'origin_kind' => 'UNKNOWN', 'origin_component' => self::class, 'origin_role' => 'NONE', 'offending_fingerprint' => hash('sha256', $phrase), 'round' => 0, 'package_fingerprint' => '', 'attempt_id' => '', 'attempt_no' => 0];
             }
         }
         return $findings;

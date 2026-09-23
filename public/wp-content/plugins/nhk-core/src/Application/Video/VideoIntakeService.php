@@ -27,7 +27,7 @@ final class VideoIntakeService
     }
 
     /** @param list<array<string,mixed>> $intendedRelations @param array<string,mixed>|null $resolvedSubject */
-    public function preview(string $url, string $userHint = '', ?string $intendedCategory = null, array $intendedRelations = [], string $editorialInstruction = '', ?array $resolvedSubject = null, string $editorialTitle = '', string $complianceNote = '', bool $allowDeferredEvidence = false): VideoIntakePreview
+    public function preview(string $url, string $userHint = '', ?string $intendedCategory = null, array $intendedRelations = [], string $editorialInstruction = '', ?array $resolvedSubject = null, string $editorialTitle = '', string $complianceNote = '', bool $allowDeferredEvidence = false, string $attemptId = '', int $attemptNo = 0): VideoIntakePreview
     {
         if ($intendedCategory !== null && !array_key_exists($intendedCategory, VideoHubClassifier::hubs())) {
             throw new VideoException('VIDEO_INTENDED_CATEGORY_INVALID');
@@ -93,6 +93,8 @@ final class VideoIntakeService
                 'public_identity' => $publicIdentity,
                 'public_identity_deferred' => $existing === null,
                 'relations' => $relations,
+                'attempt_id' => $attemptId,
+                'attempt_no' => $attemptNo,
             ]);
             if (strtoupper((string) ($shared['status'] ?? '')) === 'BLOCKED') throw new VideoException(VideoEditorialOutcome::failureCode($shared));
             $sharedResult = is_array($shared['shared_result'] ?? null) ? $shared['shared_result'] : [];
@@ -143,7 +145,10 @@ final class VideoIntakeService
         $watchPath = PublicRouteResolver::videoPath((string) $editorial['title'], (string) $snapshot['external_video_id']) ?? '/video/' . strtolower((string) $snapshot['external_video_id']) . '/';
         $package['seo_projection'] = $this->seo->project($package, $watchPath);
         $warnings = array_values(array_unique(array_merge($complete->blockers, $complete->warnings, $category['warnings'] ?? [], $resolution->diagnostic !== null ? [$resolution->diagnostic] : [])));
-        return new VideoIntakePreview($videoId, $existing === null ? 'ingest' : 'update', $existing?->revision ?? 0, $package, $warnings, $research['ambiguous']);
+        $internalDiagnostics = is_array($shared) && is_object($shared['quality_report'] ?? null) && is_array($shared['quality_report']->diagnostics ?? null) ? $shared['quality_report']->diagnostics : [];
+        $internalDiagnostics['attempt_id'] = $attemptId;
+        $internalDiagnostics['attempt_no'] = $attemptNo;
+        return new VideoIntakePreview($videoId, $existing === null ? 'ingest' : 'update', $existing?->revision ?? 0, $package, $warnings, $research['ambiguous'], $internalDiagnostics);
     }
 
     /** @return array<string,mixed> */

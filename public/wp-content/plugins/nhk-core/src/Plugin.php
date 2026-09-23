@@ -1809,6 +1809,8 @@ final class Plugin {
                         trim((string) ($video['editorial_title'] ?? $context['editorial_title'] ?? '')),
                         trim((string) ($video['compliance_note'] ?? $context['compliance_note'] ?? '')),
                         true,
+                        (string) ($context['attempt_id'] ?? ''),
+                        (int) ($context['attempt_no'] ?? 0),
                     );
                     return [
                         'status' => 'verified',
@@ -1819,6 +1821,7 @@ final class Plugin {
                             'video_proposal' => $videoIntake->proposalArguments($preview, (string) ($context['capture_id'] ?? '') . ':video'),
                         ]],
                         'video_preview' => $preview->toArray(),
+                        'diagnostics' => ['editorial_quality' => $preview->internalDiagnostics],
                     ];
                 },
                 static function (array $context) use ($videoPublicationVerifier): array {

@@ -28,6 +28,9 @@ final class VideoEditorialDecisionPipelineTest extends TestCase
         self::assertSame([0, 1], $critiqueRounds);
         self::assertSame(1, $result['rounds']);
         self::assertNotEmpty($result['trace']);
+        self::assertNotSame($result['trace'][0]['package_fingerprint'], $result['trace'][1]['package_fingerprint']);
+        self::assertSame(0, $result['trace'][0]['round']);
+        self::assertSame(1, $result['trace'][1]['round']);
     }
 
     public function test_secondary_visual_support_can_be_repaired_but_core_support_hard_blocks(): void

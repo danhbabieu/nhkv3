@@ -44,4 +44,17 @@ final class PublicEditorialCopyGuardTest extends TestCase
         self::assertSame(['Trong bối cảnh tri thức NHK', 'nguồn tham chiếu cụ thể'], array_column($findings, 'phrase'));
         self::assertSame(['REPAIRABLE', 'REPAIRABLE'], array_column($findings, 'severity'));
     }
+
+    public function test_findings_are_normalized_with_guard_source_and_rule_metadata(): void
+    {
+        $findings = (new PublicEditorialCopyGuard())->findings([
+            'body' => 'Trong bối cảnh tri thức NHK, đồng hồ công cộng được nhận diện.',
+        ]);
+
+        self::assertSame('PUBLIC_COPY_GUARD', $findings[0]['finding_source']);
+        self::assertSame('public_copy.repairable_internal_language', $findings[0]['rule_id']);
+        self::assertSame('VIDEO_PUBLIC_COPY', $findings[0]['surface']);
+        self::assertSame('INTERNAL_LANGUAGE', $findings[0]['match_kind']);
+        self::assertNotSame('', $findings[0]['offending_fingerprint']);
+    }
 }

@@ -12,6 +12,7 @@ final readonly class VideoIntakePreview
         public array $package,
         public array $warnings = [],
         public array $ambiguities = [],
+        public array $internalDiagnostics = [],
     ) {
     }
 

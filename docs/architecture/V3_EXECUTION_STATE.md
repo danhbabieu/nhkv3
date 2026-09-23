@@ -238,6 +238,32 @@ STATUS: `CAPTURE_PIPELINE_TASK_9_DOCUMENTATION_LOCAL_READY / NO_LIVE_MUTATION`.
 
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-23 — Field-level public editorial quality diagnostics (LOCAL / NO SERVER ACTION)
+
+TASK_RESULT: The runtime-equivalent Video path now retains redacted,
+machine-readable public quality findings in the internal quality report and
+Capture video-enrichment diagnostics. Findings identify source/rule, public
+field, minimum matched span/fingerprint, canonical evaluated-package
+fingerprint, quality round and current Capture attempt. `PublicEditorialCopyGuard`
+and `EditorialQualityGate` are distinguishable; the diagnostic is excluded from
+`VideoIntakePreview::toArray()` and public editorial/SEO package projections.
+
+SCOPE: Instrumentation only. Composition, detection outcome, repair planning,
+repair behavior, retry behavior, owner admission and public copy were not
+changed. No production special case, live Capture retry, deployment, push,
+pull or server mutation was performed.
+
+VERIFICATION: Red observability tests failed before instrumentation because
+field/rule/span/package/attempt/source details were absent. Focused quality,
+Guard, adapter, pipeline and Capture receipt tests pass; full Unit passes
+2,385 tests / 13,782 assertions; Contract passes 6 tests / 48 assertions.
+Changed-file PHP lint and `git diff --check` pass. Integration/P4 is
+environment-gated by missing `NHK_WP_TEST_PATH=public` and
+`NHK_WP_TEST_DB=nhk_v3_test`; special-case and added-line secret scans are
+clean.
+
+STATUS: `LOCAL_OBSERVABILITY_READY_FOR_USER_DEPLOY / INTEGRATION_ENVIRONMENT_GATED / NO_SERVER_ACTION`.
+
 # Checkpoint — 2026-09-23 — Capture pipeline convergence Task 7 publication/URL/completion (LOCAL / NO LIVE MUTATION)
 
 TASK_RESULT: No product-code change was required. Existing publication gates derive blockers from current Article/Media/semantic evidence, require concrete owner IDs, reserve/read back native routes through the existing WordPress lifecycle, and keep completion false for incomplete or uncertain owners.

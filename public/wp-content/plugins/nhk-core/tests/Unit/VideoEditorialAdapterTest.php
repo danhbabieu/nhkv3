@@ -89,6 +89,27 @@ final class VideoEditorialAdapterTest extends TestCase
         ]));
     }
 
+    public function test_runtime_equivalent_video_path_retains_quality_diagnostics_without_public_package_leak(): void
+    {
+        $result = $this->adapter([])->prepare([
+            'raw_input' => 'semantic owner',
+            'user_hint' => 'semantic owner',
+            'subject_resolution' => ['primary' => ['id' => self::SUBJECT, 'type' => 'model', 'name' => 'Generic model']],
+            'public_identity_deferred' => true,
+            'attempt_id' => 'capture:attempt-1',
+            'attempt_no' => 1,
+        ]);
+
+        self::assertContains('PUBLIC_INTERNAL_JARGON_LEAK', $result['quality_report']->blockers);
+        self::assertNotEmpty($result['quality_report']->diagnostics['quality_findings']);
+        self::assertSame('summary', $result['quality_report']->diagnostics['quality_findings'][0]['field']);
+        self::assertSame('capture:attempt-1', $result['quality_report']->diagnostics['quality_findings'][0]['attempt_id']);
+        self::assertContains($result['quality_report']->diagnostics['quality_findings'][0]['origin_kind'], ['USER_INPUT', 'UNKNOWN']);
+        self::assertArrayNotHasKey('quality_findings', $result['draft']->toArray());
+        self::assertArrayNotHasKey('quality_findings', $result['seo_plan']->toArray());
+        self::assertArrayNotHasKey('quality_findings', $result['shared_enrichment']);
+    }
+
     public function test_subject_reconciled_video_scopes_user_hint_to_specimen_and_keeps_variant_context_separate(): void
     {
         $variant = '5f6c98ca-869a-4418-a8a4-1a32eb931c5e';

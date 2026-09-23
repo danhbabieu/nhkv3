@@ -16,7 +16,7 @@ final class EditorialQualityGate
         'traceability', 'profile_fit', 'public_readiness',
     ];
 
-    public function evaluate(EditorialContextPack $pack, EditorialPlan $plan, EditorialDraft $draft, SemanticSeoPlan $seo, bool $allowDeferredSeoIdentity = false): EditorialQualityReport
+    public function evaluate(EditorialContextPack $pack, EditorialPlan $plan, EditorialDraft $draft, SemanticSeoPlan $seo, bool $allowDeferredSeoIdentity = false, int $round = 0, ?string $packageFingerprint = null, string $attemptId = '', int $attemptNo = 0): EditorialQualityReport
     {
         $profile = $this->profile($pack, $plan, $draft, $seo);
         $dimensions = [];
@@ -80,8 +80,24 @@ final class EditorialQualityGate
         if ($this->hasMalformedJoin($draft->body)) $add('template_boilerplate', 'WARN', 'MALFORMED_SENTENCE_JOIN');
         if ($this->hasGenericFiller($draft->body)) $add('template_boilerplate', 'WARN', 'GENERIC_EDITORIAL_FILLER');
 
-        try { (new PublicEditorialCopyGuard())->assertEditorialPackage(['title' => $draft->title, 'summary' => $draft->summary, 'body' => $draft->body, 'seo' => ['title' => $seo->title, 'description' => $seo->metaDescription]]); }
-        catch (\Throwable) { $add('public_language', 'BLOCK', 'PUBLIC_INTERNAL_JARGON_LEAK'); }
+        $qualityFindings = [];
+        $guard = new PublicEditorialCopyGuard();
+        $guardFindings = $guard->findings(['title' => $draft->title, 'summary' => $draft->summary, 'body' => $draft->body, 'seo_title' => $seo->title, 'seo_description' => $seo->metaDescription]);
+        foreach ($guardFindings as $finding) {
+            $qualityFindings[] = EditorialQualityFinding::normalize($finding, ['round' => $round, 'package_fingerprint' => $packageFingerprint ?? $this->packageFingerprint($draft, $seo), 'attempt_id' => $attemptId, 'attempt_no' => $attemptNo]);
+            if (($finding['severity'] ?? '') === 'HARD_BLOCK') $add('public_language', 'BLOCK', 'PUBLIC_INTERNAL_JARGON_LEAK');
+        }
+        foreach ($this->internalLanguageFindings([
+            'title' => $draft->title,
+            'summary' => $draft->summary,
+            'body' => $draft->body,
+            'seo.description' => $seo->metaDescription,
+        ]) as $finding) {
+            $origin = $this->originFor((string) ($finding['offending_span'] ?? ''), $pack, $draft, $selected);
+            $qualityFindings[] = EditorialQualityFinding::normalize($finding, ['round' => $round, 'package_fingerprint' => $packageFingerprint ?? $this->packageFingerprint($draft, $seo), 'attempt_id' => $attemptId, 'attempt_no' => $attemptNo] + $origin);
+        }
+        // Keep the historical concatenated boolean as the compatibility
+        // decision. Field findings above are diagnostic evidence only.
         if ($this->hasInternalLanguage($body . ' ' . $seo->metaDescription)) $add('public_language', 'BLOCK', 'PUBLIC_INTERNAL_JARGON_LEAK');
         if ((new PublicClaimCopyPolicy())->containsUnsupportedSuperiority($body)) $add('public_claim_compliance', 'BLOCK', 'UNSUPPORTED_PROMOTIONAL_CLAIM');
 
@@ -115,7 +131,7 @@ final class EditorialQualityGate
         $dimensions['public_readiness'] = ['status' => $readiness, 'severity' => $blockers !== [] ? 'BLOCK' : ($warnings !== [] ? 'WARN' : 'INFO'), 'reasons' => array_merge($blockers, $warnings)];
         foreach ($dimensions as &$dimension) $dimension['reasons'] = array_values(array_unique(array_slice($dimension['reasons'], 0, 10)));
         unset($dimension);
-        return new EditorialQualityReport($readiness, $profile, $dimensions, $blockers, $warnings, $informational, ['gate' => 'shared_editorial_quality', 'opaque_score' => false]);
+        return new EditorialQualityReport($readiness, $profile, $dimensions, $blockers, $warnings, $informational, ['gate' => 'shared_editorial_quality', 'opaque_score' => false, 'quality_findings' => $qualityFindings, 'evaluation' => ['round' => $round, 'package_fingerprint' => $packageFingerprint ?? $this->packageFingerprint($draft, $seo), 'attempt_id' => $attemptId, 'attempt_no' => $attemptNo]]);
     }
 
     private function profile(EditorialContextPack $pack, EditorialPlan $plan, EditorialDraft $draft, SemanticSeoPlan $seo): string
@@ -227,6 +243,38 @@ final class EditorialQualityGate
     private function hasInternalLanguage(string $copy): bool
     {
         return preg_match('/(?:semantic\s+graph|claim\s+hiện\s+có|claim\s+revision|graph\s+path|evidence\s+eligibility|semantic\s+owner|governance|\bmcp\b|reconciliation\s+diagnostics?|trong\s+bối\s+cảnh\s+tri\s+thức\s+nhk|nguồn\s+tham\s+chiếu\s+cụ\s+thể|không\s+biến\s+cách\s+diễn\s+đạt\s+marketing\s+thành\s+kết\s+luận\s+phổ\s+quát)/iu', $copy) === 1;
+    }
+
+    /** @param array<string,string> $fields @return list<array<string,mixed>> */
+    private function internalLanguageFindings(array $fields): array
+    {
+        $pattern = '/(?:semantic\s+graph|claim\s+hiện\s+có|claim\s+revision|graph\s+path|evidence\s+eligibility|semantic\s+owner|governance|\bmcp\b|reconciliation\s+diagnostics?|trong\s+bối\s+cảnh\s+tri\s+thức\s+nhk|nguồn\s+tham\s+chiếu\s+cụ\s+thể|không\s+biến\s+cách\s+diễn\s+đạt\s+marketing\s+thành\s+kết\s+luận\s+phổ\s+quát)/iu';
+        $findings = [];
+        foreach ($fields as $field => $copy) {
+            if (preg_match_all($pattern, $copy, $matches) === false) continue;
+            foreach (array_values(array_unique($matches[0] ?? [])) as $span) $findings[] = ['code' => 'PUBLIC_INTERNAL_JARGON_LEAK', 'severity' => 'BLOCK', 'repairability' => 'UNKNOWN', 'rule_id' => 'editorial_quality.internal_language', 'surface' => str_starts_with($field, 'seo.') ? 'SEO' : 'VIDEO_PUBLIC_COPY', 'field' => $field, 'match_kind' => 'INTERNAL_LANGUAGE', 'offending_span' => $span, 'offending_fingerprint' => hash('sha256', $span), 'message' => 'Internal workflow language was detected in public editorial copy.', 'finding_source' => 'EDITORIAL_QUALITY_GATE', 'origin_kind' => 'UNKNOWN', 'origin_component' => self::class, 'origin_role' => 'NONE'];
+        }
+        return $findings;
+    }
+
+    private function packageFingerprint(EditorialDraft $draft, SemanticSeoPlan $seo): string
+    {
+        return hash('sha256', (string) json_encode(['title' => $draft->title, 'summary' => $draft->summary, 'body' => $draft->body, 'seo_title' => $seo->title, 'seo_description' => $seo->metaDescription], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    }
+
+    /** @param array<string,array<string,mixed>> $selected @return array<string,string> */
+    private function originFor(string $span, EditorialContextPack $pack, EditorialDraft $draft, array $selected): array
+    {
+        $contains = static function (string $haystack, string $needle): bool {
+            if ($haystack === '' || $needle === '') return false;
+            return function_exists('mb_stripos') ? mb_stripos($haystack, $needle) !== false : stripos($haystack, $needle) !== false;
+        };
+        if ($contains((string) ($pack->inputContext['raw_input'] ?? ''), $span) || $contains((string) ($draft->diagnostics['source_input'] ?? ''), $span)) return ['origin_kind' => 'USER_INPUT', 'origin_component' => 'VideoEditorialScopeNormalizer', 'origin_role' => 'NONE'];
+        foreach ($selected as $claim) {
+            if (!is_array($claim) || !$contains((string) ($claim['text'] ?? $claim['claim_text'] ?? ''), $span)) continue;
+            return ['origin_kind' => 'CANONICAL_KNOWLEDGE', 'origin_component' => 'EditorialKnowledgeSelector', 'origin_role' => trim((string) ($claim['editorial_role'] ?? 'NONE')) ?: 'NONE'];
+        }
+        return ['origin_kind' => 'UNKNOWN', 'origin_component' => '', 'origin_role' => 'NONE'];
     }
 
     /** @return list<string> */
