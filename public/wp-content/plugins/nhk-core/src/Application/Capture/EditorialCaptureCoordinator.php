@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Capture;
 
 use NHK\Core\Application\Completion\CompletionCoordinator;
-use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, SubjectResolutionService, TextInputInterpreter};
+use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, SharedEnrichmentBoundary, SubjectResolutionService, TextInputInterpreter};
 use NHK\Core\Application\Article\ArticleEditorialAdapter;
 use NHK\Core\Contracts\Capture\CaptureRepository;
 use NHK\Core\Contracts\Media\MediaBindingPort;
@@ -59,6 +59,7 @@ final class EditorialCaptureCoordinator
         private ?CanonicalDependencyValidator $canonicalDependencies = null,
         private ?ArticleEditorialAdapter $articleEditorialAdapter = null,
         private ?ContentPreparationOrchestrator $contentPreparation = null,
+        private ?SharedEnrichmentBoundary $sharedEnrichment = null,
     ) { $this->completion = $completion ?? new CompletionCoordinator(); }
 
     /** @param array<string,mixed> $input */
@@ -439,7 +440,8 @@ final class EditorialCaptureCoordinator
                 $preparationContext['preparation_fingerprint'] = $preparationResult->preparationFingerprint;
                 $record = $this->save($record, CaptureStage::INTERPRETED, $assets, $diagnostics, $receipts, 'CONTENT_PREPARATION', $record->articleId, $record->articleStateToken, $preparationResult->status === 'PREPARED' ? 'IN_PROGRESS' : $preparationResult->status, null, $record->context + $preparationContext);
                 $receipts = $record->phaseReceipts;
-                if ($preparationResult->status !== 'PREPARED') return $record;
+                if (!(new PreparationPhaseAdmissionPolicy())->mayAdmitMinimumOwner($intent, $preparationResult)) return $record;
+                $diagnostics['content_preparation']['phase_admission'] = ['status' => 'MINIMUM_OWNER_ALLOWED', 'intent' => strtoupper((string) ($intent['intent'] ?? ''))];
             }
             // Resolve before any draft/media writer. A UUID remains the
             // selected identity, but contradictory explicit text must stop
@@ -528,6 +530,30 @@ final class EditorialCaptureCoordinator
                     'items' => count($adopted),
                 ];
                 $record = $this->save($record, CaptureStage::MEDIA_ADOPTED, $assets, $diagnostics, $receipts, 'MEDIA_ADOPTED', $record->articleId, $record->articleStateToken);
+            }
+            if ($preparationResult !== null && $preparationResult->status !== 'PREPARED') {
+                if ($isVideoIntent && is_callable($this->videoEnrichment) && $videoInput !== [] && !$this->hasVideoAsset($assets)) {
+                    $this->beginPhase('VIDEO_ENRICHED');
+                    $record = $this->startReceipt($record, $assets, $diagnostics, $receipts, 'VIDEO_ENRICHED');
+                    $assets = $record->assets;
+                    $diagnostics = $record->diagnostics;
+                    $receipts = $record->phaseReceipts;
+                    $videoManifest = ($this->videoEnrichment)([
+                        'capture_id' => $record->captureId,
+                        'video' => $videoInput,
+                        'subject_resolution' => $preflightResolution,
+                        'raw_input' => $text,
+                        'editorial_title' => trim((string) ($input['title'] ?? '')),
+                    ]);
+                    $videoItems = is_array($videoManifest['items'] ?? null) ? array_values(array_filter($videoManifest['items'], 'is_array')) : [];
+                    if ($videoItems !== []) $assets = array_merge($assets, $videoItems);
+                    $diagnostics['video_enrichment'] = $this->withoutBody($videoManifest);
+                    $record = $this->save($record, CaptureStage::INTERPRETED, $assets, $diagnostics, $receipts, 'VIDEO_ENRICHED', $record->articleId, $record->articleStateToken, 'REVIEW_REQUIRED');
+                }
+                if ($record->status === 'IN_PROGRESS') {
+                    $record = $this->save($record, $record->stage, $assets, $diagnostics, $receipts, 'CONTENT_PREPARATION_SAFE_CONTINUE', $record->articleId, $record->articleStateToken, 'REVIEW_REQUIRED', 'REVIEW_REQUIRED');
+                }
+                return $record;
             }
             $this->beginPhase('SUBJECTS_RESOLVED');
             $resolution = $preparationResult?->subjectResolutionPacket?->toResolution()
@@ -639,6 +665,11 @@ final class EditorialCaptureCoordinator
 
             $inputMetadata = is_array($input['metadata'] ?? null) ? $input['metadata'] : [];
             $semanticContext = ['capture_id' => $record->captureId, 'article_id' => $record->articleId, 'article_endpoint_key' => $record->articleId !== null ? ((function_exists('get_current_blog_id') ? (int) get_current_blog_id() : 1) . ':' . (int) $record->articleId) : '', 'raw_input' => $text, 'continuation_delta_text' => trim((string) ($input['continuation_delta_text'] ?? '')), 'assets' => $assets, 'media_bindings' => is_array($input['media_bindings'] ?? null) ? $input['media_bindings'] : [], 'media_operations' => is_array($input['media_operations'] ?? null) ? $input['media_operations'] : [], 'interpretation' => $interpretation, 'subject_resolution' => $resolution, 'subject_resolution_packet' => $subjectPacket->toArray(), 'content_intent' => $intent, 'visual_opportunities' => $visualOpportunities, 'visual_support' => $diagnostics['visual_support'], 'visual_context' => is_array($input['visual_context'] ?? null) ? $input['visual_context'] : [], 'observations' => is_array($input['observations'] ?? null) ? $input['observations'] : [], 'provenance_packets' => is_array($inputMetadata['provenance_packets'] ?? null) ? $inputMetadata['provenance_packets'] : [], 'existing_capture_continuation' => ($input['existing_capture_continuation'] ?? false) === true, 'continuation_idempotency_key' => (string) ($input['continuation_idempotency_key'] ?? ''), 'governance' => is_array($input['governance'] ?? null) ? $input['governance'] : [], 'prior_diagnostics' => $diagnostics, 'phase_receipts' => $receipts];
+            $sharedEnrichment = $this->buildSharedEnrichment($record, $input, $intent, $resolution, $text, $interpretation, $preparationResult);
+            if ($sharedEnrichment !== null) {
+                $semanticContext['shared_enrichment'] = $sharedEnrichment;
+                $diagnostics['shared_enrichment'] = $this->sharedEnrichmentSummary($sharedEnrichment);
+            }
             $isMediaEnrichment = strtoupper(trim((string) ($intent['intent'] ?? ''))) === 'MEDIA_ENRICHMENT';
             if ($isMediaEnrichment) {
                 // MEDIA_ENRICHMENT owns Media and MediaUsage only. Do not
@@ -664,6 +695,7 @@ final class EditorialCaptureCoordinator
                     $permalink = trim((string) ($draftSnapshot['permalink'] ?? ''));
                     try {
                         $sharedEditorial = $this->articleEditorialAdapter->prepare($semanticContext + [
+                            'shared_enrichment' => $sharedEnrichment,
                             'prepared_context' => [
                                 'subject_resolution_packet' => $preparationResult?->subjectResolutionPacket?->toArray() ?? $subjectPacket->toArray(),
                                 'selected_related_entities' => $preparationResult?->plan['related_entities'] ?? [],
@@ -682,7 +714,9 @@ final class EditorialCaptureCoordinator
                         $retrieved = $this->claims->retrieve($semanticContext);
                     }
                 } else {
-                    $retrieved = $this->claims->retrieve($semanticContext);
+                    $retrieved = is_array($sharedEnrichment['content']['retrieval'] ?? null)
+                        ? $sharedEnrichment['content']['retrieval']
+                        : $this->claims->retrieve($semanticContext);
                 }
                 $diagnostics['claim_retrieval'] = $retrieved;
                 if (is_array($sharedEditorial)) {
@@ -727,7 +761,7 @@ final class EditorialCaptureCoordinator
                 }
 
                 $videoPublication = $isVideoIntent && ($videoInput !== [] || $hasVideoAsset || $this->videoOwnerId($assets, [], $writes) !== '') && is_callable($this->videoPublicationVerifier)
-                    ? ($this->videoPublicationVerifier)(['capture_id' => $record->captureId, 'assets' => $assets, 'subject_resolution' => $resolution, 'semantic_write_back' => $writes])
+                    ? ($this->videoPublicationVerifier)(['capture_id' => $record->captureId, 'assets' => $assets, 'subject_resolution' => $resolution, 'semantic_write_back' => $writes, 'shared_enrichment' => $sharedEnrichment])
                     : ['status' => 'not_requested', 'items' => [], 'blockers' => []];
                 $diagnostics['video_publication'] = $this->withoutBody($videoPublication);
                 $diagnostics['deep_enrichment'] = $this->deepEnrichment($retrieved, $writes, [], $visualOpportunities);
@@ -750,6 +784,7 @@ final class EditorialCaptureCoordinator
                         'content_intent' => $intent,
                         'semantic' => $retrieved,
                         'semantic_write_back' => $writes,
+                        'shared_enrichment' => $sharedEnrichment,
                     ]);
                     $diagnostics['media_enrichment'] = $this->withoutBody($media);
                     $mediaStatus = strtoupper(trim((string) ($media['status'] ?? '')));
@@ -791,7 +826,7 @@ final class EditorialCaptureCoordinator
                 $record = $this->save($record, CaptureStage::COMPOSED, $assets, $diagnostics, $receipts, 'COMPOSED', $record->articleId, $record->articleStateToken);
             }
 
-            $mediaContext = ['capture' => $record->toArray(), 'capture_record' => $record, 'article_id' => $record->articleId, 'assets' => $assets, 'media_bindings' => is_array($input['media_bindings'] ?? null) ? $input['media_bindings'] : [], 'article_media_bindings' => is_array($input['article_media_bindings'] ?? null) ? $input['article_media_bindings'] : [], 'media_operations' => is_array($input['media_operations'] ?? null) ? $input['media_operations'] : [], 'subject_resolution' => $resolution, 'subject_resolution_packet' => $subjectPacket->toArray(), 'content_intent' => $intent, 'composition' => $this->withoutBody($composition), 'visual_opportunities' => $visualOpportunities, 'visual_support' => $diagnostics['visual_support'], 'capture_fingerprint' => $record->requestFingerprint, 'staging_acceptance' => is_array($input['staging_acceptance'] ?? null) ? $input['staging_acceptance'] : null];
+            $mediaContext = ['capture' => $record->toArray(), 'capture_record' => $record, 'article_id' => $record->articleId, 'assets' => $assets, 'media_bindings' => is_array($input['media_bindings'] ?? null) ? $input['media_bindings'] : [], 'article_media_bindings' => is_array($input['article_media_bindings'] ?? null) ? $input['article_media_bindings'] : [], 'media_operations' => is_array($input['media_operations'] ?? null) ? $input['media_operations'] : [], 'subject_resolution' => $resolution, 'subject_resolution_packet' => $subjectPacket->toArray(), 'content_intent' => $intent, 'composition' => $this->withoutBody($composition), 'visual_opportunities' => $visualOpportunities, 'visual_support' => $diagnostics['visual_support'], 'capture_fingerprint' => $record->requestFingerprint, 'staging_acceptance' => is_array($input['staging_acceptance'] ?? null) ? $input['staging_acceptance'] : null, 'shared_enrichment' => $sharedEnrichment];
             if (is_array($mediaContext['staging_acceptance']) && isset($mediaContext['staging_acceptance']['payload_fingerprint'])) $mediaContext['payload_fingerprint'] = $mediaContext['staging_acceptance']['payload_fingerprint'];
             if ($videoThumbnailFallback !== null) $mediaContext['video_thumbnail_fallback'] = $videoThumbnailFallback;
             $media = ($this->mediaReconcile)($mediaContext);
@@ -805,7 +840,7 @@ final class EditorialCaptureCoordinator
             $assets = $record->assets;
             $diagnostics = $record->diagnostics;
             $receipts = $record->phaseReceipts;
-            $publicationContext = ['capture' => $record->toArray(), 'article_id' => $record->articleId, 'content_intent' => $intent, 'composition' => $this->withoutBody($composition), 'seo_projection' => $composition['seo_projection'] ?? [], 'quality_gate' => $diagnostics['shared_editorial'] ?? [], 'media' => $media, 'semantic' => $retrieved, 'semantic_write_back' => $writes, 'subject_resolution' => $resolution, 'subject_resolution_packet' => $subjectPacket->toArray()];
+            $publicationContext = ['capture' => $record->toArray(), 'article_id' => $record->articleId, 'content_intent' => $intent, 'composition' => $this->withoutBody($composition), 'seo_projection' => $composition['seo_projection'] ?? [], 'quality_gate' => $diagnostics['shared_editorial'] ?? [], 'media' => $media, 'semantic' => $retrieved, 'semantic_write_back' => $writes, 'subject_resolution' => $resolution, 'subject_resolution_packet' => $subjectPacket->toArray(), 'shared_enrichment' => $sharedEnrichment];
             $publication = ($this->publicationGate)($publicationContext);
             // A native media/editorial write may rotate the token between the
             // first gate read and review. Refresh once, then continue with the
@@ -841,7 +876,7 @@ final class EditorialCaptureCoordinator
             $assets = $record->assets;
             $diagnostics = $record->diagnostics;
             $receipts = $record->phaseReceipts;
-            $final = ($this->finalReadBack)(['capture' => $record->toArray(), 'article_id' => $record->articleId, 'composition' => $this->withoutBody($composition), 'publication' => $publication, 'video_publication' => $videoPublication, 'semantic_write_back' => $writes, 'published' => $published]);
+            $final = ($this->finalReadBack)(['capture' => $record->toArray(), 'article_id' => $record->articleId, 'composition' => $this->withoutBody($composition), 'publication' => $publication, 'video_publication' => $videoPublication, 'semantic_write_back' => $writes, 'shared_enrichment' => $sharedEnrichment, 'published' => $published]);
             $diagnostics['final_read_back'] = $this->withoutBody($final);
             if (($final['status'] ?? '') !== 'verified') throw new \RuntimeException('CAPTURE_FINAL_READBACK_UNAVAILABLE');
             $children = $this->completionChildren($record, $writes, $media, $videoPublication, $publication, $final, $published);
@@ -1008,6 +1043,87 @@ final class EditorialCaptureCoordinator
         ];
     }
 
+    /** @param array<string,mixed> $input @param array<string,mixed> $intent @param array<string,mixed> $resolution @param array<string,mixed> $interpretation @return array<string,mixed>|null */
+    private function buildSharedEnrichment(CaptureRecord $record, array $input, array $intent, array $resolution, string $text, array $interpretation, mixed $preparation): ?array
+    {
+        if ($this->sharedEnrichment === null) return null;
+        $intentName = strtoupper(trim((string) ($intent['intent'] ?? '')));
+        $profile = match ($intentName) {
+            'VIDEO' => 'video',
+            'TEXT_ARTICLE', 'IMAGE_ARTICLE' => 'article',
+            'MEDIA_ENRICHMENT' => 'media',
+            'KNOWLEDGE_DELTA' => 'knowledge_delta',
+            default => null,
+        };
+        if ($profile === null) return null;
+        $primary = is_array($resolution['primary'] ?? null) ? $resolution['primary'] : [];
+        $metadata = is_array($input['metadata'] ?? null) ? $input['metadata'] : [];
+        $scope = strtolower(trim((string) ($metadata['knowledge_scope'] ?? ($primary['type'] ?? 'entity'))));
+        if (!in_array($scope, ['entity', 'brand', 'model', 'variant', 'movement', 'specimen_observation'], true)) $scope = 'entity';
+        $prepared = [];
+        if (is_object($preparation)) {
+            $packet = $preparation->subjectResolutionPacket ?? null;
+            if (is_object($packet) && method_exists($packet, 'toArray')) $prepared['subject_resolution_packet'] = $packet->toArray();
+            $plan = is_array($preparation->plan ?? null) ? $preparation->plan : [];
+            $enrichment = is_array($preparation->enrichment ?? null) ? $preparation->enrichment : [];
+            $prepared['selected_related_entities'] = is_array($plan['related_entities'] ?? null) ? $plan['related_entities'] : [];
+            $prepared['selected_knowledge'] = is_array($enrichment['selected_knowledge'] ?? null) ? $enrichment['selected_knowledge'] : [];
+        }
+        $ownerId = $record->articleId !== null ? (string) $record->articleId : '';
+        if ($ownerId === '' && $profile === 'video') foreach ($record->assets as $asset) {
+            if (!is_array($asset) || ($asset['kind'] ?? '') !== 'video') continue;
+            $proposal = is_array($asset['video_proposal'] ?? null) ? $asset['video_proposal'] : [];
+            $payload = is_array($proposal['payload'] ?? null) ? $proposal['payload'] : [];
+            $ownerId = trim((string) ($asset['video_id'] ?? $payload['canonical_id'] ?? $proposal['subject_id'] ?? ''));
+            if ($ownerId !== '') break;
+        }
+        $request = [
+            'profile' => $profile,
+            'capture_id' => $record->captureId,
+            'owner_id' => $ownerId,
+            'subject_resolution' => $resolution,
+            'subject' => $primary,
+            'topic' => trim((string) ($input['title'] ?? $text)),
+            'raw_input' => $text,
+            'title' => trim((string) ($input['title'] ?? '')),
+            'hints' => is_array($input['subject_hints'] ?? null) ? $input['subject_hints'] : [],
+            'observations' => is_array($input['observations'] ?? null) ? $input['observations'] : [],
+            'prepared_context' => $prepared,
+            'subject_id' => (string) ($primary['id'] ?? ''),
+            'facet' => (string) ($metadata['knowledge_facet'] ?? 'recognition'),
+            'scope' => $scope,
+            'observation' => trim((string) ($input['knowledge_observation'] ?? $text)),
+            'origin' => strtoupper(trim((string) ($metadata['provenance_origin'] ?? 'EXPLICIT_USER_KNOWLEDGE'))),
+            'operation_id' => $record->captureId . ':shared-enrichment',
+            'generated' => false,
+            'context' => is_array($input['knowledge_context'] ?? null) ? $input['knowledge_context'] : [],
+        ];
+        $relationHints = is_array($interpretation['relation_hints'] ?? null) ? $interpretation['relation_hints'] : [];
+        $video = is_array($input['video'] ?? null) ? $input['video'] : [];
+        $videoRelations = $profile === 'video' && is_array($video['intended_relations'] ?? null) ? $video['intended_relations'] : [];
+        $request['relations'] = array_values(array_merge($relationHints, $videoRelations));
+        return $this->sharedEnrichment->enrich($request);
+    }
+
+    /** @param array<string,mixed> $result @return array<string,mixed> */
+    private function sharedEnrichmentSummary(array $result): array
+    {
+        $content = is_array($result['content'] ?? null) ? $result['content'] : [];
+        $knowledge = is_array($result['knowledge'] ?? null) ? $result['knowledge'] : [];
+        $relations = is_array($result['relations'] ?? null) ? $result['relations'] : [];
+        $claimRefs = [];
+        foreach ((array) ($content['selected_claims'] ?? []) as $claim) {
+            if (!is_array($claim)) continue;
+            $claimRefs[] = ['id' => (string) ($claim['claim_id'] ?? $claim['id'] ?? ''), 'revision' => max(1, (int) ($claim['claim_revision'] ?? $claim['revision'] ?? 1))];
+        }
+        return [
+            'profile' => (string) ($result['profile'] ?? ''),
+            'content' => ['status' => (string) ($content['status'] ?? ''), 'selected_claims' => $claimRefs, 'gaps' => array_values(array_map('strval', (array) ($content['gaps'] ?? []))), 'diagnostics' => array_values(array_map('strval', (array) ($content['diagnostics'] ?? [])))],
+            'knowledge' => ['status' => (string) ($knowledge['status'] ?? ''), 'classifications' => array_values(array_map('strval', (array) ($knowledge['classifications'] ?? []))), 'proposal_ready' => ($knowledge['proposal_ready'] ?? false) === true, 'diagnostics' => array_values(array_map('strval', (array) ($knowledge['diagnostics'] ?? [])))],
+            'relations' => ['status' => (string) ($relations['status'] ?? ''), 'readiness' => is_array($relations['readiness'] ?? null) ? $relations['readiness'] : [], 'diagnostics' => array_values(array_map('strval', (array) ($relations['diagnostics'] ?? [])))],
+        ];
+    }
+
     /**
      * Finish a Capture whose intent has no Article owner. The semantic/video
      * owners still receive final read-back, but Article publication stages are
@@ -1170,6 +1286,12 @@ final class EditorialCaptureCoordinator
             if ($id !== '') return $id;
         }
         return '';
+    }
+
+    /** @param list<array<string,mixed>> $assets */
+    private function hasVideoAsset(array $assets): bool
+    {
+        return array_filter($assets, static fn (mixed $asset): bool => is_array($asset) && ($asset['kind'] ?? '') === 'video') !== [];
     }
 
     /** @param array<string,mixed> $input */

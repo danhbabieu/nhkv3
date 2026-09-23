@@ -1,3 +1,104 @@
+# Checkpoint — 2026-09-23 — End-to-end acceptance and architectural hardening (LOCAL / GUARDED TEST DB / NO LIVE MUTATION)
+
+TASK_RESULT: Checkpoint 6 exercised the real Capture-to-completion lifecycle
+with the existing Article, Video, Media, Knowledge, Relation, Governance,
+canonical read-back and CompletionCoordinator boundaries. The isolated
+WordPress/MySQL harness was available at the documented exact target
+`NHK_WP_TEST_PATH=public`, `NHK_WP_TEST_DB=nhk_v3_test`; no staging or
+production runtime was contacted and no live semantic mutation, deployment or
+publication was performed.
+
+HARDENING: Acceptance found and corrected only two test-harness defects: the
+image-orientation unit shim and Governance admin unit shims were defining
+WordPress globals in the PHPUnit parent process, colliding with later real
+WordPress bootstrap. The shims now load only inside isolated unit processes.
+No production architecture, entity, schema, Governance, Graph, owner,
+completion or publication semantics were redesigned.
+
+VERIFICATION: Focused CP1–5 convergence/enrichment/completion/media/living
+Knowledge suite passed 292 tests / 1,200 assertions. Full Unit passed 2,346
+tests / 13,618 assertions. Guarded Integration passed 141 tests / 1,261
+assertions with 12 intentional skips. The final full guarded repository passed
+2,493 tests / 14,927 assertions with 0 failures/errors and 12 skips; PHP CLI
+used a 512M limit because the isolated REST integration exercises exceed the
+default 128M ceiling. PHP lint, `git diff --check` and secret-pattern review
+passed. The duplicate-key database diagnostic is the expected negative-path
+assertion in the recovery integration test.
+
+STATUS: `CHECKPOINT_6_PASS / FULL_UNIT_PASS / FULL_INTEGRATION_PASS / NO_LIVE_MUTATION`.
+
+# Checkpoint — 2026-09-23 — Enrichment result lifecycle integration (LOCAL / NO LIVE MUTATION)
+
+TASK_RESULT: Checkpoint 5 connects the shared enrichment result to the real
+Capture lifecycle after minimum owner admission and authoritative subject
+resolution. Plugin construction now supplies one shared boundary instance to
+Capture, Article and Video adapters. Capture passes the transient result into
+semantic/Governance context, Media reconciliation, Video publication checks,
+Article composition/SEO/quality inputs and final read-back; only a body-free
+readiness summary is retained in Capture diagnostics. Article and Video keep
+their domain-specific downstream pipelines. Media fast path remains before
+semantic enrichment. Knowledge candidate readiness remains independent from
+content readiness and canonical mutation remains with the existing governed
+semantic writer. No Checkpoint 6 work was performed.
+
+VERIFICATION: Focused Capture/Article/Video/shared/completion lifecycle suite
+passed 127 tests / 631 assertions with 1 warning, 7 deprecations and 1
+PHPUnit deprecation. Full Unit passed 2,346 tests / 13,618 assertions with 19
+warnings, 41 deprecations and 29 PHPUnit deprecations. Full repository suite
+reached 2,493 tests / 13,689 assertions; 21 integration/P4 failures remain
+environment-gated by missing `NHK_WP_TEST_PATH=public` and
+`NHK_WP_TEST_DB=nhk_v3_test`, with 119 skips. Changed PHP lint and
+`git diff --check` passed. No schema migration, data mutation, staging/live
+mutation, publication, deployment or push occurred.
+
+STATUS: `CHECKPOINT_5_LOCAL_READY / FULL_UNIT_PASS / INTEGRATION_ENVIRONMENT_GATED / NO_LIVE_MUTATION`.
+
+# Checkpoint — 2026-09-23 — Shared dual enrichment seam (LOCAL / NO LIVE MUTATION)
+
+TASK_RESULT: Checkpoint 4 implementation adds the transient
+`SharedEnrichmentBoundary` over the existing eligible-Claim retrieval,
+selection, Knowledge candidate classification and Proposal envelope services.
+Article and Video adapters now consume the shared content branch while keeping
+their existing composition, SEO, quality, Video decision and owner boundaries.
+Knowledge Delta returns independent duplicate/add-evidence/qualify/contradict/
+novel/ambiguous/unsupported branches with provenance and proposal readiness;
+relations remain candidate/readiness-only and are never applied. Media receives
+the shared content profile without Article composition. No Governance, Graph,
+MediaUsage, persistence, schema, owner-ordering or publication behavior was
+changed. Checkpoint 5 was not implemented.
+
+VERIFICATION: Shared boundary and Article/Video adapter suite passed 12 tests /
+53 assertions before the expanded matrix; the expanded shared matrix passes 4
+tests / 29 assertions with 1 existing warning. Full Unit passed 2,345 tests /
+13,605 assertions with 19 warnings, 41 deprecations and 29 PHPUnit
+deprecations. Full repository suite reached 2,492 tests / 13,676 assertions;
+the same 21 integration/P4 failures remain environment-gated by missing
+`NHK_WP_TEST_PATH=public` and `NHK_WP_TEST_DB=nhk_v3_test`, with 119 skips.
+Changed PHP lint and `git diff --check` passed. No schema migration, data
+mutation, staging/live mutation, publication, deployment or push occurred.
+
+STATUS: `CHECKPOINT_4_LOCAL_READY / FULL_UNIT_PASS / INTEGRATION_ENVIRONMENT_GATED / NO_LIVE_MUTATION`.
+
+# Checkpoint — 2026-09-23 — Pipeline continuation and minimum owner admission (LOCAL / NO LIVE MUTATION)
+
+TASK_RESULT: Checkpoint 3 consumes `continuationDecision` at the real Capture
+preparation boundary. Non-escalating preparation findings may admit the
+minimum safe Article draft or Video external-owner path; exact semantic
+resolution remains a separate phase and no placeholder
+`SubjectResolutionPacket` is created. Critical identity/Knowledge paths still
+stop, Media fast path remains unchanged, and full dual enrichment is deferred.
+
+VERIFICATION: Focused Capture/Video/Article/Media/Knowledge suite passed 260
+tests / 1,062 assertions with 8 deprecations and 3 PHPUnit deprecations. Full
+Unit passed 2,341 tests / 13,583 assertions with 18 warnings, 41 deprecations
+and 29 PHPUnit deprecations. Changed PHP lint and `git diff --check` passed.
+The full repository suite reached 2,488 tests / 13,654 assertions with the
+same 21 environment-gated integration failures requiring the WordPress test
+environment. No schema migration, data mutation, staging/live mutation,
+publication, push or deployment occurred.
+
+STATUS: `CHECKPOINT_3_LOCAL_READY / FULL_UNIT_PASS / INTEGRATION_ENVIRONMENT_GATED / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-23 — Server-derived requirements and safe continuation (LOCAL / NO LIVE MUTATION)
 
 TASK_RESULT: Checkpoint 2 adds an explicit workflow continuation decision beside

@@ -5,7 +5,7 @@ namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Capture\{ContentPreparationOrchestrator, EditorialCaptureCoordinator};
 use NHK\Core\Application\Capture\ContentIntentRouter;
-use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, SubjectResolutionService, TextInputInterpreter};
+use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, EditorialClaimRetrievalService, EditorialKnowledgeSelector, SharedEnrichmentBoundary, SubjectResolutionService, TextInputInterpreter};
 use NHK\Core\Contracts\Capture\{CaptureAddendumRepository, CaptureRepository};
 use NHK\Core\Domain\Capture\CaptureAddendumRecord;
 use NHK\Core\Domain\Capture\{CaptureRecord, CaptureStage, SubjectResolutionPacket};
@@ -18,6 +18,23 @@ use PHPUnit\Framework\TestCase;
  */
 final class EditorialCaptureConvergenceE2ETest extends TestCase
 {
+    public function test_capture_passes_shared_enrichment_into_real_semantic_lifecycle_context(): void
+    {
+        $captures = new Pr5CaptureRepository();
+        $calls = ['draft' => 0, 'semantic' => 0, 'media' => 0, 'publication' => 0, 'final' => 0];
+        $seen = [];
+        $events = [];
+        $engine = new ClaimRetrievalEngine(static fn (array $subject): array => ['status' => 'available', 'items' => []], static fn (array $subject, array $neighborhood): array => [['id' => 'claim-lifecycle', 'claim_id' => 'claim-lifecycle', 'subject_id' => '11111111-1111-4111-8111-111111111111', 'subject_type' => 'model', 'text' => 'Một Claim đủ điều kiện.', 'scope' => 'model', 'provenance' => 'CATALOG_SUPPORTED', 'evidence_status' => 'SUPPORTED_WITHIN_SCOPE']]);
+        $shared = new SharedEnrichmentBoundary(new EditorialClaimRetrievalService($engine), new EditorialKnowledgeSelector());
+        $resolver = new SubjectResolutionService(static fn (string $value): array => $value === '11111111-1111-4111-8111-111111111111' ? [['id' => $value, 'type' => 'model', 'name' => 'Lifecycle Model']] : []);
+        $coordinator = $this->coordinator($captures, $calls, $events, subjectResolver: $resolver, shared: $shared, sharedObserver: static function (array $context) use (&$seen): void { $seen[] = (string) ($context['shared_enrichment']['profile'] ?? ''); });
+        $result = $coordinator->execute(['idempotency_key' => 'shared-lifecycle-article', 'intent' => 'TEXT_ARTICLE', 'text' => 'Bài viết có Claim đủ điều kiện.', 'canonical_uuid' => '11111111-1111-4111-8111-111111111111']);
+
+        self::assertArrayHasKey('shared_enrichment', $result->diagnostics);
+        self::assertContains('claim-lifecycle', $result->diagnostics['shared_enrichment']['content']['selected_claims'] ? array_column($result->diagnostics['shared_enrichment']['content']['selected_claims'], 'id') : []);
+        self::assertSame(['article'], $seen);
+    }
+
     /** @dataProvider nonVideoIntentProvider */
     public function test_non_video_intent_never_enters_video_callbacks(string $intent, array $input, array $physicalItems): void
     {
@@ -152,6 +169,75 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
         self::assertSame('REVIEW_REQUIRED', $review->status);
         self::assertSame(0, $reviewCalls['draft']);
         self::assertSame(['physical'], $reviewEvents);
+    }
+
+    public function test_safe_optional_preparation_admits_article_draft_but_stops_before_exact_semantics(): void
+    {
+        $calls = ['draft' => 0, 'semantic' => 0, 'media' => 0, 'publication' => 0, 'final' => 0];
+        $events = [];
+        $resolver = new SubjectResolutionService(static fn (string $value): array => []);
+        $coordinator = $this->coordinator(
+            new Pr5CaptureRepository(),
+            $calls,
+            $events,
+            subjectResolver: $resolver,
+            preparation: new ContentPreparationOrchestrator($resolver),
+        );
+
+        $input = [
+            'idempotency_key' => 'optional-preparation-article-admission',
+            'intent' => 'TEXT_ARTICLE',
+            'text' => 'Một bản thảo biên tập có chủ đề đủ dùng.',
+        ];
+        $result = $coordinator->execute($input);
+        $retry = $coordinator->execute($input);
+
+        self::assertSame(1001, $result->articleId);
+        self::assertSame('REVIEW_REQUIRED', $result->status);
+        self::assertSame(1, $calls['draft']);
+        self::assertSame(0, $calls['semantic']);
+        self::assertSame(['physical', 'draft'], $events);
+        self::assertTrue($result->diagnostics['content_preparation']['continuation_decision']['may_continue'] ?? false);
+        self::assertArrayNotHasKey('subject_resolution_packet', $result->diagnostics);
+        self::assertSame($result->captureId, $retry->captureId);
+        self::assertSame(1001, $retry->articleId);
+    }
+
+    public function test_safe_optional_preparation_admits_video_owner_without_fabricating_subject_packet(): void
+    {
+        $calls = ['draft' => 0, 'semantic' => 0, 'media' => 0, 'publication' => 0, 'final' => 0];
+        $events = [];
+        $videoCalls = 0;
+        $resolver = new SubjectResolutionService(static fn (string $value): array => []);
+        $videoId = UuidCodec::newV7();
+        $coordinator = $this->coordinator(
+            new Pr5CaptureRepository(),
+            $calls,
+            $events,
+            subjectResolver: $resolver,
+            preparation: new ContentPreparationOrchestrator($resolver),
+            videoEnrichment: static function (array $context) use (&$videoCalls, $videoId): array {
+                ++$videoCalls;
+                return ['items' => [['kind' => 'video', 'video_id' => $videoId, 'video_proposal' => ['payload' => ['canonical_id' => $videoId]]]]];
+            },
+        );
+
+        $input = [
+            'idempotency_key' => 'optional-preparation-video-admission',
+            'intent' => 'VIDEO',
+            'text' => 'Video có danh tính nguồn xác định.',
+            'video' => ['url' => 'https://youtu.be/dQw4w9WgXcQ'],
+        ];
+        $result = $coordinator->execute($input);
+        $retry = $coordinator->execute($input);
+
+        self::assertSame(1, $videoCalls);
+        self::assertSame($videoId, $result->assets[0]['video_id'] ?? null);
+        self::assertNotSame('COMPLETE', $result->status);
+        self::assertArrayNotHasKey('subject_resolution_packet', $result->diagnostics);
+        self::assertSame('REVIEW_REQUIRED', $result->diagnostics['content_preparation']['status']);
+        self::assertSame($result->captureId, $retry->captureId);
+        self::assertSame($videoId, $retry->assets[0]['video_id'] ?? null);
     }
 
     public function test_interrupted_prepared_capture_reuses_enrichment_and_article_on_retry(): void
@@ -488,6 +574,8 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
         ?SubjectResolutionService $subjectResolver = null,
         ?ContentPreparationOrchestrator $preparation = null,
         ?callable $draft = null,
+        ?SharedEnrichmentBoundary $shared = null,
+        ?callable $sharedObserver = null,
     ): EditorialCaptureCoordinator {
         return new EditorialCaptureCoordinator(
             $captures,
@@ -496,7 +584,7 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
             new TextInputInterpreter(),
             $subjectResolver ?? new SubjectResolutionService(static fn (string $hint): array => []),
             new ClaimRetrievalEngine(static fn (array $subject): array => ['status' => 'available', 'items' => []], static fn (array $subject, array $neighborhood): array => []),
-            static function (array $context) use (&$calls, &$events, $semanticStatus, $semanticExtra): array { ++$calls['semantic']; $events[] = 'semantic'; return array_merge(['status' => $semanticStatus, 'writes' => []], $semanticExtra); },
+            static function (array $context) use (&$calls, &$events, $sharedObserver, $semanticStatus, $semanticExtra): array { ++$calls['semantic']; $events[] = 'semantic'; if ($sharedObserver !== null) $sharedObserver($context); return array_merge(['status' => $semanticStatus, 'writes' => []], $semanticExtra); },
             new ArticleComposer(),
             $media ?? static function (array $context) use (&$calls, &$events): array { ++$calls['media']; $events[] = 'media'; return ['status' => 'RECONCILED']; },
             static function (array $context) use (&$calls, &$events): array { ++$calls['publication']; $events[] = 'publication'; return ['eligible' => true]; },
@@ -517,6 +605,7 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
             null,
             null,
             $preparation,
+            $shared,
         );
     }
 }

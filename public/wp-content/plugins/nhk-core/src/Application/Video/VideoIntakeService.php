@@ -91,8 +91,11 @@ final class VideoIntakeService
                 'editorial_title' => $editorialTitle,
                 'subject_resolution' => ['primary' => $effectiveSubject],
                 'public_identity' => $publicIdentity,
+                'relations' => $relations,
             ]);
             if (strtoupper((string) ($shared['status'] ?? '')) === 'BLOCKED') throw new VideoException(VideoEditorialOutcome::failureCode($shared));
+            $sharedResult = is_array($shared['shared_result'] ?? null) ? $shared['shared_result'] : [];
+            if (is_array($sharedResult['relations']['candidates'] ?? null) && $sharedResult['relations']['candidates'] !== []) $candidatePayloads = array_values(array_filter($sharedResult['relations']['candidates'], 'is_array'));
             $draft = $shared['draft'];
             $editorial = [
                 'title' => $draft->title,
@@ -130,6 +133,7 @@ final class VideoIntakeService
         if (is_array($shared)) {
             $package['content_quality'] = $contentQuality;
             $package['editorial_claim_dependencies'] = $shared['fingerprint_claims'];
+            $package['shared_enrichment'] = $shared['shared_enrichment'] ?? [];
         }
         $package['knowledge_enrichment'] = $this->knowledgeEnrichmentPacket($research, $snapshot, $resolution, $userHint, $intendedTargets);
         if ($resolution->diagnostic !== null) $package['source_diagnostic'] = $resolution->diagnostic;

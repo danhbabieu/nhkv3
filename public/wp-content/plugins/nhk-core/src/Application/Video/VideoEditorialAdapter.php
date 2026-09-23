@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Video;
 
-use NHK\Core\Application\Semantic\{ClaimRetrievalEngine, EditorialClaimRetrievalService, EditorialKnowledgeSelector, EditorialQualityGate, ReaderJourneyPlanner, SemanticSeoPlanner, SharedEditorialComposer};
+use NHK\Core\Application\Semantic\{ClaimRetrievalEngine, EditorialClaimRetrievalService, EditorialKnowledgeSelector, EditorialQualityGate, ReaderJourneyPlanner, SemanticSeoPlanner, SharedEditorialComposer, SharedEnrichmentBoundary};
 
 /**
  * Video-owned boundary over the shared transient editorial pipeline.
@@ -21,20 +21,24 @@ final class VideoEditorialAdapter
         private EditorialQualityGate $quality,
         private ?VideoStatementDecisionEngine $statementDecisions = null,
         private ?VideoEditorialDecisionPipeline $decisionPipeline = null,
+        private ?SharedEnrichmentBoundary $shared = null,
     ) {
     }
 
-    public static function fromEngine(ClaimRetrievalEngine $engine): self
+    public static function fromEngine(ClaimRetrievalEngine $engine, ?SharedEnrichmentBoundary $shared = null): self
     {
+        $retrieval = new EditorialClaimRetrievalService($engine);
+        $selector = new EditorialKnowledgeSelector();
         return new self(
-            new EditorialClaimRetrievalService($engine),
-            new EditorialKnowledgeSelector(),
+            $retrieval,
+            $selector,
             new ReaderJourneyPlanner(),
             new SharedEditorialComposer(),
             new SemanticSeoPlanner(),
             new EditorialQualityGate(),
             new VideoStatementDecisionEngine(),
             new VideoEditorialDecisionPipeline(),
+            $shared ?? new SharedEnrichmentBoundary($retrieval, $selector),
         );
     }
 
@@ -53,8 +57,14 @@ final class VideoEditorialAdapter
             'observations' => is_array($context['observations'] ?? null) ? $context['observations'] : [],
         ];
         $profile = ['profile' => 'video', 'selection_limit' => 6, 'result_limit' => 50];
-        $retrieved = $this->retrieval->retrieve($subject, $topic, (array) ($context['hints'] ?? []), $profile);
-        $pack = $this->selector->select($retrieved, $topic, $subject, $profile, $inputContext);
+        $shared = $this->shared?->enrich([
+            'profile' => 'video', 'subject_resolution' => $resolution, 'subject' => $subject,
+            'topic' => $topic, 'raw_input' => $inputContext['raw_input'], 'title' => $inputContext['title'],
+            'observations' => $inputContext['observations'], 'hints' => (array) ($context['hints'] ?? []),
+            'relations' => is_array($context['relations'] ?? null) ? $context['relations'] : [],
+        ]);
+        $retrieved = is_array($shared['content']['retrieval'] ?? null) ? $shared['content']['retrieval'] : $this->retrieval->retrieve($subject, $topic, (array) ($context['hints'] ?? []), $profile);
+        $pack = $shared['content']['pack'] ?? $this->selector->select($retrieved, $topic, $subject, $profile, $inputContext);
         $plan = $this->journey->plan($pack);
         $draft = $this->composer->compose($plan);
         $seo = $this->seo->plan($pack, $plan, $draft, [
@@ -96,6 +106,8 @@ final class VideoEditorialAdapter
                 'id' => (string) ($claim['claim_id'] ?? ''),
                 'revision' => max(1, (int) ($claim['claim_revision'] ?? 1)),
             ], array_filter($pack->selectedClaims, 'is_array'))),
+            'shared_enrichment' => $shared['content'] ?? ['status' => 'NOT_REQUESTED'],
+            'shared_result' => $shared,
         ];
     }
 }

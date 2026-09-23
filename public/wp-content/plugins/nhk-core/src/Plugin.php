@@ -27,7 +27,7 @@ use NHK\Core\Application\Runtime\SemanticWritePolicyResolver;
 use NHK\Core\Application\Mcp\{McpAbilityRegistration, McpArticleIngestHandler, McpGovernanceHandler, McpReadHandler, McpSemanticContextResolver, McpToolCatalog, McpTransport, McpDocumentationRegistry};
 use NHK\Core\Application\Media\{ImageIngestEntrypoint, MediaBatchUploadService, MediaBindingService};
 use NHK\Core\Application\Capture\{CaptureArticlePreflightHandoff, CaptureEditorialWriteGuard, CapturePhaseReceiptReducer, CaptureVideoProvenancePlanner, CaptureVideoPublicationVerifier, ClockTypeShadowClassifier, ContentPreparationOrchestrator, EditorialCaptureContinuationService, EditorialCaptureCoordinator, GovernedCaptureContinuationService, RelationProposalReconciliationService};
-use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, ClaimReusePolicy, SubjectResolutionService, TextInputInterpreter};
+use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, ClaimReusePolicy, EditorialClaimRetrievalService, EditorialKnowledgeSelector, SharedEnrichmentBoundary, SubjectResolutionService, TextInputInterpreter};
 use NHK\Core\Application\Article\{ArticleEditorialAdapter, ArticleIngestCoordinator, ArticleIngestPreflight, ArticleResearchPreflight, ArticleVerificationReader, SemanticProposalPlanner, OwnerPublicationApplicationService};
 use NHK\Core\Infrastructure\Http\ReadApi;
 use NHK\Core\Infrastructure\Http\AdminWorkbenchReadApi;
@@ -1120,7 +1120,17 @@ final class Plugin {
             );
             $youtubeConfiguration = new \NHK\Core\Application\Video\YouTubeApiConfiguration();
             $youtubeClient = static fn (object $identity): array => (new YouTubeDataApiClient(null, null, $youtubeConfiguration))->fetch($identity);
-            $videoEditorialAdapter = VideoEditorialAdapter::fromEngine($captureClaims);
+            $sharedEnrichment = new SharedEnrichmentBoundary(
+                new EditorialClaimRetrievalService($captureClaims),
+                new EditorialKnowledgeSelector(),
+                relations: static function (array $request) use ($videoRelationCandidates): array {
+                    $videoId = trim((string) ($request['owner_id'] ?? ''));
+                    $relations = array_values(array_filter((array) ($request['relations'] ?? []), 'is_array'));
+                    if ($videoId === '' || $relations === []) return [];
+                    return array_values(array_map(static fn (\NHK\Core\Domain\Video\VideoRelationCandidate $candidate): array => $candidate->toProposalPayload(), $videoRelationCandidates->plan($videoId, $relations, true)));
+                },
+            );
+            $videoEditorialAdapter = VideoEditorialAdapter::fromEngine($captureClaims, $sharedEnrichment);
             $videoEditorialResume = new \NHK\Core\Application\Video\VideoEditorialResumePlanner($videos, new VideoEditorialGenerator(), new VideoSeoProjection(), null, $videoKnowledgeEnrichment, $videoEditorialAdapter);
             $captureGovernance->setVideoEditorialResume($videoEditorialResume);
             $videoIntake = new VideoIntakeService(new YouTubeSourceAdapter($youtubeClient), $videos, new VideoHubClassifier(), $videoRelationCandidates, new VideoEditorialGenerator(), new VideoCompletenessPolicy(), new VideoSeoProjection(), new VideoInternalSemanticResearcher($authority, $types), $videoKnowledgeEnrichment, $videoEditorialAdapter);
@@ -1169,7 +1179,7 @@ final class Plugin {
                 },
             );
             $publicUrlMaintenance = (new \NHK\Core\Infrastructure\PublicIdentity\WordPressPublicUrlMaintenanceRuntime($wpdb, $authority, $types, $publicContexts, $videos, $media, $assets, $publicIdentityRepository))->service();
-            $articleEditorialAdapter = ArticleEditorialAdapter::fromEngine($captureClaims);
+            $articleEditorialAdapter = ArticleEditorialAdapter::fromEngine($captureClaims, $sharedEnrichment);
             $captureCanonicalInventory = self::canonicalInventory($types, $authority, $media, $videos, $claims, $sources, $evidence);
             $contentPreparation = new ContentPreparationOrchestrator(
                 $captureSubjectResolver,
@@ -1824,6 +1834,7 @@ final class Plugin {
                 $canonicalDependencies,
                 $articleEditorialAdapter,
                 $contentPreparation,
+                $sharedEnrichment,
             );
             $captureContinuation = new EditorialCaptureContinuationService($captureRepository, $captureAddendumRepository, $capture, static function (array $input) use ($imageIngest, $existingMediaResolver): array {
                 $mediaIds = is_array($input['media_ids'] ?? null) ? array_values($input['media_ids']) : [];

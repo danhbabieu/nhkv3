@@ -71,7 +71,7 @@ final class PreparationDependencyPolicy
     {
         if (($context['requires_exact_subject'] ?? false) === true) return true;
         $intent = strtoupper(trim((string) ($context['content_intent']['intent'] ?? $input['intent'] ?? '')));
-        return in_array($intent, ['VIDEO', 'KNOWLEDGE_DELTA', 'KNOWLEDGE_REPAIR'], true);
+        return in_array($intent, ['KNOWLEDGE_DELTA', 'KNOWLEDGE_REPAIR'], true);
     }
 
     private function defaultEscalation(PreparationDependencyClass $class, string $readiness, bool $required): ?string

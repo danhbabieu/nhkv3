@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Article;
 
-use NHK\Core\Application\Semantic\{ClaimRetrievalEngine, EditorialClaimRetrievalService, EditorialKnowledgeSelector, EditorialQualityGate, ReaderJourneyPlanner, SemanticSeoPlanner, SharedEditorialComposer};
+use NHK\Core\Application\Semantic\{ClaimRetrievalEngine, EditorialClaimRetrievalService, EditorialKnowledgeSelector, EditorialQualityGate, ReaderJourneyPlanner, SemanticSeoPlanner, SharedEditorialComposer, SharedEnrichmentBoundary};
 
 /**
  * Article-owned boundary for the shared transient editorial pipeline.
@@ -20,18 +20,22 @@ final class ArticleEditorialAdapter
         private SharedEditorialComposer $composer,
         private SemanticSeoPlanner $seo,
         private EditorialQualityGate $quality,
+        private ?SharedEnrichmentBoundary $shared = null,
     ) {
     }
 
-    public static function fromEngine(ClaimRetrievalEngine $engine): self
+    public static function fromEngine(ClaimRetrievalEngine $engine, ?SharedEnrichmentBoundary $shared = null): self
     {
+        $retrieval = new EditorialClaimRetrievalService($engine);
+        $selector = new EditorialKnowledgeSelector();
         return new self(
-            new EditorialClaimRetrievalService($engine),
-            new EditorialKnowledgeSelector(),
+            $retrieval,
+            $selector,
             new ReaderJourneyPlanner(),
             new SharedEditorialComposer(),
             new SemanticSeoPlanner(),
             new EditorialQualityGate(),
+            $shared ?? new SharedEnrichmentBoundary($retrieval, $selector),
         );
     }
 
@@ -47,9 +51,14 @@ final class ArticleEditorialAdapter
             'observations' => is_array($context['observations'] ?? null) ? $context['observations'] : [],
         ];
         $profile = ['profile' => 'article', 'selection_limit' => 8, 'result_limit' => 50];
-        $retrieved = $this->retrieval->retrieve($subject, $topic, (array) ($context['hints'] ?? []), $profile);
-        $retrieved = $this->boundToPreparedContext($retrieved, is_array($context['prepared_context'] ?? null) ? $context['prepared_context'] : [], $subject);
-        $pack = $this->selector->select($retrieved, $topic, $subject, $profile, $inputContext);
+        $shared = $this->shared?->enrich([
+            'profile' => 'article', 'subject_resolution' => $resolution, 'subject' => $subject,
+            'topic' => $topic, 'raw_input' => $inputContext['raw_input'], 'title' => $inputContext['title'],
+            'observations' => $inputContext['observations'], 'hints' => (array) ($context['hints'] ?? []),
+            'prepared_context' => is_array($context['prepared_context'] ?? null) ? $context['prepared_context'] : [],
+        ]);
+        $retrieved = is_array($shared['content']['retrieval'] ?? null) ? $shared['content']['retrieval'] : $this->retrieval->retrieve($subject, $topic, (array) ($context['hints'] ?? []), $profile);
+        $pack = $shared['content']['pack'] ?? $this->selector->select($retrieved, $topic, $subject, $profile, $inputContext);
         $plan = $this->journey->plan($pack);
         $draft = $this->composer->compose($plan);
         $seo = $this->seo->plan($pack, $plan, $draft, [
@@ -71,6 +80,8 @@ final class ArticleEditorialAdapter
             'draft' => $draft,
             'seo_plan' => $seo,
             'quality_report' => $quality,
+            'shared_enrichment' => $shared['content'] ?? ['status' => 'NOT_REQUESTED'],
+            'shared_result' => $shared,
         ];
     }
 
