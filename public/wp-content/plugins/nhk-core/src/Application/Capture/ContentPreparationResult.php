@@ -20,6 +20,8 @@ final readonly class ContentPreparationResult
      * @param list<string> $blockers
      * @param list<string> $reviewReasons
      * @param list<string> $warnings
+     * @param list<array<string,mixed>> $decisionTrace
+     * @param list<array<string,mixed>> $constraintFindings
      */
     public function __construct(
         public string $status,
@@ -33,6 +35,10 @@ final readonly class ContentPreparationResult
         public array $blockers = [],
         public array $reviewReasons = [],
         public array $warnings = [],
+        public array $decisionTrace = [],
+        public array $constraintFindings = [],
+        public string $qualityDecision = 'READY',
+        public int $repairRounds = 0,
     ) {
         if (!in_array($status, ['PREPARED', 'REVIEW_REQUIRED', 'BLOCKED'], true)) {
             throw new \InvalidArgumentException('Content preparation status is invalid.');
@@ -43,6 +49,8 @@ final readonly class ContentPreparationResult
         if ($status === 'PREPARED' && ($subjectResolutionPacket === null || $subjectResolutionPacket->status !== 'resolved')) {
             throw new \InvalidArgumentException('Prepared content requires a resolved subject packet.');
         }
+        if (!in_array($this->qualityDecision, ['READY', 'REVIEW_REQUIRED', 'HARD_BLOCK'], true)) throw new \InvalidArgumentException('Content quality decision is invalid.');
+        if ($this->repairRounds < 0 || $this->repairRounds > 3) throw new \InvalidArgumentException('Content repair rounds are invalid.');
     }
 
     /** @param array<string,mixed> $value */
@@ -65,6 +73,10 @@ final readonly class ContentPreparationResult
                 array_values(array_map('strval', (array) ($value['blockers'] ?? []))),
                 array_values(array_map('strval', (array) ($value['review_reasons'] ?? []))),
                 array_values(array_map('strval', (array) ($value['warnings'] ?? []))),
+                is_array($value['decision_trace'] ?? null) ? $value['decision_trace'] : [],
+                is_array($value['constraint_findings'] ?? null) ? $value['constraint_findings'] : [],
+                trim((string) ($value['quality_decision'] ?? 'READY')),
+                max(0, min(3, (int) ($value['repair_rounds'] ?? 0))),
             );
         } catch (\Throwable) {
             return null;
@@ -86,6 +98,10 @@ final readonly class ContentPreparationResult
             'blockers' => array_values(array_map('strval', $this->blockers)),
             'review_reasons' => array_values(array_map('strval', $this->reviewReasons)),
             'warnings' => array_values(array_map('strval', $this->warnings)),
+            'decision_trace' => $this->decisionTrace,
+            'constraint_findings' => $this->constraintFindings,
+            'quality_decision' => $this->qualityDecision,
+            'repair_rounds' => $this->repairRounds,
         ];
     }
 }

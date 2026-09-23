@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Capture;
 
 use NHK\Core\Application\Semantic\SubjectResolutionService;
+use NHK\Core\Application\Video\VideoStatementDecisionEngine;
 use NHK\Core\Domain\Capture\SubjectResolutionPacket;
 
 /**
@@ -17,6 +18,7 @@ final class ContentPreparationOrchestrator
         private SubjectResolutionService $subjects,
         private $canonicalInventory = null,
         private $governedEnrichment = null,
+        private ?VideoStatementDecisionEngine $statementDecisions = null,
     ) {
     }
 
@@ -33,9 +35,24 @@ final class ContentPreparationOrchestrator
             'source_precedence' => ['canonical_uuid', 'stable_key', 'explicit_subject_hint', 'title_subject', 'body_mention'],
             'media_video' => $this->mediaVideoDiagnostics($input, $assets),
         ];
+        $statementDecision = $this->statementDecisions ??= new VideoStatementDecisionEngine();
+        $statementResult = $statementDecision->evaluate(
+            is_array($interpretation['statements'] ?? null) ? $interpretation['statements'] : [],
+            is_array($context['canonical_context'] ?? null) ? $context['canonical_context'] : [],
+            is_array($context['evidence_context'] ?? null) ? $context['evidence_context'] : [],
+            is_array($context['visual_context'] ?? null) ? $context['visual_context'] : [],
+        );
+        $decisionTrace = $statementResult->items();
+        $constraintFindings = $statementResult->findings();
+        $qualityDecision = $this->decisionQuality($constraintFindings);
+        $repairRounds = max(0, min(3, (int) ($context['repair_rounds'] ?? 0)));
+        $diagnostics['decision_pipeline'] = 'interpret_resolve_compare_classify_treat';
+        $diagnostics['decision_trace_count'] = count($decisionTrace);
         $enrichment = ['status' => 'NOT_REQUESTED', 'items' => []];
         $reviewReasons = [];
         $blockers = [];
+        if ($qualityDecision === 'HARD_BLOCK') $blockers[] = 'VIDEO_DECISION_HARD_BLOCK';
+        elseif ($qualityDecision === 'REVIEW_REQUIRED') $reviewReasons[] = 'VIDEO_DECISION_REVIEW_REQUIRED';
 
         if (($resolution['status'] ?? '') === 'ambiguous' || ($resolution['conflicts'] ?? []) !== []) {
             $reviewReasons[] = 'PRIMARY_SUBJECT_AMBIGUOUS';
@@ -69,18 +86,18 @@ final class ContentPreparationOrchestrator
             $reviewReasons[] = 'PRIMARY_SUBJECT_NOT_RESOLVED';
         }
         if ($blockers !== []) {
-            return new ContentPreparationResult('BLOCKED', $fingerprint, null, $candidates, $gaps, $plan, $enrichment, $diagnostics, $blockers, $reviewReasons);
+            return new ContentPreparationResult('BLOCKED', $fingerprint, null, $candidates, $gaps, $plan, $enrichment, $diagnostics, $blockers, $reviewReasons, [], $decisionTrace, $constraintFindings, $qualityDecision, $repairRounds);
         }
         if ($reviewReasons !== []) {
-            return new ContentPreparationResult('REVIEW_REQUIRED', $fingerprint, null, $candidates, $gaps, $plan, $enrichment, $diagnostics, [], $reviewReasons);
+            return new ContentPreparationResult('REVIEW_REQUIRED', $fingerprint, null, $candidates, $gaps, $plan, $enrichment, $diagnostics, [], $reviewReasons, [], $decisionTrace, $constraintFindings, $qualityDecision, $repairRounds);
         }
 
         $packet = SubjectResolutionPacket::fromResolution($resolution);
         if ($packet === null || $packet->status !== 'resolved') {
-            return new ContentPreparationResult('REVIEW_REQUIRED', $fingerprint, null, $candidates, $gaps, $plan, $enrichment, $diagnostics, [], ['FINAL_SUBJECT_PACKET_INVALID']);
+            return new ContentPreparationResult('REVIEW_REQUIRED', $fingerprint, null, $candidates, $gaps, $plan, $enrichment, $diagnostics, [], ['FINAL_SUBJECT_PACKET_INVALID'], [], $decisionTrace, $constraintFindings, $qualityDecision, $repairRounds);
         }
         $diagnostics['phase'] = 'PREPARED';
-        return new ContentPreparationResult('PREPARED', $fingerprint, $packet, $candidates, $gaps, $plan, $enrichment, $diagnostics);
+        return new ContentPreparationResult('PREPARED', $fingerprint, $packet, $candidates, $gaps, $plan, $enrichment, $diagnostics, [], [], [], $decisionTrace, $constraintFindings, $qualityDecision, $repairRounds);
     }
 
     /** @param array<string,mixed> $input @param array<string,mixed> $interpretation @param list<array<string,mixed>> $assets @param array<string,mixed> $context */
@@ -222,6 +239,13 @@ final class ContentPreparationOrchestrator
             'video_present' => is_array($input['video'] ?? null),
             'semantic_promotion' => false,
         ];
+    }
+
+    private function decisionQuality(array $findings): string
+    {
+        foreach ($findings as $finding) if (($finding['severity'] ?? '') === 'HARD_BLOCK') return 'HARD_BLOCK';
+        foreach ($findings as $finding) if (($finding['severity'] ?? '') === 'REVIEW_REQUIRED') return 'REVIEW_REQUIRED';
+        return 'READY';
     }
 
     private function withoutBodies(mixed $value): mixed

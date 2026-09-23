@@ -19,6 +19,8 @@ final class VideoEditorialAdapter
         private SharedEditorialComposer $composer,
         private SemanticSeoPlanner $seo,
         private EditorialQualityGate $quality,
+        private ?VideoStatementDecisionEngine $statementDecisions = null,
+        private ?VideoEditorialDecisionPipeline $decisionPipeline = null,
     ) {
     }
 
@@ -31,6 +33,8 @@ final class VideoEditorialAdapter
             new SharedEditorialComposer(),
             new SemanticSeoPlanner(),
             new EditorialQualityGate(),
+            new VideoStatementDecisionEngine(),
+            new VideoEditorialDecisionPipeline(),
         );
     }
 
@@ -62,6 +66,18 @@ final class VideoEditorialAdapter
             'structured_data' => ['type' => 'VideoObject'],
         ]);
         $quality = $this->quality->evaluate($pack, $plan, $draft, $seo);
+        $statementDecision = ($this->statementDecisions ??= new VideoStatementDecisionEngine())->evaluate(
+            is_array($context['statements'] ?? null) ? $context['statements'] : [],
+            is_array($context['canonical_context'] ?? null) ? $context['canonical_context'] : [],
+            is_array($context['evidence_context'] ?? null) ? $context['evidence_context'] : [],
+            is_array($context['visual_context'] ?? null) ? $context['visual_context'] : [],
+        );
+        $decision = ($this->decisionPipeline ??= new VideoEditorialDecisionPipeline())->run(
+            ['title' => $draft->title, 'body' => $draft->body, 'claims' => $pack->selectedClaims],
+            ['statement_decision' => $statementDecision->toArray()],
+            static fn (array $package): array => $package,
+            static fn (array $package, array $decisionContext, int $round): array => $round === 0 ? $decisionContext['statement_decision']['findings'] : [],
+        );
 
         return [
             'status' => $quality->readiness,
@@ -72,6 +88,10 @@ final class VideoEditorialAdapter
             'draft' => $draft,
             'seo_plan' => $seo,
             'quality_report' => $quality,
+            'decision_trace' => $statementDecision->items(),
+            'constraint_findings' => $decision['findings'],
+            'quality_decision' => $decision['quality'],
+            'repair_rounds' => $decision['rounds'],
             'fingerprint_claims' => array_values(array_map(static fn (array $claim): array => [
                 'id' => (string) ($claim['claim_id'] ?? ''),
                 'revision' => max(1, (int) ($claim['claim_revision'] ?? 1)),

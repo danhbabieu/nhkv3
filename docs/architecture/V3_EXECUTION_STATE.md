@@ -1,5 +1,43 @@
 # P0 Checkpoints — 2026-09-22 (LOCAL / DEPLOYMENT PENDING)
 
+# Checkpoint — 2026-09-23 — Video Intake Intelligent Constraints (LOCAL / NO LIVE MUTATION)
+
+ARCHITECTURE: Video Intake now exposes a pure decision pipeline of interpret →
+resolve scored canonical candidates → retrieve/compare bounded context →
+classify statements → choose scoped editorial treatment → compose/critique →
+bounded repair → quality decision. `VideoStatementDecisionEngine` emits a
+claim-local decision trace; `VideoSubjectResolutionDecision` uses name/alias,
+parent/model, configuration facets, music, movement, observations and context
+without identity-specific thresholds. `VideoEditorialDecisionPipeline` runs
+registered repairs for at most three rounds. Capture preparation and the Video
+adapter serialize the trace, findings, quality decision and repair rounds while
+preserving Capture ownership, canonical UUID/revision, Governance, Evidence and
+idempotency boundaries.
+
+CONSTRAINT_POLICY: `INFO` is diagnostic; `REPAIRABLE` invokes bounded repair;
+`REVIEW_REQUIRED` preserves human review for the affected claim/artifact;
+`HARD_BLOCK` is limited to unresolved identity, unreconciled core conflict,
+required governed approval, indispensable unsupported core Evidence/Visual
+Support, or integrity/ownership violation. Unsupported secondary details,
+sparse Knowledge, uncertainty, wording and non-essential visual gaps remain
+claim-local and do not hard-block the Video.
+
+ACCEPTANCE_MATRIX: Focused coverage includes short input, scoped specimen
+observation, facet-based auto-resolution, true ambiguity, canonical/user-input
+classification, unsupported and conflicting statements, secondary/core visual
+support, sparse/rich Knowledge compatibility, persisted Capture trace retry,
+duplicate/idempotency-preserving serialization and unrelated candidate values.
+The existing Golden regression passes the same adapter decision path and records
+`USER_OBSERVATION → ATTRIBUTE_AND_SCOPE → READY`; no Golden/Odo/UUID/YouTube
+branch exists in production code. No MCP/live canonical mutation occurred.
+
+VERIFICATION: Focused Video/Capture/Semantic suite passes 74 tests / 232
+assertions. Full Unit passes 2,286 tests / 13,391 assertions with 18 existing
+warnings, 39 deprecations and 28 PHPUnit deprecations. Composer PHP lint log
+contains no parse/fatal errors; changed-file lint and `git diff --check` pass.
+
+STATUS: `VIDEO_INTAKE_INTELLIGENT_CONSTRAINTS_LOCAL_READY / NO_LIVE_MUTATION`.
+
 Tasks 5–6: native Article slug/permalink allocation and publish read-back no
 longer require semantic PublicIdentity; generic IMAGE_ARTICLE proves one
 Capture/Article, shared subject packet, explicit Media over stale reusable

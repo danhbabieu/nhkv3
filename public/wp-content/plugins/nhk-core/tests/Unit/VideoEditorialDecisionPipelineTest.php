@@ -32,7 +32,7 @@ final class VideoEditorialDecisionPipelineTest extends TestCase
     public function test_secondary_visual_support_can_be_repaired_but_core_support_hard_blocks(): void
     {
         $pipeline = new VideoEditorialDecisionPipeline();
-        $secondary = $pipeline->run(['title' => 'Video', 'body' => 'Body'], [], static fn (array $package): array => $package, static fn (): array => [[
+        $secondary = $pipeline->run(['title' => 'Video', 'body' => 'Body'], [], static fn (array $package): array => $package, static fn (array $package): array => $package['repair_log'] ?? [] ? [] : [[
             'code' => 'VISUAL_SUPPORT_SECONDARY', 'severity' => 'REPAIRABLE', 'scope' => 'claim', 'claim_id' => 'secondary', 'repair' => 'REMOVE_UNSUPPORTED', 'reason' => 'Optional detail can be removed.',
         ]]);
         $core = $pipeline->run(['title' => 'Video', 'body' => 'Body'], [], static fn (array $package): array => $package, static fn (): array => [[

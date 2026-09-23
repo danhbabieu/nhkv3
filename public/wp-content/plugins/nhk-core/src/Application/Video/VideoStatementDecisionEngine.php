@@ -15,8 +15,8 @@ final class VideoStatementDecisionEngine
             $classification = $this->classify($statement, $canonicalContext, $evidenceContext);
             [$action, $reason] = $this->treatment($classification, $statement);
             $support = [
-                'canonical' => is_array($statement['canonical'] ?? null) ? $statement['canonical'] : $canonicalContext,
-                'evidence' => is_array($statement['evidence'] ?? null) ? $statement['evidence'] : $evidenceContext,
+                'canonical' => $this->withoutBodies(is_array($statement['canonical'] ?? null) ? $statement['canonical'] : $canonicalContext),
+                'evidence' => $this->withoutBodies(is_array($statement['evidence'] ?? null) ? $statement['evidence'] : $evidenceContext),
             ];
             $scope = [
                 'subject' => (string) ($statement['scope'] ?? 'video'),
@@ -39,7 +39,7 @@ final class VideoStatementDecisionEngine
 
     private function classify(array $statement, array $canonicalContext, array $evidenceContext): string
     {
-        if (($statement['canonical_match'] ?? false) === true || ($statement['support_type'] ?? '') === 'canonical') return VideoStatementClassification::CANONICAL_SUPPORTED;
+        if (($statement['canonical_match'] ?? false) === true || ($statement['support_type'] ?? '') === 'canonical' || $this->matchesCanonicalContext($statement, $canonicalContext)) return VideoStatementClassification::CANONICAL_SUPPORTED;
         if (($statement['observation'] ?? false) === true || ($statement['provenance'] ?? '') === 'OBSERVED_FROM_MEDIA') return VideoStatementClassification::USER_OBSERVATION;
         if (($statement['source_supported'] ?? false) === true || in_array(($statement['provenance'] ?? ''), ['CATALOG_SUPPORTED', 'EXTERNAL_RESEARCH'], true)) return VideoStatementClassification::SOURCE_SUPPORTED;
         if (($statement['inferable'] ?? false) === true && ($statement['within_scope'] ?? false) === true) return VideoStatementClassification::INFERABLE_WITHIN_SCOPE;
@@ -95,5 +95,34 @@ final class VideoStatementDecisionEngine
         $result = [];
         foreach ($statement as $key => $value) if (!in_array((string) $key, ['raw_input', 'body', 'content'], true)) $result[$key] = $value;
         return $result;
+    }
+
+    private function matchesCanonicalContext(array $statement, array $canonicalContext): bool
+    {
+        $text = $this->normalize((string) ($statement['text'] ?? ''));
+        if ($text === '') return false;
+        foreach ($canonicalContext as $row) {
+            if (!is_array($row)) continue;
+            $candidate = $this->normalize((string) ($row['text'] ?? $row['name'] ?? $row['title'] ?? ''));
+            if ($candidate !== '' && ($candidate === $text || (($statement['canonical_id'] ?? null) !== null && (string) ($row['id'] ?? '') === (string) $statement['canonical_id']))) return true;
+        }
+        return false;
+    }
+
+    private function withoutBodies(mixed $value): mixed
+    {
+        if (!is_array($value)) return $value;
+        $result = [];
+        foreach ($value as $key => $item) {
+            if (in_array((string) $key, ['raw_input', 'content', 'body', 'post_content'], true)) continue;
+            $result[$key] = $this->withoutBodies($item);
+        }
+        return $result;
+    }
+
+    private function normalize(string $value): string
+    {
+        $value = function_exists('mb_strtolower') ? mb_strtolower($value) : strtolower($value);
+        return preg_replace('/\s+/u', ' ', trim($value)) ?? trim($value);
     }
 }

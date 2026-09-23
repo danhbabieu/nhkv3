@@ -27,6 +27,7 @@ final class VideoEditorialAdapterTest extends TestCase
         ]);
 
         self::assertSame('READY', $result['quality_report']->readiness);
+        self::assertSame('READY', $result['quality_decision']);
         self::assertSame('video', $result['draft']->profile);
         self::assertSame('claim-v1', $result['draft']->claimTrace[0]['claim_id']);
         self::assertSame('/video/odo-36/', $result['seo_plan']->canonicalUrl);
@@ -63,11 +64,14 @@ final class VideoEditorialAdapterTest extends TestCase
             'source' => ['source_title' => 'Golden Odo 36/10', 'platform' => 'youtube', 'external_video_id' => 'P4KaHX3LBOw'],
             'raw_input' => 'mặt số nổi nguyên bản',
             'user_hint' => 'mặt số nổi nguyên bản',
+            'statements' => [['id' => 'observation', 'text' => 'mặt số nổi nguyên bản', 'observation' => true, 'scope' => 'depicted specimen', 'attribution' => 'trong video']],
             'subject_resolution' => ['primary' => ['id' => $variant, 'type' => 'variant', 'name' => 'Odo 36/10 two-tune']],
             'public_identity' => ['canonical_url' => '/video/odo-36-10/', 'canonical_identity' => true, 'public_eligible' => true],
         ]);
 
         self::assertSame('READY', $result['quality_report']->readiness);
+        self::assertSame('READY', $result['quality_decision']);
+        self::assertSame('USER_OBSERVATION', $result['decision_trace'][0]['classification']);
         self::assertStringContainsString('chiếc đồng hồ trong video', mb_strtolower($result['draft']->body));
         self::assertStringContainsString('10 côn và 10 búa', $result['draft']->body);
         self::assertStringContainsString('Westminster và Gai Carillon', $result['draft']->body);

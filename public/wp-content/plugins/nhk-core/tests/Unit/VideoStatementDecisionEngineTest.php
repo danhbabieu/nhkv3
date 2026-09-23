@@ -57,4 +57,18 @@ final class VideoStatementDecisionEngineTest extends TestCase
         self::assertSame('INFO', $result->findings()[0]['severity']);
         self::assertSame('REVIEW_REQUIRED', $result->findings()[1]['severity']);
     }
+
+    public function test_matches_bounded_canonical_context_and_omits_raw_body_from_trace(): void
+    {
+        $result = (new VideoStatementDecisionEngine())->evaluate(
+            [['id' => 'claim-1', 'text' => 'Model A', 'raw_input' => 'secret']],
+            [['id' => 'entity-a', 'name' => 'Model A', 'body' => 'private body']],
+            [['id' => 'evidence-a', 'text' => 'Model A', 'content' => 'private evidence']],
+        );
+
+        self::assertSame('CANONICAL_SUPPORTED', $result->items()[0]['classification']);
+        self::assertArrayNotHasKey('body', $result->items()[0]['support']['canonical'][0]);
+        self::assertArrayNotHasKey('content', $result->items()[0]['support']['evidence'][0]);
+        self::assertArrayNotHasKey('raw_input', $result->items()[0]['statement']);
+    }
 }
