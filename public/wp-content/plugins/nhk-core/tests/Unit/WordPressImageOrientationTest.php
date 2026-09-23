@@ -78,8 +78,11 @@ namespace NHK\Tests\Unit {
 
 use NHK\Core\Application\Media\PublicImageSizingPolicy;
 use NHK\Core\Infrastructure\Media\WordPressImageOrientationNormalizer;
+use PHPUnit\Framework\Attributes\PreserveGlobalState;
+use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 
+#[PreserveGlobalState(false)]
 final class WordPressImageOrientationTest extends TestCase
 {
     public static function setUpBeforeClass(): void
@@ -106,6 +109,7 @@ final class WordPressImageOrientationTest extends TestCase
         require_once ABSPATH . WPINC . '/class-wp-image-editor-gd.php';
     }
 
+    #[RunInSeparateProcess]
     public function test_portrait_pixels_with_orientation_one_resize_to_portrait_webp(): void
     {
         $result = $this->process(1152, 1536, 1, 'portrait');
@@ -115,6 +119,7 @@ final class WordPressImageOrientationTest extends TestCase
         $this->assertDominantColor($result['image'], 450, 900, 'blue');
     }
 
+    #[RunInSeparateProcess]
     public function test_landscape_pixels_with_orientation_one_resize_to_landscape_webp(): void
     {
         $result = $this->process(1536, 1152, 1, 'landscape');
@@ -124,6 +129,7 @@ final class WordPressImageOrientationTest extends TestCase
         $this->assertDominantColor($result['image'], 900, 450, 'blue');
     }
 
+    #[RunInSeparateProcess]
     public function test_exif_orientation_six_is_applied_once_before_resize(): void
     {
         $result = $this->process(1536, 1152, 6, 'landscape');
@@ -134,6 +140,7 @@ final class WordPressImageOrientationTest extends TestCase
         self::assertFalse($result['has_orientation_metadata']);
     }
 
+    #[RunInSeparateProcess]
     public function test_exif_orientation_eight_is_applied_once_before_resize(): void
     {
         $result = $this->process(1536, 1152, 8, 'landscape');
@@ -144,6 +151,7 @@ final class WordPressImageOrientationTest extends TestCase
         self::assertFalse($result['has_orientation_metadata']);
     }
 
+    #[RunInSeparateProcess]
     public function test_image_without_exif_orientation_is_not_rotated(): void
     {
         $result = $this->process(1536, 1152, null, 'landscape');
@@ -154,6 +162,7 @@ final class WordPressImageOrientationTest extends TestCase
         self::assertFalse($result['has_orientation_metadata']);
     }
 
+    #[RunInSeparateProcess]
     public function test_small_image_with_orientation_one_is_not_upscaled(): void
     {
         $result = $this->process(800, 600, 1, 'landscape');

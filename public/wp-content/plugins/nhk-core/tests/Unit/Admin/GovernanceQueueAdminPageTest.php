@@ -62,6 +62,7 @@ final class GovernanceQueueAdminPageTest extends TestCase
         $_GET = [];
         $_POST = [];
         $GLOBALS['nhk_test_caps'] = [];
+        unset($GLOBALS['wpdb']);
     }
 
     public function test_get_rendering_invokes_only_query_and_never_action_service(): void

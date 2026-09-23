@@ -35,24 +35,24 @@ final class CollectorProfileApi
         ];
     }
 
-    /** @return array<string,mixed>|\WP_Error */
-    public function read(string $classificationId, int $page = 1, int $perPage = 50, int $renderCap = 0): array|\WP_Error
+    /** @return array<string,mixed> */
+    public function read(string $classificationId, int $page = 1, int $perPage = 50, int $renderCap = 0): array
     {
-        $result = $this->profile->build($classificationId, $page, $perPage, $renderCap);
-        if (($result['status'] ?? '') === 'unavailable' && class_exists('WP_Error')) {
-            return new \WP_Error('nhk_collector_profile_unavailable', 'Collector profile is not available.', ['status' => 503, 'reason' => $result['reason'] ?? 'PROFILE_UNAVAILABLE']);
-        }
-        return $result;
+        return $this->profile->build($classificationId, $page, $perPage, $renderCap);
     }
 
     /** @return array<string,mixed>|\WP_Error */
     private function request(\WP_REST_Request $request): array|\WP_Error
     {
-        return $this->read(
+        $result = $this->read(
             (string) $request['id'],
             max(1, (int) ($request['page'] ?? 1)),
             min(200, max(1, (int) ($request['per_page'] ?? 50))),
             min(10000, max(0, (int) ($request['render_cap'] ?? 0))),
         );
+        if (($result['status'] ?? '') === 'unavailable' && class_exists('WP_Error')) {
+            return new \WP_Error('nhk_collector_profile_unavailable', 'Collector profile is not available.', ['status' => 503, 'reason' => $result['reason'] ?? 'PROFILE_UNAVAILABLE']);
+        }
+        return $result;
     }
 }

@@ -17716,3 +17716,20 @@ FIXTURE_HARDCODE_AUDIT: FAIL for the whole legacy production tree because pre-ex
 LOCAL_VERIFICATION: NHK Unit passed 2,319 tests / 13,512 assertions with 18 warnings, 39 deprecations and 29 PHPUnit deprecations. NHK Contract passed 6 tests / 48 assertions. Affected M–P/Capture/Video/Article/Media group passed 126 tests / 619 assertions. Post-fix Article/Capture group passed 79 tests / 313 assertions. Hierarchical verification tests passed 3 tests / 7 assertions.
 QUALITY: All changed PHP files lint clean; `git diff --check` passed; final repository status is understood. Runtime deployment/read-back is unavailable.
 STATUS: `LOCAL_VERIFICATION_COMPLETE / DEPLOYMENT_NOT_READY / FIXTURE_AUDIT_OPEN / NO_LIVE_MUTATION`.
+
+# Checkpoint — 2026-09-23 — Full-suite isolation and HTTP error-boundary repair (LOCAL / RUNTIME BLOCKED)
+
+ROOT_CAUSES_FIXED: Collector profile direct reads now preserve the typed
+projection array and convert unavailable results to `WP_Error` only at the REST
+request boundary. WordPress image-orientation tests run in isolated processes,
+and the governance admin unit teardown no longer leaks a fake `$wpdb` object
+into later Integration setup/teardown.
+
+VERIFICATION: Full `composer test` reaches all 2,466 tests with 13,583
+assertions and no internal errors; 21 guarded Integration/acceptance failures
+remain because the local MySQL service is unavailable and the required
+`NHK_WP_TEST_PATH=public`/`nhk_v3_test` runtime cannot bootstrap. `composer
+lint` and `git diff --check` pass. No staging, production, Article, Media or
+publication mutation was performed.
+
+STATUS=`LOCAL_TEST_INTERNALS_PASS / INTEGRATION_RUNTIME_BLOCKED / DEPLOYMENT_NOT_RUN / LIVE_CAPTURE_NOT_RUN`.
