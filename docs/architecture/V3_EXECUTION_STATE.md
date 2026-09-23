@@ -1,3 +1,23 @@
+# Checkpoint — 2026-09-23 — Server-derived requirements and safe continuation (LOCAL / NO LIVE MUTATION)
+
+TASK_RESULT: Checkpoint 2 adds an explicit workflow continuation decision beside
+semantic preparation. `PreparationDependencyRequirements` accepts only
+server-owned requirement context; `EditorialCaptureCoordinator` removes
+caller-supplied dependency declarations before preparation. Optional
+enrichment may be deferred, publication-only readiness blocks only the public
+phase, and escalating identity/factual/Governance/Evidence findings deny
+continuation. `PREPARED` still requires a truthful resolved
+`SubjectResolutionPacket`; no owner ordering or downstream engine was changed.
+
+VERIFICATION: Checkpoint 2 focused suite passed 216 tests / 863 assertions with
+7 deprecations and 2 PHPUnit deprecations. Full Unit passed 2,339 tests /
+13,567 assertions with 18 warnings, 41 deprecations and 29 PHPUnit
+deprecations. Changed PHP lint and `git diff --check` passed. No schema
+migration, data mutation, staging/live mutation, publication, push or
+deployment occurred.
+
+STATUS: `CHECKPOINT_2_LOCAL_READY / FULL_UNIT_PASS / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-23 — Preparation dependency classification/local readiness (LOCAL / NO LIVE MUTATION)
 
 TASK_RESULT: Checkpoint 1 implementation is bounded to the preparation/readiness

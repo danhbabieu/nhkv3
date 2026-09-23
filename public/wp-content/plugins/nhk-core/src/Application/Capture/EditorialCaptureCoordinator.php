@@ -421,6 +421,11 @@ final class EditorialCaptureCoordinator
                 $storedPreparation = is_array($record->context['content_preparation'] ?? null) ? $record->context['content_preparation'] : [];
                 $storedResult = ContentPreparationResult::fromArray($storedPreparation);
                 $preparationContext = is_array($input['content_preparation'] ?? null) ? $input['content_preparation'] : [];
+                unset($preparationContext['server_dependency_requirements'], $preparationContext['trusted_dependency_requirements'], $preparationContext['dependency_requirements']);
+                $preparationContext['content_intent'] = $intent;
+                $preparationContext['server_dependency_requirements'] = is_array($record->context['server_dependency_requirements'] ?? null)
+                    ? $record->context['server_dependency_requirements']
+                    : [];
                 $preparationContext['capture_id'] = $record->captureId;
                 $preparationContext['governance'] = is_array($input['governance'] ?? null) ? $input['governance'] : [];
                 if ($persistedPacket?->status === 'resolved') $preparationContext['persisted_subject_resolution_packet'] = $persistedPacket->toArray();

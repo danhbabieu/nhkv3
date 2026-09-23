@@ -51,7 +51,7 @@ final class PreparationDependencyPolicy
 
         // Requirements must be supplied by an internal application boundary;
         // caller-provided capture input cannot downgrade a dependency.
-        foreach ((array) ($context['trusted_dependency_requirements'] ?? []) as $requirement) {
+        foreach ((array) ($context['server_dependency_requirements'] ?? []) as $requirement) {
             if (!is_array($requirement)) continue;
             $code = trim((string) ($requirement['code'] ?? ''));
             $class = PreparationDependencyClass::tryFrom(strtoupper(trim((string) ($requirement['kind'] ?? ''))));
@@ -70,7 +70,7 @@ final class PreparationDependencyPolicy
     private function requiresExactIdentity(array $input, array $context): bool
     {
         if (($context['requires_exact_subject'] ?? false) === true) return true;
-        $intent = strtoupper(trim((string) ($input['intent'] ?? $context['content_intent']['intent'] ?? '')));
+        $intent = strtoupper(trim((string) ($context['content_intent']['intent'] ?? $input['intent'] ?? '')));
         return in_array($intent, ['VIDEO', 'KNOWLEDGE_DELTA', 'KNOWLEDGE_REPAIR'], true);
     }
 

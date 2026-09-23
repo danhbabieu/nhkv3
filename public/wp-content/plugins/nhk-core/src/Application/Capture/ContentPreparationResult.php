@@ -41,6 +41,7 @@ final readonly class ContentPreparationResult
         public string $qualityDecision = 'READY',
         public int $repairRounds = 0,
         public array $dependencyFindings = [],
+        public ?PreparationContinuationDecision $continuationDecision = null,
     ) {
         if (!in_array($status, ['PREPARED', 'REVIEW_REQUIRED', 'BLOCKED'], true)) {
             throw new \InvalidArgumentException('Content preparation status is invalid.');
@@ -80,6 +81,7 @@ final readonly class ContentPreparationResult
                 trim((string) ($value['quality_decision'] ?? 'READY')),
                 max(0, min(3, (int) ($value['repair_rounds'] ?? 0))),
                 is_array($value['dependency_findings'] ?? null) ? $value['dependency_findings'] : [],
+                PreparationContinuationDecision::fromArray(is_array($value['continuation_decision'] ?? null) ? $value['continuation_decision'] : []),
             );
         } catch (\Throwable) {
             return null;
@@ -106,6 +108,7 @@ final readonly class ContentPreparationResult
             'quality_decision' => $this->qualityDecision,
             'repair_rounds' => $this->repairRounds,
             'dependency_findings' => $this->dependencyFindings,
+            'continuation_decision' => $this->continuationDecision?->toArray(),
         ];
     }
 }

@@ -74,7 +74,7 @@ final class ContentPreparationOrchestratorTest extends TestCase
             [],
             [],
             [
-                'trusted_dependency_requirements' => [[
+                'server_dependency_requirements' => [[
                     'code' => 'RELATED_VARIANT_CONTEXT',
                     'kind' => 'OPTIONAL_ENRICHMENT',
                     'readiness' => 'INCOMPLETE',
@@ -89,6 +89,8 @@ final class ContentPreparationOrchestratorTest extends TestCase
         self::assertSame('INCOMPLETE', $result->dependencyFindings[0]['readiness']);
         self::assertFalse($result->dependencyFindings[0]['escalates']);
         self::assertSame([], $result->reviewReasons);
+        self::assertTrue($result->continuationDecision?->mayContinue);
+        self::assertSame(['RELATED_VARIANT_CONTEXT'], $result->continuationDecision?->deferredFindings);
     }
 
     public function test_required_factual_dependency_still_escalates_when_exact_subject_is_needed(): void
@@ -103,7 +105,7 @@ final class ContentPreparationOrchestratorTest extends TestCase
             [],
             [],
             [
-                'trusted_dependency_requirements' => [[
+                'server_dependency_requirements' => [[
                     'code' => 'VARIANT_TECHNICAL_FACT',
                     'kind' => 'REQUIRED_FACTUAL_DEPENDENCY',
                     'readiness' => 'BLOCKED',
@@ -130,7 +132,7 @@ final class ContentPreparationOrchestratorTest extends TestCase
             [],
             [],
             [
-                'trusted_dependency_requirements' => [[
+                'server_dependency_requirements' => [[
                     'code' => 'REQUIRED_EVIDENCE_MISSING',
                     'kind' => 'REQUIRED_FACTUAL_DEPENDENCY',
                     'readiness' => 'BLOCKED',
@@ -168,6 +170,7 @@ final class ContentPreparationOrchestratorTest extends TestCase
         self::assertSame($subjectId, $result->subjectResolutionPacket?->canonicalSubjectId);
         self::assertSame(0, $resolverCalls);
         self::assertContains('PERSISTED_RESOLVED_SUBJECT_REUSED', $result->diagnostics['subject_precedence'] ?? []);
+        self::assertTrue($result->continuationDecision?->mayContinue);
     }
 
     public function test_persisted_auto_resolved_subject_also_beats_weaker_candidates(): void

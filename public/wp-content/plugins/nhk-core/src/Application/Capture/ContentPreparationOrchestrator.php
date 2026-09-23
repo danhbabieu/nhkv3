@@ -53,11 +53,15 @@ final class ContentPreparationOrchestrator
         $decisionTrace = $statementResult->items();
         $constraintFindings = $statementResult->findings();
         $qualityDecision = $this->decisionQuality($constraintFindings);
-        $dependencyFindings = (new PreparationDependencyPolicy())->classify($input, $resolution, $constraintFindings, $context + ['content_intent' => $context['content_intent'] ?? ['intent' => $input['intent'] ?? '']]);
+        $serverRequirements = (new PreparationDependencyRequirements())->derive($input, $interpretation, $context);
+        $dependencyContext = $context + ['content_intent' => $context['content_intent'] ?? ['intent' => $input['intent'] ?? ''], 'server_dependency_requirements' => $serverRequirements];
+        $dependencyFindings = (new PreparationDependencyPolicy())->classify($input, $resolution, $constraintFindings, $dependencyContext);
+        $continuationDecision = (new PreparationContinuationPolicy())->decide($dependencyFindings, ['phase' => $context['pipeline_phase'] ?? 'EDITORIAL_WORKING', 'intent' => $dependencyContext['content_intent']['intent'] ?? '']);
         $repairRounds = max(0, min(3, (int) ($context['repair_rounds'] ?? 0)));
         $diagnostics['decision_pipeline'] = 'interpret_resolve_compare_classify_treat';
         $diagnostics['decision_trace_count'] = count($decisionTrace);
         $diagnostics['dependency_findings'] = $dependencyFindings;
+        $diagnostics['continuation_decision'] = $continuationDecision->toArray();
         $enrichment = ['status' => 'NOT_REQUESTED', 'items' => []];
         $reviewReasons = array_values(array_unique(array_map(
             static fn (array $finding): string => (string) ($finding['code'] ?? ''),
@@ -100,18 +104,18 @@ final class ContentPreparationOrchestrator
             $reviewReasons[] = 'PRIMARY_SUBJECT_NOT_RESOLVED';
         }
         if ($blockers !== []) {
-            return new ContentPreparationResult('BLOCKED', $fingerprint, null, $candidates, $gaps, $plan, $enrichment, $diagnostics, $blockers, $reviewReasons, [], $decisionTrace, $constraintFindings, $qualityDecision, $repairRounds, $dependencyFindings);
+            return new ContentPreparationResult('BLOCKED', $fingerprint, null, $candidates, $gaps, $plan, $enrichment, $diagnostics, $blockers, $reviewReasons, [], $decisionTrace, $constraintFindings, $qualityDecision, $repairRounds, $dependencyFindings, $continuationDecision);
         }
         if ($reviewReasons !== []) {
-            return new ContentPreparationResult('REVIEW_REQUIRED', $fingerprint, null, $candidates, $gaps, $plan, $enrichment, $diagnostics, [], $reviewReasons, [], $decisionTrace, $constraintFindings, $qualityDecision, $repairRounds, $dependencyFindings);
+            return new ContentPreparationResult('REVIEW_REQUIRED', $fingerprint, null, $candidates, $gaps, $plan, $enrichment, $diagnostics, [], $reviewReasons, [], $decisionTrace, $constraintFindings, $qualityDecision, $repairRounds, $dependencyFindings, $continuationDecision);
         }
 
         $packet = SubjectResolutionPacket::fromResolution($resolution);
         if ($packet === null || $packet->status !== 'resolved') {
-            return new ContentPreparationResult('REVIEW_REQUIRED', $fingerprint, null, $candidates, $gaps, $plan, $enrichment, $diagnostics, [], ['FINAL_SUBJECT_PACKET_INVALID'], [], $decisionTrace, $constraintFindings, $qualityDecision, $repairRounds, $dependencyFindings);
+            return new ContentPreparationResult('REVIEW_REQUIRED', $fingerprint, null, $candidates, $gaps, $plan, $enrichment, $diagnostics, [], ['FINAL_SUBJECT_PACKET_INVALID'], [], $decisionTrace, $constraintFindings, $qualityDecision, $repairRounds, $dependencyFindings, $continuationDecision);
         }
         $diagnostics['phase'] = 'PREPARED';
-        return new ContentPreparationResult('PREPARED', $fingerprint, $packet, $candidates, $gaps, $plan, $enrichment, $diagnostics, [], [], [], $decisionTrace, $constraintFindings, $qualityDecision, $repairRounds, $dependencyFindings);
+        return new ContentPreparationResult('PREPARED', $fingerprint, $packet, $candidates, $gaps, $plan, $enrichment, $diagnostics, [], [], [], $decisionTrace, $constraintFindings, $qualityDecision, $repairRounds, $dependencyFindings, $continuationDecision);
     }
 
     /** @param array<string,mixed> $input @param array<string,mixed> $interpretation @param list<array<string,mixed>> $assets @param array<string,mixed> $context */
