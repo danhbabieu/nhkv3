@@ -17,6 +17,7 @@ final class ArticleReconciliationOrchestrator
         $state = ($this->load)($input);
         $state['intent'] = ($this->resolveIntent)($state + $input);
         $state['subject_packet'] = ($this->resolveSubject)($state + $input);
+        $state['subject_packet_supersession'] = $this->subjectPacketSupersession($state);
         $planner = $this->planner ?? new ArticleRemediationPlanner();
         $seen = [];
         $actions = [];
@@ -24,6 +25,10 @@ final class ArticleReconciliationOrchestrator
         for ($pass = 1; $pass <= self::MAX_PASSES; $pass++) {
             $state['inspection'] = ($this->inspect)($state + $input);
             $diagnostics = array_values(array_unique(array_map('strval', (array) ($state['inspection']['diagnostics'] ?? $state['inspection']['blockers'] ?? []))));
+            if (is_array($state['subject_packet_supersession'])) {
+                $diagnostics[] = 'SUBJECT_PACKET_SUPERSESSION';
+                $diagnostics = array_values(array_unique($diagnostics));
+            }
             $planned = $planner->plan($state + $state['inspection'], $diagnostics);
             $passActions = array_map(static fn ($action): array => $action->toArray(), $planned);
             $actions = array_merge($actions, $passActions);
@@ -45,10 +50,29 @@ final class ArticleReconciliationOrchestrator
             $safe = array_values(array_filter($planned, static fn ($action): bool => $action->autoRepairSafe));
             if ($safe === []) return $this->finish($state, $passes, $actions, ['outcome' => 'OWNER_REVIEW_REQUIRED', 'blockers' => $diagnostics], 'OWNER_REVIEW_REQUIRED');
             $state = array_replace($state, ($this->repair)($state + $input, $safe));
+            $state['subject_packet_supersession'] = $this->subjectPacketSupersession($state);
         }
         return $this->finish($state, $passes, $actions, ['outcome' => 'SYSTEM_BLOCKED', 'blockers' => ['REMEDIATION_PASS_LIMIT_REACHED']], 'SYSTEM_BLOCKED');
     }
 
     /** @return array<string,mixed> */
     private function finish(array $state, array $passes, array $actions, array $review, string $status): array { return ['status' => $status, 'passes' => $passes, 'actions' => $actions, 'review' => $review, 'state' => $state]; }
+
+    /** @return array<string,mixed>|null */
+    private function subjectPacketSupersession(array $state): ?array
+    {
+        $current = is_array($state['subject_packet'] ?? null) ? $state['subject_packet'] : [];
+        $persisted = is_array($state['subject_resolution_packet'] ?? null) ? $state['subject_resolution_packet'] : [];
+        if ($current === [] || $persisted === []) return null;
+        $identity = static fn (array $packet): array => [
+            strtolower(trim((string) ($packet['status'] ?? ''))),
+            strtolower(trim((string) ($packet['canonical_subject_id'] ?? $packet['id'] ?? ''))),
+            strtolower(trim((string) ($packet['entity_type'] ?? $packet['type'] ?? ''))),
+            strtolower(trim((string) ($packet['stable_key'] ?? ''))),
+            (int) ($packet['revision'] ?? 0),
+        ];
+        if ($identity($current) === $identity($persisted)) return null;
+        if (($current['status'] ?? '') !== 'resolved' || ($persisted['status'] ?? '') !== 'resolved') return null;
+        return ['previous' => $persisted, 'current' => $current];
+    }
 }

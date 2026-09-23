@@ -876,7 +876,7 @@ final class Plugin {
             // One generic recovery boundary for existing Capture-owned Articles.
             // The orchestrator plans and bounds work; existing owner adapters
             // remain responsible for every durable mutation.
-            add_filter('nhk_v3_article_reconciliation_orchestrator', static function (mixed $current) use ($articleEditorial, $captureRepository, $articleMedia, $canonicalPublicationContext, $draftGateway, $editorialPosts): mixed {
+            add_filter('nhk_v3_article_reconciliation_orchestrator', static function (mixed $current) use ($articleEditorial, $captureRepository, $articleMedia, $canonicalPublicationContext, $draftGateway, $editorialPosts, $graphService, $articleCoordinator): mixed {
                 if ($current instanceof \NHK\Core\Application\Article\ArticleReconciliationOrchestrator) return $current;
                 return new \NHK\Core\Application\Article\ArticleReconciliationOrchestrator(
                     static function (array $input) use ($articleEditorial, $captureRepository): array {
@@ -893,7 +893,7 @@ final class Plugin {
                     static function (array $state): array {
                         return is_array($state['subject_resolution_packet'] ?? null) ? $state['subject_resolution_packet'] : [];
                     },
-                    static function (array $state) use ($canonicalPublicationContext, $articleMedia): array {
+                    static function (array $state) use ($canonicalPublicationContext, $articleMedia, $graphService): array {
                         $owner = $state['state'] ?? null;
                         if (!$owner instanceof \NHK\Core\Domain\Article\EditorialPostState) return ['diagnostics' => ['WP_POST_UNAVAILABLE']];
                         $evidence = $canonicalPublicationContext($owner, []);
@@ -904,20 +904,71 @@ final class Plugin {
                         $evidence['media_snapshot'] = $media;
                         $gate = (new \NHK\Core\Application\Article\ArticlePublicationGate())->check($owner, $evidence, $owner->token);
                         $mediaDiagnostics = array_values(array_filter(array_map(static fn (array $item): string => (string) ($item['code'] ?? ''), (array) ($media['diagnostics'] ?? [])), static fn (string $code): bool => $code !== ''));
-                        return ['diagnostics' => array_values(array_unique(array_merge($gate->blockers, $mediaDiagnostics))), 'evidence' => $evidence, 'state_token' => $owner->token, 'media' => $media];
+                        $relationDiagnostics = [];
+                        $aboutEdges = [];
+                        $packet = is_array($state['subject_packet'] ?? null) ? $state['subject_packet'] : [];
+                        $targetId = trim((string) ($packet['canonical_subject_id'] ?? $packet['id'] ?? ''));
+                        try {
+                            $aboutEdges = array_values(array_filter((array) ($graphService->findOutgoing(new \NHK\Core\Domain\Graph\NodeReference('wp_post', $owner->endpointKey), 'about', 0, 200, false)['items'] ?? []), static fn (mixed $edge): bool => $edge instanceof \NHK\Core\Domain\Graph\GraphEdge && $edge->isActive()));
+                            $matching = array_values(array_filter($aboutEdges, static fn ($edge): bool => $edge->target->reference->endpoint_key === $targetId));
+                            if ($targetId !== '' && count($matching) !== 1) $relationDiagnostics[] = 'ARTICLE_ABOUT_RELATION_MISMATCH';
+                        } catch (\Throwable) {
+                            $relationDiagnostics[] = 'SEMANTIC_READBACK_UNVERIFIED';
+                        }
+                        return ['diagnostics' => array_values(array_unique(array_merge($gate->blockers, $mediaDiagnostics, $relationDiagnostics))), 'evidence' => $evidence, 'state_token' => $owner->token, 'media' => $media, 'about_edges' => $aboutEdges];
                     },
-                    static function (array $state, array $actions) use ($articleMedia, $editorialPosts): array {
+                    static function (array $state, array $actions) use ($articleMedia, $editorialPosts, $captureRepository, $articleCoordinator): array {
                         $postId = (int) ($state['post_id'] ?? 0);
+                        $capture = $state['capture'] ?? null;
+                        $packet = is_array($state['subject_packet'] ?? null) ? $state['subject_packet'] : [];
                         foreach ($actions as $action) {
+                            if ($action->action === 'SUPERSEDE_SUBJECT_PACKET' && $capture instanceof \NHK\Core\Domain\Capture\CaptureRecord && $packet !== []) {
+                                $old = is_array($capture->context['subject_resolution_packet'] ?? null) ? $capture->context['subject_resolution_packet'] : [];
+                                $history = is_array($capture->context['subject_resolution_packet_history'] ?? null) ? $capture->context['subject_resolution_packet_history'] : [];
+                                if ($old !== [] && $history === []) $history[] = $old;
+                                $context = $capture->context;
+                                $context['subject_resolution_packet'] = $packet;
+                                $context['subject_resolution_packet_history'] = $history;
+                                $diagnostics = $capture->diagnostics;
+                                $diagnostics['subject_resolution_packet'] = $packet;
+                                $diagnostics['subjects'] = ['status' => 'resolved', 'primary' => ['id' => (string) ($packet['canonical_subject_id'] ?? $packet['id'] ?? ''), 'type' => (string) ($packet['entity_type'] ?? $packet['type'] ?? ''), 'stable_key' => (string) ($packet['stable_key'] ?? ''), 'name' => (string) ($packet['canonical_name'] ?? $packet['name'] ?? ''), 'revision' => (int) ($packet['revision'] ?? 1)]];
+                                $diagnostics['subject_packet_supersession'] = ['previous' => $old, 'current' => $packet];
+                                $capture = $captureRepository->save(new \NHK\Core\Domain\Capture\CaptureRecord($capture->captureId, $capture->idempotencyKey, $capture->requestFingerprint, $capture->stage, $capture->status, $capture->articleId, $capture->articleStateToken, $capture->assets, $context, $diagnostics, $capture->phaseReceipts, $capture->revision + 1, $capture->createdAt, gmdate('Y-m-d H:i:s.u')));
+                            }
+                            if ($action->action === 'CONVERGE_PRIMARY_ABOUT' && $capture instanceof \NHK\Core\Domain\Capture\CaptureRecord) {
+                                $sourceKey = (string) ($state['state']->endpointKey ?? '');
+                                $targetId = trim((string) ($packet['canonical_subject_id'] ?? $packet['id'] ?? ''));
+                                $targetType = trim((string) ($packet['entity_type'] ?? $packet['type'] ?? ''));
+                                $commands = [];
+                                foreach ((array) ($state['inspection']['about_edges'] ?? []) as $edge) {
+                                    if (!$edge instanceof \NHK\Core\Domain\Graph\GraphEdge || !$edge->isActive()) continue;
+                                    if ($edge->target->reference->endpoint_key === $targetId) continue;
+                                    $commands[] = ['slot' => 'retire-about-' . $edge->edge_uuid, 'operation' => 'relation_retire', 'entity_type' => 'relation', 'subject_id' => $edge->edge_uuid, 'target_uuid' => $edge->edge_uuid, 'expected_revision' => $edge->revision, 'payload' => ['source_type' => 'wp_post', 'source_key' => $sourceKey, 'target_type' => $edge->target->reference->endpoint_type, 'target_key' => $edge->target->reference->endpoint_key, 'predicate' => 'about', 'capture_id' => $capture->captureId]];
+                                }
+                                $create = $targetId !== '' && $targetType !== '' ? ['slot' => 'create-about-' . $targetId, 'operation' => 'relation_create', 'entity_type' => 'relation', 'subject_id' => $sourceKey, 'target_uuid' => $targetId, 'expected_revision' => 1, 'payload' => ['source_type' => 'wp_post', 'source_key' => $sourceKey, 'target_type' => $targetType, 'target_key' => $targetId, 'predicate' => 'about', 'capture_id' => $capture->captureId, 'provenance' => 'CURRENT_EXPLICIT_SUBJECT_RECONCILIATION', 'reason' => 'Current exact canonical subject supersedes stale Article binding.']]: null;
+                                $base = ['intent' => 'reconcile', 'capture_id' => $capture->captureId, 'target_wp_post' => ['endpoint_type' => 'wp_post', 'endpoint_key' => $sourceKey], 'expected_editorial_state' => ['state_token' => (string) ($state['state_token'] ?? $state['state']->token)]];
+                                if ($commands !== []) {
+                                    $retireResult = $articleCoordinator->execute($base + ['idempotency_key' => $capture->captureId . ':article-about-retire:' . hash('sha256', json_encode($commands, JSON_THROW_ON_ERROR)), 'semantic_bundle' => ['commands' => $commands]]);
+                                    if (($retireResult->outcome ?? null) === \NHK\Core\Domain\Article\ArticleIngestOutcome::COMPLETED) {
+                                        $freshEdges = $graphService->findOutgoing(new \NHK\Core\Domain\Graph\NodeReference('wp_post', $sourceKey), 'about', 0, 200, false)['items'] ?? [];
+                                        $commands = [];
+                                        foreach ((array) $freshEdges as $edge) if ($edge instanceof \NHK\Core\Domain\Graph\GraphEdge && $edge->isActive() && $edge->target->reference->endpoint_key !== $targetId) $commands[] = ['slot' => 'retire-about-' . $edge->edge_uuid, 'operation' => 'relation_retire', 'entity_type' => 'relation', 'subject_id' => $edge->edge_uuid, 'target_uuid' => $edge->edge_uuid, 'expected_revision' => $edge->revision, 'payload' => ['source_type' => 'wp_post', 'source_key' => $sourceKey, 'target_type' => $edge->target->reference->endpoint_type, 'target_key' => $edge->target->reference->endpoint_key, 'predicate' => 'about', 'capture_id' => $capture->captureId]];
+                                    }
+                                }
+                                if ($create !== null && $commands === []) $articleCoordinator->execute($base + ['idempotency_key' => $capture->captureId . ':article-about-create:' . hash('sha256', json_encode($packet, JSON_THROW_ON_ERROR)), 'semantic_bundle' => ['commands' => [$create]]]);
+                            }
                             if ($action->owner === 'media') {
                                 $desired = is_array($state['desired_media']['selected'] ?? null) ? $state['desired_media']['selected'] : [];
                                 if (isset($desired['media_id'])) $desired = [(string) ($desired['role'] ?? 'featured_primary') => $desired];
-                                $articleMedia->ensureForPost($postId, ['subject' => (string) (($state['state']->title ?? '')), 'force_inline_reconcile' => true, 'allow_historical_reuse' => false, 'allow_scoped_reuse' => false], $desired);
+                                $mediaContext = ['subject' => (string) (($state['state']->title ?? '')), 'capture_id' => $capture instanceof \NHK\Core\Domain\Capture\CaptureRecord ? $capture->captureId : '', 'capture_has_physical_assets' => true, 'force_inline_reconcile' => true, 'allow_historical_reuse' => false, 'allow_scoped_reuse' => false, 'content_intent' => is_object($capture) && is_array($capture->context['content_intent'] ?? null) ? $capture->context['content_intent'] : [], 'subject_resolution_packet' => $packet];
+                                if (($mediaContext['content_intent']['intent'] ?? '') === 'IMAGE_ARTICLE' && count($desired) === 1) $mediaContext['single_real_image_exception'] = true;
+                                $articleMedia->ensureForPost($postId, $mediaContext, $desired);
                             }
                             if ($action->action === 'ALLOCATE_SLUG' && isset($state['state'])) $editorialPosts->update($postId, ['post_name' => sanitize_title((string) $state['state']->title)]);
                         }
                         $fresh = $editorialPosts->read($postId);
-                        return $fresh === null ? [] : ['state' => $fresh, 'slug' => $fresh->slug, 'permalink' => $fresh->permalink];
+                        $nextCapture = $capture instanceof \NHK\Core\Domain\Capture\CaptureRecord ? $captureRepository->findById($capture->captureId) : null;
+                        return $fresh === null ? [] : ['state' => $fresh, 'capture' => $nextCapture, 'subject_resolution_packet' => $packet, 'slug' => $fresh->slug, 'permalink' => $fresh->permalink];
                     },
                     static function (array $state) use ($draftGateway): array {
                         $owner = $state['state'] ?? null;

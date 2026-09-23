@@ -71,4 +71,41 @@ final class ArticleReconciliationOrchestratorTest extends TestCase
         self::assertTrue($action['auto_repair_safe']);
         self::assertContains('capture-child-admission', $action['dependencies']);
     }
+
+    public function test_current_exact_subject_supersedes_stale_packet_once_and_preserves_owner_boundary(): void
+    {
+        $repairs = 0;
+        $old = ['status' => 'resolved', 'canonical_subject_id' => 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'entity_type' => 'music', 'stable_key' => 'music:old', 'revision' => 1];
+        $current = ['status' => 'resolved', 'canonical_subject_id' => 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'entity_type' => 'model', 'stable_key' => 'model:current', 'revision' => 2];
+        $orchestrator = new ArticleReconciliationOrchestrator(
+            static fn (array $input): array => ['post_id' => 91, 'subject_resolution_packet' => $old],
+            static fn (array $state): array => ['intent' => 'TEXT_ARTICLE'],
+            static fn (array $state): array => $current,
+            static fn (array $state): array => ['diagnostics' => []],
+            static function (array $state, array $actions) use (&$repairs, $current): array {
+                $repairs++;
+                self::assertSame('SUPERSEDE_SUBJECT_PACKET', $actions[0]->action);
+                return ['subject_resolution_packet' => $current, 'subject_packet_supersession' => null];
+            },
+            static fn (array $state): array => ['outcome' => 'PASS'],
+            static fn (array $state): array => [],
+            static fn (array $state): array => ['status' => 'verified'],
+        );
+
+        $result = $orchestrator->reconcile(['post_id' => 91]);
+
+        self::assertSame('PASS', $result['status']);
+        self::assertSame(1, $repairs);
+        self::assertSame('SUBJECT_PACKET_SUPERSESSION', $result['actions'][0]['code']);
+    }
+
+    public function test_about_relation_mismatch_is_a_governed_capture_child_action(): void
+    {
+        $action = (new ArticleRemediationPlanner())->plan([], ['ARTICLE_ABOUT_RELATION_MISMATCH'])[0]->toArray();
+        self::assertSame('graph', $action['owner']);
+        self::assertSame('CONVERGE_PRIMARY_ABOUT', $action['action']);
+        self::assertTrue($action['auto_repair_safe']);
+        self::assertContains('capture-child-admission', $action['dependencies']);
+        self::assertContains('governed-proposal', $action['dependencies']);
+    }
 }
