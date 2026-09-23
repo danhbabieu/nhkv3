@@ -1,3 +1,11 @@
+# Checkpoint — 2026-09-23 — Capture pipeline convergence Task 7 publication/URL/completion (LOCAL / NO LIVE MUTATION)
+
+TASK_RESULT: No product-code change was required. Existing publication gates derive blockers from current Article/Media/semantic evidence, require concrete owner IDs, reserve/read back native routes through the existing WordPress lifecycle, and keep completion false for incomplete or uncertain owners.
+
+VERIFICATION: Publication/completion/route-focused suite passed 70 tests / 321 assertions. Coverage includes optional TEXT media, required IMAGE media, stale blocker removal, route readiness/activation, rendered URL verification and empty-owner rejection. No database, staging, V2 or production mutation occurred.
+
+STATUS: `CAPTURE_PIPELINE_TASK_7_PUBLICATION_URL_COMPLETION_LOCAL_READY / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-23 — Capture pipeline convergence Task 6 state-token rehydration (LOCAL / NO LIVE MUTATION)
 
 TASK_RESULT: No product-code change was required. Existing retry boundaries rehydrate current Article state, enforce expected state tokens/CAS, persist token rotation after MediaUsage/publication read-back, and retain append-only receipts while reducing the current outcome.
