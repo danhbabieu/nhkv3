@@ -106,4 +106,29 @@ final class VideoEditorialDecisionPipelineTest extends TestCase
         self::assertSame('HARD_BLOCK', $result['quality']);
         self::assertSame([], $result['editorial_package']['repair_log'] ?? []);
     }
+
+    public function test_repair_revalidates_and_updates_seo_projection_from_the_repaired_package(): void
+    {
+        $guard = new PublicEditorialCopyGuard();
+        $result = (new VideoEditorialDecisionPipeline())->run(
+            [
+                'title' => 'Video về một hiện vật',
+                'body' => 'Trong bối cảnh tri thức NHK, nội dung mô tả hiện vật.',
+                'seo_description' => 'Trong bối cảnh tri thức NHK, mô tả ngắn cho người đọc.',
+                'claims' => [],
+            ],
+            [],
+            static fn (array $package): array => $package,
+            static fn (array $package) => array_map(static fn (array $finding): array => [
+                'code' => $finding['code'], 'severity' => $finding['severity'], 'scope' => 'artifact',
+                'claim_id' => null, 'repair' => $finding['repair'], 'reason' => $finding['reason'],
+                'field' => $finding['field'],
+            ], $guard->findings($package)),
+        );
+
+        self::assertSame('READY', $result['quality']);
+        self::assertStringNotContainsString('tri thức NHK', $result['editorial_package']['body']);
+        self::assertStringNotContainsString('tri thức NHK', $result['editorial_package']['seo_description']);
+        self::assertSame([0, 1], array_column($result['trace'], 'round'));
+    }
 }
