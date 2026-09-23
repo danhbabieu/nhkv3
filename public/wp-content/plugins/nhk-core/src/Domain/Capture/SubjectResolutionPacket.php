@@ -122,3 +122,4 @@ final readonly class SubjectResolutionPacket
         ];
     }
 }
+

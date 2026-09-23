@@ -9,8 +9,8 @@ use NHK\Core\Shared\Uuid\UuidCodec;
 /** Canonical subject resolver adapter. Ambiguity and absence remain explicit. */
 final class SubjectResolutionService
 {
-    /** @param callable(string):array $resolver */
-    public function __construct(private $resolver) {}
+    /** @param callable(string):array|object $resolver */
+    public function __construct(private $resolver, private ?SubjectStructuralContextReader $structuralContext = null, private $compositeResolver = null) {}
 
     /** @param list<string> $hints @return array<string,mixed> */
     public function resolve(array $hints): array
@@ -71,7 +71,7 @@ final class SubjectResolutionService
         }
 
         if ($hints !== []) {
-            $result = $this->resolveBucket($hints, 'explicit_subject_hint', true);
+            $result = $this->resolveExplicitHints($hints);
             if ($result['resolved'] !== []) return $result;
             $result['diagnostics'][] = 'SUBJECT_EXPLICIT_HINT_UNRESOLVED';
             return $this->finalize($result, 'unresolved');
@@ -134,6 +134,83 @@ final class SubjectResolutionService
         ], $ordered === [] ? 'unresolved' : ($candidates === [] ? 'resolved' : 'ambiguous'));
     }
 
+    /** @param list<string> $hints @return array<string,mixed> */
+    private function resolveExplicitHints(array $hints): array
+    {
+        $candidateMap = [];
+        $unresolved = [];
+        foreach ($hints as $hint) {
+            $matches = $this->lookup($hint);
+            if ($matches === []) $unresolved[] = $hint;
+            foreach ($matches as $match) {
+                $key = (string) (($match['type'] ?? '') . ':' . ($match['id'] ?? ''));
+                if ($key !== ':') $candidateMap[$key] = $match + ['match_source' => $hint];
+            }
+        }
+        if (is_callable($this->compositeResolver) && count($hints) > 1) foreach ((array) ($this->compositeResolver)($hints) as $match) {
+            if (!is_array($match)) continue;
+            $key = (string) (($match['type'] ?? '') . ':' . ($match['id'] ?? ''));
+            if ($key !== ':') $candidateMap[$key] = $match + ['match' => 'composite_explicit_hint', 'match_source' => implode(' | ', $hints)];
+        }
+        $candidates = array_values($candidateMap);
+        if ($candidates === []) return $this->finalize(['resolved' => [], 'candidates' => [], 'unresolved' => $unresolved, 'conflicts' => [], 'diagnostics' => [], 'primary_source' => 'explicit_subject_hint'], 'unresolved');
+        $contexts = [];
+        foreach ($candidates as $candidate) {
+            $context = $this->structuralContext?->contextFor($candidate) ?? $this->compatibilityContext($candidate);
+            $contexts[(string) $candidate['id']] = $context;
+            $candidate['structural_context'] = $context;
+            $candidateMap[(string) $candidate['type'] . ':' . (string) $candidate['id']] = $candidate;
+        }
+        $candidates = array_values($candidateMap);
+        $conflicts = $this->hierarchicalConflicts($candidates, $contexts);
+        if ($conflicts !== []) return $this->finalize(['resolved' => $candidates, 'candidates' => ['explicit' => $candidates], 'unresolved' => $unresolved, 'conflicts' => $conflicts, 'diagnostics' => ['SUBJECT_CONFLICT_REVIEW_REQUIRED'], 'primary_source' => 'explicit_subject_hint'], 'conflict');
+        $narrowest = array_values(array_filter($candidates, fn (array $candidate): bool => !$this->hasNarrowerCompatibleCandidate($candidate, $candidates, $contexts)));
+        $byType = [];
+        foreach ($narrowest as $candidate) $byType[(string) ($candidate['type'] ?? '')][] = $candidate;
+        $unique = array_values(array_filter($narrowest, static fn (array $candidate): bool => count($byType[(string) ($candidate['type'] ?? '')] ?? []) === 1));
+        if (count($unique) !== 1) return $this->finalize(['resolved' => $narrowest, 'candidates' => ['explicit' => $candidates], 'unresolved' => $unresolved, 'conflicts' => [], 'diagnostics' => ['SUBJECT_AMBIGUOUS'], 'primary_source' => 'explicit_subject_hint'], 'ambiguous');
+        $primary = $unique[0];
+        $compatible = [];
+        foreach ($candidates as $candidate) if ((string) ($candidate['id'] ?? '') !== (string) ($primary['id'] ?? '') && $this->isAncestorOf($candidate, $primary, $contexts)) $compatible[] = $candidate;
+        return $this->finalize(['resolved' => [$primary], 'candidates' => ['explicit' => $candidates], 'unresolved' => $unresolved, 'conflicts' => [], 'compatibility_candidates' => $compatible, 'diagnostics' => [], 'primary_source' => 'explicit_subject_hint', 'decision_class' => 'SPECIFICITY_' . strtoupper((string) ($primary['type'] ?? ''))], 'resolved');
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function lookup(string $value): array
+    {
+        $matches = is_callable($this->resolver) ? ($this->resolver)($value) : (is_object($this->resolver) && method_exists($this->resolver, 'resolve') ? $this->resolver->resolve($value) : []);
+        return is_array($matches) ? array_values(array_filter($matches, 'is_array')) : [];
+    }
+
+    /** @return array<string,mixed> */
+    private function compatibilityContext(array $candidate): array
+    {
+        return ['status' => 'available', 'candidate' => $candidate, 'ancestors' => array_map(static fn (string $id): array => ['id' => $id], array_values((array) (($candidate['compatibility'] ?? [])['parent_ids'] ?? []))), 'relation_path' => [], 'reasons' => [], 'warnings' => []];
+    }
+
+    /** @param list<array<string,mixed>> $candidates @param array<string,array<string,mixed>> $contexts @return list<array<string,mixed>> */
+    private function hierarchicalConflicts(array $candidates, array $contexts): array
+    {
+        $conflicts = [];
+        foreach ($candidates as $index => $left) foreach (array_slice($candidates, $index + 1) as $right) {
+            if (($left['type'] ?? '') === ($right['type'] ?? '') && ($left['id'] ?? '') !== ($right['id'] ?? '')) $conflicts[] = ['kind' => 'same_type_identity', 'expected' => $left, 'candidate' => $right];
+            elseif (!$this->isAncestorOf($left, $right, $contexts) && !$this->isAncestorOf($right, $left, $contexts) && ($left['type'] ?? '') !== ($right['type'] ?? '')) $conflicts[] = ['kind' => 'incompatible_hierarchy', 'expected' => $left, 'candidate' => $right];
+        }
+        return $conflicts;
+    }
+
+    private function isAncestorOf(array $ancestor, array $descendant, array $contexts): bool
+    {
+        foreach ((array) (($contexts[(string) ($descendant['id'] ?? '')]['ancestors'] ?? [])) as $context) if (is_array($context) && (string) ($context['id'] ?? '') === (string) ($ancestor['id'] ?? '')) return true;
+        return in_array((string) ($ancestor['id'] ?? ''), (array) (($descendant['compatibility'] ?? [])['parent_ids'] ?? []), true);
+    }
+
+    private function hasNarrowerCompatibleCandidate(array $candidate, array $candidates, array $contexts): bool
+    {
+        foreach ($candidates as $other) if ((string) ($other['id'] ?? '') !== (string) ($candidate['id'] ?? '') && $this->isAncestorOf($candidate, $other, $contexts)) return true;
+        return false;
+    }
+
     /** @param array<string,mixed> $result @return array<string,mixed> */
     private function finalize(array $result, string $status): array
     {
@@ -148,7 +225,9 @@ final class SubjectResolutionService
             'candidates' => (array) ($result['candidates'] ?? []),
             'unresolved' => array_values((array) ($result['unresolved'] ?? [])),
             'conflicts' => array_values((array) ($result['conflicts'] ?? [])),
-            'compatibility_candidates' => [],
+            'compatibility_candidates' => array_values((array) ($result['compatibility_candidates'] ?? [])),
+            'compatible_context' => array_values((array) ($result['compatibility_candidates'] ?? [])),
+            'decision_class' => (string) ($result['decision_class'] ?? ''),
             'diagnostics' => $diagnostics,
         ];
     }
@@ -227,3 +306,4 @@ final class SubjectResolutionService
         };
     }
 }
+
