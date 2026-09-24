@@ -83,8 +83,136 @@ final class ClaimRetrievalEngine
         return ['status' => $blockers === [] ? 'available' : 'partial', 'items' => $items, 'selected_claims' => $selected, 'blockers' => array_values(array_unique($blockers)), 'retrieval_diagnostics' => $diagnostics];
     }
 
+    /**
+     * Retrieve a bounded opportunity for every meaningful SemanticNeed before
+     * applying the merged candidate limit.
+     *
+     * @param array<string,mixed> $context
+     * @param list<SemanticNeed|array<string,mixed>> $needs
+     * @return array<string,mixed>
+     */
+    public function retrieveForNeeds(array $context, array $needs): array
+    {
+        $normalizedNeeds = [];
+        foreach ($needs as $need) {
+            try {
+                $normalizedNeeds[] = $need instanceof SemanticNeed ? $need : SemanticNeed::fromArray($need);
+            } catch (\Throwable) {
+                continue;
+            }
+        }
+        $limit = min($this->limit, max(1, (int) ($context['result_limit'] ?? $this->limit)), 200);
+        $all = [];
+        $blockers = [];
+        $needDiagnostics = [];
+        $retrievalOrder = 0;
+        foreach ($normalizedNeeds as $need) {
+            $needData = $need->toArray();
+            $subject = $need->canonicalSubject();
+            $neighborhood = ($this->neighborhood)($subject);
+            $needId = $need->needId();
+            $needDiagnostics[$needId] = [
+                'need_id' => $needId,
+                'facet_key' => $need->facetKey(),
+                'concept_key' => $need->conceptKey(),
+                'opportunity_allocated' => max(1, min(200, (int) ($need->retrievalPolicy()['opportunity_budget'] ?? 1))),
+                'candidate_count' => 0,
+                'eligible_count' => 0,
+                'stop_reason' => 'opportunity_exhausted',
+            ];
+            if (!is_array($neighborhood) || ($neighborhood['status'] ?? 'available') !== 'available') {
+                $blockers[] = 'GRAPH_RESEARCH_UNAVAILABLE';
+                $needDiagnostics[$needId]['stop_reason'] = 'graph_unavailable';
+                continue;
+            }
+            $rows = $this->claimsFor($subject, $neighborhood, $needData);
+            if (!is_array($rows)) {
+                $blockers[] = 'CLAIM_RETRIEVAL_UNAVAILABLE';
+                $needDiagnostics[$needId]['stop_reason'] = 'claims_unavailable';
+                continue;
+            }
+            $opportunity = $needDiagnostics[$needId]['opportunity_allocated'];
+            $opportunityRows = array_values(array_filter($rows, function (mixed $row) use ($need): bool {
+                if (!is_array($row)) return false;
+                $rowFacet = strtolower(trim((string) ($row['facet'] ?? $row['knowledge_facet'] ?? '')));
+                return $need->facetKey() === '' || $rowFacet === '' || $rowFacet === $need->facetKey();
+            }));
+            foreach (array_slice($opportunityRows, 0, $opportunity) as $row) {
+                if (!is_array($row)) continue;
+                $rowFacet = strtolower(trim((string) ($row['facet'] ?? $row['knowledge_facet'] ?? '')));
+                if ($need->facetKey() !== '' && $rowFacet !== '' && $rowFacet !== $need->facetKey()) continue;
+                $candidate = $this->candidate($row, $subject, $neighborhood, strtolower($need->facetKey() . ' ' . $need->conceptKey()), $needData);
+                $candidate['_retrieval_order'] = $retrievalOrder++;
+                $candidate['need_id'] = $needId;
+                $candidate['need_ids'] = [$needId];
+                $candidate['facet'] = $rowFacet !== '' ? $rowFacet : $need->facetKey();
+                $candidate['concept'] = strtolower(trim((string) ($row['concept'] ?? $row['concept_key'] ?? $need->conceptKey())));
+                $candidate['retrieval_tier'] = 'EXACT';
+                $candidate['editorial_treatment'] = 'DIRECT_FACT';
+                $candidate['coverage_kind'] = 'exact';
+                $key = $candidate['claim_id'] . ':' . $candidate['claim_revision'];
+                if (!isset($all[$key])) {
+                    $all[$key] = $candidate;
+                } else {
+                    $all[$key]['need_ids'] = array_values(array_unique(array_merge((array) ($all[$key]['need_ids'] ?? []), [$needId])));
+                    if ($candidate['score'] > $all[$key]['score']) $all[$key] = array_replace($all[$key], $candidate, ['need_ids' => $all[$key]['need_ids']]);
+                }
+                $needDiagnostics[$needId]['candidate_count']++;
+                if ($candidate['decision'] === 'include') $needDiagnostics[$needId]['eligible_count']++;
+            }
+            if ($needDiagnostics[$needId]['eligible_count'] > 0) $needDiagnostics[$needId]['stop_reason'] = 'exact_candidates_available';
+        }
+
+        $items = array_values($all);
+        usort($items, static function (array $left, array $right): int {
+            $score = $right['score'] <=> $left['score'];
+            if ($score !== 0) return $score;
+            return ((int) ($left['_retrieval_order'] ?? 0)) <=> ((int) ($right['_retrieval_order'] ?? 0));
+        });
+        $mandatory = [];
+        foreach ($normalizedNeeds as $need) {
+            $needId = $need->needId();
+            foreach ($items as $index => $item) {
+                if (in_array($needId, (array) ($item['need_ids'] ?? []), true) && ($item['decision'] ?? '') === 'include') {
+                    $mandatory[$index] = $item;
+                    break;
+                }
+            }
+        }
+        $merged = array_values($mandatory);
+        $seen = [];
+        foreach ($merged as $item) $seen[$item['claim_id'] . ':' . $item['claim_revision']] = true;
+        foreach ($items as $item) {
+            $key = $item['claim_id'] . ':' . $item['claim_revision'];
+            if (isset($seen[$key])) continue;
+            if (count($merged) >= $limit) break;
+            $merged[] = $item;
+            $seen[$key] = true;
+        }
+        $selected = array_values(array_filter($merged, static fn (array $item): bool => ($item['decision'] ?? '') === 'include'));
+        return [
+            'status' => $blockers === [] ? 'available' : 'partial',
+            'items' => array_slice($merged, 0, $limit),
+            'eligible_claims' => $selected,
+            'selected_claims' => $selected,
+            'need_diagnostics' => array_values($needDiagnostics),
+            'blockers' => array_values(array_unique($blockers)),
+            'retrieval_diagnostics' => [
+                'need_count' => count($normalizedNeeds),
+                'initial_candidates' => count($all),
+                'candidates_considered' => count($merged),
+                'opportunity_allocated_per_need' => $normalizedNeeds === [] ? 0 : min(array_map(static fn (SemanticNeed $need): int => max(1, (int) ($need->retrievalPolicy()['opportunity_budget'] ?? 1)), $normalizedNeeds)),
+                'starvation_prevention' => 'mandatory_first_candidate_per_need',
+                'expansion_depth' => 0,
+                'rounds' => [],
+                'stop_reason' => 'facet_opportunities_merged',
+            ],
+        ];
+    }
+
     /** @param array<string,mixed> $row @param array<string,mixed> $subject @param array<string,mixed> $neighborhood @return array<string,mixed> */
-    private function candidate(array $row, array $subject, array $neighborhood, string $intent): array
+    /** @param array<string,mixed>|null $need */
+    private function candidate(array $row, array $subject, array $neighborhood, string $intent, ?array $need = null): array
     {
         $id = trim((string) ($row['id'] ?? $row['claim_id'] ?? ''));
         $revision = max(1, (int) ($row['revision'] ?? $row['claim_revision'] ?? 1));
@@ -118,10 +246,24 @@ final class ClaimRetrievalEngine
         return [
             'claim_id' => $id, 'claim_revision' => $revision, 'text' => $text, 'subject_id' => $claimSubject, 'subject_type' => $claimSubjectType,
             'scope' => $scope, 'provenance' => $provenance, 'evidence_status' => $evidence,
+            'need_id' => (string) ($need['need_id'] ?? ''),
+            'facet' => strtolower(trim((string) ($row['facet'] ?? $row['knowledge_facet'] ?? ''))),
+            'concept' => strtolower(trim((string) ($row['concept'] ?? $row['concept_key'] ?? ''))),
             'relation_path' => $path, 'hop_count' => $hop, 'score' => round($score, 6),
             'decision' => $decision, 'reason' => $reason, 'warnings' => $warnings,
             'source_ids' => array_values((array) ($row['source_ids'] ?? [])), 'evidence_ids' => array_values((array) ($row['evidence_ids'] ?? [])),
         ];
+    }
+
+    /** @param array<string,mixed> $subject @param array<string,mixed> $neighborhood @param array<string,mixed> $need @return array<int,mixed> */
+    private function claimsFor(array $subject, array $neighborhood, array $need): array
+    {
+        $reflection = is_array($this->claims)
+            ? new \ReflectionMethod($this->claims[0], $this->claims[1])
+            : new \ReflectionFunction($this->claims);
+        return $reflection->getNumberOfParameters() >= 3
+            ? (array) ($this->claims)($subject, $neighborhood, $need)
+            : (array) ($this->claims)($subject, $neighborhood);
     }
 
     /**

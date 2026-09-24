@@ -91,6 +91,59 @@ final class EditorialClaimRetrievalService
         ];
     }
 
+    /**
+     * @param list<SemanticNeed|array<string,mixed>> $needs
+     * @param array<string,mixed> $profile
+     * @return array<string,mixed>
+     */
+    public function retrieveForNeeds(SemanticInputEnvelope $envelope, array $needs, array $profile = []): array
+    {
+        $input = $envelope->toArray();
+        $raw = $this->engine->retrieveForNeeds([
+            'raw_input' => trim((string) ($input['raw_text'] ?? '')),
+            'profile' => $profile,
+            'result_limit' => max(1, min(200, (int) ($profile['result_limit'] ?? $this->defaultLimit))),
+        ], $needs);
+        $primary = is_array(($input['subject_resolution']['primary'] ?? null)) ? $input['subject_resolution']['primary'] : [];
+        $items = [];
+        foreach ((array) ($raw['items'] ?? []) as $item) {
+            if (!is_array($item)) continue;
+            $claimSubjectId = (string) ($item['subject_id'] ?? '');
+            $claimSubjectType = (string) ($item['subject_type'] ?? '');
+            $eligible = ($item['decision'] ?? '') === 'include';
+            $items[] = $item + [
+                'original_subject' => ['id' => $claimSubjectId, 'type' => $claimSubjectType],
+                'resolved_primary_subject' => $primary,
+                'graph_path' => (array) ($item['relation_path'] ?? []),
+                'retrieval_origin' => $claimSubjectId !== '' && $claimSubjectId === (string) ($primary['id'] ?? '') ? 'direct' : 'neighborhood',
+                'eligibility' => $eligible ? 'eligible' : 'ineligible',
+                'scope_compatibility' => $this->scopeStatus($item),
+                'provenance_references' => [
+                    'source_ids' => array_values((array) ($item['source_ids'] ?? [])),
+                    'evidence_ids' => array_values((array) ($item['evidence_ids'] ?? [])),
+                ],
+                'evidence' => [
+                    'status' => $this->evidenceStatus((string) ($item['evidence_status'] ?? '')),
+                    'raw_status' => (string) ($item['evidence_status'] ?? ''),
+                ],
+                'exclusion_reasons' => $eligible ? [] : $this->exclusionReasons($item),
+            ];
+        }
+        $eligible = array_values(array_filter($items, static fn (array $item): bool => ($item['eligibility'] ?? '') === 'eligible'));
+        return $raw + [
+            'items' => $items,
+            'eligible_claims' => $eligible,
+            'selected_claims' => $eligible,
+            'diagnostics' => [
+                'result_limit' => max(1, min(200, (int) ($profile['result_limit'] ?? $this->defaultLimit))),
+                'candidate_count' => count($items),
+                'eligible_count' => count($eligible),
+                'profile' => $profile,
+                'retrieval_diagnostics' => (array) ($raw['retrieval_diagnostics'] ?? []),
+            ],
+        ];
+    }
+
     private function scopeStatus(array $item): string
     {
         return in_array('SEMANTIC_SCOPE_NOT_APPLICABLE', (array) ($item['warnings'] ?? []), true)

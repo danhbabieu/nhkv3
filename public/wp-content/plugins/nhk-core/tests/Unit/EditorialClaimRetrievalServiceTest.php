@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Tests\Unit;
 
-use NHK\Core\Application\Semantic\{ClaimRetrievalEngine, EditorialClaimRetrievalService};
+use NHK\Core\Application\Semantic\{ClaimRetrievalEngine, EditorialClaimRetrievalService, SemanticInputEnvelope, SemanticNeed};
 use PHPUnit\Framework\TestCase;
 
 final class EditorialClaimRetrievalServiceTest extends TestCase
@@ -62,6 +62,28 @@ final class EditorialClaimRetrievalServiceTest extends TestCase
 
         self::assertCount(7, $result['items']);
         self::assertLessThanOrEqual(7, $result['diagnostics']['result_limit']);
+    }
+
+    public function test_multi_need_service_exposes_need_trace_and_canonical_revision(): void
+    {
+        $service = $this->service([
+            ['id' => 'facet-claim', 'revision' => 4, 'subject_id' => self::SUBJECT, 'subject_type' => 'model', 'text' => 'Odo 36 có vách máy.', 'scope' => 'model', 'facet' => 'configuration', 'provenance' => 'CATALOG_SUPPORTED', 'evidence_status' => 'SUPPORTED_WITHIN_SCOPE', 'source_ids' => ['source-1'], 'evidence_ids' => ['evidence-1']],
+        ]);
+        $envelope = SemanticInputEnvelope::fromArray(['raw_text' => 'vách máy', 'subject_resolution' => ['primary' => ['id' => self::SUBJECT, 'type' => 'model']]]);
+        $need = SemanticNeed::fromArray([
+            'canonical_subject' => ['id' => self::SUBJECT, 'type' => 'model'],
+            'facet_key' => 'configuration', 'concept_key' => 'machine_wall', 'scope' => 'model',
+            'intent' => 'vách máy', 'origin' => 'USER_EXPLICIT', 'confidence' => 0.9,
+            'evidence_requirement' => 'SUPPORTED_WITHIN_SCOPE',
+        ]);
+
+        $result = $service->retrieveForNeeds($envelope, [$need], ['result_limit' => 5]);
+
+        self::assertSame('available', $result['status']);
+        self::assertSame($need->needId(), $result['items'][0]['need_id']);
+        self::assertSame(4, $result['items'][0]['claim_revision']);
+        self::assertSame(['source-1'], $result['items'][0]['source_ids']);
+        self::assertArrayHasKey('need_diagnostics', $result);
     }
 
     private function service(array $rows): EditorialClaimRetrievalService
