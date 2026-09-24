@@ -36,7 +36,7 @@ final class VideoSeoProjection
             'name' => $editorialTitle,
             'description' => $editorialSummary,
             'url' => $watchPath,
-            'embedUrl' => preg_match('/^[A-Za-z0-9_-]{11}$/', $id) === 1 ? 'https://www.youtube-nocookie.com/embed/' . $id : null,
+            'embedUrl' => preg_match('/^[A-Za-z0-9_-]{11}$/', $id) === 1 ? \NHK\Core\Domain\Video\YouTubeVideoIdentity::privacyEmbedUrl($id) : null,
         ];
         if (!$seoProjection['indexable']) return [
             'title' => $seoTitle,

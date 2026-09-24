@@ -89,6 +89,40 @@ STATUS: `CONFIRMED_SUBJECT_RECONCILIATION_MIXED_ROUTING_LOCAL_READY / INTEGRATIO
 
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-25 — YouTube Video retry embed contract repair (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE_CONFIRMED: The source adapter and initial Video intake generated the
+privacy-enhanced canonical embed URL, but the existing-Capture retry branch for
+a planned Video identity rebuilt metadata in
+`VideoEditorialResumePlanner::preApplyCreatePlan()` without restoring
+`embed_url`. Controlled Apply therefore received an empty embed value and
+reported `INVALID_EMBED_URL`; the `youtube-nocookie.com` host was not the first
+rejection. The previous generic `FILTER_VALIDATE_URL` rule also did not encode
+the intended YouTube embed contract, allowing unrelated valid URLs through.
+
+FIXED_BOUNDARY: `YouTubeVideoIdentity` now owns the canonical privacy embed
+representation and exact validator. Intake, retry reconstruction, SEO/public
+projection and completeness use that shared boundary. Retry restores the
+canonical embed from the immutable external Video ID; completeness requires
+HTTPS `www.youtube-nocookie.com/embed/{same 11-char YouTube ID}` and rejects
+non-YouTube, mismatched, malformed or source-field URLs. Governance,
+eligibility, owner identity and Controlled Apply remain unchanged.
+
+REGRESSION: Added retry rebuild coverage, Controlled Apply persistence and
+same-owner/idempotency coverage, plus canonical privacy-embed acceptance and
+non-YouTube rejection. Existing Shorts/watch/youtu.be normalization tests
+remain in the Video suite.
+
+VERIFICATION: Focused RED reproduced missing `embed_url`; focused GREEN passed.
+Full Unit passed 2,600 tests / 15,132 assertions with 19 warnings, 45
+deprecations and 32 PHPUnit deprecations under 512M. Contract passed 6 tests /
+48 assertions. Video/Capture Integration was invoked but environment-gated by
+missing `NHK_WP_TEST_PATH`/`NHK_WP_TEST_DB`; no database, staging/production
+data, deployment or runtime mutation occurred. PHP lint, diff check and
+special-case/secret review remain final gates for this checkpoint.
+
+STATUS: `YOUTUBE_EMBED_CONTRACT_REPAIRED_LOCAL_READY / INTEGRATION_ENVIRONMENT_GATED / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-25 — Generic read-only Easy MCP projection boundary
 
 ROOT_CAUSE: the Easy MCP compatibility projection only normalized descriptors

@@ -112,9 +112,44 @@ final class VideoEditorialResumePlannerTest extends TestCase
         self::assertSame('capture:retry:video', $plan['idempotency_key']);
         self::assertSame($videoId, $plan['payload']['canonical_id']);
         self::assertSame('dQw4w9WgXcQ', $plan['payload']['metadata']['source']['external_video_id']);
+        self::assertSame('https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ', $plan['payload']['metadata']['embed_url']);
         self::assertSame('01a09e44-539a-7f1a-938a-d7d91bb689a3', $plan['payload']['metadata']['knowledge_enrichment']['subject']['id']);
         self::assertSame('classification', $plan['payload']['metadata']['knowledge_enrichment']['subject']['type']);
         self::assertNotContains('NO_SUPPORTED_SUBJECT', $plan['payload']['metadata']['knowledge_enrichment']['diagnostics']);
+    }
+
+    public function test_rebuilt_embed_survives_controlled_apply_and_reuses_the_same_owner(): void
+    {
+        $videoId = '01a0aaf8-2a84-7287-bbd8-70af4d5485e4';
+        $repository = new class implements VideoRepository {
+            /** @var array<string,Video> */
+            public array $items = [];
+            public function findByCanonicalId(string $id): ?Video { return $this->items[$id] ?? null; }
+            public function findByExternalReference(string $platform, string $externalId): ?Video { foreach ($this->items as $video) if ($video->platform === $platform && $video->externalVideoId === $externalId) return $video; return null; }
+            public function create(Video $video): Video { return $this->items[$video->canonicalId] = $video; }
+            public function update(Video $video, int $expectedRevision): Video { return $this->items[$video->canonicalId] = $video; }
+            public function list(bool $includeRetired = false): array { return array_values($this->items); }
+        };
+        $planner = new VideoEditorialResumePlanner($repository, new VideoEditorialGenerator(), new VideoSeoProjection());
+        $plan = $planner->plan(['operation' => 'ingest', 'entity_type' => 'video', 'idempotency_key' => 'capture:retry:video', 'payload' => [
+            'canonical_id' => $videoId,
+            'url' => 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+            'metadata' => ['source' => ['platform' => 'youtube', 'external_video_id' => 'dQw4w9WgXcQ', 'canonical_source_url' => 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'availability' => 'available', 'embeddable' => true], 'source_rights' => 'PUBLIC_EXTERNAL_REFERENCE'],
+        ]], [
+            'continuation_delta_text' => '',
+            'subject_resolution' => ['primary' => ['id' => '01a09e44-539a-7f1a-938a-d7d91bb689a3', 'type' => 'classification']],
+            'retrieval' => ['selected_claims' => []],
+        ]);
+        $proposal = new Proposal('video-rebuilt-apply', $videoId, 'ingest', $plan['payload'], 'content', 1, 'dependencies', ProposalState::APPROVED, idempotencyKey: 'capture:retry:video', entityType: 'video');
+        $executor = new AuthorityProposalExecutor(new AuthorityService(new InMemoryAuthorityRepository(), new EntityTypeRegistry()), null, null, new VideoService($repository));
+
+        $first = $executor($proposal);
+        $second = $executor($proposal);
+
+        self::assertSame($videoId, $first->canonicalId);
+        self::assertSame($videoId, $second->canonicalId);
+        self::assertSame('https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ', $repository->findByCanonicalId($videoId)?->metadata['embed_url']);
+        self::assertCount(1, $repository->list());
     }
 
     public function test_legacy_preview_derived_state_is_not_authoritative_for_absent_video_retry(): void

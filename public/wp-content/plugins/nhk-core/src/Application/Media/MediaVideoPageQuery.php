@@ -158,7 +158,7 @@ final class MediaVideoPageQuery
             'external_id' => $video->externalVideoId,
             'url' => $video->canonicalUrl,
             'public_url' => $publicUrl,
-            'embed_url' => $sourceAvailable ? 'https://www.youtube-nocookie.com/embed/' . $video->externalVideoId : null,
+            'embed_url' => $sourceAvailable ? \NHK\Core\Domain\Video\YouTubeVideoIdentity::privacyEmbedUrl($video->externalVideoId) : null,
             'source_available' => $sourceAvailable,
             'source_thumbnail_url' => ($thumbnail = $this->sourceThumbnail($source))['url'] ?? null,
             'source_thumbnail' => $thumbnail,

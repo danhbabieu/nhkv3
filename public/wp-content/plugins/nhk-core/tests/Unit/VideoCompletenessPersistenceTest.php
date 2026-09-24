@@ -143,11 +143,11 @@ final class VideoCompletenessPersistenceTest extends TestCase
         $evidenceId = UuidCodec::newV7();
         $store = new RestartableVideoStore();
         $store->metadata = [
-            'source' => ['identity_valid' => true, 'availability' => 'available', 'embeddable' => true],
+            'source' => ['platform' => 'youtube', 'external_video_id' => 'dQw4w9WgXcQ', 'identity_valid' => true, 'availability' => 'available', 'embeddable' => true],
             'source_rights' => 'PUBLIC_EXTERNAL_REFERENCE',
             'editorial' => ['title' => 'Video', 'summary' => 'Summary', 'body' => 'Body'],
             'category' => ['primary' => ['key' => '01']],
-            'embed_url' => 'https://www.youtube.com/embed/dQw4w9WgXcQ',
+            'embed_url' => 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
             'seo' => ['title' => 'Video', 'description' => 'Summary'],
             'semantic_attachments' => [[
                 'predicate' => 'about',

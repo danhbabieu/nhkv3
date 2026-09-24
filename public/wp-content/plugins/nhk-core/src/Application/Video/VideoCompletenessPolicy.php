@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Video;
 
-use NHK\Core\Domain\Video\{VideoCompletenessResult, VideoSourceRights};
+use NHK\Core\Domain\Video\{VideoCompletenessResult, VideoSourceRights, YouTubeVideoIdentity};
 
 final class VideoCompletenessPolicy
 {
@@ -24,7 +24,7 @@ final class VideoCompletenessPolicy
         if (!VideoSourceRights::isValid((string) ($package['source_rights'] ?? ''))) $blockers[] = 'SOURCE_RIGHTS_UNRESOLVED';
         $editorial = is_array($package['editorial'] ?? null) ? $package['editorial'] : [];
         foreach (['title', 'summary', 'body'] as $field) if (trim((string) ($editorial[$field] ?? '')) === '') $blockers[] = 'EDITORIAL_INCOMPLETE';
-        if (filter_var((string) ($package['embed_url'] ?? ''), FILTER_VALIDATE_URL) === false) $blockers[] = 'INVALID_EMBED_URL';
+        if (!$this->isValidEmbedUrl($package)) $blockers[] = 'INVALID_EMBED_URL';
         return array_values(array_unique($blockers));
     }
 
@@ -63,11 +63,22 @@ final class VideoCompletenessPolicy
         $category = is_array($package['category'] ?? null) ? $package['category'] : [];
         if (!is_array($category['primary'] ?? null) || trim((string) ($category['primary']['key'] ?? '')) === '') $blockers[] = 'CATEGORY_UNRESOLVED';
         if (!is_array($package['semantic_attachments'] ?? null) || $package['semantic_attachments'] === []) $blockers[] = 'NO_SEMANTIC_ATTACHMENT';
-        if (filter_var((string) ($package['embed_url'] ?? ''), FILTER_VALIDATE_URL) === false) $blockers[] = 'INVALID_EMBED_URL';
+        if (!$this->isValidEmbedUrl($package)) $blockers[] = 'INVALID_EMBED_URL';
         $seo = is_array($package['seo'] ?? null) ? $package['seo'] : [];
         if (trim((string) ($seo['title'] ?? '')) === '' || trim((string) ($seo['description'] ?? '')) === '') $blockers[] = 'SEO_INCOMPLETE';
         if (($package['transcript_policy'] ?? 'NO_TRANSCRIPT') === 'NO_TRANSCRIPT') $warnings[] = 'TRANSCRIPT_UNAVAILABLE';
         if (!is_array($package['provenance'] ?? null) || $package['provenance'] === []) $warnings[] = 'PROVENANCE_INCOMPLETE';
         return new VideoCompletenessResult($blockers === [], array_values(array_unique($blockers)), array_values(array_unique($warnings)));
+    }
+
+    /** @param array<string,mixed> $package */
+    private function isValidEmbedUrl(array $package): bool
+    {
+        $source = is_array($package['source'] ?? null) ? $package['source'] : [];
+        return strtolower((string) ($source['platform'] ?? 'youtube')) === 'youtube'
+            && YouTubeVideoIdentity::isValidPrivacyEmbedUrl(
+                (string) ($package['embed_url'] ?? ''),
+                trim((string) ($source['external_video_id'] ?? '')),
+            );
     }
 }

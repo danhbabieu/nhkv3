@@ -230,7 +230,7 @@ final class VideoRelationLifecycleTest extends TestCase
                 // Intake completeness is evaluated before the relation exists;
                 // this stale blocker must not prevent relation materialization.
                 'completeness' => ['blockers' => ['NO_SEMANTIC_ATTACHMENT']],
-                'source' => ['identity_valid' => true, 'availability' => 'available', 'embeddable' => true],
+                'source' => ['platform' => 'youtube', 'external_video_id' => 'dQw4w9WgXcQ', 'identity_valid' => true, 'availability' => 'available', 'embeddable' => true],
                 'source_rights' => 'PUBLIC_EXTERNAL_REFERENCE',
                 'editorial' => ['title' => 'Video lifecycle', 'summary' => 'Summary', 'body' => 'Body'],
                 'category' => ['primary' => null],
@@ -410,7 +410,7 @@ final class VideoRelationLifecycleTest extends TestCase
         $video = $executor(new Proposal('video-historical', 'video', 'ingest', [
             'canonical_id' => $videoId, 'url' => 'https://youtu.be/dQw4w9WgXcQ', 'title' => 'Historical video',
             'metadata' => [
-                'intake_version' => 1, 'source' => ['identity_valid' => true, 'availability' => 'available', 'embeddable' => true],
+                'intake_version' => 1, 'source' => ['platform' => 'youtube', 'external_video_id' => 'dQw4w9WgXcQ', 'identity_valid' => true, 'availability' => 'available', 'embeddable' => true],
                 'source_rights' => 'PUBLIC_EXTERNAL_REFERENCE', 'editorial' => ['title' => 'Historical', 'summary' => 'Summary', 'body' => 'Body'],
                 'category' => ['primary' => ['key' => '01']], 'embed_url' => 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
                 'seo' => ['title' => 'Historical', 'description' => 'Summary'], 'semantic_attachments' => [],

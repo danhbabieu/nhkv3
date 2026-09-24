@@ -6,7 +6,7 @@ namespace NHK\Core\Application\Video;
 use NHK\Core\Application\Compliance\PublicEditorialCopyGuard;
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Governance\CommandCanonicalizer;
-use NHK\Core\Domain\Video\Video;
+use NHK\Core\Domain\Video\{Video, YouTubeVideoIdentity};
 
 /** Builds a governed update for an existing Video without changing identity. */
 final class VideoEditorialResumePlanner
@@ -181,6 +181,7 @@ final class VideoEditorialResumePlanner
             'provenance' => is_array($persistedMetadata['provenance'] ?? null) ? $persistedMetadata['provenance'] : [],
             'source_rights' => $persistedMetadata['source_rights'] ?? null,
             'transcript_policy' => $persistedMetadata['transcript_policy'] ?? null,
+            'embed_url' => YouTubeVideoIdentity::privacyEmbedUrl((string) $source['external_video_id']),
         ];
         $metadata = array_filter($metadata, static fn (mixed $value): bool => $value !== null && $value !== []);
         $metadata['subject_resolution_packet'] = $subject;

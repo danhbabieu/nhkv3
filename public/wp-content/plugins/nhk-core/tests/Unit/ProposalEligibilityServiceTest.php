@@ -27,7 +27,7 @@ final class ProposalEligibilityServiceTest extends TestCase
     {
         $proposal = $this->proposal([
             'subject_resolution_packet' => ['id' => self::SUBJECT, 'type' => 'variant'],
-            'source' => ['identity_valid' => true, 'availability' => 'available', 'embeddable' => true],
+            'source' => ['platform' => 'youtube', 'external_video_id' => 'dQw4w9WgXcQ', 'identity_valid' => true, 'availability' => 'available', 'embeddable' => true],
             'source_rights' => 'PUBLIC_EXTERNAL_REFERENCE',
             'editorial' => ['title' => 'Video', 'summary' => 'Tóm tắt', 'body' => 'Nội dung'],
             'embed_url' => 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
@@ -43,7 +43,7 @@ final class ProposalEligibilityServiceTest extends TestCase
     {
         $proposal = $this->proposal([
             'subject_resolution_packet' => ['id' => self::SUBJECT, 'type' => 'variant', 'name' => 'Odo 36/8'],
-            'source' => ['identity_valid' => true, 'availability' => 'available', 'embeddable' => true],
+            'source' => ['platform' => 'youtube', 'external_video_id' => 'dQw4w9WgXcQ', 'identity_valid' => true, 'availability' => 'available', 'embeddable' => true],
             'source_rights' => 'PUBLIC_EXTERNAL_REFERENCE',
             'editorial' => ['title' => 'Video', 'summary' => 'Tóm tắt', 'body' => 'Nội dung'],
             'embed_url' => 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',

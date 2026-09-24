@@ -204,16 +204,29 @@ final class VideoGovernanceGenericityTest extends TestCase
     public function test_zero_attachment_does_not_invent_relation_and_keeps_blocker(): void
     {
         $result = (new VideoCompletenessPolicy())->evaluate([
-            'source' => ['identity_valid' => true, 'availability' => 'available', 'embeddable' => true],
+            'source' => ['platform' => 'youtube', 'external_video_id' => 'dQw4w9WgXcQ', 'identity_valid' => true, 'availability' => 'available', 'embeddable' => true],
             'source_rights' => 'PUBLIC_EXTERNAL_REFERENCE',
             'editorial' => ['title' => 'T', 'summary' => 'S', 'body' => 'B'],
             'category' => ['primary' => ['key' => 'category']],
             'semantic_attachments' => [],
-            'embed_url' => 'https://www.youtube-nocookie.com/embed/example',
+            'embed_url' => 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
             'seo' => ['title' => 'T', 'description' => 'S'],
         ]);
 
         self::assertContains('NO_SEMANTIC_ATTACHMENT', $result->blockers);
+        self::assertNotContains('INVALID_EMBED_URL', $result->blockers);
+    }
+
+    public function test_video_completeness_rejects_non_youtube_embed_urls(): void
+    {
+        $result = (new VideoCompletenessPolicy())->ownerBlockers([
+            'source' => ['platform' => 'youtube', 'external_video_id' => 'dQw4w9WgXcQ', 'identity_valid' => true, 'availability' => 'available', 'embeddable' => true],
+            'source_rights' => 'PUBLIC_EXTERNAL_REFERENCE',
+            'editorial' => ['title' => 'T', 'summary' => 'S', 'body' => 'B'],
+            'embed_url' => 'https://example.com/embed/dQw4w9WgXcQ',
+        ]);
+
+        self::assertContains('INVALID_EMBED_URL', $result);
     }
 
     public function test_multiple_about_attachments_are_deterministic_and_non_semantic_input_order(): void

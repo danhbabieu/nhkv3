@@ -144,7 +144,7 @@ final class VideoEditorialEnrichmentTest extends TestCase
     public function test_completeness_recomputes_current_attachment_instead_of_reusing_stale_blocker(): void
     {
         $result = (new VideoCompletenessPolicy())->evaluate([
-            'source' => ['identity_valid' => true, 'availability' => 'available', 'embeddable' => true],
+            'source' => ['platform' => 'youtube', 'external_video_id' => 'dQw4w9WgXcQ', 'identity_valid' => true, 'availability' => 'available', 'embeddable' => true],
             'source_rights' => 'PUBLIC_EXTERNAL_REFERENCE',
             'editorial' => ['title' => 'Video', 'summary' => 'Tóm tắt', 'body' => 'Nội dung'],
             'category' => ['primary' => ['key' => '01']],

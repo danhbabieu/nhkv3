@@ -6,7 +6,7 @@ namespace NHK\Core\Application\Video;
 use NHK\Core\Application\Entity\PublicRouteResolver;
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Application\Semantic\EditorialContextPack;
-use NHK\Core\Domain\Video\{VideoEditorialEnrichmentContext, VideoIntakePreview, VideoSourceRights};
+use NHK\Core\Domain\Video\{VideoEditorialEnrichmentContext, VideoIntakePreview, VideoSourceRights, YouTubeVideoIdentity};
 use NHK\Core\Domain\Video\VideoException;
 use NHK\Core\Shared\Uuid\UuidCodec;
 
@@ -149,7 +149,7 @@ final class VideoIntakeService
             'subject_resolution_packet' => $effectiveSubject,
             'seo' => $seoData,
             'content_quality' => is_object($contentQuality) ? $contentQuality->toArray() : $contentQuality,
-            'embed_url' => 'https://www.youtube-nocookie.com/embed/' . $snapshot['external_video_id'],
+            'embed_url' => YouTubeVideoIdentity::privacyEmbedUrl((string) $snapshot['external_video_id']),
             'provenance' => ['source_url' => $snapshot['canonical_source_url'], 'user_hint' => $userHint !== '' ? ['value' => $userHint, 'kind' => 'USER_HINT'] : null],
             'source_rights' => VideoSourceRights::PUBLIC_EXTERNAL_REFERENCE,
             'chapters' => $chapters,
