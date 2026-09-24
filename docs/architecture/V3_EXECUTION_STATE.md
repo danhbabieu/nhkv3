@@ -1,5 +1,25 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-24 — Media shared-core lifecycle connection (LOCAL / NO SERVER ACTION)
+
+IMPLEMENTED: After Brain 2 Article/Video contract closure, the existing
+MediaUniversalEnrichmentAdapter can now be constructed from the existing
+ClaimRetrievalEngine and delegates to SharedEnrichmentBoundary/Universal Core.
+It returns the canonical transient content/knowledge/relation branches and
+keeps the no-argument path fail-closed for unavailable infrastructure. No
+Media owner, persistence writer, binary mutation, schema or new semantic type
+was introduced.
+
+FIX: Universal Core now ignores non-scalar retrieval diagnostic payloads when
+building string diagnostic codes, preventing array-to-string warnings while
+preserving the structured retrieval diagnostics in their owning branch.
+
+VERIFICATION: Media/Universal Core plus Article/Video regression matrix passed
+31 tests / 143 assertions with no warnings. Brain 2 has passed focused contract,
+depth, quality, repair and SEO boundary coverage before Media connection.
+
+STATUS: `BRAIN2_AND_MEDIA_PIPELINE_LOCAL_READY / NO_SERVER_ACTION`
+
 # Checkpoint — 2026-09-24 — Brain 2 content depth and repair readiness (LOCAL / NO SERVER ACTION)
 
 REGRESSION: ReaderJourney now has a production-shaped depth assertion proving

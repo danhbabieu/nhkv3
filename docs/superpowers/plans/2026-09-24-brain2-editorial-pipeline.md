@@ -20,10 +20,10 @@ until the Brain 2 exit criteria pass.
 
 - [x] Slice 2: Article/Video contract closure and metadata propagation
 - [x] Slice 3: sparse/rich content depth and reader journey parity
-- [ ] Slice 4: quality diagnostics and bounded repair lifecycle
-- [ ] Slice 5: final-package SEO boundary and revalidation
-- [ ] Brain 2 verification and execution-state checkpoint
-- [ ] Media lifecycle connection after Brain 2 passes
+- [x] Slice 4: quality diagnostics and bounded repair lifecycle
+- [x] Slice 5: final-package SEO boundary and revalidation
+- [x] Brain 2 verification and execution-state checkpoint
+- [x] Media lifecycle connection after Brain 2 passes
 - [ ] Final verification and delivery report
 
 ## Verification

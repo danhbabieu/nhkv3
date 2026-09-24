@@ -82,7 +82,7 @@ final class UniversalEnrichmentCore
         $retrieved = $this->boundToPreparedContext($retrieved, is_array($options['prepared_context'] ?? null) ? $options['prepared_context'] : [], $subject);
         $inputContext = ['raw_input' => trim((string) ($value['body'] ?? '')), 'title' => trim((string) ($value['title'] ?? '')), 'observations' => (array) ($value['observations'] ?? [])];
         $pack = $this->selector->select($retrieved, $topic, $subject, $profileData, $inputContext);
-        $diagnostics = array_values(array_filter(array_map('strval', (array) ($retrieved['diagnostics'] ?? []))));
+        $diagnostics = array_values(array_filter(array_map(static fn (mixed $diagnostic): string => is_scalar($diagnostic) ? trim((string) $diagnostic) : '', (array) ($retrieved['diagnostics'] ?? []))));
         if ($pack->selectedClaims === []) $diagnostics[] = 'SHARED_CONTENT_CONTEXT_SPARSE';
         return [
             'status' => $pack->status === 'available' ? 'AVAILABLE' : strtoupper($pack->status),
