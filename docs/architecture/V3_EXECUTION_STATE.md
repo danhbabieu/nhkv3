@@ -18779,3 +18779,41 @@ Special-case scan of the production diff is clean. No staging, production,
 database mutation, push, pull or deployment was performed.
 
 STATUS: `LOCAL_FIX_READY_FOR_USER_DEPLOY / INTEGRATION_ENVIRONMENT_GATED / NO_SERVER_ACTION`.
+# Checkpoint — 2026-09-24 — Universal consumption and Living Knowledge closure (LOCAL / NO SERVER ACTION)
+
+IMPLEMENTED: Added an owner-neutral consumption contract and capability
+registry. Media now consumes the existing EnrichmentPack through a bounded
+caption/alt_text/description policy and Media quality gate; contextual,
+ineligible, provenance-only and unsupported visual assertions are excluded,
+and the adapter returns a consumption plan instead of an enrichment dead-end.
+Controlled Media apply is plan-only until Governance approval and delegates to
+the existing MediaBindingService callable boundary; completion requires
+canonical identity/read-back and uncertain outcomes reconcile the same identity.
+
+IMPLEMENTED: Added owner-neutral Living Knowledge lifecycle over the existing
+ProjectionDependencyIndex and ProjectionInvalidationService. Consumed claims
+register their owner, surface, revision and trace; a Knowledge revision marks
+all dependent owner types stale and returns
+`EDITORIAL_REGENERATION_AVAILABLE` without rewriting public content.
+Regeneration callbacks explicitly re-enter the Universal Core, preview/diff
+reports dependency additions/removals and wording changes, governed apply is
+required, and failed canonical read-back remains STALE. In-memory dependency
+registration now refreshes revision metadata idempotently, matching the
+existing WPDB upsert behavior.
+
+VERIFICATION: Focused consumption/lifecycle/regression matrix passed 152 tests
+/ 518 assertions. Full NHK Unit passed 2,496 tests / 14,331 assertions with
+18 warnings, 41 deprecations and 30 PHPUnit deprecations under 512M. NHK
+Contract passed 6 tests / 48 assertions. PHP lint and `git diff --check`
+passed. Composer validation passed with the existing missing-license warning.
+Guarded Integration was attempted against `nhk_v3_test` and remains
+`ENVIRONMENT_GATE_ONLY` because WordPress returned `Error establishing a
+database connection`; no integration assertion failure was observed.
+
+SAFETY: No Universal Core, SemanticNeed, applicability, Coverage, Knowledge,
+Evidence or Graph architecture was changed. No migration, database/staging/
+production mutation, Governance apply, deployment or push occurred. V2.3,
+V2.4, graph-direction and information-gain regressions remain covered by the
+passing Unit suite. Commits: `f43376de`, `afd020c7`, `9f06b718`, `b27a5fc0`.
+
+STATUS: `UNIVERSAL_CONSUMPTION_LIVING_KNOWLEDGE_READY_WITH_ENVIRONMENT_GATE / NO_SERVER_ACTION`
