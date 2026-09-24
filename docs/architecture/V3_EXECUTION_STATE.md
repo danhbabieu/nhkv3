@@ -1,5 +1,29 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-24 — Bounded Video editorial failure diagnostics (LOCAL / NO SERVER ACTION)
+
+IMPLEMENTED: Added a bounded `VideoEditorialFailureDiagnostics` read model for
+Video editorial failures. It retains quality readiness/blockers/warnings,
+quality dimensions, semantic-need summaries, bounded retrieval/coverage counts,
+repair rounds and terminal codes while excluding raw editorial text, raw claim
+items and offending spans. `VideoException` can carry this read-only packet,
+and `EditorialCaptureCoordinator` persists it under
+`editorial_failure_diagnostics` in the existing Capture diagnostics JSON. No
+schema or migration was introduced and no quality/lifecycle decision was
+relaxed.
+
+VERIFICATION: Focused Video/Capture/semantic matrix passed 135 tests / 591
+assertions with 1 warning, 3 deprecations and 30 PHPUnit deprecations. Full NHK
+Unit passed 2,451 tests / 14,159 assertions with 19 warnings, 41 deprecations
+and 30 PHPUnit deprecations under `memory_limit=512M`. PHP lint and
+`git diff --check` pass. The initial default-memory full-unit attempt was
+environment/tooling-gated by the existing 128M limit in
+`TrustedProvidedFileMaterializerTest`; the repository-standard 512M rerun
+passed. No integration run, database mutation, Capture retry, deployment,
+publication, push or commit occurred.
+
+STATUS: `LOCAL_VIDEO_EDITORIAL_FAILURE_DIAGNOSTICS_READY_FOR_REVIEW / FULL_UNIT_PASS / NO_SERVER_ACTION`.
+
 # Checkpoint — 2026-09-24 — Acceptance blockers closed (LOCAL / NO SERVER ACTION)
 
 FIXED: The production shared enrichment composition now injects the bounded

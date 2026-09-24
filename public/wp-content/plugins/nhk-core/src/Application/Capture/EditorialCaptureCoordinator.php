@@ -915,6 +915,9 @@ final class EditorialCaptureCoordinator
             $failureCode = $this->failureCode($error);
             $status = $this->failureStatus($failureCode);
             $diagnostics['failure'] = ['code' => $failureCode, 'message' => $error->getMessage(), 'classification' => $status];
+            if ($error instanceof \NHK\Core\Domain\Video\VideoException && $error->diagnostics !== []) {
+                $diagnostics['editorial_failure_diagnostics'] = $error->diagnostics;
+            }
             $intent = is_array($diagnostics['content_intent'] ?? null) ? $diagnostics['content_intent'] : [];
             $writes = is_array($diagnostics['semantic_write_back'] ?? null) ? $diagnostics['semantic_write_back'] : [];
             $media = is_array($diagnostics['media_usage'] ?? null) ? $diagnostics['media_usage'] : [];

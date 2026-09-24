@@ -97,7 +97,24 @@ final class VideoIntakeService
                 'attempt_id' => $attemptId,
                 'attempt_no' => $attemptNo,
             ]);
-            if (strtoupper((string) ($shared['status'] ?? '')) === 'BLOCKED') throw new VideoException(VideoEditorialOutcome::failureCode($shared));
+            if (strtoupper((string) ($shared['status'] ?? '')) === 'BLOCKED') {
+                $quality = is_object($shared['quality_report'] ?? null) && method_exists($shared['quality_report'], 'toArray')
+                    ? $shared['quality_report']->toArray()
+                    : [];
+                throw new VideoException(
+                    VideoEditorialOutcome::failureCode($shared),
+                    0,
+                    null,
+                    VideoEditorialFailureDiagnostics::project([
+                        'content' => is_array($shared['shared_enrichment'] ?? null) ? $shared['shared_enrichment'] : [],
+                        'quality_report' => $quality,
+                        'quality_decision' => $shared['quality_decision'] ?? '',
+                        'repair_rounds' => $shared['repair_rounds'] ?? 0,
+                        'quality_re_evaluations' => $shared['quality_re_evaluations'] ?? [],
+                        'constraint_findings' => $shared['constraint_findings'] ?? [],
+                    ]),
+                );
+            }
             $sharedResult = is_array($shared['shared_result'] ?? null) ? $shared['shared_result'] : [];
             if (is_array($sharedResult['relations']['candidates'] ?? null) && $sharedResult['relations']['candidates'] !== []) $candidatePayloads = array_values(array_filter($sharedResult['relations']['candidates'], 'is_array'));
             $draft = $shared['draft'];
