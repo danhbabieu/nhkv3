@@ -69,7 +69,7 @@ use NHK\Core\Infrastructure\Graph\{CoreEndpointResolverRegistrar, GraphClockType
 use NHK\Core\Infrastructure\Governance\WpdbDependencyRepository;
 use NHK\Core\Infrastructure\Governance\GovernanceRuntimeFactory;
 use NHK\Core\Application\Entity\{ComparisonPageQuery, EntityMediaProjection, EntityPageQuery, EntityProfileAdminProjection, PublicEndpointEligibilityResolver, PublicEntityCollectionQuery, PublicEntityEligibilityPolicy, PublicIdentityContract, PublicRouteResolver, RelatedContentQuery};
-use NHK\Core\Application\Media\{ArticleMediaCoordinator, ArticleMediaSeoProjection, MediaEnrichmentFrontendReadbackVerifier, MediaIngestGateway, MediaService, MediaVideoPageQuery, PublicMediaGalleryQuery, VisualOpportunityDetector, VisualSupportRequirementService};
+use NHK\Core\Application\Media\{ArticleMediaCoordinator, ArticleMediaSeoProjection, MediaEnrichmentFinalReadbackPolicy, MediaIngestGateway, MediaService, MediaVideoPageQuery, PublicMediaGalleryQuery, VisualOpportunityDetector, VisualSupportRequirementService};
 use NHK\Core\Application\Video\{VideoCompletenessPolicy, VideoEditorialAdapter, VideoEditorialGenerator, VideoHubClassifier, VideoIntakeService, VideoInternalSemanticResearcher, VideoKnowledgeEnrichmentPlanner, VideoRelationCandidatePlanner, VideoSeoProjection, VideoService, VideoSourceRefreshCommand, YouTubeDataApiClient, YouTubeSourceAdapter};
 use NHK\Core\Application\Home\HomeSemanticQuery;
 use NHK\Core\Application\Search\SearchSemanticQuery;
@@ -285,7 +285,7 @@ final class Plugin {
             $publicRoutes = new PublicRouteResolver($authority, $types, $publicContexts);
             $publicEligibility = new PublicEntityEligibilityPolicy($authority, $types, $publicRoutes, $publicContexts);
             $entityMediaProjection = new EntityMediaProjection($media, $assets, $usages);
-            $frontendReadback = new MediaEnrichmentFrontendReadbackVerifier($authority, $types, static fn (?object $entity): bool => $entity !== null && $publicEligibility->evaluate($entity)->eligible, static fn (string $type, string $id): array => $entityMediaProjection->forEntity($type, $id), $usages);
+            $mediaFinalReadback = new MediaEnrichmentFinalReadbackPolicy();
             $publicCollection = new PublicEntityCollectionQuery($authority, $types, new PublicIdentityContract($types), $publicEligibility, $publicRoutes, new BrandAggregationQuery($graphService, $authority, $types, $publicRoutes, $publicEligibility), static fn (): bool => $publicStatus->authorityStorageReady(), $entityMediaProjection, new EntityKnowledgeProjection($claims, $evidence, $sources, $publicStatus));
             $governanceRuntime = GovernanceRuntimeFactory::fromWordPress($wpdb, $sharedAttachmentBridge);
             $stagingScopeVerifier = $governanceRuntime->stagingScopeVerifier ?? new \NHK\Core\Application\Governance\StagingAcceptanceScopeVerifier(
@@ -1485,11 +1485,17 @@ final class Plugin {
                         $endpointType = trim((string) ($primary['type'] ?? ''));
                         $endpointKey = trim((string) ($primary['id'] ?? ''));
                         $usageReadback = [];
+                        $mediaReadback = [];
                         foreach ($assets as $asset) {
                             if (!is_array($asset)) continue;
                             $mediaId = trim((string) ($asset['media_id'] ?? ''));
                             if ($mediaId === '') $incomplete[] = 'MEDIA_CANONICAL_ID_MISSING';
                             if (($asset['attachment_readback_status'] ?? 'verified') !== 'verified') $incomplete[] = 'MEDIA_ATTACHMENT_READBACK_REQUIRED';
+                            if ($mediaId !== '') {
+                                $canonicalMedia = $media->findByCanonicalId($mediaId);
+                                if (!$canonicalMedia instanceof \NHK\Core\Domain\Media\Media) $incomplete[] = 'MEDIA_CANONICAL_READBACK_UNAVAILABLE';
+                                else $mediaReadback[] = ['status' => 'verified', 'media_id' => $canonicalMedia->canonicalId, 'name' => $canonicalMedia->canonicalName, 'revision' => $canonicalMedia->revision];
+                            }
                             if ($mediaId !== '' && $endpointType !== '' && $endpointKey !== '') {
                                 $mediaContext = is_array($asset['media_context'] ?? null) ? $asset['media_context'] : [];
                                 $role = \NHK\Core\Domain\Media\MediaUsageRoleRegistry::FEATURED_PRIMARY;
@@ -1530,7 +1536,7 @@ final class Plugin {
                                     [],
                                     (string) ($mediaContext['title'] ?? ''),
                                 );
-                                $usageReadback[] = ['usage_id' => $usage->usageId, 'media_id' => $usage->mediaId, 'endpoint_type' => $usage->endpointType, 'endpoint_key' => $usage->endpointKey, 'role' => $usage->role, 'revision' => $usage->revision, 'reconciliation' => 'MEDIA_USAGE_' . (string) ($plannedAction['action'] ?? 'UPDATE')];
+                                $usageReadback[] = ['status' => 'verified', 'usage_id' => $usage->usageId, 'media_id' => $usage->mediaId, 'endpoint_type' => $usage->endpointType, 'endpoint_key' => $usage->endpointKey, 'role' => $usage->role, 'revision' => $usage->revision, 'reconciliation' => 'MEDIA_USAGE_' . (string) ($plannedAction['action'] ?? 'UPDATE')];
                                 try { do_action('nhk_v3_media_adoption_phase', 'USAGE_RECONCILED', (int) ($asset['attachment_id'] ?? 0), $usage->mediaId); } catch (\Throwable) { }
                             }
                         }
@@ -1540,6 +1546,7 @@ final class Plugin {
                             'media_ids' => array_values(array_unique($mediaIds)),
                             'media_complete' => $incomplete === [],
                             'blockers' => array_values(array_unique($incomplete)),
+                            'media_readback' => $mediaReadback,
                             'media_usage' => $usageReadback,
                             'canonical_readback' => ['media_ids' => array_values(array_unique($mediaIds)), 'media_usage' => $usageReadback],
                             'frontend_verified' => null,
@@ -1716,7 +1723,7 @@ final class Plugin {
                     $blockers = (array) ($review['blockers'] ?? $review['diagnostics'] ?? []);
                     return ['eligible' => (($review['outcome'] ?? '') === 'PASS' || ($review['eligible'] ?? false) === true) && $blockers === [], 'blockers' => $blockers, 'review' => $review, 'fresh_preflight' => $freshResearch->toArray(), 'state_token' => $review['state_token'] ?? $expectedToken];
                 },
-                static function (array $context) use ($articleEditorial, $frontendReadback): array {
+                static function (array $context) use ($articleEditorial, $mediaFinalReadback): array {
                     $articleId = (int) ($context['article_id'] ?? 0);
                     $media = is_array($context['media'] ?? null) ? $context['media'] : [];
                     $bindingResults = array_values(array_filter((array) ($media['bindings'] ?? []), 'is_array'));
@@ -1735,13 +1742,7 @@ final class Plugin {
                                 if ($expectedIds === [] || $expectedIds !== $actualIds || count(array_filter($metadataReadback, static fn (array $item): bool => ($item['status'] ?? '') === 'verified' && trim((string) ($item['name'] ?? '')) !== '')) !== count($expectedIds)) return ['status' => 'unavailable', 'reason' => 'MEDIA_OWNER_READBACK_UNVERIFIED', 'media_readback' => $metadataReadback];
                                 return ['status' => 'verified', 'frontend_verified' => null, 'media_readback' => $metadataReadback, 'media_usage' => [], 'article_owner' => 'NOT_REQUIRED'];
                             }
-                            $verified = [];
-                            foreach ($bindingResults as $binding) {
-                                $readback = is_array($binding['readback'] ?? null) ? $binding['readback'] : [];
-                                $verified[] = $frontendReadback->verify((string) ($readback['target_type'] ?? ''), (string) ($readback['target_id'] ?? ''), (string) ($readback['media_id'] ?? ''));
-                            }
-                            if ($verified === [] || count(array_filter($verified, static fn (array $item): bool => ($item['status'] ?? '') === 'verified')) !== count($verified)) return ['status' => 'unavailable', 'reason' => 'FRONTEND_READBACK_NOT_VERIFIED', 'frontend_verified' => false, 'media_bindings' => $verified];
-                            return ['status' => 'verified', 'frontend_verified' => true, 'media_bindings' => $verified, 'article_owner' => 'NOT_REQUIRED'];
+                            return $mediaFinalReadback->verify($media);
                         }
                         $payload = ['stage' => 'CAPTURE_FINAL_CANONICAL_READBACK', 'status' => 'VERIFIED', 'capture_id' => (string) ($context['capture']['capture_id'] ?? ''), 'article_owner' => 'NOT_REQUIRED', 'media_binding_count' => count($bindingResults), 'at' => gmdate('c')];
                         if (function_exists('do_action')) { try { do_action('nhk_v3_capture_stage_trace', $payload); } catch (\Throwable) { } }
