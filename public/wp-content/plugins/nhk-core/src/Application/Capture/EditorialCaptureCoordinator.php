@@ -540,6 +540,15 @@ final class EditorialCaptureCoordinator
                 $record = $this->save($record, CaptureStage::MEDIA_ADOPTED, $assets, $diagnostics, $receipts, 'MEDIA_ADOPTED', $record->articleId, $record->articleStateToken);
             }
             if ($preparationResult !== null && $preparationResult->status !== 'PREPARED' && !$preparationCanContinue) {
+                $diagnostics['deep_enrichment'] = [
+                    'status' => $preparationResult->blockers !== []
+                        ? 'BLOCKED'
+                        : ($preparationResult->subjectResolutionPacket === null ? 'SUBJECT_UNRESOLVED' : 'DEFERRED'),
+                    'visual_support' => ['status' => 'deferred', 'requirements' => []],
+                    'knowledge_reuse' => [],
+                    'article_reuse_internal_link' => [],
+                    'new_deep_content_opportunity' => null,
+                ];
                 if ($isVideoIntent && is_callable($this->videoEnrichment) && $videoInput !== [] && !$this->hasVideoAsset($assets)) {
                     $this->beginPhase('VIDEO_ENRICHED');
                     $record = $this->startReceipt($record, $assets, $diagnostics, $receipts, 'VIDEO_ENRICHED');
@@ -778,7 +787,7 @@ final class EditorialCaptureCoordinator
                     ? ($this->videoPublicationVerifier)(['capture_id' => $record->captureId, 'assets' => $assets, 'subject_resolution' => $resolution, 'semantic_write_back' => $writes, 'shared_enrichment' => $sharedEnrichment])
                     : ['status' => 'not_requested', 'items' => [], 'blockers' => []];
                 $diagnostics['video_publication'] = $this->withoutBody($videoPublication);
-                $diagnostics['deep_enrichment'] = $this->deepEnrichment($retrieved, $writes, [], $visualOpportunities);
+                $diagnostics['deep_enrichment'] = $this->deepEnrichment($retrieved, $writes, [], $visualOpportunities, $sharedEnrichment);
             }
 
             if (!$articleRequired && $record->articleId === null) {
@@ -845,7 +854,7 @@ final class EditorialCaptureCoordinator
             if ($videoThumbnailFallback !== null) $mediaContext['video_thumbnail_fallback'] = $videoThumbnailFallback;
             $media = ($this->mediaReconcile)($mediaContext);
             $diagnostics['media_usage'] = $this->withoutBody($media);
-            $diagnostics['deep_enrichment'] = $this->deepEnrichment($retrieved, $writes, $media, $visualOpportunities);
+            $diagnostics['deep_enrichment'] = $this->deepEnrichment($retrieved, $writes, $media, $visualOpportunities, $sharedEnrichment);
             if (trim((string) ($media['editorial_state_token'] ?? '')) !== '' && $media['editorial_state_token'] !== $record->articleStateToken) {
                 $record = $this->save($record, CaptureStage::COMPOSED, $assets, $diagnostics, $receipts, 'COMPOSED', $record->articleId, (string) $media['editorial_state_token']);
             }
@@ -977,7 +986,9 @@ final class EditorialCaptureCoordinator
         foreach ((array) ($input['media_bindings'] ?? []) as $binding) {
             if (strtoupper(trim((string) ($binding['selection_source'] ?? 'USER_EXPLICIT'))) === 'SYSTEM_AUTO') throw new \RuntimeException('MEDIA_BINDING_GOVERNANCE_REQUIRED');
         }
-        $scope = $this->stagingScopeVerifier?->forCapture($record, $input, $assets);
+        if ($this->stagingScopeVerifier === null) throw new \RuntimeException('MEDIA_BINDING_STAGING_SCOPE_REQUIRED');
+        $scope = $this->stagingScopeVerifier->forCapture($record, $input, $assets);
+        if ($scope === null) throw new \RuntimeException('MEDIA_BINDING_STAGING_SCOPE_REQUIRED');
         unset($input['staging_acceptance']);
         if ($scope !== null) $input['staging_acceptance'] = $scope;
         $intent = ['status' => 'resolved', 'intent' => 'MEDIA_ENRICHMENT', 'source' => 'EXPLICIT_TYPED_BINDING', 'article_required' => false, 'media_required' => true, 'diagnostics' => [], 'signals' => ['typed_media_binding' => true]];
@@ -1076,12 +1087,14 @@ final class EditorialCaptureCoordinator
     }
 
     /** @return array<string,mixed> */
-    private function deepEnrichment(array $retrieved, array $writes, array $media, array $opportunities): array
+    private function deepEnrichment(array $retrieved, array $writes, array $media, array $opportunities, ?array $sharedEnrichment = null): array
     {
         $reusedKnowledge = array_values(array_filter((array) ($writes['reused_claims'] ?? $retrieved['selected_claims'] ?? []), 'is_array'));
         $articleCandidates = array_values(array_filter((array) ($media['internal_link_candidates'] ?? $media['related_articles'] ?? $writes['internal_link_candidates'] ?? []), 'is_array'));
+        $sharedContentStatus = strtoupper(trim((string) ($sharedEnrichment['content']['status'] ?? '')));
+        $pipelineStatus = $sharedEnrichment !== null && $sharedContentStatus !== 'NOT_REQUESTED' ? 'COMPLETED' : 'NOT_REQUESTED';
         return [
-            'status' => ($reusedKnowledge !== [] || $articleCandidates !== []) ? 'REUSE_EXISTING' : ($opportunities !== [] ? 'NEW_DEEP_CONTENT_OPPORTUNITY' : 'NOT_REQUESTED'),
+            'status' => ($reusedKnowledge !== [] || $articleCandidates !== []) ? 'REUSE_EXISTING' : ($opportunities !== [] ? 'NEW_DEEP_CONTENT_OPPORTUNITY' : $pipelineStatus),
             'visual_support' => $opportunities === [] ? ['status' => 'not_requested', 'requirements' => []] : ['status' => 'optional_enrichment', 'requirements' => array_values(array_map(static fn (array $item): array => ['feature_key' => $item['feature_key'] ?? '', 'recommended_view' => $item['recommended_view'] ?? '', 'priority' => $item['priority'] ?? 0], $opportunities))],
             'knowledge_reuse' => $reusedKnowledge,
             'article_reuse_internal_link' => $articleCandidates,
@@ -1267,16 +1280,18 @@ final class EditorialCaptureCoordinator
             $this->mediaOwnerIds($media),
         );
         $required = match (strtoupper(trim((string) ($intent['intent'] ?? '')))) {
-            'VIDEO' => [['owner_type' => 'video', 'owner_id' => $videoOwnerId]],
+            'VIDEO' => $videoOwnerId === '' ? [['owner_type' => 'video']] : [['owner_type' => 'video', 'owner_id' => $videoOwnerId]],
             'KNOWLEDGE_DELTA' => [['owner_type' => 'knowledge']],
             'IMAGE_ARTICLE', 'TEXT_ARTICLE' => [['owner_type' => 'wp_post', 'owner_id' => $record->articleId === null ? '' : (string) $record->articleId]],
             'MEDIA_ENRICHMENT' => $mediaOwners !== [] ? $mediaOwners : [['owner_type' => 'media', 'owner_id' => '']],
             default => [],
         };
         if (strtoupper(trim((string) ($intent['intent'] ?? ''))) === 'IMAGE_ARTICLE' && $assets !== []) {
-            $required = array_merge($required, $mediaOwners !== [] ? $mediaOwners : [['owner_type' => 'media', 'owner_id' => '']]);
+            $required = array_merge($required, $mediaOwners);
         }
-        return $required;
+        return array_values(array_filter($required, static function (array $owner): bool {
+            return !array_key_exists('owner_id', $owner) || trim((string) $owner['owner_id']) !== '';
+        }));
     }
 
     /** @return list<string> */

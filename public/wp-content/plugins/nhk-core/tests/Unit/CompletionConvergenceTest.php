@@ -488,4 +488,22 @@ final class CompletionConvergenceTest extends TestCase
             ['owner_type' => 'media', 'owner_id' => 'media-2'],
         ], $owners);
     }
+
+    public function test_required_owner_projection_never_emits_blank_owner_ids(): void
+    {
+        $coordinator = (new \ReflectionClass(EditorialCaptureCoordinator::class))->newInstanceWithoutConstructor();
+        $method = new \ReflectionMethod($coordinator, 'requiredOwners');
+        $method->setAccessible(true);
+        $capture = new CaptureRecord(
+            '01a0b384-6a83-7f99-b231-d784b9ab9542',
+            'capture-1',
+            hash('sha256', 'fingerprint'),
+            'FINAL_READBACK',
+            'IN_PROGRESS',
+        );
+
+        self::assertSame([['owner_type' => 'video']], $method->invoke($coordinator, ['intent' => 'VIDEO'], $capture, [], [], [], []));
+        self::assertSame([], $method->invoke($coordinator, ['intent' => 'MEDIA_ENRICHMENT'], $capture, [], [], [], []));
+        self::assertSame([], $method->invoke($coordinator, ['intent' => 'TEXT_ARTICLE'], $capture, [], [], [], []));
+    }
 }

@@ -442,6 +442,12 @@ final class ContentIntentRouterTest extends TestCase
             null,
             contentIntentRouter: new ContentIntentRouter(),
             mediaBindingService: $binding,
+            stagingScopeVerifier: new StagingAcceptanceScopeVerifier(
+                static fn (): string => 'staging',
+                'test-secret',
+                static fn (array $scope, CaptureRecord $capture, array $input, array $assets): bool => true,
+                can: static fn (string $capability): bool => true,
+            ),
         );
 
         $result = $coordinator->execute([
@@ -538,6 +544,12 @@ final class ContentIntentRouterTest extends TestCase
             null,
             contentIntentRouter: new ContentIntentRouter(),
             mediaBindingService: $binding,
+            stagingScopeVerifier: new StagingAcceptanceScopeVerifier(
+                static fn (): string => 'staging',
+                'test-secret',
+                static fn (array $scope, CaptureRecord $capture, array $input, array $assets): bool => true,
+                can: static fn (string $capability): bool => true,
+            ),
         );
     }
 

@@ -35,6 +35,27 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
         self::assertSame(['article'], $seen);
     }
 
+    public function test_shared_enrichment_marks_deep_enrichment_complete_when_no_reuse_is_available(): void
+    {
+        $captures = new Pr5CaptureRepository();
+        $calls = ['draft' => 0, 'semantic' => 0, 'media' => 0, 'publication' => 0, 'final' => 0];
+        $events = [];
+        $engine = new ClaimRetrievalEngine(static fn (array $subject): array => ['status' => 'available', 'items' => []], static fn (array $subject, array $neighborhood): array => []);
+        $shared = new SharedEnrichmentBoundary(new EditorialClaimRetrievalService($engine), new EditorialKnowledgeSelector());
+        $resolver = new SubjectResolutionService(static fn (string $value): array => [['id' => $value, 'type' => 'model', 'name' => 'Sparse Model']]);
+        $coordinator = $this->coordinator($captures, $calls, $events, subjectResolver: $resolver, shared: $shared);
+
+        $result = $coordinator->execute([
+            'idempotency_key' => 'shared-sparse-article',
+            'intent' => 'TEXT_ARTICLE',
+            'text' => 'Bài viết không có claim tái sử dụng.',
+            'canonical_uuid' => '11111111-1111-4111-8111-111111111111',
+        ]);
+
+        self::assertSame('COMPLETED', $result->diagnostics['deep_enrichment']['status']);
+        self::assertSame('NO_ELIGIBLE_CLAIMS', $result->diagnostics['shared_enrichment']['content']['status']);
+    }
+
     public function test_retry_rehydrates_persisted_confirmation_before_weaker_subject_resolution(): void
     {
         $captures = new Pr5CaptureRepository();
@@ -408,6 +429,7 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
         self::assertSame(['physical', 'draft'], $events);
         self::assertTrue($result->diagnostics['content_preparation']['continuation_decision']['may_continue'] ?? false);
         self::assertArrayNotHasKey('subject_resolution_packet', $result->diagnostics);
+        self::assertSame('SUBJECT_UNRESOLVED', $result->diagnostics['deep_enrichment']['status']);
         self::assertSame($result->captureId, $retry->captureId);
         self::assertSame(1001, $retry->articleId);
     }

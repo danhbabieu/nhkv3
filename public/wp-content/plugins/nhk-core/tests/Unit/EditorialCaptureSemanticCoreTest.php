@@ -90,6 +90,26 @@ final class EditorialCaptureSemanticCoreTest extends TestCase
         self::assertSame([], $result['claim_trace']);
     }
 
+    public function test_non_video_article_rejects_video_derived_claims_and_source_boilerplate(): void
+    {
+        $result = (new ArticleComposer())->compose(
+            'Một bài viết về mẫu đồng hồ.',
+            [],
+            [[
+                'claim_id' => 'video-derived-claim',
+                'revision' => 1,
+                'text' => 'The source identifies this Video as concerning canonical Odo 24.',
+                'provenance' => 'CATALOG_SUPPORTED',
+                'source_domain' => 'video',
+                'editorial_role' => 'video_derived',
+            ]],
+            ['content_intent' => ['intent' => 'IMAGE_ARTICLE']],
+        );
+
+        self::assertStringNotContainsString('The source identifies this Video', $result['content']);
+        self::assertSame([], $result['claim_trace']);
+    }
+
     public function test_repeated_resume_replaces_same_managed_claim_section_instead_of_appending(): void
     {
         $claims = [

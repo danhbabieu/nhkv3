@@ -31,8 +31,15 @@ final class ArticleComposer
         // legacy claim must not poison an otherwise safe editorial rewrite.
         $usableClaims = array_values(array_filter($selectedClaims, static function (mixed $claim) use ($guard, $projectionEligibility, $context): bool {
             if (!is_array($claim)) return false;
+            $contentIntent = is_array($context['content_intent'] ?? null) ? $context['content_intent'] : [];
+            $source = is_array($claim['source'] ?? null) ? $claim['source'] : [];
+            $intent = strtoupper(trim((string) ($contentIntent['intent'] ?? ($context['content_intent'] ?? ''))));
+            $sourceDomain = strtolower(trim((string) ($claim['source_domain'] ?? ($source['domain'] ?? ''))));
+            $editorialRole = strtolower(trim((string) ($claim['editorial_role'] ?? $claim['role'] ?? '')));
+            if ($intent !== 'VIDEO' && (in_array($sourceDomain, ['video', 'video_derived', 'video-derived'], true) || in_array($editorialRole, ['video', 'video_derived', 'video-derived'], true))) return false;
             $text = trim((string) ($claim['text'] ?? ''));
             if ($text === '') return false;
+            if ($intent !== 'VIDEO' && preg_match('/\b(?:the\s+source\s+identifies\s+this\s+video|video-derived|source-identification\s+boilerplate|canonical\s+(?:video|variant|model))\b/i', $text) === 1) return false;
             if (($projectionEligibility->evaluate($claim, $context)['eligible'] ?? false) !== true) return false;
             try { $guard->assertSafe($text); return true; } catch (\Throwable) { return false; }
         }));
