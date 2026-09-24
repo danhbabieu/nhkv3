@@ -41,7 +41,17 @@ final readonly class OwnerConsumptionPlan
             'coverage' => $this->coverage,
             'gaps' => $this->gaps,
             'quality' => $this->quality,
-            'capabilities' => ['surfaces' => $this->capability->surfaces, 'canonical_readback' => $this->capability->canonicalReadback, 'dependencies' => $this->capability->dependencies],
+            'capabilities' => [
+                'surfaces' => $this->capability->surfaces,
+                'canonical_readback' => $this->capability->canonicalReadback,
+                'dependencies' => $this->capability->dependencies,
+                'identity_requirements' => $this->capability->identityRequirements,
+                'canonical_completion' => $this->capability->canonicalCompletion,
+                'minimum_safe_representation' => $this->capability->minimumSafeRepresentation,
+                'publication_requirements' => $this->capability->publicationRequirements,
+                'readback_strategy' => $this->capability->readbackStrategy,
+                'dependency_policy' => $this->capability->dependencyPolicy,
+            ],
         ];
     }
 }

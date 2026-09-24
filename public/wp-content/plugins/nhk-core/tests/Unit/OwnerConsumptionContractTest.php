@@ -4,10 +4,38 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Consumption\{OwnerCapability, OwnerCapabilityRegistry, OwnerConsumptionPlan};
+use NHK\Core\Application\Completion\CompletionCoordinator;
 use PHPUnit\Framework\TestCase;
 
 final class OwnerConsumptionContractTest extends TestCase
 {
+    public function test_capability_declares_minimum_safe_representation_and_lifecycle_policy(): void
+    {
+        $capability = OwnerCapability::forOwner('future_owner', ['summary'], true, true, [
+            'identity_requirements' => ['owner_id', 'source_identity'],
+            'canonical_completion' => ['requires_readback' => true],
+            'minimum_safe_representation' => ['summary' => 'source_title'],
+            'publication_requirements' => ['summary' => 'safe_only'],
+            'readback_strategy' => 'canonical_id',
+            'dependency_policy' => 'consumed_only',
+        ]);
+
+        self::assertSame(['summary' => 'source_title'], $capability->minimumSafeRepresentation);
+        self::assertSame('canonical_id', $capability->readbackStrategy);
+        self::assertSame('consumed_only', $capability->dependencyPolicy);
+    }
+
+    public function test_two_owners_with_one_subject_remain_distinct_in_completion_identity(): void
+    {
+        $coordinator = new CompletionCoordinator();
+        $first = $coordinator->finalize('future_owner', 'owner-a', ['canonical_readback' => ['canonical_id' => 'owner-a'], 'subject_id' => 'subject-1']);
+        $second = $coordinator->finalize('future_owner', 'owner-b', ['canonical_readback' => ['canonical_id' => 'owner-b'], 'subject_id' => 'subject-1']);
+
+        self::assertNotSame($first['owner_id'], $second['owner_id']);
+        self::assertSame('owner-a', $first['canonical_readback']['canonical_id']);
+        self::assertSame('owner-b', $second['canonical_readback']['canonical_id']);
+    }
+
     public function test_capabilities_declare_surfaces_without_forcing_seo_or_composer(): void
     {
         $registry = new OwnerCapabilityRegistry();
