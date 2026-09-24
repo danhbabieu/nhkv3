@@ -10,6 +10,34 @@ use PHPUnit\Framework\TestCase;
 
 final class CompletionConvergenceTest extends TestCase
 {
+    public function test_sparse_or_zero_knowledge_does_not_block_canonical_owner_existence(): void
+    {
+        $packet = (new CompletionCoordinator())->finalize('future_owner', 'owner-1', [
+            'canonical_readback' => ['canonical_id' => 'owner-1'],
+            'enrichment_readiness' => ['status' => 'SPARSE', 'warnings' => ['KNOWLEDGE_UNAVAILABLE']],
+            'publication_readiness' => ['status' => 'BLOCKED', 'blockers' => ['PUBLIC_PROJECTION_UNSAFE']],
+        ]);
+
+        self::assertSame('COMPLETE', $packet['canonical_existence']['status']);
+        self::assertSame('SPARSE', $packet['enrichment_readiness']['status']);
+        self::assertSame('BLOCKED', $packet['publication_readiness']['status']);
+        self::assertTrue($packet['complete']);
+        self::assertNotContains('KNOWLEDGE_UNAVAILABLE', $packet['blockers']);
+    }
+
+    public function test_missing_canonical_readback_blocks_owner_without_promoting_editorial_warning(): void
+    {
+        $packet = (new CompletionCoordinator())->finalize('video', 'video-1', [
+            'content_quality' => 'CONTENT_NEEDS_REVIEW',
+            'enrichment_readiness' => ['status' => 'SPARSE', 'warnings' => ['LOW_INFORMATION_GAIN']],
+        ]);
+
+        self::assertSame('BLOCKED', $packet['canonical_existence']['status']);
+        self::assertFalse($packet['complete']);
+        self::assertContains('CANONICAL_READBACK_UNVERIFIED', $packet['blockers']);
+        self::assertNotSame('CONTENT_NEEDS_REVIEW', $packet['canonical_existence']['status']);
+    }
+
     public function test_article_required_owner_uses_current_native_post_id(): void
     {
         $coordinator = (new \ReflectionClass(EditorialCaptureCoordinator::class))->newInstanceWithoutConstructor();
@@ -30,7 +58,7 @@ final class CompletionConvergenceTest extends TestCase
         );
     }
 
-    public function test_proposal_apply_is_not_public_completion(): void
+    public function test_proposal_apply_can_be_canonical_complete_without_public_completion(): void
     {
         $packet = (new CompletionCoordinator())->finalize('video', 'video-1', [
             'proposal_state' => 'applied',
@@ -41,7 +69,9 @@ final class CompletionConvergenceTest extends TestCase
         self::assertSame('COMPLETE', $packet['canonical_state']);
         self::assertSame('BLOCKED', $packet['public_state']);
         self::assertSame('BLOCKED', $packet['frontend_state']);
-        self::assertFalse($packet['complete']);
+        self::assertTrue($packet['complete']);
+        self::assertSame('COMPLETE', $packet['canonical_existence']['status']);
+        self::assertSame('BLOCKED', $packet['publication_readiness']['status']);
     }
 
     public function test_public_video_is_complete_only_after_all_readbacks(): void
@@ -62,7 +92,7 @@ final class CompletionConvergenceTest extends TestCase
         self::assertSame([], $packet['blockers']);
     }
 
-    public function test_video_completion_requires_content_complete_in_addition_to_public_readbacks(): void
+    public function test_video_editorial_review_does_not_block_canonical_owner_completion(): void
     {
         $packet = (new CompletionCoordinator())->finalize('video', 'video-1', [
             'canonical_readback' => ['canonical_id' => 'video-1'],
@@ -73,9 +103,10 @@ final class CompletionConvergenceTest extends TestCase
             'frontend_verified' => true,
         ]);
 
-        self::assertFalse($packet['complete']);
+        self::assertTrue($packet['complete']);
         self::assertSame('CONTENT_NEEDS_REVIEW', $packet['content_state']);
-        self::assertContains('CONTENT_NEEDS_REVIEW', $packet['blockers']);
+        self::assertSame('NEEDS_REVIEW', $packet['enrichment_readiness']['status']);
+        self::assertNotContains('CONTENT_NEEDS_REVIEW', $packet['canonical_existence']['blockers']);
     }
 
     public function test_source_and_evidence_can_complete_without_public_route(): void
@@ -99,7 +130,8 @@ final class CompletionConvergenceTest extends TestCase
 
         self::assertSame('COMPLETE', $packet['canonical_state']);
         self::assertSame('BLOCKED', $packet['public_state']);
-        self::assertFalse($packet['complete']);
+        self::assertTrue($packet['complete']);
+        self::assertSame('COMPLETE', $packet['canonical_existence']['status']);
     }
 
     public function test_model_operation_with_required_relation_unresolved_is_partial(): void

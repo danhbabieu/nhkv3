@@ -56,9 +56,7 @@ final class CompletionCoordinator
             'PARTIAL',
             'NOT_APPLICABLE',
         );
-        $content = $ownerType === 'video'
-            ? $this->state($evidence['content_quality'] ?? null, null, 'CONTENT_COMPLETE', 'CONTENT_NEEDS_REVIEW', 'BLOCKED')
-            : 'NOT_APPLICABLE';
+        $content = $this->state($evidence['content_quality'] ?? null, null, 'CONTENT_COMPLETE', 'CONTENT_NEEDS_REVIEW', 'BLOCKED');
         $projectionConsistency = 'NOT_APPLICABLE';
         if ($ownerType === 'video' && array_key_exists('projection_consistency', $evidence)) {
             $projectionConsistency = $this->state($evidence['projection_consistency'], null, 'COMPLETE', 'BLOCKED', 'PARTIAL');
@@ -89,19 +87,11 @@ final class CompletionCoordinator
         if ($canonical !== 'COMPLETE' && $blockers === []) $blockers[] = 'CANONICAL_READBACK_UNVERIFIED';
         if ($dependencies === 'BLOCKED' && $blockers === []) $blockers[] = 'DEPENDENCY_READBACK_UNVERIFIED';
         if ($relations === 'BLOCKED' && $blockers === []) $blockers[] = 'RELATION_OR_USAGE_RECONCILIATION_FAILED';
-        if ($ownerType === 'video' && $content !== 'CONTENT_COMPLETE') $blockers[] = 'CONTENT_NEEDS_REVIEW';
-        if ($ownerType === 'video' && $projectionConsistency === 'BLOCKED') $blockers[] = 'VIDEO_PROJECTION_REVISION_MISMATCH';
-        if ($public === 'BLOCKED' && $publicCapable && $blockers === []) $blockers[] = 'PUBLIC_ELIGIBILITY_NOT_VERIFIED';
-        if ($frontend === 'BLOCKED' && $publicCapable && $blockers === []) $blockers[] = 'FRONTEND_READBACK_NOT_VERIFIED';
-
-        $complete = $canonical === 'COMPLETE'
-            && in_array($dependencies, ['COMPLETE', 'NOT_APPLICABLE'], true)
-            && in_array($relations, ['COMPLETE', 'NOT_APPLICABLE'], true)
-            && in_array($content, ['CONTENT_COMPLETE', 'NOT_APPLICABLE'], true)
-            && in_array($projectionConsistency, ['COMPLETE', 'NOT_APPLICABLE'], true)
-            && in_array($public, ['READY', 'NOT_APPLICABLE'], true)
-            && in_array($frontend, ['VERIFIED', 'NOT_APPLICABLE'], true)
-            && $blockers === [];
+        $enrichment = $this->enrichmentReadiness($evidence, $content, $dependencies, $relations);
+        $publication = $this->publicationReadiness($evidence, $public, $frontend, $projectionConsistency, $publicCapable);
+        $ownerBlockers = $this->ownerBlockers($blockers);
+        if ($canonical !== 'COMPLETE' && $ownerBlockers === []) $ownerBlockers[] = 'CANONICAL_READBACK_UNVERIFIED';
+        $complete = $canonical === 'COMPLETE' && $ownerBlockers === [];
 
         return [
             'owner_type' => $ownerType,
@@ -110,16 +100,72 @@ final class CompletionCoordinator
             'canonical_state' => $canonical,
             'canonical_readback' => is_array($evidence['canonical_readback'] ?? null) ? $evidence['canonical_readback'] : null,
             'canonical_readback_verified' => $canonicalReadbackVerified,
+            'canonical_existence' => [
+                'status' => $canonical,
+                'blockers' => array_values(array_unique($ownerBlockers)),
+                'readback_verified' => $canonicalReadbackVerified,
+            ],
             'dependency_state' => $dependencies,
             'relation_or_usage_state' => $relations,
             'content_state' => $content,
             'projection_consistency' => $projectionConsistency,
             'public_state' => $public,
             'frontend_state' => $frontend,
+            'enrichment_readiness' => $enrichment,
+            'publication_readiness' => $publication,
             'complete' => $complete,
             'status' => $complete ? 'COMPLETE' : ($canonical === 'BLOCKED' ? 'BLOCKED' : 'PARTIAL'),
-            'blockers' => array_values(array_unique($blockers)),
+            'blockers' => array_values(array_unique(array_merge($ownerBlockers, $this->strings($enrichment['blockers'] ?? []), $this->strings($publication['blockers'] ?? [])))),
         ];
+    }
+
+    /** @return array<string,mixed> */
+    private function enrichmentReadiness(array $evidence, string $content, string $dependencies, string $relations): array
+    {
+        $readiness = is_array($evidence['enrichment_readiness'] ?? null) ? $evidence['enrichment_readiness'] : [];
+        $status = strtoupper(trim((string) ($readiness['status'] ?? '')));
+        if ($status === '') {
+            $status = $content === 'CONTENT_COMPLETE' || $content === 'NOT_APPLICABLE' ? 'RICH' : ($content === 'CONTENT_NEEDS_REVIEW' ? 'NEEDS_REVIEW' : 'UNAVAILABLE');
+        }
+        return [
+            'status' => $status,
+            'blockers' => $this->strings($readiness['blockers'] ?? []),
+            'warnings' => $this->strings($readiness['warnings'] ?? []),
+            'gaps' => $this->strings($readiness['gaps'] ?? []),
+            'dependency_state' => $dependencies,
+            'relation_state' => $relations,
+        ];
+    }
+
+    /** @return array<string,mixed> */
+    private function publicationReadiness(array $evidence, string $public, string $frontend, string $projectionConsistency, bool $publicCapable): array
+    {
+        $readiness = is_array($evidence['publication_readiness'] ?? null) ? $evidence['publication_readiness'] : [];
+        $status = strtoupper(trim((string) ($readiness['status'] ?? '')));
+        if ($status === '') {
+            $status = !$publicCapable ? 'NOT_APPLICABLE' : ($public === 'READY' && $frontend === 'VERIFIED' && $projectionConsistency !== 'BLOCKED' ? 'READY' : 'BLOCKED');
+        }
+        $blockers = $this->strings($readiness['blockers'] ?? []);
+        if ($publicCapable && $public === 'BLOCKED' && $blockers === []) $blockers[] = 'PUBLIC_ELIGIBILITY_NOT_VERIFIED';
+        if ($publicCapable && $frontend === 'BLOCKED' && $blockers === []) $blockers[] = 'FRONTEND_READBACK_NOT_VERIFIED';
+        if ($projectionConsistency === 'BLOCKED' && $blockers === []) $blockers[] = 'PROJECTION_REVISION_MISMATCH';
+        return [
+            'status' => $status,
+            'blockers' => array_values(array_unique($blockers)),
+            'warnings' => $this->strings($readiness['warnings'] ?? []),
+            'surface' => trim((string) ($readiness['surface'] ?? '')),
+        ];
+    }
+
+    /** @param list<string> $blockers @return list<string> */
+    private function ownerBlockers(array $blockers): array
+    {
+        return array_values(array_filter($blockers, static function (string $blocker): bool {
+            return !in_array($blocker, [
+                'CONTENT_NEEDS_REVIEW', 'LOW_INFORMATION_GAIN', 'PUBLIC_ELIGIBILITY_NOT_VERIFIED',
+                'FRONTEND_READBACK_NOT_VERIFIED', 'VIDEO_PROJECTION_REVISION_MISMATCH',
+            ], true);
+        }));
     }
 
     /** @param list<array<string,mixed>> $children @return array<string,mixed> */
