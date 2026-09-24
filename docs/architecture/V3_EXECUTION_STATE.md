@@ -1,5 +1,42 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-24 — Acceptance blockers closed (LOCAL / NO SERVER ACTION)
+
+FIXED: The production shared enrichment composition now injects the bounded
+`SemanticNeedVocabulary` bridge over the canonical `KnowledgeFacetProfile`
+facet registry and constructs `SemanticNeedDecomposer` at the Plugin boundary;
+the compatibility constructor also remains safe for direct adapter composition.
+Article Capture context, Article adapter and Video adapter forward structured
+components/observations, so normal callers no longer need to precompute
+`semantic_needs`. Production-style Article and Video tests prove multiple
+needs, authoritative subject retention and need-aware retrieval through the
+shared boundary. Generic text continues to resolve through the existing
+Article/Capture surface; no unsupported `text` selector profile was added.
+Media/Image has no independent production semantic enrichment adapter/lifecycle
+in the current architecture, so it remains `MEDIA_ADAPTER_NOT_YET_CONNECTED`
+and was not manufactured in this fix.
+
+FIXED: Specificity metadata now survives selector → KnowledgeUnit → Reader
+Journey → Composer/SEO traces, including original/target subject, scope,
+retrieval tier, coverage kind, editorial treatment and context-only state.
+Supporting/background material is context-framed, excluded from SEO direct
+metadata enrichment, and contextual-only selection triggers the Quality Gate's
+insufficient exact coverage warning. No phrase filter or canonical mutation was
+introduced.
+
+VERIFICATION: Acceptance-focused matrix passed 162 tests / 735 assertions;
+production-style wiring plus specificity tests are included. Full NHK Unit
+passed 2,449 tests / 14,145 assertions with 19 warnings, 41 deprecations and
+30 PHPUnit deprecations under `memory_limit=512M`. NHK Contract passed 6 tests /
+48 assertions. PHP lint, Composer lint and `git diff --check` pass; secret
+review found only existing vocabulary/token terminology, no credential. The
+guarded Integration command with `NHK_WP_TEST_PATH=public` and
+`NHK_WP_TEST_DB=nhk_v3_test` remains environment-gated by WordPress
+“Error establishing a database connection”. No schema/migration, database,
+staging/production mutation, deploy, push or Capture retry occurred.
+
+STATUS: `LOCAL_UNIVERSAL_SEMANTIC_ENRICHMENT_CODE_READY_INTEGRATION_ENVIRONMENT_GATED / NO_SERVER_ACTION`.
+
 # Checkpoint — 2026-09-24 — Facet-aware semantic retrieval implementation (LOCAL / NO SERVER ACTION)
 
 IMPLEMENTED: The current Adaptive Knowledge Selection path now receives a

@@ -21,6 +21,7 @@ final class SharedEnrichmentBoundary
         private mixed $relations = null,
         private ?SemanticNeedDecomposer $decomposer = null,
     ) {
+        $this->decomposer ??= new SemanticNeedDecomposer(new TextInputInterpreter(), new SemanticNeedVocabulary());
     }
 
     /** @param array<string,mixed> $request @return array<string,mixed> */

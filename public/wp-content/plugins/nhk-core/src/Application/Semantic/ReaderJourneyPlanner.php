@@ -22,6 +22,10 @@ final class ReaderJourneyPlanner
         $roleCounts = [];
         foreach (array_slice($selected, 0, max(0, $maxSections - 1)) as $index => $claim) {
             $role = strtoupper(trim((string) ($claim['editorial_role'] ?? ($index === 0 ? 'CORE' : 'CONTEXT'))));
+            $treatment = strtoupper(trim((string) ($claim['editorial_treatment'] ?? '')));
+            if (in_array($treatment, ['SUPPORTING_CONTEXT', 'BACKGROUND_CONTEXT'], true)) $role = 'CONTEXT';
+            if ($treatment === 'COMPARATIVE_CONTEXT') $role = 'COMPARISON';
+            $claim['editorial_role'] = $role;
             $roleIndex = (int) ($roleCounts[$role] ?? 0);
             $roleCounts[$role] = $roleIndex + 1;
             $unit = is_array($claim['knowledge_unit'] ?? null) ? $claim['knowledge_unit'] : [];
@@ -89,7 +93,20 @@ final class ReaderJourneyPlanner
 
     private function reference(array $claim): array
     {
-        return ['claim_id' => (string) ($claim['claim_id'] ?? ''), 'claim_revision' => max(1, (int) ($claim['claim_revision'] ?? 1)), 'original_subject' => $claim['original_subject'] ?? [], 'graph_path' => $claim['graph_path'] ?? [], 'retrieval_origin' => (string) ($claim['retrieval_origin'] ?? ''), 'editorial_role' => (string) ($claim['editorial_role'] ?? '')];
+        return [
+            'claim_id' => (string) ($claim['claim_id'] ?? ''),
+            'claim_revision' => max(1, (int) ($claim['claim_revision'] ?? 1)),
+            'original_subject' => $claim['original_subject'] ?? [],
+            'target_subject' => $claim['resolved_primary_subject'] ?? $claim['target_subject'] ?? [],
+            'scope' => (string) ($claim['scope'] ?? ''),
+            'graph_path' => $claim['graph_path'] ?? [],
+            'retrieval_origin' => (string) ($claim['retrieval_origin'] ?? ''),
+            'retrieval_tier' => (string) ($claim['retrieval_tier'] ?? 'EXACT'),
+            'coverage_kind' => (string) ($claim['coverage_kind'] ?? 'exact'),
+            'editorial_treatment' => (string) ($claim['editorial_treatment'] ?? 'DIRECT_FACT'),
+            'semantic_context_only' => ($claim['semantic_context_only'] ?? false) === true,
+            'editorial_role' => (string) ($claim['editorial_role'] ?? ''),
+        ];
     }
 
     private function visualFor(string $claimId, array $visualSupport): array

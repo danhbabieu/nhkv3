@@ -114,6 +114,7 @@ final class EditorialKnowledgeSelector
             $claim['knowledge_unit'] = $data;
             $claim['utility'] = ['information_gain' => $this->novelty($claim, $inputContext), 'reader_value' => round($this->score($claim, $topic, $inputContext), 6), 'semantic_coverage' => $aspects, 'total' => round($this->score($claim, $topic, $inputContext) + count($aspects), 6)];
             $claim['editorial_role'] = $isExactCoverage ? $this->role($claim, $selected) : 'SUPPORTING_CONTEXT';
+            $claim['semantic_context_only'] = !$isExactCoverage;
             $claim['selection_reason'] = $isExactCoverage ? 'applicable KnowledgeUnit adds uncovered reader coverage' : 'applicable KnowledgeUnit provides bounded contextual support';
             $claim['state'] = EditorialSemanticRolePolicy::SELECTED;
             $claim['publicly_composable'] = true;
@@ -152,6 +153,8 @@ final class EditorialKnowledgeSelector
             'contextual_coverage' => array_values(array_unique($contextualCoverage)),
             'coverage_status' => $coverageStatus,
             'coverage_kinds' => array_values(array_unique(array_map(static fn (array $claim): string => (string) ($claim['coverage_kind'] ?? 'exact'), $selected))),
+            'exact_selected_count' => count(array_filter($selected, static fn (array $claim): bool => strtolower((string) ($claim['coverage_kind'] ?? 'exact')) === 'exact')),
+            'non_exact_selected_count' => count(array_filter($selected, static fn (array $claim): bool => strtolower((string) ($claim['coverage_kind'] ?? 'exact')) !== 'exact')),
             'stop_reason' => $stopReason,
             'context_budget' => (int) $policy['token_budget'],
             'context_budget_used' => $usedTokens,

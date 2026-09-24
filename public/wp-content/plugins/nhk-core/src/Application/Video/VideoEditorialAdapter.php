@@ -67,7 +67,7 @@ final class VideoEditorialAdapter
         $shared = $this->shared?->enrich([
             'profile' => 'video', 'subject_resolution' => $resolution, 'subject' => $subject,
             'topic' => $topic, 'retrieval_topic' => $retrievalTopic, 'raw_input' => $inputContext['raw_input'], 'title' => $inputContext['title'],
-            'observations' => $inputContext['observations'], 'hints' => (array) ($context['hints'] ?? []),
+            'observations' => $inputContext['observations'], 'components' => (array) ($context['components'] ?? $context['semantic_components'] ?? []), 'hints' => (array) ($context['hints'] ?? []),
             'semantic_needs' => (array) ($context['semantic_needs'] ?? $context['needs'] ?? []),
             'relations' => is_array($context['relations'] ?? null) ? $context['relations'] : [],
         ]);

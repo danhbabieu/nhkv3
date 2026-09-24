@@ -33,7 +33,10 @@ final class EditorialQualityGate
         foreach (self::DIMENSIONS as $dimension) $dimensions[$dimension] = ['status' => 'READY', 'severity' => 'INFO', 'reasons' => []];
 
         $selectionDiagnostics = $pack->diagnostics;
-        $coverageGateRequired = ($selectionDiagnostics['quality_requires_coverage'] ?? false) === true || ($selectionDiagnostics['coverage_status'] ?? '') === 'THIN';
+        $contextOnlyCoverage = (int) ($selectionDiagnostics['selected_count'] ?? 0) > 0
+            && (int) ($selectionDiagnostics['exact_selected_count'] ?? 0) === 0
+            && (int) ($selectionDiagnostics['non_exact_selected_count'] ?? 0) > 0;
+        $coverageGateRequired = ($selectionDiagnostics['quality_requires_coverage'] ?? false) === true || ($selectionDiagnostics['coverage_status'] ?? '') === 'THIN' || $contextOnlyCoverage;
         if ($coverageGateRequired && in_array((string) ($selectionDiagnostics['coverage_status'] ?? ''), ['THIN', 'PARTIAL'], true)) $add('knowledge_utilization', 'WARN', 'INSUFFICIENT_READER_COVERAGE');
         if ($coverageGateRequired && ($selectionDiagnostics['stop_reason'] ?? '') === 'marginal_gain_low') $add('information_gain', 'WARN', 'LOW_MARGINAL_INFORMATION_GAIN');
         if ($coverageGateRequired && ($selectionDiagnostics['stop_reason'] ?? '') === 'context_budget') $add('information_gain', 'WARN', 'CONTEXT_BUDGET_EXCEEDED');

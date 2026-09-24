@@ -48,7 +48,18 @@ final class SemanticSeoPlanner
         $links = $this->links((array) ($context['internal_link_candidates'] ?? []), $canonicalUrl);
         $cannibalization = $this->cannibalization($pack->primarySubject, $intent, (array) ($context['competing_pages'] ?? []));
         $structured = $this->structured($context['structured_data'] ?? null, $canonicalUrl, $title, $claims);
-        $trace = array_values(array_map(static fn (array $claim): array => ['claim_id' => (string) ($claim['claim_id'] ?? ''), 'claim_revision' => max(1, (int) ($claim['claim_revision'] ?? 1)), 'original_subject' => $claim['original_subject'] ?? [], 'editorial_role' => (string) ($claim['editorial_role'] ?? '')], array_filter($claims, 'is_array')));
+        $trace = array_values(array_map(static fn (array $claim): array => [
+            'claim_id' => (string) ($claim['claim_id'] ?? ''),
+            'claim_revision' => max(1, (int) ($claim['claim_revision'] ?? 1)),
+            'original_subject' => $claim['original_subject'] ?? [],
+            'target_subject' => $claim['resolved_primary_subject'] ?? $claim['target_subject'] ?? [],
+            'scope' => (string) ($claim['scope'] ?? ''),
+            'retrieval_tier' => (string) ($claim['retrieval_tier'] ?? 'EXACT'),
+            'coverage_kind' => (string) ($claim['coverage_kind'] ?? 'exact'),
+            'editorial_treatment' => (string) ($claim['editorial_treatment'] ?? 'DIRECT_FACT'),
+            'semantic_context_only' => ($claim['semantic_context_only'] ?? false) === true,
+            'editorial_role' => (string) ($claim['editorial_role'] ?? ''),
+        ], array_filter($claims, 'is_array')));
         $diagnostics = ['cannibalization' => $cannibalization, 'profile' => $profile, 'selected_claim_count' => count($trace), 'selected_public_unit_count' => count($pack->knowledgeUnits), 'public_material_source' => 'final_validated_reader_package', 'projection_only' => true, 'policy_version' => 'semantic-seo-v1', 'topic_fulfillment' => $fulfillment, 'title_narrowed' => $topic !== $pack->topic, 'semantic_cluster_sources' => $this->clusterSources($cluster, $topic, $claims, (array) ($context['dictionary_terms'] ?? []))];
         if ($profile === '' || !in_array($profile, self::PROFILES, true)) $readinessResult = new \NHK\Core\Domain\Seo\SeoReadinessResult(SeoReadinessResult::NOT_APPLICABLE, ['PROFILE_UNSUPPORTED']);
         return new SemanticSeoPlan($readinessResult->status(), $profile, $intent, $pack->primarySubject, $pack->topic, $cluster, $title, $h1, $meta, $canonicalUrl, ['title' => $title, 'description' => $meta, 'canonical' => $canonicalUrl], $links, $dictionary, $structured, $trace, $diagnostics, $readinessResult->reasons());
@@ -73,7 +84,7 @@ final class SemanticSeoPlanner
         $extra = '';
         $topicKey = $this->phraseKey($topic);
         foreach ($claims as $claim) {
-            if (!is_array($claim) || ($claim['eligibility'] ?? 'eligible') !== 'eligible') continue;
+            if (!is_array($claim) || ($claim['eligibility'] ?? 'eligible') !== 'eligible' || ($claim['semantic_context_only'] ?? false) === true) continue;
             $candidate = trim((string) ($claim['text'] ?? ''));
             if ($candidate === '' || $this->phraseKey($candidate) === $topicKey || $this->overlap($topic, $candidate) >= 0.45) continue;
             $extra = $candidate;

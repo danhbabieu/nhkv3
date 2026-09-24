@@ -1140,6 +1140,7 @@ final class Plugin {
             $sharedEnrichment = new SharedEnrichmentBoundary(
                 new EditorialClaimRetrievalService($captureClaims),
                 new EditorialKnowledgeSelector(),
+                decomposer: new \NHK\Core\Application\Semantic\SemanticNeedDecomposer(new TextInputInterpreter(), new \NHK\Core\Application\Semantic\SemanticNeedVocabulary()),
                 relations: static function (array $request) use ($videoRelationCandidates): array {
                     $videoId = trim((string) ($request['owner_id'] ?? ''));
                     $relations = array_values(array_filter((array) ($request['relations'] ?? []), 'is_array'));
