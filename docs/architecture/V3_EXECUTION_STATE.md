@@ -1,5 +1,47 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-24 — Bounded Claim eligibility trace for V2.2 (LOCAL / NO SERVER ACTION)
+
+RUNTIME_EVIDENCE: Staging source `0af86a32cd6ad3a244cd7d8e79b8858ccdf4cff1`,
+Capture `01a0d116-a363-7780-b7c0-82c68f04a438`, revision `23`, still reports
+`VIDEO_EDITORIAL_QUALITY_BLOCKED` with terminal `INELIGIBLE_CLAIM_USED` after
+V2.1 correctly changed the decision from `READY` to `HARD_BLOCK`. No runtime
+retry was performed.
+
+LOCAL_TRACE: The shared production-shaped path proves that retrieval may return
+an ineligible candidate, but `EditorialClaimRetrievalService`,
+`EditorialKnowledgeSelector` and `KnowledgeUnitBuilder` exclude it before
+KnowledgeUnit selection; only the eligible candidate contributes exact
+coverage. ReaderJourney and Composer retain the eligible treatment metadata.
+No A/C/D/E/F/G/H violation is reproducible from the canonical producers. The
+runtime diagnostic lacks Claim identity, so B/I/J/K cannot be distinguished
+without another runtime observation and must not be guessed.
+
+SEMANTIC_NEED_ZERO: `VALID_FALLBACK_PATH`. For this runtime request no valid
+semantic components or explicit needs were supplied; decomposer output is
+empty, so `SharedEnrichmentBoundary` legitimately uses its fallback retrieval
+request. Retrieval/selection then proceed independently. This is not causal to
+the eligibility blocker.
+
+FIX: Added bounded `trace` diagnostics containing only Claim IDs/revisions,
+subjects, scope, facet, eligibility, evidence, applicability, retrieval tier,
+treatment, context-only flags, KnowledgeUnit IDs, coverage aspects, journey
+references and composer trace metadata. Claim text and raw payloads remain
+excluded. This enables exact FIRST-BROKEN-BOUNDARY identification on the next
+authorized runtime observation without retrying this Capture.
+
+VERIFICATION: Production-shaped shared trace matrix passed 76 tests / 280
+assertions with 1 warning. Full NHK Unit passed 2,454 tests / 14,172
+assertions with 19 warnings, 41 deprecations and 30 PHPUnit deprecations.
+NHK Contract passed 6 tests / 48 assertions. PHP lint, Composer validation and
+lint, `git diff --check` and special-case scan passed. Guarded Integration was
+attempted with `NHK_WP_TEST_PATH=public` and `NHK_WP_TEST_DB=nhk_v3_test`, but
+WordPress returned “Error establishing a database connection”; classify as
+`INTEGRATION_ENVIRONMENT_GATED`, not PASS. No migration, database mutation,
+owner creation, deployment, push or retry.
+
+STATUS: `LOCAL_V2_2_TRACE_READY_RUNTIME_IDENTITY_REQUIRED / NO_SERVER_ACTION`.
+
 # Checkpoint — 2026-09-24 — Shared Quality Gate / Video decision contract fix (LOCAL / NO SERVER ACTION)
 
 ROOT_CAUSE: The shared semantic producer correctly excluded ineligible Claims

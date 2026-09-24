@@ -146,6 +146,31 @@ final class VideoEditorialAdapter
         $finalPackage = ['title' => $finalDraft->title, 'summary' => $finalDraft->summary, 'body' => $finalDraft->body, 'seo_title' => $finalSeo->title, 'seo_description' => $finalSeo->metaDescription];
         $finalFingerprint = hash('sha256', (string) json_encode($finalPackage, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
         $quality = $this->quality->evaluate($pack, $plan, $finalDraft, $finalSeo, ($context['public_identity_deferred'] ?? false) === true, (int) ($decision['rounds'] ?? 0), $finalFingerprint, $attemptId, $attemptNo);
+        $sharedContent = is_array($shared['content'] ?? null) ? $shared['content'] : ['status' => 'NOT_REQUESTED'];
+        $sharedContent['editorial_trace'] = [
+            'journey' => array_values(array_map(static fn (array $section): array => [
+                'section_id' => (string) ($section['id'] ?? ''),
+                'unit_id' => (string) ($section['unit_id'] ?? ''),
+                'claim_refs' => array_values(array_map(static fn (array $claim): array => [
+                    'claim_id' => (string) ($claim['claim_id'] ?? ''),
+                    'claim_revision' => max(1, (int) ($claim['claim_revision'] ?? 1)),
+                    'original_subject' => $claim['original_subject'] ?? [],
+                    'target_subject' => $claim['target_subject'] ?? $claim['resolved_primary_subject'] ?? [],
+                    'scope' => (string) ($claim['scope'] ?? ''),
+                    'facet' => (string) ($claim['facet'] ?? $claim['knowledge_facet'] ?? ''),
+                    'eligibility' => (string) ($claim['eligibility'] ?? ''),
+                    'evidence_status' => (string) ($claim['evidence']['status'] ?? $claim['evidence_status'] ?? ''),
+                    'retrieval_origin' => (string) ($claim['retrieval_origin'] ?? ''),
+                    'applicability' => (string) ($claim['applicability'] ?? ''),
+                    'retrieval_tier' => (string) ($claim['retrieval_tier'] ?? ''),
+                    'coverage_kind' => (string) ($claim['coverage_kind'] ?? ''),
+                    'editorial_treatment' => (string) ($claim['editorial_treatment'] ?? ''),
+                    'semantic_context_only' => ($claim['semantic_context_only'] ?? false) === true,
+                    'broader_context_only' => ($claim['broader_context_only'] ?? false) === true,
+                ], array_filter((array) ($section['claims'] ?? []), 'is_array'))),
+            ], array_filter($plan->sections, 'is_array'))),
+            'composer' => array_values(array_map(static fn (array $trace): array => $trace, $finalDraft->claimTrace)),
+        ];
 
         return [
             'status' => $quality->readiness,
@@ -165,7 +190,7 @@ final class VideoEditorialAdapter
                 'id' => (string) ($claim['claim_id'] ?? ''),
                 'revision' => max(1, (int) ($claim['claim_revision'] ?? 1)),
             ], array_filter($pack->selectedClaims, 'is_array'))),
-            'shared_enrichment' => $shared['content'] ?? ['status' => 'NOT_REQUESTED'],
+            'shared_enrichment' => $sharedContent,
             'shared_result' => $shared,
         ];
     }

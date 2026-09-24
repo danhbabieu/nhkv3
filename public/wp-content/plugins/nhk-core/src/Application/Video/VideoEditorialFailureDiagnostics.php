@@ -83,6 +83,7 @@ final class VideoEditorialFailureDiagnostics
                 'stop_reason' => self::string($retrievalDiagnostics['stop_reason'] ?? ''),
                 'needs' => $needDiagnostics,
             ],
+            'trace' => self::trace($content, $pack),
             'repair' => [
                 'decision' => self::string($result['quality_decision'] ?? ''),
                 'rounds' => self::boundedInt($result['repair_rounds'] ?? 0),
@@ -90,6 +91,65 @@ final class VideoEditorialFailureDiagnostics
             ],
             'terminal' => ['codes' => $codes],
         ];
+    }
+
+    /** @return array<string,mixed> */
+    private static function trace(array $content, mixed $pack): array
+    {
+        $selected = $pack instanceof EditorialContextPack ? $pack->selectedClaims : (array) ($content['selected_claims'] ?? []);
+        $excluded = $pack instanceof EditorialContextPack ? $pack->excludedCandidates : [];
+        $units = [];
+        if ($pack instanceof EditorialContextPack) {
+            foreach (array_slice($pack->knowledgeUnits, 0, 20) as $unit) {
+                if (!is_object($unit) || !method_exists($unit, 'toArray')) continue;
+                $data = $unit->toArray();
+                $claim = is_array($data['claim'] ?? null) ? $data['claim'] : [];
+                $units[] = [
+                    'unit_id' => self::string($data['unit_id'] ?? ''),
+                    'claim' => self::claimMetadata($claim),
+                    'supporting_claims' => array_values(array_map(static fn (mixed $item): array => self::claimMetadata(is_array($item) ? $item : []), array_slice((array) ($data['supporting_claims'] ?? []), 0, 20))),
+                    'coverage_aspects' => array_values(array_map([self::class, 'string'], array_slice((array) ($data['coverage_aspects'] ?? []), 0, 20))),
+                    'publicly_composable' => ($data['publicly_composable'] ?? false) === true,
+                ];
+            }
+        }
+
+        $editorial = is_array($content['editorial_trace'] ?? null) ? $content['editorial_trace'] : [];
+        return [
+            'selected_claims' => array_values(array_map(static fn (mixed $claim): array => self::claimMetadata(is_array($claim) ? $claim : []), array_slice($selected, 0, 20))),
+            'excluded_claims' => array_values(array_map(static fn (mixed $claim): array => self::claimMetadata(is_array($claim) ? $claim : []), array_slice($excluded, 0, 20))),
+            'knowledge_units' => $units,
+            'journey' => array_slice((array) ($editorial['journey'] ?? []), 0, 20),
+            'composer' => array_values(array_map(static fn (mixed $trace): array => self::claimMetadata(is_array($trace) ? $trace : []), array_slice((array) ($editorial['composer'] ?? []), 0, 20))),
+        ];
+    }
+
+    /** @param array<string,mixed> $claim @return array<string,mixed> */
+    private static function claimMetadata(array $claim): array
+    {
+        $subject = is_array($claim['original_subject'] ?? null) ? $claim['original_subject'] : [];
+        $target = is_array($claim['resolved_primary_subject'] ?? $claim['target_subject'] ?? null) ? ($claim['resolved_primary_subject'] ?? $claim['target_subject']) : [];
+        return array_filter([
+            'claim_id' => self::string($claim['claim_id'] ?? $claim['id'] ?? ''),
+            'claim_revision' => self::boundedInt($claim['claim_revision'] ?? $claim['revision'] ?? 0),
+            'canonical_subject_id' => self::string($target['id'] ?? ''),
+            'claim_subject_id' => self::string($subject['id'] ?? $claim['subject_id'] ?? ''),
+            'claim_subject_type' => self::string($subject['type'] ?? $claim['subject_type'] ?? ''),
+            'scope' => self::string($claim['scope'] ?? ''),
+            'facet' => self::string($claim['facet'] ?? $claim['knowledge_facet'] ?? ''),
+            'eligibility' => self::string($claim['eligibility'] ?? ''),
+            'evidence_status' => self::string($claim['evidence']['status'] ?? $claim['evidence_status'] ?? ''),
+            'retrieval_origin' => self::string($claim['retrieval_origin'] ?? ''),
+            'applicability' => self::string($claim['applicability'] ?? ''),
+            'retrieval_tier' => self::string($claim['retrieval_tier'] ?? ''),
+            'coverage_kind' => self::string($claim['coverage_kind'] ?? ''),
+            'editorial_treatment' => self::string($claim['editorial_treatment'] ?? ''),
+            'semantic_context_only' => ($claim['semantic_context_only'] ?? false) === true,
+            'broader_context_only' => ($claim['broader_context_only'] ?? false) === true,
+            'publicly_composable' => ($claim['publicly_composable'] ?? true) === true,
+            'state' => self::string($claim['state'] ?? ''),
+            'exclusion_reasons' => self::codes($claim['exclusion_reasons'] ?? []),
+        ], static fn (mixed $value): bool => $value !== '' && $value !== []);
     }
 
     /** @param mixed $value */

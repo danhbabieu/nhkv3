@@ -96,6 +96,31 @@ final class SharedEnrichmentBoundaryTest extends TestCase
         self::assertSame('USER_EXPLICIT', $result['content']['semantic_needs'][0]['origin']);
     }
 
+    public function test_shared_pipeline_retrieves_ineligible_claim_but_never_selects_or_counts_it_as_exact_knowledge(): void
+    {
+        $boundary = new SharedEnrichmentBoundary(
+            new EditorialClaimRetrievalService(new ClaimRetrievalEngine(
+                static fn (array $subject): array => ['status' => 'available', 'items' => []],
+                static fn (array $subject, array $neighborhood): array => [
+                    ['id' => 'blocked', 'claim_id' => 'blocked', 'subject_id' => self::SUBJECT, 'subject_type' => 'model', 'facet' => 'configuration', 'text' => 'Blocked fact.', 'scope' => 'model', 'provenance' => 'CATALOG_SUPPORTED', 'evidence_status' => 'MISSING'],
+                    ['id' => 'eligible', 'claim_id' => 'eligible', 'subject_id' => self::SUBJECT, 'subject_type' => 'model', 'facet' => 'recognition', 'text' => 'Eligible fact.', 'scope' => 'model', 'provenance' => 'CATALOG_SUPPORTED', 'evidence_status' => 'SUPPORTED_WITHIN_SCOPE'],
+                ],
+            )),
+            new EditorialKnowledgeSelector(),
+        );
+
+        $result = $boundary->enrich([
+            'profile' => 'video',
+            'subject_resolution' => ['primary' => ['id' => self::SUBJECT, 'type' => 'model']],
+            'topic' => 'fact',
+        ]);
+
+        self::assertSame(['eligible', 'blocked'], array_column($result['content']['retrieval']['items'], 'claim_id'));
+        self::assertSame(['eligible'], array_column($result['content']['selected_claims'], 'claim_id'));
+        self::assertSame(1, $result['content']['pack']->diagnostics['exact_selected_count']);
+        self::assertSame(['blocked'], array_column($result['content']['pack']->excludedCandidates, 'claim_id'));
+    }
+
     public function test_knowledge_delta_preserves_classifications_provenance_and_proposal_readiness(): void
     {
         $subject = UuidCodec::newV7();

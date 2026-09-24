@@ -91,4 +91,26 @@ final class VideoEditorialFailureDiagnosticsTest extends TestCase
         self::assertSame(1, $result['semantic']['exact_count']);
         self::assertSame(2, $result['semantic']['selected_unit_count']);
     }
+
+    public function test_projects_bounded_claim_and_unit_contract_metadata_without_claim_text(): void
+    {
+        $claim = [
+            'claim_id' => 'claim-1', 'claim_revision' => 3,
+            'original_subject' => ['id' => 'subject-1', 'type' => 'model'],
+            'resolved_primary_subject' => ['id' => 'subject-1', 'type' => 'model'],
+            'subject_id' => 'subject-1', 'scope' => 'model', 'facet' => 'configuration',
+            'eligibility' => 'ineligible', 'evidence' => ['status' => 'missing'],
+            'retrieval_origin' => 'direct', 'applicability' => 'applicable',
+            'retrieval_tier' => 'EXACT', 'coverage_kind' => 'exact',
+            'editorial_treatment' => 'DIRECT_FACT', 'exclusion_reasons' => ['EVIDENCE_MISSING'],
+            'text' => 'must_not_escape',
+        ];
+        $pack = new EditorialContextPack('no_useful_claims', ['id' => 'subject-1', 'type' => 'model'], 'subject', ['profile' => 'video'], 'available', [], [$claim], [], [], [], ['coverage_status' => 'THIN']);
+        $result = VideoEditorialFailureDiagnostics::project(['content' => ['pack' => $pack, 'selected_claims' => [], 'editorial_trace' => ['composer' => [$claim]]]]);
+
+        self::assertSame('claim-1', $result['trace']['excluded_claims'][0]['claim_id']);
+        self::assertSame('ineligible', $result['trace']['excluded_claims'][0]['eligibility']);
+        self::assertSame('subject-1', $result['trace']['excluded_claims'][0]['canonical_subject_id']);
+        self::assertStringNotContainsString('must_not_escape', json_encode($result, JSON_UNESCAPED_UNICODE));
+    }
 }
