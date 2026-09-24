@@ -6,6 +6,7 @@ namespace NHK\Tests\Unit;
 use NHK\Core\Application\Governance\GovernanceService;
 use NHK\Core\Application\Mcp\{McpGovernanceHandler, McpDispatchRegistry, McpReadHandler, McpSemanticContextResolver, McpToolCatalog, McpTransport};
 use NHK\Core\Application\Mcp\McpAbilityRegistration;
+use NHK\Core\Infrastructure\Mcp\EasyMcpNativeFileCompatibilityAdapter;
 use NHK\Core\Domain\Authority\{CanonicalEntityTypeCatalog, EntityTypeRegistry};
 use NHK\Tests\Support\{InMemoryAuthorityRepository, InMemoryProposalRepository};
 use PHPUnit\Framework\TestCase;
@@ -24,8 +25,9 @@ final class KnowledgeWriterPreviewMcpTest extends TestCase
         self::assertFalse($tool['governed']);
         self::assertSame('nhk.knowledge.writer.preview', McpDispatchRegistry::handlerKey('nhk.knowledge.writer.preview'));
         self::assertTrue(McpToolCatalog::hasExecutableDispatchHandler('nhk.knowledge.writer.preview'));
-        self::assertNull(McpAbilityRegistration::abilityNameForTool('nhk.knowledge.writer.preview'));
-        self::assertNotEmpty(McpAbilityRegistration::explicitExclusionReasons()['nhk.knowledge.writer.preview']);
+        self::assertSame('nhk-v3/knowledge-writer-preview', McpAbilityRegistration::abilityNameForTool('nhk.knowledge.writer.preview'));
+        self::assertContains('nhk-v3/knowledge-writer-preview', McpAbilityRegistration::operatorEnabledAbilityAllowlist());
+        self::assertArrayNotHasKey('nhk.knowledge.writer.preview', McpAbilityRegistration::explicitExclusionReasons());
 
         $schema = $tool['inputSchema'];
         self::assertContains('instruction', $schema['required']);
@@ -34,6 +36,34 @@ final class KnowledgeWriterPreviewMcpTest extends TestCase
         self::assertSame(1000, $schema['properties']['instruction']['maxLength']);
         self::assertSame(12, $schema['properties']['observations']['maxItems']);
         self::assertSame(4000, $schema['properties']['output_constraints']['properties']['max_chars']['maximum']);
+    }
+
+    public function test_advertised_read_only_capability_is_exported_with_catalog_schema_and_known_capability_remains_exported(): void
+    {
+        $catalog = array_column(McpToolCatalog::tools(), null, 'name');
+        $connectorTools = [];
+        foreach (['nhk.knowledge.writer.preview', 'nhk.documentation.bootstrap'] as $toolName) {
+            $ability = McpAbilityRegistration::abilityNameForTool($toolName);
+            self::assertNotNull($ability);
+            $connectorTools[] = [
+                'name' => McpAbilityRegistration::connectorToolNameForAbility($ability),
+                'description' => 'stale',
+                'inputSchema' => ['type' => 'object', 'properties' => ['stale' => ['type' => 'string']]],
+            ];
+        }
+
+        $projected = array_column(EasyMcpNativeFileCompatibilityAdapter::projectTools($connectorTools), null, 'name');
+        foreach (['nhk.knowledge.writer.preview', 'nhk.documentation.bootstrap'] as $toolName) {
+            $ability = McpAbilityRegistration::abilityNameForTool($toolName);
+            $connector = McpAbilityRegistration::connectorToolNameForAbility((string) $ability);
+            self::assertArrayHasKey($connector, $projected, $toolName);
+            self::assertSame($catalog[$toolName]['description'], $projected[$connector]['description'], $toolName);
+            self::assertJsonStringEqualsJsonString(
+                json_encode(EasyMcpNativeFileCompatibilityAdapter::normalizeFinalInputSchema($catalog[$toolName]['inputSchema']), JSON_THROW_ON_ERROR),
+                json_encode($projected[$connector]['inputSchema'], JSON_THROW_ON_ERROR),
+                $toolName,
+            );
+        }
     }
 
     public function test_tools_call_dispatches_structured_preview_with_read_capability_only(): void

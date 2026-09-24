@@ -41,9 +41,9 @@ final class KnowledgeWriterPreviewExposureTest extends TestCase
         self::assertFalse($tool['governed']);
         self::assertNotEmpty($tool['dispatch']);
         self::assertSame(64, strlen(McpToolCatalog::schemaHash('nhk.knowledge.writer.preview')));
-        self::assertNull(McpAbilityRegistration::abilityNameForTool('nhk.knowledge.writer.preview'));
-        self::assertNotContains('nhk-v3/knowledge-writer-preview', McpAbilityRegistration::operatorEnabledAbilityAllowlist());
+        self::assertSame('nhk-v3/knowledge-writer-preview', McpAbilityRegistration::abilityNameForTool('nhk.knowledge.writer.preview'));
+        self::assertContains('nhk-v3/knowledge-writer-preview', McpAbilityRegistration::operatorEnabledAbilityAllowlist());
         self::assertNotContains('nhk-v3/knowledge-writer-preview', McpAbilityRegistration::explicitInternalAdminAbilityAllowlist());
-        self::assertNotEmpty(McpAbilityRegistration::explicitExclusionReasons()['nhk.knowledge.writer.preview'] ?? '');
+        self::assertArrayNotHasKey('nhk.knowledge.writer.preview', McpAbilityRegistration::explicitExclusionReasons());
     }
 }

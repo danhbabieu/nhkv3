@@ -21,6 +21,7 @@ final class McpCapabilityManifestTest extends TestCase
         self::assertTrue($manifest['media']['read_back']);
         self::assertContains('nhk.article.preflight', $manifest['article']['reads']);
         self::assertContains('nhk.article.ingest', $manifest['article']['writes']);
+        self::assertContains('nhk.knowledge.writer.preview', $manifest['knowledge']['reads']);
         self::assertTrue($manifest['article']['seo_preflight']);
         self::assertSame([], $manifest['article']['unsupported']);
         self::assertNotContains('nhk.article.create', array_merge($manifest['article']['reads'], $manifest['article']['writes']));

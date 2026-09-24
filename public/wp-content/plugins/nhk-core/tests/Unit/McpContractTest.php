@@ -477,6 +477,7 @@ final class McpContractTest extends TestCase
             'nhk-v3/knowledge-get',
             'nhk-v3/source-get',
             'nhk-v3/evidence-get',
+            'nhk-v3/knowledge-writer-preview',
         ], McpAbilityRegistration::readAbilityNames());
         self::assertSame('nhk-v3/entity-get', McpAbilityRegistration::abilityNameForTool('nhk.entity.get'));
         self::assertSame('nhk-v3/docs-bootstrap', McpAbilityRegistration::abilityNameForTool('nhk.docs.bootstrap'));

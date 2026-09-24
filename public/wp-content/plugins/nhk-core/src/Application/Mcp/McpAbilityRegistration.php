@@ -107,7 +107,7 @@ final class McpAbilityRegistration
 
     public static function toolNameForAbility(string $abilityName): ?string
     {
-        foreach ([self::READ_TOOL_MAP, self::CAPABILITY_GATED_READ_TOOL_MAP, self::GOVERNED_TOOL_MAP] as $map) {
+        foreach ([self::readToolMap(), self::CAPABILITY_GATED_READ_TOOL_MAP, self::GOVERNED_TOOL_MAP] as $map) {
             foreach ($map as $toolName => $mappedAbility) {
                 if ($mappedAbility === $abilityName) return $toolName;
             }
@@ -371,15 +371,31 @@ final class McpAbilityRegistration
         'nhk.relation.backfill.apply' => 'nhk-v3/relation-backfill-apply',
     ];
 
-    /** @var array<string,string> */
-    private const EXPLICIT_EXCLUSION_REASONS = [
-        'nhk.knowledge.writer.preview' => 'MCP transport only: the preview requires the explicitly wired KnowledgeWriterPreviewService and is not exposed through the WordPress Ability adapter.',
-    ];
+    /**
+     * Every public read-only catalog entry gets an Ability projection unless
+     * an explicit compatibility mapping already defines its stable ID. This
+     * keeps the catalog and external discovery surfaces from drifting apart
+     * when a read capability is added with a transport-owned handler.
+     *
+     * @return array<string,string>
+     */
+    private static function readToolMap(): array
+    {
+        $map = self::READ_TOOL_MAP;
+        foreach (McpToolCatalog::tools() as $tool) {
+            $toolName = (string) ($tool['name'] ?? '');
+            if ($toolName === '' || ($tool['kind'] ?? null) !== 'read' || ($tool['governed'] ?? true) !== false) continue;
+            if (isset($map[$toolName]) || isset(self::CAPABILITY_GATED_READ_TOOL_MAP[$toolName]) || SingleEntryPointPolicy::isInternalOnly($toolName)) continue;
+            $slug = preg_replace('/^nhk\./', '', $toolName) ?? $toolName;
+            $map[$toolName] = 'nhk-v3/' . trim((string) preg_replace('/[^a-z0-9]+/i', '-', $slug), '-');
+        }
+        return $map;
+    }
 
     /** @return list<string> */
     public static function readAbilityNames(): array
     {
-        return array_values(self::READ_TOOL_MAP);
+        return array_values(self::readToolMap());
     }
 
     /** @return list<string> */
@@ -390,7 +406,7 @@ final class McpAbilityRegistration
 
     public static function abilityNameForTool(string $tool): ?string
     {
-        return self::READ_TOOL_MAP[$tool] ?? self::CAPABILITY_GATED_READ_TOOL_MAP[$tool] ?? self::GOVERNED_TOOL_MAP[$tool] ?? null;
+        return self::readToolMap()[$tool] ?? self::CAPABILITY_GATED_READ_TOOL_MAP[$tool] ?? self::GOVERNED_TOOL_MAP[$tool] ?? null;
     }
 
     /** @return list<string> */
@@ -402,13 +418,13 @@ final class McpAbilityRegistration
     /** @return list<string> */
     public static function abilityNames(): array
     {
-        return array_values(array_unique(array_merge([self::MCP_APP_DIAGNOSTICS_ABILITY], self::READ_TOOL_MAP, self::CAPABILITY_GATED_READ_TOOL_MAP, self::GOVERNED_TOOL_MAP)));
+        return array_values(array_unique(array_merge([self::MCP_APP_DIAGNOSTICS_ABILITY], self::readToolMap(), self::CAPABILITY_GATED_READ_TOOL_MAP, self::GOVERNED_TOOL_MAP)));
     }
 
     /** @return array<string,string> */
     public static function explicitExclusionReasons(): array
     {
-        return self::EXPLICIT_EXCLUSION_REASONS;
+        return [];
     }
 
     public static function registerCategory(): void
@@ -424,7 +440,7 @@ final class McpAbilityRegistration
     {
         if (!function_exists('wp_register_ability')) return;
         $tools = array_column(McpToolCatalog::tools(), null, 'name');
-        foreach (self::READ_TOOL_MAP as $toolName => $abilityName) {
+        foreach (self::readToolMap() as $toolName => $abilityName) {
             $tool = $tools[$toolName] ?? null;
             if (!is_array($tool) || ($tool['kind'] ?? null) !== 'read' || ($tool['governed'] ?? true) !== false) continue;
             wp_register_ability($abilityName, [
@@ -785,7 +801,10 @@ final class McpAbilityRegistration
                 'nhk.source.get' => $read->sourceGet((string) ($input['id'] ?? '')),
             'nhk.evidence.get' => $read->evidenceGet((string) ($input['id'] ?? '')),
                 'nhk.media.attachment.get' => $read->mediaAttachmentGet((int) ($input['attachment_id'] ?? 0)),
-                default => new \WP_Error('nhk_mcp_ability_not_found', 'NHK V3 read ability is not registered.'),
+                // Transport-owned read capabilities do not need a second
+                // Ability handler. Their descriptor and execution both
+                // re-enter the canonical MCP transport.
+                default => self::executeMcp($tool, $input),
             };
         } catch (\InvalidArgumentException $error) {
             return new \WP_Error('nhk_mcp_invalid_input', $error->getMessage(), ['status' => 400]);

@@ -19032,3 +19032,36 @@ secret review are recorded with the Task 3 commit.
 
 SAFETY: No semantic owner, Knowledge/Evidence/Graph record, schema, database,
 staging/production environment, deployment or remote repository was changed.
+
+# Checkpoint — 2026-09-24 — Knowledge Writer Preview external MCP exposure correction (LOCAL / READ-ONLY)
+
+ROOT_CAUSE: `nhk.knowledge.writer.preview` was present in `McpToolCatalog`,
+`McpDispatchRegistry` and the production `McpTransport` composition, but
+`McpAbilityRegistration` explicitly excluded it from the WordPress/Easy MCP
+Ability projection. The external connector therefore had no normalized Ability
+ID, enabled descriptor or callable `tools/list` entry even though internal MCP
+dispatch tests passed.
+
+FIRST_BROKEN_BOUNDARY: WordPress Ability/Easy MCP registration, after the
+canonical catalog and before connector descriptor export. The catalog,
+transport dispatch, schema and production preview-service wiring were intact.
+
+IMPLEMENTED: Public read-only catalog entries without a legacy Ability mapping
+now receive a deterministic `nhk-v3/<tool-slug>` Ability projection and use the
+canonical MCP transport as the generic execution fallback. The Knowledge
+capability manifest now includes the preview read. No operation-name exception,
+second semantic path or mutation path was added.
+
+VERIFICATION: Preview exposure regression, Easy MCP descriptor projection,
+catalog/dispatch/schema parity, transport, Plugin wiring and Knowledge manifest
+tests pass. Full Unit passed 2,561 tests / 14,831 assertions under 512M, with
+18 warnings, 43 deprecations and 30 PHPUnit deprecations. Contract passed 6
+tests / 48 assertions. PHP lint and `git diff --check` passed. Changed-diff
+secret scan and exposure special-case scan passed. Guarded MCP Integration
+attempted 31 tests and skipped all 31 because the required WordPress/database
+runtime was unavailable; no integration assertion failure occurred.
+
+SAFETY: No migration, database write, staging/production mutation, deployment,
+push or remote runtime action occurred. Existing user changes were preserved.
+
+STATUS: `KNOWLEDGE_WRITER_MCP_EXPOSURE_READY / NO_SERVER_ACTION`
