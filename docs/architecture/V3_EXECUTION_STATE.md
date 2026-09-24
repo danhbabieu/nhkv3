@@ -1,5 +1,22 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-24 — Knowledge Writer Preview Task 3 review fix (LOCAL / READ-ONLY)
+
+Wired the existing read-only `KnowledgeWriterPreviewService` into the production
+MCP composition using the current Authority resolver, Capture subject resolver,
+and shared enrichment boundary, then passed it through `McpTransport`'s named
+optional dependency. The MCP-only catalog and dispatch boundary remain
+unchanged; missing service state still fails closed as
+`KNOWLEDGE_WRITER_PREVIEW_UNAVAILABLE`. No new semantic writer or mutation
+capability was introduced.
+
+VERIFICATION: Focused Knowledge Writer Preview/service/contract/safety and MCP
+suite passed 91 tests / 2,680 assertions. `Plugin.php` PHP lint and
+`git diff --check` passed. The diff contains only the production composition
+root and this execution-state checkpoint.
+No database, staging/production, deployment, push or external service was
+touched.
+
 # Checkpoint — 2026-09-24 — Knowledge Writer Preview Task 2 contract coverage (LOCAL / READ-ONLY)
 
 Added synthetic-fixture acceptance coverage for the eight registered preview
