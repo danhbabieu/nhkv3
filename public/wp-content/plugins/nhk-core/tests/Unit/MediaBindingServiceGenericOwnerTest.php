@@ -73,6 +73,25 @@ final class MediaBindingServiceGenericOwnerTest extends TestCase
         self::assertSame(MediaUsageRoleRegistry::EVIDENCE, $result['readback']['role']);
         self::assertSame($targetId, $usages->listByEndpoint('knowledge', $targetId, MediaUsageRoleRegistry::EVIDENCE)[0]->endpointKey);
     }
+
+    public function test_non_representative_binding_has_no_representative_slot_and_is_idempotent_by_role_placement(): void
+    {
+        $mediaId = UuidCodec::newV7();
+        $targetId = UuidCodec::newV7();
+        $media = new GenericMediaRepository(new Media($mediaId, 'nhk:media:detail', 'Detail', 'ready', []));
+        $usages = new GenericUsageRepository();
+        $capabilities = new MediaOwnerCapabilityRegistry();
+        $capabilities->register(MediaOwnerCapability::forEndpoint('classification', [MediaUsageRoleRegistry::TECHNICAL_DETAIL]));
+        $types = new EntityTypeRegistry();
+        $types->register(new EntityTypeDefinition('classification', 1, true));
+        $service = new MediaBindingService($media, new GenericAssetRepository(), $usages, new GenericAuthorityRepository(new AuthorityEntity($targetId, 'classification', 'nhk:classification:detail', 'Detail', 1, [])), $types, new GenericOperationRepository(), capabilities: $capabilities);
+
+        $result = $service->bind(['idempotency_key' => 'detail-binding', 'media' => ['id' => $mediaId], 'target' => ['type' => 'classification', 'id' => $targetId], 'role' => MediaUsageRoleRegistry::TECHNICAL_DETAIL, 'selection_source' => 'USER_EXPLICIT', 'selection_policy' => 'PINNED']);
+
+        self::assertSame('COMPLETE', $result['status']);
+        self::assertNull($result['readback']['active_representative_count']);
+        self::assertSame('', $result['readback']['active_slot']);
+    }
 }
 
 final class GenericMediaRepository implements MediaRepository

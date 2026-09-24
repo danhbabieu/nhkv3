@@ -297,7 +297,7 @@ final class Plugin {
                             && $publicEligibility->evaluate($owner)->eligible
                             && $publicRoutes->path($owner) !== null;
                     }
-                    return ['projection_required' => true, 'public_required' => $public || $capability->requiresPublicSurface];
+                    return ['projection_required' => $capability->requiresProjection, 'public_required' => $public || $capability->requiresPublicSurface, 'frontend_required' => $capability->requiresFrontendReadback];
                 },
                 static function (string $type, string $id, string $mediaId, string $role) use ($entityMediaProjection): array {
                     $projection = $entityMediaProjection->forEntity($type, $id);

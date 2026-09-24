@@ -37,14 +37,9 @@ final class EntityMediaProjection
     {
         $media = $this->media->findByCanonicalId($usage->mediaId);
         if (!$media instanceof Media || !$media->active || $media->readiness !== 'ready' || $media->isSystemPlaceholder()) return null;
-        // wp_post does not carry an Authority subject key at this generic
-        // projection boundary; Article preflight/SEO supplies the canonical
-        // subject-bound read model. Authority endpoints can validate directly
-        // against their endpoint key here.
-        if ($usage->endpointType !== 'wp_post') {
-            $assessment = ($this->suitabilityPolicy ??= new SemanticSuitabilityPolicy())->evaluateMedia($media, $this->assets->listByMediaId($media->canonicalId), ['subject_ids' => [$usage->endpointKey]], 'SYSTEM_AUTO', $usage->role);
-            if (($assessment['valid_for_completeness'] ?? false) !== true) return null;
-        }
+        // MediaUsage is the canonical, governed consumer binding. Projection
+        // must not re-run SYSTEM_AUTO suitability and silently hide an
+        // explicit USER_EXPLICIT/PINNED binding from public read models.
         $asset = (new PublicMediaAssetSelector())->canonical($this->assets->listByMediaId($media->canonicalId));
         if (!$asset instanceof MediaAsset) return null;
         $filename = is_string($asset->metadata['canonical_filename'] ?? null) && trim((string) $asset->metadata['canonical_filename']) !== '' ? (string) $asset->metadata['canonical_filename'] : basename(str_replace('\\', '/', $asset->storageKey));

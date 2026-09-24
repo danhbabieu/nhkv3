@@ -46,11 +46,11 @@ final class MediaEnrichmentCompletionPolicy
             $projection[] = ['status' => $projectionOk ? 'verified' : 'stale', 'target_type' => $type, 'target_id' => $target, 'media_id' => $mediaId] + $projectionReadback;
             if (!$projectionOk) return ['status' => 'unavailable', 'reason' => 'PROJECTION_READBACK_STALE', 'projection' => $projection];
 
-            if (($capability['public_required'] ?? false) === true) {
+            if (($capability['public_required'] ?? false) === true || ($capability['frontend_required'] ?? false) === true) {
                 $publicReadback = ($this->public)($type, $target, $mediaId, $role);
                 $publicOk = ($publicReadback['status'] ?? '') === 'verified' && ($publicReadback['media_id'] ?? '') === $mediaId;
                 $public[] = ['status' => $publicOk ? 'verified' : 'stale', 'target_type' => $type, 'target_id' => $target, 'media_id' => $mediaId] + $publicReadback;
-                if (!$publicOk) return ['status' => 'unavailable', 'reason' => 'PUBLIC_SURFACE_READBACK_STALE', 'projection' => $projection, 'public' => $public];
+                if (!$publicOk) return ['status' => 'unavailable', 'reason' => ($capability['frontend_required'] ?? false) === true ? 'FRONTEND_READBACK_STALE' : 'PUBLIC_SURFACE_READBACK_STALE', 'projection' => $projection, 'public' => $public];
             }
         }
         return ['status' => 'verified', 'completion' => 'PUBLIC_COMPLETE', 'canonical_status' => 'CANONICAL_COMPLETE', 'projected_status' => 'PROJECTED_COMPLETE', 'projection' => $projection, 'public' => $public, 'canonical_owner' => 'MediaUsage'];

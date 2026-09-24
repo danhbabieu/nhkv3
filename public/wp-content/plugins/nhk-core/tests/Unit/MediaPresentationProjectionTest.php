@@ -30,6 +30,18 @@ final class MediaPresentationProjectionTest extends TestCase
         self::assertNotSame($result['representative']['media_id'], $result['evidence'][0]['media_id']);
     }
 
+    public function test_explicit_pinned_usage_is_projected_without_re_running_auto_suitability(): void
+    {
+        [$media, $assets, $usages, $service] = $this->stores();
+        $item = $service->create('pinned-no-subject', 'Pinned image', 'ready');
+        $service->addAsset($item->canonicalId, 'original', 'uploads/pinned.webp', hash('sha256', 'pinned'), 'image/webp', 10, 1200, 675, 'PUBLIC', ['canonical_filename' => 'pinned.webp']);
+        $service->addUsage($item->canonicalId, 'brand', 'brand-without-asset-subject', 'representative', 0, '', '', [], '', '', 'USER_EXPLICIT', 'PINNED');
+
+        $projection = (new \NHK\Core\Application\Entity\EntityMediaProjection($media, $assets, $usages))->forEntity('brand', 'brand-without-asset-subject');
+
+        self::assertSame($item->canonicalId, $projection['representative']['media_id'] ?? null);
+    }
+
     /** @dataProvider mediaCapableOwnerMatrix */
     public function test_registered_media_capable_owner_projection_consumes_canonical_usage(string $endpointType, string $endpointKey, string $role): void
     {

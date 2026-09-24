@@ -268,9 +268,10 @@ final class MediaBindingService implements MediaBindingPort
         foreach (['alt_text' => 1000, 'caption' => 2000, 'title' => 255] as $key => $limit) if (strlen((string) ($seo[$key] ?? '')) > $limit) throw new MediaException('MEDIA_USAGE_SEO_INVALID');
         $expected = (int) ($request['expected_usage_revision'] ?? 0);
         if (in_array($operation, ['replace', 'remove'], true) && $expected < 1) throw new MediaException('MEDIA_USAGE_REVISION_REQUIRED');
-        $placement = trim((string) ($request['placement_key'] ?? ($type === 'wp_post' ? $role : 'representative')));
-        if ($placement === '') throw new MediaException('MEDIA_USAGE_PLACEMENT_REQUIRED');
-        return ['operation' => $operation, 'target' => $target, 'media' => $media, 'role' => $role, 'selection_source' => $source, 'selection_policy' => $policy, 'seo' => ['alt_text' => (string) ($seo['alt_text'] ?? ''), 'caption' => (string) ($seo['caption'] ?? ''), 'title' => (string) ($seo['title'] ?? '')], 'sort_order' => max(0, (int) ($request['sort_order'] ?? 0)), 'placement_key' => $placement, 'active_slot' => $operation === 'remove' ? 'retired' : ($type === 'wp_post' ? null : 'representative'), 'usage_id' => trim((string) ($request['usage_id'] ?? '')), 'expected_usage_revision' => $expected];
+        $requestedPlacement = trim((string) ($request['placement_key'] ?? ''));
+        $placement = $requestedPlacement !== '' ? $requestedPlacement : ($type === 'wp_post' ? $role : ($role === MediaUsageRoleRegistry::REPRESENTATIVE ? 'representative' : ''));
+        if ($role === MediaUsageRoleRegistry::REPRESENTATIVE && $placement === '') throw new MediaException('MEDIA_USAGE_PLACEMENT_REQUIRED');
+        return ['operation' => $operation, 'target' => $target, 'media' => $media, 'role' => $role, 'selection_source' => $source, 'selection_policy' => $policy, 'seo' => ['alt_text' => (string) ($seo['alt_text'] ?? ''), 'caption' => (string) ($seo['caption'] ?? ''), 'title' => (string) ($seo['title'] ?? '')], 'sort_order' => max(0, (int) ($request['sort_order'] ?? 0)), 'placement_key' => $placement, 'active_slot' => $operation === 'remove' ? 'retired' : ($role === MediaUsageRoleRegistry::REPRESENTATIVE ? 'representative' : null), 'usage_id' => trim((string) ($request['usage_id'] ?? '')), 'expected_usage_revision' => $expected];
     }
 
     /** @param array<string,mixed> $reference @return array{type:string,key:string} */
@@ -369,7 +370,7 @@ final class MediaBindingService implements MediaBindingPort
     {
         $role = (string) $normalized['role'];
         $capability = $this->capabilities?->forEndpoint($targetType);
-        $current = array_values(array_filter($this->usages->listByEndpoint($targetType, $targetId, $role), static fn (mixed $item): bool => $item instanceof MediaUsage && $item->activeSlot !== 'retired' && $item->placementKey === ''));
+        $current = array_values(array_filter($this->usages->listByEndpoint($targetType, $targetId, $role), static fn (mixed $item): bool => $item instanceof MediaUsage && $item->activeSlot !== 'retired' && $item->placementKey === (string) $normalized['placement_key']));
         if ($role === MediaUsageRoleRegistry::REPRESENTATIVE) {
             $current = array_values(array_filter($this->usages->listByEndpoint($targetType, $targetId, $role), static fn (mixed $item): bool => $item instanceof MediaUsage && $item->activeSlot !== 'retired'));
         }
