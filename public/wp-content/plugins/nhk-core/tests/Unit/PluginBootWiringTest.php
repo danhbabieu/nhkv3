@@ -91,20 +91,6 @@ final class PluginBootWiringTest extends TestCase
         self::assertStringContainsString("'nhk.media.binding.get' => \$read->mediaBindingGet", $registration);
     }
 
-    public function test_knowledge_writer_preview_service_is_injected_into_production_mcp_transport(): void
-    {
-        $plugin = (string) file_get_contents(__DIR__ . '/../../src/Plugin.php');
-        $service = strpos($plugin, '$knowledgeWriterPreview = new KnowledgeWriterPreviewService(');
-        $transport = strpos($plugin, 'new McpTransport(');
-        $injection = strpos($plugin, 'knowledgeWriterPreview: $knowledgeWriterPreview');
-
-        self::assertNotFalse($service, 'The MCP composition must construct the preview service.');
-        self::assertNotFalse($transport, 'The MCP composition must construct its transport.');
-        self::assertNotFalse($injection, 'The production transport must receive the preview service.');
-        self::assertLessThan($transport, $service, 'The service must exist before the transport is composed.');
-        self::assertGreaterThan($transport, $injection, 'The named service dependency must belong to the transport construction.');
-    }
-
     public function test_easy_mcp_native_file_adapter_is_registered_without_changing_the_nhk_entrypoint(): void
     {
         $plugin = (string) file_get_contents(__DIR__ . '/../../src/Plugin.php');

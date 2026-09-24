@@ -54,6 +54,31 @@ final class McpTransportIntegrationTest extends TestCase
         self::assertSame(['resolved' => [], 'candidates' => [], 'ambiguities' => [], 'missing' => [], 'conflicts' => [], 'relations' => []], $response->get_data()['result']['structuredContent']);
     }
 
+    public function test_production_plugin_composition_dispatches_knowledge_writer_preview(): void
+    {
+        $users = get_users(['role' => 'administrator', 'number' => 1]);
+        self::assertNotEmpty($users, 'The read-only MCP integration requires an administrator account.');
+        wp_set_current_user((int) $users[0]->ID);
+
+        $response = $this->request('tools/call', [
+            'id' => 102,
+            'params' => [
+                'name' => 'nhk.knowledge.writer.preview',
+                'arguments' => [
+                    'subject' => ['type' => 'brand', 'name' => 'Integration preview subject'],
+                    'instruction' => 'Summarize only supported information in Vietnamese.',
+                    'purpose' => 'concise_answer',
+                ],
+            ],
+        ], ['Mcp-Name' => 'nhk.knowledge.writer.preview']);
+
+        self::assertSame(200, $response->get_status(), (string) wp_json_encode($response->get_data()));
+        $result = $response->get_data()['result'];
+        self::assertFalse($result['isError'] ?? true, (string) wp_json_encode($result));
+        self::assertTrue($result['structuredContent']['read_only'] ?? false, (string) wp_json_encode($result));
+        self::assertArrayNotHasKey('error', $result['structuredContent'] ?? []);
+    }
+
     public function test_wordpress_abilities_register_public_media_ingest_and_export_its_contract(): void
     {
         $abilities = wp_get_abilities(['namespace' => 'nhk-v3']);

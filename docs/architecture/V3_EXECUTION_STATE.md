@@ -1,5 +1,21 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-24 — Knowledge Writer Preview production wiring regression
+
+Replaced the `PluginBootWiringTest` source-text ordering assertion with a
+WordPress integration regression that invokes `nhk.knowledge.writer.preview`
+through the route registered by the production Plugin boot path. It asserts the
+dispatch returns a read-only structured preview instead of the missing-service
+error. The invocation is read-only and uses the existing `nhk_v3_test` guarded
+integration harness; no production composition or data behavior changed.
+
+VERIFICATION: The focused integration test is present but could not execute in
+this environment: without bootstrap variables PHPUnit skips it, and with
+`NHK_WP_TEST_PATH=public` plus `NHK_WP_TEST_DB=nhk_v3_test`, WordPress exits with
+`Error establishing a database connection` before the test runs. Focused unit
+regressions, PHP lint, `git diff --check`, and secret review are recorded with
+the Task 3 review-fix commit.
+
 # Checkpoint — 2026-09-24 — Knowledge Writer Preview Task 3 rereview coverage
 
 Added focused regression coverage for the production `Plugin` composition
