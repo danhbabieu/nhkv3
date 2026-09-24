@@ -23,4 +23,9 @@ final readonly class SemanticInputEnvelope
         $value['input_type'] = $value['owner_or_source_type'];
         return $value;
     }
+
+    public function toUniversal(): UniversalInputEnvelope
+    {
+        return $this->universal;
+    }
 }

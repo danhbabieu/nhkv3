@@ -10,9 +10,9 @@ final class SemanticNeedDecomposer
     {
     }
 
-    public function decompose(SemanticInputEnvelope $envelope): SemanticNeedDecompositionResult
+    public function decompose(UniversalInputEnvelope|SemanticInputEnvelope $envelope): SemanticNeedDecompositionResult
     {
-        $input = $envelope->toArray();
+        $input = $envelope instanceof SemanticInputEnvelope ? $envelope->toUniversal()->toArray() : $envelope->toArray();
         $resolution = is_array($input['subject_resolution'] ?? null) ? $input['subject_resolution'] : [];
         $subject = is_array($resolution['primary'] ?? null) ? $resolution['primary'] : [];
         $subjectId = trim((string) ($subject['id'] ?? $subject['canonical_subject_id'] ?? ''));
