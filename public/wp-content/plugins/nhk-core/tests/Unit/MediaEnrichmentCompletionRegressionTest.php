@@ -5,6 +5,8 @@ namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Completion\CompletionCoordinator;
 use NHK\Core\Application\Media\MediaEnrichmentCompletionPolicy;
+use NHK\Core\Application\Capture\EditorialCaptureCoordinator;
+use NHK\Core\Domain\Capture\CaptureRecord;
 use PHPUnit\Framework\TestCase;
 
 final class MediaEnrichmentCompletionRegressionTest extends TestCase
@@ -85,5 +87,46 @@ final class MediaEnrichmentCompletionRegressionTest extends TestCase
         self::assertSame('VERIFIED', $completion['frontend_state']);
         self::assertTrue($completion['complete']);
         self::assertNotContains('CANONICAL_READBACK_UNVERIFIED', $completion['blockers']);
+    }
+
+    public function test_completion_children_preserve_target_capability_evidence_from_final_readback(): void
+    {
+        $mediaId = '01a0d3d5-3ded-7553-87c8-eeed409465a1';
+        $targetId = 'fdf5bfd5-d3f4-4281-a39e-77c9271bcf4a';
+        $capture = new CaptureRecord(
+            '01a0d3d5-b2c4-7a0f-a261-39c7cef8f0ee',
+            'media-enrichment-retry',
+            hash('sha256', 'media-enrichment-retry'),
+            'MEDIA_RECONCILED',
+            'IN_PROGRESS',
+        );
+        $coordinator = (new \ReflectionClass(EditorialCaptureCoordinator::class))->newInstanceWithoutConstructor();
+        $method = new \ReflectionMethod($coordinator, 'completionChildren');
+        $method->setAccessible(true);
+        $children = $method->invoke($coordinator, $capture, [], [
+            'status' => 'RECONCILED',
+            'media_ids' => [$mediaId],
+            'media_complete' => true,
+            'bindings' => [[
+                'status' => 'COMPLETE',
+                'readback' => [
+                    'status' => 'verified',
+                    'media_id' => $mediaId,
+                    'target_type' => 'model',
+                    'target_id' => $targetId,
+                    'usage_id' => '70700000-0000-7000-8000-000000000001',
+                ],
+            ]],
+        ], [], [], [
+            'status' => 'verified',
+            'public' => [['status' => 'verified', 'target_type' => 'model', 'target_id' => $targetId, 'media_id' => $mediaId]],
+            'frontend' => [['status' => 'verified', 'target_type' => 'model', 'target_id' => $targetId, 'media_id' => $mediaId]],
+        ], false);
+
+        $modelChild = array_values(array_filter($children, static fn (array $child): bool => ($child['owner_type'] ?? '') === 'model'))[0] ?? [];
+        self::assertSame($targetId, $modelChild['owner_id'] ?? null);
+        self::assertSame('COMPLETE', $modelChild['relation_or_usage_state'] ?? null);
+        self::assertTrue($modelChild['public_eligible'] ?? false);
+        self::assertTrue($modelChild['frontend_verified'] ?? false);
     }
 }
