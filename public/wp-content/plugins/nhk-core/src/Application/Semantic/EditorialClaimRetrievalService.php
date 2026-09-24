@@ -96,15 +96,15 @@ final class EditorialClaimRetrievalService
      * @param array<string,mixed> $profile
      * @return array<string,mixed>
      */
-    public function retrieveForNeeds(SemanticInputEnvelope $envelope, array $needs, array $profile = []): array
+    public function retrieveForNeeds(UniversalInputEnvelope|SemanticInputEnvelope $envelope, array $needs, array $profile = []): array
     {
-        $input = $envelope->toArray();
-        $raw = $this->engine->retrieveForNeeds([
-            'raw_input' => trim((string) ($input['raw_text'] ?? '')),
+        $input = $envelope instanceof SemanticInputEnvelope ? $envelope->toUniversal() : $envelope;
+        $value = $input->toArray();
+        $raw = $this->engine->retrieveForNeeds($input, $needs, [
             'profile' => $profile,
             'result_limit' => max(1, min(200, (int) ($profile['result_limit'] ?? $this->defaultLimit))),
-        ], $needs);
-        $primary = is_array(($input['subject_resolution']['primary'] ?? null)) ? $input['subject_resolution']['primary'] : [];
+        ]);
+        $primary = is_array(($value['subject_resolution']['primary'] ?? null)) ? $value['subject_resolution']['primary'] : [];
         $items = [];
         foreach ((array) ($raw['items'] ?? []) as $item) {
             if (!is_array($item)) continue;

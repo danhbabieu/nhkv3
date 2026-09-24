@@ -91,8 +91,19 @@ final class ClaimRetrievalEngine
      * @param list<SemanticNeed|array<string,mixed>> $needs
      * @return array<string,mixed>
      */
-    public function retrieveForNeeds(array $context, array $needs): array
+    public function retrieveForNeeds(UniversalInputEnvelope|array $input, array $needs, array $profile = []): array
     {
+        if ($input instanceof UniversalInputEnvelope) {
+            $value = $input->toArray();
+            $primary = is_array($value['subject_resolution']['primary'] ?? null) ? $value['subject_resolution']['primary'] : [];
+            $context = [
+                'raw_input' => (string) ($value['body'] ?? $value['raw_text'] ?? $value['title'] ?? ''),
+                'subject_resolution' => ['subjects' => $primary === [] ? [] : [$primary]],
+                'profile' => $profile,
+            ] + $profile;
+        } else {
+            $context = $input + $profile;
+        }
         $normalizedNeeds = [];
         foreach ($needs as $need) {
             try {
