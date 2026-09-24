@@ -15,7 +15,11 @@ final class InMemoryProjectionDependencyIndex implements ProjectionDependencyInd
     public function add(array $dependency): void
     {
         $key = implode('|', [(string) ($dependency['kind'] ?? ''), (string) ($dependency['id'] ?? ''), (string) ($dependency['node_uuid'] ?? ''), (string) ($dependency['section_key'] ?? '')]);
-        foreach ($this->items as $item) if (($item['_key'] ?? '') === $key) return;
+        foreach ($this->items as $index => $item) if (($item['_key'] ?? '') === $key) {
+            $dependency['_key'] = $key;
+            $this->items[$index] = array_replace($item, $dependency);
+            return;
+        }
         $dependency['_key'] = $key; $this->items[] = $dependency;
     }
 
