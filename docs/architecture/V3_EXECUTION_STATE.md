@@ -1,5 +1,44 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-24 — Universal owner lifecycle separation (LOCAL / NO SERVER ACTION)
+
+ROOT_CAUSE / FIRST_BROKEN_BOUNDARY: `CompletionCoordinator` coupled Video
+editorial/content quality and public/frontend readiness to the same completion
+boolean used for canonical owner existence. The shared capability contract also
+lacked minimum-safe representation and lifecycle policy metadata, while
+`SemanticNeed` did not preserve a distinct target subject for multi-subject
+owners.
+
+IMPLEMENTED: Completion packets now expose independent
+`canonical_existence`, `enrichment_readiness` and `publication_readiness`
+dimensions while preserving compatibility fields. Canonical owner completion is
+proven by owner identity plus canonical read-back; sparse or unavailable
+enrichment and publication review no longer invalidate the owner packet.
+OwnerCapability now declares identity, canonical completion, minimum-safe
+representation, publication, read-back and dependency policies. SemanticNeed
+preserves original subject, target subject and owner context; target-scoped
+retrieval retains original/target qualification metadata. Editorial quality
+reports now aggregate OWNER_VALIDITY, FACTUAL_SAFETY, EDITORIAL_QUALITY and
+PUBLICATION_QUALITY dimensions. Generic Article/Video/Media/future-owner
+acceptance coverage was added without a new owner pipeline or schema change.
+
+VERIFICATION: Focused architecture matrix passed 108 tests / 334 assertions;
+affected Capture/Admin suite passed 48 tests / 287 assertions. Full PHPUnit
+with `memory_limit=512M` reached 2,674 tests / 14,536 assertions; remaining 23
+failures are 21 environment-gated Integration/P4 checks requiring
+`NHK_WP_TEST_PATH=public` and `NHK_WP_TEST_DB=nhk_v3_test`, plus two failures in
+the concurrent Knowledge Writer workstream. The default 128M full run hit the
+known `TrustedProvidedFileMaterializerTest` memory ceiling. Composer metadata
+validation passed with the existing missing-license warning, `git diff --check`
+passed, and the changed lifecycle files lint clean. The special-case scan found
+no new production branches; existing Video/YouTube and historical fixture
+references are unrelated pre-existing code.
+
+SAFETY: No migration, schema change, database/staging/production mutation,
+Governance apply, deployment, publication or push occurred. Existing unrelated
+Knowledge Writer changes were preserved and not included in the lifecycle
+commits.
+
 # Checkpoint — 2026-09-24 — System-wide acceptance audit and graph-direction fix
 
 AUDIT_SCOPE: Continued from `23fee9dd` without opening a new architecture
