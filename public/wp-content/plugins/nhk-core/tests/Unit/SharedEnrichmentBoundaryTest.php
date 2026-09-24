@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Knowledge\{KnowledgeEnrichmentPlanner, KnowledgeEnrichmentProposalFactory};
-use NHK\Core\Application\Semantic\{ClaimRetrievalEngine, EditorialClaimRetrievalService, EditorialKnowledgeSelector, SharedEnrichmentBoundary};
+use NHK\Core\Application\Semantic\{ClaimRetrievalEngine, EditorialClaimRetrievalService, EditorialKnowledgeSelector, SemanticInputEnvelope, SemanticNeed, SemanticNeedDecomposer, SharedEnrichmentBoundary, TextInputInterpreter};
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
 use NHK\Core\Domain\Knowledge\{KnowledgeClaim, Source};
 use NHK\Core\Shared\Uuid\UuidCodec;
@@ -45,6 +45,55 @@ final class SharedEnrichmentBoundaryTest extends TestCase
         $sparse = $empty->enrich(['profile' => 'media', 'subject' => ['id' => self::SUBJECT, 'type' => 'model'], 'topic' => 'none']);
         self::assertContains('SHARED_CONTENT_CONTEXT_SPARSE', $sparse['content']['diagnostics']);
         self::assertSame('NOT_REQUESTED', $sparse['knowledge']['status']);
+    }
+
+    public function test_shared_boundary_retrieves_supplied_needs_before_selection_without_surface_owner_change(): void
+    {
+        $boundary = $this->boundary();
+        $need = SemanticNeed::fromArray([
+            'canonical_subject' => ['id' => self::SUBJECT, 'type' => 'model'],
+            'facet_key' => 'configuration', 'concept_key' => 'wall', 'scope' => 'model',
+            'origin' => 'USER_EXPLICIT', 'confidence' => 0.9,
+        ]);
+        $result = $boundary->enrich([
+            'profile' => 'media', 'subject_resolution' => ['primary' => ['id' => self::SUBJECT, 'type' => 'model']],
+            'topic' => 'Odo 36', 'semantic_needs' => [$need->toArray()],
+        ]);
+
+        self::assertSame('media', $result['profile']);
+        self::assertSame($need->needId(), $result['content']['retrieval']['items'][0]['need_id']);
+        self::assertArrayHasKey('need_diagnostics', $result['content']['retrieval']);
+    }
+
+    public function test_shared_boundary_decomposes_registered_components_before_retrieval_for_media_surface(): void
+    {
+        $vocabulary = new class {
+            public function isRegistered(string $facet, string $concept): bool
+            {
+                return $facet === 'configuration' && $concept === 'wall';
+            }
+        };
+        $decomposer = new SemanticNeedDecomposer(new TextInputInterpreter(), $vocabulary);
+        $boundary = new SharedEnrichmentBoundary(
+            new EditorialClaimRetrievalService(new ClaimRetrievalEngine(static fn (array $subject): array => ['status' => 'available', 'items' => []], static fn (array $subject, array $neighborhood): array => [['id' => 'claim-1', 'claim_id' => 'claim-1', 'subject_id' => self::SUBJECT, 'subject_type' => 'model', 'facet' => 'configuration', 'text' => 'Odo 36 có vách ngăn.', 'scope' => 'model', 'provenance' => 'CATALOG_SUPPORTED', 'evidence_status' => 'SUPPORTED_WITHIN_SCOPE']])),
+            new EditorialKnowledgeSelector(),
+            null,
+            null,
+            null,
+            $decomposer,
+        );
+
+        $result = $boundary->enrich([
+            'profile' => 'media',
+            'subject_resolution' => ['primary' => ['id' => self::SUBJECT, 'type' => 'model']],
+            'raw_input' => 'Odo 36',
+            'components' => [['facet_key' => 'configuration', 'concept_key' => 'wall', 'origin' => 'USER_EXPLICIT', 'scope' => 'model']],
+        ]);
+
+        self::assertCount(1, $result['content']['semantic_needs']);
+        self::assertSame('configuration', $result['content']['semantic_needs'][0]['facet_key']);
+        self::assertSame('claim-1', $result['content']['retrieval']['items'][0]['claim_id']);
+        self::assertSame('USER_EXPLICIT', $result['content']['semantic_needs'][0]['origin']);
     }
 
     public function test_knowledge_delta_preserves_classifications_provenance_and_proposal_readiness(): void

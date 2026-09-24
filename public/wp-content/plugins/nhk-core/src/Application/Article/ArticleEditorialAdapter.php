@@ -50,11 +50,12 @@ final class ArticleEditorialAdapter
             'title' => trim((string) ($context['title'] ?? '')),
             'observations' => is_array($context['observations'] ?? null) ? $context['observations'] : [],
         ];
-        $profile = ['profile' => 'article', 'selection_limit' => 8, 'result_limit' => 50];
+        $profile = ['profile' => 'article', 'result_limit' => 50];
         $shared = $this->shared?->enrich([
             'profile' => 'article', 'subject_resolution' => $resolution, 'subject' => $subject,
             'topic' => $topic, 'raw_input' => $inputContext['raw_input'], 'title' => $inputContext['title'],
             'observations' => $inputContext['observations'], 'hints' => (array) ($context['hints'] ?? []),
+            'semantic_needs' => (array) ($context['semantic_needs'] ?? $context['needs'] ?? []),
             'prepared_context' => is_array($context['prepared_context'] ?? null) ? $context['prepared_context'] : [],
         ]);
         $retrieved = is_array($shared['content']['retrieval'] ?? null) ? $shared['content']['retrieval'] : $this->retrieval->retrieve($subject, $topic, (array) ($context['hints'] ?? []), $profile);

@@ -63,11 +63,12 @@ final class VideoEditorialAdapter
             'title' => trim((string) ($context['editorial_title'] ?? '')),
             'observations' => is_array($context['observations'] ?? null) ? $context['observations'] : [],
         ];
-        $profile = ['profile' => 'video', 'selection_limit' => 6, 'result_limit' => 50];
+        $profile = ['profile' => 'video', 'result_limit' => 50];
         $shared = $this->shared?->enrich([
             'profile' => 'video', 'subject_resolution' => $resolution, 'subject' => $subject,
             'topic' => $topic, 'retrieval_topic' => $retrievalTopic, 'raw_input' => $inputContext['raw_input'], 'title' => $inputContext['title'],
             'observations' => $inputContext['observations'], 'hints' => (array) ($context['hints'] ?? []),
+            'semantic_needs' => (array) ($context['semantic_needs'] ?? $context['needs'] ?? []),
             'relations' => is_array($context['relations'] ?? null) ? $context['relations'] : [],
         ]);
         $retrieved = is_array($shared['content']['retrieval'] ?? null) ? $shared['content']['retrieval'] : $this->retrieval->retrieve($subject, $topic, (array) ($context['hints'] ?? []), $profile);

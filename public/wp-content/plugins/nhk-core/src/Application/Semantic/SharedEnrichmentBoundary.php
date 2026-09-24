@@ -19,6 +19,7 @@ final class SharedEnrichmentBoundary
         private ?KnowledgeEnrichmentPlanner $knowledge = null,
         private ?KnowledgeEnrichmentProposalFactory $proposalFactory = null,
         private mixed $relations = null,
+        private ?SemanticNeedDecomposer $decomposer = null,
     ) {
     }
 
@@ -33,7 +34,7 @@ final class SharedEnrichmentBoundary
             'relations' => ['status' => 'NOT_REQUESTED', 'candidates' => [], 'readiness' => [], 'diagnostics' => []],
         ];
 
-        if (in_array($profile, ['article', 'video', 'media'], true)) $result['content'] = $this->content($request, $profile);
+        if (in_array($profile, ['article', 'video', 'media', 'text'], true)) $result['content'] = $this->content($request, $profile);
         if ($profile === 'knowledge_delta' || (($request['knowledge'] ?? false) === true)) $result['knowledge'] = $this->knowledge($request);
         if (is_array($request['relations'] ?? null)) $result['relations'] = $this->relations($request);
         return $result;
@@ -46,9 +47,27 @@ final class SharedEnrichmentBoundary
         $subject = is_array($resolution['primary'] ?? null) ? $resolution['primary'] : (is_array($request['subject'] ?? null) ? $request['subject'] : []);
         $topic = trim((string) ($request['topic'] ?? $request['raw_input'] ?? $request['title'] ?? ''));
         $retrievalTopic = trim((string) ($request['retrieval_topic'] ?? $topic));
-        $selectionLimit = $profile === 'video' ? 6 : 8;
-        $profileData = ['profile' => $profile, 'selection_limit' => $selectionLimit, 'result_limit' => 50];
-        $retrieved = $this->retrieval->retrieve($subject, $retrievalTopic, (array) ($request['hints'] ?? []), $profileData);
+        $profileData = ['profile' => $profile, 'result_limit' => max(1, min(200, (int) ($request['result_limit'] ?? 50)))];
+        if (array_key_exists('selection_limit', $request)) $profileData['selection_limit'] = max(1, min(20, (int) $request['selection_limit']));
+        $envelope = SemanticInputEnvelope::fromArray([
+            'raw_text' => (string) ($request['raw_input'] ?? $retrievalTopic),
+            'title' => (string) ($request['title'] ?? ''),
+            'subject_resolution' => ['primary' => $subject],
+            'components' => (array) ($request['components'] ?? $request['semantic_components'] ?? []),
+            'observations' => (array) ($request['observations'] ?? []),
+            'target_surface' => $profile,
+        ]);
+        $needs = array_values(array_filter((array) ($request['semantic_needs'] ?? $request['needs'] ?? []), static fn (mixed $need): bool => $need instanceof SemanticNeed || is_array($need)));
+        $decomposition = null;
+        if ($needs === [] && $this->decomposer !== null) {
+            $decomposition = $this->decomposer->decompose($envelope)->toArray();
+            $needs = (array) ($decomposition['needs'] ?? []);
+        }
+        if ($needs !== []) {
+            $retrieved = $this->retrieval->retrieveForNeeds($envelope, $needs, $profileData);
+        } else {
+            $retrieved = $this->retrieval->retrieve($subject, $retrievalTopic, (array) ($request['hints'] ?? []), $profileData);
+        }
         $retrieved = $this->boundToPreparedContext($retrieved, is_array($request['prepared_context'] ?? null) ? $request['prepared_context'] : [], $subject);
         $inputContext = [
             'raw_input' => trim((string) ($request['raw_input'] ?? '')),
@@ -62,6 +81,8 @@ final class SharedEnrichmentBoundary
         return [
             'status' => $pack->status,
             'retrieval' => $retrieved,
+            'semantic_needs' => array_map(static fn (mixed $need): array => $need instanceof SemanticNeed ? $need->toArray() : (array) $need, $needs),
+            'decomposition' => $decomposition,
             'pack' => $pack,
             'selected_claims' => $pack->selectedClaims,
             'gaps' => array_values(array_unique($gaps)),

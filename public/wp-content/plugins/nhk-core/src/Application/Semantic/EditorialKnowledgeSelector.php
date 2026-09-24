@@ -96,7 +96,7 @@ final class EditorialKnowledgeSelector
             $coverageKind = strtolower(trim((string) ($claim['coverage_kind'] ?? 'exact')));
             $isExactCoverage = !isset($claim['retrieval_tier']) || strtoupper((string) $claim['retrieval_tier']) === 'EXACT' || $coverageKind === 'exact';
             if (!$isExactCoverage) $aspects = [];
-            if ($aspects === [] && (!$isExactCoverage || ($claim['retrieval_origin'] ?? '') === 'neighborhood' || $explicitCeiling !== null)) $aspects = ['context:' . (string) ($claim['claim_id'] ?? count($selected))];
+            if ($aspects === []) $aspects = ['context:' . (string) ($claim['claim_id'] ?? count($selected))];
             $tokenCost = count($this->tokens((string) ($claim['text'] ?? '')));
             $gain = count($aspects) + (($claim['retrieval_origin'] ?? '') === 'direct' ? 0.75 : 0.5) + min(0.25, $this->score($claim, $topic, $inputContext) / 40.0);
             if ($aspects === [] || $gain < (float) $policy['minimum_gain']) {

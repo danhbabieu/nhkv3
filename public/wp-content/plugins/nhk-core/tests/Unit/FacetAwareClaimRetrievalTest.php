@@ -77,6 +77,42 @@ final class FacetAwareClaimRetrievalTest extends TestCase
         self::assertSame('legacy-1', $result['items'][0]['claim_id']);
     }
 
+    public function test_duplicate_heavy_storage_order_does_not_hide_later_useful_facet(): void
+    {
+        $subject = ['id' => 'subject-1', 'type' => 'variant'];
+        $rows = [];
+        for ($i = 0; $i < 60; $i++) $rows[] = $this->claim('duplicate-' . $i, 'facet-a', 0.1);
+        $rows[] = $this->claim('useful-b', 'facet-b', 1.0);
+        $engine = new ClaimRetrievalEngine(
+            static fn (array $requested): array => ['status' => 'available', 'items' => []],
+            static function (array $requested, array $neighborhood, array $need = []) use ($rows): array { return $rows; },
+            limit: 4,
+        );
+
+        $result = $engine->retrieveForNeeds(['result_limit' => 4], [$this->need($subject, 'facet-a'), $this->need($subject, 'facet-b')]);
+
+        self::assertContains('useful-b', array_column($result['items'], 'claim_id'));
+    }
+
+    public function test_large_need_retrieval_is_deterministic_and_diagnostics_do_not_include_raw_payloads(): void
+    {
+        $rows = [];
+        for ($i = 0; $i < 1000; $i++) $rows[] = $this->claim('claim-' . $i, $i % 2 === 0 ? 'facet-a' : 'facet-b', 1.0);
+        $engine = new ClaimRetrievalEngine(
+            static fn (array $requested): array => ['status' => 'available', 'items' => []],
+            static function (array $requested, array $neighborhood, array $need = []) use ($rows): array { return $rows; },
+            limit: 20,
+        );
+        $needs = [$this->need(['id' => 'subject-1', 'type' => 'variant'], 'facet-a'), $this->need(['id' => 'subject-1', 'type' => 'variant'], 'facet-b')];
+
+        $first = $engine->retrieveForNeeds(['result_limit' => 20], $needs);
+        $second = $engine->retrieveForNeeds(['result_limit' => 20], $needs);
+
+        self::assertSame($first['retrieval_diagnostics'], $second['retrieval_diagnostics']);
+        self::assertLessThanOrEqual(20, count($first['items']));
+        self::assertStringNotContainsString('raw_secret', json_encode($first['retrieval_diagnostics'], JSON_UNESCAPED_UNICODE));
+    }
+
     /** @return array<string,mixed> */
     private function claim(string $id, string $facet, float $relevance): array
     {
