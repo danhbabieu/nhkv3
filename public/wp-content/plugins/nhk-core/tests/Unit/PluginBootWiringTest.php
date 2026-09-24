@@ -25,7 +25,7 @@ final class PluginBootWiringTest extends TestCase
     public function test_article_research_inventory_captures_every_required_media_dependency_and_uses_input_resolution(): void
     {
         $plugin = (string) file_get_contents(__DIR__ . '/../../src/Plugin.php');
-        $inventoryStart = strpos($plugin, 'static function (array $input) use ($authority, $types, $claims, $sources, $evidence, $media, $assets, $usages, $videos, $graphService, $predicates)');
+        $inventoryStart = strpos($plugin, 'static function (array $input) use ($authority, $types, $claims, $sources, $evidence, $media, $assets, $usages, $videos, $graphService, $predicates, $mediaBindingService)');
         self::assertNotFalse($inventoryStart, 'Article inventory composition must capture its required MediaAssetRepository.');
 
         $inventory = substr($plugin, $inventoryStart, strpos($plugin, "                [\$articlePublicEligibility, 'evaluate']", $inventoryStart) - $inventoryStart);

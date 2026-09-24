@@ -20,6 +20,7 @@ final class EntityMediaProjection
         $evidence = [];
         $gallery = [];
         foreach ($this->usages->listByEndpoint($endpointType, $endpointKey) as $usage) {
+            if ($usage->activeSlot === 'retired') continue;
             $item = $this->item($usage);
             if ($item === null) continue;
             $gallery[] = $item;

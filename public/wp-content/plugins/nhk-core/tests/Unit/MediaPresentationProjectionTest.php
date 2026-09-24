@@ -30,6 +30,31 @@ final class MediaPresentationProjectionTest extends TestCase
         self::assertNotSame($result['representative']['media_id'], $result['evidence'][0]['media_id']);
     }
 
+    /** @dataProvider mediaCapableOwnerMatrix */
+    public function test_registered_media_capable_owner_projection_consumes_canonical_usage(string $endpointType, string $endpointKey, string $role): void
+    {
+        [$media, $assets, $usages, $service] = $this->stores();
+        $item = $service->create('matrix-' . $endpointType, 'Matrix ' . $endpointType, 'ready', ['subject_id' => $endpointKey]);
+        $service->addAsset($item->canonicalId, 'original', 'uploads/matrix-' . $endpointType . '.webp', hash('sha256', $endpointType), 'image/webp', 10, 1200, 675, 'PUBLIC', ['canonical_filename' => 'matrix-' . $endpointType . '.webp']);
+        $service->addUsage($item->canonicalId, $endpointType, $endpointKey, $role, 0, 'Matrix');
+
+        $result = (new \NHK\Core\Application\Entity\EntityMediaProjection($media, $assets, $usages))->forEntity($endpointType, $endpointKey);
+        self::assertSame($item->canonicalId, $result['representative']['media_id'] ?? null, $endpointType);
+    }
+
+    /** @return array<string,array{string,string,string}> */
+    public static function mediaCapableOwnerMatrix(): array
+    {
+        return [
+            'brand' => ['brand', 'brand-1', 'representative'],
+            'model' => ['model', 'model-1', 'representative'],
+            'variant' => ['variant', 'variant-1', 'representative'],
+            'classification' => ['classification', 'classification-1', 'representative'],
+            'knowledge' => ['knowledge', 'knowledge-1', 'representative'],
+            'article' => ['wp_post', '1:55', 'featured_primary'],
+        ];
+    }
+
     /** @return array{0:object,1:object,2:object,3:MediaService} */
     private function stores(): array
     {
