@@ -1,5 +1,27 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-24 — Brain 2 contract closure (LOCAL / NO SERVER ACTION)
+
+IMPLEMENTED: Closed the existing Article/Video editorial contract boundary
+without introducing a new owner or semantic type. Shared Composer now rejects
+ineligible, non-publicly-composable or inapplicable claims even when a caller
+constructs a raw EditorialPlan. ReaderJourney, Composer and Semantic SEO retain
+applicability and specificity alongside subject, scope, retrieval, coverage,
+treatment and semantic-context metadata. Context-only material remains
+traceable for diagnostics but cannot become visible structured-data claims.
+EditorialQualityGate now blocks contextual Claims rendered with exact/direct
+treatment. Empty input no longer receives generic editorial filler.
+
+REGRESSION: Production-shaped Article/Video/shared matrix passed 82 tests / 316
+assertions. Focused semantic matrix passed 60 tests / 228 assertions. Existing
+specificity propagation, provenance exclusion, raw-plan exclusion and adapter
+quality behavior remain covered.
+
+SAFETY: No migration, schema change, database/staging/production mutation,
+Graph/Knowledge/Evidence write, deployment, publication or push occurred.
+
+STATUS: `LOCAL_BRAIN2_CONTRACT_CLOSED / NO_SERVER_ACTION`
+
 # Checkpoint — 2026-09-24 — Editorial information-gain closure (LOCAL / NO SERVER ACTION)
 
 IMPLEMENTED: Closed the bounded marginal-information-gain gap in the existing

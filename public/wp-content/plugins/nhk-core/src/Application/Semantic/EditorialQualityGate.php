@@ -59,6 +59,8 @@ final class EditorialQualityGate
             $id = trim((string) ($trace['claim_id'] ?? ''));
             if ($id === '' || !isset($selected[$id]) || ($selected[$id]['eligibility'] ?? '') !== 'eligible') { $add('traceability', 'BLOCK', 'INELIGIBLE_CLAIM_USED'); continue; }
             $traceIds[$id] = true;
+            if (($trace['semantic_context_only'] ?? false) === true && in_array(strtoupper((string) ($trace['editorial_role'] ?? '')), ['CORE', 'IDENTIFICATION'], true)) $add('scope', 'BLOCK', 'CONTEXTUAL_CLAIM_RENDERED_AS_EXACT');
+            if (($trace['semantic_context_only'] ?? false) === true && strtoupper((string) ($trace['editorial_treatment'] ?? '')) === 'DIRECT_FACT') $add('scope', 'BLOCK', 'CONTEXTUAL_CLAIM_RENDERED_AS_EXACT');
             if ((int) ($trace['claim_revision'] ?? 0) !== (int) ($selected[$id]['claim_revision'] ?? 0)) $add('traceability', 'BLOCK', 'STALE_CLAIM_REVISION');
             $traceSubject = $trace['original_subject']['id'] ?? null;
             $claimSubject = $selected[$id]['original_subject']['id'] ?? null;

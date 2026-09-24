@@ -99,6 +99,8 @@ final class ReaderJourneyPlanner
             'original_subject' => $claim['original_subject'] ?? [],
             'target_subject' => $claim['resolved_primary_subject'] ?? $claim['target_subject'] ?? [],
             'scope' => (string) ($claim['scope'] ?? ''),
+            'applicability' => (string) ($claim['applicability'] ?? 'applicable'),
+            'specificity' => $claim['specificity'] ?? $claim['semantic_specificity'] ?? null,
             'graph_path' => $claim['graph_path'] ?? [],
             'retrieval_origin' => (string) ($claim['retrieval_origin'] ?? ''),
             'retrieval_tier' => (string) ($claim['retrieval_tier'] ?? 'EXACT'),

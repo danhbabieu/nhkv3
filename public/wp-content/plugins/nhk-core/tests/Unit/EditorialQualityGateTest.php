@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Tests\Unit;
 
-use NHK\Core\Application\Semantic\{EditorialContextPack, EditorialDraft, EditorialPlan, EditorialQualityGate, EditorialQualityReport, SemanticSeoPlan};
+use NHK\Core\Application\Semantic\{EditorialContextPack, EditorialDraft, EditorialPlan, EditorialQualityGate, EditorialQualityReport, SemanticSeoPlan, SemanticSeoPlanner};
 use PHPUnit\Framework\TestCase;
 
 final class EditorialQualityGateTest extends TestCase
@@ -166,6 +166,19 @@ final class EditorialQualityGateTest extends TestCase
         self::assertContains('SPARSE_KNOWLEDGE_INPUT', $report->informational);
         self::assertSame('WARN', $report->dimensions['profile_fit']['severity']);
         self::assertSame('INCOMPLETE', $report->readiness);
+    }
+
+    public function test_contextual_claim_rendered_as_exact_is_blocked(): void
+    {
+        $claim = ['claim_id' => 'context-1', 'claim_revision' => 1, 'text' => 'Thông tin bối cảnh rộng hơn.', 'eligibility' => 'eligible', 'evidence' => ['status' => 'eligible'], 'publicly_composable' => true, 'semantic_context_only' => true, 'editorial_treatment' => 'DIRECT_FACT', 'editorial_role' => 'CORE', 'original_subject' => ['id' => self::SUBJECT, 'type' => 'model']];
+        $pack = new EditorialContextPack('available', ['id' => self::SUBJECT, 'type' => 'model'], $this->topic(), ['profile' => 'article'], 'available', [$claim], []);
+        $plan = new EditorialPlan('available', 'article', ['id' => self::SUBJECT, 'type' => 'model'], $this->topic(), [['id' => 'opening', 'claim_refs' => []], ['id' => 'core', 'claim_refs' => [['claim_id' => 'context-1']]]]);
+        $draft = new EditorialDraft('available', 'article', $this->topic(), 'Thông tin bối cảnh rộng hơn.', 'Thông tin bối cảnh rộng hơn.', [['claim_id' => 'context-1', 'claim_revision' => 1, 'semantic_context_only' => true, 'editorial_treatment' => 'DIRECT_FACT', 'editorial_role' => 'CORE']], []);
+        $seo = (new SemanticSeoPlanner())->plan($pack, $plan, $draft, ['public_identity' => ['canonical_url' => '/mau/odo36/', 'public_eligible' => true, 'canonical_identity' => true]]);
+
+        $report = (new EditorialQualityGate())->evaluate($pack, $plan, $draft, $seo);
+
+        self::assertContains('CONTEXTUAL_CLAIM_RENDERED_AS_EXACT', $report->blockers);
     }
 
     public function test_untraceable_factual_assertion_blocks_grounding(): void

@@ -54,6 +54,8 @@ final class SemanticSeoPlanner
             'original_subject' => $claim['original_subject'] ?? [],
             'target_subject' => $claim['resolved_primary_subject'] ?? $claim['target_subject'] ?? [],
             'scope' => (string) ($claim['scope'] ?? ''),
+            'applicability' => (string) ($claim['applicability'] ?? 'applicable'),
+            'specificity' => $claim['specificity'] ?? $claim['semantic_specificity'] ?? null,
             'retrieval_tier' => (string) ($claim['retrieval_tier'] ?? 'EXACT'),
             'coverage_kind' => (string) ($claim['coverage_kind'] ?? 'exact'),
             'editorial_treatment' => (string) ($claim['editorial_treatment'] ?? 'DIRECT_FACT'),
@@ -238,6 +240,6 @@ final class SemanticSeoPlanner
     {
         $type = is_array($input) ? (string) ($input['type'] ?? '') : '';
         if (!in_array($type, self::STRUCTURED_TYPES, true) || $canonicalUrl === null) return [];
-        return ['type' => $type, 'name' => $title, 'url' => $canonicalUrl, 'visible_claim_ids' => array_values(array_map(static fn (array $claim): string => (string) ($claim['claim_id'] ?? ''), array_filter($claims, static fn (mixed $claim): bool => is_array($claim) && ($claim['eligibility'] ?? '') === 'eligible')))] ;
+        return ['type' => $type, 'name' => $title, 'url' => $canonicalUrl, 'visible_claim_ids' => array_values(array_map(static fn (array $claim): string => (string) ($claim['claim_id'] ?? ''), array_filter($claims, static fn (mixed $claim): bool => is_array($claim) && ($claim['eligibility'] ?? '') === 'eligible' && ($claim['semantic_context_only'] ?? false) !== true && ($claim['editorial_treatment'] ?? 'DIRECT_FACT') === 'DIRECT_FACT')))] ;
     }
 }

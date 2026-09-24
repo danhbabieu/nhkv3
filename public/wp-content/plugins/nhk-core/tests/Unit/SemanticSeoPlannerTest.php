@@ -105,6 +105,21 @@ final class SemanticSeoPlannerTest extends TestCase
         self::assertNotContains('provenance', array_column($plan->claimTrace, 'claim_id'));
     }
 
+    public function test_context_only_claim_is_traceable_but_never_visible_in_structured_data(): void
+    {
+        $context = ['claim_id' => 'context', 'claim_revision' => 2, 'text' => 'Model rộng hơn có đặc điểm P.', 'eligibility' => 'eligible', 'publicly_composable' => true, 'semantic_context_only' => true, 'editorial_treatment' => 'BACKGROUND_CONTEXT', 'editorial_role' => 'CONTEXT'];
+        $fact = ['claim_id' => 'fact', 'claim_revision' => 1, 'text' => 'Odo 36 có vách cam.', 'eligibility' => 'eligible', 'publicly_composable' => true, 'semantic_context_only' => false, 'editorial_treatment' => 'DIRECT_FACT', 'editorial_role' => 'CORE'];
+        $pack = new EditorialContextPack('available', ['id' => self::SUBJECT, 'type' => 'model'], 'Odo 36 vách cam', ['profile' => 'article'], 'available', [$context, $fact], [], ['raw_input' => 'Odo 36']);
+        $editorialPlan = new EditorialPlan('available', 'article', ['id' => self::SUBJECT, 'type' => 'model'], 'Odo 36 vách cam', []);
+        $draft = new EditorialDraft('available', 'article', 'Odo 36 vách cam', 'Odo 36 có vách cam.', 'Odo 36 có vách cam.', [['claim_id' => 'fact']], []);
+
+        $plan = $this->planner()->plan($pack, $editorialPlan, $draft, ['public_identity' => ['canonical_url' => '/mau/odo36/', 'public_eligible' => true, 'canonical_identity' => true], 'structured_data' => ['type' => 'Article']]);
+
+        self::assertContains('context', array_column($plan->claimTrace, 'claim_id'));
+        self::assertContains('fact', $plan->structuredData['visible_claim_ids']);
+        self::assertNotContains('context', $plan->structuredData['visible_claim_ids']);
+    }
+
     public function test_h2_seo_copy_is_differentiated_and_cluster_uses_meaningful_phrases(): void
     {
         $plan = $this->planner()->plan($this->pack(), $this->editorialPlan(), $this->draft(), [

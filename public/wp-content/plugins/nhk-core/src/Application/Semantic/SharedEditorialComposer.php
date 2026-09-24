@@ -29,7 +29,11 @@ final class SharedEditorialComposer
             if (($section['id'] ?? '') === 'opening') continue;
             $realized = [];
             foreach ((array) ($section['claims'] ?? []) as $index => $claim) {
-                if (!is_array($claim) || ($claim['eligibility'] ?? '') !== 'eligible' || trim((string) ($claim['claim_id'] ?? '')) === '') {
+                if (!is_array($claim)
+                    || ($claim['eligibility'] ?? '') !== 'eligible'
+                    || ($claim['publicly_composable'] ?? true) !== true
+                    || (($claim['applicability'] ?? 'applicable') !== 'applicable')
+                    || trim((string) ($claim['claim_id'] ?? '')) === '') {
                     $traceFailure = true;
                     continue;
                 }
@@ -44,6 +48,8 @@ final class SharedEditorialComposer
                     'original_subject' => $claim['original_subject'] ?? [],
                     'target_subject' => $claim['resolved_primary_subject'] ?? $claim['target_subject'] ?? [],
                     'scope' => (string) ($claim['scope'] ?? ''),
+                    'applicability' => (string) ($claim['applicability'] ?? 'applicable'),
+                    'specificity' => $claim['specificity'] ?? $claim['semantic_specificity'] ?? null,
                     'graph_path' => $claim['graph_path'] ?? [],
                     'retrieval_tier' => (string) ($claim['retrieval_tier'] ?? 'EXACT'),
                     'coverage_kind' => (string) ($claim['coverage_kind'] ?? 'exact'),
@@ -61,7 +67,6 @@ final class SharedEditorialComposer
             if ($realized !== []) $paragraphs[] = implode(' ', $realized);
         }
 
-        if ($paragraphs === []) $paragraphs[] = 'Nội dung đang chờ bổ sung dữ liệu biên tập.';
         $body = implode("\n\n", array_map(fn (string $paragraph): string => $this->normalizeParagraph($paragraph), $paragraphs));
         $guard->assertSafe($title);
         $guard->assertSafe($body);

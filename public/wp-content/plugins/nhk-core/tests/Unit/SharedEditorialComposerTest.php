@@ -129,6 +129,24 @@ final class SharedEditorialComposerTest extends TestCase
         self::assertStringNotContainsString('Mẫu A có vách cam. Mẫu A có vách xanh.', $draft->body);
     }
 
+    public function test_raw_plan_cannot_bypass_public_composability_or_applicability(): void
+    {
+        $plan = new EditorialPlan('available', 'article', ['id' => self::SUBJECT, 'type' => 'model'], 'Odo 36', [
+            ['id' => 'opening', 'claims' => [], 'claim_refs' => []],
+            ['id' => 'core', 'claims' => [
+                ['claim_id' => 'private', 'claim_revision' => 1, 'text' => 'Không được đưa vào bài.', 'eligibility' => 'eligible', 'publicly_composable' => false, 'applicability' => 'applicable'],
+                ['claim_id' => 'broad', 'claim_revision' => 1, 'text' => 'Không được mở rộng phạm vi.', 'eligibility' => 'eligible', 'publicly_composable' => true, 'applicability' => 'inapplicable'],
+            ], 'claim_refs' => []],
+        ], ['raw_input' => 'Mô tả đầu vào của Odo 36.']);
+
+        $draft = (new SharedEditorialComposer())->compose($plan);
+
+        self::assertSame([], $draft->claimTrace);
+        self::assertStringNotContainsString('Không được đưa vào bài', $draft->body);
+        self::assertStringNotContainsString('Không được mở rộng phạm vi', $draft->body);
+        self::assertSame('review', $draft->status);
+    }
+
     private function pack(string $profile, array $claims, array $input = [], array $visual = []): EditorialContextPack
     {
         return new EditorialContextPack('available', ['id' => self::SUBJECT, 'type' => 'model'], '3 phiên bản vách máy Odo 36', ['profile' => $profile], 'available', $claims, [], $input, $visual, [], ['policy_version' => 'test']);
