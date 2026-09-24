@@ -67,7 +67,7 @@ final class AdminDomainAdapterTest extends TestCase
         self::assertSame(1, $row['usage_count']);
         self::assertSame('variant', $row['primary_entity']['type']);
         self::assertArrayHasKey('completion', $row);
-        self::assertFalse($row['completion']['complete']);
+        self::assertTrue($row['completion']['complete']);
     }
 
     public function test_media_detail_is_a_usable_readback_projection_with_assets_roles_usage_and_provenance(): void

@@ -146,9 +146,9 @@ final class CompletionCoordinator
             $status = !$publicCapable ? 'NOT_APPLICABLE' : ($public === 'READY' && $frontend === 'VERIFIED' && $projectionConsistency !== 'BLOCKED' ? 'READY' : 'BLOCKED');
         }
         $blockers = $this->strings($readiness['blockers'] ?? []);
-        if ($publicCapable && $public === 'BLOCKED' && $blockers === []) $blockers[] = 'PUBLIC_ELIGIBILITY_NOT_VERIFIED';
-        if ($publicCapable && $frontend === 'BLOCKED' && $blockers === []) $blockers[] = 'FRONTEND_READBACK_NOT_VERIFIED';
-        if ($projectionConsistency === 'BLOCKED' && $blockers === []) $blockers[] = 'PROJECTION_REVISION_MISMATCH';
+        if ($publicCapable && $public === 'BLOCKED' && !in_array('PUBLIC_ELIGIBILITY_NOT_VERIFIED', $blockers, true)) $blockers[] = 'PUBLIC_ELIGIBILITY_NOT_VERIFIED';
+        if ($publicCapable && $frontend === 'BLOCKED' && !in_array('FRONTEND_READBACK_NOT_VERIFIED', $blockers, true)) $blockers[] = 'FRONTEND_READBACK_NOT_VERIFIED';
+        if ($projectionConsistency === 'BLOCKED' && !in_array('PROJECTION_REVISION_MISMATCH', $blockers, true)) $blockers[] = 'PROJECTION_REVISION_MISMATCH';
         return [
             'status' => $status,
             'blockers' => array_values(array_unique($blockers)),
@@ -183,6 +183,7 @@ final class CompletionCoordinator
             if (is_array($child['completion'] ?? null)) $child['completion'] = $packet;
             $packets[] = $packet;
             if (($packet['complete'] ?? false) !== true) array_push($blockers, ...$this->strings($packet['blockers'] ?? []));
+            if (($packet['publication_readiness']['status'] ?? '') === 'BLOCKED') array_push($blockers, ...$this->strings($packet['publication_readiness']['blockers'] ?? []));
         }
         $requiredOwners = $this->ownerSpecs($evidence['required_owners'] ?? []);
         $missingRequiredOwners = array_values(array_filter($requiredOwners, function (array $required) use ($packets): bool {
@@ -220,12 +221,29 @@ final class CompletionCoordinator
             'owner_id' => trim($captureId),
             'canonical_state' => $canonical,
             'canonical_readback_verified' => $canonicalReadbackVerified,
+            'canonical_existence' => [
+                'status' => $canonical,
+                'blockers' => $canonical === 'COMPLETE' ? [] : ['CANONICAL_READBACK_UNVERIFIED'],
+                'readback_verified' => $canonicalReadbackVerified,
+            ],
             'required_owners' => $requiredOwners,
             'missing_required_owners' => $missingRequiredOwners,
             'dependency_state' => $complete ? 'COMPLETE' : 'PARTIAL',
             'relation_or_usage_state' => 'NOT_APPLICABLE',
             'public_state' => 'NOT_APPLICABLE',
             'frontend_state' => 'NOT_APPLICABLE',
+            'enrichment_readiness' => [
+                'status' => $complete ? 'RICH' : 'PARTIAL',
+                'blockers' => [],
+                'warnings' => [],
+                'gaps' => $resumeChildren,
+            ],
+            'publication_readiness' => [
+                'status' => 'NOT_APPLICABLE',
+                'blockers' => [],
+                'warnings' => [],
+                'surface' => '',
+            ],
             'complete' => $complete,
             'status' => $complete ? 'COMPLETE' : ($canonical === 'BLOCKED' ? 'BLOCKED' : 'PARTIAL'),
             'blockers' => array_values(array_unique($blockers)),
