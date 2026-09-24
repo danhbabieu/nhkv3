@@ -81,6 +81,22 @@ final class EditorialKnowledgeSelectorAdaptiveTest extends TestCase
         self::assertLessThanOrEqual(count($article->selectedClaims), count($video->selectedClaims) + 1);
     }
 
+    public function test_relaxed_and_background_candidates_remain_context_and_do_not_claim_exact_coverage(): void
+    {
+        $claim = $this->claim('context', 'Broader family context.', 'family', [
+            'retrieval_tier' => 'BACKGROUND_CONTEXT',
+            'coverage_kind' => 'contextual',
+        ]);
+
+        $pack = (new EditorialKnowledgeSelector())->select($this->retrieval([$claim]), 'subject overview', $this->subject(), ['profile' => 'article']);
+
+        self::assertCount(1, $pack->selectedClaims);
+        self::assertSame('SUPPORTING_CONTEXT', $pack->selectedClaims[0]['editorial_role']);
+        self::assertSame('contextual', $pack->selectedClaims[0]['coverage_kind']);
+        self::assertNotSame('SUFFICIENT', $pack->diagnostics['coverage_status']);
+        self::assertContains('contextual', $pack->diagnostics['coverage_kinds']);
+    }
+
     /** @param list<array<string,mixed>> $claims @return array<string,mixed> */
     private function retrieval(array $claims): array { return ['status' => 'available', 'items' => $claims, 'eligible_claims' => $claims]; }
 

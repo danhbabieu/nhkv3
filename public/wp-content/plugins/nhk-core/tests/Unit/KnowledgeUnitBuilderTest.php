@@ -52,6 +52,24 @@ final class KnowledgeUnitBuilderTest extends TestCase
         self::assertSame(1, $first->diagnostics['unit_count']);
     }
 
+    public function test_unit_trace_preserves_need_facet_tier_treatment_and_coverage_kind(): void
+    {
+        $result = (new KnowledgeUnitBuilder())->build([
+            $this->candidate('relaxed', 'Broader family context.', [
+                'need_id' => 'need-1',
+                'retrieval_tier' => 'SUBJECT_BROADENED',
+                'editorial_treatment' => 'SUPPORTING_CONTEXT',
+                'coverage_kind' => 'applicable_relaxed',
+            ]),
+        ], ['id' => self::SUBJECT, 'type' => 'model'], 'family context', ['profile' => 'article']);
+
+        $unit = $result->units[0]->toArray();
+        self::assertSame('need-1', $unit['claim']['need_id']);
+        self::assertSame('SUBJECT_BROADENED', $unit['claim']['retrieval_tier']);
+        self::assertSame('SUPPORTING_CONTEXT', $unit['claim']['editorial_treatment']);
+        self::assertSame('applicable_relaxed', $unit['claim']['coverage_kind']);
+    }
+
     /** @param array<string,mixed> $extra */
     private function candidate(string $id, string $text, array $extra = []): array
     {
