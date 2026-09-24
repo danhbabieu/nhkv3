@@ -1,5 +1,29 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-24 — Knowledge Writer Preview Task 4 boundary verification (LOCAL / NO LIVE MUTATION)
+
+IMPLEMENTED: Production `Plugin` composition constructs the read-only
+`KnowledgeWriterPreviewService` from the existing `$researchResolver`, Capture
+subject resolver and shared enrichment service, then injects it into the single
+`McpTransport`. The MCP catalog and normal transport dispatch expose the
+structured preview using ordinary `read` capability. The WordPress Ability
+adapter explicitly excludes this tool; it is absent from both operator and
+internal/admin Ability allowlists, with no generic Ability or mutation path.
+
+TESTS: Added `KnowledgeWriterPreviewExposureTest` to lock the production
+composition and MCP-only boundary. Focused exposure, Plugin boot-wiring and
+MCP dispatch tests passed 22 tests / 98 assertions. The production-bootstrap
+integration test was attempted against exact `nhk_v3_test`, but WordPress
+stopped during bootstrap with `Error establishing a database connection`;
+the separate unit transport invocation passed. PHP lint and `git diff
+--check` were run for this checkpoint.
+
+RULING: Task 4's older Ability-registration and Ability-callback requirements
+conflict with the established Task 3 MCP-only boundary and the user's explicit
+instruction. Keep the MCP transport as the supported exposure; do not register
+an Ability or mutation route. Cost if this ruling is wrong: clients that can
+call only WordPress Abilities will not discover this preview.
+
 # Checkpoint — 2026-09-24 — Knowledge Writer Preview production wiring regression
 
 Replaced the `PluginBootWiringTest` source-text ordering assertion with a

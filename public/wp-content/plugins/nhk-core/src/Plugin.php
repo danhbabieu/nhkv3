@@ -1882,7 +1882,7 @@ final class Plugin {
                 ? new \NHK\Core\Application\Mcp\RecoveryMcpRuntimeBinding($wpdb)
                 : null;
             $knowledgeWriterPreview = new KnowledgeWriterPreviewService(
-                new McpSemanticContextResolver($authority, $types),
+                $researchResolver,
                 $captureSubjectResolver,
                 $sharedEnrichment,
                 new ReaderJourneyPlanner(),
