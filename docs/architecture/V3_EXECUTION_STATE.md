@@ -1,5 +1,25 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-24 — Facet-aware semantic retrieval design and plan (PLAN READY / NO CODE MUTATION)
+
+DESIGN: The approved architectural direction is recorded in
+`docs/superpowers/specs/2026-09-24-facet-aware-semantic-retrieval-design.md`.
+It preserves the existing Adaptive Knowledge Selection boundary and adds only
+transient shared input/need decomposition, facet-aware bounded retrieval,
+per-need relaxation and specificity trace before `KnowledgeUnit`/Coverage.
+
+PLAN: The implementation plan is recorded in
+`docs/superpowers/plans/2026-09-24-facet-aware-semantic-retrieval.md`. It uses
+small TDD tasks, keeps Media/Image on the existing shared media profile because
+no equivalent Media editorial adapter exists, and forbids migration, semantic
+mutation, deployment and production special cases.
+
+VERIFICATION: Spec and plan placeholder scans are clean and `git diff --check`
+passes. No production code, schema, database, staging/live runtime or
+canonical semantic data was changed.
+
+STATUS: `FACET_AWARE_RETRIEVAL_PLAN_READY / AWAITING_USER_EXECUTION_METHOD / NO_CODE_MUTATION`.
+
 # Checkpoint — 2026-09-24 — Existing canonical Video frontend reconciliation (LOCAL / NO SERVER ACTION)
 
 SOURCE_PROOF: `/video/` is served by `PublicMediaVideoRoutes` through
