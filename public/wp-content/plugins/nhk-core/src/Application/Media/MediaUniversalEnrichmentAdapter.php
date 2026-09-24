@@ -41,4 +41,12 @@ final class MediaUniversalEnrichmentAdapter
             'knowledge' => ['status' => 'NOT_REQUESTED', 'candidates' => [], 'proposals' => [], 'diagnostics' => []],
         ]);
     }
+
+    public function consume(UniversalInputEnvelope $input, array $mediaContext = []): \NHK\Core\Application\Consumption\OwnerConsumptionPlan
+    {
+        $pack = $this->enrich($input);
+        $mediaContext['owner_id'] ??= (string) (($input->toArray()['source_identity']['id'] ?? ''));
+        if (trim((string) ($mediaContext['owner_id'] ?? '')) === '') $mediaContext['owner_id'] = 'transient-media-owner';
+        return (new MediaConsumptionPlanner())->plan($pack, $mediaContext);
+    }
 }

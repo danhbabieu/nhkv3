@@ -15,15 +15,16 @@ final readonly class OwnerConsumptionPlan
         private array $trace,
         private array $coverage,
         private array $gaps,
+        private array $quality,
     ) {
     }
 
-    public static function forCapability(OwnerCapability $capability, array $owner, array $surfaces, array $dependencies = [], array $policies = [], array $trace = [], array $coverage = [], array $gaps = []): self
+    public static function forCapability(OwnerCapability $capability, array $owner, array $surfaces, array $dependencies = [], array $policies = [], array $trace = [], array $coverage = [], array $gaps = [], array $quality = []): self
     {
         $ownerId = trim((string) ($owner['id'] ?? $owner['canonical_id'] ?? ''));
         if ($ownerId === '') throw new \InvalidArgumentException('OWNER_CONSUMPTION_ID_REQUIRED');
         foreach (array_keys($surfaces) as $surface) if (!$capability->supports((string) $surface)) unset($surfaces[$surface]);
-        return new self($capability, $owner, $surfaces, $dependencies, $policies, $trace, $coverage, $gaps);
+        return new self($capability, $owner, $surfaces, $dependencies, $policies, $trace, $coverage, $gaps, $quality);
     }
 
     public function capability(): OwnerCapability { return $this->capability; }
@@ -39,6 +40,7 @@ final readonly class OwnerConsumptionPlan
             'trace' => $this->trace,
             'coverage' => $this->coverage,
             'gaps' => $this->gaps,
+            'quality' => $this->quality,
             'capabilities' => ['surfaces' => $this->capability->surfaces, 'canonical_readback' => $this->capability->canonicalReadback, 'dependencies' => $this->capability->dependencies],
         ];
     }
