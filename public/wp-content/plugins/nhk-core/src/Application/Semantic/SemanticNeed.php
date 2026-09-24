@@ -6,10 +6,12 @@ namespace NHK\Core\Application\Semantic;
 /** Immutable transient request for one independently retrievable meaning. */
 final readonly class SemanticNeed
 {
-    /** @param array<string,mixed> $subject @param array<string,mixed> $retrievalPolicy @param array<string,mixed> $relaxationPolicy */
+    /** @param array<string,mixed> $subject @param array<string,mixed> $targetSubject @param array<string,mixed> $ownerContext @param array<string,mixed> $retrievalPolicy @param array<string,mixed> $relaxationPolicy */
     private function __construct(
         private string $needId,
         private array $subject,
+        private array $targetSubject,
+        private array $ownerContext,
         private string $concept,
         private string $facet,
         private string $scope,
@@ -38,6 +40,15 @@ final readonly class SemanticNeed
             throw new \InvalidArgumentException('Semantic need requires a concept or facet.');
         }
 
+        $target = is_array($data['target_subject'] ?? null) ? $data['target_subject'] : $subject;
+        $targetId = trim((string) ($target['id'] ?? $target['canonical_subject_id'] ?? ''));
+        $targetType = trim((string) ($target['type'] ?? $target['entity_type'] ?? ''));
+        if ($targetId === '' || $targetType === '') {
+            throw new \InvalidArgumentException('Semantic need target requires a canonical subject identity.');
+        }
+        $target = $target + ['id' => $targetId, 'type' => $targetType];
+        $ownerContext = is_array($data['owner_context'] ?? null) ? $data['owner_context'] : [];
+
         $confidence = (float) ($data['confidence'] ?? 0.0);
         if ($confidence < 0.0 || $confidence > 1.0) {
             throw new \InvalidArgumentException('Semantic need confidence must be between 0 and 1.');
@@ -49,15 +60,19 @@ final readonly class SemanticNeed
         $scope = self::normalize((string) ($data['scope'] ?? 'unresolved'));
         $intent = self::normalize((string) ($data['intent'] ?? ''));
         $evidence = strtoupper(trim((string) ($data['evidence_requirement'] ?? '')));
-        $identity = implode('|', [$subjectId, $subjectType, (string) ($subject['revision'] ?? ''), $concept, $facet, $scope, $origin]);
+        $identity = implode('|', [$subjectId, $subjectType, $targetId, $targetType, (string) ($subject['revision'] ?? ''), $concept, $facet, $scope, $origin]);
         $needId = trim((string) ($data['need_id'] ?? '')) ?: 'need:' . hash('sha256', $identity);
 
-        return new self($needId, $subject + ['id' => $subjectId, 'type' => $subjectType], $concept, $facet, $scope, $intent, $origin, $confidence, $evidence, $retrieval, $relaxation);
+        return new self($needId, $subject + ['id' => $subjectId, 'type' => $subjectType], $target, $ownerContext, $concept, $facet, $scope, $intent, $origin, $confidence, $evidence, $retrieval, $relaxation);
     }
 
     public function needId(): string { return $this->needId; }
     /** @return array<string,mixed> */
     public function canonicalSubject(): array { return $this->subject; }
+    /** @return array<string,mixed> */
+    public function targetSubject(): array { return $this->targetSubject; }
+    /** @return array<string,mixed> */
+    public function ownerContext(): array { return $this->ownerContext; }
     public function conceptKey(): string { return $this->concept; }
     public function facetKey(): string { return $this->facet; }
     public function scope(): string { return $this->scope; }
@@ -76,6 +91,8 @@ final readonly class SemanticNeed
         return [
             'need_id' => $this->needId,
             'canonical_subject' => $this->subject,
+            'target_subject' => $this->targetSubject,
+            'owner_context' => $this->ownerContext,
             'concept_key' => $this->concept,
             'facet_key' => $this->facet,
             'scope' => $this->scope,

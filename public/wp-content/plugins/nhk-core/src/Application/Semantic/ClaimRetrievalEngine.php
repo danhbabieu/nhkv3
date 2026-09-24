@@ -125,7 +125,7 @@ final class ClaimRetrievalEngine
         $rounds = [];
         foreach ($normalizedNeeds as $need) {
             $needData = $need->toArray();
-            $subject = $need->canonicalSubject();
+            $subject = $need->targetSubject();
             $neighborhood = ($this->neighborhood)($subject);
             $needId = $need->needId();
             $needDiagnostics[$needId] = [
@@ -163,6 +163,8 @@ final class ClaimRetrievalEngine
                 $candidate['_retrieval_order'] = $retrievalOrder++;
                 $candidate['need_id'] = $needId;
                 $candidate['need_ids'] = [$needId];
+                $candidate['original_subject'] = $need->canonicalSubject();
+                $candidate['target_subject'] = $need->targetSubject();
                 $candidate['facet'] = $rowFacet !== '' ? $rowFacet : $need->facetKey();
                 $candidate['concept'] = strtolower(trim((string) ($row['concept'] ?? $row['concept_key'] ?? $need->conceptKey())));
                 $candidate['retrieval_tier'] = 'EXACT';
@@ -200,6 +202,8 @@ final class ClaimRetrievalEngine
                         $candidate['_retrieval_order'] = $retrievalOrder++;
                         $candidate['need_id'] = $needId;
                         $candidate['need_ids'] = [$needId];
+                        $candidate['original_subject'] = $need->canonicalSubject();
+                        $candidate['target_subject'] = $need->targetSubject();
                         $candidate['facet'] = $rowFacet !== '' ? $rowFacet : $need->facetKey();
                         $candidate['concept'] = strtolower(trim((string) ($row['concept'] ?? $row['concept_key'] ?? $need->conceptKey())));
                         $candidate['retrieval_tier'] = $tier;

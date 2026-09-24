@@ -50,6 +50,8 @@ final class SemanticNeedDecomposer
             $scope = $this->normalize((string) ($component['scope'] ?? ($origin === 'SPECIMEN_OBSERVATION' ? 'specimen' : 'unresolved')));
             $need = SemanticNeed::fromArray([
                 'canonical_subject' => $subject,
+                'target_subject' => is_array($component['target_subject'] ?? null) ? $component['target_subject'] : (is_array($component['target'] ?? null) ? $component['target'] : $subject),
+                'owner_context' => is_array($input['owner_context'] ?? null) ? $input['owner_context'] : (is_array($input['semantic_context']['owner'] ?? null) ? $input['semantic_context']['owner'] : []),
                 'concept_key' => $concept,
                 'facet_key' => $facet,
                 'scope' => $scope,

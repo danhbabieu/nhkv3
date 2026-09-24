@@ -67,6 +67,38 @@ final class UniversalFacetRetrievalTest extends TestCase
         self::assertSame('exact_candidates_available', $result['need_diagnostics'][0]['stop_reason']);
     }
 
+    public function test_target_scoped_need_retrieves_against_target_and_preserves_original_subject(): void
+    {
+        $engine = new ClaimRetrievalEngine(
+            static fn (array $subject): array => ['status' => 'available', 'items' => []],
+            static fn (array $subject, array $neighborhood, array $need): array => [[
+                'claim_id' => 'claim-target-b',
+                'revision' => 1,
+                'text' => 'Target B fact.',
+                'subject_id' => $subject['id'],
+                'subject_type' => $subject['type'],
+                'facet' => $need['facet_key'],
+                'scope' => 'model',
+                'provenance' => 'SOURCE_EXPLICIT',
+                'evidence_status' => 'SUPPORTED_WITHIN_SCOPE',
+            ]],
+            2,
+            10,
+        );
+        $input = UniversalInputEnvelope::fromArray(['subject_resolution' => ['primary' => ['id' => 'subject-a', 'type' => 'model']]]);
+        $need = SemanticNeed::fromArray([
+            'canonical_subject' => ['id' => 'subject-a', 'type' => 'model'],
+            'target_subject' => ['id' => 'subject-b', 'type' => 'model'],
+            'facet_key' => 'dimensions',
+        ]);
+
+        $result = $engine->retrieveForNeeds($input, [$need]);
+
+        self::assertSame('subject-b', $result['items'][0]['subject_id']);
+        self::assertSame('subject-a', $result['items'][0]['original_subject']['id']);
+        self::assertSame('subject-b', $result['items'][0]['target_subject']['id']);
+    }
+
     private function need(string $facet, string $concept): SemanticNeed
     {
         return SemanticNeed::fromArray([

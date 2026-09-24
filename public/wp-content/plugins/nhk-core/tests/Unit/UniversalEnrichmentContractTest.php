@@ -3,11 +3,25 @@ declare(strict_types=1);
 
 namespace NHK\Tests\Unit;
 
-use NHK\Core\Application\Semantic\{EnrichmentPack, SemanticInputEnvelope, UniversalInputEnvelope};
+use NHK\Core\Application\Semantic\{EnrichmentPack, SemanticInputEnvelope, SemanticNeed, UniversalInputEnvelope};
 use PHPUnit\Framework\TestCase;
 
 final class UniversalEnrichmentContractTest extends TestCase
 {
+    public function test_semantic_need_preserves_distinct_target_subject_and_owner_context(): void
+    {
+        $need = SemanticNeed::fromArray([
+            'canonical_subject' => ['id' => 'subject-a', 'type' => 'model'],
+            'target_subject' => ['id' => 'subject-b', 'type' => 'model'],
+            'owner_context' => ['owner_id' => 'article-1', 'owner_type' => 'article'],
+            'facet_key' => 'dimensions',
+        ]);
+
+        self::assertSame('subject-a', $need->canonicalSubject()['id']);
+        self::assertSame('subject-b', $need->targetSubject()['id']);
+        self::assertSame('article-1', $need->ownerContext()['owner_id']);
+    }
+
     public function test_universal_input_preserves_optional_context_and_normalizes_origins(): void
     {
         $input = UniversalInputEnvelope::fromArray([
