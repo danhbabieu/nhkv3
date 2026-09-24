@@ -290,7 +290,7 @@ final class EditorialCaptureContinuationService
         }
         if (!in_array($capture->status, ['FAILED_RETRYABLE', 'REVIEW_REQUIRED'], true)) return [$capture, 'CAPTURE_SUBJECT_RECONCILIATION_STATUS_NOT_ALLOWED'];
         $intent = strtoupper(trim((string) (($capture->context['content_intent']['intent'] ?? ''))));
-        if ($intent !== 'VIDEO') return [$capture, 'CAPTURE_SUBJECT_RECONCILIATION_VIDEO_REQUIRED'];
+        if (!in_array($intent, ['VIDEO', 'IMAGE_ARTICLE', 'TEXT_ARTICLE'], true)) return [$capture, 'CAPTURE_SUBJECT_RECONCILIATION_INTENT_NOT_SUPPORTED'];
         if (!is_array($selection) || ($selection['confirmed'] ?? false) !== true) return [$capture, 'CAPTURE_SUBJECT_RECONCILIATION_CONFIRMATION_REQUIRED'];
         $authority = strtoupper(trim((string) ($selection['authority'] ?? $selection['source'] ?? '')));
         $explicitPacket = SubjectResolutionPacket::fromArray(is_array($selection['packet'] ?? null) ? $selection['packet'] : (is_array($selection['subject_resolution_packet'] ?? null) ? $selection['subject_resolution_packet'] : []));

@@ -169,6 +169,51 @@ final class McpCaptureReadContractTest extends TestCase
         ], $read->captureGet('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'));
     }
 
+    public function test_capture_review_projection_exposes_reason_and_subject_continuation(): void
+    {
+        $id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+        $record = new CaptureRecord(
+            $id,
+            'capture-review-reason',
+            hash('sha256', 'capture-review-reason'),
+            'INTERPRETED',
+            'REVIEW_REQUIRED',
+            null,
+            null,
+            [],
+            ['content_intent' => ['intent' => 'IMAGE_ARTICLE']],
+            [
+                'content_preparation' => [
+                    'status' => 'REVIEW_REQUIRED',
+                    'review_reasons' => ['PRIMARY_SUBJECT_AMBIGUOUS'],
+                    'candidates' => [['value' => 'Candidate A', 'source' => 'explicit_subject_hint']],
+                    'continuation_decision' => ['may_continue' => false, 'reason' => 'BLOCKING_DEPENDENCY_REQUIRES_REVIEW'],
+                ],
+                'completion' => ['status' => 'REVIEW_REQUIRED', 'blockers' => []],
+            ],
+        );
+        $repository = new class($record) implements CaptureRepository {
+            public function __construct(private CaptureRecord $record) {}
+            public function findByIdempotencyKey(string $key): ?CaptureRecord { return null; }
+            public function findById(string $captureId): ?CaptureRecord { return $captureId === $this->record->captureId ? $this->record : null; }
+            public function create(CaptureRecord $record): CaptureRecord { return $record; }
+            public function save(CaptureRecord $record): CaptureRecord { return $record; }
+        };
+        $read = new McpReadHandler(
+            $this->createMock(AuthorityRepository::class), new EntityTypeRegistry(),
+            $this->createMock(MediaRepository::class), $this->createMock(MediaAssetRepository::class), $this->createMock(MediaUsageRepository::class),
+            $this->createMock(VideoRepository::class), $this->createMock(KnowledgeRepository::class), $this->createMock(EvidenceRepository::class),
+            captures: $repository,
+        );
+
+        $projection = $read->captureGet($id);
+
+        self::assertSame(['PRIMARY_SUBJECT_AMBIGUOUS'], $projection['review']['reasons']);
+        self::assertSame(['Candidate A'], array_column($projection['review']['candidates'], 'value'));
+        self::assertSame('nhk.capture.ingest', $projection['review']['continuation']['entrypoint']);
+        self::assertSame('subject_reconciliation', $projection['review']['continuation']['input']);
+    }
+
     public function test_capture_read_retry_projection_matches_shared_executor_gate_for_non_resumable_block(): void
     {
         $id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';

@@ -81,6 +81,22 @@ final class McpReadHandler
             : (is_array($diagnostics['subject_resolution_packet'] ?? null) ? $diagnostics['subject_resolution_packet'] : null);
         $completion = is_array($diagnostics['completion'] ?? null) ? $diagnostics['completion'] : [];
         $completion = $this->reconcileCurrentCaptureCompletion($capture, $completion);
+        $preparation = is_array($diagnostics['content_preparation'] ?? null) ? $diagnostics['content_preparation'] : [];
+        $review = null;
+        if (strtoupper(trim((string) ($preparation['status'] ?? ''))) === 'REVIEW_REQUIRED') {
+            $reasons = array_values(array_filter(array_map('strval', (array) ($preparation['review_reasons'] ?? [])), static fn (string $reason): bool => trim($reason) !== ''));
+            $subjectReview = array_intersect($reasons, ['PRIMARY_SUBJECT_AMBIGUOUS', 'SUBJECT_CONFLICT_REVIEW_REQUIRED', 'FINAL_SUBJECT_PACKET_INVALID']) !== [];
+            $review = [
+                'status' => 'REVIEW_REQUIRED',
+                'reasons' => $reasons,
+                'blockers' => array_values(array_map('strval', (array) ($preparation['blockers'] ?? []))),
+                'candidates' => is_array($preparation['candidates'] ?? null) ? array_values($preparation['candidates']) : [],
+                'continuation' => [
+                    'entrypoint' => 'nhk.capture.ingest',
+                    'input' => $subjectReview ? 'subject_reconciliation' : 'capture_continuation',
+                ],
+            ];
+        }
         $children = \NHK\Core\Application\Completion\CompletionCoordinator::effectiveChildren(
             array_values(array_filter((array) ($completion['children'] ?? []), 'is_array')),
         );
@@ -125,6 +141,7 @@ final class McpReadHandler
                 'target' => $binding['target'] ?? null, 'role' => $binding['role'] ?? null, 'selection_source' => $binding['selection_source'] ?? null, 'selection_policy' => $binding['selection_policy'] ?? null,
             ] : [], $context['media_bindings'])) : [],
             'owners' => $owners,
+            'review' => $review,
             'blockers' => array_values(array_map('strval', (array) ($completion['blockers'] ?? $diagnostics['blockers'] ?? []))),
             'warnings' => array_values(array_map('strval', (array) ($diagnostics['publication']['warnings'] ?? $diagnostics['warnings'] ?? []))),
             'required_owners' => $completion['required_owners'] ?? [], 'missing_required_owners' => $completion['missing_required_owners'] ?? [],

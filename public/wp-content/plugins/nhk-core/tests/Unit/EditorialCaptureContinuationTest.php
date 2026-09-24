@@ -1354,6 +1354,51 @@ final class EditorialCaptureContinuationTest extends TestCase
         self::assertSame($candidateId, $events['subject_id']);
     }
 
+    public function test_subject_reconciliation_is_available_for_ambiguous_article_capture(): void
+    {
+        $captures = new ContinuationCaptureRepository();
+        $events = [];
+        $candidateId = UuidCodec::newV7();
+        $packet = [
+            'status' => 'ambiguous',
+            'canonical_subject_id' => '',
+            'entity_type' => '',
+            'stable_key' => '',
+            'canonical_name' => '',
+            'revision' => 0,
+            'diagnostics' => ['candidates' => [[
+                'id' => $candidateId,
+                'type' => 'model',
+                'stable_key' => 'nhk:model:article-review',
+                'name' => 'Article Review Model',
+                'revision' => 3,
+            ]]],
+        ];
+        $capture = new CaptureRecord(
+            UuidCodec::newV7(),
+            'article-subject-reconciliation',
+            hash('sha256', 'article-subject-reconciliation'),
+            CaptureStage::INTERPRETED->value,
+            'REVIEW_REQUIRED',
+            null,
+            null,
+            [],
+            ['content_intent' => ['intent' => 'IMAGE_ARTICLE'], 'subject_resolution_packet' => $packet],
+            ['content_preparation' => ['status' => 'REVIEW_REQUIRED', 'review_reasons' => ['PRIMARY_SUBJECT_AMBIGUOUS']]],
+            [],
+        );
+        $captures->create($capture);
+        $service = new EditorialCaptureContinuationService($captures, new ContinuationAddendumRepository(), $this->coordinator($captures, $events));
+        $method = new \ReflectionMethod($service, 'reconcileSubject');
+        $method->setAccessible(true);
+
+        [$resolved, $error] = $method->invoke($service, $capture, ['confirmed' => true, 'candidate_uuid' => $candidateId]);
+
+        self::assertNull($error);
+        self::assertSame($candidateId, $resolved->context['subject_resolution_packet']['canonical_subject_id']);
+        self::assertSame('CONFIRMED', $resolved->diagnostics['subject_reconciliation']['status']);
+    }
+
     public function test_replaying_the_same_confirmed_subject_reconciliation_is_idempotent_after_completion(): void
     {
         $captures = new ContinuationCaptureRepository();

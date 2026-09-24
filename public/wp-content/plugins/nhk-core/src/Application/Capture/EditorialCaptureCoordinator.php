@@ -443,8 +443,13 @@ final class EditorialCaptureCoordinator
                 $preparationContext['preparation_fingerprint'] = $preparationResult->preparationFingerprint;
                 $record = $this->save($record, CaptureStage::INTERPRETED, $assets, $diagnostics, $receipts, 'CONTENT_PREPARATION', $record->articleId, $record->articleStateToken, $preparationResult->status === 'PREPARED' ? 'IN_PROGRESS' : $preparationResult->status, null, $record->context + $preparationContext);
                 $receipts = $record->phaseReceipts;
-                if (!(new PreparationPhaseAdmissionPolicy())->mayAdmitMinimumOwner($intent, $preparationResult)) return $record;
+                $minimumOwnerAdmitted = (new PreparationPhaseAdmissionPolicy())->mayAdmitMinimumOwner($intent, $preparationResult);
+                if (!$minimumOwnerAdmitted) return $record;
                 $diagnostics['content_preparation']['phase_admission'] = ['status' => 'MINIMUM_OWNER_ALLOWED', 'intent' => strtoupper((string) ($intent['intent'] ?? ''))];
+                $preparationCanContinue = $preparationResult->status === 'PREPARED' || $preparationResult->subjectResolutionPacket?->status === 'resolved';
+            } else {
+                $minimumOwnerAdmitted = true;
+                $preparationCanContinue = true;
             }
             // Resolve before any draft/media writer. A UUID remains the
             // selected identity, but contradictory explicit text must stop
@@ -534,7 +539,7 @@ final class EditorialCaptureCoordinator
                 ];
                 $record = $this->save($record, CaptureStage::MEDIA_ADOPTED, $assets, $diagnostics, $receipts, 'MEDIA_ADOPTED', $record->articleId, $record->articleStateToken);
             }
-            if ($preparationResult !== null && $preparationResult->status !== 'PREPARED') {
+            if ($preparationResult !== null && $preparationResult->status !== 'PREPARED' && !$preparationCanContinue) {
                 if ($isVideoIntent && is_callable($this->videoEnrichment) && $videoInput !== [] && !$this->hasVideoAsset($assets)) {
                     $this->beginPhase('VIDEO_ENRICHED');
                     $record = $this->startReceipt($record, $assets, $diagnostics, $receipts, 'VIDEO_ENRICHED');

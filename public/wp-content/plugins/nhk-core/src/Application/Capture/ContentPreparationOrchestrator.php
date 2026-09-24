@@ -117,14 +117,14 @@ final class ContentPreparationOrchestrator
         if (($resolution['status'] ?? '') !== 'resolved' && $reviewReasons === [] && $blockers === []) {
             $reviewReasons[] = 'PRIMARY_SUBJECT_NOT_RESOLVED';
         }
+        $packet = SubjectResolutionPacket::fromResolution($resolution);
         if ($blockers !== []) {
-            return new ContentPreparationResult('BLOCKED', $fingerprint, null, $candidates, $gaps, $plan, $enrichment, $diagnostics, $blockers, $reviewReasons, [], $decisionTrace, $constraintFindings, $qualityDecision, $repairRounds, $dependencyFindings, $continuationDecision);
+            return new ContentPreparationResult('BLOCKED', $fingerprint, $packet?->status === 'resolved' ? $packet : null, $candidates, $gaps, $plan, $enrichment, $diagnostics, $blockers, $reviewReasons, [], $decisionTrace, $constraintFindings, $qualityDecision, $repairRounds, $dependencyFindings, $continuationDecision);
         }
         if ($reviewReasons !== []) {
-            return new ContentPreparationResult('REVIEW_REQUIRED', $fingerprint, null, $candidates, $gaps, $plan, $enrichment, $diagnostics, [], $reviewReasons, [], $decisionTrace, $constraintFindings, $qualityDecision, $repairRounds, $dependencyFindings, $continuationDecision);
+            return new ContentPreparationResult('REVIEW_REQUIRED', $fingerprint, $packet?->status === 'resolved' ? $packet : null, $candidates, $gaps, $plan, $enrichment, $diagnostics, [], $reviewReasons, [], $decisionTrace, $constraintFindings, $qualityDecision, $repairRounds, $dependencyFindings, $continuationDecision);
         }
 
-        $packet = SubjectResolutionPacket::fromResolution($resolution);
         if ($packet === null || $packet->status !== 'resolved') {
             return new ContentPreparationResult('REVIEW_REQUIRED', $fingerprint, null, $candidates, $gaps, $plan, $enrichment, $diagnostics, [], ['FINAL_SUBJECT_PACKET_INVALID'], [], $decisionTrace, $constraintFindings, $qualityDecision, $repairRounds, $dependencyFindings, $continuationDecision);
         }
