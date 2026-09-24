@@ -222,6 +222,14 @@ final class CompletionCoordinator
             $resumeChildren[] = $this->resumeChild((string) ($packet['owner_type'] ?? ''));
         }
         $resumeChildren = array_values(array_unique(array_filter($resumeChildren, static fn (string $item): bool => $item !== '')));
+        $relationStates = array_values(array_filter(array_map(static fn (array $packet): string => strtoupper(trim((string) ($packet['relation_or_usage_state'] ?? ''))), $packets), static fn (string $state): bool => $state !== '' && $state !== 'NOT_APPLICABLE'));
+        $publicStates = array_values(array_filter(array_map(static fn (array $packet): string => strtoupper(trim((string) ($packet['public_state'] ?? ''))), $packets), static fn (string $state): bool => $state !== '' && $state !== 'NOT_APPLICABLE'));
+        $frontendStates = array_values(array_filter(array_map(static fn (array $packet): string => strtoupper(trim((string) ($packet['frontend_state'] ?? ''))), $packets), static fn (string $state): bool => $state !== '' && $state !== 'NOT_APPLICABLE'));
+        $aggregateState = static function (array $states, string $complete): string {
+            if (in_array('BLOCKED', $states, true)) return 'BLOCKED';
+            if (in_array('PARTIAL', $states, true)) return 'PARTIAL';
+            return in_array($complete, $states, true) || in_array('READY', $states, true) || in_array('VERIFIED', $states, true) ? $complete : 'NOT_APPLICABLE';
+        };
         return [
             'owner_type' => 'capture',
             'owner_id' => trim($captureId),
@@ -235,9 +243,9 @@ final class CompletionCoordinator
             'required_owners' => $requiredOwners,
             'missing_required_owners' => $missingRequiredOwners,
             'dependency_state' => $complete ? 'COMPLETE' : 'PARTIAL',
-            'relation_or_usage_state' => 'NOT_APPLICABLE',
-            'public_state' => 'NOT_APPLICABLE',
-            'frontend_state' => 'NOT_APPLICABLE',
+            'relation_or_usage_state' => $aggregateState($relationStates, 'COMPLETE'),
+            'public_state' => $aggregateState($publicStates, 'READY'),
+            'frontend_state' => $aggregateState($frontendStates, 'VERIFIED'),
             'enrichment_readiness' => [
                 'status' => $complete ? 'RICH' : 'PARTIAL',
                 'blockers' => [],

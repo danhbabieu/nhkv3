@@ -1279,6 +1279,15 @@ final class EditorialCaptureCoordinator
             static fn (string $mediaId): array => ['owner_type' => 'media', 'owner_id' => $mediaId],
             $this->mediaOwnerIds($media),
         );
+        $bindingOwners = [];
+        foreach ((array) ($media['binding_results'] ?? $media['bindings'] ?? []) as $binding) {
+            if (!is_array($binding)) continue;
+            $readback = is_array($binding['readback'] ?? null) ? $binding['readback'] : $binding;
+            $type = strtolower(trim((string) ($readback['target_type'] ?? $binding['endpoint_type'] ?? '')));
+            $id = trim((string) ($readback['target_id'] ?? $binding['endpoint_key'] ?? ''));
+            if ($type !== '' && $id !== '') $bindingOwners[] = ['owner_type' => $type, 'owner_id' => $id];
+        }
+        $mediaOwners = array_values(array_unique(array_merge($bindingOwners, $mediaOwners), SORT_REGULAR));
         $required = match (strtoupper(trim((string) ($intent['intent'] ?? '')))) {
             'VIDEO' => $videoOwnerId === '' ? [['owner_type' => 'video']] : [['owner_type' => 'video', 'owner_id' => $videoOwnerId]],
             'KNOWLEDGE_DELTA' => [['owner_type' => 'knowledge']],
@@ -1709,7 +1718,37 @@ final class EditorialCaptureCoordinator
         $mediaComplete = in_array(strtoupper(trim((string) ($media['status'] ?? ''))), ['COMPLETE', 'RECONCILED'], true);
         $mediaFrontendVerified = $media['frontend_verified'] ?? ($final['frontend_verified'] ?? null);
         foreach (array_values(array_unique($mediaIds)) as $mediaId) {
-            $children[] = ['owner_type' => 'media', 'owner_id' => $mediaId, 'canonical_readback' => $mediaComplete ? ['id' => $mediaId] : null, 'relation_or_usage_state' => $mediaComplete ? 'COMPLETE' : 'PARTIAL', 'public_eligible' => ($media['media_complete'] ?? false) === true || (($media['media_complete'] ?? null) === null && $mediaComplete), 'frontend_verified' => $mediaFrontendVerified, 'blockers' => (array) ($media['blockers'] ?? [])];
+            $children[] = ['owner_type' => 'media', 'owner_id' => $mediaId, 'canonical_readback' => $mediaComplete ? ['id' => $mediaId] : null, 'relation_or_usage_state' => $mediaComplete ? 'COMPLETE' : 'PARTIAL', 'public_eligible' => ($media['media_complete'] ?? false) === true || (($media['media_complete'] ?? null) === null && $mediaComplete), 'frontend_verified' => $mediaFrontendVerified, 'public_projection_owner' => false, 'owner_role' => 'semantic_dependency', 'blockers' => (array) ($media['blockers'] ?? [])];
+        }
+        $targetReceipts = [];
+        foreach ((array) ($media['bindings'] ?? $final['media_bindings'] ?? []) as $binding) {
+            if (!is_array($binding)) continue;
+            $readback = is_array($binding['readback'] ?? null) ? $binding['readback'] : [];
+            $targetType = strtolower(trim((string) ($readback['target_type'] ?? '')));
+            $targetId = trim((string) ($readback['target_id'] ?? ''));
+            $usageId = trim((string) ($readback['usage_id'] ?? ''));
+            $mediaId = trim((string) ($readback['media_id'] ?? $binding['media_id'] ?? ''));
+            if ($targetType === '' || $targetId === '' || $usageId === '' || $mediaId === '') continue;
+            $targetReceipts[$targetType . '|' . $targetId] = [$targetType, $targetId, $usageId, $mediaId, $readback];
+        }
+        foreach ($targetReceipts as [$targetType, $targetId, $usageId, $mediaId, $readback]) {
+            $publicVerified = false;
+            foreach ((array) ($final['public'] ?? []) as $receipt) {
+                if (is_array($receipt) && ($receipt['target_type'] ?? '') === $targetType && ($receipt['target_id'] ?? '') === $targetId && ($receipt['media_id'] ?? '') === $mediaId && ($receipt['status'] ?? '') === 'verified') $publicVerified = true;
+            }
+            $frontendVerified = false;
+            foreach ((array) ($final['frontend'] ?? []) as $receipt) {
+                if (is_array($receipt) && ($receipt['target_type'] ?? '') === $targetType && ($receipt['target_id'] ?? '') === $targetId && ($receipt['media_id'] ?? '') === $mediaId && ($receipt['status'] ?? '') === 'verified') $frontendVerified = true;
+            }
+            $children[] = [
+                'owner_type' => $targetType,
+                'owner_id' => $targetId,
+                'canonical_readback' => ['canonical_id' => $targetId, 'media_id' => $mediaId, 'usage_id' => $usageId, 'status' => $readback['status'] ?? 'verified'],
+                'relation_or_usage_state' => strtolower((string) ($readback['status'] ?? '')) === 'verified' ? 'COMPLETE' : 'PARTIAL',
+                'public_eligible' => $publicVerified,
+                'frontend_verified' => $frontendVerified,
+                'blockers' => [],
+            ];
         }
         return $children;
     }

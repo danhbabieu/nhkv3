@@ -24,6 +24,7 @@ final class MediaEnrichmentCompletionPolicy
 
         $projection = [];
         $public = [];
+        $frontend = [];
         foreach ($receipts as $receipt) {
             $readback = is_array($receipt['readback'] ?? null) ? $receipt['readback'] : $receipt;
             $mediaId = trim((string) ($readback['media_id'] ?? $receipt['media_id'] ?? ''));
@@ -49,10 +50,12 @@ final class MediaEnrichmentCompletionPolicy
             if (($capability['public_required'] ?? false) === true || ($capability['frontend_required'] ?? false) === true) {
                 $publicReadback = ($this->public)($type, $target, $mediaId, $role);
                 $publicOk = ($publicReadback['status'] ?? '') === 'verified' && ($publicReadback['media_id'] ?? '') === $mediaId;
-                $public[] = ['status' => $publicOk ? 'verified' : 'stale', 'target_type' => $type, 'target_id' => $target, 'media_id' => $mediaId] + $publicReadback;
+                $receipt = ['status' => $publicOk ? 'verified' : 'stale', 'target_type' => $type, 'target_id' => $target, 'media_id' => $mediaId] + $publicReadback;
+                if (($capability['public_required'] ?? false) === true) $public[] = $receipt;
+                if (($capability['frontend_required'] ?? false) === true) $frontend[] = $receipt;
                 if (!$publicOk) return ['status' => 'unavailable', 'reason' => ($capability['frontend_required'] ?? false) === true ? 'FRONTEND_READBACK_STALE' : 'PUBLIC_SURFACE_READBACK_STALE', 'projection' => $projection, 'public' => $public];
             }
         }
-        return ['status' => 'verified', 'completion' => 'PUBLIC_COMPLETE', 'canonical_status' => 'CANONICAL_COMPLETE', 'projected_status' => 'PROJECTED_COMPLETE', 'projection' => $projection, 'public' => $public, 'canonical_owner' => 'MediaUsage'];
+        return ['status' => 'verified', 'completion' => 'PUBLIC_COMPLETE', 'canonical_status' => 'CANONICAL_COMPLETE', 'projected_status' => 'PROJECTED_COMPLETE', 'projection' => $projection, 'public' => $public, 'frontend' => $frontend, 'canonical_owner' => 'MediaUsage'];
     }
 }
