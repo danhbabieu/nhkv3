@@ -526,9 +526,19 @@ final class McpTransport
         }
         $intent = is_array($arguments['authority_intent'] ?? null) ? $arguments['authority_intent'] : [];
         $declaredPurpose = strtoupper(trim((string) ($arguments['purpose'] ?? '')));
-        $authorityPacket = in_array($declaredPurpose, ['AUTHORITY', 'MIXED'], true)
+        // Subject reconciliation is an existing editorial Capture retry. It
+        // must retain the Capture continuation boundary even when a client
+        // echoes the persisted MIXED purpose; otherwise the request is
+        // misclassified as an Authority approval packet and fails with
+        // AUTHORITY_CONTINUATION_REQUIRED before the persisted subject state
+        // can be validated.
+        $subjectReconciliationContinuation = isset($arguments['capture_id'])
+            && strtoupper(trim((string) ($arguments['resume_mode'] ?? ''))) === 'RETRY'
+            && is_array($arguments['subject_reconciliation'] ?? null);
+        $authorityPacket = !$subjectReconciliationContinuation
+            && (in_array($declaredPurpose, ['AUTHORITY', 'MIXED'], true)
             || in_array((string) ($intent['mode'] ?? ''), ['PLAN', 'APPLY_APPROVED_PLAN'], true)
-            || $relationshipOnly;
+            || $relationshipOnly);
         if ($authorityPacket) {
             $this->assertAuthoritySemanticWriteAllowed();
             if ($this->authorityCapture === null) throw new \RuntimeException('AUTHORITY_CAPTURE_UNAVAILABLE');

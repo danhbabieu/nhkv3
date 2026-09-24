@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Tests\Unit;
 
-use NHK\Core\Application\Capture\{ContentPreparationOrchestrator, EditorialCaptureContinuationService, EditorialCaptureCoordinator};
+use NHK\Core\Application\Capture\{AuthorityCaptureService, ContentPreparationOrchestrator, EditorialCaptureContinuationService, EditorialCaptureCoordinator};
 use NHK\Core\Application\Mcp\{McpDocumentationRegistry, McpGovernanceHandler, McpReadHandler, McpTransport};
 use NHK\Core\Application\Governance\GovernanceService;
 use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
@@ -658,6 +658,84 @@ final class EditorialCaptureContinuationTest extends TestCase
         self::assertSame('RETRY', $response['body']['result']['structuredContent']['retry']['mode']);
         self::assertArrayNotHasKey('addendum', $response['body']['result']['structuredContent']);
         self::assertCount(0, $addenda->records);
+    }
+
+    public function test_transport_routes_confirmed_subject_reconciliation_to_same_capture_even_when_purpose_is_mixed(): void
+    {
+        $captures = new ContinuationCaptureRepository();
+        $addenda = new ContinuationAddendumRepository();
+        $candidateId = '4cbe5aa1-4222-46bd-a140-6ab66d2da199';
+        $capture = new CaptureRecord(
+            UuidCodec::newV7(),
+            'vedette-37-confirmation',
+            hash('sha256', 'vedette-37-confirmation'),
+            CaptureStage::SEMANTICS_RECONCILED->value,
+            'COMPLETE',
+            null,
+            null,
+            [],
+            [
+                'purpose' => 'MIXED',
+                'content_intent' => ['intent' => 'TEXT_ARTICLE', 'article_required' => true],
+                'subject_resolution_packet' => [
+                    'status' => 'resolved',
+                    'canonical_subject_id' => $candidateId,
+                    'entity_type' => 'model',
+                    'stable_key' => 'nhk:model:vedette.37',
+                    'canonical_name' => 'Vedette 37',
+                    'revision' => 1,
+                    'primary_source' => 'USER_CONFIRMED_SUBJECT_RECONCILIATION',
+                ],
+            ],
+            [
+                'subject_reconciliation' => [
+                    'status' => 'CONFIRMED',
+                    'candidate_uuid' => $candidateId,
+                    'source' => 'USER_CONFIRMED_SUBJECT_RECONCILIATION',
+                ],
+                'completion' => ['status' => 'COMPLETE', 'complete' => true],
+            ],
+            [],
+        );
+        $captures->create($capture);
+        $events = [];
+        $coordinator = $this->coordinator($captures, $events);
+        $documentation = new McpDocumentationRegistry();
+        $checkpoint = $documentation->bootstrap();
+        $transport = new McpTransport(
+            new McpReadHandler(
+                $this->createMock(AuthorityRepository::class), new EntityTypeRegistry(),
+                $this->createMock(MediaRepository::class), $this->createMock(MediaAssetRepository::class),
+                $this->createMock(MediaUsageRepository::class), $this->createMock(VideoRepository::class),
+                $this->createMock(KnowledgeRepository::class), $this->createMock(EvidenceRepository::class),
+                null, $this->createMock(SourceRepository::class), null, null, null,
+            ),
+            new McpGovernanceHandler(new GovernanceService(new InMemoryProposalRepository())),
+            static fn (string $capability): bool => true,
+            documentation: $documentation,
+            capture: $coordinator,
+            captureContinuation: new EditorialCaptureContinuationService($captures, $addenda, $coordinator),
+            authorityCapture: new AuthorityCaptureService($captures, static fn (array $input, CaptureRecord $record): array => []),
+        );
+        $arguments = [
+            'capture_id' => $capture->captureId,
+            'idempotency_key' => $capture->idempotencyKey,
+            'resume_mode' => 'RETRY',
+            'purpose' => 'MIXED',
+            'subject_reconciliation' => ['confirmed' => true, 'candidate_uuid' => $candidateId],
+            'documentation_checkpoint' => ['manifest_hash' => $checkpoint['manifest_hash'], 'documentation_version' => $checkpoint['documentation_version']],
+        ];
+
+        $first = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/call', 'params' => ['name' => 'nhk.capture.ingest', 'arguments' => $arguments]]);
+        $replay = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 2, 'method' => 'tools/call', 'params' => ['name' => 'nhk.capture.ingest', 'arguments' => $arguments]]);
+
+        self::assertSame(200, $first['status']);
+        self::assertFalse($first['body']['result']['isError'] ?? false);
+        self::assertSame('REPLAYED', $first['body']['result']['structuredContent']['retry']['status']);
+        self::assertSame($capture->captureId, $first['body']['result']['structuredContent']['capture']['capture_id']);
+        self::assertSame($candidateId, $first['body']['result']['structuredContent']['capture']['context']['subject_resolution_packet']['canonical_subject_id']);
+        self::assertSame('REPLAYED', $replay['body']['result']['structuredContent']['retry']['status']);
+        self::assertSame($capture->captureId, $replay['body']['result']['structuredContent']['capture']['capture_id']);
     }
 
     public function test_existing_capture_continuation_preserves_governed_provenance_packets(): void

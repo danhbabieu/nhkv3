@@ -1,3 +1,39 @@
+# Checkpoint — 2026-09-24 — Confirmed subject reconciliation mixed-purpose routing fix (LOCAL / INTEGRATION ENVIRONMENT-GATED)
+
+ROOT_CAUSE_CONFIRMED: `McpTransport::captureIngest()` classified every request
+with `purpose=MIXED` as an Authority packet before considering the explicit
+`subject_reconciliation` continuation. A client that echoed the persisted
+Capture purpose therefore entered `AuthorityCaptureService` instead of the
+existing `EditorialCaptureContinuationService`; without an Authority plan
+mode it returned `AUTHORITY_CONTINUATION_REQUIRED`/approval admission failure
+before the persisted subject reconciliation state could be validated.
+
+FIXED_BOUNDARY: A request bound to an existing Capture with
+`resume_mode=RETRY` and a structured `subject_reconciliation` packet now takes
+the editorial Capture continuation boundary before purpose-based Authority
+classification. Candidate validation remains unchanged and fail-closed: the
+UUID must be valid and match the persisted confirmed subject or the current
+ambiguous candidate set. Governance, canonical owners and the single Capture
+entry point are unchanged.
+
+REGRESSION: Added a transport-level Vedette 37 replay test using canonical
+Model UUID `4cbe5aa1-4222-46bd-a140-6ab66d2da199`. It proves the confirmed
+subject packet is read from the same persisted Capture, returns `REPLAYED`,
+and an identical replay with the same idempotency key returns the same
+`capture_id` without creating another Capture.
+
+VERIFICATION: Focused Capture/Authority/MCP/subject suite passed 136 tests /
+1,132 assertions. Full NHK Unit passed 2,562 tests / 14,838 assertions with
+18 warnings, 43 deprecations and 30 PHPUnit deprecations under 512M. Contract
+and related Integration suites were invoked; Contract passed, while the
+guarded Integration environment was unavailable because
+`NHK_WP_TEST_PATH=public` and `NHK_WP_TEST_DB=nhk_v3_test` were not configured.
+Changed PHP files lint clean and `git diff --check` passed. No database,
+staging/production, Governance apply, deployment or remote runtime mutation
+was performed.
+
+STATUS: `CONFIRMED_SUBJECT_RECONCILIATION_MIXED_ROUTING_LOCAL_READY / INTEGRATION_ENVIRONMENT_GATED / NO_LIVE_MUTATION`.
+
 # NHK V3 Execution State
 
 # Checkpoint — 2026-09-24 — Knowledge Writer Preview Task 4/5 closure (LOCAL / READ-ONLY)
