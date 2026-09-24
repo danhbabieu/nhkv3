@@ -106,6 +106,12 @@ final class ClaimRetrievalEngine
         $blockers = [];
         $needDiagnostics = [];
         $retrievalOrder = 0;
+        $initialCandidateCount = 0;
+        $allocationCount = 0;
+        $expansionRoundCount = 0;
+        $expansionDepth = 0;
+        $coverageCounts = ['exact' => 0, 'applicable_relaxed' => 0, 'contextual' => 0];
+        $rounds = [];
         foreach ($normalizedNeeds as $need) {
             $needData = $need->toArray();
             $subject = $need->canonicalSubject();
@@ -132,6 +138,7 @@ final class ClaimRetrievalEngine
                 continue;
             }
             $opportunity = $needDiagnostics[$needId]['opportunity_allocated'];
+            $allocationCount += $opportunity;
             $opportunityRows = array_values(array_filter($rows, function (mixed $row) use ($need): bool {
                 if (!is_array($row)) return false;
                 $rowFacet = strtolower(trim((string) ($row['facet'] ?? $row['knowledge_facet'] ?? '')));
@@ -150,6 +157,8 @@ final class ClaimRetrievalEngine
                 $candidate['retrieval_tier'] = 'EXACT';
                 $candidate['editorial_treatment'] = 'DIRECT_FACT';
                 $candidate['coverage_kind'] = 'exact';
+                $initialCandidateCount++;
+                $coverageCounts['exact']++;
                 $key = $candidate['claim_id'] . ':' . $candidate['claim_revision'];
                 if (!isset($all[$key])) {
                     $all[$key] = $candidate;
@@ -167,8 +176,11 @@ final class ClaimRetrievalEngine
             if (is_callable($this->expansion)) {
                 foreach (SemanticNeedRetrievalPolicy::tiersFor($need) as $tier) {
                     if ($tier === 'EXACT') continue;
+                    $expansionRoundCount++;
+                    $expansionDepth = max($expansionDepth, (int) array_search($tier, SemanticNeedRetrievalPolicy::TIERS, true));
                     $expanded = $this->expandForNeed($subject, $need, $tier, SemanticNeedRetrievalPolicy::normalize($need->retrievalPolicy()));
                     $needDiagnostics[$needId]['relaxation_rounds'][] = ['tier' => $tier, 'candidate_count' => count($expanded)];
+                    if (count($rounds) < 50) $rounds[] = ['need_id' => $needId, 'tier' => $tier, 'candidate_count' => count($expanded)];
                     foreach (array_slice($expanded, 0, min(200, (int) ($need->retrievalPolicy()['expansion_budget'] ?? 50))) as $row) {
                         if (!is_array($row)) continue;
                         $rowFacet = strtolower(trim((string) ($row['facet'] ?? $row['knowledge_facet'] ?? '')));
@@ -183,6 +195,7 @@ final class ClaimRetrievalEngine
                         $candidate['semantic_distance'] = (int) array_search($tier, SemanticNeedRetrievalPolicy::TIERS, true);
                         $candidate['editorial_treatment'] = $tier === 'BACKGROUND_CONTEXT' ? 'BACKGROUND_CONTEXT' : 'SUPPORTING_CONTEXT';
                         $candidate['coverage_kind'] = $tier === 'BACKGROUND_CONTEXT' ? 'contextual' : 'applicable_relaxed';
+                        $coverageCounts[$candidate['coverage_kind']]++;
                         $candidate['relaxation_reason'] = 'exact_need_uncovered';
                         $key = $candidate['claim_id'] . ':' . $candidate['claim_revision'];
                         if (!isset($all[$key])) $all[$key] = $candidate;
@@ -238,12 +251,18 @@ final class ClaimRetrievalEngine
             'blockers' => array_values(array_unique($blockers)),
             'retrieval_diagnostics' => [
                 'need_count' => count($normalizedNeeds),
-                'initial_candidates' => count($all),
+                'initial_candidates' => $initialCandidateCount,
+                'initial_candidate_count' => $initialCandidateCount,
                 'candidates_considered' => count($merged),
                 'opportunity_allocated_per_need' => $normalizedNeeds === [] ? 0 : min(array_map(static fn (SemanticNeed $need): int => max(1, (int) ($need->retrievalPolicy()['opportunity_budget'] ?? 1)), $normalizedNeeds)),
+                'allocation_count' => $allocationCount,
                 'starvation_prevention' => 'mandatory_first_candidate_per_need',
-                'expansion_depth' => 0,
-                'rounds' => [],
+                'expansion_depth' => $expansionDepth,
+                'expansion_round_count' => $expansionRoundCount,
+                'rounds' => $rounds,
+                'coverage_counts' => $coverageCounts,
+                'selected_count' => count($selected),
+                'stop_reasons' => array_count_values(array_map(static fn (array $diagnostic): string => (string) ($diagnostic['stop_reason'] ?? 'unknown'), $needDiagnostics)),
                 'stop_reason' => 'facet_opportunities_merged',
             ],
         ];
