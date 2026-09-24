@@ -6,7 +6,7 @@ namespace NHK\Core\Application\Semantic;
 /** Deterministic adaptive selection of applicable Claims into a transient editorial pack. */
 final class EditorialKnowledgeSelector
 {
-    private const SUPPORTED_PROFILES = ['article', 'video', 'image', 'media'];
+    private const SUPPORTED_PROFILES = ['article', 'video', 'image', 'media', 'generic'];
 
     public function __construct(
         private ?TopicFulfillment $topicFulfillment = null,

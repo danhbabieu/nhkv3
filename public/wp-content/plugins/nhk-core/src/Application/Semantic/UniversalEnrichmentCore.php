@@ -30,13 +30,19 @@ final class UniversalEnrichmentCore
     public function enrich(UniversalInputEnvelope $input, array $options = []): EnrichmentPack
     {
         $inputValue = $input->toArray();
-        $profile = strtolower(trim((string) ($options['profile'] ?? $inputValue['target_surface'] ?? '')));
+        $profile = strtolower(trim((string) ($options['profile'] ?? '')));
+        if ($profile === '') {
+            $profile = strtolower(trim((string) ($inputValue['target_surface'] ?? '')));
+        }
+        if ($profile === '' || $profile === 'generic') {
+            $profile = strtolower(trim((string) ($inputValue['owner_or_source_type'] ?? 'generic')));
+        }
         $branches = [
             'content' => ['status' => 'NOT_REQUESTED', 'retrieval' => [], 'pack' => null, 'selected_claims' => [], 'gaps' => [], 'diagnostics' => []],
             'knowledge' => ['status' => 'NOT_REQUESTED', 'candidates' => [], 'proposals' => [], 'classifications' => [], 'proposal_ready' => false, 'diagnostics' => []],
             'relations' => ['status' => 'NOT_REQUESTED', 'candidates' => [], 'readiness' => [], 'diagnostics' => []],
         ];
-        if (in_array($profile, ['article', 'video', 'media', 'image', 'text', 'generic_source'], true)) {
+        if ($profile !== '' && $profile !== 'knowledge_delta') {
             $branches['content'] = $this->content($input, $options, $profile);
         }
         if (($options['knowledge'] ?? false) === true || $profile === 'knowledge_delta') {
@@ -69,7 +75,8 @@ final class UniversalEnrichmentCore
         $subject = is_array($resolution['primary'] ?? null) ? $resolution['primary'] : [];
         $topic = trim((string) ($options['topic'] ?? $value['body'] ?? $value['title'] ?? ''));
         $retrievalTopic = trim((string) ($options['retrieval_topic'] ?? $topic));
-        $profileData = ['profile' => $profile, 'result_limit' => max(1, min(200, (int) ($options['result_limit'] ?? 50)))];
+        $selectorProfile = in_array($profile, ['article', 'video', 'media', 'image'], true) ? $profile : 'generic';
+        $profileData = ['profile' => $selectorProfile, 'owner_profile' => $profile, 'result_limit' => max(1, min(200, (int) ($options['result_limit'] ?? 50)))];
         if (array_key_exists('selection_limit', $options)) $profileData['selection_limit'] = max(1, min(20, (int) $options['selection_limit']));
         $needs = array_values(array_filter((array) ($options['semantic_needs'] ?? $options['needs'] ?? []), static fn (mixed $need): bool => $need instanceof SemanticNeed || is_array($need)));
         $decomposition = null;
@@ -86,6 +93,7 @@ final class UniversalEnrichmentCore
         if ($pack->selectedClaims === []) $diagnostics[] = 'SHARED_CONTENT_CONTEXT_SPARSE';
         return [
             'status' => $pack->status === 'available' ? 'AVAILABLE' : strtoupper($pack->status),
+            'owner_profile' => $profile,
             'retrieval' => $retrieved,
             'semantic_needs' => array_map(static fn (mixed $need): array => $need instanceof SemanticNeed ? $need->toArray() : (array) $need, $needs),
             'decomposition' => $decomposition,

@@ -41,6 +41,22 @@ final class UniversalEnrichmentCoreTest extends TestCase
         self::assertSame('NOT_REQUESTED', $pack->toArray()['relations']['status']);
     }
 
+    public function test_model_and_future_owner_profiles_use_shared_enrichment_without_editorial_composer(): void
+    {
+        $core = $this->core();
+        $pack = $core->enrich(UniversalInputEnvelope::fromArray([
+            'owner_or_source_type' => 'future_owner',
+            'title' => 'A future owner subject',
+            'subject_resolution' => ['primary' => ['id' => 'subject-1', 'type' => 'model']],
+        ]), ['profile' => 'future_owner', 'topic' => 'A future owner subject']);
+
+        $content = $pack->toArray()['content'];
+        self::assertSame('AVAILABLE', $content['status']);
+        self::assertSame('future_owner', $content['owner_profile']);
+        self::assertNotEmpty($content['selected_claims']);
+        self::assertSame('generic', $content['pack']->toArray()['profile']['profile']);
+    }
+
     private function core(?callable $relations = null): UniversalEnrichmentCore
     {
         $engine = new ClaimRetrievalEngine(

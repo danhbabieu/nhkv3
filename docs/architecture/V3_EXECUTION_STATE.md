@@ -1,5 +1,44 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-24 — Universal Core future-owner profile seam
+
+ROOT_CAUSE / FIRST_BROKEN_BOUNDARY: `UniversalEnrichmentCore` admitted content
+only for the current Article/Video/Media/Image/text profiles, while
+`EditorialKnowledgeSelector` rejected every other owner profile. Model/Variant
+and future owner adapters therefore could not consume shared enrichment
+without first becoming editorial Composer profiles. The first broken boundary
+was shared-core profile admission, not retrieval, applicability or owner
+lifecycle.
+
+FIX: Any non-empty non-`knowledge_delta` owner profile now enters the same
+Universal Core content path. Current editorial profiles keep their existing
+presentation policy; other profiles use the bounded `generic` selector seam
+and preserve their original `owner_profile` for the future adapter. This is a
+transient read/planning path only: it creates no owner, prose, Knowledge,
+Graph relation or Governance mutation, and does not alter factual eligibility.
+
+REGRESSION: A production-shaped generic future-owner test proves that a
+`future_owner` profile receives the same shared retrieval and selected
+KnowledgeUnit output without invoking an editorial Composer profile. Existing
+Article/Video/Media/generic-source behavior remains covered by the focused
+matrix.
+
+VERIFICATION: Focused Universal/semantic/Article/Video/Media/Knowledge/Graph
+matrix passed 149 tests / 710 assertions. NHK Unit passed 2,482 tests /
+14,273 assertions with 18 warnings, 41 deprecations and 30 PHPUnit
+deprecations under `memory_limit=512M`. NHK Contract passed 6 tests / 48
+assertions. Changed PHP files linted clean and `git diff --check` passed.
+The special-case scan found only pre-existing identity-resolution and quality
+validation references; no new Odo/Jacquemart/YouTube/UUID production branch
+was added.
+
+INTEGRATION: Not rerun in this checkpoint; prior guarded Integration remains
+`INTEGRATION_ENVIRONMENT_GATED` because WordPress could not establish the
+`nhk_v3_test` database connection.
+
+SAFETY: No migration, schema change, database/staging/production mutation,
+Graph/Knowledge/Evidence write, deployment, publication or push occurred.
+
 # Checkpoint — 2026-09-24 — Brain 2 + Media pipeline final local verification
 
 FINAL LOCAL RESULT: `BRAIN2_AND_MEDIA_PIPELINE_READY`. Article and Video share
