@@ -39,4 +39,31 @@ final class ReaderJourneyPlannerTest extends TestCase
         self::assertSame(['fact'], array_column($draft->claimTrace, 'claim_id'));
         self::assertStringNotContainsString('La source identifie', $draft->body);
     }
+
+    public function test_article_is_deeper_than_video_while_both_keep_the_same_reader_safe_claims(): void
+    {
+        $claims = [];
+        foreach (range(1, 7) as $index) {
+            $claims[] = [
+                'claim_id' => 'fact-' . $index,
+                'claim_revision' => 1,
+                'text' => 'Odo 36 có chi tiết nhận biết số ' . $index . '.',
+                'eligibility' => 'eligible',
+                'publicly_composable' => true,
+                'applicability' => 'applicable',
+                'editorial_role' => $index === 1 ? 'CORE' : 'EXPLANATION',
+            ];
+        }
+        $articlePack = new EditorialContextPack('available', ['id' => 'subject-1', 'type' => 'model'], 'Odo 36', ['profile' => 'article'], 'available', $claims, []);
+        $videoPack = new EditorialContextPack('available', ['id' => 'subject-1', 'type' => 'model'], 'Odo 36', ['profile' => 'video'], 'available', $claims, []);
+
+        $article = (new ReaderJourneyPlanner())->plan($articlePack);
+        $video = (new ReaderJourneyPlanner())->plan($videoPack);
+
+        self::assertSame('deep', $article->diagnostics['depth']);
+        self::assertSame('concise', $video->diagnostics['depth']);
+        self::assertCount(7, array_merge(...array_map(static fn (array $section): array => $section['claim_refs'], $article->sections)));
+        self::assertCount(4, array_merge(...array_map(static fn (array $section): array => $section['claim_refs'], $video->sections)));
+        self::assertSame(['fact-1', 'fact-2', 'fact-3', 'fact-4'], array_column(array_merge(...array_map(static fn (array $section): array => $section['claim_refs'], $video->sections)), 'claim_id'));
+    }
 }

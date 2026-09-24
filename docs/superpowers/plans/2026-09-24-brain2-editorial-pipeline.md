@@ -18,8 +18,8 @@ until the Brain 2 exit criteria pass.
 
 ## Execution ledger
 
-- [ ] Slice 2: Article/Video contract closure and metadata propagation
-- [ ] Slice 3: sparse/rich content depth and reader journey parity
+- [x] Slice 2: Article/Video contract closure and metadata propagation
+- [x] Slice 3: sparse/rich content depth and reader journey parity
 - [ ] Slice 4: quality diagnostics and bounded repair lifecycle
 - [ ] Slice 5: final-package SEO boundary and revalidation
 - [ ] Brain 2 verification and execution-state checkpoint

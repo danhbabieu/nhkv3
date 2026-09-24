@@ -1,5 +1,20 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-24 — Brain 2 content depth and repair readiness (LOCAL / NO SERVER ACTION)
+
+REGRESSION: ReaderJourney now has a production-shaped depth assertion proving
+the existing surface policy remains intact: Article consumes a deeper bounded
+journey while Video remains concise, and both preserve the same reader-safe
+ordering. Sparse input remains source-grounded without fabricated enrichment.
+The existing Video decision pipeline continues to execute bounded repair,
+recompose/SEO regeneration and revalidation with no new Claim creation.
+
+VERIFICATION: Focused Article/Video depth, readability, quality and decision
+matrix passed 68 tests / 222 assertions with 1 warning. No Media lifecycle was
+started in this checkpoint.
+
+STATUS: `LOCAL_BRAIN2_DEPTH_REPAIR_READY / NO_SERVER_ACTION`
+
 # Checkpoint — 2026-09-24 — Brain 2 contract closure (LOCAL / NO SERVER ACTION)
 
 IMPLEMENTED: Closed the existing Article/Video editorial contract boundary
