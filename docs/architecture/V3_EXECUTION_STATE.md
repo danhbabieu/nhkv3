@@ -1,5 +1,20 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-24 — Knowledge Writer Preview Task 1 review fixes (LOCAL / READ-ONLY)
+
+The Task 1 preview fix is in `a3106d4004a233c516e9745e58ee58a6857bc5a4`.
+Reader answers now fail closed on internal control metadata and known non-UUID
+Source/Evidence IDs; explicit locator conflicts stop retrieval; registered
+facet-only needs accept natural Vietnamese claim text while existing
+applicability/evidence checks remain in force. The preview's used trace and
+coverage follow rendered prose, incompatible depth is rejected, and request
+and diagnostic projection are bounded. Safety fixtures snapshot all named
+owner-state categories through an observable retrieval hook. The shared
+composer, CompletionCoordinator and UniversalOwnerLifecycleAcceptance remain
+unchanged. Verification and deviations are recorded in
+`.superpowers/sdd/2026-09-24-knowledge-writer-preview/task-1-fix-report.md`.
+No schema change, semantic write, deployment, staging action or push occurred.
+
 # Checkpoint — 2026-09-24 — Universal owner lifecycle separation (LOCAL / NO SERVER ACTION)
 
 ROOT_CAUSE / FIRST_BROKEN_BOUNDARY: `CompletionCoordinator` coupled Video
