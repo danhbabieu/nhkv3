@@ -1,5 +1,44 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-24 — Shared Quality Gate / Video decision contract fix (LOCAL / NO SERVER ACTION)
+
+ROOT_CAUSE: The shared semantic producer correctly excluded ineligible Claims
+from `EditorialContextPack::selectedClaims` through
+`EditorialKnowledgeSelector` and `KnowledgeUnitBuilder`. The actual contract
+violation was downstream: `EditorialQualityGate` produced blockers such as
+`INELIGIBLE_CLAIM_USED`, but `VideoEditorialAdapter` supplied only copy-guard and
+statement findings to `VideoEditorialDecisionPipeline`. The consumer therefore
+reported `quality_decision=READY` and `repair_rounds=0` while the shared Quality
+Gate was `BLOCKED`.
+
+FIX: `VideoEditorialAdapter` now converts the current shared Quality Gate
+blockers into bounded artifact-scoped `HARD_BLOCK` findings for the generic
+Video decision pipeline on every critique/re-evaluation. The pipeline therefore
+cannot claim readiness when the shared typed editorial pack contract is blocked;
+ineligible Claims remain excluded and are never converted, published or
+silently repaired. This does not change Claim eligibility, Quality severity,
+owner ordering, canonical subject resolution or persistence behavior.
+
+AUDIT: Repository scan found legitimate typed `EditorialContextPack` property
+access in shared Article/Video/SEO/diagnostic paths and legitimate serialized
+array boundaries (`toArray()`, retrieval read models, persisted diagnostics).
+No additional invalid object-as-array access was found in the current semantic
+or Video paths. `EditorialKnowledgeSelector`, `KnowledgeUnitBuilder`,
+`ReaderJourneyPlanner` and `SharedEditorialComposer` preserve the eligible
+typed Claim contract.
+
+VERIFICATION: Focused semantic/editorial matrix passed 71 tests / 247
+assertions with 1 warning. Full NHK Unit passed 2,452 tests / 14,164
+assertions with 19 warnings, 41 deprecations and 30 PHPUnit deprecations.
+NHK Contract passed 6 tests / 48 assertions. Composer validation, full PHP
+lint, `git diff --check` and special-case scan passed. Guarded Integration was
+attempted with `NHK_WP_TEST_PATH=public` and `NHK_WP_TEST_DB=nhk_v3_test`, but
+WordPress returned “Error establishing a database connection”; Integration is
+an environment gate, not PASS. No migration, database mutation, Capture
+retry, deployment, push or publication occurred.
+
+STATUS: `LOCAL_EDITORIAL_CONTEXT_PACK_CONSUMER_CONTRACT_FIX_READY_INTEGRATION_ENVIRONMENT_GATED / NO_SERVER_ACTION`.
+
 # Checkpoint — 2026-09-24 — EditorialContextPack typed contract fix (LOCAL / NO SERVER ACTION)
 
 ROOT_CAUSE: V1 `VideoEditorialFailureDiagnostics::project()` consumed the

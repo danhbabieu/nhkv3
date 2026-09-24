@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Video;
 
 use NHK\Core\Application\Compliance\PublicEditorialCopyGuard;
-use NHK\Core\Application\Semantic\{ClaimRetrievalEngine, EditorialClaimRetrievalService, EditorialKnowledgeSelector, EditorialQualityGate, ReaderJourneyPlanner, SemanticSeoPlanner, SharedEditorialComposer, SharedEnrichmentBoundary};
+use NHK\Core\Application\Semantic\{ClaimRetrievalEngine, EditorialClaimRetrievalService, EditorialKnowledgeSelector, EditorialQualityGate, EditorialQualityReport, ReaderJourneyPlanner, SemanticSeoPlanner, SharedEditorialComposer, SharedEnrichmentBoundary};
 use NHK\Core\Application\Semantic\{EditorialDraft, SemanticSeoPlan};
 
 /**
@@ -133,10 +133,11 @@ final class VideoEditorialAdapter
                 $currentSeo = $this->seo->plan($pack, $plan, $currentDraft, $seoContext);
                 $currentPackage = ['title' => $currentDraft->title, 'summary' => $currentDraft->summary, 'body' => $currentDraft->body, 'seo_title' => $currentSeo->title, 'seo_description' => $currentSeo->metaDescription];
                 $currentFingerprint = hash('sha256', (string) json_encode($currentPackage, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
-                $qualityReevaluations[] = $this->quality->evaluate($pack, $plan, $currentDraft, $currentSeo, ($context['public_identity_deferred'] ?? false) === true, $round, $currentFingerprint, $attemptId, $attemptNo)->toArray();
+                $currentQuality = $this->quality->evaluate($pack, $plan, $currentDraft, $currentSeo, ($context['public_identity_deferred'] ?? false) === true, $round, $currentFingerprint, $attemptId, $attemptNo);
+                $qualityReevaluations[] = $currentQuality->toArray();
                 $findings = $copyGuard->findings($package);
                 if ($round === 0) $findings = array_merge($findings, $decisionContext['statement_decision']['findings'] ?? []);
-                return $findings;
+                return array_merge($this->qualityBlockFindings($currentQuality), $findings);
             },
         );
 
@@ -167,5 +168,18 @@ final class VideoEditorialAdapter
             'shared_enrichment' => $shared['content'] ?? ['status' => 'NOT_REQUESTED'],
             'shared_result' => $shared,
         ];
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function qualityBlockFindings(EditorialQualityReport $quality): array
+    {
+        return array_values(array_map(static fn (string $code): array => [
+            'code' => $code,
+            'severity' => VideoConstraintSeverity::HARD_BLOCK,
+            'scope' => 'artifact',
+            'claim_id' => null,
+            'repair' => VideoEditorialAction::USE_AS_IS,
+            'reason' => 'Shared EditorialQualityGate blocked the video editorial package.',
+        ], array_values(array_unique($quality->blockers))));
     }
 }

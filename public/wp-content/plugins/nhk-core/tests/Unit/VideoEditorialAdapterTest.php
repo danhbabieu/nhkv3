@@ -49,6 +49,8 @@ final class VideoEditorialAdapterTest extends TestCase
         self::assertSame('BLOCKED', $result['quality_report']->readiness);
         self::assertContains('SEO_NOT_READY', $result['quality_report']->blockers);
         self::assertContains('MISSING_PUBLIC_IDENTITY', $result['seo_plan']->blockers);
+        self::assertSame('HARD_BLOCK', $result['quality_decision']);
+        self::assertContains('SEO_NOT_READY', array_column($result['constraint_findings'], 'code'));
     }
 
     public function test_new_video_owner_defers_public_identity_seo_until_governed_creation(): void
