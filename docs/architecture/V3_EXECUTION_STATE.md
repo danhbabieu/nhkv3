@@ -1,5 +1,35 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-24 — Brain 2 + Media pipeline final local verification
+
+FINAL LOCAL RESULT: `BRAIN2_AND_MEDIA_PIPELINE_READY`. Article and Video share
+the closed EnrichmentPack → ReaderJourney → Composer → Quality → SEO boundary;
+rich Article depth and concise Video depth remain bounded; contextual,
+provenance-only, inapplicable and unsupported material cannot become exact
+public prose or structured SEO visibility. Video bounded repair re-composes,
+regenerates SEO and revalidates without creating Claims. Media now delegates to
+the existing Universal Core through an explicit engine-backed adapter seam and
+remains read/planning-only.
+
+VERIFICATION: NHK Unit passed 2,481 tests / 14,269 assertions under PHP
+memory_limit=512M with 18 warnings, 41 deprecations and 30 PHPUnit
+deprecations. NHK Contract passed 6 tests / 48 assertions. Focused
+Article/Video/Media/semantic matrices passed; Composer validation was valid
+with the repository's existing missing-license warning; Composer lint, full
+PHP lint and `git diff --check` passed. Scoped secret review found no newly
+introduced credential, token or private-key material.
+
+INTEGRATION: Guarded `NHK Integration` invocation was environment-gated by
+WordPress `Error establishing a database connection`; no integration mutation
+was attempted. This is not reported as a code pass.
+
+SAFETY: No migration, schema change, database/staging/production mutation,
+Graph/Knowledge/Evidence write, deployment, publication or push occurred.
+
+COMMITS: `cb1bfa6a`, `4cb27e76`, `2775bc86`, `d5d1dd6d`.
+
+STATUS: `BRAIN2_AND_MEDIA_PIPELINE_READY / INTEGRATION_ENVIRONMENT_GATED / NO_SERVER_ACTION`
+
 # Checkpoint — 2026-09-24 — Media shared-core lifecycle connection (LOCAL / NO SERVER ACTION)
 
 IMPLEMENTED: After Brain 2 Article/Video contract closure, the existing
