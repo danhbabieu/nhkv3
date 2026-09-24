@@ -34,9 +34,15 @@ tests remain fixtures only.
 VERIFICATION: Graph/semantic/owner/lifecycle/Knowledge/relation/Media/SEO
 focused matrix passed 272 tests / 966 assertions with 3 warnings, 6
 deprecations and 30 PHPUnit deprecations. Generic profile and SEO regressions
-passed 2 tests / 7 assertions. Changed code was linted and `git diff --check`
-passed. Full Unit and Contract rerun remains the final gate after this
-checkpoint commit.
+passed 2 tests / 7 assertions. Full Unit passed 2,485 tests / 14,287
+assertions with 18 warnings, 41 deprecations and 30 PHPUnit deprecations under
+`memory_limit=512M`. Contract passed 6 tests / 48 assertions. Changed code
+was linted, Composer validation passed with the repository's existing missing
+license warning, and `git diff --check` passed.
+
+INTEGRATION: Guarded `NHK Integration` was attempted against
+`nhk_v3_test`; WordPress returned `Error establishing a database connection`.
+This is `ENVIRONMENT_GATE_ONLY`, not a product or architecture failure.
 
 NEXT_BLOCKER: Media is currently adapter-only: the shared pack is produced,
 but no production Media caption/alt/description presentation consumer is
