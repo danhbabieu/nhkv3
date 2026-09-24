@@ -10,6 +10,24 @@ final class EditorialQualityGateTest extends TestCase
 {
     private const SUBJECT = '4cbe5aa1-4222-46bd-a140-6ab66d2da199';
 
+    public function test_sparse_editorial_quality_is_not_an_owner_validity_blocker(): void
+    {
+        $report = $this->gate()->evaluate($this->pack([], [], 'video'), $this->plan('video'), new EditorialDraft('sparse_input', 'video', $this->topic(), 'Odo 36', 'Odo 36', [], ['information_gain' => 0.0]), $this->seo('video'));
+
+        self::assertSame('READY', $report->dimensions['owner_validity']['status']);
+        self::assertContains('LOW_INFORMATION_GAIN', $report->dimensions['editorial_quality']['reasons']);
+        self::assertNotContains('LOW_INFORMATION_GAIN', $report->blockers);
+    }
+
+    public function test_unsafe_public_assertion_blocks_publication_but_not_canonical_existence(): void
+    {
+        $draft = new EditorialDraft('available', 'article', 'Odo 36', 'Knowledge stable key', 'Odo 36 là số 1 và có canonical UUID abc.', [['claim_id' => 'core-1', 'claim_revision' => 2]]);
+        $report = $this->gate()->evaluate($this->pack(), $this->plan(), $draft, $this->seo());
+
+        self::assertSame('READY', $report->dimensions['owner_validity']['status']);
+        self::assertSame('BLOCKED', $report->dimensions['publication_quality']['status']);
+    }
+
     public function test_good_odo_package_is_ready_without_an_opaque_score(): void
     {
         $report = $this->gate()->evaluate($this->pack(), $this->plan(), $this->draft(), $this->seo());

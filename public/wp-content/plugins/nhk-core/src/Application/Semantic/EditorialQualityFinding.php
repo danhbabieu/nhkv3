@@ -25,6 +25,7 @@ final readonly class EditorialQualityFinding
         public string $findingSource,
         public string $attemptId = '',
         public int $attemptNo = 0,
+        public string $dimension = 'EDITORIAL_QUALITY',
     ) {
     }
 
@@ -58,6 +59,7 @@ final readonly class EditorialQualityFinding
             trim((string) ($finding['finding_source'] ?? $context['finding_source'] ?? 'UNKNOWN')) ?: 'UNKNOWN',
             trim((string) ($finding['attempt_id'] ?? $context['attempt_id'] ?? '')),
             (int) ($finding['attempt_no'] ?? $context['attempt_no'] ?? 0),
+            strtoupper(trim((string) ($finding['dimension'] ?? $context['dimension'] ?? self::dimensionFor($code)))),
         ))->toArray();
     }
 
@@ -83,6 +85,14 @@ final readonly class EditorialQualityFinding
             'finding_source' => $this->findingSource,
             'attempt_id' => $this->attemptId,
             'attempt_no' => $this->attemptNo,
+            'dimension' => $this->dimension,
         ];
+    }
+
+    private static function dimensionFor(string $code): string
+    {
+        if (in_array($code, ['UNTRACEABLE_FACTUAL_ASSERTION', 'INELIGIBLE_CLAIM_USED', 'INELIGIBLE_SELECTED_CLAIM', 'CLAIM_EVIDENCE_NOT_ELIGIBLE', 'STALE_CLAIM_REVISION', 'EDITORIAL_SCOPE_WIDENED', 'INAPPLICABLE_NEIGHBOR_SELECTED'], true)) return 'FACTUAL_SAFETY';
+        if (in_array($code, ['PUBLIC_INTERNAL_JARGON_LEAK', 'UNSUPPORTED_PROMOTIONAL_CLAIM', 'SEO_NOT_READY', 'INVALID_PUBLIC_INTERNAL_LINK', 'VISUAL_SUPPORT_UNRESOLVED'], true)) return 'PUBLICATION_QUALITY';
+        return 'EDITORIAL_QUALITY';
     }
 }

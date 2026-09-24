@@ -13,7 +13,8 @@ final class EditorialQualityGate
         'factual_grounding', 'scope', 'evidence', 'knowledge_utilization', 'information_gain',
         'reader_journey', 'topic_centrality', 'redundancy', 'template_boilerplate', 'public_language',
         'visual_support', 'seo_readiness', 'internal_link_quality', 'public_claim_compliance',
-        'traceability', 'profile_fit', 'public_readiness',
+        'traceability', 'profile_fit', 'public_readiness', 'owner_validity', 'factual_safety',
+        'editorial_quality', 'publication_quality',
     ];
 
     public function evaluate(EditorialContextPack $pack, EditorialPlan $plan, EditorialDraft $draft, SemanticSeoPlan $seo, bool $allowDeferredSeoIdentity = false, int $round = 0, ?string $packageFingerprint = null, string $attemptId = '', int $attemptNo = 0): EditorialQualityReport
@@ -156,9 +157,32 @@ final class EditorialQualityGate
         $informational = array_values(array_unique(array_slice($informational, 0, 30)));
         $readiness = $blockers !== [] ? 'BLOCKED' : ($warnings !== [] ? 'INCOMPLETE' : 'READY');
         $dimensions['public_readiness'] = ['status' => $readiness, 'severity' => $blockers !== [] ? 'BLOCK' : ($warnings !== [] ? 'WARN' : 'INFO'), 'reasons' => array_merge($blockers, $warnings)];
+        $dimensions['owner_validity'] = ['status' => 'READY', 'severity' => 'INFO', 'reasons' => ['CANONICAL_VALIDITY_DELEGATED_TO_COMPLETION_COORDINATOR']];
+        $dimensions['factual_safety'] = $this->aggregateDimension($dimensions, ['factual_grounding', 'evidence', 'scope', 'traceability']);
+        $dimensions['editorial_quality'] = $this->aggregateDimension($dimensions, ['knowledge_utilization', 'information_gain', 'reader_journey', 'topic_centrality', 'redundancy', 'template_boilerplate', 'profile_fit']);
+        $dimensions['publication_quality'] = $this->aggregateDimension($dimensions, ['public_language', 'visual_support', 'seo_readiness', 'internal_link_quality', 'public_claim_compliance', 'public_readiness']);
         foreach ($dimensions as &$dimension) $dimension['reasons'] = array_values(array_unique(array_slice($dimension['reasons'], 0, 10)));
         unset($dimension);
         return new EditorialQualityReport($readiness, $profile, $dimensions, $blockers, $warnings, $informational, ['gate' => 'shared_editorial_quality', 'opaque_score' => false, 'quality_findings' => $qualityFindings, 'evaluation' => ['round' => $round, 'package_fingerprint' => $packageFingerprint ?? $this->packageFingerprint($draft, $seo), 'attempt_id' => $attemptId, 'attempt_no' => $attemptNo]]);
+    }
+
+    /** @param array<string,array<string,mixed>> $dimensions @param list<string> $names @return array<string,mixed> */
+    private function aggregateDimension(array $dimensions, array $names): array
+    {
+        $reasons = [];
+        $blocked = false;
+        $warned = false;
+        foreach ($names as $name) {
+            $dimension = $dimensions[$name] ?? [];
+            $reasons = array_merge($reasons, (array) ($dimension['reasons'] ?? []));
+            $blocked = $blocked || ($dimension['status'] ?? '') === 'BLOCKED';
+            $warned = $warned || ($dimension['status'] ?? '') === 'INCOMPLETE';
+        }
+        return [
+            'status' => $blocked ? 'BLOCKED' : ($warned ? 'INCOMPLETE' : 'READY'),
+            'severity' => $blocked ? 'BLOCK' : ($warned ? 'WARN' : 'INFO'),
+            'reasons' => array_values(array_unique($reasons)),
+        ];
     }
 
     private function profile(EditorialContextPack $pack, EditorialPlan $plan, EditorialDraft $draft, SemanticSeoPlan $seo): string
