@@ -84,6 +84,7 @@ final class KnowledgeUnitBuilder
     private function nearKey(array $candidate, string $text): string
     {
         $tokens = $this->tokens($text);
+        sort($tokens, SORT_STRING);
         return implode(' ', $tokens);
     }
 

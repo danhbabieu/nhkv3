@@ -148,6 +148,8 @@ final class EditorialKnowledgeSelector
             'marginal_gains' => $gains,
             'policy_version' => 'adaptive-knowledge-selection-v1',
             'information_gain' => array_sum($gains),
+            'provenance_dominated' => count($build->grounding) > count($selected) && count($build->grounding) > 0,
+            'duplicate_dominated' => count(array_filter($excluded, static fn (array $candidate): bool => in_array('REDUNDANT_INFORMATION', (array) ($candidate['exclusion_reasons'] ?? []), true))) > 0,
         ];
         return $this->pack($status, $primarySubject, $topic, $profile, $retrievalStatus, $selected, $excluded, [], $diagnostics, $this->visualSupport($selected), $inputContext, $grounding, $readerFacts, $units);
     }
