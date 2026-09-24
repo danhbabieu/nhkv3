@@ -29,7 +29,8 @@ final class UniversalEnrichmentCore
     /** @param array<string,mixed> $options */
     public function enrich(UniversalInputEnvelope $input, array $options = []): EnrichmentPack
     {
-        $profile = strtolower(trim((string) ($options['profile'] ?? $input->toArray()['target_surface'] ?? '')));
+        $inputValue = $input->toArray();
+        $profile = strtolower(trim((string) ($options['profile'] ?? $inputValue['target_surface'] ?? '')));
         $branches = [
             'content' => ['status' => 'NOT_REQUESTED', 'retrieval' => [], 'pack' => null, 'selected_claims' => [], 'gaps' => [], 'diagnostics' => []],
             'knowledge' => ['status' => 'NOT_REQUESTED', 'candidates' => [], 'proposals' => [], 'classifications' => [], 'proposal_ready' => false, 'diagnostics' => []],
@@ -39,10 +40,23 @@ final class UniversalEnrichmentCore
             $branches['content'] = $this->content($input, $options, $profile);
         }
         if (($options['knowledge'] ?? false) === true || $profile === 'knowledge_delta') {
-            $branches['knowledge'] = $this->knowledge($input, $options);
+            $knowledgeOptions = $options;
+            if (trim((string) ($knowledgeOptions['observation'] ?? '')) === '') {
+                foreach ((array) ($inputValue['observations'] ?? []) as $observation) {
+                    if (!is_array($observation)) continue;
+                    $value = trim((string) ($observation['value'] ?? $observation['text'] ?? $observation['observation'] ?? ''));
+                    if ($value === '') continue;
+                    $knowledgeOptions['observation'] = $value;
+                    $knowledgeOptions['origin'] ??= (string) ($observation['origin'] ?? '');
+                    break;
+                }
+            }
+            $branches['knowledge'] = $this->knowledge($input, $knowledgeOptions);
         }
-        if (is_array($options['relations'] ?? null)) {
-            $branches['relations'] = $this->relations($options);
+        if (is_array($options['relations'] ?? null) || (array) ($inputValue['relations'] ?? []) !== []) {
+            $relationOptions = $options;
+            $relationOptions['relations'] ??= $inputValue['relations'];
+            $branches['relations'] = $this->relations($relationOptions);
         }
         return EnrichmentPack::fromBranches($branches);
     }
