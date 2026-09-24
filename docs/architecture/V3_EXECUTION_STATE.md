@@ -1,5 +1,39 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-24 — Facet-aware semantic retrieval implementation (LOCAL / NO SERVER ACTION)
+
+IMPLEMENTED: The current Adaptive Knowledge Selection path now receives a
+transient `SemanticInputEnvelope`, decomposes only through an injected
+registered-vocabulary read port, creates deterministic subject/facet/concept
+needs, allocates facet opportunities before the merged limit, and applies
+bounded per-need exact/relaxed/contextual retrieval. Shared Article, Video,
+Media/Image and generic-text boundary paths preserve their owner-specific
+surface policies; no second Video or Media semantic pipeline was introduced.
+The boundary returns bounded semantic-needs/decomposition/retrieval
+diagnostics, and the selector continues to own KnowledgeUnit/coverage/adaptive
+selection. No generic vocabulary adapter was invented where the canonical
+registry is not yet exposed; absent vocabulary remains fail-closed.
+
+VERIFICATION: Focused semantic/adapters matrix passed 379 tests / 1,563
+assertions with 3 warnings, 4 deprecations and 30 PHPUnit deprecations. Full
+NHK Unit passed 2,446 tests / 14,126 assertions with 19 warnings, 41
+deprecations and 30 PHPUnit deprecations under `memory_limit=512M`. NHK
+Contract passed 6 tests / 48 assertions. Performance/diagnostic tests were
+run twice, each passing 2 tests / 18 assertions with deterministic output.
+Changed-file PHP lint and `git diff --check` pass; Composer lint pass. The
+special-case scan found only pre-existing identity/content-quality references
+in `CanonicalAuthoritySubjectResolver.php` and `EditorialQualityGate.php`,
+not new retrieval/decomposition logic. The guarded Integration command was
+attempted with `NHK_WP_TEST_PATH=public` and `NHK_WP_TEST_DB=nhk_v3_test`, but
+WordPress returned “Error establishing a database connection”; Integration is
+runtime-gated, not PASS.
+
+SAFETY: No schema or migration file changed, no database/staging/production
+mutation occurred, no Capture retry, deployment, push or publication occurred,
+and no canonical semantic writer was called by the new transient path.
+
+STATUS: `LOCAL_UNIVERSAL_SEMANTIC_ENRICHMENT_READY_FOR_USER_DEPLOY / FULL_UNIT_PASS / CONTRACT_PASS / INTEGRATION_RUNTIME_GATED / NO_SERVER_ACTION`.
+
 # Checkpoint — 2026-09-24 — Universal facet-aware enrichment wiring (LOCAL / NO SERVER ACTION)
 
 IMPLEMENTED: The shared transient semantic-needs path now supports bounded
