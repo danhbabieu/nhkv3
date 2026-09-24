@@ -66,6 +66,32 @@ final class KnowledgeWriterPreviewMcpTest extends TestCase
         }
     }
 
+    public function test_missing_easy_mcp_descriptors_are_materialized_for_every_public_catalog_read(): void
+    {
+        $projected = array_column(EasyMcpNativeFileCompatibilityAdapter::projectTools([]), null, 'name');
+        $parity = McpAbilityRegistration::callableParity();
+
+        foreach (McpToolCatalog::tools() as $tool) {
+            $toolName = (string) $tool['name'];
+            if (($parity[$toolName]['easy_mcp_descriptor_exposed'] ?? false) !== true) continue;
+
+            $ability = McpAbilityRegistration::abilityNameForTool($toolName);
+            self::assertNotNull($ability, $toolName);
+            $connector = McpAbilityRegistration::connectorToolNameForAbility($ability);
+            self::assertArrayHasKey($connector, $projected, $toolName);
+            self::assertSame($tool['description'], $projected[$connector]['description'], $toolName);
+        }
+
+        $preview = $projected['wp_ability_nhk_v3_knowledge_writer_preview'];
+        self::assertSame(
+            EasyMcpNativeFileCompatibilityAdapter::normalizeFinalInputSchema(
+                array_column(McpToolCatalog::tools(), null, 'name')['nhk.knowledge.writer.preview']['inputSchema'],
+            ),
+            $preview['inputSchema'],
+        );
+        self::assertSame(McpToolCatalog::schemaHash('nhk.knowledge.writer.preview'), $preview['_meta']['nhk/schemaHash']);
+    }
+
     public function test_tools_call_dispatches_structured_preview_with_read_capability_only(): void
     {
         $capabilities = [];

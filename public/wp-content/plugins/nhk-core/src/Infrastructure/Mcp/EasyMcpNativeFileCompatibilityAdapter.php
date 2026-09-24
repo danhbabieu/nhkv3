@@ -118,6 +118,7 @@ final class EasyMcpNativeFileCompatibilityAdapter
     /** @param list<array<string,mixed>> $tools @return list<array<string,mixed>> */
     public static function projectTools(array $tools): array
     {
+        $present = [];
         foreach ($tools as $index => $tool) {
             if (!is_array($tool)) continue;
 
@@ -130,6 +131,7 @@ final class EasyMcpNativeFileCompatibilityAdapter
             }
 
             $name = (string) ($tool['name'] ?? '');
+            if ($name !== '') $present[$name] = true;
             $canonical = in_array($name, [self::WIDGET_OPEN_TOOL, self::WIDGET_UPLOAD_TOOL], true)
                 ? self::canonicalDefinitionForSpecialTool($name)
                 : self::canonicalDefinitionForConnectorTool($name);
@@ -157,6 +159,43 @@ final class EasyMcpNativeFileCompatibilityAdapter
                 );
             }
             $tools[$index] = $tool;
+        }
+
+        // The dynamic registrar can omit a newly-added public read Ability
+        // from its snapshot even though the canonical catalog and parity map
+        // already contain it. Materialize the missing connector descriptors
+        // from those same catalog-owned definitions so discovery cannot drift
+        // from the executable Ability projection. This is deliberately
+        // catalog-generic; no capability receives a tool-specific exception.
+        $parity = McpAbilityRegistration::callableParity();
+        foreach (McpToolCatalog::tools() as $canonicalTool) {
+            $toolName = (string) ($canonicalTool['name'] ?? '');
+            if (($parity[$toolName]['easy_mcp_descriptor_exposed'] ?? false) !== true) continue;
+
+            $ability = McpAbilityRegistration::abilityNameForTool($toolName);
+            if ($ability === null) continue;
+            $connectorName = McpAbilityRegistration::connectorToolNameForAbility($ability);
+            if (isset($present[$connectorName])) continue;
+
+            $definition = in_array($connectorName, [self::WIDGET_OPEN_TOOL, self::WIDGET_UPLOAD_TOOL], true)
+                ? self::canonicalDefinitionForSpecialTool($connectorName)
+                : self::canonicalDefinitionForConnectorTool($connectorName);
+            if ($definition === null) continue;
+
+            $definition['name'] = $connectorName;
+            $definition['inputSchema'] = self::normalizeFinalInputSchema((array) ($definition['inputSchema'] ?? []));
+            if (!in_array($connectorName, [self::WIDGET_OPEN_TOOL, self::WIDGET_UPLOAD_TOOL], true)) {
+                $definition['_meta'] = ['nhk/schemaHash' => McpToolCatalog::schemaHash($toolName)];
+            }
+            if (is_array($definition['connectorMeta'] ?? null) && $definition['connectorMeta'] !== [] && !array_is_list($definition['connectorMeta'])) {
+                $definition['_meta'] = array_replace_recursive(
+                    is_array($definition['_meta'] ?? null) && !array_is_list($definition['_meta']) ? $definition['_meta'] : [],
+                    $definition['connectorMeta'],
+                );
+            }
+            unset($definition['connectorMeta'], $definition['kind'], $definition['governed'], $definition['surface'], $definition['dispatch']);
+            $tools[] = $definition;
+            $present[$connectorName] = true;
         }
 
         return $tools;

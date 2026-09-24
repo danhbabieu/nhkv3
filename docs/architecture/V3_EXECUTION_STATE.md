@@ -89,6 +89,24 @@ STATUS: `CONFIRMED_SUBJECT_RECONCILIATION_MIXED_ROUTING_LOCAL_READY / INTEGRATIO
 
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-25 — Generic read-only Easy MCP projection boundary
+
+ROOT_CAUSE: the Easy MCP compatibility projection only normalized descriptors
+already emitted by the dynamic registrar. A catalog-registered public read
+capability could therefore have a dynamic Ability mapping and dispatch/parity
+inputs while still having no connector descriptor record.
+
+FIX: `EasyMcpNativeFileCompatibilityAdapter::projectTools()` now materializes
+missing descriptors generically from the catalog-owned Ability/parity mapping,
+including the canonical schema and schema hash. Existing descriptors remain
+the source for presence/filtering and are only normalized/reconciled.
+
+VERIFICATION: focused MCP parity/projection suite passed 111 tests / 4,079
+assertions; full Unit passed 2,595 tests / 15,115 assertions with an explicit
+512 MB PHP memory limit; Contract passed 6 tests / 48 assertions. No semantic
+service, Brain, Capture, Governance, database, deployment or live data path
+was changed.
+
 # Checkpoint — 2026-09-24 — Knowledge Writer Preview Task 4/5 closure (LOCAL / READ-ONLY)
 
 TASK_4_DECISION: SATISFIED_BY_EXISTING_IMPLEMENTATION. Tasks 1–3 already prove
