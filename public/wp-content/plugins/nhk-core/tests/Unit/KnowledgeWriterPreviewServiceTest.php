@@ -140,6 +140,23 @@ final class KnowledgeWriterPreviewServiceTest extends TestCase
         }
     }
 
+    public function test_each_purpose_returns_a_deterministic_reader_safe_preview(): void
+    {
+        $purposes = ['concise_answer', 'collector_explanation', 'article_section', 'video_description', 'media_caption', 'media_alt', 'entity_summary', 'technical_explanation'];
+        foreach ($purposes as $purpose) {
+            $request = $this->request(['purpose' => $purpose]);
+            $first = $this->service()->preview($request);
+            $second = $this->service()->preview($request);
+
+            self::assertSame(json_encode($first, JSON_UNESCAPED_UNICODE), json_encode($second, JSON_UNESCAPED_UNICODE), $purpose);
+            self::assertTrue($first['read_only'], $purpose);
+            self::assertSame('available', $first['status'], $purpose);
+            self::assertNotSame('', $first['answer'], $purpose);
+            self::assertStringNotContainsString('claim_id', strtolower($first['answer']), $purpose);
+            self::assertStringNotContainsString('provenance', strtolower($first['answer']), $purpose);
+        }
+    }
+
     public function test_requested_facets_are_retrieved_and_uncovered_facet_is_reported(): void
     {
         $result = $this->service()->preview($this->request(['requested_facets' => ['recognition', 'music']]));
@@ -330,6 +347,37 @@ final class KnowledgeWriterPreviewServiceTest extends TestCase
         self::assertSame($modelId, $used[0]['original_subject']['id']);
         self::assertSame('variant_of', $used[0]['graph_path'][0]['predicate']);
         self::assertNotSame('DIRECT_FACT', $used[0]['treatment']);
+    }
+
+    public function test_broader_context_cannot_satisfy_requested_exact_facet_coverage(): void
+    {
+        $modelId = '00000002-1111-4111-8111-111111111111';
+        $this->rows = [[
+            'id' => 'claim-broader-context', 'revision' => 4, 'subject_id' => $modelId, 'subject_type' => 'model',
+            'facet' => 'recognition', 'text' => 'Chủ thể model có vòng chỉ giờ.', 'scope' => 'model',
+            'provenance' => 'CATALOG_SUPPORTED', 'evidence_status' => 'SUPPORTED_WITHIN_SCOPE',
+            'relation_path' => [['source' => 'variant:' . $this->subjectId, 'target' => 'model:' . $modelId, 'predicate' => 'variant_of', 'persisted_source' => 'variant:' . $this->subjectId, 'persisted_target' => 'model:' . $modelId, 'direction' => 'OUTGOING']],
+        ]];
+
+        $result = $this->service()->preview($this->request(['requested_facets' => ['recognition']]));
+
+        self::assertSame([], $result['coverage']['covered_facets']);
+        self::assertSame(['recognition'], $result['coverage']['uncovered_facets']);
+        self::assertSame('sparse', $result['coverage']['status']);
+        self::assertSame([], $result['used_knowledge']);
+    }
+
+    public function test_quality_projection_exposes_existing_grounding_repetition_and_specificity_dimensions(): void
+    {
+        $result = $this->service()->preview($this->request());
+        $dimensions = $result['quality']['dimensions'];
+
+        foreach (['factual_grounding', 'scope', 'evidence', 'traceability', 'factual_safety', 'information_gain', 'redundancy', 'reader_journey', 'public_language', 'editorial_quality'] as $dimension) {
+            self::assertArrayHasKey($dimension, $dimensions);
+            self::assertContains($dimensions[$dimension]['status'], ['READY', 'INCOMPLETE', 'BLOCKED']);
+        }
+        self::assertArrayHasKey('readiness', $result['quality']);
+        self::assertContains($result['quality']['readiness'], ['READY', 'INCOMPLETE', 'BLOCKED']);
     }
 
     public function test_duplicate_claim_does_not_repeat_factual_sentence(): void

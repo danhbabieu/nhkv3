@@ -1,5 +1,18 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-24 — Knowledge Writer Preview Task 2 contract coverage (LOCAL / READ-ONLY)
+
+Added synthetic-fixture acceptance coverage for the eight registered preview
+purposes, deterministic reader-safe output, sparse and unsafe factual inputs,
+bounded read-only result shape, existing quality dimensions, and exact-facet
+coverage remaining unfilled by broader contextual material. Existing service
+behavior passed these contracts, so no preview production code changed.
+
+VERIFICATION: The focused Knowledge Writer Preview, safety, contract, shared
+enrichment, Reader Journey and editorial quality suite passed 89 tests / 420
+assertions. No schema, semantic record, staging/production data, deployment,
+push or external service was touched.
+
 # Checkpoint — 2026-09-24 — Knowledge Writer Preview Task 1 review fixes (LOCAL / READ-ONLY)
 
 The Task 1 preview fix is in `a3106d4004a233c516e9745e58ee58a6857bc5a4`.
