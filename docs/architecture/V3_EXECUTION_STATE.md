@@ -85,6 +85,34 @@ occurred.
 
 STATUS: `LOCAL_FIX_READY_FOR_USER_DEPLOY / INTEGRATION_ENVIRONMENT_GATED / NO_SERVER_ACTION`.
 
+# Checkpoint — 2026-09-24 — Adaptive Knowledge selection boundary (LOCAL / NO DEPLOY)
+
+IMPLEMENTED: Shared transient KnowledgeUnit/CoverageAspect models with
+deterministic near-duplicate collapse and complete Claim/Evidence/provenance
+support trace. Editorial selection now filters applicability and public role,
+selects by uncovered reader coverage and marginal gain under surface context
+budgets, and exposes THIN/PARTIAL/SUFFICIENT plus bounded diagnostics. Retrieval
+supports gap-driven bounded expansion only when explicitly supplied coverage
+gaps; it never scans the full Graph. ReaderJourney groups supporting Claims by
+unit/aspect, Composer receives public material only, and Semantic SEO reports
+its final validated reader-package source.
+
+USAGE_MEMORY: Repository audit found no existing editorial Claim/Knowledge usage
+store with matching semantics. A transient idempotent EditorialUsageMemory is
+used as a secondary tie-break only; no persistence or migration was added.
+Quality diagnostics include coverage, provenance/duplicate domination, public
+role, inapplicable-neighbor, marginal-gain, context-budget and non-public SEO
+signals.
+
+VERIFICATION: Focused selector/coverage/retrieval/journey/composer/SEO/quality
+suites pass locally, including 1000-candidate/500-duplicate deterministic
+performance coverage. NHK Unit passes 2,422 tests / 14,032 assertions;
+Contract passes 6 tests / 48 assertions. Integration ran 141 tests with 21
+failures and 119 skips, all blocked by the documented missing
+`NHK_WP_TEST_PATH=public`/`NHK_WP_TEST_DB=nhk_v3_test` environment. PHP lint
+and `git diff --check` pass. No staging, production, database, publication,
+push or deployment action was performed.
+
 # Checkpoint — 2026-09-23 — Runtime retry and public-copy convergence (LOCAL / NO SERVER ACTION)
 
 TASK_RESULT: The local runtime seam now excludes explicit internal semantic

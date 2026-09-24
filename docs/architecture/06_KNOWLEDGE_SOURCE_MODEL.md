@@ -210,3 +210,32 @@ scope exact, so a specimen observation cannot broaden a Knowledge Claim to
 Variant, Model or Brand. Public Knowledge projection resolves only public-safe
 Media derivatives and may omit a missing/private visual without treating the
 Knowledge content itself as invalid.
+
+## Adaptive editorial reuse boundary — 2026-09-24
+
+Retrieval budget is not editorial selection budget. A bounded candidate pool may
+be wider than the final reader package; Claim count is not reader coverage.
+Graph reachability discovers candidates but does not establish applicability.
+Truth confidence and reader utility are separate dimensions, and Knowledge
+popularity is never Knowledge authority.
+
+Shared editorial selection forms transient `KnowledgeUnit` propositions before
+planning a ReaderJourney. Deterministic semantic deduplication may combine
+near-duplicate Claims into one coverage unit while retaining every Claim ID,
+revision, Source/Evidence reference and provenance trace. Coverage and marginal
+information gain determine stopping; no fixed final Claim quota, graph dump,
+provenance padding or fabricated Knowledge is permitted.
+
+Grounding/control/provenance material may remain in trace but cannot satisfy
+reader coverage, enter public prose or generate SEO. Sparse results are exposed
+as thin/partial/sufficient policy diagnostics and the surface quality contract
+decides whether thin content is safe. Applicable neighbors may fill an
+uncovered aspect only through bounded expansion; an inapplicable neighbor is
+never selectable.
+
+Usage memory, when available, is a secondary contextual diversity signal only.
+It cannot change Claim truth, confidence, Evidence status, eligibility,
+applicability or canonical authority. Published usage is recorded only after a
+final accepted/governed boundary and is idempotent; selected, failed or aborted
+drafts are not published usage. Existing dependency tracking remains distinct
+from editorial usage memory.

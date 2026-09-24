@@ -20,6 +20,7 @@ final class AdaptiveKnowledgeQualityDiagnosticsTest extends TestCase
             'candidate_count' => 1000,
             'provenance_dominated' => true,
             'duplicate_dominated' => true,
+            'quality_requires_coverage' => true,
         ]);
         $plan = new EditorialPlan('available', 'video', ['id' => 'subject', 'type' => 'model'], 'subject', [['id' => 'opening', 'claims' => []]]);
         $draft = new EditorialDraft('available', 'video', 'subject', 'Subject', 'Subject có cấu hình.', [['claim_id' => 'fact', 'claim_revision' => 1]]);

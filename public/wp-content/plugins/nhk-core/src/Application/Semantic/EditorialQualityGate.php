@@ -33,9 +33,10 @@ final class EditorialQualityGate
         foreach (self::DIMENSIONS as $dimension) $dimensions[$dimension] = ['status' => 'READY', 'severity' => 'INFO', 'reasons' => []];
 
         $selectionDiagnostics = $pack->diagnostics;
-        if (in_array((string) ($selectionDiagnostics['coverage_status'] ?? ''), ['THIN', 'PARTIAL'], true)) $add('knowledge_utilization', 'WARN', 'INSUFFICIENT_READER_COVERAGE');
-        if (($selectionDiagnostics['stop_reason'] ?? '') === 'marginal_gain_low') $add('information_gain', 'WARN', 'LOW_MARGINAL_INFORMATION_GAIN');
-        if (($selectionDiagnostics['stop_reason'] ?? '') === 'context_budget') $add('information_gain', 'WARN', 'CONTEXT_BUDGET_EXCEEDED');
+        $coverageGateRequired = ($selectionDiagnostics['quality_requires_coverage'] ?? false) === true || ($selectionDiagnostics['coverage_status'] ?? '') === 'THIN';
+        if ($coverageGateRequired && in_array((string) ($selectionDiagnostics['coverage_status'] ?? ''), ['THIN', 'PARTIAL'], true)) $add('knowledge_utilization', 'WARN', 'INSUFFICIENT_READER_COVERAGE');
+        if ($coverageGateRequired && ($selectionDiagnostics['stop_reason'] ?? '') === 'marginal_gain_low') $add('information_gain', 'WARN', 'LOW_MARGINAL_INFORMATION_GAIN');
+        if ($coverageGateRequired && ($selectionDiagnostics['stop_reason'] ?? '') === 'context_budget') $add('information_gain', 'WARN', 'CONTEXT_BUDGET_EXCEEDED');
         if (($selectionDiagnostics['provenance_dominated'] ?? false) === true) $add('knowledge_utilization', 'WARN', 'PROVENANCE_DOMINATED_SELECTION');
         if (($selectionDiagnostics['duplicate_dominated'] ?? false) === true) $add('redundancy', 'WARN', 'DUPLICATE_KNOWLEDGE_DOMINATION');
         if ((int) ($selectionDiagnostics['knowledge_unit_count'] ?? 0) > (int) ($selectionDiagnostics['selected_unit_count'] ?? 0) && (int) ($selectionDiagnostics['selected_unit_count'] ?? 0) > 0) $add('knowledge_utilization', 'INFO', 'SELECTED_KNOWLEDGE_DISCARDED');
