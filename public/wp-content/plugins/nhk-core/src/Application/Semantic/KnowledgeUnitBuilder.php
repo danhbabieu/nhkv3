@@ -93,8 +93,13 @@ final class KnowledgeUnitBuilder
     {
         $facet = trim((string) ($candidate['facet'] ?? $candidate['knowledge_facet'] ?? ''));
         if ($facet !== '') return [$this->aspectKey($facet)];
-        $tokens = $this->tokens($topic . ' ' . (string) ($candidate['text'] ?? ''));
-        return $tokens === [] ? [] : ['topic:' . $tokens[0]];
+        $tokens = $this->tokens((string) ($candidate['text'] ?? $candidate['claim_text'] ?? ''));
+        if ($tokens === []) {
+            $tokens = $this->tokens($topic);
+        }
+        if ($tokens === []) return [];
+        sort($tokens, SORT_STRING);
+        return ['proposition:' . substr(hash('sha256', implode(' ', $tokens)), 0, 16)];
     }
 
     private function aspectKey(string $value): string { return 'facet:' . implode('_', $this->tokens($value)); }

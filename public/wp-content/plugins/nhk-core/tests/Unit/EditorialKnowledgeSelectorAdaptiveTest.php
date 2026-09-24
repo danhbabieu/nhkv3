@@ -97,6 +97,20 @@ final class EditorialKnowledgeSelectorAdaptiveTest extends TestCase
         self::assertContains('contextual', $pack->diagnostics['coverage_kinds']);
     }
 
+    public function test_exact_candidate_without_new_coverage_is_rejected_instead_of_getting_synthetic_context_gain(): void
+    {
+        $pack = (new EditorialKnowledgeSelector())->select($this->retrieval([
+            $this->claim('configuration-a', 'Subject có cấu hình máy ba vách.', 'configuration'),
+            $this->claim('configuration-b', 'Subject có cấu hình máy bốn vách.', 'configuration'),
+            $this->claim('appearance', 'Subject có mặt số đặc biệt.', 'appearance'),
+        ]), 'cấu hình và mặt số', $this->subject(), ['profile' => 'article']);
+
+        self::assertSame(['configuration-a', 'appearance'], array_column($pack->selectedClaims, 'claim_id'));
+        $excluded = array_values(array_filter($pack->excludedCandidates, static fn (array $claim): bool => ($claim['claim_id'] ?? '') === 'configuration-b'));
+        self::assertCount(1, $excluded);
+        self::assertContains('LOW_MARGINAL_INFORMATION_GAIN', $excluded[0]['exclusion_reasons']);
+    }
+
     /** @param list<array<string,mixed>> $claims @return array<string,mixed> */
     private function retrieval(array $claims): array { return ['status' => 'available', 'items' => $claims, 'eligible_claims' => $claims]; }
 

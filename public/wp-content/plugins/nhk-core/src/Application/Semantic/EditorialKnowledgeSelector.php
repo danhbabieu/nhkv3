@@ -94,9 +94,15 @@ final class EditorialKnowledgeSelector
             $aspects = array_values(array_diff((array) ($data['coverage_aspects'] ?? []), $covered));
             $claim = $unit->claim();
             $coverageKind = strtolower(trim((string) ($claim['coverage_kind'] ?? 'exact')));
-            $isExactCoverage = !isset($claim['retrieval_tier']) || strtoupper((string) $claim['retrieval_tier']) === 'EXACT' || $coverageKind === 'exact';
-            if (!$isExactCoverage) $aspects = [];
-            if ($aspects === []) $aspects = ['context:' . (string) ($claim['claim_id'] ?? count($selected))];
+            $retrievalOrigin = strtolower(trim((string) ($claim['retrieval_origin'] ?? '')));
+            $semanticRole = strtoupper(trim((string) ($claim['semantic_role'] ?? '')));
+            $isExactCoverage = $coverageKind === 'exact'
+                && (!isset($claim['retrieval_tier']) || strtoupper((string) $claim['retrieval_tier']) === 'EXACT')
+                && $retrievalOrigin !== 'neighborhood'
+                && $semanticRole !== EditorialSemanticRolePolicy::SUPPORTING_CONTEXT;
+            if (!$isExactCoverage) {
+                $aspects = ['context:' . (string) ($claim['claim_id'] ?? count($selected))];
+            }
             $tokenCost = count($this->tokens((string) ($claim['text'] ?? '')));
             $gain = count($aspects) + (($claim['retrieval_origin'] ?? '') === 'direct' ? 0.75 : 0.5) + min(0.25, $this->score($claim, $topic, $inputContext) / 40.0);
             if ($aspects === [] || $gain < (float) $policy['minimum_gain']) {
@@ -113,13 +119,17 @@ final class EditorialKnowledgeSelector
             }
             $claim['knowledge_unit'] = $data;
             $claim['utility'] = ['information_gain' => $this->novelty($claim, $inputContext), 'reader_value' => round($this->score($claim, $topic, $inputContext), 6), 'semantic_coverage' => $aspects, 'total' => round($this->score($claim, $topic, $inputContext) + count($aspects), 6)];
-            $claim['editorial_role'] = $isExactCoverage ? $this->role($claim, $selected) : 'SUPPORTING_CONTEXT';
+            $claim['editorial_role'] = $isExactCoverage || $retrievalOrigin === 'neighborhood' ? $this->role($claim, $selected) : 'SUPPORTING_CONTEXT';
             $claim['semantic_context_only'] = !$isExactCoverage;
             $claim['selection_reason'] = $isExactCoverage ? 'applicable KnowledgeUnit adds uncovered reader coverage' : 'applicable KnowledgeUnit provides bounded contextual support';
             $claim['state'] = EditorialSemanticRolePolicy::SELECTED;
             $claim['publicly_composable'] = true;
             $selected[] = $claim;
-            if ($isExactCoverage) $covered = array_values(array_unique(array_merge($covered, (array) ($data['coverage_aspects'] ?? []))));
+            $explicitCoverage = array_values(array_filter(
+                (array) ($data['coverage_aspects'] ?? []),
+                static fn (mixed $aspect): bool => is_string($aspect) && str_starts_with($aspect, 'facet:')
+            ));
+            if ($isExactCoverage && $explicitCoverage !== []) $covered = array_values(array_unique(array_merge($covered, $explicitCoverage)));
             elseif ($coverageKind === 'contextual') $contextualCoverage[] = (string) ($claim['claim_id'] ?? '');
             else $relaxedCoverage[] = (string) ($claim['claim_id'] ?? '');
             $usedTokens += $tokenCost;

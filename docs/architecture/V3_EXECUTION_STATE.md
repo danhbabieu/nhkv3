@@ -1,5 +1,39 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-24 — Editorial information-gain closure (LOCAL / NO SERVER ACTION)
+
+IMPLEMENTED: Closed the bounded marginal-information-gain gap in the existing
+`EditorialKnowledgeSelector`/`KnowledgeUnitBuilder` path. Exact Claims whose
+explicit facet coverage is already covered are now excluded with
+`LOW_MARGINAL_INFORMATION_GAIN` instead of receiving a synthetic
+`context:<claim_id>` aspect. Neighborhood Claims remain contextual
+`EXPLANATION`; background/contextual Claims remain `SUPPORTING_CONTEXT` and
+cannot advance exact coverage. Claims without a registered facet now receive a
+deterministic proposition fingerprint derived from normalized Claim content,
+not Claim identity, so distinct supported facts remain selectable while exact
+facet saturation remains bounded.
+
+REGRESSION: Added a production-shaped adaptive selector test proving that a
+second exact Claim for an already-covered facet is excluded without synthetic
+gain. Existing Video, Article, neighborhood, contextual, duplicate and rich
+pool behavior remains covered.
+
+VERIFICATION: Focused semantic/editorial matrix passed 66 tests / 221
+assertions with 1 warning, 31 PHPUnit deprecations and existing PHPUnit
+deprecation output. NHK Unit passed 2,476 tests / 14,252 assertions with 19
+warnings, 41 deprecations and 30 PHPUnit deprecations using
+`memory_limit=512M`. PHP lint passed; `git diff --check` passed. The default
+128M full-suite attempt remains environment/tooling-gated by the known
+`TrustedProvidedFileMaterializerTest` allocation; the 512M Unit suite passed.
+Full combined execution still has 21 integration failures because the exact
+WordPress/test-database environment is unavailable; these are environment
+gates, not semantic regressions.
+
+SAFETY: No migration, schema change, database/staging/production mutation,
+Graph/Knowledge/Evidence write, deployment, publication or push occurred.
+
+STATUS: `LOCAL_EDITORIAL_INFORMATION_GAIN_READY_INTEGRATION_ENVIRONMENT_GATED / NO_SERVER_ACTION`
+
 # Checkpoint — 2026-09-24 — Universal Enrichment Core verification (LOCAL / NO SERVER ACTION)
 
 ROOT_CAUSE / REGRESSION: The compatibility boundary supplied `raw_input`,
