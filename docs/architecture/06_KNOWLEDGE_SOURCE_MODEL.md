@@ -239,3 +239,20 @@ applicability or canonical authority. Published usage is recorded only after a
 final accepted/governed boundary and is idempotent; selected, failed or aborted
 drafts are not published usage. Existing dependency tracking remains distinct
 from editorial usage memory.
+
+### Universal transient semantic-needs retrieval — 2026-09-24
+
+Article, Video, Media/Image and generic text may share the transient
+`SemanticInputEnvelope`/`SemanticNeed` read path. Each need preserves its
+canonical subject, facet/concept, narrowest scope, origin, confidence, Claim
+revision, relation path and Source/Evidence identifiers. Decomposition and
+retrieval are planning-only: observations, hints, captions, transcripts and
+generated prose do not become Knowledge or Evidence without the existing
+reuse-first Governance lifecycle.
+
+Facet opportunities are allocated before the merged candidate limit. Duplicate
+or storage order cannot starve a sparse facet. Relaxation is per uncovered
+need, uses only registered safe tiers, and marks broader material as relaxed,
+comparative or background context; it never satisfies exact coverage or
+rewrites a broader Claim as a narrow fact. The existing KnowledgeUnit, coverage
+and adaptive selector remain the downstream selection boundary.

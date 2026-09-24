@@ -1,5 +1,36 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-24 — Universal facet-aware enrichment wiring (LOCAL / NO SERVER ACTION)
+
+IMPLEMENTED: The shared transient semantic-needs path now supports bounded
+facet-first retrieval, duplicate-heavy storage-order protection, per-need safe
+relaxation and explicit exact/relaxed/contextual treatment before the existing
+KnowledgeUnit/coverage/adaptive selector. Shared Article, Video, Media and
+generic-text profiles retain separate surface policy and owner boundaries;
+Video does not use a separate enrichment pipeline. Default Article/Video
+selection no longer injects fixed 8/6 ceilings; an explicit caller limit is
+still honored. Observations and generated prose remain planning input only.
+
+REGRESSIONS: Multiple facets in one request, >50 duplicate Claims before a
+useful facet, 1000-candidate deterministic diagnostics, sparse/uncovered needs,
+exact-stop, per-need relaxation, broad/background treatment, shared Media
+profile wiring and Article/Video adapter separation are covered by focused
+tests. Existing owner/Governance/idempotency/read-back behavior was not
+replaced by this transient layer.
+
+VERIFICATION: Focused matrix passed 30 tests / 145 assertions. Full Unit passed
+2,445 tests / 14,114 assertions with 19 warnings, 41 deprecations and 30
+PHPUnit deprecations using 512M. Contract passed 6 tests / 48 assertions.
+Changed-file PHP lint and `git diff --check` pass. The guarded Integration
+command was attempted with `NHK_WP_TEST_PATH=public` and
+`NHK_WP_TEST_DB=nhk_v3_test`, but WordPress returned “Error establishing a
+database connection”; Integration is therefore runtime-gated, not PASS.
+No schema, database, staging/production mutation, Capture retry, deployment,
+pull or push occurred. Capture
+`01a0d09c-48a5-7286-9181-f75b89024f64` was not retried.
+
+STATUS: `LOCAL_UNIVERSAL_SEMANTIC_ENRICHMENT_READY_FOR_USER_DEPLOY / FULL_UNIT_PASS / CONTRACT_PASS / INTEGRATION_RUNTIME_GATED / NO_SERVER_ACTION`.
+
 # Checkpoint — 2026-09-24 — Facet-aware semantic retrieval design and plan (PLAN READY / NO CODE MUTATION)
 
 DESIGN: The approved architectural direction is recorded in
