@@ -87,6 +87,11 @@ final class AuthorityProposalExecutor
         if ($proposal->entityType === 'video' && $proposal->operation === 'ingest') {
             if (!$this->video) throw new \RuntimeException('Video executor is not configured.');
             $payload = $proposal->payload;
+            $existing = isset($payload['canonical_id']) && (string) $payload['canonical_id'] !== ''
+                ? $this->video->find((string) $payload['canonical_id'])
+                : null;
+            if ($existing === null && (string) ($payload['url'] ?? '') !== '') $existing = $this->video->findByUrl((string) $payload['url']);
+            if ($existing === null) $this->assertVideoOwnerEligibility(is_array($payload['metadata'] ?? null) ? $payload['metadata'] : []);
             $video = $this->video->ingestUrl(
                 (string) ($payload['url'] ?? ''),
                 (string) ($payload['title'] ?? ''),
@@ -278,7 +283,12 @@ final class AuthorityProposalExecutor
                 ];
             }
         }
-        if ($attachments === [] && !$semanticReconciliationRequested) throw new \RuntimeException('NO_SEMANTIC_ATTACHMENT');
+        // A canonical Video owner may be persisted before optional semantic
+        // attachment/enrichment is available. Attachment readiness remains a
+        // publication/enrichment outcome and is reconciled independently.
+        // Any supplied attachment still crosses the strict Graph/Evidence
+        // validation below.
+        if ($attachments === []) return [];
         if ($this->graph === null) throw new \RuntimeException('Graph executor is not configured.');
         $desired = [];
         foreach ($attachments as $attachment) {
@@ -324,7 +334,6 @@ final class AuthorityProposalExecutor
             $key = strtolower($edge->predicate) . '|' . strtolower($target->reference->endpoint_type) . '|' . strtolower($target->reference->endpoint_key);
             if (!isset($desired[$key])) $this->graph->retire($edge->edge_uuid, $edge->revision);
         }
-        if ($attachments === []) return [];
         foreach ($attachments as $attachment) {
             $predicate = (string) ($attachment['predicate'] ?? '');
             $target = new NodeReference((string) ($attachment['target_type'] ?? ''), (string) ($attachment['target_uuid'] ?? $attachment['target_key'] ?? ''));
@@ -369,17 +378,20 @@ final class AuthorityProposalExecutor
     {
         $metadata = $video->metadata;
         if ($attachments !== []) $metadata['semantic_attachments'] = $attachments;
-        $result = ($this->completeness ?? new VideoCompletenessPolicy())->evaluate($metadata);
         // Hub classification is a publication/navigation concern. It must
         // remain visible in canonical metadata and keep the Video
         // non-publishable, but it cannot veto a governed owner whose source,
         // editorial payload and semantic attachment have already passed
         // canonical read-back. Every other completeness blocker remains a
         // fail-closed Controlled Apply guard.
-        $canonicalBlockers = array_values(array_filter(
-            $result->blockers,
-            static fn (string $blocker): bool => $blocker !== 'CATEGORY_UNRESOLVED',
-        ));
+        $canonicalBlockers = ($this->completeness ?? new VideoCompletenessPolicy())->ownerBlockers($metadata);
         if ($canonicalBlockers !== []) throw new \RuntimeException('VIDEO_COMPLETENESS_BLOCKED:' . implode(',', $canonicalBlockers));
+    }
+
+    /** @param array<string,mixed> $metadata */
+    private function assertVideoOwnerEligibility(array $metadata): void
+    {
+        $blockers = ($this->completeness ?? new VideoCompletenessPolicy())->ownerBlockers($metadata);
+        if ($blockers !== []) throw new \RuntimeException('VIDEO_COMPLETENESS_BLOCKED:' . implode(',', $blockers));
     }
 }

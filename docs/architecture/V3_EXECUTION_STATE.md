@@ -18884,3 +18884,58 @@ V2.4, graph-direction and information-gain regressions remain covered by the
 passing Unit suite. Commits: `f43376de`, `afd020c7`, `9f06b718`, `b27a5fc0`.
 
 STATUS: `UNIVERSAL_CONSUMPTION_LIVING_KNOWLEDGE_READY_WITH_ENVIRONMENT_GATE / NO_SERVER_ACTION`
+
+# Checkpoint — 2026-09-24 — Video canonical owner persistence boundary (LOCAL / NO SERVER ACTION)
+
+ROOT_CAUSE: The existing-child Video retry preserved the planned canonical
+identity and correctly re-entered governed apply, but Video proposal eligibility
+treated an empty semantic-attachment set as an owner-level failure. The
+executor repeated that failure before owner persistence. This conflated
+enrichment/readiness with canonical owner validity, so a valid sparse owner
+never reached controlled apply. Canonical read-back and CompletionCoordinator
+were already fail-closed and are unchanged.
+
+IMPLEMENTED: Video owner eligibility now blocks only explicit owner-level
+invalidity (identity, source availability/rights/embeddability, required
+editorial fields, or invalid embed URL). Empty semantic attachments, editorial
+NEEDS_REVIEW, category gaps and SEO gaps remain readiness/enrichment evidence.
+Controlled Video ingest may therefore persist the governed owner with a stable
+identity and empty optional attachments; supplied attachments still use the
+existing strict Graph/Evidence validation. Existing external-reference and
+canonical-ID idempotency remain the duplicate-prevention boundary. No shared
+Universal lifecycle law, canonical read-back verifier, repository identity,
+CompletionCoordinator, or runtime fixture was special-cased.
+
+VERIFICATION: Focused lifecycle and generic Video matrix passed 170 tests / 806
+assertions; post-change P6/eligibility/governance tests passed 24 tests / 85
+assertions. Full NHK Unit passed 2,548 tests / 14,672 assertions under 512M,
+with 18 warnings, 41 deprecations and 30 PHPUnit deprecations. NHK Contract
+passed 6 tests / 48 assertions. Composer PHP lint, `git diff --check`, and the
+production special-case scan passed. Guarded Integration was attempted and is
+environment-gated: 21 setup failures require `NHK_WP_TEST_PATH=public` and a
+working WordPress/database environment; 119 tests were skipped. No integration
+assertion failure was observed.
+
+SAFETY: No migration, staging/production mutation, deployment, push or direct
+database write occurred. Existing unrelated KnowledgeWriterPreview changes
+were preserved. No commit was created.
+
+STATUS: `CANONICAL_OWNER_PERSISTENCE_READY_WITH_INTEGRATION_ENVIRONMENT_GATE / NO_SERVER_ACTION`
+
+# Checkpoint — 2026-09-24 — Knowledge Writer Preview MCP exposure (LOCAL / READ-ONLY)
+
+Registered `nhk.knowledge.writer.preview` in the canonical MCP catalog and
+dispatch registry with a bounded request schema, ordinary read capability and
+the existing `KnowledgeWriterPreviewService` facade. The tool returns the
+service's structured read-only preview through the normal transport response.
+The WordPress Ability adapter records an explicit MCP-only exclusion because
+it does not receive this preview service dependency; the MCP transport remains
+the executable exposure boundary.
+
+VERIFICATION: Focused MCP preview, catalog, transport-boundary and schema-parity
+tests passed 53 tests / 2,398 assertions. The new transport test confirms that
+only ordinary `read` capability is requested. PHP lint, diff checks and scoped
+secret review are recorded with the Task 3 commit.
+
+SAFETY: No semantic owner, Knowledge/Evidence/Graph record, schema, database,
+staging/production environment, deployment or remote repository was changed.

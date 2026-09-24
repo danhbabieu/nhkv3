@@ -4,6 +4,9 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Governance\{GovernanceService, StagingAcceptanceScopeVerifier};
+use NHK\Core\Application\Authority\AuthorityService;
+use NHK\Core\Application\Governance\AuthorityProposalExecutor;
+use NHK\Core\Application\Video\VideoService;
 use NHK\Core\Application\Capture\CaptureVideoProvenancePlanner;
 use NHK\Core\Application\Video\{VideoCompletenessPolicy, VideoRelationCandidatePlanner};
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
@@ -17,6 +20,79 @@ use PHPUnit\Framework\TestCase;
 
 final class VideoGovernanceGenericityTest extends TestCase
 {
+    public function test_sparse_editorial_review_does_not_block_governed_video_owner_write(): void
+    {
+        $videoId = UuidCodec::newV7();
+        $videos = new class implements VideoRepository {
+            /** @var array<string,Video> */
+            public array $items = [];
+            public function findByCanonicalId(string $id): ?Video { return $this->items[$id] ?? null; }
+            public function findByExternalReference(string $platform, string $externalId): ?Video
+            {
+                foreach ($this->items as $video) if ($video->platform === $platform && $video->externalVideoId === $externalId) return $video;
+                return null;
+            }
+            public function create(Video $video): Video { return $this->items[$video->canonicalId] = $video; }
+            public function update(Video $video, int $expectedRevision): Video { return $this->items[$video->canonicalId] = $video; }
+            public function list(bool $includeRetired = false): array { return array_values($this->items); }
+        };
+        $metadata = [
+            'source' => ['identity_valid' => true, 'availability' => 'available', 'embeddable' => true, 'external_video_id' => 'dQw4w9WgXcQ', 'platform' => 'youtube'],
+            'source_rights' => 'PUBLIC_EXTERNAL_REFERENCE',
+            'editorial' => ['title' => 'Video an toàn', 'summary' => 'Tóm tắt tối thiểu', 'body' => 'Nội dung tối thiểu trong phạm vi nguồn.'],
+            'content_quality' => ['status' => 'CONTENT_NEEDS_REVIEW'],
+            'category' => ['primary' => null],
+            'semantic_attachments' => [],
+            'embed_url' => 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
+            'seo' => ['title' => 'Video an toàn', 'description' => 'Tóm tắt tối thiểu'],
+        ];
+        $proposal = new Proposal($videoId, $videoId, 'ingest', [
+            'canonical_id' => $videoId,
+            'url' => 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+            'title' => 'Video an toàn',
+            'metadata' => $metadata,
+        ], 'content', null, 'dependencies', ProposalState::APPROVED, idempotencyKey: 'sparse-video-owner', entityType: 'video');
+
+        $result = (new AuthorityProposalExecutor(
+            new AuthorityService(new \NHK\Tests\Support\InMemoryAuthorityRepository(), new \NHK\Core\Domain\Authority\EntityTypeRegistry()),
+            video: new VideoService($videos),
+        ))($proposal);
+
+        self::assertInstanceOf(Video::class, $result);
+        self::assertSame($videoId, $videos->findByCanonicalId($videoId)?->canonicalId);
+        self::assertContains('CONTENT_NEEDS_REVIEW', $result->metadata['completeness']['blockers']);
+        self::assertContains('NO_SEMANTIC_ATTACHMENT', $result->metadata['completeness']['blockers']);
+    }
+
+    public function test_owner_level_source_identity_blocker_still_prevents_video_write(): void
+    {
+        $videoId = UuidCodec::newV7();
+        $videos = new class implements VideoRepository {
+            public function findByCanonicalId(string $id): ?Video { return null; }
+            public function findByExternalReference(string $platform, string $externalId): ?Video { return null; }
+            public function create(Video $video): Video { throw new \LogicException('owner blocker must prevent create'); }
+            public function update(Video $video, int $expectedRevision): Video { return $video; }
+            public function list(bool $includeRetired = false): array { return []; }
+        };
+        $proposal = new Proposal($videoId, $videoId, 'ingest', [
+            'canonical_id' => $videoId,
+            'url' => 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+            'title' => 'Video không hợp lệ',
+            'metadata' => [
+                'source' => ['identity_valid' => false, 'availability' => 'available', 'embeddable' => true, 'external_video_id' => 'dQw4w9WgXcQ', 'platform' => 'youtube'],
+                'source_rights' => 'PUBLIC_EXTERNAL_REFERENCE',
+                'editorial' => ['title' => 'Video', 'summary' => 'Tóm tắt', 'body' => 'Nội dung'],
+                'semantic_attachments' => [],
+            ],
+        ], 'content', null, 'dependencies', ProposalState::APPROVED, idempotencyKey: 'blocked-video-owner', entityType: 'video');
+
+        $this->expectExceptionMessage('VIDEO_COMPLETENESS_BLOCKED:INVALID_SOURCE_IDENTITY');
+        (new AuthorityProposalExecutor(
+            new AuthorityService(new \NHK\Tests\Support\InMemoryAuthorityRepository(), new \NHK\Core\Domain\Authority\EntityTypeRegistry()),
+            video: new VideoService($videos),
+        ))($proposal);
+    }
+
     public function test_variant_and_model_about_attachments_are_signed_from_final_payload(): void
     {
         foreach (['variant', 'model'] as $targetType) {

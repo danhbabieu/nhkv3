@@ -8,6 +8,27 @@ use NHK\Core\Domain\Video\{VideoCompletenessResult, VideoSourceRights};
 final class VideoCompletenessPolicy
 {
     /**
+     * Return only blockers that make the canonical owner unsafe to persist.
+     * Editorial, relation/enrichment and publication readiness are evaluated
+     * independently after the owner write and read-back.
+     *
+     * @return list<string>
+     */
+    public function ownerBlockers(array $package): array
+    {
+        $blockers = [];
+        $source = is_array($package['source'] ?? null) ? $package['source'] : [];
+        if (($source['identity_valid'] ?? true) !== true) $blockers[] = 'INVALID_SOURCE_IDENTITY';
+        if (($source['availability'] ?? 'unknown') !== 'available') $blockers[] = 'SOURCE_UNAVAILABLE';
+        if (($source['embeddable'] ?? true) === false) $blockers[] = 'SOURCE_NOT_EMBEDDABLE';
+        if (!VideoSourceRights::isValid((string) ($package['source_rights'] ?? ''))) $blockers[] = 'SOURCE_RIGHTS_UNRESOLVED';
+        $editorial = is_array($package['editorial'] ?? null) ? $package['editorial'] : [];
+        foreach (['title', 'summary', 'body'] as $field) if (trim((string) ($editorial[$field] ?? '')) === '') $blockers[] = 'EDITORIAL_INCOMPLETE';
+        if (filter_var((string) ($package['embed_url'] ?? ''), FILTER_VALIDATE_URL) === false) $blockers[] = 'INVALID_EMBED_URL';
+        return array_values(array_unique($blockers));
+    }
+
+    /**
      * Re-evaluate the current projection from attachment state that has
      * already passed canonical Graph/Evidence read-back.
      *

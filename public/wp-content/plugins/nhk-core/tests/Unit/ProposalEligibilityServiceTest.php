@@ -23,19 +23,30 @@ final class ProposalEligibilityServiceTest extends TestCase
     private const ID = '018f2f1e-7b2c-7abc-8def-0123456789ab';
     private const SUBJECT = '852da54d-457a-4397-a16d-52d9452ba766';
 
-    public function test_video_ingest_without_semantic_attachment_is_not_ready(): void
+    public function test_video_ingest_without_semantic_attachment_can_reach_owner_apply(): void
     {
-        $proposal = $this->proposal(['semantic_attachments' => []]);
+        $proposal = $this->proposal([
+            'subject_resolution_packet' => ['id' => self::SUBJECT, 'type' => 'variant'],
+            'source' => ['identity_valid' => true, 'availability' => 'available', 'embeddable' => true],
+            'source_rights' => 'PUBLIC_EXTERNAL_REFERENCE',
+            'editorial' => ['title' => 'Video', 'summary' => 'Tóm tắt', 'body' => 'Nội dung'],
+            'embed_url' => 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
+            'semantic_attachments' => [],
+        ]);
         $service = $this->service($proposal);
 
-        self::assertFalse($service->check($proposal->id)->ready);
-        self::assertSame(['NO_SEMANTIC_ATTACHMENT'], $service->check($proposal->id)->reasons);
+        self::assertTrue($service->check($proposal->id)->ready);
+        self::assertSame([], $service->check($proposal->id)->reasons);
     }
 
     public function test_legacy_user_hint_evidence_is_not_eligible(): void
     {
         $proposal = $this->proposal([
             'subject_resolution_packet' => ['id' => self::SUBJECT, 'type' => 'variant', 'name' => 'Odo 36/8'],
+            'source' => ['identity_valid' => true, 'availability' => 'available', 'embeddable' => true],
+            'source_rights' => 'PUBLIC_EXTERNAL_REFERENCE',
+            'editorial' => ['title' => 'Video', 'summary' => 'Tóm tắt', 'body' => 'Nội dung'],
+            'embed_url' => 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
             'semantic_attachments' => [[
                 'target_type' => 'variant',
                 'target_uuid' => self::SUBJECT,

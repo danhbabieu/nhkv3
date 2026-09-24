@@ -16,6 +16,12 @@ final class VideoService
         return $this->videos->findByCanonicalId($id);
     }
 
+    public function findByUrl(string $url): ?Video
+    {
+        $normalized = Video::fromUrl($url);
+        return $this->videos->findByExternalReference($normalized->platform, $normalized->externalVideoId);
+    }
+
     public function ingestUrl(string $url, string $title = '', array $metadata = [], ?string $thumbnailMediaId = null, ?string $canonicalId = null, bool $active = true): Video
     {
         $normalized = Video::fromUrl($url);

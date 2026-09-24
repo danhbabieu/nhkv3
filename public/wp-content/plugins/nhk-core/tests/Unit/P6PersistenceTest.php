@@ -139,9 +139,9 @@ final class P6PersistenceTest extends TestCase
         $types->register(new EntityTypeDefinition('brand', 1, true, []));
         $service = new VideoService($repo);
         $executor = new AuthorityProposalExecutor(new AuthorityService(new InMemoryAuthorityRepository(), $types), null, null, $service);
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('NO_SEMANTIC_ATTACHMENT');
-        $executor(new Proposal('video-ingest-1', 'video', 'ingest', ['url' => 'https://youtu.be/9bZkp7q19f0', 'title' => 'Canonical video', 'metadata' => ['source' => 'test']], 'content', 1, 'deps', ProposalState::APPROVED, '1', '2', null, 'idem-video-ingest', 1, null, null, null, 'video'));
+        $result = $executor(new Proposal('video-ingest-1', 'video', 'ingest', ['url' => 'https://youtu.be/9bZkp7q19f0', 'title' => 'Canonical video', 'metadata' => ['source' => ['identity_valid' => true, 'availability' => 'available', 'embeddable' => true], 'source_rights' => 'PUBLIC_EXTERNAL_REFERENCE', 'editorial' => ['title' => 'Canonical video', 'summary' => 'Tóm tắt', 'body' => 'Nội dung'], 'embed_url' => 'https://www.youtube-nocookie.com/embed/9bZkp7q19f0']], 'content', 1, 'deps', ProposalState::APPROVED, '1', '2', null, 'idem-video-ingest', 1, null, null, null, 'video'));
+        self::assertInstanceOf(Video::class, $result);
+        self::assertCount(1, $repo->items);
     }
 
     public function test_media_and_video_are_real_graph_endpoints_and_retired_records_remain_resolvable(): void

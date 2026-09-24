@@ -5,6 +5,7 @@ namespace NHK\Core\Application\Governance;
 
 use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
 use NHK\Core\Application\Semantic\SubjectResolutionService;
+use NHK\Core\Application\Video\VideoCompletenessPolicy;
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Governance\Proposal;
 use NHK\Core\Domain\Graph\{EndpointTypeRegistry, NodeReference, PredicateRegistry};
@@ -25,6 +26,7 @@ final class VideoProposalEligibilityEvaluator
         private CanonicalDependencyValidator $dependencies,
         private ?SubjectResolutionService $subjectResolver = null,
         private $targetActive = null,
+        private ?VideoCompletenessPolicy $completeness = null,
     ) {
     }
 
@@ -49,9 +51,9 @@ final class VideoProposalEligibilityEvaluator
         if ($proposal->entityType !== 'video' || $proposal->operation !== 'ingest') return [];
         $metadata = is_array($proposal->payload['metadata'] ?? null) ? $proposal->payload['metadata'] : [];
         $attachments = $metadata['semantic_attachments'] ?? null;
-        if (!is_array($attachments) || $attachments === []) return ['NO_SEMANTIC_ATTACHMENT'];
+        $attachments = is_array($attachments) ? $attachments : [];
+        $reasons = $this->ownerBlockers($metadata);
 
-        $reasons = [];
         $packet = is_array($metadata['subject_resolution_packet'] ?? null) ? $metadata['subject_resolution_packet'] : [];
         $subjectId = trim((string) ($packet['id'] ?? ''));
         $subjectType = trim((string) ($packet['type'] ?? ''));
@@ -123,6 +125,12 @@ final class VideoProposalEligibilityEvaluator
         }
 
         return array_values(array_unique($reasons));
+    }
+
+    /** @return list<string> */
+    private function ownerBlockers(array $metadata): array
+    {
+        return ($this->completeness ?? new VideoCompletenessPolicy())->ownerBlockers($metadata);
     }
 
     private function referenceHint(string $title): string
