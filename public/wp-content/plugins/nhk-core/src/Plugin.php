@@ -1933,7 +1933,7 @@ final class Plugin {
                 static function (array $context) use ($videoPublicationVerifier): array {
                     return $videoPublicationVerifier->verify($context);
                 },
-                null,
+                new \NHK\Core\Application\Completion\CompletionCoordinator(static fn (string $ownerType): ?array => ($mediaCapabilities->forEndpoint($ownerType))?->toArray()),
                 $clockTypeShadowClassifier,
                 new \NHK\Core\Application\Capture\ContentIntentRouter(),
                 new VisualOpportunityDetector(),

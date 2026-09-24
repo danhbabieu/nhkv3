@@ -90,7 +90,7 @@ final class MediaBindingServiceGenericOwnerTest extends TestCase
 
         self::assertSame('COMPLETE', $result['status']);
         self::assertNull($result['readback']['active_representative_count']);
-        self::assertSame('', $result['readback']['active_slot']);
+        self::assertNull($result['readback']['active_slot']);
     }
 }
 

@@ -12,6 +12,11 @@ namespace NHK\Core\Application\Completion;
  */
 final class CompletionCoordinator
 {
+    /** @param (callable(string):?array<string,mixed>)|null $capabilityResolver */
+    public function __construct(private $capabilityResolver = null)
+    {
+    }
+
     /** @var list<string> */
     private const PUBLIC_CAPABLE = [
         'wp_post', 'knowledge', 'media', 'video',
@@ -24,7 +29,8 @@ final class CompletionCoordinator
     {
         $ownerType = strtolower(trim($ownerType));
         $ownerId = trim($ownerId);
-        $publicCapable = in_array($ownerType, self::PUBLIC_CAPABLE, true)
+        $capability = is_callable($this->capabilityResolver) ? ($this->capabilityResolver)($ownerType) : null;
+        $publicCapable = (is_array($capability) ? (($capability['public_capable'] ?? $capability['requires_public_surface'] ?? false) === true) : in_array($ownerType, self::PUBLIC_CAPABLE, true))
             && ($evidence['public_projection_owner'] ?? true) !== false
             && strtolower(trim((string) ($evidence['owner_role'] ?? ''))) !== 'semantic_dependency';
         $blockers = $this->strings($evidence['blockers'] ?? []);

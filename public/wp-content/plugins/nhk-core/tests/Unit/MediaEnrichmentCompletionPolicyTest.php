@@ -56,4 +56,28 @@ final class MediaEnrichmentCompletionPolicyTest extends TestCase
         self::assertSame('verified', $result['status']);
         self::assertSame([], $result['public']);
     }
+
+    public function test_canonical_only_owner_is_complete_without_projection_or_frontend_gate(): void
+    {
+        $policy = new MediaEnrichmentCompletionPolicy(
+            static fn (): array => ['projection_required' => false, 'public_required' => false, 'frontend_required' => false],
+            static fn (): array => ['status' => 'stale', 'media_id' => 'other'],
+            static fn (): array => ['status' => 'stale', 'media_id' => 'other'],
+        );
+        $result = $policy->verify(['bindings' => [$this->receipt()]]);
+        self::assertSame('verified', $result['status']);
+        self::assertSame([], $result['public']);
+    }
+
+    public function test_frontend_gate_is_distinct_and_fails_closed(): void
+    {
+        $policy = new MediaEnrichmentCompletionPolicy(
+            static fn (): array => ['projection_required' => true, 'public_required' => false, 'frontend_required' => true],
+            static fn (): array => ['status' => 'verified', 'media_id' => 'media-1'],
+            static fn (): array => ['status' => 'stale', 'media_id' => 'other'],
+        );
+        $result = $policy->verify(['bindings' => [$this->receipt()]]);
+        self::assertSame('unavailable', $result['status']);
+        self::assertSame('FRONTEND_READBACK_STALE', $result['reason']);
+    }
 }
