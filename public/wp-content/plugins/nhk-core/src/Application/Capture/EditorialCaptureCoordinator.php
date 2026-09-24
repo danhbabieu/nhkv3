@@ -1655,6 +1655,33 @@ final class EditorialCaptureCoordinator
                 ? ['completion' => $write['completion'], 'current_outcome' => true]
                 : ['owner_type' => $type, 'owner_id' => (string) ($write['canonical_id'] ?? ''), 'canonical_readback' => $write['canonical_readback'] ?? null, 'dependency_state' => ($write['status'] ?? '') === 'APPLIED' ? 'COMPLETE' : 'PARTIAL', 'blockers' => (array) ($write['blockers'] ?? [])];
         }
+        // Retry/provenance continuation also records a compact child receipt
+        // separately from the governed write list. Register that receipt when
+        // it is the only current owner projection; otherwise the richer
+        // governed/public packet above remains authoritative for the same
+        // canonical identity.
+        $registeredVideoIds = [];
+        foreach ($children as $child) {
+            $packet = is_array($child['completion'] ?? null) ? $child['completion'] : $child;
+            if (!is_array($packet) || strtolower(trim((string) ($packet['owner_type'] ?? ''))) !== 'video') continue;
+            $id = trim((string) ($packet['owner_id'] ?? ''));
+            if ($id !== '') $registeredVideoIds[$id] = true;
+        }
+        foreach ((array) ($writes['video_children'] ?? []) as $child) {
+            if (!is_array($child)) continue;
+            $id = trim((string) ($child['canonical_id'] ?? (($child['canonical_readback']['canonical_id'] ?? ''))));
+            if ($id === '' || isset($registeredVideoIds[$id])) continue;
+            $status = strtoupper(trim((string) ($child['status'] ?? '')));
+            $children[] = [
+                'owner_type' => 'video',
+                'owner_id' => $id,
+                'canonical_readback' => $child['canonical_readback'] ?? null,
+                'dependency_state' => in_array($status, ['APPLIED', 'REUSED_VERIFIED'], true) ? 'COMPLETE' : 'PARTIAL',
+                'blockers' => (array) ($child['blockers'] ?? []),
+                'current_outcome' => true,
+            ];
+            $registeredVideoIds[$id] = true;
+        }
         foreach ((array) ($videoPublication['items'] ?? []) as $video) if (is_array($video) && is_array($video['completion'] ?? null)) $children[] = ['completion' => $video['completion'], 'current_outcome' => true];
         $mediaIds = array_values(array_unique(array_filter(array_map('strval', (array) ($media['media_ids'] ?? [])), static fn (string $id): bool => trim($id) !== '')));
         $singleMediaId = trim((string) ($media['media_id'] ?? $media['canonical_id'] ?? ''));

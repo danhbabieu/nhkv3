@@ -767,6 +767,46 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
         self::assertContains('REQUIRED_OWNER_READBACK_UNVERIFIED', $result->diagnostics['completion']['blockers']);
     }
 
+    public function test_video_child_readback_is_registered_when_retry_result_is_only_in_video_children(): void
+    {
+        $captures = new Pr5CaptureRepository();
+        $calls = ['draft' => 0, 'semantic' => 0, 'media' => 0, 'publication' => 0, 'final' => 0];
+        $events = [];
+        $videoId = UuidCodec::newV7();
+        $coordinator = $this->coordinator(
+            $captures,
+            $calls,
+            $events,
+            semanticStatus: 'APPLIED',
+            semanticExtra: [
+                'video_children' => [[
+                    'status' => 'APPLIED',
+                    'canonical_id' => $videoId,
+                    'canonical_readback' => ['canonical_id' => $videoId, 'entity_type' => 'video', 'active' => true, 'revision' => 2],
+                ]],
+            ],
+            videoEnrichment: static fn (): array => ['items' => [[
+                'kind' => 'video',
+                'video_id' => $videoId,
+                'video_proposal' => ['operation' => 'ingest', 'payload' => ['canonical_id' => $videoId]],
+            ]]],
+            videoPublication: static fn (): array => ['status' => 'not_requested', 'items' => [], 'blockers' => []],
+        );
+
+        $result = $coordinator->execute([
+            'idempotency_key' => 'video-child-readback-registration-' . bin2hex(random_bytes(4)),
+            'intent' => 'VIDEO',
+            'purpose' => 'EDITORIAL',
+            'text' => 'Retry result retains the canonical Video child read-back.',
+            'video' => ['url' => 'https://youtu.be/' . substr(bin2hex(random_bytes(6)), 0, 11)],
+        ]);
+
+        self::assertSame([['owner_type' => 'video', 'owner_id' => $videoId]], $result->diagnostics['completion']['required_owners']);
+        self::assertSame([], $result->diagnostics['completion']['missing_required_owners']);
+        self::assertSame($videoId, $result->diagnostics['completion']['children'][0]['owner_id']);
+        self::assertSame($videoId, $result->diagnostics['completion']['children'][0]['canonical_readback']['canonical_id']);
+    }
+
     /**
      * @param array<string,int> $calls
      * @param list<string> $events

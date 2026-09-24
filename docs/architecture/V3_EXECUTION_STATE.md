@@ -1,5 +1,35 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-24 — Video retry owner read-back registration (LOCAL / NO SERVER ACTION)
+
+ROOT_CAUSE / FIRST_BROKEN_BOUNDARY: The retry/provenance continuation persisted
+the canonical Video result in `semantic_write_back.video_children`, but the
+Capture completion child projection only consumed the governed `writes` list
+and `video_publication.items`. `required_owners` could therefore resolve the
+Video UUID from the asset/child receipt while `owners` had no matching
+canonical-read-back packet, producing a false
+`REQUIRED_OWNER_READBACK_UNVERIFIED` and the same missing owner in enrichment.
+
+FIX: Preserve `canonical_id` and `canonical_readback` in the provenance Video
+child receipt, then register that receipt in Capture completion when it is the
+only current Video projection. If the same canonical Video already has a
+richer governed/public completion packet, that packet remains authoritative;
+the child receipt is not allowed to create a duplicate owner. Empty or
+read-back-less identities remain incomplete and fail closed.
+
+REGRESSION: Added a production-shaped Capture test proving a retry result held
+only in `video_children` reconciles the exact same Video UUID into
+`required_owners`, `owners` and canonical read-back without a second owner.
+
+VERIFICATION: Focused Capture/Completion/Governed-Continuation/Video
+publication suites pass 105 tests / 535 assertions. Full Unit passes 2,458
+tests / 14,185 assertions with 19 existing warnings and 41 deprecations (30
+PHPUnit deprecations). PHP lint and `git diff --check` pass. No Capture,
+Video, Knowledge, Evidence, Graph, staging/production, deployment or push
+mutation occurred.
+
+STATUS: `VIDEO_RETRY_OWNER_READBACK_LOCAL_READY / DEPLOYMENT_PENDING / SEMANTIC_MUTATION_NONE`
+
 # Checkpoint — 2026-09-24 — KnowledgeUnit supporting-Claim Quality identity fix (LOCAL / NO SERVER ACTION)
 
 RUNTIME_CONTRADICTION: On staging revision

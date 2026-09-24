@@ -226,7 +226,14 @@ final class GovernedCaptureContinuationService
                 $this->executeVideoProvenancePlan($plan['capture_video_provenance'], $control, $writes, $lifecycle);
                 $childWrites = array_slice($writes, $before);
                 $last = $childWrites === [] ? ['status' => 'FAILED_RETRYABLE', 'blockers' => ['VIDEO_CHILD_NO_RESULT']] : $childWrites[array_key_last($childWrites)];
-                $videoChildren[] = ['fingerprint' => $this->videoPlanFingerprint($plan, $context), 'status' => (string) ($last['status'] ?? 'FAILED_RETRYABLE'), 'blockers' => (array) ($last['blockers'] ?? [])];
+                $readback = is_array($last['canonical_readback'] ?? null) ? $last['canonical_readback'] : [];
+                $videoChildren[] = [
+                    'fingerprint' => $this->videoPlanFingerprint($plan, $context),
+                    'status' => (string) ($last['status'] ?? 'FAILED_RETRYABLE'),
+                    'canonical_id' => trim((string) ($last['canonical_id'] ?? $last['result_entity_uuid'] ?? ($readback['canonical_id'] ?? ''))),
+                    'canonical_readback' => $readback !== [] ? $readback : null,
+                    'blockers' => (array) ($last['blockers'] ?? []),
+                ];
                 continue;
             }
             if (($plan['entity_type'] ?? '') === 'video') {
