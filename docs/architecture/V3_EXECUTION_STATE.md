@@ -1,5 +1,33 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-24 — Universal Enrichment Core verification (LOCAL / NO SERVER ACTION)
+
+ROOT_CAUSE / REGRESSION: The compatibility boundary supplied `raw_input`,
+but the new UniversalInputEnvelope only recognized `body`, `text` and
+`raw_text`. Video runtime-equivalent intake therefore lost its source-title
+context before retrieval/selection, producing a sparse pack and a false
+`VIDEO_EDITORIAL_QUALITY_BLOCKED`. Non-scalar title/body input could also
+produce PHP array-to-string warnings.
+
+FIX: UniversalInputEnvelope now accepts `raw_input` as a transient body alias
+and normalizes title/body aliases through a scalar-only helper. Invalid shapes
+remain empty and diagnostic, fail closed, and do not become public prose. Added
+contract regressions for alias preservation and non-scalar input safety. No
+owner-specific enrichment brain, persistence, Governance write, schema or
+migration was introduced.
+
+VERIFICATION: Focused Universal/Article/Video/Media/Graph/Capture matrix passed
+109 tests / 478 assertions with 1 warning and 31 PHPUnit deprecations. Full NHK
+Unit passed 2,475 tests / 14,248 assertions with 19 warnings, 41 deprecations
+and 30 PHPUnit deprecations under `memory_limit=512M`. PHP lint, Composer
+validation and `git diff --check` passed. Guarded Integration was attempted with
+`NHK_WP_TEST_PATH=public` and `NHK_WP_TEST_DB=nhk_v3_test`; WordPress returned
+`Error establishing a database connection`, so Integration is
+`INTEGRATION_ENVIRONMENT_GATED`, not PASS. No database, staging, V2,
+production, deployment, publication or push mutation occurred.
+
+STATUS: `LOCAL_UNIVERSAL_ENRICHMENT_CORE_READY_INTEGRATION_ENVIRONMENT_GATED / NO_SERVER_ACTION`
+
 # Checkpoint — 2026-09-24 — Video retry owner read-back registration (LOCAL / NO SERVER ACTION)
 
 ROOT_CAUSE / FIRST_BROKEN_BOUNDARY: The retry/provenance continuation persisted

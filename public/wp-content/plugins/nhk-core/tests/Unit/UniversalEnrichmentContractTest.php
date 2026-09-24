@@ -44,6 +44,31 @@ final class UniversalEnrichmentContractTest extends TestCase
         self::assertNotSame('variant', $value['subject_resolution']['primary']['type'] ?? null);
     }
 
+    public function test_raw_input_alias_is_preserved_as_transient_body_context(): void
+    {
+        $input = UniversalInputEnvelope::fromArray([
+            'owner_or_source_type' => 'video',
+            'raw_input' => 'Odo 36',
+            'subject_resolution' => ['primary' => ['id' => 'subject-1', 'type' => 'model']],
+        ]);
+
+        self::assertSame('Odo 36', $input->toArray()['body']);
+        self::assertSame('Odo 36', $input->toArray()['raw_text']);
+        self::assertNotContains('INPUT_CONTENT_UNAVAILABLE', $input->toArray()['diagnostics']);
+    }
+
+    public function test_non_scalar_text_aliases_fail_closed_without_array_to_string_warnings(): void
+    {
+        $input = UniversalInputEnvelope::fromArray([
+            'title' => ['unexpected' => 'shape'],
+            'body' => ['unexpected' => 'shape'],
+        ]);
+
+        self::assertSame('', $input->toArray()['title']);
+        self::assertSame('', $input->toArray()['body']);
+        self::assertContains('INPUT_CONTENT_UNAVAILABLE', $input->toArray()['diagnostics']);
+    }
+
     public function test_legacy_semantic_input_delegates_to_the_universal_contract(): void
     {
         $legacy = SemanticInputEnvelope::fromArray([

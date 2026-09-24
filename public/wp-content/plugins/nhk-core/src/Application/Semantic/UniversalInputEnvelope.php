@@ -20,7 +20,7 @@ final readonly class UniversalInputEnvelope
     public static function fromArray(array $input): self
     {
         $owner = trim((string) ($input['owner_or_source_type'] ?? $input['input_type'] ?? 'generic'));
-        $body = trim((string) ($input['body'] ?? $input['text'] ?? $input['raw_text'] ?? ''));
+        $body = self::scalarString($input['body'] ?? $input['text'] ?? $input['raw_text'] ?? $input['raw_input'] ?? '');
         $subjectResolution = is_array($input['subject_resolution'] ?? null) ? $input['subject_resolution'] : [];
         $observations = self::normalizeRecords($input['observations'] ?? [], 'MACHINE_DERIVED');
         $components = self::normalizeComponents($input['components'] ?? []);
@@ -29,14 +29,15 @@ final readonly class UniversalInputEnvelope
         if ($subjectResolution === [] || !is_array($subjectResolution['primary'] ?? null)) {
             $diagnostics[] = 'CANONICAL_SUBJECT_UNAVAILABLE';
         }
-        if ($body === '' && trim((string) ($input['title'] ?? '')) === '') {
+        $title = self::scalarString($input['title'] ?? '');
+        if ($body === '' && $title === '') {
             $diagnostics[] = 'INPUT_CONTENT_UNAVAILABLE';
         }
 
         $value = [
             'owner_or_source_type' => $owner !== '' ? strtolower($owner) : 'generic',
             'source_identity' => is_array($input['source_identity'] ?? null) ? $input['source_identity'] : [],
-            'title' => trim((string) ($input['title'] ?? '')),
+            'title' => $title,
             'body' => $body,
             'raw_text' => $body,
             'subject_resolution' => $subjectResolution,
@@ -104,5 +105,10 @@ final readonly class UniversalInputEnvelope
     private static function strings(mixed $value): array
     {
         return array_values(array_filter(array_map(static fn (mixed $item): string => trim((string) $item, " \t\n\r\0\x0B"), (array) $value), static fn (string $item): bool => $item !== ''));
+    }
+
+    private static function scalarString(mixed $value): string
+    {
+        return is_scalar($value) ? trim((string) $value) : '';
     }
 }
