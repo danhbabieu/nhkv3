@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Tests\Unit;
 
-use NHK\Core\Application\Semantic\{SemanticInputEnvelope, SemanticNeed, SemanticNeedRetrievalPolicy};
+use NHK\Core\Application\Semantic\{SemanticInputEnvelope, SemanticNeed, SemanticNeedDecomposer, SemanticNeedRetrievalPolicy, TextInputInterpreter};
 use PHPUnit\Framework\TestCase;
 
 final class SemanticNeedDecompositionTest extends TestCase
@@ -115,5 +115,77 @@ final class SemanticNeedDecompositionTest extends TestCase
         self::assertLessThanOrEqual(200, $policy['opportunity_budget']);
         self::assertLessThanOrEqual(200, $policy['expansion_budget']);
         self::assertNotContains('UNSAFE_DOMAIN_GUESS', $policy['tiers']);
+    }
+
+    public function test_decomposer_emits_independent_needs_and_deduplicates_equivalent_components(): void
+    {
+        $envelope = SemanticInputEnvelope::fromArray([
+            'raw_text' => 'năm khái quát',
+            'subject_resolution' => ['primary' => ['id' => 'subject-1', 'type' => 'variant', 'revision' => 3]],
+            'components' => [
+                ['facet_key' => 'dial', 'concept_key' => 'form', 'scope' => 'variant', 'origin' => 'USER_EXPLICIT'],
+                ['facet_key' => 'case', 'concept_key' => 'style', 'scope' => 'variant', 'origin' => 'USER_EXPLICIT'],
+                ['facet_key' => 'movement', 'concept_key' => 'mechanism', 'scope' => 'variant', 'origin' => 'SOURCE_EXPLICIT'],
+                ['facet_key' => 'finish', 'concept_key' => 'treatment', 'scope' => 'variant', 'origin' => 'MACHINE_DERIVED'],
+                ['facet_key' => 'configuration', 'concept_key' => 'layout', 'scope' => 'variant', 'origin' => 'USER_EXPLICIT'],
+                ['facet_key' => 'dial', 'concept_key' => 'form', 'scope' => 'variant', 'origin' => 'USER_EXPLICIT'],
+            ],
+        ]);
+
+        $result = (new SemanticNeedDecomposer(new TextInputInterpreter(), $this->vocabulary()))->decompose($envelope);
+        $needs = $result->toArray()['needs'];
+
+        self::assertCount(5, $needs);
+        self::assertSame(['dial', 'case', 'movement', 'finish', 'configuration'], array_column($needs, 'facet_key'));
+        self::assertSame(['subject-1', 'subject-1', 'subject-1', 'subject-1', 'subject-1'], array_column(array_column($needs, 'canonical_subject'), 'id'));
+        self::assertContains('DUPLICATE_NEED_COLLAPSED', $result->toArray()['diagnostics']);
+    }
+
+    public function test_decomposer_preserves_authoritative_subject_and_specimen_origin(): void
+    {
+        $envelope = SemanticInputEnvelope::fromArray([
+            'subject_resolution' => [
+                'primary' => ['id' => 'authoritative-1', 'type' => 'variant', 'revision' => 7],
+                'candidates' => [['id' => 'weaker-1', 'type' => 'model']],
+            ],
+            'subject_hints' => ['weaker-1'],
+            'observations' => [['text' => 'observed feature', 'facet_key' => 'appearance', 'concept_key' => 'surface', 'scope' => 'specimen', 'origin' => 'SPECIMEN_OBSERVATION']],
+        ]);
+
+        $needs = (new SemanticNeedDecomposer(new TextInputInterpreter(), $this->vocabulary()))->decompose($envelope)->toArray()['needs'];
+
+        self::assertCount(1, $needs);
+        self::assertSame('authoritative-1', $needs[0]['canonical_subject']['id']);
+        self::assertSame('variant', $needs[0]['canonical_subject']['type']);
+        self::assertSame('specimen', $needs[0]['scope']);
+        self::assertSame('SPECIMEN_OBSERVATION', $needs[0]['origin']);
+    }
+
+    public function test_decomposer_keeps_unknown_lexical_candidate_unresolved(): void
+    {
+        $envelope = SemanticInputEnvelope::fromArray([
+            'raw_text' => 'từ khóa chưa đăng ký',
+            'subject_resolution' => ['primary' => ['id' => 'subject-1', 'type' => 'variant']],
+            'components' => [['facet_key' => 'unknown-facet', 'concept_key' => 'unknown-concept', 'origin' => 'MACHINE_DERIVED']],
+        ]);
+
+        $result = (new SemanticNeedDecomposer(new TextInputInterpreter(), $this->vocabulary()))->decompose($envelope)->toArray();
+
+        self::assertSame([], $result['needs']);
+        self::assertNotEmpty($result['unresolved']);
+        self::assertContains('UNREGISTERED_SEMANTIC_PRIMITIVE', array_column($result['unresolved'], 'reason'));
+    }
+
+    private function vocabulary(): object
+    {
+        return new class {
+            public function isRegistered(string $facet, string $concept): bool
+            {
+                return in_array($facet . ':' . $concept, [
+                    'dial:form', 'case:style', 'movement:mechanism', 'finish:treatment',
+                    'configuration:layout', 'appearance:surface',
+                ], true);
+            }
+        };
     }
 }
