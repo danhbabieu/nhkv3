@@ -86,6 +86,30 @@ final class EditorialClaimRetrievalServiceTest extends TestCase
         self::assertArrayHasKey('need_diagnostics', $result);
     }
 
+    public function test_need_items_are_normalized_before_selector_consumes_them(): void
+    {
+        $service = $this->service([[
+            'id' => 'need-direct', 'revision' => 3, 'subject_id' => self::SUBJECT,
+            'subject_type' => 'model', 'text' => 'Configuration của mẫu gồm vách máy.',
+            'scope' => 'model', 'facet' => 'configuration', 'provenance' => 'CATALOG_SUPPORTED',
+            'evidence_status' => 'SUPPORTED_WITHIN_SCOPE', 'source_ids' => ['source-generic'],
+        ]]);
+        $need = SemanticNeed::fromArray([
+            'canonical_subject' => ['id' => self::SUBJECT, 'type' => 'model'],
+            'facet_key' => 'configuration', 'scope' => 'model', 'origin' => 'USER_EXPLICIT',
+        ]);
+        $envelope = SemanticInputEnvelope::fromArray([
+            'raw_text' => 'vách máy', 'subject_resolution' => ['primary' => ['id' => self::SUBJECT, 'type' => 'model']],
+        ]);
+
+        $result = $service->retrieveForNeeds($envelope, [$need]);
+
+        self::assertSame('eligible', $result['items'][0]['eligibility']);
+        self::assertSame(self::SUBJECT, $result['items'][0]['original_subject']['id']);
+        self::assertSame('eligible', $result['items'][0]['evidence']['status']);
+        self::assertSame(['source-generic'], $result['items'][0]['provenance_references']['source_ids']);
+    }
+
     private function service(array $rows): EditorialClaimRetrievalService
     {
         $engine = new ClaimRetrievalEngine(

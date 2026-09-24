@@ -130,7 +130,7 @@ final class EditorialClaimRetrievalService
             ];
         }
         $eligible = array_values(array_filter($items, static fn (array $item): bool => ($item['eligibility'] ?? '') === 'eligible'));
-        return $raw + [
+        return array_replace($raw, [
             'items' => $items,
             'eligible_claims' => $eligible,
             'selected_claims' => $eligible,
@@ -141,7 +141,7 @@ final class EditorialClaimRetrievalService
                 'profile' => $profile,
                 'retrieval_diagnostics' => (array) ($raw['retrieval_diagnostics'] ?? []),
             ],
-        ];
+        ]);
     }
 
     private function scopeStatus(array $item): string
