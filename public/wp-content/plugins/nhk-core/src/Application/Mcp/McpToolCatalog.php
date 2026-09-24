@@ -32,6 +32,26 @@ final class McpToolCatalog
             self::tool('nhk.semantic.resolve', 'Resolve read-only Authority context by UUID, stable key or exact name/alias; ambiguous matches remain candidates.', ['context' => ['type' => 'object']], ['context']),
             self::tool('nhk.entity.neighborhood', 'Read a bounded semantic neighborhood from canonical Graph relations.', ['type' => ['type' => 'string', 'minLength' => 1], 'id' => self::uuidField(), 'profile' => ['type' => 'string', 'enum' => ['brand', 'model', 'variant', 'classification', 'specimen']], 'max_hops' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 2], 'limit' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 50]], ['type', 'id', 'profile']),
             self::tool('nhk.article.preflight', 'Read-only preflight for an existing WordPress Post semantic reconciliation.', self::articleProperties(false), ['intent']),
+            self::tool('nhk.knowledge.writer.preview', 'Read-only preview of a bounded reader response grounded in resolved canonical subjects and eligible existing Knowledge.', [
+                'subject' => ['type' => 'object', 'properties' => [
+                    'type' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 64],
+                    'entity_type' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 64],
+                    'canonical_uuid' => self::uuidField(), 'uuid' => self::uuidField(),
+                    'stable_key' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 160],
+                    'query' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 200],
+                    'name' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 200],
+                ], 'minProperties' => 1, 'additionalProperties' => false],
+                'instruction' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 1000],
+                'purpose' => ['type' => 'string', 'enum' => ['concise_answer', 'collector_explanation', 'article_section', 'video_description', 'media_caption', 'media_alt', 'entity_summary', 'technical_explanation']],
+                'requested_facets' => ['type' => 'array', 'maxItems' => 12, 'items' => ['type' => 'string', 'enum' => \NHK\Core\Domain\Knowledge\KnowledgeFacetProfile::FACETS]],
+                'depth' => ['type' => 'string', 'enum' => ['concise', 'deep']],
+                'observations' => ['type' => 'array', 'maxItems' => 12, 'items' => ['type' => 'object', 'properties' => ['value' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 500]], 'required' => ['value'], 'additionalProperties' => false]],
+                'output_constraints' => ['type' => 'object', 'properties' => [
+                    'format' => ['type' => 'string', 'enum' => ['text']],
+                    'language' => ['type' => 'string', 'enum' => ['vi']],
+                    'max_chars' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 4000],
+                ], 'additionalProperties' => false],
+            ], ['instruction']),
             self::tool('nhk.article.ingest', 'Resume governed reconciliation or a bounded update of an existing Article using the same idempotency key.', self::articleProperties(true), ['idempotency_key', 'intent'], true),
             self::tool('nhk.capture.ingest', 'Capture new editorial input or continue one existing Capture; classify intent before creating an Article, preserve canonical owners, reconcile typed MediaUsage bindings even without an Article, resolve bounded semantic context when required and return the current read-back.', [
                 'idempotency_key' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 191],

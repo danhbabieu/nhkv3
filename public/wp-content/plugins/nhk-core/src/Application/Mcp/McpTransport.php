@@ -12,6 +12,7 @@ use NHK\Core\Application\Media\{ImageIngestEntrypoint, MediaBatchUploadService, 
 use NHK\Core\Application\WordPress\{CategoryGateway, EditorialDraftGateway};
 use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
 use NHK\Core\Application\Knowledge\KnowledgeRepairPreviewService;
+use NHK\Core\Application\Semantic\KnowledgeWriterPreviewService;
 use NHK\Core\Application\PublicIdentity\PublicUrlMaintenanceService;
 use NHK\Core\Application\Capture\{AuthorityCaptureService, EditorialCaptureContinuationService, EditorialCaptureCoordinator, PlanReapprovalRequired};
 use NHK\Core\Application\Capture\MutationOutcomeClassifier;
@@ -52,6 +53,7 @@ final class McpTransport
         private ?VideoSourceRefreshCommand $videoSourceRefresh = null,
         private ?KnowledgeRepairPreviewService $knowledgeRepairPreview = null,
         private ?VideoFrontendReconciliationService $videoFrontendReconciliation = null,
+        private ?KnowledgeWriterPreviewService $knowledgeWriterPreview = null,
     ) {}
 
     /** @return array{status:int,body:?array} */
@@ -151,7 +153,7 @@ final class McpTransport
         SingleEntryPointPolicy::guard($name, $this->can);
         $capability = match ($name) {
             'nhk.documentation.bootstrap', 'nhk.documentation.get', 'nhk.documentation.list', 'nhk.docs.bootstrap', 'nhk.docs.get' => 'read',
-            'nhk.article.preflight', 'nhk.relationship.registry', 'nhk.relationship.list', 'nhk.relationship.get', 'nhk.relationship.preview' => 'read',
+            'nhk.article.preflight', 'nhk.relationship.registry', 'nhk.relationship.list', 'nhk.relationship.get', 'nhk.relationship.preview', 'nhk.knowledge.writer.preview' => 'read',
             'nhk.article.ingest' => 'nhk_ingest_articles',
             'nhk.capture.ingest' => 'nhk_ingest_articles',
             'nhk.category.create', 'nhk.category.update', 'nhk.category.assign', 'nhk.category.unassign', 'nhk.category.delete', 'nhk.article.draft.create', 'nhk.article.draft.update', 'nhk.article.publish', 'nhk.article.publish.review', 'nhk.article.publish.approve', 'nhk.article.trash', 'nhk.article.restore' => 'nhk_ingest_articles',
@@ -182,6 +184,7 @@ final class McpTransport
             if (($arguments['dry_run'] ?? false) !== true) $arguments = RelationshipOwnerContract::routeMediaCompatibility($arguments);
         }
         $result = match ($dispatch) {
+            'nhk.knowledge.writer.preview' => $this->knowledgeWriterPreview?->preview($arguments) ?? throw new \RuntimeException('KNOWLEDGE_WRITER_PREVIEW_UNAVAILABLE'),
             'nhk.documentation.bootstrap', 'nhk.docs.bootstrap' => ($this->documentation ?? new McpDocumentationRegistry())->bootstrap(),
             'nhk.documentation.get' => ($this->documentation ?? new McpDocumentationRegistry())->get((string) ($arguments['path'] ?? ''), isset($arguments['start_line']) ? (int) $arguments['start_line'] : null, isset($arguments['line_count']) ? (int) $arguments['line_count'] : null),
             'nhk.documentation.list' => ($this->documentation ?? new McpDocumentationRegistry())->list(isset($arguments['status']) ? (string) $arguments['status'] : null, isset($arguments['domain']) ? (string) $arguments['domain'] : null, isset($arguments['path_prefix']) ? (string) $arguments['path_prefix'] : null),

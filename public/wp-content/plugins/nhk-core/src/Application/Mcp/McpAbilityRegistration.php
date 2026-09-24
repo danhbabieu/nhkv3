@@ -372,7 +372,9 @@ final class McpAbilityRegistration
     ];
 
     /** @var array<string,string> */
-    private const EXPLICIT_EXCLUSION_REASONS = [];
+    private const EXPLICIT_EXCLUSION_REASONS = [
+        'nhk.knowledge.writer.preview' => 'MCP transport only: the preview requires the explicitly wired KnowledgeWriterPreviewService and is not exposed through the WordPress Ability adapter.',
+    ];
 
     /** @return list<string> */
     public static function readAbilityNames(): array
