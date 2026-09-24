@@ -19172,3 +19172,35 @@ SAFETY: No migration, database write, staging/production mutation, deployment,
 push or remote runtime action occurred. Existing user changes were preserved.
 
 STATUS: `KNOWLEDGE_WRITER_MCP_EXPOSURE_READY / NO_SERVER_ACTION`
+
+# Checkpoint — 2026-09-25 — Media Enrichment completion/readback recovery (LOCAL / NO SERVER ACTION)
+
+ROOT_CAUSE: Capture failure recovery read `diagnostics.media_usage` while the
+current MEDIA_ENRICHMENT binding/MediaUsage packet is persisted under
+`diagnostics.media_enrichment`. Completion therefore lost the verified target
+and usage evidence and reduced relation/usage, canonical and public/frontend
+states to incomplete or not applicable. Retry rehydration also omitted the
+persisted media binding packet, risking re-entry outside the idempotent binding
+path.
+
+IMPLEMENTED: Failure recovery now prefers the current `media_enrichment`
+packet and keeps `media_usage` only as an older-capture fallback. Retry input
+rehydrates persisted `media_bindings` and `media_operations` on the same
+Capture. Final MediaUsage readback now fails closed when its actual Media ID
+does not match the requested binding or when required role identity is absent.
+MediaBindingService, Governance, WordPress featured-image writes and the
+FINAL_READBACK phase were not bypassed or replaced.
+
+VERIFICATION: Focused Media/Capture regression passed 31 tests / 178
+assertions. Full NHK Unit passed 2,598 tests / 15,124 assertions under 512M,
+with 19 warnings, 45 deprecations and 32 PHPUnit deprecations. NHK Contract
+passed 6 tests / 48 assertions. PHP lint and `git diff --check` passed.
+Guarded Integration was attempted; 21 setup failures require
+`NHK_WP_TEST_PATH=public` and a working WordPress/database environment, while
+120 tests were skipped. No integration assertion failure was observed.
+
+SAFETY: No migration, database/staging/production mutation, deployment, push,
+or runtime Capture mutation occurred. Staging @v51 verification for the
+historical Capture remains an external deployment/infrastructure gate.
+
+STATUS: `MEDIA_ENRICHMENT_COMPLETION_RECOVERY_READY_WITH_INTEGRATION_AND_RUNTIME_ENVIRONMENT_GATES / NO_SERVER_ACTION`

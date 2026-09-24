@@ -35,6 +35,60 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
         self::assertSame(['article'], $seen);
     }
 
+    public function test_media_enrichment_failure_recovery_preserves_current_media_enrichment_readback(): void
+    {
+        $captures = new Pr5CaptureRepository();
+        $calls = ['draft' => 0, 'semantic' => 0, 'media' => 0, 'publication' => 0, 'final' => 0];
+        $events = [];
+        $mediaId = UuidCodec::newV7();
+        $targetId = UuidCodec::newV7();
+        $usageId = UuidCodec::newV7();
+        $coordinator = $this->coordinator(
+            $captures,
+            $calls,
+            $events,
+            semanticStatus: 'SKIPPED',
+            media: static fn (): array => [
+                'status' => 'COMPLETE',
+                'media_ids' => [$mediaId],
+                'media_complete' => true,
+                'bindings' => [[
+                    'status' => 'COMPLETE',
+                    'readback' => [
+                        'status' => 'verified',
+                        'media_id' => $mediaId,
+                        'target_type' => 'model',
+                        'target_id' => $targetId,
+                        'usage_id' => $usageId,
+                        'role' => 'representative',
+                    ],
+                ]],
+            ],
+            subjectResolver: new SubjectResolutionService(static fn (string $hint): array => [[
+                'id' => $targetId,
+                'type' => 'model',
+                'name' => 'Runtime Model',
+            ]]),
+            final: static function (array $context): array {
+                throw new \RuntimeException('CAPTURE_FINAL_READBACK_UNAVAILABLE');
+            },
+            physical: static fn (): array => ['items' => [['media_id' => $mediaId]]],
+        );
+
+        $result = $coordinator->execute([
+            'idempotency_key' => 'media-enrichment-recovery-' . bin2hex(random_bytes(4)),
+            'intent' => 'MEDIA_ENRICHMENT',
+            'purpose' => 'EDITORIAL',
+            'text' => 'Media enrichment recovery.',
+            'subject_hints' => [$targetId],
+        ]);
+
+        self::assertSame('FAILED_RETRYABLE', $result->status);
+        self::assertSame('COMPLETE', $result->diagnostics['media_enrichment']['status']);
+        self::assertSame('COMPLETE', $result->diagnostics['completion']['relation_or_usage_state']);
+        self::assertTrue($result->diagnostics['completion']['children'][1]['canonical_readback_verified'] ?? false);
+    }
+
     public function test_shared_enrichment_marks_deep_enrichment_complete_when_no_reuse_is_available(): void
     {
         $captures = new Pr5CaptureRepository();
@@ -845,12 +899,14 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
         ?SubjectResolutionService $subjectResolver = null,
         ?ContentPreparationOrchestrator $preparation = null,
         ?callable $draft = null,
+        ?callable $final = null,
+        ?callable $physical = null,
         ?SharedEnrichmentBoundary $shared = null,
         ?callable $sharedObserver = null,
     ): EditorialCaptureCoordinator {
         return new EditorialCaptureCoordinator(
             $captures,
-            static function (array $input) use (&$events): array { $events[] = 'physical'; return ['items' => []]; },
+            $physical ?? static function (array $input) use (&$events): array { $events[] = 'physical'; return ['items' => []]; },
             $draft ?? static function (array $input) use (&$calls, &$events): array { ++$calls['draft']; $events[] = 'draft'; return ['post_id' => 1001, 'state_token' => 'article-token']; },
             new TextInputInterpreter(),
             $subjectResolver ?? new SubjectResolutionService(static fn (string $hint): array => []),
@@ -859,7 +915,7 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
             new ArticleComposer(),
             $media ?? static function (array $context) use (&$calls, &$events): array { ++$calls['media']; $events[] = 'media'; return ['status' => 'RECONCILED']; },
             static function (array $context) use (&$calls, &$events): array { ++$calls['publication']; $events[] = 'publication'; return ['eligible' => true]; },
-            static function (array $context) use (&$calls, &$events): array { ++$calls['final']; $events[] = 'final'; return ['status' => 'verified']; },
+            $final ?? static function (array $context) use (&$calls, &$events): array { ++$calls['final']; $events[] = 'final'; return ['status' => 'verified']; },
             null,
             null,
             null,

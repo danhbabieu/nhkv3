@@ -934,7 +934,13 @@ final class EditorialCaptureCoordinator
             }
             $intent = is_array($diagnostics['content_intent'] ?? null) ? $diagnostics['content_intent'] : [];
             $writes = is_array($diagnostics['semantic_write_back'] ?? null) ? $diagnostics['semantic_write_back'] : [];
-            $media = is_array($diagnostics['media_usage'] ?? null) ? $diagnostics['media_usage'] : [];
+            // MEDIA_ENRICHMENT stores its canonical binding/usage read-back
+            // under media_enrichment. Keep media_usage as a compatibility
+            // fallback for older captures, but never discard the current
+            // enrichment packet during failure recovery.
+            $media = is_array($diagnostics['media_enrichment'] ?? null)
+                ? $diagnostics['media_enrichment']
+                : (is_array($diagnostics['media_usage'] ?? null) ? $diagnostics['media_usage'] : []);
             $videoPublication = is_array($diagnostics['video_publication'] ?? null) ? $diagnostics['video_publication'] : [];
             $partialCompletion = $this->completion->aggregateCapture(
                 $record->captureId,
@@ -967,6 +973,8 @@ final class EditorialCaptureCoordinator
             'intent' => (string) ($intent['intent'] ?? ($original['intent'] ?? '')),
             'publish' => ($original['publish'] ?? false) === true,
             'video' => is_array($original['video'] ?? null) ? $original['video'] : [],
+            'media_bindings' => is_array($context['media_bindings'] ?? null) ? $context['media_bindings'] : [],
+            'media_operations' => is_array($context['media_operations'] ?? null) ? $context['media_operations'] : [],
         ];
         foreach ($defaults as $key => $value) {
             $current = $input[$key] ?? null;

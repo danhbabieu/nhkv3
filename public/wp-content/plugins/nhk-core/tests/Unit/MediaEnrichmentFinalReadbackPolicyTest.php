@@ -48,4 +48,25 @@ final class MediaEnrichmentFinalReadbackPolicyTest extends TestCase
         self::assertSame('unavailable', $result['status']);
         self::assertSame('MEDIA_USAGE_CANONICAL_READBACK_UNVERIFIED', $result['reason']);
     }
+
+    public function test_binding_readback_identity_mismatch_remains_fail_closed(): void
+    {
+        $result = (new MediaEnrichmentFinalReadbackPolicy())->verify([
+            'bindings' => [[
+                'status' => 'COMPLETE',
+                'media_id' => 'media-requested',
+                'readback' => [
+                    'status' => 'verified',
+                    'media_id' => 'media-actual',
+                    'usage_id' => 'usage-1',
+                    'target_type' => 'model',
+                    'target_id' => 'model-1',
+                    'role' => 'representative',
+                ],
+            ]],
+        ]);
+
+        self::assertSame('unavailable', $result['status']);
+        self::assertSame('MEDIA_USAGE_CANONICAL_READBACK_UNVERIFIED', $result['reason']);
+    }
 }

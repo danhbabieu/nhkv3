@@ -18,12 +18,16 @@ final class MediaEnrichmentFinalReadbackPolicy
         if ($bindings !== []) {
             foreach ($bindings as $binding) {
                 $readback = is_array($binding['readback'] ?? null) ? $binding['readback'] : [];
+                $expectedMediaId = trim((string) ($binding['media_id'] ?? ''));
+                $actualMediaId = trim((string) ($readback['media_id'] ?? ''));
                 if (strtoupper(trim((string) ($binding['status'] ?? ''))) !== 'COMPLETE'
                     || strtolower(trim((string) ($readback['status'] ?? ''))) !== 'verified'
-                    || trim((string) ($readback['media_id'] ?? '')) === ''
+                    || $actualMediaId === ''
+                    || ($expectedMediaId !== '' && $expectedMediaId !== $actualMediaId)
                     || trim((string) ($readback['usage_id'] ?? '')) === ''
                     || trim((string) ($readback['target_type'] ?? '')) === ''
-                    || trim((string) ($readback['target_id'] ?? '')) === '') {
+                    || trim((string) ($readback['target_id'] ?? '')) === ''
+                    || trim((string) ($readback['role'] ?? '')) === '') {
                     return ['status' => 'unavailable', 'reason' => 'MEDIA_USAGE_CANONICAL_READBACK_UNVERIFIED'];
                 }
             }

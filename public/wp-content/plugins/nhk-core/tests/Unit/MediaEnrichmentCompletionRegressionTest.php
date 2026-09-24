@@ -129,4 +129,41 @@ final class MediaEnrichmentCompletionRegressionTest extends TestCase
         self::assertTrue($modelChild['public_eligible'] ?? false);
         self::assertTrue($modelChild['frontend_verified'] ?? false);
     }
+
+    public function test_old_media_enrichment_retry_rehydrates_persisted_bindings_without_changing_capture_identity(): void
+    {
+        $captureId = '01a0d3d5-b2c4-7a0f-a261-39c7cef8f0ee';
+        $binding = [
+            'selection_source' => 'USER_EXPLICIT',
+            'target' => ['type' => 'model', 'id' => 'fdf5bfd5-d3f4-4281-a39e-77c9271bcf4a'],
+            'media_id' => '01a0d3d5-3ded-7553-87c8-eeed409465a1',
+        ];
+        $capture = new CaptureRecord(
+            $captureId,
+            'media-enrichment-old-retry',
+            hash('sha256', 'media-enrichment-old-retry'),
+            'FINAL_READBACK',
+            'FAILED_RETRYABLE',
+            null,
+            null,
+            [['media_id' => $binding['media_id']]],
+            [
+                'raw_input' => 'Media enrichment retry.',
+                'content_intent' => ['intent' => 'MEDIA_ENRICHMENT'],
+                'media_bindings' => [$binding],
+                'media_operations' => [],
+            ],
+            ['failure' => ['code' => 'CAPTURE_FINAL_READBACK_UNAVAILABLE']],
+            [],
+        );
+        $coordinator = (new \ReflectionClass(EditorialCaptureCoordinator::class))->newInstanceWithoutConstructor();
+        $method = new \ReflectionMethod($coordinator, 'rehydrateRetryInput');
+        $method->setAccessible(true);
+
+        $retryInput = $method->invoke($coordinator, $capture, ['existing_capture_retry' => true]);
+
+        self::assertSame($captureId, $capture->captureId);
+        self::assertSame([$binding], $retryInput['media_bindings']);
+        self::assertSame([], $retryInput['media_operations']);
+    }
 }
