@@ -1,3 +1,39 @@
+# Checkpoint — 2026-09-24 — Generic MediaEnrichment projection/public completion (LOCAL / INTEGRATION ENVIRONMENT-GATED)
+
+ROOT_CAUSE_CONFIRMED: Canonical MediaUsage was verified, but the enrichment
+completion path did not require the registered owner's projection/read-model
+to return that MediaUsage. The public dossier/template consumes
+`EntityMediaProjection`, so a canonical representative could exist while the
+frontend remained stale. The old fallback also wrote non-Authority usages via
+the legacy MediaService path.
+
+FIXED_BOUNDARY: MediaEnrichment now builds governed MediaBinding requests for
+registered media-capable endpoints, using `representative` for semantic owners
+and `featured_primary` for `wp_post`. Completion verifies canonical MediaUsage,
+projection/read-model, and—when the owner has a public route—public surface
+readback. Retired usages are excluded from the projection, preserving one
+active representative after replacement. Retry uses the same Capture-derived
+idempotency keys and re-enters the governed binding/readback path.
+
+REGRESSION: Added capability-driven completion tests, projection matrix tests
+for Brand/Model/Variant/Classification/Knowledge/Article, and used the
+registry-backed generic-owner and enrichment matrix tests for Video/Media
+fixtures. No model/Odo-specific code or WordPress featured-image dual-write
+was added.
+
+VERIFICATION: Full Unit passed 2,587 tests / 14,934 assertions with 18
+warnings, 43 deprecations and 32 PHPUnit deprecations under 512M. Focused
+media suite passed 56 tests / 197 assertions. Contract/continuation suite
+passed 155 tests / 1,238 assertions. PHP lint and `git diff --check` passed.
+Guarded integration bootstrap was attempted against exact `nhk_v3_test` but
+WordPress reported `Error establishing a database connection`; no database,
+staging/production data, deployment, or remote mutation occurred. The remote
+Odo 30 page loaded but did not expose an image/gallery in the inspected AX
+surface, so live frontend verification remains NOT VERIFIED until deployment
+and a reachable acceptance environment are available.
+
+STATUS: `GENERIC_MEDIA_PROJECTION_LOCAL_READY / INTEGRATION_ENVIRONMENT_GATED / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-24 — Confirmed subject reconciliation mixed-purpose routing fix (LOCAL / INTEGRATION ENVIRONMENT-GATED)
 
 ROOT_CAUSE_CONFIRMED: `McpTransport::captureIngest()` classified every request

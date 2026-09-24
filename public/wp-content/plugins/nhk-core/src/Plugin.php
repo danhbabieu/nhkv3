@@ -285,9 +285,11 @@ final class Plugin {
             $publicRoutes = new PublicRouteResolver($authority, $types, $publicContexts);
             $publicEligibility = new PublicEntityEligibilityPolicy($authority, $types, $publicRoutes, $publicContexts);
             $entityMediaProjection = new EntityMediaProjection($media, $assets, $usages);
+            $mediaCapabilities = \NHK\Core\Application\Media\MediaOwnerCapabilityRegistry::fromEndpointRegistry($endpoints);
             $mediaFinalReadback = new \NHK\Core\Application\Media\MediaEnrichmentCompletionPolicy(
-                static function (string $type, string $id) use ($endpoints, $types, $authority, $publicEligibility, $publicRoutes): ?array {
-                    if (!isset($endpoints->all()[$type])) return null;
+                static function (string $type, string $id) use ($mediaCapabilities, $types, $authority, $publicEligibility, $publicRoutes): ?array {
+                    $capability = $mediaCapabilities->forEndpoint($type);
+                    if ($capability === null) return null;
                     $public = false;
                     if ($types->has($type)) {
                         $owner = $authority->findByCanonicalId($id);
@@ -295,7 +297,7 @@ final class Plugin {
                             && $publicEligibility->evaluate($owner)->eligible
                             && $publicRoutes->path($owner) !== null;
                     }
-                    return ['projection_required' => true, 'public_required' => $public];
+                    return ['projection_required' => true, 'public_required' => $public || $capability->requiresPublicSurface];
                 },
                 static function (string $type, string $id, string $mediaId, string $role) use ($entityMediaProjection): array {
                     $projection = $entityMediaProjection->forEntity($type, $id);
@@ -1382,7 +1384,7 @@ final class Plugin {
                     return $governanceResult + ['candidate_writes' => array_merge($candidates, $videoCandidates), 'reused_claims' => $reusedClaims, 'relation_hints' => (array) ($interpretation['relation_hints'] ?? []), 'subject_resolution' => $context['subject_resolution'] ?? [], 'governance_available' => $mcpGovernance instanceof McpGovernanceHandler];
                 },
                 new ArticleComposer(),
-                static function (array $context) use ($articleMedia, $mediaService, $usages, $media, $assets, $mediaBindingService, $mcpGovernance, $wordpressAttachments, $stagingScopeVerifier): array {
+                static function (array $context) use ($articleMedia, $mediaService, $usages, $media, $assets, $mediaBindingService, $mediaCapabilities, $mcpGovernance, $wordpressAttachments, $stagingScopeVerifier): array {
                     $trace = static function (string $stage, string $status, array $details = []): void {
                         $payload = array_merge(['stage' => $stage, 'status' => $status, 'at' => gmdate('c')], $details);
                         if (function_exists('do_action')) { try { do_action('nhk_v3_capture_stage_trace', $payload); } catch (\Throwable) { } }
@@ -1509,6 +1511,49 @@ final class Plugin {
                     }
                     if (strtoupper(trim((string) ($context['content_intent']['intent'] ?? ''))) === 'MEDIA_ENRICHMENT') {
                         $trace('MEDIA_USAGE_RECONCILIATION', 'STARTED', ['capture_id' => (string) ($context['capture']['capture_id'] ?? '')]);
+                        $primary = is_array($context['subject_resolution']['primary'] ?? null) ? $context['subject_resolution']['primary'] : [];
+                        $explicitBindings = [];
+                        foreach (['media_bindings', 'capture_media_bindings'] as $bindingKey) {
+                            foreach ((array) ($context[$bindingKey] ?? []) as $binding) if (is_array($binding)) $explicitBindings[] = $binding;
+                        }
+                        $requests = (new \NHK\Core\Application\Media\MediaEnrichmentBindingRequestBuilder())->build(
+                            $assets,
+                            $primary,
+                            $explicitBindings,
+                            (string) ($context['capture']['capture_id'] ?? ''),
+                        );
+                        $bindingBatch = $requests === []
+                            ? ['status' => 'PARTIAL', 'bindings' => [], 'media_ids' => []]
+                            : $mediaBindingService->bindMany($requests, (string) ($context['capture']['capture_id'] ?? '') . ':media-enrichment', $assets);
+                        $bindingResults = is_array($bindingBatch['bindings'] ?? null) ? $bindingBatch['bindings'] : [];
+                        $mediaIds = [];
+                        foreach ($bindingResults as $bindingResult) {
+                            $candidateMediaId = trim((string) ($bindingResult['media_id'] ?? (($bindingResult['readback']['media_id'] ?? ''))));
+                            if ($candidateMediaId !== '') $mediaIds[] = $candidateMediaId;
+                        }
+                        $mediaIds = array_values(array_unique($mediaIds));
+                        $mediaReadback = [];
+                        foreach ($mediaIds as $mediaId) {
+                            $canonicalMedia = $media->findByCanonicalId($mediaId);
+                            if ($canonicalMedia instanceof \NHK\Core\Domain\Media\Media) $mediaReadback[] = ['status' => 'verified', 'media_id' => $canonicalMedia->canonicalId, 'name' => $canonicalMedia->canonicalName, 'revision' => $canonicalMedia->revision];
+                        }
+                        $usageReadback = [];
+                        foreach ($bindingResults as $bindingResult) $usageReadback[] = (array) ($bindingResult['readback'] ?? []);
+                        $trace('MEDIA_USAGE_RECONCILIATION', $bindingBatch['status'] === 'COMPLETE' ? 'VERIFIED' : 'PARTIAL', ['capture_id' => (string) ($context['capture']['capture_id'] ?? ''), 'media_count' => count($mediaIds), 'usage_count' => count($usageReadback)]);
+                        return [
+                            'status' => $bindingBatch['status'] === 'COMPLETE' && $mediaIds !== [] ? 'RECONCILED' : 'PARTIAL',
+                            'media_ids' => $mediaIds,
+                            'media_complete' => $bindingBatch['status'] === 'COMPLETE',
+                            'blockers' => $bindingBatch['status'] === 'COMPLETE' ? [] : ['MEDIA_BINDING_INCOMPLETE'],
+                            'media_readback' => $mediaReadback,
+                            'media_usage' => $usageReadback,
+                            'canonical_readback' => ['media_ids' => $mediaIds, 'media_usage' => $usageReadback],
+                            'frontend_verified' => null,
+                            'binding_results' => $bindingResults,
+                            'governed_media_operations' => $governedMediaOperations,
+                        ];
+                    }
+                    if (false) {
                         $incomplete = [];
                         $suitabilityPolicy = new \NHK\Core\Application\Media\SemanticSuitabilityPolicy();
                         $primary = is_array($context['subject_resolution']['primary'] ?? null) ? $context['subject_resolution']['primary'] : [];
@@ -1571,9 +1616,9 @@ final class Plugin {
                                     $adoptedMediaId = (string) ($binding['media_id'] ?? $binding['readback']['media_id'] ?? $mediaId);
                                     $usageReadback[] = ['status' => 'verified', 'usage_id' => (string) ($binding['usage_id'] ?? $binding['readback']['usage_id'] ?? ''), 'media_id' => $adoptedMediaId, 'endpoint_type' => $endpointType, 'endpoint_key' => $endpointKey, 'role' => \NHK\Core\Domain\Media\MediaUsageRoleRegistry::REPRESENTATIVE, 'revision' => (int) ($binding['revision'] ?? $binding['readback']['revision'] ?? 1), 'reconciliation' => 'MEDIA_USAGE_' . (string) ($plannedAction['action'] ?? 'UPDATE'), 'readback' => $binding['readback'] ?? []];
                                 } else {
-                                    $usage = $mediaService->addUsage($mediaId, $endpointType, $endpointKey, $role, (int) ($asset['sort_order'] ?? 0), (string) ($mediaContext['alt_text'] ?? ''), (string) ($mediaContext['caption'] ?? ''), [], (string) ($mediaContext['title'] ?? ''));
-                                    $adoptedMediaId = $usage->mediaId;
-                                    $usageReadback[] = ['status' => 'verified', 'usage_id' => $usage->usageId, 'media_id' => $usage->mediaId, 'endpoint_type' => $usage->endpointType, 'endpoint_key' => $usage->endpointKey, 'role' => $usage->role, 'revision' => $usage->revision, 'reconciliation' => 'MEDIA_USAGE_' . (string) ($plannedAction['action'] ?? 'UPDATE')];
+                                    $incomplete[] = 'MEDIA_USAGE_OWNER_CAPABILITY_UNAVAILABLE';
+                                    $trace('MEDIA_USAGE_RECONCILIATION', 'DEFERRED', ['reason' => 'MEDIA_USAGE_OWNER_CAPABILITY_UNAVAILABLE', 'media_id' => $mediaId, 'endpoint_type' => $endpointType]);
+                                    continue;
                                 }
                                 try { do_action('nhk_v3_media_adoption_phase', 'USAGE_RECONCILED', (int) ($asset['attachment_id'] ?? 0), $adoptedMediaId); } catch (\Throwable) { }
                             }
