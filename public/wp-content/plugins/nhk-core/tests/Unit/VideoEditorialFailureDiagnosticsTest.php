@@ -5,6 +5,7 @@ namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Video\VideoEditorialFailureDiagnostics;
 use NHK\Core\Domain\Video\VideoException;
+use NHK\Core\Application\Semantic\EditorialContextPack;
 use PHPUnit\Framework\TestCase;
 
 final class VideoEditorialFailureDiagnosticsTest extends TestCase
@@ -62,5 +63,32 @@ final class VideoEditorialFailureDiagnosticsTest extends TestCase
         $error = new VideoException('VIDEO_EDITORIAL_QUALITY_BLOCKED', 0, null, ['quality' => ['readiness' => 'BLOCKED']]);
 
         self::assertSame(['quality' => ['readiness' => 'BLOCKED']], $error->diagnostics);
+    }
+
+    public function test_projects_the_canonical_editorial_context_pack_object_without_array_access(): void
+    {
+        $pack = new EditorialContextPack(
+            'partial',
+            ['id' => 'subject-1', 'type' => 'model'],
+            'Subject',
+            ['profile' => 'video'],
+            'partial',
+            [],
+            [],
+            [],
+            [],
+            [],
+            ['coverage_status' => 'PARTIAL', 'exact_selected_count' => 1, 'selected_unit_count' => 2],
+        );
+
+        $result = VideoEditorialFailureDiagnostics::project([
+            'content' => ['pack' => $pack, 'semantic_needs' => [
+                ['need_id' => 'need-1', 'facet_key' => 'configuration', 'concept_key' => 'wall'],
+            ]],
+        ]);
+
+        self::assertSame('PARTIAL', $result['semantic']['coverage_status']);
+        self::assertSame(1, $result['semantic']['exact_count']);
+        self::assertSame(2, $result['semantic']['selected_unit_count']);
     }
 }

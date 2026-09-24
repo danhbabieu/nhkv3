@@ -1,5 +1,35 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-24 — EditorialContextPack typed contract fix (LOCAL / NO SERVER ACTION)
+
+ROOT_CAUSE: V1 `VideoEditorialFailureDiagnostics::project()` consumed the
+canonical `SharedEnrichmentBoundary` `content.pack` producer as an array. The
+producer returns the transient typed `EditorialContextPack` object. The invalid
+operations were `content['pack']['diagnostics']` reads while constructing
+diagnostics after `VIDEO_EDITORIAL_QUALITY_BLOCKED`; this produced the runtime
+`CANNOT_USE_OBJECT_OF_TYPE_NHK_CORE_APPLICATION_SEMANTIC_EDITORIALCONTEXTPACK_AS_ARRAY`
+failure before any Video owner creation. No Article/Video/shared production
+consumer scan found another invalid `EditorialContextPack` array access.
+
+FIX: The diagnostics consumer now requires the canonical
+`EditorialContextPack` typed object and reads `$pack->diagnostics`. It does not
+serialize the pack for convenience, add an array compatibility path, change
+Quality severity, alter owner ordering or re-resolve the canonical subject.
+
+VERIFICATION: Typed-object regression, sparse/diagnostic, shared semantic,
+Article and Video focused tests passed 115 tests / 419 assertions with 1
+warning and 30 PHPUnit deprecations. Full NHK Unit passed 2,452 tests / 14,162
+assertions with 19 warnings, 41 deprecations and 30 PHPUnit deprecations under
+`memory_limit=512M`. NHK Contract passed 6 tests / 48 assertions. Composer
+lint, Composer validation, PHP lint, `git diff --check` and changed-scope
+secret review passed. Guarded Integration was attempted with
+`NHK_WP_TEST_PATH=public` and `NHK_WP_TEST_DB=nhk_v3_test`, but WordPress
+returned “Error establishing a database connection”; Integration remains an
+environment gate, not PASS. No migration, database mutation, Capture retry,
+deployment, push or publication occurred.
+
+STATUS: `LOCAL_V2_EDITORIAL_CONTEXT_PACK_CONTRACT_FIX_READY_INTEGRATION_ENVIRONMENT_GATED / NO SERVER ACTION`.
+
 # Checkpoint — 2026-09-24 — Bounded Video editorial failure diagnostics (LOCAL / NO SERVER ACTION)
 
 IMPLEMENTED: Added a bounded `VideoEditorialFailureDiagnostics` read model for

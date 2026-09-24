@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Video;
 
+use NHK\Core\Application\Semantic\EditorialContextPack;
+
 /**
  * Bounded, machine-readable diagnostics for a failed Video editorial attempt.
  * This is a read model only: it never changes quality or lifecycle decisions.
@@ -17,6 +19,8 @@ final class VideoEditorialFailureDiagnostics
         $retrievalDiagnostics = is_array($retrieval['retrieval_diagnostics'] ?? null)
             ? $retrieval['retrieval_diagnostics']
             : (is_array($retrieval['diagnostics'] ?? null) ? $retrieval['diagnostics'] : []);
+        $pack = $content['pack'] ?? null;
+        $packDiagnostics = $pack instanceof EditorialContextPack ? $pack->diagnostics : [];
         $quality = is_array($result['quality_report'] ?? null) ? $result['quality_report'] : [];
         $findings = array_values(array_filter((array) ($result['constraint_findings'] ?? []), 'is_array'));
 
@@ -65,12 +69,12 @@ final class VideoEditorialFailureDiagnostics
             'semantic' => [
                 'need_count' => count($needs),
                 'needs' => $needs,
-                'coverage_status' => self::string(($content['pack']['diagnostics']['coverage_status'] ?? $content['coverage_status'] ?? '')),
-                'exact_count' => self::boundedInt($content['pack']['diagnostics']['exact_selected_count'] ?? 0),
-                'relaxed_count' => self::boundedInt($content['pack']['diagnostics']['relaxed_selected_count'] ?? 0),
-                'contextual_count' => self::boundedInt($content['pack']['diagnostics']['contextual_selected_count'] ?? $content['pack']['diagnostics']['non_exact_selected_count'] ?? 0),
-                'uncovered_count' => self::boundedInt($content['pack']['diagnostics']['uncovered_count'] ?? 0),
-                'selected_unit_count' => self::boundedInt($content['pack']['diagnostics']['selected_unit_count'] ?? 0),
+                'coverage_status' => self::string($packDiagnostics['coverage_status'] ?? $content['coverage_status'] ?? ''),
+                'exact_count' => self::boundedInt($packDiagnostics['exact_selected_count'] ?? 0),
+                'relaxed_count' => self::boundedInt($packDiagnostics['relaxed_selected_count'] ?? 0),
+                'contextual_count' => self::boundedInt($packDiagnostics['contextual_selected_count'] ?? $packDiagnostics['non_exact_selected_count'] ?? 0),
+                'uncovered_count' => self::boundedInt($packDiagnostics['uncovered_count'] ?? 0),
+                'selected_unit_count' => self::boundedInt($packDiagnostics['selected_unit_count'] ?? 0),
             ],
             'retrieval' => [
                 'status' => self::string($retrieval['status'] ?? ''),
