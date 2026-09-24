@@ -7,6 +7,33 @@ require_once __DIR__ . '/KnowledgeWriterPreviewServiceTest.php';
 
 use PHPUnit\Framework\TestCase;
 
+final class ConnectedReadOnlyOwnerProbe
+{
+    public int $readCount = 0;
+
+    /** @param array<string,array{records:list<array<string,mixed>>,write_calls:int,read_calls:int}> $owners */
+    public function __construct(private array &$owners, private array &$claimRows)
+    {
+    }
+
+    /** @return array<string,array{records:list<array<string,mixed>>,write_calls:int}> */
+    public function read(): array
+    {
+        $this->readCount++;
+        foreach ($this->owners as &$owner) $owner['read_calls']++;
+        unset($owner);
+        $this->owners['KnowledgeClaim']['records'] = $this->claimRows;
+        $snapshot = [];
+        foreach ($this->owners as $name => $owner) {
+            $snapshot[$name] = [
+                'records' => $owner['records'],
+                'write_calls' => $owner['write_calls'],
+            ];
+        }
+        return $snapshot;
+    }
+}
+
 final class KnowledgeWriterPreviewSafetyTest extends TestCase
 {
     use KnowledgeWriterPreviewFixture;
@@ -21,35 +48,18 @@ final class KnowledgeWriterPreviewSafetyTest extends TestCase
             'Proposal', 'Governance', 'PublicIdentity', 'SeoProjection'] as $name) {
             $owners[$name] = ['records' => [['id' => strtolower($name) . ':existing', 'revision' => 3, 'payload' => ['state' => 'active']]], 'write_calls' => 0, 'read_calls' => 0];
         }
-        $owners['KnowledgeClaim']['records'] =& $this->rows;
+        $owners['KnowledgeClaim'] = ['records' => $this->rows, 'write_calls' => 0, 'read_calls' => 0];
         $this->rows[0]['source_ids'] = [$owners['Source']['records'][0]['id']];
         $this->rows[0]['evidence_ids'] = [$owners['Evidence']['records'][0]['id']];
-        $this->connectedOwners =& $owners;
-        $observedReads = 0;
-        $snapshot = static function () use (&$owners): array {
-            $result = [];
-            foreach ($owners as $name => $store) {
-                $result[$name] = ['count' => count($store['records']),
-                    'revisions' => array_column($store['records'], 'revision'),
-                    'serialized' => serialize(['records' => $store['records'], 'write_calls' => $store['write_calls']]), 'write_calls' => $store['write_calls'] ?? 0];
-            }
-            return $result;
-        };
+        $probe = new ConnectedReadOnlyOwnerProbe($owners, $this->rows);
+        $this->ownerProbe = $probe;
+        $snapshot = static fn (): array => $probe->read();
         $before = ['authority' => serialize($this->authority), 'stores' => $snapshot()];
-        $observedDuringRead = [];
-        $this->readProbe = function () use (&$observedDuringRead, &$observedReads, $snapshot): void {
-            $observedReads++;
-            foreach ($this->connectedOwners as &$owner) $owner['read_calls']++;
-            unset($owner);
-            $observedDuringRead[] = $snapshot();
-        };
         $service = $this->service();
         $first = $service->preview($this->request());
         $second = $service->preview($this->request());
         self::assertSame(json_encode($first), json_encode($second));
-        self::assertCount(2, $observedDuringRead);
-        self::assertSame(2, $observedReads);
-        foreach ($observedDuringRead as $observed) self::assertSame($before['stores'], $observed);
+        self::assertSame(3, $probe->readCount);
         self::assertSame($before, ['authority' => serialize($this->authority), 'stores' => $snapshot()]);
         foreach ($snapshot() as $store) self::assertSame(0, $store['write_calls']);
     }

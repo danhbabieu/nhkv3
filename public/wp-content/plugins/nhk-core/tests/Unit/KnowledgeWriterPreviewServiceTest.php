@@ -16,6 +16,7 @@ trait KnowledgeWriterPreviewFixture
     private array $rows = [];
     private bool $retrievalFailure = false;
     private $readProbe = null;
+    private $ownerProbe = null;
     private InMemoryAuthorityRepository $authority;
     private EntityTypeRegistry $types;
 
@@ -40,7 +41,7 @@ trait KnowledgeWriterPreviewFixture
     {
         $canonical = new CanonicalAuthoritySubjectResolver($this->authority, $this->types);
         $engine = new ClaimRetrievalEngine(
-            function (array $subject): array { $this->retrievals[] = $subject; if ($this->readProbe !== null) ($this->readProbe)(); if ($this->retrievalFailure) throw new \RuntimeException('private infrastructure detail'); return ['status' => 'available', 'items' => []]; },
+            function (array $subject): array { $this->retrievals[] = $subject; if ($this->readProbe !== null) ($this->readProbe)(); if ($this->ownerProbe !== null) $this->ownerProbe->read(); if ($this->retrievalFailure) throw new \RuntimeException('private infrastructure detail'); return ['status' => 'available', 'items' => []]; },
             fn (array $subject, array $neighborhood): array => $this->rows,
         );
         return new KnowledgeWriterPreviewService(
