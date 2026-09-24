@@ -36,4 +36,26 @@ final class SemanticNeighborhoodQueryTest extends TestCase
         self::assertSame('unsupported', $query->query(new NodeReference('classification', 'root'), 'unknown')['status']);
         self::assertSame('unsupported', $query->query(new NodeReference('classification', 'root'), 'classification', 3)['status']);
     }
+
+    public function test_reverse_traversal_preserves_persisted_direction_and_never_rewrites_predicate_as_forward_fact(): void
+    {
+        $registry = new EndpointTypeRegistry();
+        foreach (['model', 'variant'] as $type) {
+            $registry->register($type, new FakeEndpointResolver($type, ['model-1', 'variant-1']));
+        }
+        $graph = new GraphService(new InMemoryGraphRepository(), $registry, new PredicateRegistry(), new InMemoryAuditSink());
+        $graph->create(new NodeReference('variant', 'variant-1'), 'variant_of', new NodeReference('model', 'model-1'));
+
+        $result = (new SemanticNeighborhoodQuery(new RelatedSemanticQuery($graph, new PredicateTraversalPolicy(new PredicateRegistry()))))
+            ->query(new NodeReference('model', 'model-1'), 'model');
+
+        self::assertSame('available', $result['status']);
+        $path = $result['items'][0]['best_path'];
+        self::assertSame('variant:variant-1', $path[0]['persisted_source']);
+        self::assertSame('model:model-1', $path[0]['persisted_target']);
+        self::assertSame('INCOMING', $path[0]['traversal_direction']);
+        self::assertSame('INVERSE_TRAVERSAL_OF_PERSISTED_EDGE', $path[0]['directional_semantics']);
+        self::assertSame('variant_of', $path[0]['predicate']);
+        self::assertNotSame('model:model-1', $path[0]['persisted_source']);
+    }
 }

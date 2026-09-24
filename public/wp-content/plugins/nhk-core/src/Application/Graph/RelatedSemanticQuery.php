@@ -32,7 +32,21 @@ final class RelatedSemanticQuery
                         if (!$edge instanceof GraphEdge || !$edge->isActive()) continue;
                         $other = $direction === 'outgoing' ? $edge->target->reference : $edge->source->reference;
                         if (!$this->policy->permits($current, $direction, $other, $edge->predicate)) continue;
-                        $nextPath = array_merge($path, [['source' => $current->key(), 'predicate' => $edge->predicate, 'target' => $other->key()]]);
+                        $nextPath = array_merge($path, [[
+                            // Keep the stored edge orientation separate from the
+                            // direction used to discover the neighboring node.
+                            'source' => $edge->source->reference->key(),
+                            'predicate' => $edge->predicate,
+                            'target' => $edge->target->reference->key(),
+                            'persisted_source' => $edge->source->reference->key(),
+                            'persisted_target' => $edge->target->reference->key(),
+                            'traversed_from' => $current->key(),
+                            'traversed_to' => $other->key(),
+                            'traversal_direction' => strtoupper($direction),
+                            'directional_semantics' => $direction === 'incoming'
+                                ? 'INVERSE_TRAVERSAL_OF_PERSISTED_EDGE'
+                                : 'FORWARD_PERSISTED_EDGE',
+                        ]]);
                         $hops = $depth + 1;
                         if ($other->key() !== $source->key() && ($targetTypes === [] || in_array($other->endpoint_type, $targetTypes, true))) {
                             $key = $other->key();

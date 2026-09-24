@@ -83,6 +83,20 @@ final class SemanticSeoPlannerTest extends TestCase
         }
     }
 
+    public function test_generic_owner_profile_is_not_automatically_seo_applicable(): void
+    {
+        $plan = $this->planner()->plan(
+            $this->pack('generic'),
+            $this->editorialPlan('generic'),
+            $this->draft('generic'),
+            ['public_identity' => ['canonical_url' => '/future-owner/', 'public_eligible' => true, 'canonical_identity' => true]]
+        );
+
+        self::assertSame('NOT_APPLICABLE', $plan->readiness);
+        self::assertContains('PROFILE_UNSUPPORTED', $plan->blockers);
+        self::assertNull($plan->canonicalUrl);
+    }
+
     public function test_generated_seo_copy_has_no_internal_jargon_and_is_not_evidence(): void
     {
         $plan = $this->planner()->plan($this->pack(), $this->editorialPlan(), $this->draft(), ['public_identity' => ['canonical_url' => '/mau/odo36/', 'public_eligible' => true, 'canonical_identity' => true]]);

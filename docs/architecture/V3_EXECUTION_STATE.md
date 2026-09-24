@@ -1,5 +1,51 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-24 — System-wide acceptance audit and graph-direction fix
+
+AUDIT_SCOPE: Continued from `23fee9dd` without opening a new architecture
+initiative. The audit traced Universal Core, decomposition, retrieval,
+applicability, graph traversal, KnowledgeUnit/coverage, Reader Journey,
+Composer/Quality/repair/SEO, owner adapters and lifecycle/read-back boundaries.
+
+ACCEPTANCE_LEDGER: 46 grouped invariant rows were audited: 41
+`PROVEN_EXISTING` or `PROVEN_BY_NEW_TEST`, 0 remaining `BROKEN`, 3
+`ENVIRONMENT_ONLY` rows (the two historical production-shaped runtime
+references and guarded Integration), and 2 `NOT_IMPLEMENTED` rows. The
+`NOT_IMPLEMENTED` rows are the downstream Media presentation/lifecycle
+connection and a controlled `EDITORIAL_REGENERATION_AVAILABLE` read-back path
+across multiple owner types. They are independent follow-up gaps, not reasons
+to redesign the semantic core. Integration is `ENVIRONMENT_GATE_ONLY` because
+the WordPress `nhk_v3_test` database connection is unavailable.
+
+FIRST_BROKEN_BOUNDARY: `RelatedSemanticQuery` path projection. Reverse
+traversal serialized the traversal orientation as if it were the persisted
+edge orientation, allowing a persisted `Variant --variant_of--> Model` edge to
+look like `Model --variant_of--> Variant` downstream.
+
+FIX: Every traversed hop now preserves persisted source/target, traversed
+from/to, `OUTGOING`/`INCOMING` direction and explicit directional semantics.
+The Graph remains read-only; no predicate, edge or canonical record changed.
+
+REGRESSION: Added a synthetic generic model/variant graph test proving reverse
+traversal retains `INVERSE_TRAVERSAL_OF_PERSISTED_EDGE`. Added generic profile
+eligibility and generic SEO non-applicability regressions. Existing Odo-shaped
+tests remain fixtures only.
+
+VERIFICATION: Graph/semantic/owner/lifecycle/Knowledge/relation/Media/SEO
+focused matrix passed 272 tests / 966 assertions with 3 warnings, 6
+deprecations and 30 PHPUnit deprecations. Generic profile and SEO regressions
+passed 2 tests / 7 assertions. Changed code was linted and `git diff --check`
+passed. Full Unit and Contract rerun remains the final gate after this
+checkpoint commit.
+
+NEXT_BLOCKER: Media is currently adapter-only: the shared pack is produced,
+but no production Media caption/alt/description presentation consumer is
+connected to it. Do not solve this in the graph-direction fix round.
+
+SAFETY: No migration, schema change, database/staging/production mutation,
+Capture retry, Knowledge/Evidence/Graph write, Governance apply, deployment or
+push occurred.
+
 # Checkpoint — 2026-09-24 — Universal Core future-owner profile seam
 
 ROOT_CAUSE / FIRST_BROKEN_BOUNDARY: `UniversalEnrichmentCore` admitted content

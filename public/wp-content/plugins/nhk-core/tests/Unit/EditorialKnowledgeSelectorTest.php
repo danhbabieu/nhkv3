@@ -66,6 +66,21 @@ final class EditorialKnowledgeSelectorTest extends TestCase
         self::assertSame([], $pack->selectedClaims);
     }
 
+    public function test_generic_profile_preserves_claim_eligibility_and_selection_semantics(): void
+    {
+        $candidate = $this->claim('core', 'A supported fact.', 1, 'direct');
+        $candidate['eligibility'] = 'eligible';
+        $retrieval = ['status' => 'available', 'eligible_claims' => [$candidate], 'items' => [$candidate]];
+
+        $article = $this->selector()->select($retrieval, 'A supported fact', ['id' => self::SUBJECT, 'type' => 'model'], ['profile' => 'article']);
+        $generic = $this->selector()->select($retrieval, 'A supported fact', ['id' => self::SUBJECT, 'type' => 'model'], ['profile' => 'generic']);
+
+        self::assertSame(['core'], array_column($article->selectedClaims, 'claim_id'));
+        self::assertSame(['core'], array_column($generic->selectedClaims, 'claim_id'));
+        self::assertSame($article->selectedClaims[0]['eligibility'], $generic->selectedClaims[0]['eligibility']);
+        self::assertSame('generic', $generic->profile['profile']);
+    }
+
     public function test_visual_support_is_preserved_as_unresolved_and_representative_media_is_not_feature_support(): void
     {
         $candidate = $this->claim('visual', 'Vách cam giúp nhận diện cấu hình Odo 36.', 1, 'direct');
