@@ -34,6 +34,23 @@ and a reachable acceptance environment are available.
 
 STATUS: `GENERIC_MEDIA_PROJECTION_LOCAL_READY / INTEGRATION_ENVIRONMENT_GATED / NO_LIVE_MUTATION`.
 
+# Checkpoint — 2026-09-24 — MediaEnrichment final completion regression addendum
+
+REGRESSION_ADDENDUM: Added a retry-shaped regression using the supplied
+Capture/Model Odo 30/Media identities. It proves that verified MediaUsage
+readback is retained through `MediaEnrichmentCompletionPolicy`, target
+capability evidence is emitted by `EditorialCaptureCoordinator`, and Capture
+completion reports canonical readback verified, relation/usage COMPLETE,
+public READY, frontend VERIFIED and `complete=true`.
+
+VERIFICATION_ADDENDUM: Focused regression passed 2 tests / 11 assertions;
+focused coordinator/binding suite passed 131 tests / 669 assertions; full Unit
+passed 2,594 tests / 14,957 assertions under 512M; Contract passed 6 tests / 48
+assertions; full PHP lint and `git diff --check` passed. Guarded Integration
+was invoked but remains environment-gated because `NHK_WP_TEST_PATH=public` and
+`NHK_WP_TEST_DB=nhk_v3_test` are unavailable. No staging/production deploy or
+live mutation was performed.
+
 # Checkpoint — 2026-09-24 — Confirmed subject reconciliation mixed-purpose routing fix (LOCAL / INTEGRATION ENVIRONMENT-GATED)
 
 ROOT_CAUSE_CONFIRMED: `McpTransport::captureIngest()` classified every request
