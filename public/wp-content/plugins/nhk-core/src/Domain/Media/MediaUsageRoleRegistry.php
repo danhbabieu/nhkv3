@@ -33,6 +33,19 @@ final class MediaUsageRoleRegistry
     }
 
     /** @return list<string> */
+    public static function enrichmentRoles(): array
+    {
+        return [
+            self::REPRESENTATIVE,
+            self::FEATURED_PRIMARY,
+            self::INLINE_PRIMARY,
+            self::INLINE_SUPPORTING,
+            self::EVIDENCE,
+            self::TECHNICAL_DETAIL,
+        ];
+    }
+
+    /** @return list<string> */
     public static function mandatoryArticleRoles(): array
     {
         return [self::FEATURED_PRIMARY, self::INLINE_PRIMARY];

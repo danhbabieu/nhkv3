@@ -3,6 +3,9 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Media;
 
+use NHK\Core\Domain\Graph\EndpointTypeRegistry;
+use NHK\Core\Domain\Media\MediaUsageRoleRegistry;
+
 /** Explicit runtime registry for MediaUsage owner capabilities. */
 final class MediaOwnerCapabilityRegistry
 {
@@ -27,5 +30,14 @@ final class MediaOwnerCapabilityRegistry
     public function all(): array
     {
         return array_values($this->capabilities);
+    }
+
+    public static function fromEndpointRegistry(EndpointTypeRegistry $endpoints): self
+    {
+        $registry = new self();
+        foreach (array_keys($endpoints->all()) as $endpointType) {
+            $registry->register(MediaOwnerCapability::forEndpoint($endpointType, MediaUsageRoleRegistry::enrichmentRoles()));
+        }
+        return $registry;
     }
 }

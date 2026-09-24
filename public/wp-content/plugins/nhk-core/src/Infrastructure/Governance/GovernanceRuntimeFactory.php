@@ -8,12 +8,12 @@ use NHK\Core\Application\Collector\CollectorFacetMaintenanceExecutor;
 use NHK\Core\Application\Governance\{AuthorityProposalExecutor, CanonicalApplyReadBackVerifier, ControlledApplyService, GovernanceAutomationPolicyRegistry, GovernanceAutomationPolicyResolver, GovernanceAutomationTypeRegistry, GovernanceService, MediaBindingStagingGuard, OperationScopedStagingGuard, ProposalEligibilityService, StagingAcceptanceScopeVerifier, VideoProposalEligibilityEvaluator, WordPressGovernanceAuthorizer};
 use NHK\Core\Application\Graph\{ClassifiedAsPolicy, ClassificationHierarchyPolicy, GraphService};
 use NHK\Core\Application\Knowledge\{CanonicalDependencyValidator, KnowledgeService};
-use NHK\Core\Application\Media\{MediaBindingService, MediaIngestGateway, MediaService};
+use NHK\Core\Application\Media\{MediaBindingService, MediaIngestGateway, MediaOwnerCapabilityRegistry, MediaService};
 use NHK\Core\Application\Video\{HistoricalVideoRelationEvidenceReconciliation, VideoCompletenessPolicy, VideoService};
 use NHK\Core\Application\Semantic\{CanonicalAuthoritySubjectResolver, SubjectResolutionService};
 use NHK\Core\Contracts\Governance\ProposalRepository;
 use NHK\Core\Domain\Authority\{CanonicalEntityTypeCatalog, EntityTypeRegistry};
-use NHK\Core\Domain\Graph\{EndpointTypeRegistry, PredicateRegistry};
+use NHK\Core\Domain\Graph\{EndpointTypeRegistry, NodeReference, PredicateRegistry};
 use NHK\Core\Domain\Governance\DependencyGraph;
 use NHK\Core\Infrastructure\Authority\{WpdbAuthorityRepository, WpdbSemanticMergeReceiptRepository};
 use NHK\Core\Infrastructure\Database\WpdbTransactionManager;
@@ -42,6 +42,18 @@ final class GovernanceRuntimeFactory
         $evidence = new WpdbEvidenceRepository($wpdb);
         $endpoints = new EndpointTypeRegistry();
         CoreEndpointResolverRegistrar::register($endpoints, $types, $authority, $media, $videos, $claims, $sources, $evidence);
+        $mediaCapabilities = MediaOwnerCapabilityRegistry::fromEndpointRegistry($endpoints);
+        $mediaTargetResolver = static function (string $type, array $reference) use ($endpoints): array {
+            $id = trim((string) ($reference['id'] ?? ''));
+            if (!\NHK\Core\Shared\Uuid\UuidCodec::isValid($id)) return ['active' => false];
+            try {
+                $resolver = $endpoints->resolver($type);
+                $normalized = $resolver->normalize(new NodeReference($type, $id));
+                return ['canonical_id' => $normalized->endpoint_key, 'active' => $resolver->exists($normalized)];
+            } catch (\Throwable) {
+                return ['active' => false];
+            }
+        };
         $graphRepository = new WpdbGraphRepository($wpdb);
         $predicates = new PredicateRegistry();
         $classifiedAsPolicy = new ClassifiedAsPolicy();
@@ -143,7 +155,7 @@ final class GovernanceRuntimeFactory
         });
         $eligibility->setStagingScopeResolver($authorityScopeResolver);
         $eligibility->setStagingScopeDiagnosticProvider([$stagingScopeVerifier, 'proposalDescriptorDiagnostic']);
-        $mediaBinding = new MediaBindingService($media, $assets, $usages, $authority, $types, new \NHK\Core\Infrastructure\Media\WpdbMediaBindingOperationRepository($wpdb), stagingGuard: new MediaBindingStagingGuard($environment, [$stagingScopeVerifier, 'verifyBindingRequest'], static fn (string $capability): bool => function_exists('current_user_can') && current_user_can($capability)));
+        $mediaBinding = new MediaBindingService($media, $assets, $usages, $authority, $types, new \NHK\Core\Infrastructure\Media\WpdbMediaBindingOperationRepository($wpdb), stagingGuard: new MediaBindingStagingGuard($environment, [$stagingScopeVerifier, 'verifyBindingRequest'], static fn (string $capability): bool => function_exists('current_user_can') && current_user_can($capability)), capabilities: $mediaCapabilities, targetResolver: $mediaTargetResolver);
         $stagingGuard = new OperationScopedStagingGuard(
             $environment,
             static fn (string $capability): bool => function_exists('current_user_can') && current_user_can($capability),

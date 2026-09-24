@@ -27,6 +27,8 @@ final class MediaBindingService implements MediaBindingPort
         private ?MediaBindingOperationRepository $operations = null,
         private RepresentativeEligibilityRegistry $eligibility = new RepresentativeEligibilityRegistry(),
         private $stagingGuard = null,
+        private ?MediaOwnerCapabilityRegistry $capabilities = null,
+        private $targetResolver = null,
     ) {}
 
     /** @param array<string,mixed> $request @return array<string,mixed> */
@@ -63,7 +65,7 @@ final class MediaBindingService implements MediaBindingPort
             $operation = $this->advance($operation, MediaBindingOperation::VALIDATE, 'IN_PROGRESS');
             $media = $this->resolveMedia((array) $normalized['media']);
             $operation = $this->advance($operation, MediaBindingOperation::RESOLVE_MEDIA, 'IN_PROGRESS', $media->canonicalId);
-            $target = $this->resolveTarget((array) $normalized['target']);
+            $target = $this->resolveBindingTarget((array) $normalized['target']);
             $operation = $this->advance($operation, MediaBindingOperation::RESOLVE_TARGET, 'IN_PROGRESS', $media->canonicalId, metadata: ['seo' => $normalized['seo'], 'target_stable_key' => $target->stableKey]);
             $operation = $this->advance($operation, MediaBindingOperation::PLAN, 'IN_PROGRESS', $media->canonicalId);
             $usage = $this->applyUsage($media, $target->entityType, $target->canonicalId, $normalized, $operation);
@@ -73,7 +75,7 @@ final class MediaBindingService implements MediaBindingPort
             $operation = $this->advance($operation, MediaBindingOperation::SEO_INVALIDATE, 'IN_PROGRESS', $media->canonicalId, $usage['usage']->usageId, $usage['previous_usage_id']);
             if (function_exists('do_action')) do_action('nhk_v3_media_binding_projection_invalidate', $target->entityType, $target->canonicalId, $usage['usage']->usageId);
             $operation = $this->advance($operation, MediaBindingOperation::PROJECTION_INVALIDATE, 'IN_PROGRESS', $media->canonicalId, $usage['usage']->usageId, $usage['previous_usage_id']);
-            $readback = $this->readback($media->canonicalId, $target->entityType, $target->canonicalId, $usage['usage']->usageId);
+            $readback = $this->readback($media->canonicalId, $target->entityType, $target->canonicalId, $usage['usage']->usageId, $usage['usage']->role);
             $operation = $this->advance($operation, MediaBindingOperation::FINAL_READBACK, 'IN_PROGRESS', $media->canonicalId, $usage['usage']->usageId, $usage['previous_usage_id'], ['readback' => $readback]);
             $operation = $this->advance($operation, MediaBindingOperation::COMPLETE, 'COMPLETE', $media->canonicalId, $usage['usage']->usageId, $usage['previous_usage_id'], ['readback' => $readback, 'reconciliation' => $usage['reconciliation']]);
             return $operation->toArray() + ['usage' => $this->usageArray($usage['usage']), 'readback' => $readback, 'reconciliation' => $usage['reconciliation']];
@@ -180,7 +182,8 @@ final class MediaBindingService implements MediaBindingPort
     /** Resolve an exact Authority target for governed staging/eligibility preflight. */
     public function resolveTargetReference(array $reference): \NHK\Core\Domain\Authority\AuthorityEntity
     {
-        return $this->resolveTarget($reference);
+        $target = $this->resolveTarget($reference);
+        return $this->authority->findByCanonicalId($target->canonicalId) ?? throw new MediaException('MEDIA_BINDING_TARGET_NOT_FOUND');
     }
 
     /**
@@ -226,7 +229,13 @@ final class MediaBindingService implements MediaBindingPort
         $source = strtoupper(trim((string) ($request['selection_source'] ?? 'USER_EXPLICIT')));
         $policy = strtoupper(trim((string) ($request['selection_policy'] ?? ($source === 'SYSTEM_AUTO' ? 'AUTO' : 'PINNED'))));
         $role = trim((string) ($request['role'] ?? MediaUsageRoleRegistry::REPRESENTATIVE));
-        if (trim((string) ($request['idempotency_key'] ?? '')) === '' || !is_array($media) || !is_array($target) || $role !== MediaUsageRoleRegistry::REPRESENTATIVE) throw new MediaException('MEDIA_BINDING_REQUEST_INVALID');
+        if (trim((string) ($request['idempotency_key'] ?? '')) === '' || !is_array($media) || !is_array($target)) throw new MediaException('MEDIA_BINDING_REQUEST_INVALID');
+        MediaUsageRoleRegistry::assertKnown($role);
+        $targetType = strtolower(trim((string) ($target['type'] ?? '')));
+        $capability = $this->capabilities?->forEndpoint($targetType);
+        if ($this->capabilities !== null && $capability === null) throw new MediaException('MEDIA_BINDING_TARGET_CAPABILITY_UNAVAILABLE');
+        if ($capability !== null && !$capability->supportsRole($role)) throw new MediaException('MEDIA_BINDING_ROLE_UNSUPPORTED');
+        if ($this->capabilities === null && $role !== MediaUsageRoleRegistry::REPRESENTATIVE) throw new MediaException('MEDIA_BINDING_REQUEST_INVALID');
         if ($targetId === '' && trim((string) ($target['stable_key'] ?? '')) === '') throw new MediaException('MEDIA_BINDING_TARGET_REFERENCE_REQUIRED');
         if ($mediaId === '' && trim((string) ($media['stable_key'] ?? '')) === '' && (int) ($media['attachment_id'] ?? 0) < 1 && trim((string) ($media['url'] ?? '')) === '') throw new MediaException('MEDIA_BINDING_MEDIA_REFERENCE_REQUIRED');
         if (!in_array($source, ['USER_EXPLICIT', 'SYSTEM_AUTO'], true) || !in_array($policy, ['PINNED', 'AUTO'], true) || ($source === 'USER_EXPLICIT' && $policy !== 'PINNED') || ($source === 'SYSTEM_AUTO' && $policy !== 'AUTO')) throw new MediaException('MEDIA_BINDING_SELECTION_INVALID');
@@ -275,7 +284,7 @@ final class MediaBindingService implements MediaBindingPort
             return ['type' => 'wp_post', 'key' => $blog . ':' . $post];
         }
         if (!$this->types->has($type)) throw new MediaException('MEDIA_USAGE_TARGET_TYPE_INVALID');
-        $target = $this->resolveTarget($reference);
+        $target = $this->resolveBindingTarget($reference);
         return ['type' => $target->entityType, 'key' => $target->canonicalId];
     }
 
@@ -339,11 +348,33 @@ final class MediaBindingService implements MediaBindingPort
         return $target;
     }
 
+    private function resolveBindingTarget(array $reference): MediaBindingTarget
+    {
+        $type = strtolower(trim((string) ($reference['type'] ?? '')));
+        $capability = $this->capabilities?->forEndpoint($type);
+        if ($this->capabilities !== null && $capability === null) throw new MediaException('MEDIA_BINDING_TARGET_CAPABILITY_UNAVAILABLE');
+        if ($this->targetResolver !== null && is_callable($this->targetResolver) && $capability !== null && !$this->types->has($type)) {
+            $resolved = ($this->targetResolver)($type, $reference);
+            if (!is_array($resolved)) throw new MediaException('MEDIA_BINDING_TARGET_NOT_FOUND');
+            $id = trim((string) ($resolved['canonical_id'] ?? $resolved['id'] ?? ''));
+            if (!UuidCodec::isValid($id) || ($resolved['active'] ?? false) !== true) throw new MediaException('MEDIA_BINDING_TARGET_NOT_FOUND');
+            return new MediaBindingTarget($type, $id, trim((string) ($resolved['stable_key'] ?? '')), true);
+        }
+        $target = $this->resolveTarget($reference);
+        return new MediaBindingTarget($target->entityType, $target->canonicalId, $target->stableKey, $target->active());
+    }
+
     /** @param array<string,mixed> $normalized @return array{usage:MediaUsage,previous_usage_id:?string,reconciliation:string} */
     private function applyUsage(Media $media, string $targetType, string $targetId, array $normalized, MediaBindingOperation $operation): array
     {
-        $current = array_values(array_filter($this->usages->listByEndpoint($targetType, $targetId, MediaUsageRoleRegistry::REPRESENTATIVE), static fn (mixed $item): bool => $item instanceof MediaUsage && $item->activeSlot !== 'retired'));
-        if (count($current) > 1) throw new MediaException('MEDIA_BINDING_REPRESENTATIVE_SLOT_CONFLICT');
+        $role = (string) $normalized['role'];
+        $capability = $this->capabilities?->forEndpoint($targetType);
+        $current = array_values(array_filter($this->usages->listByEndpoint($targetType, $targetId, $role), static fn (mixed $item): bool => $item instanceof MediaUsage && $item->activeSlot !== 'retired' && $item->placementKey === ''));
+        if ($role === MediaUsageRoleRegistry::REPRESENTATIVE) {
+            $current = array_values(array_filter($this->usages->listByEndpoint($targetType, $targetId, $role), static fn (mixed $item): bool => $item instanceof MediaUsage && $item->activeSlot !== 'retired'));
+        }
+        $max = $capability?->maxActiveRepresentatives ?? 1;
+        if ($role === MediaUsageRoleRegistry::REPRESENTATIVE && count($current) > $max) throw new MediaException('MEDIA_BINDING_REPRESENTATIVE_SLOT_CONFLICT');
         $existing = $current[0] ?? null;
         if ($existing instanceof MediaUsage && $existing->selectionPolicy === 'PINNED' && $normalized['selection_source'] === 'SYSTEM_AUTO' && $existing->mediaId !== $media->canonicalId) throw new MediaException('PINNED_REPRESENTATIVE_PROTECTED');
         if ($existing instanceof MediaUsage && $existing->mediaId === $media->canonicalId) {
@@ -352,8 +383,10 @@ final class MediaBindingService implements MediaBindingPort
             return ['usage' => $updated, 'previous_usage_id' => null, 'reconciliation' => 'UPDATE'];
         }
         if ($existing instanceof MediaUsage && !$this->usages instanceof MediaUsageUpdater) throw new MediaException('MEDIA_BINDING_USAGE_UPDATE_UNAVAILABLE');
-        if ($existing instanceof MediaUsage) $this->usages->update(new MediaUsage($existing->usageId, $existing->mediaId, $existing->endpointType, $existing->endpointKey, 'gallery', $existing->sortOrder, $existing->altText, $existing->caption, $existing->keywordGroups, $existing->title, $existing->revision, $existing->placementKey, $existing->selectionSource, $existing->selectionPolicy, null));
-        $candidate = new MediaUsage(UuidCodec::newV7(), $media->canonicalId, $targetType, $targetId, MediaUsageRoleRegistry::REPRESENTATIVE, 0, (string) $normalized['seo']['alt_text'], (string) $normalized['seo']['caption'], [], (string) $normalized['seo']['title'], 1, 'representative', (string) $normalized['selection_source'], (string) $normalized['selection_policy'], 'representative');
+        if ($existing instanceof MediaUsage && $role === MediaUsageRoleRegistry::REPRESENTATIVE) $this->usages->update(new MediaUsage($existing->usageId, $existing->mediaId, $existing->endpointType, $existing->endpointKey, 'gallery', $existing->sortOrder, $existing->altText, $existing->caption, $existing->keywordGroups, $existing->title, $existing->revision, $existing->placementKey, $existing->selectionSource, $existing->selectionPolicy, null));
+        $activeSlot = $role === MediaUsageRoleRegistry::REPRESENTATIVE ? ($capability?->representativeSlot ?? 'representative') : null;
+        $placement = $role === MediaUsageRoleRegistry::REPRESENTATIVE ? ($capability?->representativeSlot ?? 'representative') : '';
+        $candidate = new MediaUsage(UuidCodec::newV7(), $media->canonicalId, $targetType, $targetId, $role, 0, (string) $normalized['seo']['alt_text'], (string) $normalized['seo']['caption'], [], (string) $normalized['seo']['title'], 1, $placement, (string) $normalized['selection_source'], (string) $normalized['selection_policy'], $activeSlot);
         try {
             $usage = $this->usages->create($candidate);
         } catch (\Throwable) {
@@ -370,12 +403,14 @@ final class MediaBindingService implements MediaBindingPort
     }
 
     /** @return array<string,mixed> */
-    private function readback(string $mediaId, string $targetType, string $targetId, string $usageId): array
+    private function readback(string $mediaId, string $targetType, string $targetId, string $usageId, string $role): array
     {
-        $usages = $this->usages->listByEndpoint($targetType, $targetId, MediaUsageRoleRegistry::REPRESENTATIVE);
+        $usages = $this->usages->listByEndpoint($targetType, $targetId, $role);
         $matches = array_values(array_filter($usages, static fn (MediaUsage $item): bool => $item->usageId === $usageId && $item->mediaId === $mediaId));
-        if (count($matches) !== 1 || count($usages) !== 1) throw new MediaException('MEDIA_BINDING_FINAL_READBACK_FAILED');
-        return ['status' => 'verified', 'media_id' => $mediaId, 'target_type' => $targetType, 'target_id' => $targetId, 'usage_id' => $usageId, 'role' => MediaUsageRoleRegistry::REPRESENTATIVE, 'active_slot' => $matches[0]->activeSlot, 'active_representative_count' => count($usages)];
+        $capability = $this->capabilities?->forEndpoint($targetType);
+        $expectedCount = $role === MediaUsageRoleRegistry::REPRESENTATIVE ? ($capability?->maxActiveRepresentatives ?? 1) : null;
+        if (count($matches) !== 1 || ($expectedCount !== null && count($usages) !== 1)) throw new MediaException('MEDIA_BINDING_FINAL_READBACK_FAILED');
+        return ['status' => 'verified', 'media_id' => $mediaId, 'target_type' => $targetType, 'target_id' => $targetId, 'usage_id' => $usageId, 'role' => $role, 'active_slot' => $matches[0]->activeSlot, 'active_representative_count' => $expectedCount === null ? null : count($usages)];
     }
 
     private function advance(MediaBindingOperation $operation, string $stage, string $status, ?string $mediaId = null, ?string $resultingUsageId = null, ?string $previousUsageId = null, array $metadata = []): MediaBindingOperation
