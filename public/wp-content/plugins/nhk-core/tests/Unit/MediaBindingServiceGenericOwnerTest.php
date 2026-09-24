@@ -92,6 +92,29 @@ final class MediaBindingServiceGenericOwnerTest extends TestCase
         self::assertNull($result['readback']['active_representative_count']);
         self::assertNull($result['readback']['active_slot']);
     }
+
+    public function test_retry_reuses_same_binding_operation_and_does_not_duplicate_usage(): void
+    {
+        $mediaId = UuidCodec::newV7();
+        $targetId = UuidCodec::newV7();
+        $media = new GenericMediaRepository(new Media($mediaId, 'nhk:media:retry', 'Retry', 'ready', []));
+        $usages = new GenericUsageRepository();
+        $operations = new GenericOperationRepository();
+        $types = new EntityTypeRegistry();
+        $types->register(new EntityTypeDefinition('classification', 1, true));
+        $capabilities = new MediaOwnerCapabilityRegistry();
+        $capabilities->register(MediaOwnerCapability::forEndpoint('classification', [MediaUsageRoleRegistry::REPRESENTATIVE]));
+        $service = new MediaBindingService($media, new GenericAssetRepository(), $usages, new GenericAuthorityRepository(new AuthorityEntity($targetId, 'classification', 'nhk:classification:retry', 'Retry', 1, [])), $types, $operations, capabilities: $capabilities);
+        $request = ['idempotency_key' => 'retry-binding', 'media' => ['id' => $mediaId], 'target' => ['type' => 'classification', 'id' => $targetId], 'role' => MediaUsageRoleRegistry::REPRESENTATIVE, 'selection_source' => 'USER_EXPLICIT', 'selection_policy' => 'PINNED'];
+
+        $first = $service->bind($request);
+        $second = $service->bind($request);
+
+        self::assertSame('COMPLETE', $first['status']);
+        self::assertSame('COMPLETE', $second['status']);
+        self::assertSame($first['operation_id'], $second['operation_id']);
+        self::assertCount(1, $usages->listByEndpoint('classification', $targetId, MediaUsageRoleRegistry::REPRESENTATIVE));
+    }
 }
 
 final class GenericMediaRepository implements MediaRepository
