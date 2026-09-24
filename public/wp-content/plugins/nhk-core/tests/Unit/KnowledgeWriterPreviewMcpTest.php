@@ -72,6 +72,35 @@ final class KnowledgeWriterPreviewMcpTest extends TestCase
         self::assertSame(['read'], $capabilities);
     }
 
+    public function test_tools_call_fails_closed_when_preview_service_is_missing(): void
+    {
+        $read = new McpReadHandler(
+            $this->authority,
+            $this->types,
+            $this->createMock(\NHK\Core\Contracts\Media\MediaRepository::class),
+            $this->createMock(\NHK\Core\Contracts\Media\MediaAssetRepository::class),
+            $this->createMock(\NHK\Core\Contracts\Media\MediaUsageRepository::class),
+            $this->createMock(\NHK\Core\Contracts\Video\VideoRepository::class),
+            $this->createMock(\NHK\Core\Contracts\Knowledge\KnowledgeRepository::class),
+            $this->createMock(\NHK\Core\Contracts\Knowledge\EvidenceRepository::class),
+            resolver: new McpSemanticContextResolver($this->authority, $this->types),
+        );
+        $transport = new McpTransport(
+            $read,
+            new McpGovernanceHandler(new GovernanceService(new InMemoryProposalRepository())),
+            static fn (string $capability): bool => $capability === 'read',
+        );
+
+        $response = $transport->dispatch([
+            'jsonrpc' => '2.0', 'id' => 2, 'method' => 'tools/call',
+            'params' => ['name' => 'nhk.knowledge.writer.preview', 'arguments' => $this->request()],
+        ], ['Mcp-Name' => 'nhk.knowledge.writer.preview']);
+
+        self::assertSame(200, $response['status']);
+        self::assertTrue($response['body']['result']['isError']);
+        self::assertSame('KNOWLEDGE_WRITER_PREVIEW_UNAVAILABLE', $response['body']['result']['structuredContent']['error']['code']);
+    }
+
     private function tool(string $name): array
     {
         foreach (McpToolCatalog::tools() as $tool) if ($tool['name'] === $name) return $tool;

@@ -1,5 +1,19 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-24 — Knowledge Writer Preview Task 3 rereview coverage
+
+Added focused regression coverage for the production `Plugin` composition
+constructing `KnowledgeWriterPreviewService` before the MCP transport and
+passing it through the named `knowledgeWriterPreview` dependency. Added a
+transport dispatch regression proving an absent service returns the exact
+`KNOWLEDGE_WRITER_PREVIEW_UNAVAILABLE` fail-closed error. Production behavior
+and architecture were unchanged.
+
+VERIFICATION: Focused `KnowledgeWriterPreviewMcpTest` and
+`PluginBootWiringTest` passed 21 tests / 85 assertions. Both changed PHP test
+files passed PHP lint and `git diff --check`. No database, staging/production,
+deployment, push or external service was touched.
+
 # Checkpoint — 2026-09-24 — Knowledge Writer Preview Task 3 review fix (LOCAL / READ-ONLY)
 
 Wired the existing read-only `KnowledgeWriterPreviewService` into the production
