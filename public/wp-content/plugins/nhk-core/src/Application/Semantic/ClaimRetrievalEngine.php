@@ -160,7 +160,46 @@ final class ClaimRetrievalEngine
                 $needDiagnostics[$needId]['candidate_count']++;
                 if ($candidate['decision'] === 'include') $needDiagnostics[$needId]['eligible_count']++;
             }
-            if ($needDiagnostics[$needId]['eligible_count'] > 0) $needDiagnostics[$needId]['stop_reason'] = 'exact_candidates_available';
+            if ($needDiagnostics[$needId]['eligible_count'] > 0) {
+                $needDiagnostics[$needId]['stop_reason'] = 'exact_candidates_available';
+                continue;
+            }
+            if (is_callable($this->expansion)) {
+                foreach (SemanticNeedRetrievalPolicy::tiersFor($need) as $tier) {
+                    if ($tier === 'EXACT') continue;
+                    $expanded = $this->expandForNeed($subject, $need, $tier, SemanticNeedRetrievalPolicy::normalize($need->retrievalPolicy()));
+                    $needDiagnostics[$needId]['relaxation_rounds'][] = ['tier' => $tier, 'candidate_count' => count($expanded)];
+                    foreach (array_slice($expanded, 0, min(200, (int) ($need->retrievalPolicy()['expansion_budget'] ?? 50))) as $row) {
+                        if (!is_array($row)) continue;
+                        $rowFacet = strtolower(trim((string) ($row['facet'] ?? $row['knowledge_facet'] ?? '')));
+                        if ($need->facetKey() !== '' && $rowFacet !== '' && $rowFacet !== $need->facetKey()) continue;
+                        $candidate = $this->candidate($row, $subject, ['items' => $expanded], strtolower($need->facetKey() . ' ' . $need->conceptKey()), $needData);
+                        $candidate['_retrieval_order'] = $retrievalOrder++;
+                        $candidate['need_id'] = $needId;
+                        $candidate['need_ids'] = [$needId];
+                        $candidate['facet'] = $rowFacet !== '' ? $rowFacet : $need->facetKey();
+                        $candidate['concept'] = strtolower(trim((string) ($row['concept'] ?? $row['concept_key'] ?? $need->conceptKey())));
+                        $candidate['retrieval_tier'] = $tier;
+                        $candidate['semantic_distance'] = (int) array_search($tier, SemanticNeedRetrievalPolicy::TIERS, true);
+                        $candidate['editorial_treatment'] = $tier === 'BACKGROUND_CONTEXT' ? 'BACKGROUND_CONTEXT' : 'SUPPORTING_CONTEXT';
+                        $candidate['coverage_kind'] = $tier === 'BACKGROUND_CONTEXT' ? 'contextual' : 'applicable_relaxed';
+                        $candidate['relaxation_reason'] = 'exact_need_uncovered';
+                        $key = $candidate['claim_id'] . ':' . $candidate['claim_revision'];
+                        if (!isset($all[$key])) $all[$key] = $candidate;
+                        else $all[$key]['need_ids'] = array_values(array_unique(array_merge((array) ($all[$key]['need_ids'] ?? []), [$needId])));
+                        $needDiagnostics[$needId]['candidate_count']++;
+                        if ($candidate['decision'] === 'include') $needDiagnostics[$needId]['eligible_count']++;
+                    }
+                    if ($needDiagnostics[$needId]['eligible_count'] > 0) {
+                        $needDiagnostics[$needId]['stop_reason'] = 'relaxed_candidate_available';
+                        break;
+                    }
+                }
+                if ($needDiagnostics[$needId]['eligible_count'] === 0) $needDiagnostics[$needId]['stop_reason'] = 'uncovered';
+            } else {
+                $needDiagnostics[$needId]['stop_reason'] = 'uncovered';
+            }
+
         }
 
         $items = array_values($all);
@@ -208,6 +247,17 @@ final class ClaimRetrievalEngine
                 'stop_reason' => 'facet_opportunities_merged',
             ],
         ];
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function expandForNeed(array $subject, SemanticNeed $need, string $tier, array $policy): array
+    {
+        try {
+            $expanded = ($this->expansion)($subject, $need, $tier, ['budget' => $policy['expansion_budget']]);
+        } catch (\ArgumentCountError) {
+            $expanded = ($this->expansion)($subject, ['reason' => 'semantic_need_gap', 'tier' => $tier, 'budget' => $policy['expansion_budget']]);
+        }
+        return is_array($expanded) ? array_values(array_filter($expanded, 'is_array')) : [];
     }
 
     /** @param array<string,mixed> $row @param array<string,mixed> $subject @param array<string,mixed> $neighborhood @return array<string,mixed> */
@@ -264,6 +314,18 @@ final class ClaimRetrievalEngine
         return $reflection->getNumberOfParameters() >= 3
             ? (array) ($this->claims)($subject, $neighborhood, $need)
             : (array) ($this->claims)($subject, $neighborhood);
+    }
+
+    /** @param array<string,mixed> $subject @param array<string,mixed> $budget @return array<int,mixed> */
+    private function expandFor(array $subject, SemanticNeed $need, string $tier, array $budget): array
+    {
+        $reflection = is_array($this->expansion)
+            ? new \ReflectionMethod($this->expansion[0], $this->expansion[1])
+            : new \ReflectionFunction($this->expansion);
+        if ($reflection->getNumberOfParameters() >= 4) {
+            return (array) ($this->expansion)($subject, $need, $tier, $budget);
+        }
+        return (array) ($this->expansion)($subject, ['reason' => $need->needId(), 'tier' => $tier, 'depth' => $budget['depth'] ?? 1, 'budget' => $budget['budget'] ?? 50]);
     }
 
     /**

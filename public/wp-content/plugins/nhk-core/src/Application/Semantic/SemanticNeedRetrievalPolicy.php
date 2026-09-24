@@ -45,4 +45,11 @@ final class SemanticNeedRetrievalPolicy
             'tiers' => $tiers,
         ];
     }
+
+    /** @return list<string> */
+    public static function tiersFor(SemanticNeed $need): array
+    {
+        $tiers = (array) ($need->relaxationPolicy()['tiers'] ?? []);
+        return array_values(array_filter($tiers, static fn (mixed $tier): bool => in_array($tier, self::TIERS, true)));
+    }
 }
