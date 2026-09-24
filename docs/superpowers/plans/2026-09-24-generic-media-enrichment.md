@@ -343,4 +343,3 @@ Use the existing approved read-only/deployment verification path to inspect the 
 - [ ] **Step 7: Commit only after fresh verification**
 
 Review `git diff`, secret scan, test output and execution state. Commit the implementation only when all required local gates pass; do not deploy.
-
