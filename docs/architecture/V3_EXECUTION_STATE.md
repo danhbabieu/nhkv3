@@ -1,5 +1,27 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-24 — Knowledge Writer Preview Task 4/5 closure (LOCAL / READ-ONLY)
+
+TASK_4_DECISION: SATISFIED_BY_EXISTING_IMPLEMENTATION. Tasks 1–3 already prove
+the read-only Knowledge Writer façade, factual/provenance safety, MCP catalog
+and dispatch behavior, and Task 3's production composition path through
+`nhk-core.php → Plugin::boot() → /nhk/v1/mcp`. The older WordPress Ability
+requirement is superseded by the accepted MCP-only boundary and was not
+reintroduced.
+
+TASK_5_DECISION: Only the genuinely missing acceptance item was completed: the
+active MCP contract now documents `nhk.knowledge.writer.preview` as a bounded,
+read-only MCP capability and explicitly distinguishes MCP runtime availability
+from generic Ability/connector exposure. Existing focused, Universal Core,
+Brain 2/information-gain, MCP and no-mutation evidence is reused; no duplicate
+runtime or composition test was added.
+
+SAFETY: No production code, schema, semantic record, database, staging/
+production data, deployment, publication, push or external service was
+modified. Integration remains a single guarded environment attempt against
+exact `nhk_v3_test`; WordPress bootstrap fails with `Error establishing a
+database connection` when that environment is unavailable.
+
 # Checkpoint — 2026-09-24 — Knowledge Writer Preview Task 4 boundary verification (LOCAL / NO LIVE MUTATION)
 
 IMPLEMENTED: Production `Plugin` composition constructs the read-only

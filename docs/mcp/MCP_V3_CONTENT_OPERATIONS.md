@@ -100,6 +100,15 @@ catalog. The parity test fails closed with
 either direction breaks. This prevents a cached or projected descriptor from
 claiming a tool that the actual `tools/call` dispatcher cannot resolve.
 
+The read-only `nhk.knowledge.writer.preview` tool is an MCP-only projection of
+the existing Universal Enrichment and Editorial Intelligence pipeline. It
+requires ordinary `read` capability, is `kind=read` and `governed=false`, and
+returns a bounded structured preview for reader-facing use. It does not create
+or mutate Capture, WordPress posts, Authority, Knowledge, Source/Evidence,
+Graph, Media, Video, Proposal, Governance, Public Identity, SEO or publication
+state. It is intentionally not registered as a generic WordPress Ability; MCP
+catalog/dispatch availability and connector exposure remain separate facts.
+
 ### Runtime semantic-write policy — 2026-09-13
 
 The deployed runtime resolves semantic mutation policy from
@@ -529,6 +538,7 @@ availability; local HTTP wire smoke remains an environment check.
 | `nhk.video.get` | Video | READ | No | N/A | No raw edge | READY for active valid public reference |
 | `nhk.video.frontend.reconcile` | Existing canonical Video → frontend read-back | WRITE / INTERNAL lifecycle check | Yes | No owner, identity, editorial or SEO write; exact owner-bound read-back only | `MediaVideoPageQuery` detail/archive + `HomeSemanticQuery` homepage source | READY only when projection, route and required listing read-backs pass; otherwise `REVIEW_REQUIRED` |
 | `nhk.knowledge.get` | Knowledge + public evidence | READ | No | N/A | No raw edge | READY for active/public chain |
+| `nhk.knowledge.writer.preview` | Universal Enrichment + Editorial Intelligence read preview | READ | No | N/A | Bounded semantic read only | READY through `/nhk/v1/mcp`; no generic Ability |
 | `nhk.source.get` | Source + public evidence | READ | No | N/A | No raw edge | READY for active/public chain |
 | `nhk.evidence.get` | Evidence + public endpoints | READ | No | N/A | No raw edge | READY for active/public chain |
 | `nhk.knowledge.ingest` | Knowledge claim | WRITE | Yes | Apply/revision governed | No edge by ingest | READY |
