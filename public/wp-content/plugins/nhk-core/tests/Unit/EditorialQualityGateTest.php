@@ -53,6 +53,37 @@ final class EditorialQualityGateTest extends TestCase
         self::assertSame('BLOCK', $report->dimensions['traceability']['severity']);
     }
 
+    public function test_eligible_redundant_knowledge_unit_support_is_validated_by_quality(): void
+    {
+        $primary = $this->claims()[0];
+        $supporting = ['claim_id' => 'support-1', 'claim_revision' => 1, 'text' => 'Odo 36 có cấu hình liên quan.', 'eligibility' => 'eligible', 'evidence' => ['status' => 'eligible'], 'publicly_composable' => true, 'editorial_role' => 'CONTEXT', 'original_subject' => ['id' => self::SUBJECT, 'type' => 'model']];
+        $primary['knowledge_unit'] = ['unit_id' => 'unit-1', 'supporting_claims' => [$primary, $supporting], 'coverage_aspects' => ['facet:configuration']];
+        $pack = $this->pack([$primary]);
+        $plan = new EditorialPlan('available', 'article', ['id' => self::SUBJECT, 'type' => 'model'], $this->topic(), [['id' => 'opening', 'claims' => []], ['id' => 'core', 'claims' => [$primary, $supporting]]]);
+        $draft = new EditorialDraft('available', 'article', $this->topic(), 'Odo 36 có ba phiên bản.', 'Odo 36 có ba phiên bản. Odo 36 có cấu hình liên quan.', [['claim_id' => 'core-1', 'claim_revision' => 2], ['claim_id' => 'support-1', 'claim_revision' => 1]], ['information_gain' => 0.7]);
+
+        $report = $this->gate()->evaluate($pack, $plan, $draft, $this->seo());
+
+        self::assertNotContains('INELIGIBLE_CLAIM_USED', $report->blockers);
+        self::assertNotContains('MISSING_CLAIM_TRACE', $report->blockers);
+    }
+
+    public function test_ineligible_supporting_claim_referenced_as_factual_support_blocks_quality(): void
+    {
+        $primary = $this->claims()[0];
+        $supporting = ['claim_id' => 'support-blocked', 'claim_revision' => 1, 'text' => 'Unsupported detail.', 'eligibility' => 'ineligible', 'evidence' => ['status' => 'missing'], 'publicly_composable' => false, 'editorial_role' => 'CONTEXT', 'original_subject' => ['id' => self::SUBJECT, 'type' => 'model']];
+        $primary['knowledge_unit'] = ['unit_id' => 'unit-1', 'supporting_claims' => [$primary, $supporting], 'coverage_aspects' => ['facet:configuration']];
+        $pack = $this->pack([$primary]);
+        $plan = new EditorialPlan('available', 'article', ['id' => self::SUBJECT, 'type' => 'model'], $this->topic(), [['id' => 'opening', 'claims' => []], ['id' => 'core', 'claims' => [$primary, $supporting]]]);
+        $draft = new EditorialDraft('available', 'article', $this->topic(), 'Odo 36 có ba phiên bản.', 'Odo 36 có ba phiên bản. Unsupported detail.', [['claim_id' => 'core-1', 'claim_revision' => 2], ['claim_id' => 'support-blocked', 'claim_revision' => 1]], ['information_gain' => 0.7]);
+
+        $report = $this->gate()->evaluate($pack, $plan, $draft, $this->seo());
+
+        self::assertSame('BLOCKED', $report->readiness);
+        self::assertContains('INELIGIBLE_SELECTED_CLAIM', $report->blockers);
+        self::assertContains('INELIGIBLE_CLAIM_USED', $report->blockers);
+    }
+
     public function test_underused_knowledge_and_buried_core_are_warned(): void
     {
         $plan = new EditorialPlan('available', 'article', ['id' => self::SUBJECT, 'type' => 'model'], $this->topic(), [

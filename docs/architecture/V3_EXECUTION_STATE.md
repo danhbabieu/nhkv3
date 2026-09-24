@@ -1,5 +1,57 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-24 — KnowledgeUnit supporting-Claim Quality identity fix (LOCAL / NO SERVER ACTION)
+
+RUNTIME_CONTRADICTION: On staging revision
+`55943aa1e3e1d8d893c8225fc018baf2bde84975`, Capture
+`01a0d116-a363-7780-b7c0-82c68f04a438`, revision `28`, the primary Claim
+`01a095fc-0f2d-7071-95cb-f630a3909673` revision 1 and redundant supporting
+Claim `01a0989f-dac8-73e9-9eba-4e596c06e05b` revision 1 were both reported
+eligible, evidence-eligible, direct, applicable and publicly composable. Both
+were carried by KnowledgeUnit
+`fb301446d1713d09e20b6cf4e58b2faf1c9335a455feddd66972dcc081f292b6` and
+emitted by ReaderJourney/Composer. Quality nevertheless reported
+`INELIGIBLE_CLAIM_USED`.
+
+ROOT_CAUSE / FIRST_BROKEN_BOUNDARY: `EditorialQualityGate::publicClaims()`
+indexed only `EditorialContextPack::selectedClaims`, which contains the
+KnowledgeUnit representative. It did not index the unit's
+`knowledge_unit.supporting_claims`. During final trace validation the valid
+supporting Claim ID was absent from the Quality identity map and entered the
+fail-closed `INELIGIBLE_CLAIM_USED` branch. Retrieval, eligibility,
+applicability, selector, deduplication, Journey and Composer were preserving
+the contract; the first violation was the Quality projection boundary.
+
+AUTHORITATIVE_CONTRACT: Claim identity/revision plus evaluated
+`eligibility`, evidence status, applicability, scope, treatment and
+`publicly_composable` metadata carried by the selected KnowledgeUnit and its
+supporting Claims. `scope=provenance` is not intrinsically private in this
+path; an eligible/evidence-eligible/publicly-composable Claim may support
+direct factual treatment under the existing shared policy.
+
+FIX: Quality now indexes the selected representative and all KnowledgeUnit
+supporting Claims, including their identity and eligibility metadata, before
+running the existing evidence/trace/treatment checks. Ineligible supporting
+Claims referenced as factual support still produce `INELIGIBLE_SELECTED_CLAIM`
+and `INELIGIBLE_CLAIM_USED`; eligible redundant support no longer produces a
+false blocker. No retrieval/selector weakening or second eligibility engine was
+introduced.
+
+DOWNSTREAM: Production-shaped Article/Video/shared tests traverse
+KnowledgeUnit → ReaderJourney → Composer → SEO → Quality → DecisionPipeline;
+eligible redundant support is not blocked, while ineligible support remains a
+hard block. `semantic.need_count=0` remains the previously classified valid
+fallback path and is unrelated.
+
+VERIFICATION: Full Unit passed 2,457 tests / 14,181 assertions with 19
+warnings, 41 deprecations and 30 PHPUnit deprecations. Contract passed 6/48;
+focused Quality/Video/shared matrix passed 79/312; PHP lint, Composer
+validation/lint, diff check and special-case scan passed. Integration is
+environment-gated by WordPress `Error establishing a database connection`.
+No migration, mutation, owner creation, retry, deployment or push.
+
+STATUS: `LOCAL_V2_3_ELIGIBILITY_REPRESENTATION_FIX_READY_INTEGRATION_ENVIRONMENT_GATED / NO_SERVER_ACTION`.
+
 # Checkpoint — 2026-09-24 — Bounded Claim eligibility trace for V2.2 (LOCAL / NO SERVER ACTION)
 
 RUNTIME_EVIDENCE: Staging source `0af86a32cd6ad3a244cd7d8e79b8858ccdf4cff1`,

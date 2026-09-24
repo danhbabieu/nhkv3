@@ -172,11 +172,26 @@ final class EditorialQualityGate
         $claims = $pack->selectedClaims !== [] ? $pack->selectedClaims : $bucketed;
         $result = [];
         foreach ($claims as $claim) {
-            if (!is_array($claim) || (($claim['publicly_composable'] ?? true) !== true) || (($claim['eligibility'] ?? 'eligible') !== 'eligible')) continue;
-            $id = trim((string) ($claim['claim_id'] ?? ''));
-            if ($id !== '') $result[$id] = $claim;
+            if (!is_array($claim)) continue;
+            $this->appendPublicClaim($result, $claim);
+            $unit = is_array($claim['knowledge_unit'] ?? null) ? $claim['knowledge_unit'] : [];
+            foreach ((array) ($unit['supporting_claims'] ?? []) as $supporting) if (is_array($supporting)) $this->appendPublicClaim($result, $supporting);
+        }
+        foreach ($pack->knowledgeUnits as $unit) {
+            if (!$unit instanceof KnowledgeUnit) continue;
+            $data = $unit->toArray();
+            $this->appendPublicClaim($result, is_array($data['claim'] ?? null) ? $data['claim'] : []);
+            foreach ((array) ($data['supporting_claims'] ?? []) as $supporting) if (is_array($supporting)) $this->appendPublicClaim($result, $supporting);
         }
         return array_values($result);
+    }
+
+    /** @param array<string,array<string,mixed>> $result @param array<string,mixed> $claim */
+    private function appendPublicClaim(array &$result, array $claim): void
+    {
+        $id = trim((string) ($claim['claim_id'] ?? ''));
+        if ($id === '') return;
+        $result[$id] ??= $claim;
     }
 
     private function containsTopic(string $copy, string $topic): bool

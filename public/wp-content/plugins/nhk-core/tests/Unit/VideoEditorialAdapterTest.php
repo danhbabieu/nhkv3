@@ -34,6 +34,25 @@ final class VideoEditorialAdapterTest extends TestCase
         self::assertSame('claim-v1', $result['fingerprint_claims'][0]['id']);
     }
 
+    public function test_video_adapter_accepts_eligible_redundant_supporting_claims_through_quality(): void
+    {
+        $adapter = $this->adapter([
+            ['id' => 'claim-primary', 'subject_id' => self::SUBJECT, 'subject_type' => 'model', 'text' => 'Odo 36 có ba phiên bản vách máy.', 'scope' => 'provenance', 'provenance' => 'CATALOG_SUPPORTED', 'evidence_status' => 'SUPPORTED_WITHIN_SCOPE'],
+            ['id' => 'claim-support', 'subject_id' => self::SUBJECT, 'subject_type' => 'model', 'text' => 'Odo 36 có ba phiên bản vách máy.', 'scope' => 'provenance', 'provenance' => 'CATALOG_SUPPORTED', 'evidence_status' => 'SUPPORTED_WITHIN_SCOPE'],
+        ]);
+
+        $result = $adapter->prepare([
+            'raw_input' => 'Đây là 3 phiên bản máy của dòng đồng hồ odo 36',
+            'subject_resolution' => ['primary' => ['id' => self::SUBJECT, 'type' => 'model', 'name' => 'Odo 36']],
+            'public_identity' => ['canonical_url' => '/video/odo-36/', 'canonical_identity' => true, 'public_eligible' => true],
+        ]);
+
+        self::assertNotSame('BLOCKED', $result['quality_report']->readiness);
+        self::assertSame('READY', $result['quality_decision']);
+        self::assertCount(2, $result['draft']->claimTrace);
+        self::assertNotContains('INELIGIBLE_CLAIM_USED', $result['quality_report']->blockers);
+    }
+
     public function test_video_adapter_blocks_without_public_identity_or_eligible_evidence(): void
     {
         $adapter = $this->adapter([
