@@ -37,11 +37,12 @@ final class KnowledgeWriterPreviewService
         $purpose = array_key_exists('purpose', $request) ? (is_string($request['purpose']) ? trim($request['purpose']) : '') : 'concise_answer';
         $policy = self::PURPOSES[$purpose] ?? null;
         $depth = $request['depth'] ?? ($policy['depth'] ?? 'concise');
-        $base = $this->emptyResult($purpose, $policy['profile'] ?? '', is_string($depth) ? $depth : '');
+        $base = $this->emptyResult($purpose, $policy['profile'] ?? '', '');
         $facets = $request['requested_facets'] ?? [];
         $instruction = $request['instruction'] ?? null;
         if ($policy === null) return $this->fail($base, 'blocked', 'UNKNOWN_PREVIEW_PURPOSE');
         if (!is_string($depth) || !in_array($depth, ['concise', 'deep'], true)) return $this->fail($base, 'blocked', 'UNKNOWN_PREVIEW_DEPTH');
+        if ($depth !== $policy['depth']) return $this->fail($base, 'blocked', 'INCOMPATIBLE_PREVIEW_DEPTH');
         if (!is_array($facets) || !array_is_list($facets) || count($facets) > 12) return $this->fail($base, 'blocked', 'INVALID_REQUESTED_FACETS');
         foreach ($facets as $facet) if (!is_string($facet) || !in_array($facet, KnowledgeFacetProfile::FACETS, true)) return $this->fail($base, 'blocked', 'UNKNOWN_KNOWLEDGE_FACET');
         if (!is_string($instruction) || trim($instruction) === '' || mb_strlen($instruction) > 1000) return $this->fail($base, 'blocked', 'INVALID_PREVIEW_INSTRUCTION');
@@ -54,12 +55,21 @@ final class KnowledgeWriterPreviewService
         }
         $locator = $request['subject'] ?? null;
         if (!is_array($locator)) return $this->fail($base, 'unresolved', 'SUBJECT_NOT_FOUND');
+        if (!$this->validLocator($locator)) return $this->fail($base, 'blocked', 'INVALID_SUBJECT_LOCATOR');
+        $observations = $request['observations'] ?? [];
+        if (!is_array($observations) || !array_is_list($observations) || count($observations) > 12) return $this->fail($base, 'blocked', 'INVALID_PREVIEW_OBSERVATIONS');
+        foreach ($observations as $observation) {
+            if (!is_array($observation) || array_diff(array_keys($observation), ['value']) !== []
+                || !is_string($observation['value'] ?? null) || trim($observation['value']) === ''
+                || mb_strlen($observation['value']) > 500) return $this->fail($base, 'blocked', 'INVALID_PREVIEW_OBSERVATIONS');
+        }
         $resolution = $this->resolveSubject($locator);
         $status = (string) ($resolution['status'] ?? 'unresolved');
         $primary = is_array($resolution['primary'] ?? null) ? $resolution['primary'] : [];
         if ($status !== 'resolved' || $primary === []) {
-            $base['diagnostics'] = array_values(array_unique(array_merge($base['diagnostics'], (array) ($resolution['diagnostics'] ?? []))));
-            return $this->fail($base, $status === 'ambiguous' ? 'ambiguous' : 'unresolved', $status === 'ambiguous' ? 'AMBIGUOUS_SUBJECT_REVIEW' : 'SUBJECT_NOT_FOUND');
+            $base['diagnostics'] = $this->reasonCodes((array) ($resolution['diagnostics'] ?? []));
+            return $this->fail($base, $status === 'conflict' ? 'blocked' : ($status === 'ambiguous' ? 'ambiguous' : 'unresolved'),
+                $status === 'conflict' ? 'SUBJECT_LOCATOR_CONFLICT' : ($status === 'ambiguous' ? 'AMBIGUOUS_SUBJECT_REVIEW' : 'SUBJECT_NOT_FOUND'));
         }
         $base['subject'] = [
             'canonical_id' => (string) ($primary['id'] ?? ''),
@@ -68,9 +78,8 @@ final class KnowledgeWriterPreviewService
             'revision' => (int) ($primary['revision'] ?? 0),
             'resolution' => (string) ($primary['match'] ?? $resolution['primary_source'] ?? ''),
         ];
-        $observations = array_values(array_filter((array) ($request['observations'] ?? []), 'is_array'));
-        $observations = array_slice($observations, 0, 12);
-        $base['context_used'] = array_map(static fn (array $item): array => ['treatment' => 'context', 'value' => is_scalar($item['value'] ?? null) ? (string) $item['value'] : ''], $observations);
+        if (mb_strlen($base['subject']['name']) > 200) return $this->fail($this->emptyResult($purpose, $policy['profile'], ''), 'blocked', 'SUBJECT_PROJECTION_UNSAFE');
+        $base['context_used'] = array_map(static fn (array $item): array => ['treatment' => 'context', 'value' => trim($item['value'])], $observations);
         $topic = (string) ($primary['name'] ?? '');
         $envelope = UniversalInputEnvelope::fromArray([
             'owner_or_source_type' => 'preview', 'subject_resolution' => ['primary' => $primary],
@@ -93,6 +102,8 @@ final class KnowledgeWriterPreviewService
         if (!$pack instanceof EditorialContextPack) return $this->fail($base, 'unavailable', 'PREVIEW_ENRICHMENT_UNAVAILABLE');
         try {
             $plan = $this->contextualize($this->journey->plan($pack), $primary);
+            if (($plan->diagnostics['depth'] ?? null) !== $depth) return $this->fail($base, 'blocked', 'PREVIEW_DEPTH_MISMATCH');
+            $base['depth']['effective'] = $depth;
             $draft = $this->composer->compose($plan);
             $seo = new SemanticSeoPlan(SeoReadinessResult::NOT_APPLICABLE, $policy['profile'], '', $primary, $topic, [], $topic, $topic, '', null, []);
             $quality = $this->qualityGate->evaluate($pack, $plan, $draft, $seo);
@@ -101,58 +112,96 @@ final class KnowledgeWriterPreviewService
         } catch (\Throwable) {
             return $this->fail($base, 'unavailable', 'PREVIEW_PIPELINE_UNAVAILABLE');
         }
-        $base['semantic_needs'] = (array) ($content['semantic_needs'] ?? []);
-        $base['used_knowledge'] = $this->usedKnowledge($draft, $plan);
+        $base['semantic_needs'] = array_slice((array) ($content['semantic_needs'] ?? []), 0, 24);
         $base['excluded_knowledge'] = $this->excludedKnowledge($pack);
-        $base['coverage'] = $this->coverage($pack, $plan, $facets);
-        $base['gaps'] = array_values(array_unique(array_merge($this->reasonCodes((array) ($content['gaps'] ?? [])), $base['coverage']['uncovered_facets'])));
-        $base['warnings'] = array_values(array_unique($quality->warnings));
-        $base['quality'] = ['readiness' => $quality->readiness, 'dimensions' => $quality->dimensions, 'blockers' => $quality->blockers];
+        $base['warnings'] = $this->reasonCodes($quality->warnings);
+        $base['quality'] = ['readiness' => $quality->readiness, 'dimensions' => $quality->dimensions, 'blockers' => $this->reasonCodes($quality->blockers)];
         $base['diagnostics'] = $this->reasonCodes((array) ($content['diagnostics'] ?? []));
-        $answer = $draft->claimTrace === [] ? '' : $this->scrub($draft->body, $primary, $pack);
-        if ($quality->blockers !== []) $answer = '';
-        if (isset($constraints['max_chars']) && mb_strlen($answer) > $constraints['max_chars']) {
+        $answer = $draft->claimTrace === [] || $quality->blockers !== [] ? '' : trim($draft->body);
+        if ($answer !== '' && !$this->readerSafe($answer, $primary, $pack)) {
+            $answer = '';
+            $base['diagnostics'][] = 'PUBLIC_COPY_UNSAFE';
+        }
+        if ($answer !== '' && mb_strlen($answer) > ($constraints['max_chars'] ?? 4000)) {
             $answer = '';
             $base['gaps'][] = 'OUTPUT_LENGTH_UNSATISFIED';
         }
         $base['answer'] = $answer;
-        $base['status'] = $answer !== '' ? 'available' : ($pack->status === 'unavailable' ? 'unavailable' : 'sparse');
+        $base['used_knowledge'] = $answer !== '' ? array_slice($this->usedKnowledge($draft, $plan, $answer), 0, 50) : [];
+        $base['coverage'] = $this->coverage($base['used_knowledge'], $facets);
+        $base['gaps'] = array_values(array_slice(array_unique(array_merge($this->reasonCodes((array) ($content['gaps'] ?? [])), $base['gaps'], $base['coverage']['uncovered_facets'])), 0, 30));
+        $base['diagnostics'] = $this->reasonCodes($base['diagnostics']);
+        $base['status'] = $answer !== '' ? 'available' : (in_array('PUBLIC_COPY_UNSAFE', $base['diagnostics'], true) ? 'blocked' : ($pack->status === 'unavailable' ? 'unavailable' : 'sparse'));
         return $base;
     }
 
-    /** @param array<string,mixed> $locator @return array<string,mixed> */
+    /** @param array<string,mixed> $locator */
+    private function validLocator(array $locator): bool
+    {
+        if (array_diff(array_keys($locator), ['type', 'entity_type', 'canonical_uuid', 'uuid', 'stable_key', 'query', 'name']) !== []) return false;
+        foreach ($locator as $key => $value) {
+            if (!is_string($value) || trim($value) === '' || mb_strlen($value) > (in_array($key, ['query', 'name'], true) ? 200 : 160)) return false;
+        }
+        if (isset($locator['type'], $locator['entity_type']) && $locator['type'] !== $locator['entity_type']) return false;
+        if (isset($locator['uuid'], $locator['canonical_uuid']) && $locator['uuid'] !== $locator['canonical_uuid']) return false;
+        return !isset($locator['query'], $locator['name']) || $locator['query'] === $locator['name'];
+    }
+
+    /** Resolve each supplied locator independently so UUID precedence cannot hide contradictions. */
     private function resolveSubject(array $locator): array
     {
-        $query = trim((string) ($locator['query'] ?? ''));
-        if ($query !== '' && !isset($locator['type']) && !isset($locator['canonical_uuid']) && !isset($locator['stable_key'])) {
-            return $this->textResolver->resolveSources(['subject_hints' => [$query]]);
+        $type = trim($locator['type'] ?? $locator['entity_type'] ?? '');
+        $locators = [];
+        foreach (['canonical_uuid' => $locator['canonical_uuid'] ?? $locator['uuid'] ?? null,
+            'stable_key' => $locator['stable_key'] ?? null, 'name' => $locator['query'] ?? $locator['name'] ?? null] as $key => $value) {
+            if ($value !== null) $locators[$key] = trim($value);
         }
-        $type = trim((string) ($locator['type'] ?? $locator['entity_type'] ?? ''));
-        $typed = $type !== '' ? [$type => [
-            'canonical_uuid' => $locator['canonical_uuid'] ?? $locator['uuid'] ?? null,
-            'stable_key' => $locator['stable_key'] ?? null,
-            'name' => $query !== '' ? $query : ($locator['name'] ?? null),
-        ]] : [
-            'canonical_uuid' => $locator['canonical_uuid'] ?? null,
-            'stable_key' => $locator['stable_key'] ?? null,
-        ];
-        $result = $this->typedResolver->resolve($typed);
-        $resolved = array_values((array) ($result['resolved'] ?? []));
-        return [
-            'status' => ($result['ambiguities'] ?? []) !== [] ? 'ambiguous' : ($resolved !== [] ? 'resolved' : 'unresolved'),
-            'primary' => count($resolved) === 1 ? $resolved[0] : null,
-            'diagnostics' => array_map(static fn (array $item): string => (string) ($item['code'] ?? ''), array_filter((array) ($result['diagnostics'] ?? []), 'is_array')),
-        ];
+        if ($locators === []) return ['status' => 'unresolved', 'primary' => null, 'diagnostics' => []];
+        $primary = null;
+        foreach ($locators as $key => $value) {
+            if ($key === 'name' && $type === '') {
+                $text = $this->textResolver->resolveSources(['subject_hints' => [$value]]);
+                $matches = array_values((array) ($text['resolved'] ?? []));
+                $resolution = ['status' => $text['status'] ?? 'unresolved', 'primary' => count($matches) === 1 ? $matches[0] : null,
+                    'diagnostics' => (array) ($text['diagnostics'] ?? [])];
+            } else {
+                $packet = $type !== '' ? [$type => [$key => $value]] : [$key => $value];
+                $result = $this->typedResolver->resolve($packet);
+                $resolved = array_values((array) ($result['resolved'] ?? []));
+                $resolution = [
+                    'status' => ($result['conflicts'] ?? []) !== [] ? 'conflict' : (($result['ambiguities'] ?? []) !== [] || count($resolved) > 1 ? 'ambiguous' : ($resolved !== [] ? 'resolved' : 'unresolved')),
+                    'primary' => count($resolved) === 1 ? $resolved[0] : null,
+                    'diagnostics' => array_map(static fn (array $item): string => (string) ($item['code'] ?? ''), array_filter((array) ($result['diagnostics'] ?? []), 'is_array')),
+                ];
+            }
+            if (($resolution['status'] ?? '') !== 'resolved' || !is_array($resolution['primary'] ?? null)) {
+                return count($locators) > 1 && ($resolution['status'] ?? '') !== 'ambiguous'
+                    ? ['status' => 'conflict', 'primary' => null, 'diagnostics' => $resolution['diagnostics'] ?? []] : $resolution;
+            }
+            $candidate = $resolution['primary'];
+            if ($primary !== null && ($candidate['id'] ?? null) !== ($primary['id'] ?? null)) {
+                return ['status' => 'conflict', 'primary' => null, 'diagnostics' => []];
+            }
+            $primary ??= $candidate;
+        }
+        return ['status' => 'resolved', 'primary' => $primary, 'diagnostics' => []];
     }
 
     /** @return list<array<string,mixed>> */
-    private function usedKnowledge(EditorialDraft $draft, EditorialPlan $plan): array
+    private function usedKnowledge(EditorialDraft $draft, EditorialPlan $plan, string $answer): array
     {
         $claims = [];
-        foreach ($plan->sections as $section) foreach ((array) ($section['claims'] ?? []) as $claim) if (is_array($claim)) $claims[(string) ($claim['claim_id'] ?? '')] = $claim;
+        foreach ($plan->sections as $section) foreach ((array) ($section['claims'] ?? []) as $claim) {
+            if (is_array($claim)) $claims[(string) ($section['id'] ?? '') . '|' . (string) ($claim['claim_id'] ?? '')] = $claim;
+        }
         $used = [];
+        $seenText = [];
+        $normalizedAnswer = $this->proseKey($answer);
         foreach ($draft->claimTrace as $trace) {
-            $claim = $claims[(string) ($trace['claim_id'] ?? '')] ?? [];
+            $claim = $claims[(string) ($trace['section_id'] ?? '') . '|' . (string) ($trace['claim_id'] ?? '')] ?? [];
+            $textKey = $this->proseKey((string) ($claim['text'] ?? $claim['claim_text'] ?? ''));
+            if ($textKey === '' || isset($seenText[$textKey]) || !str_contains($normalizedAnswer, $textKey)) continue;
+            $seenText[$textKey] = true;
             $used[] = [
                 'claim_id' => (string) ($trace['claim_id'] ?? ''), 'revision' => (int) ($trace['claim_revision'] ?? 0),
                 'original_subject' => $trace['original_subject'] ?? [], 'target_subject' => $trace['target_subject'] ?? [],
@@ -163,6 +212,11 @@ final class KnowledgeWriterPreviewService
             ];
         }
         return $used;
+    }
+
+    private function proseKey(string $text): string
+    {
+        return trim((string) (preg_replace('/[^\p{L}\p{N}]+/u', ' ', mb_strtolower($text)) ?? ''));
     }
 
     private function contextualize(EditorialPlan $plan, array $primary): EditorialPlan
@@ -191,33 +245,40 @@ final class KnowledgeWriterPreviewService
         $excluded = [];
         foreach (array_slice($pack->excludedCandidates, 0, 50) as $claim) {
             if (!is_array($claim)) continue;
-            $excluded[] = ['claim_id' => (string) ($claim['claim_id'] ?? ''), 'revision' => (int) ($claim['claim_revision'] ?? 0), 'reasons' => array_values(array_slice((array) ($claim['exclusion_reasons'] ?? []), 0, 5))];
+            $excluded[] = ['claim_id' => (string) ($claim['claim_id'] ?? ''), 'revision' => (int) ($claim['claim_revision'] ?? 0), 'reasons' => array_slice($this->reasonCodes((array) ($claim['exclusion_reasons'] ?? [])), 0, 5)];
         }
         return $excluded;
     }
 
-    /** @param list<string> $facets @return array<string,mixed> */
-    private function coverage(EditorialContextPack $pack, EditorialPlan $plan, array $facets): array
+    /** @param list<array<string,mixed>> $used @param list<string> $facets @return array<string,mixed> */
+    private function coverage(array $used, array $facets): array
     {
         $covered = [];
-        foreach ($plan->sections as $section) foreach ((array) ($section['claims'] ?? []) as $claim) if (is_array($claim) && is_string($claim['facet'] ?? null)) $covered[] = $claim['facet'];
+        foreach ($used as $claim) if (is_string($claim['facet'] ?? null) && $claim['facet'] !== '') $covered[] = $claim['facet'];
         $covered = array_values(array_unique($covered));
-        return ['status' => $covered === [] ? 'sparse' : 'partial', 'covered_facets' => $covered, 'uncovered_facets' => array_values(array_diff($facets, $covered)), 'aspects' => $pack->coverageAspects];
+        $uncovered = array_values(array_diff($facets, $covered));
+        return ['status' => $covered === [] ? 'sparse' : ($uncovered === [] ? 'complete' : 'partial'),
+            'covered_facets' => $covered, 'uncovered_facets' => $uncovered];
     }
 
-    private function scrub(string $text, array $subject, EditorialContextPack $pack): string
+    /** Reject the whole answer when control syntax or a known private identifier appears. */
+    private function readerSafe(string $text, array $subject, EditorialContextPack $pack): bool
     {
         $needles = [(string) ($subject['id'] ?? ''), (string) ($subject['stable_key'] ?? '')];
-        foreach ($pack->selectedClaims as $claim) if (is_array($claim)) $needles[] = (string) ($claim['claim_id'] ?? '');
-        $text = str_replace(array_filter($needles), '', $text);
-        $text = preg_replace('/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i', '', $text) ?? $text;
-        return trim($text);
+        foreach ($pack->selectedClaims as $claim) {
+            if (!is_array($claim)) continue;
+            foreach (['claim_id', 'subject_id'] as $key) $needles[] = (string) ($claim[$key] ?? '');
+            foreach (['source_ids', 'evidence_ids'] as $key) foreach ((array) ($claim[$key] ?? []) as $id) if (is_string($id)) $needles[] = $id;
+            foreach ((array) ($claim['provenance_references'] ?? []) as $ids) foreach ((array) $ids as $id) if (is_string($id)) $needles[] = $id;
+        }
+        foreach ($needles as $needle) if (mb_strlen($needle) >= 6 && str_contains($text, $needle)) return false;
+        return preg_match('/\b(?:source|evidence|proposal|claim|knowledge|capture|graph|canonical|stable|subject)(?:[_-]?(?:id|uuid|key|revision|state|status))?\b\s*[:=]|\b(?:source|evidence|proposal|claim|knowledge|capture|graph|canonical|stable|subject)[_-](?:id|uuid|key|revision|state|status)\b|\b[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b|\b(?:brand|model|variant|movement|classification|specimen|product):[a-z0-9_-]+\b|<!--|<[^>]+>/iu', $text) === 0;
     }
 
     /** @param array<mixed> $values @return list<string> */
     private function reasonCodes(array $values): array
     {
-        return array_values(array_unique(array_filter($values, static fn (mixed $value): bool => is_string($value) && preg_match('/^[A-Z][A-Z0-9_]{2,80}$/', $value) === 1)));
+        return array_slice(array_values(array_unique(array_filter($values, static fn (mixed $value): bool => is_string($value) && preg_match('/^[A-Z][A-Z0-9_]{2,80}$/', $value) === 1))), 0, 30);
     }
 
     /** @return array<string,mixed> */
@@ -230,7 +291,7 @@ final class KnowledgeWriterPreviewService
     private function fail(array $base, string $status, string $code): array
     {
         $base['status'] = $status;
-        $base['diagnostics'] = array_values(array_unique(array_merge($base['diagnostics'], [$code])));
+        $base['diagnostics'] = $this->reasonCodes(array_merge([$code], $base['diagnostics']));
         return $base;
     }
 }

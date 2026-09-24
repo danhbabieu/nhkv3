@@ -15,6 +15,7 @@ trait KnowledgeWriterPreviewFixture
     private array $retrievals = [];
     private array $rows = [];
     private bool $retrievalFailure = false;
+    private $readProbe = null;
     private InMemoryAuthorityRepository $authority;
     private EntityTypeRegistry $types;
 
@@ -39,7 +40,7 @@ trait KnowledgeWriterPreviewFixture
     {
         $canonical = new CanonicalAuthoritySubjectResolver($this->authority, $this->types);
         $engine = new ClaimRetrievalEngine(
-            function (array $subject): array { $this->retrievals[] = $subject; if ($this->retrievalFailure) throw new \RuntimeException('private infrastructure detail'); return ['status' => 'available', 'items' => []]; },
+            function (array $subject): array { $this->retrievals[] = $subject; if ($this->readProbe !== null) ($this->readProbe)(); if ($this->retrievalFailure) throw new \RuntimeException('private infrastructure detail'); return ['status' => 'available', 'items' => []]; },
             fn (array $subject, array $neighborhood): array => $this->rows,
         );
         return new KnowledgeWriterPreviewService(
@@ -140,11 +141,13 @@ final class KnowledgeWriterPreviewServiceTest extends TestCase
 
     public function test_requested_facets_are_retrieved_and_uncovered_facet_is_reported(): void
     {
-        $this->rows[0]['text'] = 'Chủ thể variant có dấu recognition ở vòng chỉ giờ.';
         $result = $this->service()->preview($this->request(['requested_facets' => ['recognition', 'music']]));
         self::assertCount(2, $result['semantic_needs']);
         self::assertSame(['recognition'], $result['coverage']['covered_facets'], json_encode($result, JSON_UNESCAPED_UNICODE) ?: '');
         self::assertSame(['music'], $result['coverage']['uncovered_facets']);
+        self::assertSame('partial', $result['coverage']['status']);
+        $complete = $this->service()->preview($this->request(['requested_facets' => ['recognition']]));
+        self::assertSame('complete', $complete['coverage']['status']);
     }
 
     public function test_sparse_knowledge_does_not_repeat_instruction_as_fact(): void
@@ -154,6 +157,17 @@ final class KnowledgeWriterPreviewServiceTest extends TestCase
         self::assertSame('sparse', $result['status']);
         self::assertSame('', $result['answer']);
         self::assertSame([], $result['used_knowledge']);
+    }
+
+    public function test_suppressed_answer_has_no_used_claims_or_covered_facets(): void
+    {
+        $result = $this->service()->preview($this->request([
+            'requested_facets' => ['recognition'], 'output_constraints' => ['max_chars' => 1],
+        ]));
+        self::assertSame('', $result['answer']);
+        self::assertSame([], $result['used_knowledge']);
+        self::assertSame([], $result['coverage']['covered_facets']);
+        self::assertSame(['recognition'], $result['coverage']['uncovered_facets']);
     }
 
     public function test_sibling_variant_claim_is_excluded_and_never_reaches_answer(): void
@@ -174,6 +188,96 @@ final class KnowledgeWriterPreviewServiceTest extends TestCase
         self::assertSame('blocked', $result['status']);
         self::assertContains('UNKNOWN_PREVIEW_DEPTH', $result['diagnostics']);
         self::assertSame([], $this->retrievals);
+    }
+
+    public function test_incompatible_depth_fails_before_retrieval(): void
+    {
+        $result = $this->service()->preview($this->request(['depth' => 'deep']));
+        self::assertSame('blocked', $result['status']);
+        self::assertContains('INCOMPATIBLE_PREVIEW_DEPTH', $result['diagnostics']);
+        self::assertSame([], $this->retrievals);
+    }
+
+    public function test_control_metadata_in_claim_text_blocks_reader_answer(): void
+    {
+        $this->rows[0]['text'] .= ' source_id=private-source-17 evidence_id=evidence-local-4 proposal_id=review-9.';
+        $result = $this->service()->preview($this->request());
+        self::assertSame('blocked', $result['status']);
+        self::assertSame('', $result['answer']);
+        self::assertSame([], $result['used_knowledge']);
+        self::assertContains('PUBLIC_COPY_UNSAFE', $result['diagnostics']);
+    }
+
+    public function test_non_uuid_evidence_identifier_and_control_payload_cannot_be_rendered(): void
+    {
+        $this->rows[0]['evidence_ids'] = ['private-evidence-42'];
+        $this->rows[0]['text'] .= ' private-evidence-42';
+        $result = $this->service()->preview($this->request());
+        self::assertSame('blocked', $result['status']);
+        self::assertSame('', $result['answer']);
+        self::assertSame([], $result['used_knowledge']);
+
+        $this->rows[0]['text'] = 'Chủ thể variant có mặt số với vòng chỉ giờ. source: hidden-record-7';
+        $result = $this->service()->preview($this->request());
+        self::assertSame('blocked', $result['status']);
+        self::assertSame('', $result['answer']);
+    }
+
+    public function test_conflicting_explicit_locators_do_not_retrieve(): void
+    {
+        $other = '77777777-7777-4777-8777-777777777777';
+        $this->authority->create(new AuthorityEntity($other, 'variant', 'variant:other', 'Biến thể khác', 1, []));
+        $result = $this->service()->preview($this->request(['subject' => [
+            'canonical_uuid' => $this->subjectId, 'type' => 'variant', 'stable_key' => 'variant:other',
+        ]]));
+        self::assertSame('blocked', $result['status']);
+        self::assertSame('', $result['answer']);
+        self::assertContains('SUBJECT_LOCATOR_CONFLICT', $result['diagnostics']);
+        self::assertSame([], $this->retrievals);
+    }
+
+    public function test_missing_or_contradictory_name_locator_does_not_fall_back_to_uuid(): void
+    {
+        foreach (['Không có chủ thể này', 'Chủ thể model'] as $name) {
+            $result = $this->service()->preview($this->request(['subject' => [
+                'canonical_uuid' => $this->subjectId, 'type' => 'variant', 'query' => $name,
+            ]]));
+            self::assertSame('blocked', $result['status']);
+            self::assertContains('SUBJECT_LOCATOR_CONFLICT', $result['diagnostics']);
+        }
+        self::assertSame([], $this->retrievals);
+    }
+
+    public function test_requested_facet_does_not_override_subject_applicability(): void
+    {
+        $this->rows[0]['subject_id'] = '77777777-7777-4777-8777-777777777777';
+        $result = $this->service()->preview($this->request(['requested_facets' => ['recognition']]));
+        self::assertSame([], $result['used_knowledge']);
+        self::assertContains('claim-direct', array_column($result['excluded_knowledge'], 'claim_id'));
+    }
+
+    public function test_oversized_or_malformed_context_and_query_fail_before_retrieval(): void
+    {
+        foreach ([
+            ['observations' => [['value' => str_repeat('a', 5000)]]],
+            ['observations' => [['value' => ['nested']]]],
+            ['observations' => array_fill(0, 13, ['value' => 'Ghi chú'])],
+            ['subject' => ['query' => str_repeat('x', 1000)]],
+        ] as $input) {
+            $result = $this->service()->preview($this->request($input));
+            self::assertSame('blocked', $result['status']);
+            self::assertSame([], $result['context_used']);
+        }
+        self::assertSame([], $this->retrievals);
+    }
+
+    public function test_diagnostic_projection_is_bounded_and_code_only(): void
+    {
+        $method = new \ReflectionMethod(KnowledgeWriterPreviewService::class, 'reasonCodes');
+        $codes = array_map(static fn (int $i): string => sprintf('REASON_%02d', $i), range(0, 49));
+        $result = $method->invoke($this->service(), [...$codes, 'secret=value', str_repeat('X', 100)]);
+        self::assertCount(30, $result);
+        self::assertSame(array_slice($codes, 0, 30), $result);
     }
 
     public function test_diagnostics_are_reason_codes_not_retrieval_numbers(): void
@@ -221,6 +325,7 @@ final class KnowledgeWriterPreviewServiceTest extends TestCase
         $result = $this->service()->preview($this->request());
         self::assertSame(1, substr_count($result['answer'], 'mặt số với vòng chỉ giờ'));
         self::assertContains('claim-duplicate', array_column($result['excluded_knowledge'], 'claim_id'));
+        self::assertNotContains('claim-duplicate', array_column($result['used_knowledge'], 'claim_id'));
     }
 
     public function test_reverse_traversal_retains_persisted_direction_and_context_treatment(): void

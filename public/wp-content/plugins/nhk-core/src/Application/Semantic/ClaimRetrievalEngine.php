@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Semantic;
 
 use NHK\Core\Domain\Graph\PredicateRegistry;
+use NHK\Core\Domain\Knowledge\KnowledgeFacetProfile;
 
 /** Bounded, deterministic Claim discovery and selection over owner read ports. */
 final class ClaimRetrievalEngine
@@ -310,6 +311,9 @@ final class ClaimRetrievalEngine
         $evidence = (string) ($row['evidence_status'] ?? 'NO_EVIDENCE');
         $text = (string) ($row['text'] ?? $row['claim_text'] ?? '');
         $topicOverlap = $intent !== '' ? $this->overlap($intent, strtolower($text)) : 0.0;
+        $registeredFacetMatch = $need !== null && in_array($need['facet_key'] ?? null, KnowledgeFacetProfile::FACETS, true)
+            && ($need['concept_key'] ?? '') === ''
+            && strtolower(trim((string) ($row['facet'] ?? $row['knowledge_facet'] ?? ''))) === (string) $need['facet_key'];
         $score = 0.0;
         $decision = 'include';
         $reason = 'subject, scope, provenance, evidence and registered applicability path passed the bounded retrieval policy';
@@ -317,7 +321,7 @@ final class ClaimRetrievalEngine
         if ($id === '' || $text === '') { $decision = 'exclude'; $reason = 'claim identity or text is missing'; }
         elseif (!$this->applicableToSubject($claimSubject, $claimSubjectType, $subject, $path)) { $decision = 'exclude'; $reason = 'Claim has no explainable subject-scoped applicability path'; $warnings[] = 'SEMANTIC_SCOPE_NOT_APPLICABLE'; }
         elseif ($scope === 'specimen-only' && ($subject['type'] ?? '') !== 'specimen') { $decision = 'exclude'; $reason = 'specimen-scoped Claim cannot generalize to this subject'; $warnings[] = 'SPECIMEN_SCOPE_LIMIT'; }
-        elseif ($intent !== '' && $topicOverlap <= 0.0) { $decision = 'exclude'; $reason = 'Claim is not relevant to the editorial topic'; $warnings[] = 'TOPIC_IRRELEVANT'; }
+        elseif ($intent !== '' && $topicOverlap <= 0.0 && !$registeredFacetMatch) { $decision = 'exclude'; $reason = 'Claim is not relevant to the editorial topic'; $warnings[] = 'TOPIC_IRRELEVANT'; }
         elseif ($evidence !== 'SUPPORTED_WITHIN_SCOPE') { $decision = 'review'; $reason = 'evidence is absent or insufficient for direct prose'; $warnings[] = 'EVIDENCE_SCOPE_REVIEW'; }
         elseif ($provenance === '') { $decision = 'review'; $reason = 'provenance is unavailable'; $warnings[] = 'PROVENANCE_UNAVAILABLE'; }
         if ($decision === 'include') {
