@@ -11,33 +11,44 @@ final class KnowledgeWriterPreviewSafetyTest extends TestCase
 {
     use KnowledgeWriterPreviewFixture;
 
+    /** @var array<string,array{records:list<array<string,mixed>>,write_calls:int,read_calls:int}> */
+    private array $connectedOwners = [];
+
     public function test_preview_is_deterministic_and_does_not_mutate_authority_or_claim_fixtures(): void
     {
         $owners = [];
         foreach (['Capture', 'Post', 'Media', 'MediaUsage', 'Video', 'Source', 'Evidence', 'Graph',
             'Proposal', 'Governance', 'PublicIdentity', 'SeoProjection'] as $name) {
-            $owners[$name] = ['records' => [['id' => strtolower($name) . ':existing', 'revision' => 3, 'payload' => ['state' => 'active']]], 'write_calls' => 0];
+            $owners[$name] = ['records' => [['id' => strtolower($name) . ':existing', 'revision' => 3, 'payload' => ['state' => 'active']]], 'write_calls' => 0, 'read_calls' => 0];
         }
         $owners['KnowledgeClaim']['records'] =& $this->rows;
         $this->rows[0]['source_ids'] = [$owners['Source']['records'][0]['id']];
         $this->rows[0]['evidence_ids'] = [$owners['Evidence']['records'][0]['id']];
+        $this->connectedOwners =& $owners;
+        $observedReads = 0;
         $snapshot = static function () use (&$owners): array {
             $result = [];
             foreach ($owners as $name => $store) {
                 $result[$name] = ['count' => count($store['records']),
                     'revisions' => array_column($store['records'], 'revision'),
-                    'serialized' => serialize($store), 'write_calls' => $store['write_calls'] ?? 0];
+                    'serialized' => serialize(['records' => $store['records'], 'write_calls' => $store['write_calls']]), 'write_calls' => $store['write_calls'] ?? 0];
             }
             return $result;
         };
         $before = ['authority' => serialize($this->authority), 'stores' => $snapshot()];
         $observedDuringRead = [];
-        $this->readProbe = static function () use (&$observedDuringRead, $snapshot): void { $observedDuringRead[] = $snapshot(); };
+        $this->readProbe = function () use (&$observedDuringRead, &$observedReads, $snapshot): void {
+            $observedReads++;
+            foreach ($this->connectedOwners as &$owner) $owner['read_calls']++;
+            unset($owner);
+            $observedDuringRead[] = $snapshot();
+        };
         $service = $this->service();
         $first = $service->preview($this->request());
         $second = $service->preview($this->request());
         self::assertSame(json_encode($first), json_encode($second));
         self::assertCount(2, $observedDuringRead);
+        self::assertSame(2, $observedReads);
         foreach ($observedDuringRead as $observed) self::assertSame($before['stores'], $observed);
         self::assertSame($before, ['authority' => serialize($this->authority), 'stores' => $snapshot()]);
         foreach ($snapshot() as $store) self::assertSame(0, $store['write_calls']);

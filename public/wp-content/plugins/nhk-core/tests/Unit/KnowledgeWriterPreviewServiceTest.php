@@ -208,6 +208,18 @@ final class KnowledgeWriterPreviewServiceTest extends TestCase
         self::assertContains('PUBLIC_COPY_UNSAFE', $result['diagnostics']);
     }
 
+    public function test_plural_and_provenance_control_labels_never_reach_reader_answer(): void
+    {
+        foreach (['source_ids', 'evidence_ids', 'provenance_references'] as $label) {
+            $this->rows[0]['text'] = 'Chủ thể variant có mặt số với vòng chỉ giờ. ' . $label . '=private-source-17';
+            $result = $this->service()->preview($this->request());
+            self::assertNotSame('available', $result['status'], $label);
+            self::assertSame('', $result['answer'], $label);
+            self::assertSame([], $result['used_knowledge'], $label);
+            self::assertContains('PUBLIC_COPY_UNSAFE', $result['diagnostics'], $label);
+        }
+    }
+
     public function test_non_uuid_evidence_identifier_and_control_payload_cannot_be_rendered(): void
     {
         $this->rows[0]['evidence_ids'] = ['private-evidence-42'];

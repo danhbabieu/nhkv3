@@ -272,7 +272,7 @@ final class KnowledgeWriterPreviewService
             foreach ((array) ($claim['provenance_references'] ?? []) as $ids) foreach ((array) $ids as $id) if (is_string($id)) $needles[] = $id;
         }
         foreach ($needles as $needle) if (mb_strlen($needle) >= 6 && str_contains($text, $needle)) return false;
-        return preg_match('/\b(?:source|evidence|proposal|claim|knowledge|capture|graph|canonical|stable|subject)(?:[_-]?(?:id|uuid|key|revision|state|status))?\b\s*[:=]|\b(?:source|evidence|proposal|claim|knowledge|capture|graph|canonical|stable|subject)[_-](?:id|uuid|key|revision|state|status)\b|\b[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b|\b(?:brand|model|variant|movement|classification|specimen|product):[a-z0-9_-]+\b|<!--|<[^>]+>/iu', $text) === 0;
+        return preg_match('/\b(?:source|evidence|provenance|proposal|claim|knowledge|capture|graph|canonical|stable|subject)(?:[_-]?(?:id|ids|uuid|key|revision|state|status|references?))?\b\s*[:=]|\b(?:source|evidence|provenance|proposal|claim|knowledge|capture|graph|canonical|stable|subject)[_-](?:id|ids|uuid|key|revision|state|status|references?)\b|\b[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b|\b(?:brand|model|variant|movement|classification|specimen|product):[a-z0-9_-]+\b|<!--|<[^>]+>/iu', $text) === 0;
     }
 
     /** @param array<mixed> $values @return list<string> */
