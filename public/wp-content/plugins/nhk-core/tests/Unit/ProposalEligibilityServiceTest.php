@@ -185,6 +185,37 @@ final class ProposalEligibilityServiceTest extends TestCase
         self::assertContains('TARGET_REVISION_CHANGED', $this->service($stale, mediaUsages: $usages, relationReader: $reader)->check($stale->id)->reasons);
     }
 
+    public function test_media_usage_canonical_wp_post_id_is_not_truncated_during_eligibility(): void
+    {
+        $usage = new MediaUsage('01a0d8d7-1111-7111-8111-111111111111', self::SUBJECT, 'wp_post', '1:18', 'featured_primary', revision: 1, placementKey: '');
+        $proposal = new Proposal(self::ID, self::SUBJECT, 'replace', [
+            'media' => ['id' => self::SUBJECT],
+            'target' => ['type' => 'wp_post', 'id' => '1:18', 'revision' => 1788554933],
+            'usage_id' => $usage->usageId,
+            'expected_usage_revision' => 1,
+        ], 'media-usage-canonical-wp-post', 1, 'media-usage-canonical-wp-post-dependency', ProposalState::APPROVED, targetUuid: null, entityType: 'media');
+        $reader = new class implements EligibilityReader {
+            public function isApplied(string $dependencyUuid): bool { return true; }
+            public function targetRevision(string $targetUuid): ?int { return $targetUuid === '1:18' ? 1788554933 : 1; }
+            public function targetExists(string $targetUuid): bool { return $targetUuid !== '1:1'; }
+        };
+        $usages = new class($usage) implements MediaUsageRepository {
+            public function __construct(private MediaUsage $usage) {}
+            public function create(MediaUsage $usage): MediaUsage { return $usage; }
+            public function listByMediaId(string $mediaId, ?string $role = null): array { return []; }
+            public function listByEndpoint(string $endpointType, string $endpointKey, ?string $role = null): array
+            {
+                return $endpointType === 'wp_post' && $endpointKey === '1:18' ? [$this->usage] : [];
+            }
+        };
+
+        $result = $this->service($proposal, mediaUsages: $usages, relationReader: $reader)->check($proposal->id);
+
+        self::assertTrue($result->ready);
+        self::assertNotContains('ARTICLE_TARGET_NOT_FOUND', $result->reasons);
+        self::assertNotContains('TARGET_REVISION_CHANGED', $result->reasons);
+    }
+
     public function test_evidence_requires_claim_and_source_revision_binding_and_blocks_drift(): void
     {
         $claim = '33333333-3333-4333-8333-333333333333';

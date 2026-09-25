@@ -92,10 +92,8 @@ final class ProposalEligibilityService
             $target = is_array($proposal->payload['target'] ?? null) ? $proposal->payload['target'] : [];
             $targetType = strtolower(trim((string) ($target['type'] ?? '')));
             if ($targetType === 'wp_post') {
-                $blog = (int) ($target['blog_id'] ?? 1);
-                $post = (int) ($target['post_id'] ?? $target['id'] ?? 0);
-                $endpointKey = $blog . ':' . $post;
-                if ($blog < 1 || $post < 1 || !$this->reader->targetExists($endpointKey)) $reasons[] = 'ARTICLE_TARGET_NOT_FOUND';
+                $endpointKey = $this->wpPostEndpointKey($target);
+                if ($endpointKey === null || !$this->reader->targetExists($endpointKey)) $reasons[] = 'ARTICLE_TARGET_NOT_FOUND';
             } elseif ($proposal->targetUuid === null || !$this->reader->targetExists($proposal->targetUuid)) {
                 $reasons[] = 'MEDIA_USAGE_TARGET_NOT_FOUND';
             }
@@ -176,6 +174,19 @@ final class ProposalEligibilityService
         if ($this->video !== null) $reasons = array_merge($reasons, $this->video->evaluate($proposal));
         foreach ($this->dependencies->closure($proposalId) as $dependency) if (!$this->reader->isApplied($dependency)) $reasons[] = 'DEPENDENCY_NOT_APPLIED';
         return $reasons ? new EligibilityResult(false, array_values(array_unique($reasons)), $diagnostics) : EligibilityResult::ready($diagnostics);
+    }
+
+    /** @param array<string,mixed> $target */
+    private function wpPostEndpointKey(array $target): ?string
+    {
+        $canonical = trim((string) ($target['id'] ?? ''));
+        if (preg_match('/^[1-9][0-9]*:[1-9][0-9]*$/', $canonical) === 1) return $canonical;
+
+        $blog = filter_var($target['blog_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        $post = filter_var($target['post_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        if ($blog === false || $blog === null || $post === false || $post === null) return null;
+
+        return $blog . ':' . $post;
     }
 
     private function fingerprint(mixed $value): string
