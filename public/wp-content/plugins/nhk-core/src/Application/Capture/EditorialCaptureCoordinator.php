@@ -800,7 +800,8 @@ final class EditorialCaptureCoordinator
                 // reconciliation so a media failure can recover all already
                 // resolved owner diagnostics without pretending Article
                 // composition completed.
-                $record = $this->save($record, CaptureStage::SEMANTICS_RECONCILED, $assets, $diagnostics, $receipts, 'SEMANTICS_RECONCILED', $record->articleId, $record->articleStateToken);
+                $checkpointStatus = strtoupper(trim((string) ($writes['status'] ?? ''))) === 'PARTIAL' && (array) ($writes['blockers'] ?? []) !== [] ? 'PARTIAL' : 'IN_PROGRESS';
+                $record = $this->save($record, CaptureStage::SEMANTICS_RECONCILED, $assets, $diagnostics, $receipts, 'SEMANTICS_RECONCILED', $record->articleId, $record->articleStateToken, $checkpointStatus, $checkpointStatus === 'PARTIAL' ? 'PARTIAL' : null);
                 $assets = $record->assets;
                 $diagnostics = $record->diagnostics;
                 $receipts = $record->phaseReceipts;
