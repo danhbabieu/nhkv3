@@ -1,7 +1,8 @@
 import { App } from "@modelcontextprotocol/ext-apps";
-import { assertCaptureArticleReadback, assertMediaArticleReadback, assertUploadManifestCounts, buildCaptureAssetInputs, buildWidgetState, buildWidgetUploadArguments, buildWidgetUploadFailureManifest, extractUploadManifest, inspectToolResult, mergeUploadManifest, normalizeSelectedFiles, orderUploadedItems, shouldProcessToolResultNotification, type BatchContext, type SelectedImage, type ToolResult, type ToolResultNotificationSource, type UploadedItem, type UploadManifest, type WidgetDiagnostic, type WidgetUploadReference, type WidgetUploadStatus } from "./contract";
+import { assertCaptureArticleReadback, assertMediaArticleReadback, assertUploadManifestCounts, buildCaptureAssetInputs, buildWidgetState, buildWidgetUploadArguments, buildWidgetUploadFailureManifest, extractUploadManifest, inspectToolResult, mergeUploadManifest, normalizeCaptureReadback, normalizeSelectedFiles, orderUploadedItems, shouldProcessToolResultNotification, type BatchContext, type SelectedImage, type ToolResult, type ToolResultNotificationSource, type UploadedItem, type UploadManifest, type WidgetDiagnostic, type WidgetUploadReference, type WidgetUploadStatus } from "./contract";
 import { uploadSelectedFiles, type HostUploadOutcome } from "./host-upload";
 import { planSubmissionResume } from "./resume-policy";
+import { executeResumePlan } from "./resume-executor";
 
 // Easy MCP exposes the internal/admin boundary under the registered
 // WordPress Ability name. callServerTool must use that exact runtime name;
@@ -104,6 +105,7 @@ async function start(): Promise<void> {
   let uploadStatus: WidgetUploadStatus = "idle";
   let retryOperationKey: string | null = null;
   let retryAttempt = 0;
+  let captureReadback: ReturnType<typeof assertCaptureArticleReadback> | null = null;
 
   function renderDiagnostics(): void {
     diagnosticsView.replaceChildren();
@@ -247,6 +249,37 @@ async function start(): Promise<void> {
     }
   }
 
+  function captureResumeInput(): Parameters<typeof planSubmissionResume>[0] {
+    const capture = captureReadback;
+    const usages = capture?.canonical_usage_readback ?? [];
+    return {
+      media_commit_status: "COMPLETE",
+      enrichment_status: enrichmentStatus,
+      intent: typeof capture?.content_intent === "string" ? capture.content_intent : capture?.content_intent?.intent,
+      items: orderUploadedItems(uploaded),
+      capture: { id: capture?.capture_id, exists: Boolean(capture?.capture_id) },
+      article: { id: capture?.article?.post_id ?? capture?.article_id ?? undefined, exists: Boolean(capture?.article?.post_id ?? capture?.article_id) },
+      media_usages: usages.map((usage) => ({ media_id: usage.media_id, complete: usage.active !== false, status: usage.active === false ? "RETIRED" : "COMPLETE" })),
+    };
+  }
+
+  async function retryCaptureConvergence(): Promise<void> {
+    if (!captureReadback?.capture_id || !retryOperationKey) throw new Error("CAPTURE_RETRY_CONTEXT_UNAVAILABLE");
+    const plan = planSubmissionResume(captureResumeInput());
+    const result = await executeResumePlan(plan, {
+      captureId: captureReadback.capture_id,
+      captureKey: `${retryOperationKey}:capture`,
+      callCapture: async (arguments_) => {
+        const docs = await app.callServerTool({ name: DOCUMENTATION_TOOL_NAME, arguments: {} });
+        const checkpoint = checkpointFrom(docs as ToolResult);
+        return app.callServerTool({ name: CAPTURE_TOOL_NAME, arguments: { ...arguments_, documentation_checkpoint: checkpoint } });
+      },
+    });
+    if (result === null) return;
+    captureReadback = assertCaptureResult(result as ToolResult);
+    await assertArticleMediaReadback(captureReadback);
+  }
+
   async function materializeSelectedImages(operationKey: string, namingContext: string, attempt: number): Promise<UploadManifest> {
     const priorItems = batchManifest?.items ?? [];
     const resumePlan = planSubmissionResume({
@@ -372,7 +405,15 @@ async function start(): Promise<void> {
         },
       });
       recordDiagnostic("CAPTURE_READBACK_START", "START", "CAPTURE_READBACK_REQUESTED");
-      const captureReadback = assertCaptureResult(capture as ToolResult);
+      try {
+        captureReadback = assertCaptureResult(capture as ToolResult);
+      } catch (error) {
+        const inspection = inspectToolResult(capture as ToolResult);
+        if (inspection.kind === "success") {
+          try { captureReadback = normalizeCaptureReadback(inspection.payload); } catch { /* preserve the original fail-closed error */ }
+        }
+        throw error;
+      }
       await assertArticleMediaReadback(captureReadback);
       recordDiagnostic("CAPTURE_READBACK_DONE", "DONE", "CAPTURE_READBACK_VERIFIED");
       enrichmentStatus = "COMPLETE";
@@ -417,6 +458,31 @@ async function start(): Promise<void> {
     } catch (error) {
       recordDiagnostic("ERROR", "ERROR", diagnosticCode(error), error);
       setState("PARTIAL", HOST_UPLOAD_ERROR_MESSAGE);
+    } finally {
+      uploading = false;
+      renderSelection();
+    }
+  }
+
+  async function retryEnrichmentSubmission(): Promise<void> {
+    if (!connected || uploading || !captureReadback) return;
+    uploading = true;
+    setState("UPLOADING", "Đang hoàn tất liên kết ảnh với bài viết…");
+    try {
+      await retryCaptureConvergence();
+      enrichmentStatus = "COMPLETE";
+      uploadStatus = "complete";
+      publishBatchContext();
+      retryOperationKey = null;
+      retryAttempt = 0;
+      recordDiagnostic("READY_FOR_USE", "DONE", "MEDIA_COMMIT_READY");
+      setState("SUCCESS", "Đã hoàn tất bài viết từ Media đã lưu.");
+    } catch (error) {
+      enrichmentStatus = "PARTIAL";
+      retryAttempt += 1;
+      recordDiagnostic("ERROR", "ERROR", diagnosticCode(error), error);
+      publishBatchContext();
+      setState("ERROR", MEDIA_SAVED_ERROR_MESSAGE);
     } finally {
       uploading = false;
       renderSelection();
@@ -481,7 +547,13 @@ async function start(): Promise<void> {
     selected = selected.filter((item) => item.clientFileId !== target.dataset.clientFileId);
     renderSelection();
   });
-  upload.addEventListener("click", () => void (batchManifest?.status === "partial_success" ? retryPartialSubmission() : createArticle()));
+  upload.addEventListener("click", () => void (
+    batchManifest?.status === "partial_success"
+      ? retryPartialSubmission()
+      : enrichmentStatus === "PARTIAL" && captureReadback !== null
+        ? retryEnrichmentSubmission()
+        : createArticle()
+  ));
 
   setState("CONNECTING", "Đang kết nối tới MCP Apps host…");
   recordDiagnostic("BOOT", "DONE", "WIDGET_BOOT");

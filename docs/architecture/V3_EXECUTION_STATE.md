@@ -19906,3 +19906,37 @@ fixture memory exhaustion. `git diff --check` passes. No database, staging,
 production data, deployment or live acceptance mutation was performed.
 
 STATUS: `GENERIC_SUBMISSION_RESUME_LOCAL_READY / HOST_RETRY_ISOLATION_VERIFIED / FULL_UNIT_ONE_PREEXISTING_FRONTEND_FAILURE / NO_LIVE_MUTATION / LIVE_ACCEPTANCE_NOT_RUN`.
+
+# Checkpoint — 2026-09-25 — Execute Article MediaUsage repair phase (LOCAL / NO MUTATION)
+
+ROOT_CAUSE_CONFIRMED: The image widget consumed `planSubmissionResume()` only
+for Media materialization. When the planner returned `REPAIR_MEDIA_USAGE`,
+`materializeSelectedImages()` returned the already-committed manifest and no
+runtime handler invoked the canonical Capture continuation. The next step was
+therefore `nhk.media.get` against empty usages, producing
+`ARTICLE_MEDIA_DISPOSITION_INCOMPLETE`.
+
+FIXED_BOUNDARY: Added exhaustive resume-phase dispatch. Article usage repair,
+enrichment continuation and projection retry now reuse the same Capture retry
+identity and call `capture.ingest` with `resume_mode=RETRY`; the widget then
+performs the existing per-Media canonical read-back. This preserves the
+Capture/Article/MediaUsage owner boundaries and performs no host upload, Media
+creation or Article creation on recovery. The generated single-file widget was
+rebuilt; upload and Media ingest code was not changed.
+
+REGRESSION: Added an execution test proving `REPAIR_MEDIA_USAGE` invokes the
+server Capture retry with the same Capture idempotency key and no upload path.
+Existing N=1/2/3/10 policy coverage and Capture coordinator convergence tests
+remain in place.
+
+VERIFICATION: Image widget tests pass 63/63; TypeScript typecheck and Vite
+build pass with only existing Rollup zod annotation warnings. Focused Capture
+and Media PHP tests pass 46 tests / 281 assertions; Contract passes 6 tests /
+48 assertions. Full Unit with `memory_limit=512M` passes 2,647 tests / 15,388
+assertions, with only warnings/deprecations. The default 128M run is limited by
+an existing large-file fixture memory exhaustion. `git diff --check` passes;
+no changed PHP files required lint. Guarded Integration remains unavailable
+because `NHK_WP_TEST_PATH` and `NHK_WP_TEST_DB` are unset. No database,
+staging/production data, deployment or live acceptance mutation occurred.
+
+STATUS: `ARTICLE_MEDIA_USAGE_REPAIR_EXECUTABLE_LOCAL_READY / N_IMAGE_POLICY_VERIFIED / FULL_UNIT_PASS_512M / INTEGRATION_ENVIRONMENT_GATED / NO_LIVE_MUTATION`.
