@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Media;
 
-use NHK\Core\Application\Entity\RelatedContentQuery;
+use NHK\Core\Application\Entity\{EntityMediaProjection, RelatedContentQuery};
 use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository, MediaUsageRepository};
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
@@ -34,7 +34,11 @@ final class MediaVideoPageQuery
     ) {
         $this->delivery ??= PublicMediaAssetDelivery::fromEnvironment($assets, $media);
         $this->gallery = $gallery ?? new PublicMediaGalleryQuery($media, $assets, $this->delivery, $usages, PublicMediaArticleLinkResolver::fromWordPress());
-        $this->frontendProjection = new VideoFrontendProjection();
+        $videoMedia = new EntityMediaProjection($media, $assets, $usages);
+        $this->frontendProjection = new VideoFrontendProjection(
+            null,
+            static fn (Video $video, array $source): ?array => $videoMedia->representativeForEntity('video', $video->canonicalId),
+        );
     }
 
     public function mediaDetail(string $id): ?array
@@ -137,15 +141,23 @@ final class MediaVideoPageQuery
         $projection = $this->frontendProjection->project($video);
         $urlResult = (new VideoUrlPolicy())->project($video, new VideoPublicContextSelector());
         $publicUrl = is_array($projection['item'] ?? null) ? (string) ($projection['item']['public_url'] ?? '') : null;
+        $presentationThumbnail = is_array($projection['item']['thumbnail'] ?? null) ? $projection['item']['thumbnail'] : [];
+        $sourceThumbnail = $this->sourceThumbnail($source);
+        $hasRepresentativeThumbnail = ($presentationThumbnail['source'] ?? '') === 'media_usage';
         $seoProjection = null;
         if ($urlResult['eligible'] && $sourceAvailable && ($source['availability'] ?? 'unknown') === 'available') {
             $storedProjection = is_array($metadata['seo_projection'] ?? null) ? $metadata['seo_projection'] : null;
-            // Stored projections are cache artifacts, never an authority
-            // source. Legacy projections without a revision token are
-            // rebuilt as well, so a correction cannot serve stale copy/SEO.
-            $seoProjection = $storedProjection !== null && (int) ($storedProjection['source_revision'] ?? 0) === $video->revision
+            $seoPackage = [
+                'source' => array_merge($source, ['external_video_id' => $video->externalVideoId]),
+                'editorial' => $editorial,
+                'seo' => is_array($metadata['seo'] ?? null) ? $metadata['seo'] : [],
+                'presentation_thumbnail' => $presentationThumbnail,
+            ];
+            // A governed representative MediaUsage is newer presentation
+            // state than a Video-owned SEO cache, so it always reprojects.
+            $seoProjection = !$hasRepresentativeThumbnail && $storedProjection !== null && (int) ($storedProjection['source_revision'] ?? 0) === $video->revision
                 ? $storedProjection
-                : (new VideoSeoProjection())->project(['source' => array_merge($source, ['external_video_id' => $video->externalVideoId]), 'editorial' => $editorial, 'seo' => is_array($metadata['seo'] ?? null) ? $metadata['seo'] : []], function_exists('home_url') ? home_url((string) $publicUrl) : (string) $publicUrl);
+                : (new VideoSeoProjection())->project($seoPackage, function_exists('home_url') ? home_url((string) $publicUrl) : (string) $publicUrl);
         }
         $result = [
             'canonical_id' => $video->canonicalId,
@@ -160,8 +172,12 @@ final class MediaVideoPageQuery
             'public_url' => $publicUrl,
             'embed_url' => $sourceAvailable ? \NHK\Core\Domain\Video\YouTubeVideoIdentity::privacyEmbedUrl($video->externalVideoId) : null,
             'source_available' => $sourceAvailable,
-            'source_thumbnail_url' => ($thumbnail = $this->sourceThumbnail($source))['url'] ?? null,
-            'source_thumbnail' => $thumbnail,
+            'thumbnail_url' => $presentationThumbnail['url'] ?? null,
+            'thumbnail' => $presentationThumbnail,
+            'thumbnail_source' => (string) ($presentationThumbnail['source'] ?? ''),
+            'representative_media_id' => $hasRepresentativeThumbnail ? ($presentationThumbnail['media_id'] ?? null) : null,
+            'source_thumbnail_url' => $sourceThumbnail['url'] ?? null,
+            'source_thumbnail' => $sourceThumbnail,
             'source_status' => (string) ($source['availability'] ?? 'unknown'),
             'seo_projection' => $seoProjection,
             'provenance' => $this->publicProvenance($metadata, $source),

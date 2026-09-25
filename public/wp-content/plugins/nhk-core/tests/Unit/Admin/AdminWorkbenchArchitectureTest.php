@@ -81,6 +81,17 @@ final class AdminWorkbenchArchitectureTest extends TestCase
         foreach (['loadMediaDetail', 'Xem trên web', 'Mở nguồn gốc'] as $needle) self::assertStringContainsString($needle, $js);
     }
 
+    public function test_media_workspace_can_pin_a_representative_image_to_an_existing_video(): void
+    {
+        $page = (string) file_get_contents($this->repo() . '/public/wp-content/plugins/nhk-core/src/Infrastructure/Admin/AdminWorkbenchPage.php');
+        $js = (string) file_get_contents($this->repo() . '/public/wp-content/plugins/nhk-core/assets/admin/admin-workbench.js');
+
+        self::assertStringContainsString('<option value="video">Video</option>', $page);
+        self::assertStringContainsString("value = 'representative_bind'", $js);
+        self::assertStringContainsString("value = 'representative'", $js);
+        self::assertStringContainsString('Thay ảnh đại diện', $js);
+    }
+
     /** @return list<string> */
     private function productionFiles(): array
     {

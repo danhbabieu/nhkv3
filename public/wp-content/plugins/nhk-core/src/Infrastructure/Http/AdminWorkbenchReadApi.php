@@ -108,7 +108,7 @@ final class AdminWorkbenchReadApi
         }
 
         $frontendProjection = (new VideoUrlPolicy())->project($video, new VideoPublicContextSelector());
-        return (new AdminVideoAdapter([$video]))->detail($video, $relations, $evidence, $governance, $frontendProjection);
+        return (new AdminVideoAdapter([$video], $this->usages?->listByEndpoint('video', $video->canonicalId) ?? []))->detail($video, $relations, $evidence, $governance, $frontendProjection);
     }
 
     private function entity(string $id): array|\WP_Error
@@ -120,6 +120,6 @@ final class AdminWorkbenchReadApi
     }
 
     /** @return array<string,mixed> */
-    private function videoRow(Video $item): array { return array_merge(['type' => 'video'], (new AdminVideoAdapter([$item]))->find($item->externalVideoId)[0] ?? []); }
+    private function videoRow(Video $item): array { return array_merge(['type' => 'video'], (new AdminVideoAdapter([$item], $this->usages?->listByEndpoint('video', $item->canonicalId) ?? []))->find($item->externalVideoId)[0] ?? []); }
     private function matches(string $query, string ...$values): bool { foreach ($values as $value) if (str_contains(strtolower($value), $query)) return true; return false; }
 }

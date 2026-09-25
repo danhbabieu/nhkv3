@@ -1,3 +1,42 @@
+# Checkpoint — 2026-09-25 — Governed Video representative thumbnail override (LOCAL / NO LIVE MUTATION)
+
+IMPLEMENTED: Existing canonical Video owners can now receive or replace a
+representative image through the existing governed MediaUsage boundary. Manual
+selection remains `USER_EXPLICIT / PINNED`; no Video re-ingest, duplicate Video,
+new schema, direct writer or second semantic image owner was introduced. Admin
+Video read-back derives the active representative from MediaUsage and preserves
+the historical Video thumbnail field only as legacy diagnostic context.
+
+PUBLIC_PRECEDENCE: Video presentation now resolves in the order active eligible
+NHK representative MediaUsage → external source thumbnail → existing frontend
+fallback. The same governed representative flows through homepage Video
+projection, `/video/` archive cards, the detail-page pre-play poster and current
+Video SEO/Open Graph/VideoObject projection. Source thumbnail data remains
+separately readable as fallback/provenance and does not override a pinned NHK
+representative.
+
+ADMIN_WORKFLOW: The existing MediaUsage workbench now accepts `video` as a
+target. From Video detail, “Đặt ảnh đại diện” / “Thay ảnh đại diện” pre-fills
+the exact Video UUID, `representative_bind` operation and `representative`
+role, then continues through the existing Governance lifecycle and canonical
+read-back.
+
+REGRESSION_AND_CI: Added coverage for VideoFrontendProjection precedence,
+MediaVideoPageQuery representative/fallback separation, Video SEO image
+selection, Admin adapter read-back and Admin workbench wiring. CI additionally
+removed two test-only dependencies on a developer-machine upload fixture and
+fixed one pre-existing test parse error so the repository gate can execute
+cleanly. Canonical public URL verification passed 79 tests / 387 assertions;
+full Unit passed 2,652 tests / 15,405 assertions. Composer validation, PHP lint
+and `git diff --check` passed in the PR workflows.
+
+DELIVERY_STATE: Implemented on
+`feat/video-representative-thumbnail` in draft PR #14. No merge, deployment,
+production mutation, staging semantic mutation or live Video/Media change was
+performed.
+
+STATUS: `VIDEO_REPRESENTATIVE_MEDIA_LOCAL_READY / CI_GREEN / NO_LIVE_MUTATION / NOT_DEPLOYED`.
+
 # Checkpoint — 2026-09-25 — Generic Knowledge Writer subject/applicability boundary (LOCAL / READ-ONLY)
 
 ROOT_CAUSE: Knowledge Writer passed a caller-supplied `type` into typed name

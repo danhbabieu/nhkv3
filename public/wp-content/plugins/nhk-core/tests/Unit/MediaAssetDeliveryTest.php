@@ -69,15 +69,13 @@ final class MediaAssetDeliveryTest extends TestCase
     {
         $root = sys_get_temp_dir() . '/nhk-media-' . bin2hex(random_bytes(4));
         mkdir($root);
-        $fixture = dirname(__DIR__, 4) . '/uploads/integration-source-original-5.webp';
         $path = $root . '/physical-attachment-name.webp';
-        self::assertFileExists($fixture);
-        self::assertTrue(copy($fixture, $path));
-        $contents = file_get_contents($path);
+        $contents = base64_decode('UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AA/vuUAAA=', true);
         self::assertIsString($contents);
-        self::assertSame(['width' => 16, 'height' => 304, 'mime' => 'image/webp'], ['width' => (int) getimagesize($path)[0], 'height' => (int) getimagesize($path)[1], 'mime' => (string) getimagesize($path)['mime']]);
+        self::assertTrue(file_put_contents($path, $contents) !== false);
+        self::assertSame(['width' => 1, 'height' => 1, 'mime' => 'image/webp'], ['width' => (int) getimagesize($path)[0], 'height' => (int) getimagesize($path)[1], 'mime' => (string) getimagesize($path)['mime']]);
         $mediaId = UuidCodec::newV7();
-        $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'derivative', 'uploads/2026/09/physical-attachment-name.webp', hash('sha256', $contents), 'image/webp', strlen($contents), 16, 304, 'PUBLIC', [
+        $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'derivative', 'uploads/2026/09/physical-attachment-name.webp', hash('sha256', $contents), 'image/webp', strlen($contents), 1, 1, 'PUBLIC', [
             'canonical_filename' => 'canonical-public-name.webp',
             'wordpress_attachment_id' => 86,
         ]);

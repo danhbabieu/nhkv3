@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Home;
 
-use NHK\Core\Application\Entity\{PublicEntityCollectionQuery, PublicEntityEligibilityPolicy, PublicIdentityContract, PublicRouteResolver};
+use NHK\Core\Application\Entity\{EntityMediaProjection, PublicEntityCollectionQuery, PublicEntityEligibilityPolicy, PublicIdentityContract, PublicRouteResolver};
 use NHK\Core\Application\Knowledge\KnowledgePageQuery;
 use NHK\Core\Application\Media\PublicMediaGalleryQuery;
 use NHK\Core\Application\Seo\PublicSeoProjection;
@@ -45,6 +45,7 @@ final class HomeSemanticQuery
         private ?PublicMediaGalleryQuery $gallery = null,
         private ?KnowledgePageQuery $knowledge = null,
         private ?KnowledgeRepository $claims = null,
+        private ?EntityMediaProjection $videoMedia = null,
     ) {}
 
     public function extend(array $modules): array
@@ -114,7 +115,7 @@ final class HomeSemanticQuery
             $modules['videos_total'] = 0;
             $videoItems = $this->videoItems();
             foreach ($videoItems as $item) {
-                $projection = ($this->videoProjection ??= new VideoFrontendProjection())->project($item);
+                $projection = $this->videoFrontendProjection()->project($item);
                 if (!$item->active || !$item->hasValidPublicReference() || ($projection['frontend_available'] ?? false) !== true) continue;
                 $metadata = is_array($item->metadata) ? $item->metadata : [];
                 $source = is_array($metadata['source_snapshot'] ?? null)
@@ -123,7 +124,7 @@ final class HomeSemanticQuery
                 if (isset($source['availability']) && !in_array($source['availability'], ['available','unknown'], true)) continue;
                 $editorial = is_array($metadata['editorial'] ?? null) ? $metadata['editorial'] : [];
                 $title = trim((string) ($editorial['title'] ?? '')) ?: ($item->title ?: 'Video');
-                $thumbnail = (new \NHK\Core\Application\Video\VideoThumbnailSelector())->presentationFromSource($source);
+                $thumbnail = is_array($projection['item']['thumbnail'] ?? null) ? $projection['item']['thumbnail'] : [];
                 $visual = $this->visualPolicy()->resolve(['type' => 'video', 'image_url' => $thumbnail['url'] ?? null, 'width' => $thumbnail['width'] ?? null, 'height' => $thumbnail['height'] ?? null]);
                 $modules['videos_total']++;
                 if (count($modules['videos']) >= 6) continue;
@@ -157,14 +158,14 @@ final class HomeSemanticQuery
     {
         $items = [];
         foreach ($this->latestCandidates($this->videos, fn (): array => $this->videoItems()) as $video) {
-            $projection = ($this->videoProjection ??= new VideoFrontendProjection())->project($video);
+            $projection = $this->videoFrontendProjection()->project($video);
             if (!$this->ready('video') || !$video->active || ($projection['frontend_available'] ?? false) !== true) continue;
             $metadata = is_array($video->metadata) ? $video->metadata : [];
             $source = is_array($metadata['source_snapshot'] ?? null) ? $metadata['source_snapshot'] : (is_array($metadata['source'] ?? null) ? $metadata['source'] : []);
             $editorial = is_array($metadata['editorial'] ?? null) ? $metadata['editorial'] : [];
             $url = $projection['item']['public_url'] ?? null;
             if (!is_string($url) || $url === '' || (($source['availability'] ?? 'unknown') !== 'available')) continue;
-            $thumbnail = (new \NHK\Core\Application\Video\VideoThumbnailSelector())->presentationFromSource($source);
+            $thumbnail = is_array($projection['item']['thumbnail'] ?? null) ? $projection['item']['thumbnail'] : [];
             $items[] = $this->feedItem('video', 'Video', (string) (($editorial['title'] ?? '') ?: $video->title ?: 'Video'), $url, $this->videoPublishedAt($video), $video->createdAt, (string) ($editorial['summary'] ?? ''), $thumbnail['url'] ?? null, $thumbnail['width'] ?? null, $thumbnail['height'] ?? null, $video->canonicalId);
         }
         foreach ($this->latestCandidates($this->media, fn (): array => $this->mediaItems()) as $media) {
@@ -296,6 +297,16 @@ final class HomeSemanticQuery
     }
 
     private function routes(): PublicRouteResolver { return $this->routes ??= new PublicRouteResolver($this->authority, $this->types); }
+
+    private function videoFrontendProjection(): VideoFrontendProjection
+    {
+        return $this->videoProjection ??= new VideoFrontendProjection(
+            null,
+            $this->videoMedia === null
+                ? null
+                : fn (\NHK\Core\Domain\Video\Video $video, array $source): ?array => $this->videoMedia?->representativeForEntity('video', $video->canonicalId),
+        );
+    }
     private function visualPolicy(): HomepageVisualPolicy { return $this->visualPolicy ??= new HomepageVisualPolicy(); }
     private function collection(): PublicEntityCollectionQuery
     {

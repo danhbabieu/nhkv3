@@ -35,7 +35,7 @@ final class RepresentativeMediaReconcilerTest extends TestCase
     {
         [$media, $assets, $usages, $service] = $this->stores();
         $item = $this->media($service, 'brand-wide', 9);
-        $result = (new RepresentativeMediaReconciler($media, $assets, $usages, $service)->reconcile('brand', 'brand-1', [$this->candidate($item, 99, false)]));
+        $result = (new RepresentativeMediaReconciler($media, $assets, $usages, $service))->reconcile('brand', 'brand-1', [$this->candidate($item, 99, false)]);
 
         self::assertSame('NO_SUITABLE_CANDIDATE', $result['status']);
         self::assertSame([], $usages->items);
