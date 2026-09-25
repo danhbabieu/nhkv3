@@ -19450,3 +19450,15 @@ Contract passed 6 tests / 48 assertions. Changed PHP files lint clean and
 production mutation, deployment or runtime write was performed.
 
 STATUS: `OPTIONAL_VIDEO_SUBJECT_OWNER_ADMISSION_FIXED_LOCAL_READY / INTEGRATION_ENVIRONMENT_GATED / NO_LIVE_MUTATION`.
+
+# Checkpoint — 2026-09-25 — One Capture → one Article with complete Media manifest (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE: IMAGE_ARTICLE could create the WordPress draft from raw Capture text before semantic composition, while completion could accept an empty media manifest and the Media result did not expose canonical MediaUsage read-back. This allowed duplicate/empty editorial outcomes and false COMPLETE states.
+
+FIXED_BOUNDARY: Compose the server-owned Article exactly once after semantic preparation and before Article creation; reconcile the complete Media manifest; expose canonical MediaUsage read-back before WordPress projection; and require non-empty manifest/read-back for IMAGE_ARTICLE completion. Empty-feature IMAGE_ARTICLE remains admitted. No new owner, writer, endpoint, relation or semantic type was introduced.
+
+VERIFICATION: Focused Capture/Article/Media/Completion tests passed 143 tests / 607 assertions across the implementation slice. PHP lint passed with an expanded Composer timeout. Unit passed 2,624 tests / 15,281 assertions with 19 warnings, 46 deprecations and 33 PHPUnit deprecations under 512M. Contract passed 6 tests / 48 assertions. The aggregate suite reached 2,772 tests but 21 existing integration tests are environment-gated by missing `NHK_WP_TEST_PATH`/`NHK_WP_TEST_DB`; the default 128M run also hit the existing 50MB fixture memory limit, so the verified Unit run used 512M.
+
+SAFETY: No migration, database write, Capture/Article mutation, staging/production mutation, deployment, SSH or live runtime action occurred. The branch remains on `main`; remote synchronization was separately verified.
+
+STATUS: `IMAGE_CAPTURE_MEDIA_ARTICLE_CONVERGENCE_LOCAL_READY / INTEGRATION_ENVIRONMENT_GATED / NO_LIVE_MUTATION`.
