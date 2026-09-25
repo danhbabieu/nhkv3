@@ -1918,7 +1918,7 @@ final class EditorialCaptureCoordinator
             $dispositionMediaIds[$mediaId] = true;
         }
         foreach ($expectedMediaIds as $mediaId) if (!isset($dispositionMediaIds[$mediaId])) return false;
-        $usageReadback = array_values(array_filter((array) ($media['media_usage'] ?? $media['usages'] ?? $media['canonical_readback']['media_usage'] ?? []), 'is_array'));
+        $usageReadback = array_values(array_filter((array) ($media['media_usage'] ?? $media['usages'] ?? $media['canonical_usage_readback'] ?? $media['canonical_readback']['media_usage'] ?? []), 'is_array'));
         if ($expectedMediaIds !== []) {
             $usageMediaIds = [];
             foreach ($usageReadback as $usage) {

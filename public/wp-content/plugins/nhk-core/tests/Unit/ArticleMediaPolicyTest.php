@@ -446,6 +446,8 @@ final class ArticleMediaPolicyTest extends TestCase
         self::assertSame($items[1]['media_id'], $album[1]->mediaId);
         self::assertCount(3, $result->mediaDispositions);
         self::assertSame(['APPLIED', 'APPLIED', 'APPLIED'], array_column($result->mediaDispositions, 'status'));
+        self::assertCount(3, $result->canonicalUsageReadback);
+        self::assertSame(['B', 'A', 'C'], array_map(static fn (array $usage): string => substr((string) ($usage['title'] ?? ''), -1), $result->canonicalUsageReadback));
     }
 
     public function test_repeated_supporting_media_requires_explicit_unique_placements_and_converges_without_binary_duplication(): void

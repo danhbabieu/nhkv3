@@ -179,7 +179,7 @@ final class ArticleMediaCoordinator
         $state = $mandatoryMediaMissing && !$hasValidSupporting ? MediaSeoStateRegistry::PLACEHOLDER : (in_array('MEDIA_LOW_RESOLUTION', array_column($diagnostics, 'code'), true) ? MediaSeoStateRegistry::LOW_RESOLUTION : MediaSeoStateRegistry::COMPLETE);
         $guidance = $this->guidance($slots, $context);
         $mediaDispositions = $this->mediaDispositions($endpointKey, $desiredUsages, $usagePlan);
-        $result = new ArticleMediaResult($postId, $endpointKey, $state, $slotMedia, $slots, $diagnostics, is_array($editorial) ? (string) ($editorial['state_token'] ?? '') : '', $guidance, $mediaDispositions);
+        $result = new ArticleMediaResult($postId, $endpointKey, $state, $slotMedia, $slots, $diagnostics, is_array($editorial) ? (string) ($editorial['state_token'] ?? '') : '', $guidance, $mediaDispositions, $this->canonicalUsageReadback($endpointKey));
         if ($this->wordpress !== null) {
             $payload = $result->toArray();
             $payload['force_inline_reconcile'] = ($context['force_inline_reconcile'] ?? false) === true;
@@ -240,7 +240,7 @@ final class ArticleMediaCoordinator
                 }
             }
             $nativeReadbackMismatch = $featuredNativeMismatch || $inlineNativeMismatch;
-            $result = new ArticleMediaResult($postId, $endpointKey, $nativeReadbackMismatch ? MediaSeoStateRegistry::PLACEHOLDER : $canonical->state, $finalSlotMedia, $canonical->slots, $finalDiagnostics, (string) ($readback['state_token'] ?? $canonical->editorialStateToken), $canonical->guidance, $this->mediaDispositions($endpointKey, $desiredUsages, $usagePlan));
+            $result = new ArticleMediaResult($postId, $endpointKey, $nativeReadbackMismatch ? MediaSeoStateRegistry::PLACEHOLDER : $canonical->state, $finalSlotMedia, $canonical->slots, $finalDiagnostics, (string) ($readback['state_token'] ?? $canonical->editorialStateToken), $canonical->guidance, $this->mediaDispositions($endpointKey, $desiredUsages, $usagePlan), $this->canonicalUsageReadback($endpointKey));
         }
         return $result;
     }
@@ -514,6 +514,32 @@ final class ArticleMediaCoordinator
             ];
         }
         return $dispositions;
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function canonicalUsageReadback(string $endpointKey): array
+    {
+        $items = [];
+        foreach ($this->usages->listByEndpoint('wp_post', $endpointKey) as $usage) {
+            if (!$usage instanceof \NHK\Core\Domain\Media\MediaUsage || $usage->activeSlot === 'retired') continue;
+            $items[] = [
+                'usage_id' => $usage->usageId,
+                'media_id' => $usage->mediaId,
+                'endpoint_type' => $usage->endpointType,
+                'endpoint_key' => $usage->endpointKey,
+                'role' => $usage->role,
+                'sort_order' => $usage->sortOrder,
+                'alt_text' => $usage->altText,
+                'caption' => $usage->caption,
+                'title' => $usage->title,
+                'placement_key' => $usage->placementKey,
+                'revision' => $usage->revision,
+                'active' => true,
+                'status' => 'verified',
+            ];
+        }
+        usort($items, static fn (array $left, array $right): int => [$left['sort_order'], $left['usage_id']] <=> [$right['sort_order'], $right['usage_id']]);
+        return $items;
     }
 
     /** @param list<mixed> $placements @return list<array{media_id:string,placement_key:string,sort_order:int,alt_text:string,caption:string,title:string}> */
