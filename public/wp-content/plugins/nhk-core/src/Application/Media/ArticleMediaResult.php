@@ -5,7 +5,7 @@ namespace NHK\Core\Application\Media;
 
 final readonly class ArticleMediaResult
 {
-    /** @param array<string,string> $slotMedia @param array<string,array<string,mixed>> $slots @param list<array{code:string,slot?:string,media_id?:string}> $diagnostics */
+    /** @param array<string,string> $slotMedia @param array<string,array<string,mixed>> $slots @param list<array{code:string,slot?:string,media_id?:string}> $diagnostics @param list<array<string,mixed>> $mediaDispositions */
     public function __construct(
         public int $postId,
         public string $endpointKey,
@@ -15,11 +15,12 @@ final readonly class ArticleMediaResult
         public array $diagnostics = [],
         public string $editorialStateToken = '',
         public array $guidance = [],
+        public array $mediaDispositions = [],
     ) {}
 
     /** @return array<string,mixed> */
     public function toArray(): array
     {
-        return ['post_id' => $this->postId, 'endpoint_key' => $this->endpointKey, 'state' => $this->state, 'slot_media' => $this->slotMedia, 'slots' => $this->slots, 'diagnostics' => $this->diagnostics, 'editorial_state_token' => $this->editorialStateToken, 'guidance' => $this->guidance];
+        return ['post_id' => $this->postId, 'endpoint_key' => $this->endpointKey, 'state' => $this->state, 'slot_media' => $this->slotMedia, 'slots' => $this->slots, 'diagnostics' => $this->diagnostics, 'editorial_state_token' => $this->editorialStateToken, 'guidance' => $this->guidance, 'media_dispositions' => $this->mediaDispositions];
     }
 }

@@ -117,6 +117,38 @@ was performed.
 
 STATUS: `CONFIRMED_SUBJECT_RECONCILIATION_MIXED_ROUTING_LOCAL_READY / INTEGRATION_ENVIRONMENT_GATED / NO_LIVE_MUTATION`.
 
+# Checkpoint — 2026-09-25 — Native multi-image Capture → Article/public completion boundary (FINAL LOCAL VERIFICATION / NO LIVE MUTATION)
+
+IMPLEMENTED: Shared editorial description aliases now enter the semantic Capture
+input and route multi-image requests to IMAGE_ARTICLE even when Feature is
+empty. Ordered asset manifests are preserved across physical ingest and retry.
+Article MediaUsage reconciliation exposes a terminal per-Media disposition and
+Article draft composition is deferred until canonical MediaUsage read-back.
+Existing governed Specimen intent remains capability/registry driven; no Album
+was introduced. Public Media/Article links continue to derive from active
+canonical MediaUsage and published Article state.
+
+COMPLETION_SAFETY: Capture read-back now requires every manifest Media to have
+active canonical MediaUsage and every returned Article disposition to be
+APPLIED before the Article owner can converge COMPLETE. A visitor-safe
+`result_packet` reports Article, Media, Knowledge and public-readback status
+without exposing request secrets or internal identifiers. Feature, Knowledge,
+Article and projection failures remain child/dependency isolated; retry paths
+reuse existing idempotency boundaries.
+
+VERIFICATION: Task 8 focused regression passed 80 tests / 399 assertions with
+9 pre-existing PHPUnit deprecations. Full Unit completed 2,615 tests / 15,195
+assertions with 5 existing fixture/physical-file failures, 20 warnings, 45
+deprecations and 32 PHPUnit deprecations; no new failure implicated this slice.
+Contract passed 6 tests / 48 assertions. JS tests passed 34/34, typecheck and
+Vite build passed (existing Rollup annotation warnings), changed-file PHP lint
+and full diff check passed. Integration was invoked and fail-closed because
+NHK_WP_TEST_PATH/nhk_v3_test are unavailable; 21 environment-gated failures
+and 120 skips were reported without database mutation. No deployment,
+staging/production data mutation or live Governance Apply occurred.
+
+STATUS: `CAPTURE_MULTI_IMAGE_ARTICLE_PUBLIC_LOCAL_IMPLEMENTED / AUTOMATED_LOCAL_VERIFICATION_COMPLETE / INTEGRATION_ENVIRONMENT_GATED / NO_LIVE_MUTATION`.
+
 # NHK V3 Execution State
 
 # Checkpoint — 2026-09-25 — Mobile Capture image input contract/UI (LOCAL / NO LIVE MUTATION)

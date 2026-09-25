@@ -148,6 +148,8 @@ final class McpToolCatalog
                     'additionalProperties' => false,
                 ],
                 'text' => ['type' => 'string', 'maxLength' => 20000],
+                'description' => ['type' => 'string', 'maxLength' => 20000],
+                'shared_description' => ['type' => 'string', 'maxLength' => 20000],
                 'title' => ['type' => 'string', 'maxLength' => 500],
                 'excerpt' => ['type' => 'string', 'maxLength' => 1000],
                 'subject_hints' => ['type' => 'array', 'items' => ['type' => 'string', 'minLength' => 1]],

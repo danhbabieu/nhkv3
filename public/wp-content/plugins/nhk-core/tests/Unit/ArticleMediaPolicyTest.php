@@ -431,7 +431,7 @@ final class ArticleMediaPolicyTest extends TestCase
         }
         $coordinator = new ArticleMediaCoordinator($service, $media, $assets, $usages, $blueprints, 1);
 
-        $coordinator->ensureForPost(47, ['content_intent' => ['intent' => 'IMAGE_ARTICLE'], 'single_real_image_exception' => false], [
+        $result = $coordinator->ensureForPost(47, ['content_intent' => ['intent' => 'IMAGE_ARTICLE'], 'single_real_image_exception' => false], [
             'featured_primary' => $items[0],
             'inline_primary' => $items[1],
         ], [$items[2]]);
@@ -444,6 +444,8 @@ final class ArticleMediaPolicyTest extends TestCase
         self::assertSame([0, 1, 2], array_column($album, 'sortOrder'));
         self::assertSame($items[0]['media_id'], $album[0]->mediaId);
         self::assertSame($items[1]['media_id'], $album[1]->mediaId);
+        self::assertCount(3, $result->mediaDispositions);
+        self::assertSame(['APPLIED', 'APPLIED', 'APPLIED'], array_column($result->mediaDispositions, 'status'));
     }
 
     public function test_repeated_supporting_media_requires_explicit_unique_placements_and_converges_without_binary_duplication(): void

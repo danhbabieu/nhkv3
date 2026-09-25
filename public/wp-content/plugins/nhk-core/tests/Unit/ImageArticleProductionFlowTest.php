@@ -98,6 +98,19 @@ final class ImageArticleProductionFlowTest extends TestCase
 
         self::assertSame(['media', 'draft_update'], $flow->events);
     }
+
+    public function test_non_applied_article_media_disposition_keeps_capture_partial(): void
+    {
+        $flow = new ImageArticleFlowFixture([
+            ['media_id' => 'media-featured', 'attachment_id' => 612, 'upload_status' => 'REUSED', 'sort_order' => 0],
+            ['media_id' => 'media-detail', 'attachment_id' => 613, 'upload_status' => 'REUSED', 'sort_order' => 1],
+        ], incompleteMediaDisposition: true);
+
+        $result = $flow->run();
+
+        self::assertSame('PARTIAL', $result->status);
+        self::assertNotEmpty($result->diagnostics['completion']['blockers']);
+    }
 }
 
 final class ImageArticleFlowFixture
@@ -115,7 +128,7 @@ final class ImageArticleFlowFixture
     private EditorialCaptureCoordinator $coordinator;
 
     /** @param list<array<string,mixed>> $assets */
-    public function __construct(private array $assets, bool $failMediaOnce = false, private bool $fullPath = false)
+    public function __construct(private array $assets, bool $failMediaOnce = false, private bool $fullPath = false, private bool $incompleteMediaDisposition = false)
     {
         $this->failMediaOnce = $failMediaOnce;
         $this->captures = new ImageArticleTestCaptureRepository();
@@ -148,7 +161,7 @@ final class ImageArticleFlowFixture
                     $this->usages[] = ['media_id' => (string) $asset['media_id'], 'endpoint_key' => '1:' . (string) ($context['article_id'] ?? ''), 'sort_order' => (int) ($asset['sort_order'] ?? 0), 'title' => (string) ($seo['title'] ?? ''), 'alt_text' => (string) ($seo['alt_text'] ?? ''), 'caption' => (string) ($seo['caption'] ?? '')];
                 }
                 usort($this->usages, static fn (array $left, array $right): int => $left['sort_order'] <=> $right['sort_order']);
-                return ['status' => 'RECONCILED', 'media_ids' => array_column($this->usages, 'media_id'), 'media_complete' => true, 'media_usage' => $this->usages];
+                return ['status' => 'RECONCILED', 'media_ids' => array_column($this->usages, 'media_id'), 'media_complete' => !$this->incompleteMediaDisposition, 'media_usage' => $this->usages, 'media_dispositions' => $this->incompleteMediaDisposition ? [['media_id' => 'media-detail', 'role' => 'inline_primary', 'status' => 'REVIEW_REQUIRED']] : array_map(static fn (array $usage): array => ['media_id' => $usage['media_id'], 'role' => 'inline_supporting', 'status' => 'APPLIED'], $this->usages)];
             },
             function (array $context): array {
                 $this->packetIds[] = (string) (($context['subject_resolution_packet']['id'] ?? ''));

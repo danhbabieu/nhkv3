@@ -144,6 +144,9 @@ final class McpCaptureReadContractTest extends TestCase
         self::assertArrayNotHasKey('idempotency_key', $projection);
         self::assertArrayNotHasKey('request_fingerprint', $projection);
         self::assertArrayNotHasKey('raw_input', $projection);
+        self::assertArrayHasKey('result_packet', $projection);
+        self::assertSame('PARTIAL', $projection['result_packet']['status']);
+        self::assertStringNotContainsString('media-', json_encode($projection['result_packet'], JSON_THROW_ON_ERROR));
     }
 
     public function test_unknown_capture_returns_explicit_not_found_instead_of_null(): void

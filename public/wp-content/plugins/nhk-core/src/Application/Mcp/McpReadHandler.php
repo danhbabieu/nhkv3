@@ -9,6 +9,7 @@ use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, Sourc
 use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaBindingOperationRepository, MediaRepository, MediaUsageRepository};
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Authority\{AuthorityEntity, EntityTypeRegistry};
+use NHK\Core\Domain\Capture\CaptureRecord;
 use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim};
 use NHK\Core\Domain\Media\{Media, MediaAsset, MediaUsage};
 use NHK\Core\Domain\Video\Video;
@@ -147,6 +148,7 @@ final class McpReadHandler
             'required_owners' => $completion['required_owners'] ?? [], 'missing_required_owners' => $completion['missing_required_owners'] ?? [],
             'publication' => is_array($diagnostics['publication'] ?? null) ? ['eligible' => ($diagnostics['publication']['eligible'] ?? false) === true, 'status' => (string) ($diagnostics['publication']['status'] ?? ''), 'blockers' => array_values(array_map('strval', (array) ($diagnostics['publication']['blockers'] ?? [])))] : null,
             'enrichment' => ['complete' => ($completion['complete'] ?? false) === true, 'deep_enrichment' => $diagnostics['deep_enrichment']['status'] ?? null, 'missing' => $completion['missing_required_owners'] ?? []],
+            'result_packet' => $this->resultPacket($capture, $completion, $diagnostics),
             'retry' => ['eligible' => $retry['eligible'], 'reason' => $retry['reason'], 'capture_id' => $capture->captureId],
         ];
     }
@@ -188,6 +190,13 @@ final class McpReadHandler
             $activeMediaIds[$usage->mediaId] = true;
             $activeRoles[$usage->role] = true;
         }
+        $captureMediaIds = [];
+        foreach ($capture->assets as $asset) {
+            if (!is_array($asset)) continue;
+            $mediaId = trim((string) ($asset['media_id'] ?? ''));
+            if ($mediaId !== '') $captureMediaIds[$mediaId] = true;
+        }
+        $mediaUsageComplete = $this->captureMediaUsageComplete($captureMediaIds, $activeMediaIds, diagnostics: $capture->diagnostics);
 
         $requiredOwners = [];
         foreach ((array) ($completion['required_owners'] ?? []) as $required) {
@@ -202,10 +211,7 @@ final class McpReadHandler
             $requiredOwners[] = ['owner_type' => 'wp_post', 'owner_id' => (string) $articleId];
         }
         if ($intent === 'IMAGE_ARTICLE') {
-            foreach ($capture->assets as $asset) {
-                if (!is_array($asset)) continue;
-                $mediaId = trim((string) ($asset['media_id'] ?? ''));
-                if ($mediaId === '' || !isset($activeMediaIds[$mediaId])) continue;
+            foreach (array_keys($captureMediaIds) as $mediaId) {
                 $requiredOwners[] = ['owner_type' => 'media', 'owner_id' => $mediaId];
             }
         }
@@ -221,15 +227,21 @@ final class McpReadHandler
                 $packet['owner_id'] = (string) $articleId;
                 $packet['canonical_readback'] = ['id' => $articleId];
                 $packet['current_outcome'] = true;
-                if ($activeRoles !== []) {
+                if ($activeRoles !== [] && $mediaUsageComplete) {
                     $packet['relation_or_usage_state'] = 'COMPLETE';
                     $packet['blockers'] = $this->withoutStaleArticleMediaBlockers((array) ($packet['blockers'] ?? []));
+                } elseif (!$mediaUsageComplete) {
+                    $packet['relation_or_usage_state'] = 'PARTIAL';
+                    $packet['blockers'] = array_values(array_unique([...array_map('strval', (array) ($packet['blockers'] ?? [])), 'MEDIAUSAGE_INCOMPLETE']));
                 }
-            } elseif ($type === 'media' && $ownerId !== '' && isset($activeMediaIds[$ownerId])) {
+            } elseif ($type === 'media' && $ownerId !== '' && isset($activeMediaIds[$ownerId]) && $mediaUsageComplete) {
                 $packet['canonical_readback'] = ['canonical_id' => $ownerId];
                 $packet['relation_or_usage_state'] = 'COMPLETE';
                 $packet['current_outcome'] = true;
                 $packet['blockers'] = $this->withoutStaleArticleMediaBlockers((array) ($packet['blockers'] ?? []));
+            } elseif ($type === 'media' && $ownerId !== '' && isset($activeMediaIds[$ownerId])) {
+                $packet['relation_or_usage_state'] = 'PARTIAL';
+                $packet['blockers'] = array_values(array_unique([...array_map('strval', (array) ($packet['blockers'] ?? [])), 'MEDIAUSAGE_INCOMPLETE']));
             }
             $children[$index] = $wrapped ? ['completion' => $packet, 'current_outcome' => true] : $packet;
         }
@@ -269,6 +281,38 @@ final class McpReadHandler
             ],
         );
         return $aggregate;
+    }
+
+    /** @param array<string,bool> $captureMediaIds @param array<string,bool> $activeMediaIds @param array<string,mixed> $diagnostics */
+    private function captureMediaUsageComplete(array $captureMediaIds, array $activeMediaIds, array $diagnostics): bool
+    {
+        if ($captureMediaIds === []) return true;
+        foreach (array_keys($captureMediaIds) as $mediaId) {
+            if (!isset($activeMediaIds[$mediaId])) return false;
+        }
+        $enrichment = is_array($diagnostics['media_usage'] ?? null) ? $diagnostics['media_usage'] : (is_array($diagnostics['media_enrichment'] ?? null) ? $diagnostics['media_enrichment'] : []);
+        $dispositions = array_values(array_filter((array) ($enrichment['media_dispositions'] ?? $enrichment['article_media_dispositions'] ?? []), 'is_array'));
+        foreach ($dispositions as $disposition) {
+            if (strtoupper(trim((string) ($disposition['status'] ?? ''))) !== 'APPLIED') return false;
+        }
+        return true;
+    }
+
+    /** @param array<string,mixed> $completion @param array<string,mixed> $diagnostics @return array<string,mixed> */
+    private function resultPacket(CaptureRecord $capture, array $completion, array $diagnostics): array
+    {
+        $complete = ($completion['complete'] ?? false) === true;
+        $knowledgeStatus = strtoupper(trim((string) (($diagnostics['semantic_write_back']['status'] ?? $diagnostics['knowledge']['status'] ?? ''))));
+        $publicStatus = strtolower(trim((string) (($diagnostics['final_read_back']['status'] ?? $diagnostics['publication']['status'] ?? ''))));
+        return [
+            'status' => $complete ? 'COMPLETE' : (strtoupper($capture->status) === 'REVIEW_REQUIRED' ? 'REVIEW_REQUIRED' : 'PARTIAL'),
+            'summary' => $complete ? 'Đã hoàn tất xử lý Capture.' : 'Capture đã được tiếp nhận nhưng còn bước cần hoàn tất.',
+            'article' => ['status' => $capture->articleId === null ? 'Chưa tạo bài viết.' : 'Đã tạo bài viết.'],
+            'media' => ['status' => $complete ? 'Đã xử lý liên kết ảnh theo trạng thái chuẩn.' : 'Còn ảnh hoặc liên kết ảnh cần hoàn tất.'],
+            'knowledge' => ['status' => in_array($knowledgeStatus, ['APPLIED', 'COMPLETED', 'REUSED', 'IDEMPOTENT'], true) ? 'Đã xử lý tri thức.' : 'Tri thức chưa hoàn tất hoặc không được yêu cầu.'],
+            'public' => ['status' => $publicStatus === 'verified' ? 'Đã kiểm tra hiển thị công khai.' : 'Chưa xác nhận hiển thị công khai.'],
+            'next_step' => $complete ? null : 'Tiếp tục Capture bằng cùng idempotency key.',
+        ];
     }
 
     /** @param list<mixed> $blockers @return list<string> */

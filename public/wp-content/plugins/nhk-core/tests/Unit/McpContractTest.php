@@ -212,6 +212,8 @@ final class McpContractTest extends TestCase
         self::assertSame(['VIDEO', 'IMAGE_ARTICLE', 'TEXT_ARTICLE', 'KNOWLEDGE_DELTA', 'KNOWLEDGE_REPAIR', 'MEDIA_ENRICHMENT'], $tools['nhk.capture.ingest']['inputSchema']['properties']['intent']['enum']);
         self::assertArrayHasKey('media_bindings', $tools['nhk.capture.ingest']['inputSchema']['properties']);
         self::assertArrayHasKey('asset_inputs', $tools['nhk.capture.ingest']['inputSchema']['properties']);
+        self::assertArrayHasKey('description', $tools['nhk.capture.ingest']['inputSchema']['properties']);
+        self::assertArrayHasKey('shared_description', $tools['nhk.capture.ingest']['inputSchema']['properties']);
         self::assertSame(['client_file_id', 'ordinal', 'name', 'feature_requests'], $tools['nhk.capture.ingest']['inputSchema']['properties']['asset_inputs']['items']['required']);
         self::assertSame(20, $tools['nhk.capture.ingest']['inputSchema']['properties']['asset_inputs']['maxItems']);
         self::assertSame(['representative'], $tools['nhk.media.bind']['inputSchema']['properties']['role']['enum']);

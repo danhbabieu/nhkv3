@@ -71,6 +71,20 @@ final class ArticleEditorialAdapter
         $retrieved = is_array($shared['content']['retrieval'] ?? null) ? $shared['content']['retrieval'] : $this->retrieval->retrieve($subject, $topic, (array) ($context['hints'] ?? []), $profile);
         $pack = $shared['content']['pack'] ?? $this->selector->select($retrieved, $topic, $subject, $profile, $inputContext);
         $plan = $this->journey->plan($pack);
+        if (($context['defer_composition'] ?? false) === true) {
+            return [
+                'status' => 'DEFERRED',
+                'profile' => 'article',
+                'retrieval' => $retrieved,
+                'pack' => $pack,
+                'plan' => $plan,
+                'draft' => null,
+                'seo_plan' => null,
+                'quality_report' => null,
+                'shared_enrichment' => $shared['content'] ?? ['status' => 'NOT_REQUESTED'],
+                'shared_result' => $shared,
+            ];
+        }
         $draft = $this->composer->compose($plan);
         $seo = $this->seo->plan($pack, $plan, $draft, [
             'public_identity' => is_array($context['public_identity'] ?? null) ? $context['public_identity'] : [],

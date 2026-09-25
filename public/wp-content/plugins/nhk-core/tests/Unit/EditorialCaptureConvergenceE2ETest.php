@@ -664,6 +664,73 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
         self::assertCount(3, array_unique(array_column($assets, 'client_file_id')));
     }
 
+    public function test_capture_normalizes_physical_manifest_order_and_replays_same_order(): void
+    {
+        $captures = new Pr5CaptureRepository();
+        $calls = ['draft' => 0, 'semantic' => 0, 'media' => 0, 'publication' => 0, 'final' => 0];
+        $events = [];
+        $coordinator = $this->coordinator(
+            $captures,
+            $calls,
+            $events,
+            semanticStatus: 'COMPLETED',
+            physical: static fn (array $input): array => ['items' => [
+                ['client_file_id' => 'back', 'media_id' => 'media-back', 'sort_order' => 2],
+                ['client_file_id' => 'front', 'media_id' => 'media-front', 'sort_order' => 0],
+                ['client_file_id' => 'dial', 'media_id' => 'media-dial', 'sort_order' => 1],
+            ]],
+        );
+
+        $input = ['idempotency_key' => 'ordered-capture-manifest', 'text' => 'Ba góc chụp của cùng một hiện vật.'];
+        $first = $coordinator->execute($input);
+        $replay = $coordinator->execute($input);
+
+        self::assertSame($first->captureId, $replay->captureId);
+        self::assertSame(['media-front', 'media-dial', 'media-back'], array_column($first->assets, 'media_id'));
+        self::assertSame([0, 1, 2], array_column($first->assets, 'sort_order'));
+        self::assertSame($first->assets, $replay->assets);
+        self::assertSame(1, $calls['draft']);
+    }
+
+    public function test_shared_description_enters_semantic_capture_with_empty_features_and_one_article(): void
+    {
+        $captures = new Pr5CaptureRepository();
+        $calls = ['draft' => 0, 'semantic' => 0, 'media' => 0, 'publication' => 0, 'final' => 0];
+        $events = [];
+        $seen = [];
+        $coordinator = $this->coordinator(
+            $captures,
+            $calls,
+            $events,
+            semanticStatus: 'COMPLETED',
+            physical: static fn (array $input): array => ['items' => [
+                ['kind' => 'image', 'media_id' => 'media-front', 'sort_order' => 0, 'capture_asset_input' => ['name' => 'Ảnh mặt trước', 'feature_requests' => []]],
+                ['kind' => 'image', 'media_id' => 'media-case', 'sort_order' => 1, 'capture_asset_input' => ['name' => 'Ảnh vỏ', 'feature_requests' => []]],
+                ['kind' => 'image', 'media_id' => 'media-movement', 'sort_order' => 2, 'capture_asset_input' => ['name' => 'Ảnh bộ máy', 'feature_requests' => []]],
+            ]],
+            sharedObserver: static function (array $context) use (&$seen): void {
+                $seen = [
+                    'raw_input' => (string) ($context['raw_input'] ?? ''),
+                    'editorial_copy' => (string) ($context['editorial_copy'] ?? ''),
+                    'intent' => (string) ($context['content_intent']['intent'] ?? ''),
+                    'asset_names' => array_map(static fn (array $asset): string => (string) (($asset['capture_asset_input']['name'] ?? '')), array_values(array_filter((array) ($context['assets'] ?? []), 'is_array'))),
+                ];
+            },
+        );
+
+        $result = $coordinator->execute([
+            'idempotency_key' => 'shared-description-empty-features',
+            'description' => 'Một chiếc đồng hồ cơ được chụp ở ba góc để nhận diện mặt trước, vỏ và bộ máy chuông.',
+        ]);
+
+        self::assertSame('IMAGE_ARTICLE', $result->diagnostics['content_intent']['intent']);
+        self::assertSame(1001, $result->articleId);
+        self::assertSame(1, $calls['draft']);
+        self::assertStringContainsString('Một chiếc đồng hồ cơ', $seen['raw_input']);
+        self::assertStringContainsString('Một chiếc đồng hồ cơ', $seen['editorial_copy']);
+        self::assertSame(['Ảnh mặt trước', 'Ảnh vỏ', 'Ảnh bộ máy'], $seen['asset_names']);
+    }
+
     public function test_knowledge_delta_without_image_has_no_article_and_is_not_semantically_complete_when_pending(): void
     {
         $captures = new Pr5CaptureRepository();

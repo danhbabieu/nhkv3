@@ -66,6 +66,7 @@ final class EditorialCaptureCoordinator
     /** @param array<string,mixed> $input */
     public function execute(array $input): CaptureRecord
     {
+        $input = $this->normalizeEditorialInput($input);
         if (CapturePurposePolicy::resolve($input) !== CapturePurpose::EDITORIAL) throw new \InvalidArgumentException('AUTHORITY_CAPTURE_REQUIRES_AUTHORITY_OWNER');
         $key = trim((string) ($input['idempotency_key'] ?? ''));
         if ($key === '') throw new \InvalidArgumentException('Capture idempotency key is required.');
@@ -118,7 +119,7 @@ final class EditorialCaptureCoordinator
     public function retry(CaptureRecord $record, array $input): CaptureRecord
     {
         $this->documentation?->assertCheckpoint((array) ($input['documentation_checkpoint'] ?? []));
-        $input = $this->rehydrateRetryInput($record, $input);
+        $input = $this->normalizeEditorialInput($this->rehydrateRetryInput($record, $input));
         return $this->run($record, $input);
     }
 
@@ -314,7 +315,7 @@ final class EditorialCaptureCoordinator
     private function run(CaptureRecord $record, array $input): CaptureRecord
     {
         $text = trim((string) ($input['text'] ?? $input['content'] ?? ''));
-        $assets = $record->assets;
+        $assets = $this->normalizeAssetManifest($record->assets);
         $diagnostics = $record->diagnostics;
         $receipts = $record->phaseReceipts;
         try {
@@ -335,6 +336,7 @@ final class EditorialCaptureCoordinator
                     $assets[] = $item;
                     if ($key !== '') $existingKeys[$key] = true;
                 }
+                $assets = $this->normalizeAssetManifest($assets);
                 $this->beginPhase('ASSET_FOLLOWUP');
                 $diagnostics['asset_followup'] = ['status' => 'verified', 'items' => count($followupItems), 'manifest' => $this->withoutBody((array) ($input['asset_followup_manifest'] ?? [])), 'context_hint' => $this->withoutBody((array) ($input['visual_context'] ?? []))];
                 $record = $this->save($record, $record->stage, $assets, $diagnostics, $receipts, 'ASSET_FOLLOWUP', $record->articleId, $record->articleStateToken);
@@ -345,7 +347,7 @@ final class EditorialCaptureCoordinator
             if ($assets === [] && !$this->hasStage($record, CaptureStage::ASSETS_STORED)) {
                 $this->beginPhase('ASSETS_STORED');
                 $manifest = ($this->physicalIngest)($input);
-                $assets = is_array($manifest['items'] ?? null) ? array_values($manifest['items']) : (is_array($manifest) && array_is_list($manifest) ? $manifest : []);
+                $assets = $this->normalizeAssetManifest(is_array($manifest['items'] ?? null) ? array_values($manifest['items']) : (is_array($manifest) && array_is_list($manifest) ? $manifest : []));
                 $diagnostics['physical_ingest'] = $this->withoutBody($manifest);
                 $record = $this->save($record, CaptureStage::ASSETS_STORED, $assets, $diagnostics, $receipts, 'ASSETS_STORED');
             }
@@ -744,6 +746,7 @@ final class EditorialCaptureCoordinator
                                 'selected_knowledge' => $preparationResult?->enrichment['selected_knowledge'] ?? [],
                                 'governed_enrichment_readback' => $preparationResult?->enrichment ?? [],
                             ],
+                            'defer_composition' => true,
                             'public_identity' => [
                                 'canonical_url' => $permalink,
                                 'canonical_identity' => $permalink !== '',
@@ -859,6 +862,25 @@ final class EditorialCaptureCoordinator
             $media = ($this->mediaReconcile)($mediaContext);
             $diagnostics['media_usage'] = $this->withoutBody($media);
             $diagnostics['deep_enrichment'] = $this->deepEnrichment($retrieved, $writes, $media, $visualOpportunities, $sharedEnrichment);
+            if ($this->articleEditorialAdapter !== null) {
+                try {
+                    $sharedEditorial = $this->articleEditorialAdapter->prepare($semanticContext + [
+                        'shared_enrichment' => $sharedEnrichment,
+                        'media_usage' => is_array($media['media_usage'] ?? null) ? $media['media_usage'] : (array) ($media['usages'] ?? []),
+                        'canonical_media_readback' => is_array($media['canonical_readback'] ?? null) ? $media['canonical_readback'] : [],
+                        'prepared_context' => [
+                            'subject_resolution_packet' => $preparationResult?->subjectResolutionPacket?->toArray() ?? $subjectPacket->toArray(),
+                            'selected_related_entities' => $preparationResult?->plan['related_entities'] ?? [],
+                            'selected_knowledge' => $preparationResult?->enrichment['selected_knowledge'] ?? [],
+                            'governed_enrichment_readback' => $preparationResult?->enrichment ?? [],
+                        ],
+                        'defer_composition' => false,
+                    ]);
+                } catch (\Throwable) {
+                    $sharedEditorial = null;
+                    $diagnostics['shared_editorial'] = ['status' => 'FALLBACK', 'failure_code' => 'SHARED_EDITORIAL_COMPOSITION_UNAVAILABLE'];
+                }
+            }
             if (trim((string) ($media['editorial_state_token'] ?? '')) !== '' && $media['editorial_state_token'] !== $record->articleStateToken) {
                 $record = $this->save($record, CaptureStage::COMPOSED, $assets, $diagnostics, $receipts, 'COMPOSED', $record->articleId, (string) $media['editorial_state_token']);
             }
@@ -1018,6 +1040,27 @@ final class EditorialCaptureCoordinator
         return $input;
     }
 
+    /** @param array<string,mixed> $input @return array<string,mixed> */
+    private function normalizeEditorialInput(array $input): array
+    {
+        $hasEditorialText = trim((string) ($input['text'] ?? $input['content'] ?? '')) !== '';
+        if (!$hasEditorialText) {
+            foreach (['shared_description', 'description'] as $key) {
+                $value = trim((string) ($input[$key] ?? ''));
+                if ($value !== '') {
+                    $input['text'] = $value;
+                    break;
+                }
+            }
+        }
+        if (trim((string) ($input['text'] ?? $input['content'] ?? '')) === '' && is_array($input['media'] ?? null)) {
+            $value = trim((string) (($input['media']['description'] ?? '')));
+            if ($value !== '') $input['text'] = $value;
+        }
+        if (!isset($input['asset_inputs']) && is_array($input['items'] ?? null)) $input['asset_inputs'] = $input['items'];
+        return $input;
+    }
+
     /** @param list<array<string,mixed>> $assets @param array<string,mixed> $diagnostics @param array<string,mixed> $receipts */
     private function runTypedMediaBindingFastPath(CaptureRecord $record, array $input, array $assets, array $diagnostics, array $receipts): CaptureRecord
     {
@@ -1084,6 +1127,21 @@ final class EditorialCaptureCoordinator
             if ($value !== '') return $key . ':' . $value;
         }
         return '';
+    }
+
+    /** @param list<array<string,mixed>> $assets @return list<array<string,mixed>> */
+    private function normalizeAssetManifest(array $assets): array
+    {
+        $ordered = [];
+        foreach ($assets as $index => $asset) {
+            if (!is_array($asset)) continue;
+            $sortOrder = array_key_exists('sort_order', $asset)
+                ? max(0, (int) $asset['sort_order'])
+                : (array_key_exists('ordinal', $asset) ? max(0, (int) $asset['ordinal']) : PHP_INT_MAX);
+            $ordered[] = ['sort_order' => $sortOrder, 'index' => $index, 'asset' => $asset];
+        }
+        usort($ordered, static fn (array $left, array $right): int => [$left['sort_order'], $left['index']] <=> [$right['sort_order'], $right['index']]);
+        return array_values(array_map(static fn (array $entry): array => $entry['asset'], $ordered));
     }
 
     /** @param list<array<string,mixed>> $inputs @return list<array<string,mixed>> */
@@ -1772,7 +1830,8 @@ final class EditorialCaptureCoordinator
         $mediaIds = array_values(array_unique(array_filter(array_map('strval', (array) ($media['media_ids'] ?? [])), static fn (string $id): bool => trim($id) !== '')));
         $singleMediaId = trim((string) ($media['media_id'] ?? $media['canonical_id'] ?? ''));
         if ($singleMediaId !== '') $mediaIds[] = $singleMediaId;
-        $mediaComplete = in_array(strtoupper(trim((string) ($media['status'] ?? ''))), ['COMPLETE', 'RECONCILED'], true);
+        $mediaComplete = in_array(strtoupper(trim((string) ($media['status'] ?? ''))), ['COMPLETE', 'RECONCILED'], true)
+            && $this->articleMediaDispositionsComplete($media);
         $mediaFrontendVerified = $media['frontend_verified'] ?? ($final['frontend_verified'] ?? null);
         foreach (array_values(array_unique($mediaIds)) as $mediaId) {
             $children[] = ['owner_type' => 'media', 'owner_id' => $mediaId, 'canonical_readback' => $mediaComplete ? ['id' => $mediaId] : null, 'relation_or_usage_state' => $mediaComplete ? 'COMPLETE' : 'PARTIAL', 'public_eligible' => ($media['media_complete'] ?? false) === true || (($media['media_complete'] ?? null) === null && $mediaComplete), 'frontend_verified' => $mediaFrontendVerified, 'public_projection_owner' => false, 'owner_role' => 'semantic_dependency', 'blockers' => (array) ($media['blockers'] ?? [])];
@@ -1808,5 +1867,16 @@ final class EditorialCaptureCoordinator
             ];
         }
         return $children;
+    }
+
+    /** @param array<string,mixed> $media */
+    private function articleMediaDispositionsComplete(array $media): bool
+    {
+        $dispositions = array_values(array_filter((array) ($media['media_dispositions'] ?? $media['article_media_dispositions'] ?? []), 'is_array'));
+        if ($dispositions === []) return true;
+        foreach ($dispositions as $disposition) {
+            if (strtoupper(trim((string) ($disposition['status'] ?? ''))) !== 'APPLIED') return false;
+        }
+        return true;
     }
 }
