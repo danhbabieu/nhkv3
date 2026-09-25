@@ -23,6 +23,10 @@ final class KnowledgeWriterPreviewMcpTest extends TestCase
 
         self::assertSame('read', $tool['kind']);
         self::assertFalse($tool['governed']);
+        self::assertStringContainsString('NHK Knowledge Writer', $tool['description']);
+        self::assertStringContainsString('Universal Enrichment', $tool['description']);
+        self::assertStringContainsString('read-only', $tool['description']);
+        self::assertStringContainsString('does not publish or mutate canonical data', $tool['description']);
         self::assertSame('nhk.knowledge.writer.preview', McpDispatchRegistry::handlerKey('nhk.knowledge.writer.preview'));
         self::assertTrue(McpToolCatalog::hasExecutableDispatchHandler('nhk.knowledge.writer.preview'));
         self::assertSame('nhk-v3/knowledge-writer-preview', McpAbilityRegistration::abilityNameForTool('nhk.knowledge.writer.preview'));

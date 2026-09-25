@@ -32,7 +32,7 @@ final class McpToolCatalog
             self::tool('nhk.semantic.resolve', 'Resolve read-only Authority context by UUID, stable key or exact name/alias; ambiguous matches remain candidates.', ['context' => ['type' => 'object']], ['context']),
             self::tool('nhk.entity.neighborhood', 'Read a bounded semantic neighborhood from canonical Graph relations.', ['type' => ['type' => 'string', 'minLength' => 1], 'id' => self::uuidField(), 'profile' => ['type' => 'string', 'enum' => ['brand', 'model', 'variant', 'classification', 'specimen']], 'max_hops' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 2], 'limit' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 50]], ['type', 'id', 'profile']),
             self::tool('nhk.article.preflight', 'Read-only preflight for an existing WordPress Post semantic reconciliation.', self::articleProperties(false), ['intent']),
-            self::tool('nhk.knowledge.writer.preview', 'Read-only preview of a bounded reader response grounded in resolved canonical subjects and eligible existing Knowledge.', [
+            self::tool('nhk.knowledge.writer.preview', 'NHK Knowledge Writer read-only preview: enriches the request through Universal Enrichment before drafting a reader-facing response from resolved canonical subjects and eligible existing Knowledge; it does not publish or mutate canonical data.', [
                 'subject' => ['type' => 'object', 'properties' => [
                     'type' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 64],
                     'entity_type' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 64],

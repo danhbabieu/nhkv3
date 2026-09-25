@@ -151,6 +151,33 @@ STATUS: `CAPTURE_MULTI_IMAGE_ARTICLE_PUBLIC_LOCAL_IMPLEMENTED / AUTOMATED_LOCAL_
 
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-25 — Knowledge Writer MCP cross-chat descriptor discoverability (LOCAL / NO LIVE MUTATION)
+
+IMPLEMENTED: Strengthened the canonical `nhk.knowledge.writer.preview` MCP
+descriptor so a projectless ChatGPT conversation can identify it as the NHK
+Knowledge Writer, understand that Universal Enrichment runs before drafting,
+and understand that the result is read-only and does not publish or mutate
+canonical data. The existing generic Ability → Easy MCP descriptor
+materialization remains the sole exposure mechanism; no second Ability, alias,
+or tool-specific projection was introduced.
+
+REGRESSION: The MCP exposure test now asserts the cross-chat descriptor
+contract in addition to canonical registration, connector descriptor
+materialization (`wp_ability_nhk_v3_knowledge_writer_preview`), callable
+transport dispatch, read capability and missing-service fail-closed behavior.
+
+VERIFICATION: Knowledge Writer/MCP focused suite passed 100 tests / 3,108
+assertions; enrichment/editorial focused suite passed 52 tests / 217
+assertions; Contract passed 6 tests / 48 assertions; Full Unit passed 2,624
+tests / 15,285 assertions with 19 warnings, 46 deprecations and 33 PHPUnit
+deprecations under 512M; PHP lint and `git diff --check` passed. The initial
+Full Unit invocation at the PHP default 128M limit hit an existing fixture
+allocation limit and was rerun under the repository's established 512M gate.
+Production special-case scan found only pre-existing unrelated Odo/Junghans
+compatibility/canary code; this change adds none.
+
+STATUS: `KNOWLEDGE_WRITER_MCP_DESCRIPTOR_DISCOVERABLE_LOCAL_READY / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-25 — Shared Capture description/media upload boundary repair (LOCAL / NO LIVE MUTATION)
 
 ROOT_CAUSE_CONFIRMED: The image widget sent the shared `Mô tả chung` value as
