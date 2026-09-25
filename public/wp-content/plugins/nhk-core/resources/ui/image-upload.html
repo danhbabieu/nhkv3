@@ -12181,10 +12181,11 @@ function safeUploadedItem(value, fallbackStatus = "SUCCESS") {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const record2 = value;
   const statusValue = typeof record2.status === "string" ? record2.status : record2.upload_status;
-  const normalizedStatus = typeof statusValue === "string" ? statusValue.trim().toUpperCase() : "";
-  const status = normalizedStatus === "CREATED" || normalizedStatus === "SUCCESS" ? "SUCCESS" : normalizedStatus !== "" ? normalizedStatus : fallbackStatus;
+  const normalizedStatus2 = typeof statusValue === "string" ? statusValue.trim().toUpperCase() : "";
+  const status = normalizedStatus2 === "CREATED" || normalizedStatus2 === "SUCCESS" ? "SUCCESS" : normalizedStatus2 !== "" ? normalizedStatus2 : fallbackStatus;
   const item = {
     ...Number.isInteger(record2.ordinal) && record2.ordinal >= 0 ? { ordinal: record2.ordinal } : {},
+    ...typeof record2.client_file_id === "string" ? { client_file_id: record2.client_file_id } : {},
     ...typeof record2.attachment_id === "number" ? { attachment_id: record2.attachment_id } : {},
     ...typeof record2.media_id === "string" ? { media_id: record2.media_id } : {},
     ...typeof record2.public_filename === "string" ? { public_filename: record2.public_filename } : typeof record2.filename === "string" ? { public_filename: record2.filename } : {},
@@ -12201,6 +12202,20 @@ function safeUploadedItem(value, fallbackStatus = "SUCCESS") {
   const fileId = typeof record2.file_id === "string" ? record2.file_id : typeof record2.client_file_id === "string" ? record2.client_file_id : void 0;
   if (fileId && !fileId.includes("://")) item.file_id = fileId;
   return item;
+}
+function orderUploadedItems(items) {
+  return items.map((item, index) => ({ item, index })).sort((left, right) => {
+    const leftOrdinal = Number.isInteger(left.item.ordinal) ? Number(left.item.ordinal) : Number.MAX_SAFE_INTEGER;
+    const rightOrdinal = Number.isInteger(right.item.ordinal) ? Number(right.item.ordinal) : Number.MAX_SAFE_INTEGER;
+    if (leftOrdinal !== rightOrdinal) return leftOrdinal - rightOrdinal;
+    const leftClient = left.item.client_file_id ?? left.item.file_id ?? "";
+    const rightClient = right.item.client_file_id ?? right.item.file_id ?? "";
+    if (leftClient !== rightClient) return leftClient.localeCompare(rightClient);
+    const leftMedia = left.item.media_id ?? "";
+    const rightMedia = right.item.media_id ?? "";
+    if (leftMedia !== rightMedia) return leftMedia.localeCompare(rightMedia);
+    return left.index - right.index;
+  }).map(({ item }) => item);
 }
 function extractUploadManifest(result) {
   const inspection = inspectToolResult(result);
@@ -12261,11 +12276,13 @@ function mergeUploadManifest(previous, retry, retriedOrdinals) {
   };
 }
 function buildBatchContext(items, manifest = null, enrichmentStatus = "NOT_RUN") {
+  const ordered = orderUploadedItems(items);
   return {
     ...manifest?.batch_id ? { batch_id: manifest.batch_id } : {},
-    ordered_media_ids: items.filter((item) => item.status === "SUCCESS" && typeof item.media_id === "string").map((item) => item.media_id),
-    items: items.map((item, index) => ({
+    ordered_media_ids: ordered.filter((item) => item.status === "SUCCESS" && typeof item.media_id === "string").map((item) => item.media_id),
+    items: ordered.map((item, index) => ({
       position: (item.ordinal ?? index) + 1,
+      ...item.client_file_id ? { client_file_id: item.client_file_id } : {},
       ...item.media_id ? { media_id: item.media_id } : {},
       ...item.attachment_id ? { attachment_id: item.attachment_id } : {},
       status: item.status || "SUCCESS",
@@ -12280,7 +12297,7 @@ function buildWidgetState(items, diagnostics = [], uploadStatus = items.length >
   const batchContext = buildBatchContext(items, manifest, enrichmentStatus);
   return {
     modelContent: {
-      uploaded_media: items.map((item) => ({
+      uploaded_media: orderUploadedItems(items).map((item) => ({
         media_id: item.media_id,
         attachment_id: item.attachment_id,
         public_filename: item.public_filename,
@@ -12294,7 +12311,7 @@ function buildWidgetState(items, diagnostics = [], uploadStatus = items.length >
       enrichment_status: batchContext.enrichment_status,
       diagnostics: diagnostics.map(({ error: _error, ...diagnostic }) => diagnostic)
     },
-    imageIds: items.map((item) => item.file_id).filter((id) => Boolean(id))
+    imageIds: orderUploadedItems(items).map((item) => item.file_id).filter((id) => Boolean(id))
   };
 }
 const SAFE_CODE = /^[A-Z][A-Z0-9_]{2,}$/;
@@ -12348,6 +12365,67 @@ async function uploadSelectedFiles(inputs, options) {
     outcomes[index] = await uploadOne(input, options);
   }
   return outcomes;
+}
+function normalizedStatus(value) {
+  return String(value ?? "").trim().toUpperCase();
+}
+function orderedItems(items) {
+  return items.map((item, index) => ({ item, index })).sort((left, right) => {
+    const leftOrdinal = Number.isInteger(left.item.ordinal) ? Number(left.item.ordinal) : Number.MAX_SAFE_INTEGER;
+    const rightOrdinal = Number.isInteger(right.item.ordinal) ? Number(right.item.ordinal) : Number.MAX_SAFE_INTEGER;
+    if (leftOrdinal !== rightOrdinal) return leftOrdinal - rightOrdinal;
+    const leftClient = String(left.item.client_file_id ?? "");
+    const rightClient = String(right.item.client_file_id ?? "");
+    if (leftClient !== rightClient) return leftClient.localeCompare(rightClient);
+    const leftMedia = String(left.item.media_id ?? "");
+    const rightMedia = String(right.item.media_id ?? "");
+    if (leftMedia !== rightMedia) return leftMedia.localeCompare(rightMedia);
+    return left.index - right.index;
+  }).map(({ item }) => item);
+}
+function itemNeedsMaterialization(item) {
+  const status = normalizedStatus(item.status);
+  return !item.media_id || ["LOCAL", "HOST_UPLOADED", "FAILED_RETRYABLE", "FAILED", "PARTIAL"].includes(status);
+}
+function ordinalOf(item, fallback) {
+  return Number.isInteger(item.ordinal) ? Number(item.ordinal) : fallback;
+}
+function usageIsComplete(usage) {
+  return usage?.complete === true || ["COMPLETE", "APPLIED", "VERIFIED"].includes(normalizedStatus(usage?.status));
+}
+function planSubmissionResume(input) {
+  const items = orderedItems(input.items);
+  const canonicalMediaIds = items.map((item) => String(item.media_id ?? "").trim()).filter((mediaId, index, all) => mediaId !== "" && all.indexOf(mediaId) === index);
+  const materializeOrdinals = items.filter(itemNeedsMaterialization).map((item, index) => ordinalOf(item, index)).sort((left, right) => left - right);
+  const materializeItems = items.filter(itemNeedsMaterialization);
+  const hostUploadOrdinals = materializeItems.filter((item) => String(item.file_id ?? "").trim() === "").map((item, index) => ordinalOf(item, index)).sort((left, right) => left - right);
+  const mediaUploadOrdinals = [...materializeOrdinals];
+  const usages = new Map(
+    (input.media_usages ?? []).map((usage) => [String(usage.media_id ?? "").trim(), usage]).filter(([mediaId]) => mediaId !== "")
+  );
+  const usageMediaIds = canonicalMediaIds.filter((mediaId) => !usageIsComplete(usages.get(mediaId)));
+  const mediaComplete = normalizedStatus(input.media_commit_status) === "COMPLETE" && materializeOrdinals.length === 0;
+  const captureExists = input.capture?.exists === true || input.capture?.id !== void 0;
+  const captureAction = captureExists ? "REUSE" : "ENSURE_ONE";
+  const articleExists = input.article?.exists === true || input.article?.id !== void 0;
+  const articleAction = articleExists ? "REUSE" : "ENSURE_ONE";
+  const projectionStatus = normalizedStatus(input.projection?.status);
+  if (!mediaComplete) {
+    if (materializeOrdinals.length === 0) {
+      return { phase: "CONTINUE_ENRICHMENT", materializeOrdinals: [], hostUploadOrdinals: [], mediaUploadOrdinals: [], canonicalMediaIds, usageMediaIds: [], captureAction, articleAction };
+    }
+    return { phase: "MATERIALIZE_MEDIA", materializeOrdinals, hostUploadOrdinals, mediaUploadOrdinals, canonicalMediaIds, usageMediaIds: [], captureAction, articleAction };
+  }
+  if (usageMediaIds.length > 0 && articleExists) {
+    return { phase: "REPAIR_MEDIA_USAGE", materializeOrdinals: [], hostUploadOrdinals: [], mediaUploadOrdinals: [], canonicalMediaIds, usageMediaIds, captureAction, articleAction };
+  }
+  if (["FAILED_RETRYABLE", "FAILED", "PARTIAL"].includes(projectionStatus)) {
+    return { phase: "RETRY_PROJECTION", materializeOrdinals: [], hostUploadOrdinals: [], mediaUploadOrdinals: [], canonicalMediaIds, usageMediaIds: [], captureAction, articleAction };
+  }
+  if (normalizedStatus(input.enrichment_status) !== "COMPLETE" || !articleExists) {
+    return { phase: "CONTINUE_ENRICHMENT", materializeOrdinals: [], hostUploadOrdinals: [], mediaUploadOrdinals: [], canonicalMediaIds, usageMediaIds: [], captureAction, articleAction };
+  }
+  return { phase: "NOOP", materializeOrdinals: [], hostUploadOrdinals: [], mediaUploadOrdinals: [], canonicalMediaIds, usageMediaIds: [], captureAction, articleAction };
 }
 const SERVER_TOOL_NAME = "wp_ability_nhk_v3_media_widget_upload";
 const CAPTURE_TOOL_NAME = "wp_ability_nhk_v3_capture_ingest";
@@ -12540,12 +12618,12 @@ async function start() {
   function assertCaptureResult(result) {
     const inspection = inspectToolResult(result);
     if (inspection.kind !== "success") throw new Error(inspection.code);
-    return assertCaptureArticleReadback(inspection.payload, uploaded.map((item) => item.media_id).filter((id) => Boolean(id)));
+    return assertCaptureArticleReadback(inspection.payload, orderUploadedItems(uploaded).map((item) => item.media_id).filter((id) => Boolean(id)));
   }
   async function assertArticleMediaReadback(capture) {
     const articleId = Number(capture.article?.post_id ?? capture.article_id ?? 0);
     if (!(articleId > 0)) throw new Error("ARTICLE_READBACK_UNAVAILABLE");
-    for (const mediaId of uploaded.map((item) => item.media_id).filter((id) => Boolean(id))) {
+    for (const mediaId of orderUploadedItems(uploaded).map((item) => item.media_id).filter((id) => Boolean(id))) {
       recordDiagnostic("ARTICLE_MEDIA_READBACK_START", "START", "MEDIA_GET_READBACK_REQUESTED");
       const result = await app.callServerTool({ name: MEDIA_GET_TOOL_NAME, arguments: { id: mediaId } });
       assertMediaArticleReadback(result, mediaId, articleId);
@@ -12553,12 +12631,28 @@ async function start() {
     }
   }
   async function materializeSelectedImages(operationKey, namingContext, attempt) {
-    if (batchManifest !== null && batchManifest.success_count === batchManifest.requested_count && uploaded.length === selected.length && uploaded.every((item) => Boolean(item.media_id))) return batchManifest;
-    const retryingPartialBatch = batchManifest?.status === "partial_success";
-    const sourceOrdinals = retryingPartialBatch ? batchManifest.items.filter((item) => item.status !== "SUCCESS").flatMap((item) => typeof item.ordinal === "number" && Number.isInteger(item.ordinal) && item.ordinal >= 0 && item.ordinal < selected.length ? [item.ordinal] : []) : selected.map((_item, index) => index);
-    if (retryingPartialBatch && sourceOrdinals.length === 0) return batchManifest;
+    const priorItems = batchManifest?.items ?? [];
+    const resumePlan = planSubmissionResume({
+      media_commit_status: batchManifest === null ? "NOT_RUN" : batchManifest.failure_count > 0 ? "PARTIAL" : "COMPLETE",
+      enrichment_status: enrichmentStatus,
+      items: priorItems
+    });
+    if (batchManifest !== null && resumePlan.phase !== "MATERIALIZE_MEDIA") {
+      uploaded = orderUploadedItems(batchManifest.items);
+      return batchManifest;
+    }
+    const retryingPartialBatch = resumePlan.materializeOrdinals.length > 0 && batchManifest?.status === "partial_success";
+    const sourceOrdinals = resumePlan.mediaUploadOrdinals.length > 0 ? resumePlan.mediaUploadOrdinals : selected.map((_item, index) => index);
+    const hostUploadOrdinals = new Set(
+      resumePlan.hostUploadOrdinals.length > 0 ? resumePlan.hostUploadOrdinals : sourceOrdinals
+    );
+    if (batchManifest !== null && sourceOrdinals.length === 0) return batchManifest;
     const outcomes = await uploadSelectedFiles(sourceOrdinals.map((index) => {
       const item = selected[index];
+      const previous = priorItems.find((candidate) => candidate.ordinal === index);
+      if (!hostUploadOrdinals.has(index) && previous?.file_id) {
+        return { ordinal: index, file: null, fileId: previous.file_id, fileName: previous.original_filename ?? previous.public_filename, mimeType: previous.mime };
+      }
       return item.kind === "local" ? { ordinal: index, file: item.file } : { ordinal: index, file: null, fileId: item.fileId, fileName: item.fileName, mimeType: item.mimeType };
     }), {
       uploadFile: host.uploadFile,
@@ -12630,6 +12724,12 @@ async function start() {
       if (manifest.status !== "success") throw new Error("PARTIAL_BATCH_NOT_READY");
       const docs = await app.callServerTool({ name: DOCUMENTATION_TOOL_NAME, arguments: {} });
       const checkpoint = checkpointFrom(docs);
+      const canonicalMediaIds = planSubmissionResume({
+        media_commit_status: "COMPLETE",
+        enrichment_status: enrichmentStatus,
+        items: orderUploadedItems(uploaded)
+      }).canonicalMediaIds;
+      if (canonicalMediaIds.length !== selected.length) throw new Error("MEDIA_CANONICAL_READBACK_INCOMPLETE");
       const capture = await app.callServerTool({
         name: CAPTURE_TOOL_NAME,
         arguments: {
@@ -12637,7 +12737,7 @@ async function start() {
           documentation_checkpoint: checkpoint,
           text: namingContext,
           asset_inputs: buildCaptureAssetInputs(selected),
-          media_ids: uploaded.map((item) => item.media_id).filter((id) => Boolean(id)),
+          media_ids: canonicalMediaIds,
           publish: false
         }
       });
