@@ -87,6 +87,14 @@ final class FrontendPresentationContractTest extends TestCase
         self::assertStringContainsString('line-clamp:2', $css);
     }
 
+    public function test_homepage_header_keeps_primary_and_discovery_navigation_visually_separate(): void
+    {
+        $css = $this->read('style.css');
+
+        self::assertStringContainsString('.nav-primary{display:flex;align-items:center;gap:17px;min-width:0}', $css);
+        self::assertStringContainsString('.nav{display:flex;align-items:center;gap:14px;min-width:0}', $css);
+    }
+
     public function test_homepage_prioritizes_only_the_hero_lcp_image(): void
     {
         $source = $this->read('front-page.php');

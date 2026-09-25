@@ -1,3 +1,29 @@
+# Checkpoint — 2026-09-25 — Homepage visual balance refinement (LOCAL / NO MUTATION)
+
+VISUAL_FINDINGS: Browser review of `https://demo.1945.vn/` found the staging
+homepage running a CSS/build revision older than the current branch: the
+latest-feed cards expanded to intrinsic image size and pushed their text into
+the right side of a large blank canvas. The current staging header also showed
+the primary navigation and `Khám phá` control visually touching at desktop
+width. The hero hierarchy and editorial warm palette were retained.
+
+IMPLEMENTED: Added canonical spacing between the primary navigation group and
+the discovery control, plus a bounded two-column mobile navigation grid that
+keeps touch targets and the existing focus/menu behavior intact. Existing
+homepage latest/featured image containment and responsive card rules remain
+unchanged in the current branch; no markup, content, route, schema, semantic
+owner or runtime data boundary changed.
+
+VERIFICATION: Homepage presentation contract focused suite passed 6 tests / 43
+assertions, including the new header-spacing regression. Browser staging was
+visually inspected at desktop and showed the pre-HEAD CSS issue. Local browser
+verification of the changed HEAD is blocked because WordPress cannot connect
+to the local MySQL service at `127.0.0.1:3306`; no staging/live mutation,
+deployment or database action was performed. PHP lint and full frontend gates
+remain required before commit.
+
+STATUS: `HOMEPAGE_VISUAL_REFINEMENT_LOCAL_READY / BROWSER_LOCAL_BLOCKED / NO_MUTATION / NO_COMMIT`.
+
 # Checkpoint — 2026-09-25 — Video representative MediaUsage administration (LOCAL / NO LIVE MUTATION)
 
 IMPLEMENTED: Added a shared Video representative-media presentation resolver
