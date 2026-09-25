@@ -1830,7 +1830,8 @@ final class EditorialCaptureCoordinator
         $mediaIds = array_values(array_unique(array_filter(array_map('strval', (array) ($media['media_ids'] ?? [])), static fn (string $id): bool => trim($id) !== '')));
         $singleMediaId = trim((string) ($media['media_id'] ?? $media['canonical_id'] ?? ''));
         if ($singleMediaId !== '') $mediaIds[] = $singleMediaId;
-        $mediaComplete = in_array(strtoupper(trim((string) ($media['status'] ?? ''))), ['COMPLETE', 'RECONCILED'], true);
+        $mediaComplete = in_array(strtoupper(trim((string) ($media['status'] ?? ''))), ['COMPLETE', 'RECONCILED'], true)
+            && $this->articleMediaDispositionsComplete($media);
         $mediaFrontendVerified = $media['frontend_verified'] ?? ($final['frontend_verified'] ?? null);
         foreach (array_values(array_unique($mediaIds)) as $mediaId) {
             $children[] = ['owner_type' => 'media', 'owner_id' => $mediaId, 'canonical_readback' => $mediaComplete ? ['id' => $mediaId] : null, 'relation_or_usage_state' => $mediaComplete ? 'COMPLETE' : 'PARTIAL', 'public_eligible' => ($media['media_complete'] ?? false) === true || (($media['media_complete'] ?? null) === null && $mediaComplete), 'frontend_verified' => $mediaFrontendVerified, 'public_projection_owner' => false, 'owner_role' => 'semantic_dependency', 'blockers' => (array) ($media['blockers'] ?? [])];
@@ -1866,5 +1867,16 @@ final class EditorialCaptureCoordinator
             ];
         }
         return $children;
+    }
+
+    /** @param array<string,mixed> $media */
+    private function articleMediaDispositionsComplete(array $media): bool
+    {
+        $dispositions = array_values(array_filter((array) ($media['media_dispositions'] ?? $media['article_media_dispositions'] ?? []), 'is_array'));
+        if ($dispositions === []) return true;
+        foreach ($dispositions as $disposition) {
+            if (strtoupper(trim((string) ($disposition['status'] ?? ''))) !== 'APPLIED') return false;
+        }
+        return true;
     }
 }

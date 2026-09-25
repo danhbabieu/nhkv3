@@ -117,6 +117,33 @@ was performed.
 
 STATUS: `CONFIRMED_SUBJECT_RECONCILIATION_MIXED_ROUTING_LOCAL_READY / INTEGRATION_ENVIRONMENT_GATED / NO_LIVE_MUTATION`.
 
+# Checkpoint — 2026-09-25 — Native multi-image Capture → Article/public completion boundary (LOCAL / NO LIVE MUTATION)
+
+IMPLEMENTED: Shared editorial description aliases now enter the semantic Capture
+input and route multi-image requests to IMAGE_ARTICLE even when Feature is
+empty. Ordered asset manifests are preserved across physical ingest and retry.
+Article MediaUsage reconciliation exposes a terminal per-Media disposition and
+Article draft composition is deferred until canonical MediaUsage read-back.
+Existing governed Specimen intent remains capability/registry driven; no Album
+was introduced. Public Media/Article links continue to derive from active
+canonical MediaUsage and published Article state.
+
+COMPLETION_SAFETY: Capture read-back now requires every manifest Media to have
+active canonical MediaUsage and every returned Article disposition to be
+APPLIED before the Article owner can converge COMPLETE. A visitor-safe
+`result_packet` reports Article, Media, Knowledge and public-readback status
+without exposing request secrets or internal identifiers. Feature, Knowledge,
+Article and projection failures remain child/dependency isolated; retry paths
+reuse existing idempotency boundaries.
+
+VERIFICATION: Task 8 focused regression passed 80 tests / 399 assertions with
+9 pre-existing PHPUnit deprecations. Tasks 1–7 focused suites passed at their
+respective boundaries; no database, staging/production data, Governance Apply,
+deployment or live mutation was performed. Final full-suite gates remain
+pending in this checkpoint.
+
+STATUS: `CAPTURE_MULTI_IMAGE_ARTICLE_PUBLIC_LOCAL_IMPLEMENTED / FINAL_VERIFICATION_PENDING / NO_LIVE_MUTATION`.
+
 # NHK V3 Execution State
 
 # Checkpoint — 2026-09-25 — Mobile Capture image input contract/UI (LOCAL / NO LIVE MUTATION)
