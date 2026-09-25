@@ -20007,3 +20007,74 @@ secret review passed. No live acceptance, database mutation, staging/production
 mutation, deployment or push occurred in this checkpoint.
 
 STATUS: `IMAGE_UPLOAD_DURABLE_MEDIA_CONTINUATION_LOCAL_READY / ATTEMPT_SCOPED_DIAGNOSTICS / UNIT_GREEN / INTEGRATION_ENVIRONMENT_BLOCKED / NO_MUTATION`.
+
+# Checkpoint — 2026-09-25 — Canonical Media target binding and reusable MediaUsage (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE: MediaBindingService validated targets against the Authority
+EntityTypeRegistry, while `wp_post` exists only in the registered endpoint
+registry. MCP and staging independently rebuilt Post keys, so equivalent
+target forms diverged before fingerprints, proposals and scope verification.
+
+ARCHITECTURE_IMPLEMENTED: Added MediaTargetReference, MediaTargetRegistry and
+MediaTargetNormalizer over the existing EndpointTypeRegistry/resolvers. The
+Authority catalog remains Authority-only; `wp_post` is resolved through its
+registered endpoint resolver. MediaBindingService, MCP transport, staging
+admission/guard/verifier and Governance apply now consume canonical targets.
+
+FILES_CHANGED: Canonical Media target classes and tests; MediaBindingService
+reuse/replacement; MCP transport wiring and contract test; staging scope
+convergence; featured-only WordPress projection and Governance executor
+wiring; reverse lookup acceptance test.
+
+TARGET_TYPES_SUPPORTED: Registered Authority targets (brand, model, variant,
+movement, music, component, classification, specimen, product) plus the
+registered `wp_post` editorial endpoint. No arbitrary endpoint type was added.
+
+WP_POST_NORMALIZATION: `{type:wp_post, blog_id:1, post_id:18}` and
+`{type:wp_post, id:1:18}` both normalize to endpoint type `wp_post`, key
+`1:18`, resolver-verified existence/active state and endpoint revision.
+
+MEDIA_REUSE_MODEL: One canonical Media may own independent MediaUsage rows per
+target/role/placement. Replacement retires the exact old usage, creates one
+new active usage, preserves history, enforces CAS and does not affect other
+targets. No Media or attachment clone is created by featured projection.
+
+FEATURED_ONLY_PROJECTION: `wp_post + featured_primary` uses the narrow bridge
+owner, existing Media-to-attachment mapping, editorial token CAS and
+`set_post_thumbnail` only. It does not invoke Article composition or
+`wp_update_post`, and verifies title/body/excerpt/slug/categories/semantic
+subject snapshot stability.
+
+GRAPH_RELATION_POLICY: MediaUsage remains a contextual usage owner and does
+not create Graph edges.
+
+GOVERNANCE_AND_STAGING: MCP creates canonical target payloads before proposal
+fingerprints; controlled apply remains the MediaUsage writer; staging packets
+remain Capture-bound, signed, capability/expiry/revision/payload scoped and
+fail-closed.
+
+REGRESSION_TESTS: Added normalizer, multi-target reuse, target-local
+replacement/history, MCP target convergence, staging fingerprint convergence,
+featured-only Article immutability contract and reverse Media lookup tests.
+The concrete Media UUID `01a0d7ee-3e33-7366-88c6-287112b34936` is covered in
+unit fixtures for canonical `wp_post 1:18`; no live acceptance mutation was
+performed.
+
+FOCUSED_TESTS: 210 tests, 3,100 assertions; OK with 1 warning, 4
+deprecations and 38 PHPUnit deprecations.
+
+FULL_UNIT: `php -d memory_limit=512M vendor/bin/phpunit .../tests/Unit` —
+2,675 tests, 15,490 assertions, OK with 19 warnings, 46 deprecations and 46
+PHPUnit deprecations.
+
+INTEGRATION: BLOCKED, not passed. `NHK_WP_TEST_PATH=UNSET` and
+`NHK_WP_TEST_DB=UNSET`; guarded projection test skipped and no alternate
+database was used.
+
+COMMIT: Implementation slices `2013361b`, `2ef6c50f`, `cf783e0b`, `87caae7b`
+and `90d4e9e7`; final checkpoint commit contains this evidence and the reverse
+lookup acceptance test.
+
+REMAINING_BLOCKERS: Exact guarded WordPress integration environment is
+unavailable. Live/staging acceptance for the concrete external Post 18 was
+not authorized or performed. Existing PHPUnit warnings/deprecations remain.
