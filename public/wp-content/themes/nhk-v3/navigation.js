@@ -25,7 +25,7 @@
     if (!toggle.checked || !mobileQuery.matches) return;
     if (event.key === 'Escape') { event.preventDefault(); close(true); return; }
     if (event.key !== 'Tab' || !panel) return;
-    var focusable = panel.querySelectorAll('a[href], input, button, select, textarea, [tabindex]:not([tabindex="-1"])');
+    var focusable = panel.querySelectorAll('a[href], input, button, select, textarea, summary, [tabindex]:not([tabindex="-1"])');
     if (!focusable.length) return;
     var first = focusable[0];
     var last = focusable[focusable.length - 1];
