@@ -99,6 +99,25 @@ final class FrontendPresentationContractTest extends TestCase
         self::assertStringNotContainsString("['loading' => 'eager', 'fetchpriority' => 'high', 'alt' => get_the_title()]", $source);
     }
 
+    public function test_homepage_presentation_css_keeps_only_active_hero_and_uncropped_thumbnails(): void
+    {
+        $source = $this->read('front-page.php');
+        $css = $this->read('entity.css');
+
+        self::assertStringNotContainsString('hero-slider-controls', $css);
+        self::assertStringNotContainsString('hero-slider-dots', $css);
+        self::assertStringNotContainsString('hero-visual-slider', $css);
+        self::assertStringNotContainsString('hero-latest-', $css);
+        self::assertStringNotContainsString('home-hero-with-slider', $css);
+        self::assertStringContainsString('home-hero-v2', $css);
+        self::assertStringContainsString('hero-copy-block', $css);
+        self::assertStringContainsString('hero-media-column', $css);
+        self::assertStringContainsString('.latest-feed-card-image{display:block;width:100%;height:100%;object-fit:contain}', $css);
+        self::assertStringContainsString('.support-card-image img{display:block;width:100%;height:100%;object-fit:contain}', $css);
+        self::assertStringNotContainsString('hero-slider-controls', $source);
+        self::assertStringNotContainsString('hero-visual-slider', $source);
+    }
+
     public function test_homepage_hero_and_video_cards_keep_responsive_and_lazy_image_contracts(): void
     {
         $home = $this->read('front-page.php');
