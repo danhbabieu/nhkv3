@@ -111,6 +111,41 @@ final class ImageArticleProductionFlowTest extends TestCase
         self::assertSame('PARTIAL', $result->status);
         self::assertNotEmpty($result->diagnostics['completion']['blockers']);
     }
+
+    /** @dataProvider longSharedDescriptionProvider */
+    public function test_long_shared_description_stays_semantic_and_retries_one_three_media_article_idempotently(int $length): void
+    {
+        $flow = new ImageArticleFlowFixture([
+            ['media_id' => 'media-front', 'attachment_id' => 612, 'upload_status' => 'CREATED', 'sort_order' => 0, 'media_context' => ['title' => 'Mặt trước', 'description' => 'Mặt trước', 'feature_requests' => []], 'capture_asset_input' => ['name' => 'Mặt trước', 'feature_requests' => []]],
+            ['media_id' => 'media-case', 'attachment_id' => 613, 'upload_status' => 'CREATED', 'sort_order' => 1, 'media_context' => ['title' => 'Vỏ máy', 'description' => 'Vỏ máy', 'feature_requests' => []], 'capture_asset_input' => ['name' => 'Vỏ máy', 'feature_requests' => []]],
+            ['media_id' => 'media-movement', 'attachment_id' => 614, 'upload_status' => 'CREATED', 'sort_order' => 2, 'media_context' => ['title' => 'Bộ máy', 'description' => 'Bộ máy', 'feature_requests' => []], 'capture_asset_input' => ['name' => 'Bộ máy', 'feature_requests' => []]],
+        ]);
+        $shared = str_repeat('Mô tả semantic đầy đủ không được cắt. ', $length);
+        $shared = function_exists('mb_substr') ? mb_substr($shared, 0, $length) : substr($shared, 0, $length);
+
+        $first = $flow->run(['idempotency_key' => 'long-shared-' . $length, 'text' => $shared]);
+        $retry = $flow->run(['idempotency_key' => 'long-shared-' . $length, 'text' => $shared]);
+
+        self::assertSame($length, mb_strlen($flow->semanticInputs[0]));
+        self::assertSame($shared, $flow->semanticInputs[0]);
+        self::assertSame(['Mặt trước', 'Vỏ máy', 'Bộ máy'], array_column($flow->captureAssetInputs, 'name'));
+        self::assertSame([[], [], []], array_column($flow->captureAssetInputs, 'feature_requests'));
+        self::assertCount(3, $flow->usages);
+        self::assertSame(['media-front', 'media-case', 'media-movement'], array_column($flow->usages, 'media_id'));
+        self::assertLessThanOrEqual(500, max(array_map(static fn (array $usage): int => mb_strlen((string) ($usage['description'] ?? '')), $flow->usages)));
+        self::assertSame(1, $first->articleId);
+        self::assertSame($first->captureId, $retry->captureId);
+        self::assertSame(1, $retry->articleId);
+        self::assertSame(1, $flow->draftCalls);
+        self::assertSame(['APPLIED', 'APPLIED', 'APPLIED'], array_column($retry->diagnostics['media_usage']['media_dispositions'], 'status'));
+        self::assertTrue($retry->diagnostics['media_usage']['media_complete']);
+    }
+
+    /** @return array<string, array{int}> */
+    public static function longSharedDescriptionProvider(): array
+    {
+        return ['501 characters' => [501], '2000 characters' => [2000]];
+    }
 }
 
 final class ImageArticleFlowFixture
@@ -122,6 +157,8 @@ final class ImageArticleFlowFixture
     public array $usages = [];
     public array $packetIds = [];
     public array $events = [];
+    public array $semanticInputs = [];
+    public array $captureAssetInputs = [];
     public string $subjectHintSeen = '';
     private ImageArticleTestCaptureRepository $captures;
     private bool $failMediaOnce;
@@ -134,7 +171,7 @@ final class ImageArticleFlowFixture
         $this->captures = new ImageArticleTestCaptureRepository();
         $this->coordinator = new EditorialCaptureCoordinator(
             $this->captures,
-            function (array $input): array { $this->physicalCalls++; return ['items' => $this->assets]; },
+            function (array $input): array { $this->physicalCalls++; $this->captureAssetInputs = array_map(static fn (array $asset): array => (array) ($asset['capture_asset_input'] ?? []), $this->assets); return ['items' => $this->assets]; },
             function (array $input): array { $this->draftCalls++; return ['post_id' => 1, 'state_token' => 'article-state-1', 'post' => ['post_id' => 1, 'post_modified_gmt' => '2026-09-19 00:00:01']]; },
             new TextInputInterpreter(),
             new SubjectResolutionService(function (string $hint): array {
@@ -147,6 +184,7 @@ final class ImageArticleFlowFixture
             new ClaimRetrievalEngine(static fn (array $subject): array => ['status' => 'available', 'items' => []], static fn (array $subject, array $neighborhood): array => []),
             function (array $context): array {
                 $this->packetIds[] = (string) (($context['subject_resolution_packet']['id'] ?? ''));
+                $this->semanticInputs[] = (string) ($context['raw_input'] ?? '');
                 return ['status' => 'COMPLETED', 'writes' => []];
             },
             new ArticleComposer(),
@@ -158,7 +196,7 @@ final class ImageArticleFlowFixture
                 foreach ((array) ($context['assets'] ?? []) as $asset) {
                     if (!is_array($asset) || trim((string) ($asset['media_id'] ?? '')) === '') continue;
                     $seo = is_array($asset['media_context'] ?? null) ? $asset['media_context'] : [];
-                    $this->usages[] = ['media_id' => (string) $asset['media_id'], 'endpoint_key' => '1:' . (string) ($context['article_id'] ?? ''), 'sort_order' => (int) ($asset['sort_order'] ?? 0), 'title' => (string) ($seo['title'] ?? ''), 'alt_text' => (string) ($seo['alt_text'] ?? ''), 'caption' => (string) ($seo['caption'] ?? '')];
+                    $this->usages[] = ['media_id' => (string) $asset['media_id'], 'endpoint_key' => '1:' . (string) ($context['article_id'] ?? ''), 'sort_order' => (int) ($asset['sort_order'] ?? 0), 'title' => (string) ($seo['title'] ?? ''), 'description' => (string) ($seo['description'] ?? ''), 'alt_text' => (string) ($seo['alt_text'] ?? ''), 'caption' => (string) ($seo['caption'] ?? '')];
                 }
                 usort($this->usages, static fn (array $left, array $right): int => $left['sort_order'] <=> $right['sort_order']);
                 return ['status' => 'RECONCILED', 'media_ids' => array_column($this->usages, 'media_id'), 'media_complete' => !$this->incompleteMediaDisposition, 'media_usage' => $this->usages, 'media_dispositions' => $this->incompleteMediaDisposition ? [['media_id' => 'media-detail', 'role' => 'inline_primary', 'status' => 'REVIEW_REQUIRED']] : array_map(static fn (array $usage): array => ['media_id' => $usage['media_id'], 'role' => 'inline_supporting', 'status' => 'APPLIED'], $this->usages)];

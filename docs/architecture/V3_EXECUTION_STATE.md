@@ -151,6 +151,35 @@ STATUS: `CAPTURE_MULTI_IMAGE_ARTICLE_PUBLIC_LOCAL_IMPLEMENTED / AUTOMATED_LOCAL_
 
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-25 — Shared Capture description/media upload boundary repair (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE_CONFIRMED: The image widget sent the shared `Mô tả chung` value as
+`metadata.description` on `nhk.media.widget-upload`, which is capped at 500
+characters. The same value was already sent as Capture `text`, so the Media
+Ability schema rejected 501+ character submissions before Media commit.
+
+FIXED_BOUNDARY: The widget sends an empty Media metadata object and keeps each
+per-image name in `media.title`; shared description remains the single Capture
+semantic text input. Feature requests remain optional per-image Capture input.
+User-facing failures now use a short Vietnamese message while typed diagnostic
+codes/details remain in admin diagnostics. Existing idempotency keys and retry
+flow are unchanged.
+
+REGRESSION: Added 501- and 2000-character shared-description coverage for three
+Media, empty features, one Article, complete MediaUsage dispositions, canonical
+usage order, bounded Media descriptions and idempotent retry/read-back.
+
+VERIFICATION: Focused/Contract PHP passed 95 tests / 1,038 assertions. Full Unit
+ran 2,617 tests / 15,226 assertions with 3 existing physical-fixture failures
+(`MediaAssetDeliveryTest`, `PublicMediaAssetRoutesTest`) and 20 warnings. Full
+repository run reached 2,765 tests / 15,297 assertions and was environment-gated
+by 24 integration failures requiring `NHK_WP_TEST_PATH=public`; 120 tests were
+skipped. JS tests passed 35/35, typecheck and Vite build passed, changed-file
+PHP lint and diff-check passed. No database, staging/production mutation or
+deployment was performed.
+
+STATUS: `CAPTURE_SHARED_DESCRIPTION_BOUNDARY_REPAIRED_LOCAL / AUTOMATED_LOCAL_VERIFICATION_COMPLETE / INTEGRATION_ENVIRONMENT_GATED / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-25 — Mobile Capture image input contract/UI (LOCAL / NO LIVE MUTATION)
 
 IMPLEMENTED: The NHK image uploader now presents a mobile-first, vertical
