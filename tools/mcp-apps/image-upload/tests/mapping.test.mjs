@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { assertUploadManifestCount, assertUploadManifestCounts, buildWidgetState, extractPayload, extractUploadManifest, extractUploads, inspectToolResult, mergeUploadManifest, normalizeSelectedFiles, shouldProcessToolResultNotification } from "../src/contract.ts";
+import { assertUploadManifestCount, assertUploadManifestCounts, buildCaptureAssetInputs, buildWidgetState, extractPayload, extractUploadManifest, extractUploads, inspectToolResult, mergeUploadManifest, normalizeSelectedFiles, shouldProcessToolResultNotification, splitFeatureRequests } from "../src/contract.ts";
 
 test("does not parse the tool result that opened the widget as an upload result", () => {
   assert.equal(shouldProcessToolResultNotification("open"), false);
@@ -14,8 +14,19 @@ test("normalizes ChatGPT library selections as authorized file references", () =
     { fileId: "file-one", fileName: "one.png", mimeType: "image/png" },
     { fileId: "file-two", fileName: "two.webp", mimeType: "image/webp" },
   ]), [
-    { kind: "library", fileId: "file-one", fileName: "one.png", mimeType: "image/png" },
-    { kind: "library", fileId: "file-two", fileName: "two.webp", mimeType: "image/webp" },
+    { kind: "library", clientFileId: "file-one", fileId: "file-one", fileName: "one.png", mimeType: "image/png", name: "one.png", feature: "" },
+    { kind: "library", clientFileId: "file-two", fileId: "file-two", fileName: "two.webp", mimeType: "image/webp", name: "two.webp", feature: "" },
+  ]);
+});
+
+test("keeps each asset name and feature requests structured and ordered", () => {
+  assert.deepEqual(splitFeatureRequests("Mặt trước, Odo 24\nOdo 1962"), ["Mặt trước", "Odo 24", "Odo 1962"]);
+  assert.deepEqual(buildCaptureAssetInputs([
+    { kind: "library", clientFileId: "a", fileId: "a", fileName: "a.jpg", mimeType: "image/jpeg", name: "Mặt trước", feature: "Odo 24, Odo 1962" },
+    { kind: "library", clientFileId: "b", fileId: "b", fileName: "b.jpg", mimeType: "image/jpeg", name: "Mặt sau", feature: "Odo 24" },
+  ]), [
+    { client_file_id: "a", ordinal: 0, name: "Mặt trước", feature_requests: ["Odo 24", "Odo 1962"] },
+    { client_file_id: "b", ordinal: 1, name: "Mặt sau", feature_requests: ["Odo 24"] },
   ]);
 });
 

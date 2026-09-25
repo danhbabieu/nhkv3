@@ -89,6 +89,26 @@ STATUS: `CONFIRMED_SUBJECT_RECONCILIATION_MIXED_ROUTING_LOCAL_READY / INTEGRATIO
 
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-25 — Mobile Capture image input contract/UI (LOCAL / NO LIVE MUTATION)
+
+IMPLEMENTED: The NHK image uploader now presents a mobile-first, vertical
+per-asset card with preview, full-width `Tên ảnh`, full-width `Feature`, one
+shared `Mô tả chung` textarea and one `TẢI LÊN` action. The client preserves
+stable per-file identity and order, sends one physical Media batch followed by
+one idempotent Capture request, and retains the existing retry/read-back
+diagnostics. The Capture contract additively accepts ordered `asset_inputs[]`
+with user name and `feature_requests[]`; these remain scoped input context and
+are not canonical facts, UUIDs or direct MediaUsage bindings.
+
+VERIFICATION: Uploader typecheck, Vite single-file build and 34 JavaScript
+tests passed. Focused PHP `McpContractTest` passed 40 tests / 649 assertions;
+`McpWidgetUploadTest` plus `EditorialCaptureAssetFollowUpTest` passed 12 tests
+/ 104 assertions. Changed PHP files lint clean and `git diff --check` passed.
+No database, staging/production data, Governance Apply, deployment or live
+mutation was performed. Build emitted only existing Rollup annotation warnings.
+
+STATUS: `MOBILE_CAPTURE_INPUT_LOCAL_READY / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-25 — YouTube Video retry embed contract repair (LOCAL / NO LIVE MUTATION)
 
 ROOT_CAUSE_CONFIRMED: The source adapter and initial Video intake generated the

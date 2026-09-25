@@ -46,8 +46,15 @@ export type WidgetDiagnostic = {
 export type WidgetUploadStatus = "idle" | "partial" | "complete" | "error";
 
 export type SelectedImage =
-  | { kind: "local"; file: File; metadata?: Record<string, string> }
-  | { kind: "library"; fileId: string; fileName: string; mimeType: string; metadata?: Record<string, string> };
+  | { kind: "local"; clientFileId: string; file: File; name: string; feature: string }
+  | { kind: "library"; clientFileId: string; fileId: string; fileName: string; mimeType: string; name: string; feature: string };
+
+export type CaptureAssetInput = {
+  client_file_id: string;
+  ordinal: number;
+  name: string;
+  feature_requests: string[];
+};
 
 export function normalizeSelectedFiles(value: unknown): SelectedImage[] {
   if (!Array.isArray(value)) return [];
@@ -58,8 +65,21 @@ export function normalizeSelectedFiles(value: unknown): SelectedImage[] {
     if (typeof reference.fileId !== "string" || reference.fileId === "") return [];
     if (typeof reference.fileName !== "string" || reference.fileName === "") return [];
     if (typeof reference.mimeType !== "string" || reference.mimeType === "") return [];
-    return [{ kind: "library", fileId: reference.fileId, fileName: reference.fileName, mimeType: reference.mimeType }];
+    return [{ kind: "library", clientFileId: reference.fileId, fileId: reference.fileId, fileName: reference.fileName, mimeType: reference.mimeType, name: reference.fileName, feature: "" }];
   });
+}
+
+export function splitFeatureRequests(value: string): string[] {
+  return value.split(/[\n,]/u).map((item) => item.trim()).filter(Boolean);
+}
+
+export function buildCaptureAssetInputs(items: SelectedImage[]): CaptureAssetInput[] {
+  return items.map((item, ordinal) => ({
+    client_file_id: item.clientFileId,
+    ordinal,
+    name: item.name.trim(),
+    feature_requests: splitFeatureRequests(item.feature),
+  }));
 }
 
 export type ToolResult = {

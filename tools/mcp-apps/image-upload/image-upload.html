@@ -11,14 +11,13 @@
       button { cursor: pointer; padding: 8px 12px; }
       button:disabled, input:disabled { cursor: not-allowed; opacity: .6; }
       #actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
-      #article-panel { margin-top: 12px; padding-top: 8px; border-top: 1px solid color-mix(in srgb, currentColor 22%, transparent); }
-      #article-fields { display: grid; gap: 8px; margin-top: 10px; }
-      #article-fields textarea { min-height: 180px; resize: vertical; }
-      #article-fields input, #article-fields textarea, #context { box-sizing: border-box; width: 100%; padding: 8px; }
-      #previews { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; margin: 14px 0; }
-      figure { margin: 0; border: 1px solid color-mix(in srgb, currentColor 22%, transparent); border-radius: 8px; overflow: hidden; }
-      figure img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; }
-      figcaption { padding: 6px; font-size: 12px; overflow-wrap: anywhere; }
+      #description { box-sizing: border-box; display: block; width: 100%; min-height: 120px; padding: 12px; resize: vertical; }
+      #previews { display: grid; gap: 16px; margin: 14px 0; }
+      figure { display: grid; gap: 10px; margin: 0; padding: 10px; border: 1px solid color-mix(in srgb, currentColor 22%, transparent); border-radius: 10px; }
+      figure img { display: block; width: 100%; max-height: 280px; aspect-ratio: 4 / 3; object-fit: contain; background: color-mix(in srgb, currentColor 8%, transparent); }
+      figure input, figure button { box-sizing: border-box; width: 100%; min-height: 44px; padding: 10px; }
+      .asset-label { font-weight: 700; }
+      figcaption { font-size: 12px; overflow-wrap: anywhere; opacity: .75; }
       #state { font-weight: 700; }
       #status { margin-top: 10px; white-space: pre-wrap; }
       #results { display: grid; gap: 4px; margin-top: 8px; }
@@ -28,26 +27,15 @@
   </head>
   <body>
     <h2>Ảnh NHK</h2>
-    <p>Thêm một hoặc nhiều ảnh để tải tư liệu hoặc tạo bài viết.</p>
-    <p>Ảnh được tải trước; bài viết có thể tạo sau từ đúng Media vừa tải.</p>
+    <p>Chọn một hoặc nhiều ảnh. Mỗi ảnh có tên và Feature riêng; mô tả chung áp dụng cho cả submission.</p>
     <p>Trạng thái: <span id="state">CONNECTING</span></p>
-    <label for="context">Ngữ cảnh bộ ảnh</label>
-    <input id="context" type="text" maxlength="500" placeholder="Ví dụ: máy, mặt trước, logo, mặt số của đồng hồ 36" autocomplete="off" />
     <input id="files" type="file" accept="image/jpeg,image/png,image/gif,image/webp" multiple disabled />
     <div id="actions">
       <button id="select" type="button" hidden disabled>Chọn ảnh từ thư viện ChatGPT</button>
-      <button id="upload" type="button" disabled>Tải ảnh lên</button>
+      <button id="upload" type="button" disabled>TẢI LÊN</button>
     </div>
-    <details id="article-panel">
-      <summary>Tạo bài viết</summary>
-      <div id="article-fields">
-        <label for="article-title">Tiêu đề bài viết</label>
-        <input id="article-title" type="text" maxlength="500" placeholder="Tùy chọn" autocomplete="off" />
-        <label for="article-text">Nội dung / yêu cầu bài viết</label>
-        <textarea id="article-text" maxlength="20000" placeholder="Nhập nội dung hoặc yêu cầu bài viết dài…"></textarea>
-        <button id="create" type="button" disabled>Tạo bài viết</button>
-      </div>
-    </details>
+    <label for="description">Mô tả chung</label>
+    <textarea id="description" maxlength="20000" placeholder="Mô tả chung cho toàn bộ ảnh…"></textarea>
     <div id="summary" aria-live="polite">Chưa chọn ảnh.</div>
     <div id="previews"></div>
     <div id="status" role="status" aria-live="polite">ĐANG KẾT NỐI</div>

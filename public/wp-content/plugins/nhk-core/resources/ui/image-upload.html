@@ -11,14 +11,13 @@
       button { cursor: pointer; padding: 8px 12px; }
       button:disabled, input:disabled { cursor: not-allowed; opacity: .6; }
       #actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
-      #article-panel { margin-top: 12px; padding-top: 8px; border-top: 1px solid color-mix(in srgb, currentColor 22%, transparent); }
-      #article-fields { display: grid; gap: 8px; margin-top: 10px; }
-      #article-fields textarea { min-height: 180px; resize: vertical; }
-      #article-fields input, #article-fields textarea, #context { box-sizing: border-box; width: 100%; padding: 8px; }
-      #previews { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; margin: 14px 0; }
-      figure { margin: 0; border: 1px solid color-mix(in srgb, currentColor 22%, transparent); border-radius: 8px; overflow: hidden; }
-      figure img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; }
-      figcaption { padding: 6px; font-size: 12px; overflow-wrap: anywhere; }
+      #description { box-sizing: border-box; display: block; width: 100%; min-height: 120px; padding: 12px; resize: vertical; }
+      #previews { display: grid; gap: 16px; margin: 14px 0; }
+      figure { display: grid; gap: 10px; margin: 0; padding: 10px; border: 1px solid color-mix(in srgb, currentColor 22%, transparent); border-radius: 10px; }
+      figure img { display: block; width: 100%; max-height: 280px; aspect-ratio: 4 / 3; object-fit: contain; background: color-mix(in srgb, currentColor 8%, transparent); }
+      figure input, figure button { box-sizing: border-box; width: 100%; min-height: 44px; padding: 10px; }
+      .asset-label { font-weight: 700; }
+      figcaption { font-size: 12px; overflow-wrap: anywhere; opacity: .75; }
       #state { font-weight: 700; }
       #status { margin-top: 10px; white-space: pre-wrap; }
       #results { display: grid; gap: 4px; margin-top: 8px; }
@@ -12019,8 +12018,19 @@ function normalizeSelectedFiles(value) {
     if (typeof reference.fileId !== "string" || reference.fileId === "") return [];
     if (typeof reference.fileName !== "string" || reference.fileName === "") return [];
     if (typeof reference.mimeType !== "string" || reference.mimeType === "") return [];
-    return [{ kind: "library", fileId: reference.fileId, fileName: reference.fileName, mimeType: reference.mimeType }];
+    return [{ kind: "library", clientFileId: reference.fileId, fileId: reference.fileId, fileName: reference.fileName, mimeType: reference.mimeType, name: reference.fileName, feature: "" }];
   });
+}
+function splitFeatureRequests(value) {
+  return value.split(/[\n,]/u).map((item) => item.trim()).filter(Boolean);
+}
+function buildCaptureAssetInputs(items) {
+  return items.map((item, ordinal) => ({
+    client_file_id: item.clientFileId,
+    ordinal,
+    name: item.name.trim(),
+    feature_requests: splitFeatureRequests(item.feature)
+  }));
 }
 function shouldProcessToolResultNotification(source) {
   return source === "widget-upload" || source === "capture";
@@ -12301,15 +12311,12 @@ async function start() {
   const input = byId("files");
   const select = byId("select");
   const upload = byId("upload");
-  const create = byId("create");
   const summary = byId("summary");
   const previews = byId("previews");
   const state = byId("state");
   const status = byId("status");
   const results = byId("results");
-  const context = byId("context");
-  const articleTitle = byId("article-title");
-  const articleText = byId("article-text");
+  const context = byId("description");
   const diagnosticsView = byId("diagnostics");
   const host = window.openai;
   const app = new l({ name: "NHK Image Upload", version: "1.0.0" });
@@ -12354,28 +12361,50 @@ async function start() {
   }
   function renderSelection() {
     previews.replaceChildren();
-    let total = 0;
-    selected.forEach((item) => {
+    selected.forEach((item, ordinal) => {
       const file = item.kind === "local" ? item.file : null;
       const fileName = item.kind === "local" ? item.file.name : item.fileName;
-      const fileSize = file?.size ?? 0;
-      total += fileSize;
       const figure = document.createElement("figure");
+      figure.dataset.clientFileId = item.clientFileId;
       if (file) {
         const image = document.createElement("img");
-        image.alt = file.name;
+        image.alt = item.name || file.name;
         image.src = URL.createObjectURL(file);
         figure.append(image);
       }
+      const label = document.createElement("div");
+      label.className = "asset-label";
+      label.textContent = `Ảnh ${ordinal + 1}`;
+      figure.append(label);
+      const name = document.createElement("input");
+      name.type = "text";
+      name.className = "asset-name";
+      name.placeholder = "Tên ảnh";
+      name.value = item.name;
+      name.required = true;
+      name.dataset.field = "name";
+      figure.append(name);
+      const feature = document.createElement("input");
+      feature.type = "text";
+      feature.className = "asset-feature";
+      feature.placeholder = "Feature (nhiều mục cách nhau bằng dấu phẩy)";
+      feature.value = item.feature;
+      feature.dataset.field = "feature";
+      figure.append(feature);
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "remove-asset";
+      remove.dataset.clientFileId = item.clientFileId;
+      remove.textContent = "Bỏ ảnh này";
+      figure.append(remove);
       const caption = document.createElement("figcaption");
-      caption.textContent = file ? `${fileName} (${(fileSize / 1048576).toFixed(2)} MB)` : `${fileName} (ChatGPT Library)`;
+      caption.textContent = file ? fileName : `${fileName} (Thư viện ChatGPT)`;
       figure.append(caption);
       previews.append(figure);
     });
-    summary.textContent = `${selected.length} ảnh, ${(total / 1048576).toFixed(2)} MB`;
+    summary.textContent = selected.length ? `${selected.length} ảnh đã chọn.` : "Chưa chọn ảnh.";
     const disabled = !connected || uploading || selected.length === 0 || !supportsFileUpload();
     upload.disabled = disabled;
-    create.disabled = disabled;
   }
   function renderUploads(items) {
     results.replaceChildren();
@@ -12438,9 +12467,10 @@ async function start() {
       recordDiagnostic("HOST_FILE_UPLOAD_DONE", "DONE", "HOST_FILE_UPLOAD_VERIFIED");
       const download = await host.getFileDownloadUrl({ fileId });
       if (!download.downloadUrl) throw new Error(`Download URL was not returned for ${fileName}.`);
-      references.push({ download_url: download.downloadUrl, file_id: fileId, mime_type: item.kind === "local" ? item.file.type : item.mimeType, file_name: fileName, ordinal: index, media: item.metadata ?? {} });
+      references.push({ download_url: download.downloadUrl, file_id: fileId, mime_type: item.kind === "local" ? item.file.type : item.mimeType, file_name: fileName, ordinal: index, media: { title: item.name.trim() } });
       recordDiagnostic("TRUSTED_FILE_REF_READY", "DONE", "TRUSTED_FILE_REFERENCE_READY");
     }
+    recordDiagnostic("SERVER_TOOL_CALL_START", "START", "SERVER_TOOL_CALL_REQUESTED");
     const result = await app.callServerTool({
       name: SERVER_TOOL_NAME,
       arguments: { idempotency_key: `${operationKey}${retryingPartialBatch ? `:retry:${attempt}` : ":media"}`, metadata: { description: namingContext }, items: references.map((item) => ({ client_file_id: item.file_id, filename: item.file_name, sort_order: item.ordinal, ordinal: item.ordinal, media: item.media })), files: references }
@@ -12459,53 +12489,9 @@ async function start() {
     recordDiagnostic("MEDIA_READBACK_DONE", "DONE", "MEDIA_READBACK_VERIFIED");
     return logicalManifest;
   }
-  async function uploadOnly() {
-    if (!connected || uploading || !supportsFileUpload() || selected.length === 0) return;
-    const namingContext = context.value.trim();
-    if (namingContext === "") {
-      recordDiagnostic("ERROR", "ERROR", "TRUSTWORTHY_FILENAME_CONTEXT_REQUIRED");
-      setState("ERROR", "Hãy nhập ngữ cảnh bộ ảnh trước khi tải ảnh lên.");
-      return;
-    }
-    uploading = true;
-    uploadStatus = "idle";
-    enrichmentStatus = "NOT_RUN";
-    renderSelection();
-    setState("UPLOADING", "Đang xử lý ảnh đã chọn…");
-    const operationKey = retryOperationKey ?? createIdempotencyKey();
-    try {
-      recordDiagnostic("SERVER_TOOL_CALL_START", "START", "SERVER_TOOL_CALL_REQUESTED");
-      const isRetry = batchManifest?.status === "partial_success";
-      if (isRetry) retryAttempt += 1;
-      const manifest = await materializeSelectedImages(operationKey, namingContext, retryAttempt);
-      uploadStatus = manifest.status === "success" ? "complete" : "partial";
-      publishBatchContext();
-      retryOperationKey = manifest.status === "partial_success" ? operationKey : null;
-      if (manifest.status === "success") retryAttempt = 0;
-      recordDiagnostic("MEDIA_COMMITTED", "DONE", manifest.status === "success" ? "MEDIA_COMMIT_COMPLETE" : "MEDIA_COMMIT_PARTIAL");
-      if (manifest.status === "success") {
-        setState("SUCCESS", `Đã tải ${manifest.success_count}/${manifest.requested_count} ảnh. Có thể tạo bài viết ở mục bên dưới.`);
-      } else {
-        setState("PARTIAL", `Đã tải ${manifest.success_count}/${manifest.requested_count} ảnh. Vui lòng thử lại ảnh lỗi.`);
-      }
-    } catch (error2) {
-      uploadStatus = "error";
-      retryOperationKey = operationKey;
-      recordDiagnostic("ERROR", "ERROR", diagnosticCode(error2), error2);
-      setState("ERROR", `Tải ảnh thất bại: ${safeErrorMessage(error2)}`);
-    } finally {
-      uploading = false;
-      renderSelection();
-    }
-  }
   async function createArticle() {
     if (!connected || uploading || !supportsFileUpload() || selected.length === 0) return;
     const namingContext = context.value.trim();
-    if (namingContext === "") {
-      recordDiagnostic("ERROR", "ERROR", "TRUSTWORTHY_FILENAME_CONTEXT_REQUIRED");
-      setState("ERROR", "Hãy nhập ngữ cảnh bộ ảnh trước khi tạo bài viết.");
-      return;
-    }
     uploading = true;
     enrichmentStatus = "PENDING";
     renderSelection();
@@ -12522,10 +12508,8 @@ async function start() {
         arguments: {
           idempotency_key: `${operationKey}:capture`,
           documentation_checkpoint: checkpoint,
-          intent: "IMAGE_ARTICLE",
-          title: articleTitle.value.trim(),
-          text: articleText.value,
-          metadata: { image_context: namingContext },
+          text: namingContext,
+          asset_inputs: buildCaptureAssetInputs(selected),
           media_ids: uploaded.map((item) => item.media_id).filter((id) => Boolean(id)),
           publish: false
         }
@@ -12539,7 +12523,7 @@ async function start() {
       retryOperationKey = null;
       retryAttempt = 0;
       recordDiagnostic("READY_FOR_USE", "DONE", "MEDIA_COMMIT_READY");
-      setState("SUCCESS", "Đã tạo bài viết từ Media đã tải.");
+      setState("SUCCESS", "Đã gửi một submission gồm toàn bộ ảnh.");
     } catch (error2) {
       enrichmentStatus = "PARTIAL";
       uploadStatus = uploaded.some((item) => item.status === "SUCCESS") ? "complete" : "error";
@@ -12547,6 +12531,27 @@ async function start() {
       recordDiagnostic("ERROR", "ERROR", diagnosticCode(error2), error2);
       publishBatchContext();
       setState("ERROR", `Tạo bài viết thất bại: ${safeErrorMessage(error2)}`);
+    } finally {
+      uploading = false;
+      renderSelection();
+    }
+  }
+  async function retryPartialSubmission() {
+    if (!connected || uploading || !batchManifest || batchManifest.status !== "partial_success") return;
+    uploading = true;
+    setState("UPLOADING", "Đang thử lại các ảnh chưa hoàn tất…");
+    try {
+      const key = retryOperationKey ?? createIdempotencyKey();
+      retryOperationKey = key;
+      const next = await materializeSelectedImages(key, context.value.trim(), retryAttempt + 1);
+      if (next.status !== "success") throw new Error("PARTIAL_BATCH_NOT_READY");
+      retryAttempt += 1;
+      uploadStatus = "complete";
+      publishBatchContext();
+      setState("READY", "Đã khôi phục đủ ảnh. Bấm TẢI LÊN để gửi submission.");
+    } catch (error2) {
+      recordDiagnostic("ERROR", "ERROR", diagnosticCode(error2), error2);
+      setState("PARTIAL", `Chưa thể thử lại toàn bộ ảnh: ${safeErrorMessage(error2)}`);
     } finally {
       uploading = false;
       renderSelection();
@@ -12568,7 +12573,7 @@ async function start() {
     enrichmentStatus = "NOT_RUN";
     retryOperationKey = null;
     retryAttempt = 0;
-    selected = asFiles(input.files).filter((file) => IMAGE_TYPES.test(file.type)).map((file) => ({ kind: "local", file }));
+    selected = asFiles(input.files).filter((file) => IMAGE_TYPES.test(file.type)).map((file) => ({ kind: "local", clientFileId: `${file.name}:${file.size}:${file.lastModified}`, file, name: file.name, feature: "" }));
     recordDiagnostic("FILE_SELECTED", "DONE", "LOCAL_FILE_SELECTED");
     recordDiagnostic("FILE_PREVIEW_READY", "DONE", "LOCAL_FILE_PREVIEW_READY");
     renderSelection();
@@ -12590,8 +12595,21 @@ async function start() {
       setState("ERROR", `Chọn ảnh thất bại: ${safeErrorMessage(error2)}`);
     }
   });
-  create.addEventListener("click", () => void createArticle());
-  upload.addEventListener("click", () => void uploadOnly());
+  previews.addEventListener("input", (event) => {
+    const target = event.target;
+    const figure = target.closest("figure");
+    const item = selected.find((candidate) => candidate.clientFileId === figure?.dataset.clientFileId);
+    if (!item || !target.dataset.field) return;
+    if (target.dataset.field === "name") item.name = target.value;
+    if (target.dataset.field === "feature") item.feature = target.value;
+  });
+  previews.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!target.matches(".remove-asset")) return;
+    selected = selected.filter((item) => item.clientFileId !== target.dataset.clientFileId);
+    renderSelection();
+  });
+  upload.addEventListener("click", () => void (batchManifest?.status === "partial_success" ? retryPartialSubmission() : createArticle()));
   setState("CONNECTING", "Đang kết nối tới MCP Apps host…");
   recordDiagnostic("BOOT", "DONE", "WIDGET_BOOT");
   recordDiagnostic("RESOURCE_LOADED", "DONE", "RESOURCE_READY");
@@ -12609,7 +12627,6 @@ async function start() {
     input.disabled = true;
     select.disabled = true;
     upload.disabled = true;
-    create.disabled = true;
     recordDiagnostic("ERROR", "ERROR", "MCP_APPS_CONNECT_FAILED", error2);
     setState("ERROR", `Không thể kết nối MCP Apps: ${safeErrorMessage(error2)}`);
   }
@@ -12619,26 +12636,15 @@ else void boot();</script>
   </head>
   <body>
     <h2>Ảnh NHK</h2>
-    <p>Thêm một hoặc nhiều ảnh để tải tư liệu hoặc tạo bài viết.</p>
-    <p>Ảnh được tải trước; bài viết có thể tạo sau từ đúng Media vừa tải.</p>
+    <p>Chọn một hoặc nhiều ảnh. Mỗi ảnh có tên và Feature riêng; mô tả chung áp dụng cho cả submission.</p>
     <p>Trạng thái: <span id="state">CONNECTING</span></p>
-    <label for="context">Ngữ cảnh bộ ảnh</label>
-    <input id="context" type="text" maxlength="500" placeholder="Ví dụ: máy, mặt trước, logo, mặt số của đồng hồ 36" autocomplete="off" />
     <input id="files" type="file" accept="image/jpeg,image/png,image/gif,image/webp" multiple disabled />
     <div id="actions">
       <button id="select" type="button" hidden disabled>Chọn ảnh từ thư viện ChatGPT</button>
-      <button id="upload" type="button" disabled>Tải ảnh lên</button>
+      <button id="upload" type="button" disabled>TẢI LÊN</button>
     </div>
-    <details id="article-panel">
-      <summary>Tạo bài viết</summary>
-      <div id="article-fields">
-        <label for="article-title">Tiêu đề bài viết</label>
-        <input id="article-title" type="text" maxlength="500" placeholder="Tùy chọn" autocomplete="off" />
-        <label for="article-text">Nội dung / yêu cầu bài viết</label>
-        <textarea id="article-text" maxlength="20000" placeholder="Nhập nội dung hoặc yêu cầu bài viết dài…"></textarea>
-        <button id="create" type="button" disabled>Tạo bài viết</button>
-      </div>
-    </details>
+    <label for="description">Mô tả chung</label>
+    <textarea id="description" maxlength="20000" placeholder="Mô tả chung cho toàn bộ ảnh…"></textarea>
     <div id="summary" aria-live="polite">Chưa chọn ảnh.</div>
     <div id="previews"></div>
     <div id="status" role="status" aria-live="polite">ĐANG KẾT NỐI</div>

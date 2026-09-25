@@ -113,6 +113,13 @@ thay ảnh đại diện. Checksum, tên file, URL attachment và thời điểm
 
 ## Multi-image metadata ownership — 2026-09-18
 
+The Capture uploader's per-asset `name` and `feature_requests[]` are ordered
+submission context. They are preserved with the Capture asset manifest and
+are not a second semantic store. `name` may inform bounded Media presentation
+metadata; each Feature request must be resolved, scoped and dispositioned
+independently before any governed MediaUsage binding. Ambiguous requests stay
+review-required and do not invalidate unrelated resolved requests.
+
 Capture/submission text is batch context or an ordered user instruction. It is
 not implicitly a canonical title, alt text, caption or description for every
 Media item. Each file keeps a stable ordinal (`files[i]` ↔ `items[i]`) and may

@@ -95,6 +95,7 @@ final class EditorialCaptureCoordinator
                 'title' => trim((string) ($input['title'] ?? '')),
                 'excerpt' => trim((string) ($input['excerpt'] ?? '')),
                 'metadata' => is_array($input['metadata'] ?? null) ? $input['metadata'] : [],
+                'asset_inputs' => $this->safeAssetInputs((array) ($input['asset_inputs'] ?? [])),
                 'media_bindings' => is_array($input['media_bindings'] ?? null) ? $input['media_bindings'] : [],
                 'media_operations' => is_array($input['media_operations'] ?? null) ? $input['media_operations'] : [],
                 'documentation_checkpoint' => is_array($input['documentation_checkpoint'] ?? null) ? $input['documentation_checkpoint'] : [],
@@ -1073,6 +1074,25 @@ final class EditorialCaptureCoordinator
             if ($value !== '') return $key . ':' . $value;
         }
         return '';
+    }
+
+    /** @param list<array<string,mixed>> $inputs @return list<array<string,mixed>> */
+    private function safeAssetInputs(array $inputs): array
+    {
+        $result = [];
+        foreach ($inputs as $input) {
+            if (!is_array($input)) continue;
+            $name = trim((string) ($input['name'] ?? ''));
+            if ($name === '') continue;
+            $result[] = [
+                'client_file_id' => trim((string) ($input['client_file_id'] ?? '')),
+                'ordinal' => max(0, (int) ($input['ordinal'] ?? count($result))),
+                'name' => $name,
+                'feature_requests' => array_values(array_filter(array_map(static fn (mixed $value): string => trim((string) $value), (array) ($input['feature_requests'] ?? [])), static fn (string $value): bool => $value !== '')),
+            ];
+        }
+        usort($result, static fn (array $left, array $right): int => [$left['ordinal'], $left['client_file_id']] <=> [$right['ordinal'], $right['client_file_id']]);
+        return $result;
     }
 
     private function hasDeferredArticleBindings(array $input): bool

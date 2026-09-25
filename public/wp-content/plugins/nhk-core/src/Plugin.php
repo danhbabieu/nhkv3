@@ -1323,6 +1323,15 @@ final class Plugin {
                             return ['status' => 'verified', 'items' => $items, 'count' => count($items), 'reused' => true, 'physical_input' => 'existing_wordpress_media_url'];
                         }
                         $items = $existingMediaResolver->resolve($mediaIds);
+                        foreach ((array) ($input['asset_inputs'] ?? []) as $assetInput) {
+                            if (!is_array($assetInput)) continue;
+                            $ordinal = (int) ($assetInput['ordinal'] ?? -1);
+                            if ($ordinal < 0 || !isset($items[$ordinal])) continue;
+                            $featureRequests = array_values(array_filter(array_map(static fn (mixed $value): string => trim((string) $value), (array) ($assetInput['feature_requests'] ?? [])), static fn (string $value): bool => $value !== ''));
+                            $items[$ordinal]['media_context'] = array_replace(is_array($items[$ordinal]['media_context'] ?? null) ? $items[$ordinal]['media_context'] : [], array_filter(['title' => trim((string) ($assetInput['name'] ?? ''))], static fn (mixed $value): bool => $value !== ''));
+                            $items[$ordinal]['capture_asset_input'] = ['name' => trim((string) ($assetInput['name'] ?? '')), 'feature_requests' => $featureRequests];
+                            $items[$ordinal]['sort_order'] = $ordinal;
+                        }
                         return ['status' => 'verified', 'items' => $items, 'count' => count($items), 'reused' => true];
                     }
                     $files = $input['files'] ?? [];
