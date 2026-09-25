@@ -44,20 +44,20 @@ final class TrustedProvidedFileMaterializerTest extends TestCase
         });
     }
 
-    public function test_widget_only_metadata_is_rejected_at_the_transport_boundary_with_a_typed_reason(): void
+    public function test_widget_mapping_metadata_is_accepted_but_not_forwarded_to_native_file_bag(): void
     {
+        $result = $this->materialize([[
+            'download_url' => 'https://files.openai.test/one',
+            'file_id' => 'file_one',
+            'ordinal' => 0,
+            'media' => ['title' => 'Mặt trước'],
+        ]]);
         try {
-            TrustedProvidedFileMaterializer::materialize([[
-                'download_url' => 'https://files.openai.test/one',
-                'file_id' => 'file_one',
-                'ordinal' => 0,
-                'media' => ['title' => 'Mặt trước'],
-            ]], null, null, static fn (string $host): array => [self::PUBLIC_IP]);
-            self::fail('Widget metadata must not enter the transport materializer.');
-        } catch (ChatGptMcpGatewayException $error) {
-            self::assertSame('PROVIDED_FILE_REFERENCE_UNRESOLVABLE', $error->reasonCode());
-            self::assertSame('PROVIDED_FILE_REFERENCE_FIELDS_INVALID', $error->safeReasonCode());
-            self::assertSame('validate', $error->diagnostics()['stage'] ?? null);
+            self::assertSame(['one.gif'], $result['files']['files']['name']);
+            self::assertArrayNotHasKey('ordinal', $result['files']['files']);
+            self::assertArrayNotHasKey('media', $result['files']['files']);
+        } finally {
+            $this->cleanup($result['temporary_paths']);
         }
     }
 

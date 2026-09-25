@@ -22,7 +22,11 @@ final class TrustedProvidedFileMaterializer
     private const MAX_REDIRECTS = 2;
     private const MAX_FILE_ID_LENGTH = 512;
     private const MAX_OPTIONAL_FIELD_LENGTH = 512;
-    private const REFERENCE_FIELDS = ['download_url', 'file_id', 'mime_type', 'file_name'];
+    // Widget-only mapping metadata is accepted at the outer reference
+    // boundary because the published widget contract carries ordinal/media
+    // hints alongside each provided file. It is deliberately stripped before
+    // the native PHP file bag is created below.
+    private const REFERENCE_FIELDS = ['download_url', 'file_id', 'mime_type', 'file_name', 'ordinal', 'media'];
     private const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
     /**
@@ -55,6 +59,12 @@ final class TrustedProvidedFileMaterializer
                     if (array_key_exists($optional, $reference) && (!is_string($reference[$optional]) || strlen((string) $reference[$optional]) > self::MAX_OPTIONAL_FIELD_LENGTH)) {
                         throw new ChatGptMcpGatewayException('PROVIDED_FILE_REFERENCE_UNRESOLVABLE', 'The uploaded file reference could not be resolved.');
                     }
+                }
+                if (array_key_exists('ordinal', $reference) && (!is_int($reference['ordinal']) || $reference['ordinal'] < 0 || $reference['ordinal'] >= self::MAX_FILES)) {
+                    throw new ChatGptMcpGatewayException('PROVIDED_FILE_REFERENCE_UNRESOLVABLE', 'The uploaded file reference could not be resolved.');
+                }
+                if (array_key_exists('media', $reference) && (!is_array($reference['media']) || array_is_list($reference['media']))) {
+                    throw new ChatGptMcpGatewayException('PROVIDED_FILE_REFERENCE_UNRESOLVABLE', 'The uploaded file reference could not be resolved.');
                 }
 
                 $declaredMime = trim((string) ($reference['mime_type'] ?? ''));

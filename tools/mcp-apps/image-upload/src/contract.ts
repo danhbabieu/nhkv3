@@ -26,6 +26,51 @@ export type UploadManifest = {
   user_context?: string;
 };
 
+export type WidgetUploadReference = {
+  download_url: string;
+  file_id: string;
+  mime_type: string;
+  file_name: string;
+  ordinal: number;
+  media: Record<string, string>;
+};
+
+export function buildWidgetUploadArguments(operationKey: string, references: WidgetUploadReference[], userContext: string, retryingPartialBatch: boolean, attempt: number): Record<string, unknown> {
+  return {
+    idempotency_key: `${operationKey}${retryingPartialBatch ? `:retry:${attempt}` : ":media"}`,
+    metadata: userContext === "" ? {} : { description: userContext },
+    items: references.map((reference) => ({
+      client_file_id: reference.file_id,
+      filename: reference.file_name,
+      sort_order: reference.ordinal,
+      ordinal: reference.ordinal,
+      media: reference.media,
+    })),
+    // The provided-file materializer owns this allowlist. Ordinal and media
+    // belong to the parallel item packet, never to the transport reference.
+    files: references.map(({ download_url, file_id, mime_type, file_name }) => ({ download_url, file_id, mime_type, file_name })),
+  };
+}
+
+export function buildWidgetUploadFailureManifest(references: WidgetUploadReference[], userContext: string, errorCode: string): UploadManifest {
+  return {
+    status: "partial_success",
+    requested_count: references.length,
+    success_count: 0,
+    failure_count: references.length,
+    user_context: userContext,
+    items: references.map((reference) => ({
+      ordinal: reference.ordinal,
+      client_file_id: reference.file_id,
+      file_id: reference.file_id,
+      original_filename: reference.file_name,
+      mime: reference.mime_type,
+      status: "FAILED_RETRYABLE",
+      error_code: errorCode,
+    })),
+  };
+}
+
 export type BatchContext = {
   batch_id?: string;
   ordered_media_ids: string[];

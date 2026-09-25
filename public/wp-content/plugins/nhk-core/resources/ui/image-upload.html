@@ -12010,6 +12010,40 @@ class l extends Protocol {
     }
   }
 }
+function buildWidgetUploadArguments(operationKey, references, userContext, retryingPartialBatch, attempt) {
+  return {
+    idempotency_key: `${operationKey}${retryingPartialBatch ? `:retry:${attempt}` : ":media"}`,
+    metadata: userContext === "" ? {} : { description: userContext },
+    items: references.map((reference) => ({
+      client_file_id: reference.file_id,
+      filename: reference.file_name,
+      sort_order: reference.ordinal,
+      ordinal: reference.ordinal,
+      media: reference.media
+    })),
+    // The provided-file materializer owns this allowlist. Ordinal and media
+    // belong to the parallel item packet, never to the transport reference.
+    files: references.map(({ download_url, file_id, mime_type, file_name }) => ({ download_url, file_id, mime_type, file_name }))
+  };
+}
+function buildWidgetUploadFailureManifest(references, userContext, errorCode2) {
+  return {
+    status: "partial_success",
+    requested_count: references.length,
+    success_count: 0,
+    failure_count: references.length,
+    user_context: userContext,
+    items: references.map((reference) => ({
+      ordinal: reference.ordinal,
+      client_file_id: reference.file_id,
+      file_id: reference.file_id,
+      original_filename: reference.file_name,
+      mime: reference.mime_type,
+      status: "FAILED_RETRYABLE",
+      error_code: errorCode2
+    }))
+  };
+}
 function normalizeCaptureReadback(payload) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) throw new Error("CAPTURE_READBACK_UNAVAILABLE");
   const record2 = payload;
@@ -12681,13 +12715,16 @@ async function start() {
     let manifest = { requested_count: references.length, success_count: 0, failure_count: 0, items: [] };
     if (references.length > 0) {
       recordDiagnostic("SERVER_TOOL_CALL_START", "START", "SERVER_TOOL_CALL_REQUESTED");
-      const result = await app.callServerTool({
-        name: SERVER_TOOL_NAME,
-        arguments: { idempotency_key: `${operationKey}${retryingPartialBatch ? `:retry:${attempt}` : ":media"}`, metadata: {}, items: references.map((item) => ({ client_file_id: item.file_id, filename: item.file_name, sort_order: item.ordinal, ordinal: item.ordinal, media: item.media })), files: references }
-      });
-      recordDiagnostic("SERVER_TOOL_CALL_RESULT", "DONE", "SERVER_TOOL_RESULT_RECEIVED");
-      manifest = extractUploadManifest(result);
-      assertUploadManifestCounts(manifest);
+      const result = await app.callServerTool({ name: SERVER_TOOL_NAME, arguments: buildWidgetUploadArguments(operationKey, references, namingContext, retryingPartialBatch, attempt) });
+      const inspection = inspectToolResult(result);
+      if (inspection.kind === "error") {
+        recordDiagnostic("SERVER_TOOL_CALL_RESULT", "ERROR", inspection.code);
+        manifest = buildWidgetUploadFailureManifest(references, namingContext, inspection.code);
+      } else {
+        recordDiagnostic("SERVER_TOOL_CALL_RESULT", "DONE", "SERVER_TOOL_RESULT_RECEIVED");
+        manifest = extractUploadManifest(result);
+        assertUploadManifestCounts(manifest);
+      }
     }
     const serverItems = manifest.items.map((item) => {
       const referenceOrdinal = typeof item.file_id === "string" ? references.find((reference) => reference.file_id === item.file_id)?.ordinal : void 0;

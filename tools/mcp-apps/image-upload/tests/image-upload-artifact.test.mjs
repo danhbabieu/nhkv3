@@ -64,12 +64,12 @@ test("the View reads every Article Media usage through nhk.media.get before comp
   assert.match(view, /enrichmentStatus = "COMPLETE"/);
 });
 
-test("the View keeps shared description in Capture semantic input and out of Media metadata", async () => {
+test("the View preserves shared description through Media and Capture without widening file references", async () => {
   const view = await source();
 
   assert.match(view, /text:\s*namingContext/);
-  assert.match(view, /metadata:\s*\{\s*\}/);
-  assert.doesNotMatch(view, /metadata:\s*\{\s*description:\s*namingContext/);
+  assert.match(view, /buildWidgetUploadArguments/);
+  assert.match(view, /arguments: buildWidgetUploadArguments\(/);
   assert.match(view, /Ảnh đã được lưu, nhưng phần tạo bài viết chưa hoàn tất\. Có thể thử lại mà không tải lại ảnh\./);
   assert.doesNotMatch(view, /Tạo bài viết thất bại:\s*\$\{safeErrorMessage\(error\)\}/);
 });
@@ -113,7 +113,7 @@ test("the View requires operator naming context and emits the required diagnosti
     "ATTACHMENT_READBACK_START", "ATTACHMENT_READBACK_DONE", "MEDIA_READBACK_DONE",
     "READY_FOR_USE", "ERROR",
   ]) assert.match(view, new RegExp(stage));
-  assert.match(view, /metadata:\s*\{\s*\}/);
+  assert.match(view, /buildWidgetUploadFailureManifest/);
 });
 
 test("the View keeps host upload calls sequential and single-attempt", async () => {

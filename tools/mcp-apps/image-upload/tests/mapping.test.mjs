@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { assertCaptureArticleReadback, assertMediaArticleReadback, assertUploadManifestCount, assertUploadManifestCounts, buildCaptureAssetInputs, buildWidgetState, extractPayload, extractUploadManifest, extractUploads, inspectToolResult, mergeUploadManifest, normalizeCaptureReadback, normalizeSelectedFiles, shouldProcessToolResultNotification, splitFeatureRequests } from "../src/contract.ts";
+import { assertCaptureArticleReadback, assertMediaArticleReadback, assertUploadManifestCount, assertUploadManifestCounts, buildCaptureAssetInputs, buildWidgetState, buildWidgetUploadArguments, buildWidgetUploadFailureManifest, extractPayload, extractUploadManifest, extractUploads, inspectToolResult, mergeUploadManifest, normalizeCaptureReadback, normalizeSelectedFiles, shouldProcessToolResultNotification, splitFeatureRequests } from "../src/contract.ts";
 import { planSubmissionResume } from "../src/resume-policy.ts";
 
 function committedSubmission(count, overrides = {}) {
@@ -46,6 +46,51 @@ test("retries only failed media children and preserves canonical order", () => {
   assert.deepEqual(plan.materializeOrdinals, [2, 7]);
   assert.deepEqual(plan.canonicalMediaIds, ["media-0", "media-1", "media-3", "media-4", "media-5", "media-6", "media-8", "media-9"]);
   assert.equal(plan.articleAction, "ENSURE_ONE");
+});
+
+test("builds the widget request with only server-supported file reference fields", () => {
+  const request = buildWidgetUploadArguments("operation-1", [{
+    download_url: "https://files.example/image",
+    file_id: "file-1",
+    mime_type: "image/jpeg",
+    file_name: "image.jpg",
+    ordinal: 0,
+    media: { title: "Mặt trước" },
+  }], "Bộ ảnh đồng hồ", false, 0);
+
+  assert.deepEqual(request, {
+    idempotency_key: "operation-1:media",
+    metadata: { description: "Bộ ảnh đồng hồ" },
+    items: [{ client_file_id: "file-1", filename: "image.jpg", sort_order: 0, ordinal: 0, media: { title: "Mặt trước" } }],
+    files: [{ download_url: "https://files.example/image", file_id: "file-1", mime_type: "image/jpeg", file_name: "image.jpg" }],
+  });
+});
+
+test("preserves host identities and context when the Media boundary fails before processing", () => {
+  const manifest = buildWidgetUploadFailureManifest([
+    { download_url: "https://files.example/a", file_id: "file-a", mime_type: "image/jpeg", file_name: "a.jpg", ordinal: 0, media: { title: "Mặt trước" } },
+    { download_url: "https://files.example/b", file_id: "file-b", mime_type: "image/jpeg", file_name: "b.jpg", ordinal: 1, media: { title: "Mặt sau" } },
+  ], "Bộ ảnh đồng hồ", "PROVIDED_FILE_REFERENCE_FIELDS_INVALID");
+
+  assert.equal(manifest.status, "partial_success");
+  assert.equal(manifest.user_context, "Bộ ảnh đồng hồ");
+  assert.deepEqual(manifest.items.map((item) => ({ ordinal: item.ordinal, file_id: item.file_id, client_file_id: item.client_file_id, status: item.status, error_code: item.error_code })), [
+    { ordinal: 0, file_id: "file-a", client_file_id: "file-a", status: "FAILED_RETRYABLE", error_code: "PROVIDED_FILE_REFERENCE_FIELDS_INVALID" },
+    { ordinal: 1, file_id: "file-b", client_file_id: "file-b", status: "FAILED_RETRYABLE", error_code: "PROVIDED_FILE_REFERENCE_FIELDS_INVALID" },
+  ]);
+  assert.deepEqual(buildWidgetState(manifest.items, [], "complete", manifest).modelContent.batch_context, {
+    ordered_media_ids: [],
+    items: [
+      { position: 1, client_file_id: "file-a", status: "FAILED_RETRYABLE", error_code: "PROVIDED_FILE_REFERENCE_FIELDS_INVALID" },
+      { position: 2, client_file_id: "file-b", status: "FAILED_RETRYABLE", error_code: "PROVIDED_FILE_REFERENCE_FIELDS_INVALID" },
+    ],
+    user_context: "Bộ ảnh đồng hồ",
+    media_commit_status: "PARTIAL",
+    enrichment_status: "NOT_RUN",
+  });
+  const plan = planSubmissionResume({ media_commit_status: "PARTIAL", items: manifest.items });
+  assert.deepEqual(plan.hostUploadOrdinals, []);
+  assert.deepEqual(plan.mediaUploadOrdinals, [0, 1]);
 });
 
 test("does not host-upload a failed Media commit when its stable host reference exists", () => {

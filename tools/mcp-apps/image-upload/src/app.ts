@@ -1,5 +1,5 @@
 import { App } from "@modelcontextprotocol/ext-apps";
-import { assertCaptureArticleReadback, assertMediaArticleReadback, assertUploadManifestCounts, buildCaptureAssetInputs, buildWidgetState, extractUploadManifest, inspectToolResult, mergeUploadManifest, normalizeSelectedFiles, orderUploadedItems, shouldProcessToolResultNotification, type BatchContext, type SelectedImage, type ToolResult, type ToolResultNotificationSource, type UploadedItem, type UploadManifest, type WidgetDiagnostic, type WidgetUploadStatus } from "./contract";
+import { assertCaptureArticleReadback, assertMediaArticleReadback, assertUploadManifestCounts, buildCaptureAssetInputs, buildWidgetState, buildWidgetUploadArguments, buildWidgetUploadFailureManifest, extractUploadManifest, inspectToolResult, mergeUploadManifest, normalizeSelectedFiles, orderUploadedItems, shouldProcessToolResultNotification, type BatchContext, type SelectedImage, type ToolResult, type ToolResultNotificationSource, type UploadedItem, type UploadManifest, type WidgetDiagnostic, type WidgetUploadReference, type WidgetUploadStatus } from "./contract";
 import { uploadSelectedFiles, type HostUploadOutcome } from "./host-upload";
 import { planSubmissionResume } from "./resume-policy";
 
@@ -287,7 +287,7 @@ async function start(): Promise<void> {
         setState("UPLOADING", `Đang tải ${fileName}…`);
       },
     });
-    const references: Array<{ download_url: string; file_id: string; mime_type: string; file_name: string; ordinal: number; media: Record<string, string> }> = [];
+    const references: WidgetUploadReference[] = [];
     const hostFailures: UploadedItem[] = [];
     outcomes.forEach((outcome: HostUploadOutcome) => {
       const item = selected[outcome.ordinal];
@@ -305,13 +305,16 @@ async function start(): Promise<void> {
     let manifest: UploadManifest = { status: "success", requested_count: references.length, success_count: 0, failure_count: 0, items: [] };
     if (references.length > 0) {
       recordDiagnostic("SERVER_TOOL_CALL_START", "START", "SERVER_TOOL_CALL_REQUESTED");
-      const result = await app.callServerTool({
-        name: SERVER_TOOL_NAME,
-        arguments: { idempotency_key: `${operationKey}${retryingPartialBatch ? `:retry:${attempt}` : ":media"}`, metadata: {}, items: references.map((item) => ({ client_file_id: item.file_id, filename: item.file_name, sort_order: item.ordinal, ordinal: item.ordinal, media: item.media })), files: references },
-      });
-      recordDiagnostic("SERVER_TOOL_CALL_RESULT", "DONE", "SERVER_TOOL_RESULT_RECEIVED");
-      manifest = extractUploadManifest(result as ToolResult);
-      assertUploadManifestCounts(manifest);
+      const result = await app.callServerTool({ name: SERVER_TOOL_NAME, arguments: buildWidgetUploadArguments(operationKey, references, namingContext, retryingPartialBatch, attempt) });
+      const inspection = inspectToolResult(result as ToolResult);
+      if (inspection.kind === "error") {
+        recordDiagnostic("SERVER_TOOL_CALL_RESULT", "ERROR", inspection.code);
+        manifest = buildWidgetUploadFailureManifest(references, namingContext, inspection.code);
+      } else {
+        recordDiagnostic("SERVER_TOOL_CALL_RESULT", "DONE", "SERVER_TOOL_RESULT_RECEIVED");
+        manifest = extractUploadManifest(result as ToolResult);
+        assertUploadManifestCounts(manifest);
+      }
     }
     const serverItems = manifest.items.map((item) => {
       const referenceOrdinal = typeof item.file_id === "string"

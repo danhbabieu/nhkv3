@@ -28,6 +28,40 @@ establishing a database connection` for `nhk_v3_test`. Changed PHP lint and
 
 STATUS: `KNOWLEDGE_WRITER_GENERIC_BOUNDARIES_LOCAL_READY / FULL_UNIT_EXISTING_FIXTURE_FAILURE / INTEGRATION_ENVIRONMENT_BLOCKED / NO_MUTATION`.
 
+# Checkpoint — 2026-09-25 — Live Acceptance widget reference → Media boundary repair (LOCAL / NO LIVE MUTATION)
+
+## Scope
+
+Traced the new live acceptance failure after `HOST_FILE_UPLOAD_VERIFIED` and
+`TRUSTED_FILE_REFERENCE_READY`. The widget request included the contract's
+per-file `ordinal` and `media` mapping hints, but the trusted provided-file
+materializer rejected those valid outer-reference fields before Media ingest
+with `PROVIDED_FILE_REFERENCE_FIELDS_INVALID`; the UI then collapsed the
+server error to `UPLOAD_FAILED`. The widget also sent an empty `metadata`
+object, so the server response could not preserve the shared user context.
+
+## Change
+
+The materializer now accepts `ordinal` and object-shaped `media` as mapping
+metadata and strips them before native PHP file-bag creation. The widget
+request builder sends the shared description in `metadata.description`, keeps
+mapping metadata in the ordered item packet, and sends only the server's file
+reference fields in the materializer-facing `files[]` projection. A
+transport/server failure now produces a retryable per-child manifest carrying
+stable `file_id`/ordinal identity and `user_context`; retry planning therefore
+re-enters only the Media boundary and does not call host upload again.
+
+## Verification
+
+- Image widget TypeScript typecheck/build: PASS.
+- Image widget tests: 62 tests, 62 passed.
+- Targeted PHP Media/widget tests: 76 tests, 791 assertions, PASS (existing
+  PHPUnit deprecations only).
+- Full PHPUnit with `memory_limit=512M`: 2,796 total; 21 environment-gated
+  integration failures due missing `NHK_WP_TEST_PATH` / `NHK_WP_TEST_DB`, 121
+  skipped; no failures in the affected Unit/Contract paths.
+- No staging/live mutation, upload retry or host transport change performed.
+
 # Checkpoint — 2026-09-25 — Capture Feature resolution and governed MediaUsage isolation (LOCAL / NO LIVE MUTATION)
 
 IMPLEMENTED: Added a capability-neutral Capture Feature binding coordinator. Each
