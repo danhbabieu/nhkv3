@@ -60,6 +60,7 @@ final class EditorialCaptureCoordinator
         private ?ArticleEditorialAdapter $articleEditorialAdapter = null,
         private ?ContentPreparationOrchestrator $contentPreparation = null,
         private ?SharedEnrichmentBoundary $sharedEnrichment = null,
+        private ?\NHK\Core\Application\Media\CaptureFeatureBindingCoordinator $featureBindings = null,
     ) { $this->completion = $completion ?? new CompletionCoordinator(); }
 
     /** @param array<string,mixed> $input */
@@ -347,6 +348,15 @@ final class EditorialCaptureCoordinator
                 $assets = is_array($manifest['items'] ?? null) ? array_values($manifest['items']) : (is_array($manifest) && array_is_list($manifest) ? $manifest : []);
                 $diagnostics['physical_ingest'] = $this->withoutBody($manifest);
                 $record = $this->save($record, CaptureStage::ASSETS_STORED, $assets, $diagnostics, $receipts, 'ASSETS_STORED');
+            }
+            if ($this->featureBindings !== null && $assets !== []) {
+                $featurePass = $this->featureBindings->execute($assets, $record->captureId);
+                $assets = $featurePass['assets'];
+                $diagnostics['feature_bindings'] = [
+                    'status' => $featurePass['status'],
+                    'results' => $this->withoutBody($featurePass['feature_results']),
+                ];
+                $record = $this->save($record, $record->stage, $assets, $diagnostics, $receipts, $record->stage, $record->articleId, $record->articleStateToken, $record->status);
             }
             // An exact typed Media binding is a deterministic fast path. It
             // deliberately runs before interpretation/Graph/Claim work so a
