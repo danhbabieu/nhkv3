@@ -28,6 +28,12 @@ final class ArticleDiagnosticReader
         foreach (['preflight', 'proposal_states', 'eligibility', 'apply_attempts', 'verification'] as $key) {
             if (array_key_exists($key, $context)) $diagnostic[$key] = $this->withoutEditorialBody($context[$key]);
         }
+        // Read-only convergence evidence may be attached by a bounded
+        // diagnostic caller. Keep exact supplied identities and owner states,
+        // but never turn this reader into a repair or projection writer.
+        foreach (['capture_id', 'article_id', 'media_usage', 'completion', 'public_projection'] as $key) {
+            if (array_key_exists($key, $context)) $diagnostic[$key] = $this->withoutEditorialBody($context[$key]);
+        }
         return $diagnostic;
     }
 

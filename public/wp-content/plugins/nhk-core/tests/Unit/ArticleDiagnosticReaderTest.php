@@ -25,4 +25,28 @@ final class ArticleDiagnosticReaderTest extends TestCase
         self::assertArrayNotHasKey('post_content', $diagnostic['verification']);
         self::assertSame('publish', $diagnostic['verification']['status']);
     }
+
+    public function test_read_only_diagnostic_keeps_supplied_capture_media_completion_and_public_evidence(): void
+    {
+        $receipt = new ArticleOperationReceipt(
+            '018f7c48-6d87-7a1d-8c9e-3b8c4c8d1f22', 'diagnostic-711', str_repeat('d', 64),
+            'reconcile', '1:711', 711, 'media', ArticleIngestOutcome::DEPENDENCY_UNAVAILABLE,
+            true, [], [], ['code' => 'MEDIAUSAGE_INCOMPLETE'], 1, null, null, 'token',
+        );
+
+        $diagnostic = (new ArticleDiagnosticReader())->describe($receipt, [
+            'capture_id' => '01a0d5c4-35b1-7ac6-b060-971bdf6dad85',
+            'article_id' => 711,
+            'media_usage' => ['status' => 'PARTIAL', 'media_ids' => ['media-708', 'media-709', 'media-710'], 'body' => 'not exposed'],
+            'completion' => ['relation_or_usage_state' => 'PARTIAL'],
+            'public_projection' => ['status' => 'BLOCKED'],
+        ]);
+
+        self::assertSame('01a0d5c4-35b1-7ac6-b060-971bdf6dad85', $diagnostic['capture_id']);
+        self::assertSame(711, $diagnostic['article_id']);
+        self::assertSame(['media-708', 'media-709', 'media-710'], $diagnostic['media_usage']['media_ids']);
+        self::assertArrayNotHasKey('body', $diagnostic['media_usage']);
+        self::assertSame('PARTIAL', $diagnostic['completion']['relation_or_usage_state']);
+        self::assertSame('BLOCKED', $diagnostic['public_projection']['status']);
+    }
 }
