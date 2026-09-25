@@ -664,6 +664,34 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
         self::assertCount(3, array_unique(array_column($assets, 'client_file_id')));
     }
 
+    public function test_capture_normalizes_physical_manifest_order_and_replays_same_order(): void
+    {
+        $captures = new Pr5CaptureRepository();
+        $calls = ['draft' => 0, 'semantic' => 0, 'media' => 0, 'publication' => 0, 'final' => 0];
+        $events = [];
+        $coordinator = $this->coordinator(
+            $captures,
+            $calls,
+            $events,
+            semanticStatus: 'COMPLETED',
+            physical: static fn (array $input): array => ['items' => [
+                ['client_file_id' => 'back', 'media_id' => 'media-back', 'sort_order' => 2],
+                ['client_file_id' => 'front', 'media_id' => 'media-front', 'sort_order' => 0],
+                ['client_file_id' => 'dial', 'media_id' => 'media-dial', 'sort_order' => 1],
+            ]],
+        );
+
+        $input = ['idempotency_key' => 'ordered-capture-manifest', 'text' => 'Ba góc chụp của cùng một hiện vật.'];
+        $first = $coordinator->execute($input);
+        $replay = $coordinator->execute($input);
+
+        self::assertSame($first->captureId, $replay->captureId);
+        self::assertSame(['media-front', 'media-dial', 'media-back'], array_column($first->assets, 'media_id'));
+        self::assertSame([0, 1, 2], array_column($first->assets, 'sort_order'));
+        self::assertSame($first->assets, $replay->assets);
+        self::assertSame(1, $calls['draft']);
+    }
+
     public function test_shared_description_enters_semantic_capture_with_empty_features_and_one_article(): void
     {
         $captures = new Pr5CaptureRepository();

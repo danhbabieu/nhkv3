@@ -315,7 +315,7 @@ final class EditorialCaptureCoordinator
     private function run(CaptureRecord $record, array $input): CaptureRecord
     {
         $text = trim((string) ($input['text'] ?? $input['content'] ?? ''));
-        $assets = $record->assets;
+        $assets = $this->normalizeAssetManifest($record->assets);
         $diagnostics = $record->diagnostics;
         $receipts = $record->phaseReceipts;
         try {
@@ -336,6 +336,7 @@ final class EditorialCaptureCoordinator
                     $assets[] = $item;
                     if ($key !== '') $existingKeys[$key] = true;
                 }
+                $assets = $this->normalizeAssetManifest($assets);
                 $this->beginPhase('ASSET_FOLLOWUP');
                 $diagnostics['asset_followup'] = ['status' => 'verified', 'items' => count($followupItems), 'manifest' => $this->withoutBody((array) ($input['asset_followup_manifest'] ?? [])), 'context_hint' => $this->withoutBody((array) ($input['visual_context'] ?? []))];
                 $record = $this->save($record, $record->stage, $assets, $diagnostics, $receipts, 'ASSET_FOLLOWUP', $record->articleId, $record->articleStateToken);
@@ -346,7 +347,7 @@ final class EditorialCaptureCoordinator
             if ($assets === [] && !$this->hasStage($record, CaptureStage::ASSETS_STORED)) {
                 $this->beginPhase('ASSETS_STORED');
                 $manifest = ($this->physicalIngest)($input);
-                $assets = is_array($manifest['items'] ?? null) ? array_values($manifest['items']) : (is_array($manifest) && array_is_list($manifest) ? $manifest : []);
+                $assets = $this->normalizeAssetManifest(is_array($manifest['items'] ?? null) ? array_values($manifest['items']) : (is_array($manifest) && array_is_list($manifest) ? $manifest : []));
                 $diagnostics['physical_ingest'] = $this->withoutBody($manifest);
                 $record = $this->save($record, CaptureStage::ASSETS_STORED, $assets, $diagnostics, $receipts, 'ASSETS_STORED');
             }
@@ -1106,6 +1107,21 @@ final class EditorialCaptureCoordinator
             if ($value !== '') return $key . ':' . $value;
         }
         return '';
+    }
+
+    /** @param list<array<string,mixed>> $assets @return list<array<string,mixed>> */
+    private function normalizeAssetManifest(array $assets): array
+    {
+        $ordered = [];
+        foreach ($assets as $index => $asset) {
+            if (!is_array($asset)) continue;
+            $sortOrder = array_key_exists('sort_order', $asset)
+                ? max(0, (int) $asset['sort_order'])
+                : (array_key_exists('ordinal', $asset) ? max(0, (int) $asset['ordinal']) : PHP_INT_MAX);
+            $ordered[] = ['sort_order' => $sortOrder, 'index' => $index, 'asset' => $asset];
+        }
+        usort($ordered, static fn (array $left, array $right): int => [$left['sort_order'], $left['index']] <=> [$right['sort_order'], $right['index']]);
+        return array_values(array_map(static fn (array $entry): array => $entry['asset'], $ordered));
     }
 
     /** @param list<array<string,mixed>> $inputs @return list<array<string,mixed>> */
