@@ -12,6 +12,7 @@ const IMAGE_TYPES = /^(image\/jpeg|image\/png|image\/gif|image\/webp)$/;
 const IMAGE_ACCEPT = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 const STATES = ["CONNECTING", "READY", "UPLOADING", "SUCCESS", "PARTIAL", "ERROR"] as const;
 type WidgetState = (typeof STATES)[number];
+const USER_ERROR_MESSAGE = "Không thể xử lý mô tả. Dữ liệu chưa được ghi, bạn có thể thử lại.";
 
 type ChatGptFileApi = {
   selectFiles?: () => Promise<unknown>;
@@ -59,7 +60,7 @@ function showBootstrapError(error: unknown): void {
   if (status) {
     status.dataset.state = "ERROR";
     status.className = "failure";
-    status.textContent = `Không thể khởi tạo trình tải ảnh NHK: ${safeErrorMessage(error)}`;
+    status.textContent = "Không thể khởi tạo trình tải ảnh NHK. Bạn có thể thử lại.";
   }
   if (diagnostics) {
     const row = document.createElement("div");
@@ -260,7 +261,7 @@ async function start(): Promise<void> {
     recordDiagnostic("SERVER_TOOL_CALL_START", "START", "SERVER_TOOL_CALL_REQUESTED");
     const result = await app.callServerTool({
       name: SERVER_TOOL_NAME,
-      arguments: { idempotency_key: `${operationKey}${retryingPartialBatch ? `:retry:${attempt}` : ":media"}`, metadata: { description: namingContext }, items: references.map((item) => ({ client_file_id: item.file_id, filename: item.file_name, sort_order: item.ordinal, ordinal: item.ordinal, media: item.media })), files: references },
+      arguments: { idempotency_key: `${operationKey}${retryingPartialBatch ? `:retry:${attempt}` : ":media"}`, metadata: {}, items: references.map((item) => ({ client_file_id: item.file_id, filename: item.file_name, sort_order: item.ordinal, ordinal: item.ordinal, media: item.media })), files: references },
     });
     recordDiagnostic("SERVER_TOOL_CALL_RESULT", "DONE", "SERVER_TOOL_RESULT_RECEIVED");
     const manifest = extractUploadManifest(result as ToolResult);
@@ -318,7 +319,7 @@ async function start(): Promise<void> {
       retryOperationKey = operationKey;
       recordDiagnostic("ERROR", "ERROR", diagnosticCode(error), error);
       publishBatchContext();
-      setState("ERROR", `Tạo bài viết thất bại: ${safeErrorMessage(error)}`);
+      setState("ERROR", USER_ERROR_MESSAGE);
     } finally {
       uploading = false;
       renderSelection();
@@ -340,7 +341,7 @@ async function start(): Promise<void> {
       setState("READY", "Đã khôi phục đủ ảnh. Bấm TẢI LÊN để gửi submission.");
     } catch (error) {
       recordDiagnostic("ERROR", "ERROR", diagnosticCode(error), error);
-      setState("PARTIAL", `Chưa thể thử lại toàn bộ ảnh: ${safeErrorMessage(error)}`);
+      setState("PARTIAL", USER_ERROR_MESSAGE);
     } finally {
       uploading = false;
       renderSelection();
@@ -359,7 +360,7 @@ async function start(): Promise<void> {
   };
   app.onerror = (error) => {
     recordDiagnostic("ERROR", "ERROR", "MCP_APPS_CONNECTION_ERROR", error);
-    setState("ERROR", `Kết nối MCP Apps thất bại: ${safeErrorMessage(error)}`);
+    setState("ERROR", USER_ERROR_MESSAGE);
   };
   input.addEventListener("change", () => {
     uploaded = [];
@@ -388,7 +389,7 @@ async function start(): Promise<void> {
       renderSelection();
     } catch (error) {
       recordDiagnostic("ERROR", "ERROR", "FILE_SELECTION_FAILED", error);
-      setState("ERROR", `Chọn ảnh thất bại: ${safeErrorMessage(error)}`);
+      setState("ERROR", USER_ERROR_MESSAGE);
     }
   });
   previews.addEventListener("input", (event) => {
@@ -427,7 +428,7 @@ async function start(): Promise<void> {
     select.disabled = true;
     upload.disabled = true;
     recordDiagnostic("ERROR", "ERROR", "MCP_APPS_CONNECT_FAILED", error);
-    setState("ERROR", `Không thể kết nối MCP Apps: ${safeErrorMessage(error)}`);
+    setState("ERROR", USER_ERROR_MESSAGE);
   }
 }
 

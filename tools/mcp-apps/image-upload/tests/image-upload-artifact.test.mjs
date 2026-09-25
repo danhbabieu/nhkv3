@@ -56,6 +56,16 @@ test("the View sends one submission through Media then Capture", async () => {
   assert.match(view, /publish: false/);
 });
 
+test("the View keeps shared description in Capture semantic input and out of Media metadata", async () => {
+  const view = await source();
+
+  assert.match(view, /text:\s*namingContext/);
+  assert.match(view, /metadata:\s*\{\s*\}/);
+  assert.doesNotMatch(view, /metadata:\s*\{\s*description:\s*namingContext/);
+  assert.match(view, /Không thể xử lý mô tả\. Dữ liệu chưa được ghi, bạn có thể thử lại\./);
+  assert.doesNotMatch(view, /Tạo bài viết thất bại:\s*\$\{safeErrorMessage\(error\)\}/);
+});
+
 test("upload controls are gated by the connected lifecycle", async () => {
   const html = await resource();
 
@@ -95,7 +105,7 @@ test("the View requires operator naming context and emits the required diagnosti
     "ATTACHMENT_READBACK_START", "ATTACHMENT_READBACK_DONE", "MEDIA_READBACK_DONE",
     "READY_FOR_USE", "ERROR",
   ]) assert.match(view, new RegExp(stage));
-  assert.match(view, /metadata:\s*\{\s*description:/);
+  assert.match(view, /metadata:\s*\{\s*\}/);
 });
 
 test("the View catches bootstrap failures and leaves a visible error state", async () => {
