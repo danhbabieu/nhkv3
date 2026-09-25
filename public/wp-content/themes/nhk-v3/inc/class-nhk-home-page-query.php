@@ -7,6 +7,7 @@ final class NHK_V3_Home_Page_Query
     public function read(): array
     {
         $latest = $this->posts(['posts_per_page' => 6, 'ignore_sticky_posts' => true]);
+        // sticky_posts are the editorial selection mechanism for homepage featured content.
         $featured = $this->posts(['posts_per_page' => 3, 'post__in' => array_values(array_filter(array_map('intval', (array) get_option('sticky_posts')))), 'orderby' => 'post__in']);
         if ($featured === []) $featured = $this->posts(['posts_per_page' => 3, 'offset' => 6, 'ignore_sticky_posts' => true]);
         if ($featured === []) $featured = array_slice($latest, 0, 3);

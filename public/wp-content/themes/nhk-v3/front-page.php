@@ -31,10 +31,18 @@ get_header();
   <section class="home-latest-feed" aria-labelledby="home-latest-title">
     <div class="section-head"><div><p class="eyebrow">Mới cập nhật</p><h2 id="home-latest-title">Mới nhất trong kho</h2><p class="section-deck">Những cập nhật mới nhất từ toàn bộ kho dữ liệu.</p></div></div>
     <div class="latest-feed-list">
-      <?php foreach (array_slice($latestFeed, 0, 6) as $item): $url = nhk_v3_public_url($item['url'] ?? null); if ($url === '') continue; ?>
-        <article class="latest-feed-row">
-          <div class="latest-feed-row-body"><div class="latest-feed-row-meta"><span class="latest-feed-badge"><?php echo esc_html((string) ($item['label'] ?? 'Nội dung')); ?></span></div><h3><a href="<?php echo esc_url($url); ?>"><?php echo esc_html((string) ($item['title'] ?? '')); ?></a></h3><?php if (trim((string) ($item['summary'] ?? '')) !== ''): ?><p><?php echo esc_html((string) ($item['summary'] ?? '')); ?></p><?php endif; ?></div>
-          <a class="latest-feed-arrow" href="<?php echo esc_url($url); ?>" aria-label="Mở <?php echo esc_attr((string) ($item['title'] ?? 'nội dung')); ?>">→</a>
+      <?php foreach (array_slice($latestFeed, 0, 4) as $item): $url = nhk_v3_public_url($item['url'] ?? null); if ($url === '') continue; $attachmentId = (int) ($item['attachment_id'] ?? 0); $imageUrl = trim((string) ($item['image_url'] ?? '')); $imageSrcset = trim((string) ($item['image_srcset'] ?? $item['srcset'] ?? '')); $imageSizes = trim((string) ($item['image_sizes'] ?? $item['sizes'] ?? '')); $imageWidth = max(1, (int) ($item['width'] ?? 0)); $imageHeight = max(1, (int) ($item['height'] ?? 0)); ?>
+        <article class="latest-feed-card latest-feed-row">
+          <a class="latest-feed-card-link" href="<?php echo esc_url($url); ?>">
+            <span class="latest-feed-card-thumb" aria-hidden="true">
+              <?php if ($attachmentId > 0 && function_exists('wp_get_attachment_image')): ?>
+                <?php echo wp_get_attachment_image((int) $item['attachment_id'], 'medium_large', false, ['class' => 'latest-feed-card-image', 'loading' => 'lazy', 'sizes' => $imageSizes !== '' ? $imageSizes : '(max-width: 767px) 120px, 220px']); ?>
+              <?php elseif ($imageUrl !== ''): ?>
+                <img class="latest-feed-card-image" src="<?php echo esc_url($imageUrl); ?>" alt="" width="<?php echo esc_attr((string) $imageWidth); ?>" height="<?php echo esc_attr((string) $imageHeight); ?>"<?php if ($imageSrcset !== ''): ?> srcset="<?php echo esc_attr($imageSrcset); ?>"<?php endif; ?><?php if ($imageSizes !== ''): ?> sizes="<?php echo esc_attr($imageSizes); ?>"<?php endif; ?> loading="lazy" decoding="async">
+              <?php else: ?><img class="latest-feed-card-image fallback-visual" src="<?php echo esc_url($fallback); ?>" alt="" width="640" height="400" loading="lazy" decoding="async"><?php endif; ?>
+            </span>
+            <span class="latest-feed-row-body"><span class="latest-feed-row-meta"><span class="latest-feed-badge"><?php echo esc_html((string) ($item['label'] ?? 'Nội dung')); ?></span></span><span class="latest-feed-card-title"><?php echo esc_html((string) ($item['title'] ?? '')); ?></span><?php if (trim((string) ($item['summary'] ?? '')) !== ''): ?><span class="latest-feed-card-summary"><?php echo esc_html((string) ($item['summary'] ?? '')); ?></span><?php endif; ?></span>
+          </a>
         </article>
       <?php endforeach; ?>
     </div>
@@ -47,13 +55,13 @@ get_header();
     <div class="featured-layout">
       <article class="featured-lead">
         <a class="featured-image" href="<?php the_permalink(); ?>">
-          <?php if (has_post_thumbnail()): the_post_thumbnail('large', ['loading' => 'lazy', 'alt' => get_the_title()]); else: ?><img class="fallback-visual" src="<?php echo esc_url($fallback); ?>" alt="" width="1200" height="750" loading="lazy"><?php endif; ?>
+          <?php if (has_post_thumbnail()): the_post_thumbnail('medium_large', ['loading' => 'lazy', 'alt' => get_the_title()]); else: ?><img class="fallback-visual" src="<?php echo esc_url($fallback); ?>" alt="" width="1200" height="750" loading="lazy"><?php endif; ?>
         </a>
         <div class="featured-body"><p class="eyebrow"><?php $cats = get_the_category(); echo esc_html(nhk_v3_public_category_name((string) ($cats[0]->name ?? 'Bài viết'))); ?></p><h3><a href="<?php the_permalink(); ?>"><?php the_title(); ?></a></h3><p><?php echo esc_html(nhk_v3_excerpt()); ?></p><div class="meta"><span><?php echo esc_html(get_the_author()); ?></span><time datetime="<?php echo esc_attr(get_the_date('c')); ?>"><?php echo esc_html(nhk_v3_public_date()); ?></time></div></div>
       </article>
       <div class="featured-support">
         <?php foreach (array_slice($featured, 1) as $post): setup_postdata($post); ?>
-          <article class="support-card"><p class="eyebrow"><?php $cats = get_the_category(); echo esc_html(nhk_v3_public_category_name((string) ($cats[0]->name ?? 'Bài viết'))); ?></p><h3><a href="<?php the_permalink(); ?>"><?php the_title(); ?></a></h3><p><?php echo esc_html(nhk_v3_excerpt()); ?></p><time datetime="<?php echo esc_attr(get_the_date('c')); ?>"><?php echo esc_html(nhk_v3_public_date()); ?></time></article>
+          <article class="support-card"><a class="support-card-link" href="<?php the_permalink(); ?>"><?php if (has_post_thumbnail()): ?><span class="support-card-image"><?php the_post_thumbnail('thumbnail', ['loading' => 'lazy', 'alt' => get_the_title()]); ?></span><?php endif; ?><span class="support-card-body"><span class="eyebrow"><?php $cats = get_the_category(); echo esc_html(nhk_v3_public_category_name((string) ($cats[0]->name ?? 'Bài viết'))); ?></span><span class="support-card-title"><?php the_title(); ?></span><time datetime="<?php echo esc_attr(get_the_date('c')); ?>"><?php echo esc_html(nhk_v3_public_date()); ?></time></span></a></article>
         <?php endforeach; ?>
       </div>
     </div>
@@ -83,14 +91,15 @@ get_header();
   </section>
   <?php endif; ?>
 
-  <div class="content-layout home-layout">
+  <?php $renderableHomeSections = []; foreach (($home['sections'] ?? []) as $section) { $sectionUrl = nhk_v3_public_url($section['url'] ?? null); if ($sectionUrl === '' || empty($section['posts']) || !is_array($section['posts'])) continue; $renderableHomeSections[] = [$section, $sectionUrl]; } if ($renderableHomeSections !== []): ?>
+  <div class="home-sections">
     <section class="home-feed">
-      <?php foreach (($home['sections'] ?? []) as $section): $sectionUrl = nhk_v3_public_url($section['url'] ?? null); if ($sectionUrl === '' || empty($section['posts'])) continue; ?>
+      <?php foreach ($renderableHomeSections as [$section, $sectionUrl]): ?>
         <section class="home-section"><div class="section-head"><div><p class="eyebrow"><?php echo esc_html($section['label']); ?></p><h2><?php echo esc_html($section['label']); ?> mới</h2></div><a class="text-link" href="<?php echo esc_url($sectionUrl); ?>">Xem thêm →</a></div><div class="post-grid compact"><?php foreach ($section['posts'] as $post): setup_postdata($post); get_template_part('template-parts/article-card'); endforeach; wp_reset_postdata(); ?></div></section>
       <?php endforeach; ?>
     </section>
-    <?php get_sidebar(); ?>
   </div>
+  <?php endif; ?>
 
   <?php $entities = is_array($semantic['entities'] ?? null) ? $semantic['entities'] : []; if ($entities !== []): ?>
   <section class="home-semantic-section">
