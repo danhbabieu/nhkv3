@@ -12010,6 +12010,24 @@ class l extends Protocol {
     }
   }
 }
+function assertCaptureArticleReadback(payload, expectedMediaIds) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) throw new Error("CAPTURE_READBACK_UNAVAILABLE");
+  const record2 = payload;
+  const intent = typeof record2.content_intent === "string" ? record2.content_intent : record2.content_intent?.intent;
+  if (intent?.toUpperCase() !== "IMAGE_ARTICLE") return record2;
+  const postId = record2.article?.post_id ?? record2.article_id;
+  if (!(Number(postId) > 0)) throw new Error("ARTICLE_READBACK_UNAVAILABLE");
+  const dispositions = record2.per_media_disposition ?? record2.article_media_plan?.media_dispositions ?? [];
+  const usages = record2.canonical_usage_readback ?? [];
+  const byMedia = new Map(dispositions.map((item) => [item.media_id ?? "", item.status?.toUpperCase() ?? ""]));
+  const usageMedia = new Set(usages.filter((item) => item.active !== false && item.endpoint_type === "wp_post").map((item) => item.media_id ?? ""));
+  for (const mediaId of expectedMediaIds) {
+    if (byMedia.get(mediaId) !== "APPLIED") throw new Error("ARTICLE_MEDIA_DISPOSITION_INCOMPLETE");
+    if (!usageMedia.has(mediaId)) throw new Error("ARTICLE_MEDIA_USAGE_READBACK_INCOMPLETE");
+  }
+  if (record2.capture_status && !["COMPLETE", "READY_FOR_PUBLICATION", "PUBLISHED"].includes(record2.capture_status.toUpperCase())) throw new Error("CAPTURE_ENRICHMENT_INCOMPLETE");
+  return record2;
+}
 function normalizeSelectedFiles(value) {
   if (!Array.isArray(value)) return [];
   return value.flatMap((item) => {
@@ -12451,6 +12469,7 @@ async function start() {
     if (!payload || typeof payload !== "object") throw new Error("CAPTURE_READBACK_UNAVAILABLE");
     const record2 = payload;
     if (typeof record2.capture_id !== "string" && typeof record2.capture?.capture_id !== "string") throw new Error("CAPTURE_READBACK_UNAVAILABLE");
+    assertCaptureArticleReadback(payload, uploaded.map((item) => item.media_id).filter((id) => Boolean(id)));
   }
   async function materializeSelectedImages(operationKey, namingContext, attempt) {
     if (batchManifest !== null && batchManifest.success_count === batchManifest.requested_count && uploaded.length === selected.length && uploaded.every((item) => Boolean(item.media_id))) return batchManifest;

@@ -56,6 +56,35 @@ export type CaptureAssetInput = {
   feature_requests: string[];
 };
 
+export type CaptureReadback = {
+  capture_status?: string;
+  article?: { post_id?: number | string | null } | null;
+  article_id?: number | string | null;
+  content_intent?: string | { intent?: string };
+  article_media_plan?: { media_dispositions?: Array<{ media_id?: string; status?: string }> } | null;
+  per_media_disposition?: Array<{ media_id?: string; status?: string }>;
+  canonical_usage_readback?: Array<{ media_id?: string; endpoint_type?: string; endpoint_key?: string; active?: boolean }>;
+};
+
+export function assertCaptureArticleReadback(payload: unknown, expectedMediaIds: string[]): CaptureReadback {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) throw new Error("CAPTURE_READBACK_UNAVAILABLE");
+  const record = payload as CaptureReadback;
+  const intent = typeof record.content_intent === "string" ? record.content_intent : record.content_intent?.intent;
+  if (intent?.toUpperCase() !== "IMAGE_ARTICLE") return record;
+  const postId = record.article?.post_id ?? record.article_id;
+  if (!(Number(postId) > 0)) throw new Error("ARTICLE_READBACK_UNAVAILABLE");
+  const dispositions = record.per_media_disposition ?? record.article_media_plan?.media_dispositions ?? [];
+  const usages = record.canonical_usage_readback ?? [];
+  const byMedia = new Map(dispositions.map((item) => [item.media_id ?? "", item.status?.toUpperCase() ?? ""]));
+  const usageMedia = new Set(usages.filter((item) => item.active !== false && item.endpoint_type === "wp_post").map((item) => item.media_id ?? ""));
+  for (const mediaId of expectedMediaIds) {
+    if (byMedia.get(mediaId) !== "APPLIED") throw new Error("ARTICLE_MEDIA_DISPOSITION_INCOMPLETE");
+    if (!usageMedia.has(mediaId)) throw new Error("ARTICLE_MEDIA_USAGE_READBACK_INCOMPLETE");
+  }
+  if (record.capture_status && !["COMPLETE", "READY_FOR_PUBLICATION", "PUBLISHED"].includes(record.capture_status.toUpperCase())) throw new Error("CAPTURE_ENRICHMENT_INCOMPLETE");
+  return record;
+}
+
 export function normalizeSelectedFiles(value: unknown): SelectedImage[] {
   if (!Array.isArray(value)) return [];
 

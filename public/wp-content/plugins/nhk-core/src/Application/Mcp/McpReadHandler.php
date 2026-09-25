@@ -125,6 +125,15 @@ final class McpReadHandler
             if ($videoId !== '') $videos[] = ['id' => $videoId, 'status' => (string) ($asset['status'] ?? '')];
         }
         $retry = CaptureCurrentOutcomeReducer::retryEligibility($capture);
+        $articleMediaPlan = is_array($diagnostics['media_usage'] ?? null)
+            ? $diagnostics['media_usage']
+            : (is_array($diagnostics['media_enrichment'] ?? null) ? $diagnostics['media_enrichment'] : []);
+        $blogId = function_exists('get_current_blog_id') ? max(1, (int) get_current_blog_id()) : 1;
+        $canonicalUsageReadback = $capture->articleId === null ? [] : array_map($this->usage(...), array_values(array_filter(
+            $this->usages->listByEndpoint('wp_post', $blogId . ':' . $capture->articleId),
+            static fn (MediaUsage $usage): bool => $usage->activeSlot !== 'retired',
+        )));
+        $contentIntent = is_array($context['content_intent'] ?? null) ? $context['content_intent'] : [];
         return [
             // `status` describes the read result. Keep the persisted Capture
             // lifecycle state separate so PARTIAL/REVIEW_REQUIRED cannot
@@ -137,6 +146,14 @@ final class McpReadHandler
             'revision' => $capture->revision, 'stage' => $capture->stage, 'capture_status' => $capture->status,
             'subject_resolution_packet' => $packet,
             'article' => $capture->articleId === null ? null : ['post_id' => $capture->articleId, 'state' => (string) ($diagnostics['publication']['status'] ?? '')],
+            'article_id' => $capture->articleId,
+            'post_id' => $capture->articleId,
+            'content_intent' => (string) ($contentIntent['intent'] ?? ''),
+            'article_media_plan' => $articleMediaPlan,
+            'per_media_disposition' => array_values(array_filter((array) ($articleMediaPlan['media_dispositions'] ?? $articleMediaPlan['article_media_dispositions'] ?? []), 'is_array')),
+            'canonical_usage_readback' => $canonicalUsageReadback,
+            'projection_state' => ['publication' => $diagnostics['publication'] ?? null, 'final_read_back' => $diagnostics['final_read_back'] ?? null],
+            'frontend_public_state' => ['public' => $completion['public_state'] ?? null, 'frontend' => $completion['frontend_state'] ?? null],
             'video' => array_values(array_unique($videos, SORT_REGULAR)), 'media' => array_values($media),
             'media_bindings' => is_array($context['media_bindings'] ?? null) ? array_values(array_map(static fn (mixed $binding): array => is_array($binding) ? [
                 'target' => $binding['target'] ?? null, 'role' => $binding['role'] ?? null, 'selection_source' => $binding['selection_source'] ?? null, 'selection_policy' => $binding['selection_policy'] ?? null,
@@ -183,7 +200,6 @@ final class McpReadHandler
                 break;
             }
         }
-        if ($currentUsages === [] && !$hasEmptyPostOwner) return $completion;
         $activeMediaIds = [];
         $activeRoles = [];
         foreach ($currentUsages as $usage) {
@@ -292,9 +308,15 @@ final class McpReadHandler
         }
         $enrichment = is_array($diagnostics['media_usage'] ?? null) ? $diagnostics['media_usage'] : (is_array($diagnostics['media_enrichment'] ?? null) ? $diagnostics['media_enrichment'] : []);
         $dispositions = array_values(array_filter((array) ($enrichment['media_dispositions'] ?? $enrichment['article_media_dispositions'] ?? []), 'is_array'));
+        if ($dispositions === []) return false;
+        $dispositionMediaIds = [];
         foreach ($dispositions as $disposition) {
             if (strtoupper(trim((string) ($disposition['status'] ?? ''))) !== 'APPLIED') return false;
+            $mediaId = trim((string) ($disposition['media_id'] ?? ''));
+            if ($mediaId === '') return false;
+            $dispositionMediaIds[$mediaId] = true;
         }
+        foreach (array_keys($captureMediaIds) as $mediaId) if (!isset($dispositionMediaIds[$mediaId]) || !isset($activeMediaIds[$mediaId])) return false;
         return true;
     }
 
@@ -450,7 +472,7 @@ final class McpReadHandler
     private function videoPublishedAt(Video $video): ?string { $metadata = is_array($video->metadata) ? $video->metadata : []; $source = is_array($metadata['source_snapshot'] ?? null) ? $metadata['source_snapshot'] : (is_array($metadata['source'] ?? null) ? $metadata['source'] : []); return isset($source['published_at']) && is_string($source['published_at']) ? $source['published_at'] : null; }
     private function entity(AuthorityEntity $entity): array { $definition = $this->types->get($entity->entityType); $payload = array_intersect_key($entity->payload, array_fill_keys($definition->allowedFields, true)); return ['id' => $entity->canonicalId, 'type' => $entity->entityType, 'stable_key' => $entity->stableKey, 'name' => $entity->canonicalName, 'revision' => $entity->revision, 'payload' => $payload]; }
     private function asset(MediaAsset $asset): array { return ['id' => $asset->assetId, 'kind' => $asset->kind, 'storage_key' => $asset->storageKey, 'checksum' => $asset->checksum, 'mime_type' => $asset->mimeType, 'byte_size' => $asset->byteSize, 'width' => $asset->width, 'height' => $asset->height, 'visibility' => $asset->visibility, 'metadata' => $asset->metadata]; }
-    private function usage(MediaUsage $usage): array { return ['id' => $usage->usageId, 'endpoint_type' => $usage->endpointType, 'endpoint_key' => $usage->endpointKey, 'role' => $usage->role, 'sort_order' => $usage->sortOrder, 'alt' => $usage->altText, 'caption' => $usage->caption, 'keyword_groups' => $usage->keywordGroups, 'selection_source' => $usage->selectionSource, 'selection_policy' => $usage->selectionPolicy, 'active_slot' => $usage->activeSlot]; }
+    private function usage(MediaUsage $usage): array { return ['id' => $usage->usageId, 'media_id' => $usage->mediaId, 'endpoint_type' => $usage->endpointType, 'endpoint_key' => $usage->endpointKey, 'role' => $usage->role, 'sort_order' => $usage->sortOrder, 'alt' => $usage->altText, 'caption' => $usage->caption, 'keyword_groups' => $usage->keywordGroups, 'selection_source' => $usage->selectionSource, 'selection_policy' => $usage->selectionPolicy, 'active_slot' => $usage->activeSlot, 'active' => $usage->activeSlot !== 'retired']; }
     private function publicAsset(MediaAsset $asset): array { return ['id' => $asset->assetId, 'kind' => $asset->kind, 'mime_type' => $asset->mimeType, 'byte_size' => $asset->byteSize, 'width' => $asset->width, 'height' => $asset->height, 'public_url' => '/media/asset/' . $asset->assetId . '/']; }
     private function publicUsage(MediaUsage $usage): array { return ['id' => $usage->usageId, 'media_id' => $usage->mediaId, 'target_type' => $usage->endpointType, 'target_id' => $usage->endpointKey, 'role' => $usage->role, 'placement_key' => $usage->placementKey, 'sort_order' => $usage->sortOrder, 'active' => $usage->activeSlot !== 'retired', 'revision' => $usage->revision]; }
     private function evidence(Evidence $evidence): array { return ['id' => $evidence->canonicalId, 'claim_id' => $evidence->claimId, 'source_id' => $evidence->sourceId, 'relation' => $evidence->relation, 'excerpt' => $evidence->excerpt, 'locator' => $evidence->locator, 'metadata' => $evidence->metadata, 'active' => $evidence->active, 'revision' => $evidence->revision]; }

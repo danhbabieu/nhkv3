@@ -19380,3 +19380,41 @@ mutation, Article 711 mutation, staging/production mutation, deployment or
 push occurred.
 
 STATUS: `IMAGE_CAPTURE_MEDIA_ARTICLE_PUBLIC_LOCAL_READY / INTEGRATION_ENVIRONMENT_GATED / NO_SERVER_ACTION`
+
+# Checkpoint — 2026-09-25 — Staging-shaped IMAGE_ARTICLE false-complete fix (LOCAL / NO SERVER ACTION)
+
+ROOT_CAUSE: The upload widget promoted any response containing only a
+`capture_id` to `enrichment_status=COMPLETE`. Capture read-back also preserved
+a stale completion packet when current Article MediaUsage was empty, while the
+Article media branch treated an empty disposition list as terminal. The
+canonical Article route itself already resolves shared description plus
+multiple assets to exactly one `IMAGE_ARTICLE`; the missing invariant was the
+server/read-back completion gate after Media commit.
+
+IMPLEMENTED: Article completion now requires an APPLIED disposition for every
+ordered manifest Media plus active canonical MediaUsage read-back for every
+Media. Non-Article Media binding completion requires COMPLETE bindings and
+verified usage IDs. Capture read-back reconciles current usage instead of
+returning stale completion and exposes `article_id`, `post_id`,
+`content_intent`, `article_media_plan`, per-Media disposition, canonical usage
+read-back, projection state and frontend/public state. The widget now refuses
+to promote IMAGE_ARTICLE to COMPLETE unless those fields prove the Article and
+all canonical usages; failed/review branches remain non-COMPLETE.
+
+REGRESSION: Added the exact staging shape: three ordered Media, empty Feature,
+shared Vedette 37 description, resolved semantic subject, one Article, three
+canonical Article usages, and retry without a duplicate Article. Added a
+widget contract test rejecting empty canonical usage read-back.
+
+VERIFICATION: Focused PHP suite passed 42 tests / 260 assertions; image-upload
+Node tests passed 36 tests; TypeScript typecheck and UI build passed; PHP lint
+and `git diff --check` passed. Full Unit completed 2,767 tests / 15,306
+assertions with 24 pre-existing fixture/integration-environment failures (WP
+upload fixture absence or missing `NHK_WP_TEST_PATH`/`NHK_WP_TEST_DB`), 120
+skips, 20 warnings, 45 deprecations and 34 PHPUnit deprecations. No changed
+test failed.
+
+SAFETY: No migration, database write, staging/production mutation, Capture
+mutation, deployment, push or production action occurred.
+
+STATUS: `IMAGE_CAPTURE_MEDIA_ARTICLE_PUBLIC_FALSE_COMPLETE_FIXED / READY_FOR_STAGING_DEPLOY / NO_SERVER_ACTION`

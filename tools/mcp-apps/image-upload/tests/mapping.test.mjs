@@ -1,6 +1,20 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { assertUploadManifestCount, assertUploadManifestCounts, buildCaptureAssetInputs, buildWidgetState, extractPayload, extractUploadManifest, extractUploads, inspectToolResult, mergeUploadManifest, normalizeSelectedFiles, shouldProcessToolResultNotification, splitFeatureRequests } from "../src/contract.ts";
+import { assertCaptureArticleReadback, assertUploadManifestCount, assertUploadManifestCounts, buildCaptureAssetInputs, buildWidgetState, extractPayload, extractUploadManifest, extractUploads, inspectToolResult, mergeUploadManifest, normalizeSelectedFiles, shouldProcessToolResultNotification, splitFeatureRequests } from "../src/contract.ts";
+
+test("rejects an Article capture readback without per-media canonical Article usages", () => {
+  assert.throws(() => assertCaptureArticleReadback({
+    capture_status: "COMPLETE",
+    content_intent: "IMAGE_ARTICLE",
+    article: { post_id: 711 },
+    per_media_disposition: [
+      { media_id: "media-717", status: "APPLIED" },
+      { media_id: "media-718", status: "APPLIED" },
+      { media_id: "media-719", status: "APPLIED" },
+    ],
+    canonical_usage_readback: [],
+  }, ["media-717", "media-718", "media-719"]), /ARTICLE_MEDIA_USAGE_READBACK_INCOMPLETE/);
+});
 
 test("does not parse the tool result that opened the widget as an upload result", () => {
   assert.equal(shouldProcessToolResultNotification("open"), false);

@@ -35,7 +35,7 @@ final class McpCaptureReadContractTest extends TestCase
             null,
             [['kind' => 'image', 'media_id' => $mediaId, 'attachment_id' => 686, 'attachment_readback_status' => 'verified']],
             ['content_intent' => ['intent' => 'IMAGE_ARTICLE']],
-            ['completion' => [
+            ['media_usage' => ['media_ids' => [$mediaId], 'media_dispositions' => [['media_id' => $mediaId, 'status' => 'APPLIED']], 'media_usage' => [['media_id' => $mediaId, 'active' => true]]], 'completion' => [
                 'required_owners' => [['owner_type' => 'wp_post', 'owner_id' => '']],
                 'children' => [
                     ['completion' => [
@@ -138,8 +138,8 @@ final class McpCaptureReadContractTest extends TestCase
         self::assertSame('media-631', $projection['media'][0]['media_id']);
         self::assertContains('IMAGE_ARTICLE_MEDIA_REQUIRED', $projection['blockers']);
         self::assertSame([
-            ['owner_type' => 'video', 'owner_id' => 'video-631', 'status' => 'COMPLETE'],
-            ['owner_type' => 'wp_post', 'owner_id' => '631', 'status' => 'INCOMPLETE'],
+            ['owner_type' => 'video', 'owner_id' => 'video-631', 'status' => 'BLOCKED'],
+            ['owner_type' => 'wp_post', 'owner_id' => '631', 'status' => 'PARTIAL'],
         ], $projection['owners']);
         self::assertArrayNotHasKey('idempotency_key', $projection);
         self::assertArrayNotHasKey('request_fingerprint', $projection);
