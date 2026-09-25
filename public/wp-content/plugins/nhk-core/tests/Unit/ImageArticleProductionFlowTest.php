@@ -53,6 +53,34 @@ final class ImageArticleProductionFlowTest extends TestCase
         self::assertSame('1:1', $flow->usages[0]['endpoint_key']);
     }
 
+    public function test_shared_description_and_three_feature_empty_assets_route_to_one_image_article(): void
+    {
+        $flow = new ImageArticleFlowFixture([
+            ['media_id' => 'media-717', 'attachment_id' => 717, 'upload_status' => 'REUSED', 'sort_order' => 0, 'capture_asset_input' => ['name' => 'Mặt trước vedette 37 ngắt đêm', 'feature_requests' => []]],
+            ['media_id' => 'media-718', 'attachment_id' => 718, 'upload_status' => 'REUSED', 'sort_order' => 1, 'capture_asset_input' => ['name' => 'Cần gạt chọn chức năng ngắt chuông', 'feature_requests' => []]],
+            ['media_id' => 'media-719', 'attachment_id' => 719, 'upload_status' => 'REUSED', 'sort_order' => 2, 'capture_asset_input' => ['name' => 'Mặt sau máy vedette ngắt chuông đêm', 'feature_requests' => []]],
+        ]);
+
+        $result = $flow->run([
+            'idempotency_key' => 'staging-shaped-three-media',
+            'intent' => '',
+            'text' => 'Mô tả chung về Vedette 37 và chuyển động của máy.',
+        ]);
+        $retry = $flow->run([
+            'idempotency_key' => 'staging-shaped-three-media',
+            'intent' => '',
+            'text' => 'Mô tả chung về Vedette 37 và chuyển động của máy.',
+        ]);
+
+        self::assertSame('IMAGE_ARTICLE', $result->context['content_intent']['intent']);
+        self::assertSame(1, $result->articleId);
+        self::assertSame($result->captureId, $retry->captureId);
+        self::assertSame(1, $retry->articleId);
+        self::assertSame(1, $flow->draftCalls);
+        self::assertCount(3, $flow->usages);
+        self::assertSame(['media-717', 'media-718', 'media-719'], array_column($flow->usages, 'media_id'));
+    }
+
     public function test_three_image_album_preserves_exact_order_and_contextual_metadata(): void
     {
         $flow = new ImageArticleFlowFixture([
@@ -112,6 +140,19 @@ final class ImageArticleProductionFlowTest extends TestCase
         self::assertNotEmpty($result->diagnostics['completion']['blockers']);
     }
 
+    public function test_empty_article_media_dispositions_cannot_promote_capture_to_complete(): void
+    {
+        $flow = new ImageArticleFlowFixture([
+            ['media_id' => 'media-featured', 'attachment_id' => 612, 'upload_status' => 'REUSED', 'sort_order' => 0],
+            ['media_id' => 'media-detail', 'attachment_id' => 613, 'upload_status' => 'REUSED', 'sort_order' => 1],
+        ], emptyMediaDisposition: true);
+
+        $result = $flow->run();
+
+        self::assertNotSame('COMPLETE', $result->status);
+        self::assertNotEmpty($result->diagnostics['completion']['blockers']);
+    }
+
     /** @dataProvider longSharedDescriptionProvider */
     public function test_long_shared_description_stays_semantic_and_retries_one_three_media_article_idempotently(int $length): void
     {
@@ -165,7 +206,7 @@ final class ImageArticleFlowFixture
     private EditorialCaptureCoordinator $coordinator;
 
     /** @param list<array<string,mixed>> $assets */
-    public function __construct(private array $assets, bool $failMediaOnce = false, private bool $fullPath = false, private bool $incompleteMediaDisposition = false)
+    public function __construct(private array $assets, bool $failMediaOnce = false, private bool $fullPath = false, private bool $incompleteMediaDisposition = false, private bool $emptyMediaDisposition = false)
     {
         $this->failMediaOnce = $failMediaOnce;
         $this->captures = new ImageArticleTestCaptureRepository();
@@ -199,7 +240,7 @@ final class ImageArticleFlowFixture
                     $this->usages[] = ['media_id' => (string) $asset['media_id'], 'endpoint_key' => '1:' . (string) ($context['article_id'] ?? ''), 'sort_order' => (int) ($asset['sort_order'] ?? 0), 'title' => (string) ($seo['title'] ?? ''), 'description' => (string) ($seo['description'] ?? ''), 'alt_text' => (string) ($seo['alt_text'] ?? ''), 'caption' => (string) ($seo['caption'] ?? '')];
                 }
                 usort($this->usages, static fn (array $left, array $right): int => $left['sort_order'] <=> $right['sort_order']);
-                return ['status' => 'RECONCILED', 'media_ids' => array_column($this->usages, 'media_id'), 'media_complete' => !$this->incompleteMediaDisposition, 'media_usage' => $this->usages, 'media_dispositions' => $this->incompleteMediaDisposition ? [['media_id' => 'media-detail', 'role' => 'inline_primary', 'status' => 'REVIEW_REQUIRED']] : array_map(static fn (array $usage): array => ['media_id' => $usage['media_id'], 'role' => 'inline_supporting', 'status' => 'APPLIED'], $this->usages)];
+                return ['status' => 'RECONCILED', 'media_ids' => array_column($this->usages, 'media_id'), 'media_complete' => !$this->incompleteMediaDisposition && !$this->emptyMediaDisposition, 'media_usage' => $this->emptyMediaDisposition ? [] : $this->usages, 'media_dispositions' => $this->emptyMediaDisposition ? [] : ($this->incompleteMediaDisposition ? [['media_id' => 'media-detail', 'role' => 'inline_primary', 'status' => 'REVIEW_REQUIRED']] : array_map(static fn (array $usage): array => ['media_id' => $usage['media_id'], 'role' => 'inline_supporting', 'status' => 'APPLIED'], $this->usages))];
             },
             function (array $context): array {
                 $this->packetIds[] = (string) (($context['subject_resolution_packet']['id'] ?? ''));

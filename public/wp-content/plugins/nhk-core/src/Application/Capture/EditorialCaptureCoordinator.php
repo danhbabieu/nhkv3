@@ -1831,7 +1831,9 @@ final class EditorialCaptureCoordinator
         $singleMediaId = trim((string) ($media['media_id'] ?? $media['canonical_id'] ?? ''));
         if ($singleMediaId !== '') $mediaIds[] = $singleMediaId;
         $mediaComplete = in_array(strtoupper(trim((string) ($media['status'] ?? ''))), ['COMPLETE', 'RECONCILED'], true)
-            && $this->articleMediaDispositionsComplete($media);
+            && (in_array(strtoupper(trim((string) ($record->context['content_intent']['intent'] ?? ''))), ['IMAGE_ARTICLE', 'TEXT_ARTICLE'], true)
+                ? $this->articleMediaDispositionsComplete($media)
+                : $this->canonicalMediaBindingReadbackComplete($media));
         $mediaFrontendVerified = $media['frontend_verified'] ?? ($final['frontend_verified'] ?? null);
         foreach (array_values(array_unique($mediaIds)) as $mediaId) {
             $children[] = ['owner_type' => 'media', 'owner_id' => $mediaId, 'canonical_readback' => $mediaComplete ? ['id' => $mediaId] : null, 'relation_or_usage_state' => $mediaComplete ? 'COMPLETE' : 'PARTIAL', 'public_eligible' => ($media['media_complete'] ?? false) === true || (($media['media_complete'] ?? null) === null && $mediaComplete), 'frontend_verified' => $mediaFrontendVerified, 'public_projection_owner' => false, 'owner_role' => 'semantic_dependency', 'blockers' => (array) ($media['blockers'] ?? [])];
@@ -1872,10 +1874,41 @@ final class EditorialCaptureCoordinator
     /** @param array<string,mixed> $media */
     private function articleMediaDispositionsComplete(array $media): bool
     {
+        $expectedMediaIds = array_values(array_unique(array_filter(array_map(
+            static fn (mixed $mediaId): string => trim((string) $mediaId),
+            (array) ($media['media_ids'] ?? []),
+        ), static fn (string $mediaId): bool => $mediaId !== '')));
         $dispositions = array_values(array_filter((array) ($media['media_dispositions'] ?? $media['article_media_dispositions'] ?? []), 'is_array'));
-        if ($dispositions === []) return true;
+        if ($expectedMediaIds !== [] && $dispositions === []) return false;
+        $dispositionMediaIds = [];
         foreach ($dispositions as $disposition) {
             if (strtoupper(trim((string) ($disposition['status'] ?? ''))) !== 'APPLIED') return false;
+            $mediaId = trim((string) ($disposition['media_id'] ?? ''));
+            if ($mediaId === '') return false;
+            $dispositionMediaIds[$mediaId] = true;
+        }
+        foreach ($expectedMediaIds as $mediaId) if (!isset($dispositionMediaIds[$mediaId])) return false;
+        $usageReadback = array_values(array_filter((array) ($media['media_usage'] ?? $media['usages'] ?? $media['canonical_readback']['media_usage'] ?? []), 'is_array'));
+        if ($expectedMediaIds !== []) {
+            $usageMediaIds = [];
+            foreach ($usageReadback as $usage) {
+                if (($usage['active'] ?? true) === false || ($usage['active_slot'] ?? null) === 'retired') continue;
+                $mediaId = trim((string) ($usage['media_id'] ?? ''));
+                if ($mediaId !== '') $usageMediaIds[$mediaId] = true;
+            }
+            foreach ($expectedMediaIds as $mediaId) if (!isset($usageMediaIds[$mediaId])) return false;
+        }
+        return true;
+    }
+
+    private function canonicalMediaBindingReadbackComplete(array $media): bool
+    {
+        $bindings = array_values(array_filter((array) ($media['bindings'] ?? $media['binding_results'] ?? []), 'is_array'));
+        if ($bindings === []) return false;
+        foreach ($bindings as $binding) {
+            if (strtoupper(trim((string) ($binding['status'] ?? ''))) !== 'COMPLETE') return false;
+            $readback = is_array($binding['readback'] ?? null) ? $binding['readback'] : [];
+            if (strtolower(trim((string) ($readback['status'] ?? ''))) !== 'verified' || trim((string) ($readback['usage_id'] ?? '')) === '') return false;
         }
         return true;
     }
