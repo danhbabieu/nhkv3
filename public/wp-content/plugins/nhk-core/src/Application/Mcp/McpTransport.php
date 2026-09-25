@@ -8,7 +8,7 @@ use NHK\Core\Application\Video\VideoIntakeService;
 use NHK\Core\Application\Video\VideoSourceRefreshCommand;
 use NHK\Core\Application\Video\VideoFrontendReconciliationService;
 use NHK\Core\Contracts\Media\WordPressMediaAttachmentIngestor;
-use NHK\Core\Application\Media\{ImageIngestEntrypoint, MediaBatchUploadService, MediaBindingService};
+use NHK\Core\Application\Media\{ImageIngestEntrypoint, MediaBatchUploadService, MediaBindingService, MediaTargetNormalizer};
 use NHK\Core\Application\WordPress\{CategoryGateway, EditorialDraftGateway};
 use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
 use NHK\Core\Application\Knowledge\KnowledgeRepairPreviewService;
@@ -54,6 +54,7 @@ final class McpTransport
         private ?KnowledgeRepairPreviewService $knowledgeRepairPreview = null,
         private ?VideoFrontendReconciliationService $videoFrontendReconciliation = null,
         private ?KnowledgeWriterPreviewService $knowledgeWriterPreview = null,
+        private ?MediaTargetNormalizer $mediaTargetNormalizer = null,
     ) {}
 
     /** @return array{status:int,body:?array} */
@@ -788,7 +789,11 @@ final class McpTransport
         $targetType = strtolower(trim((string) ($targetReference['type'] ?? '')));
         $targetUuid = null;
         $target = $targetReference;
-        if ($targetType !== 'wp_post') {
+        if ($this->mediaTargetNormalizer !== null) {
+            $normalized = $this->mediaTargetNormalizer->normalizeRequestTarget($targetReference);
+            $target = ['type' => $normalized['type'], 'id' => $normalized['id']];
+            if (isset($normalized['canonical_uuid'])) $targetUuid = (string) $normalized['canonical_uuid'];
+        } elseif ($targetType !== 'wp_post') {
             $resolved = $this->mediaBinding->resolveTargetReference($targetReference);
             $targetUuid = $resolved->canonicalId;
             $target = ['type' => $resolved->entityType, 'id' => $resolved->canonicalId];
