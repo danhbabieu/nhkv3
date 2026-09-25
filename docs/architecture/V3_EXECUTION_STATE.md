@@ -19319,3 +19319,42 @@ mutation, Article 711 mutation, staging/production mutation, deployment or
 push occurred.
 
 STATUS: `IMAGE_CAPTURE_MEDIA_ARTICLE_PUBLIC_LOCAL_READY / INTEGRATION_ENVIRONMENT_GATED / NO_SERVER_ACTION`
+
+# Checkpoint — 2026-09-25 — Video universal owner lifecycle staging failure boundary (LOCAL / NO SERVER ACTION)
+
+ROOT_CAUSE: The shared Capture continuation classified a bounded Video staging-admission denial as the generic Video transient failure VIDEO_EXTERNAL_TRANSIENT_FAILURE, hiding the exact operator/deployment action required by the fail-closed staging contract. The existing lifecycle receipt already emitted CONTROLLED_APPLY once; a regression test now locks that invariant.
+
+FIRST_BROKEN_BOUNDARY: GovernedCaptureContinuationService::classifiedFailure after the Video controlled-write adapter and before Capture completion aggregation.
+
+IMPLEMENTED: Preserve STAGING_SCOPE_NOT_APPROVED as a SYSTEM_BLOCKED blocker with no Governance or staging bypass. Added generic regression coverage for exact staging denial and lifecycle receipt uniqueness. No owner/enrichment/publication contract, schema, or sibling-owner path was changed.
+
+VERIFICATION: Focused Video/Governance/Universal/Publication/Article/Media tests passed 124 tests / 563 assertions. Full Unit ran 2,611 tests / 15,195 assertions; two pre-existing MCP Apps image-widget fixture failures remain outside this slice. Guarded Integration requires the documented WordPress test bootstrap and has not been mutated by this slice.
+
+SAFETY: No migration, database write, Capture mutation, staging/production mutation, deployment, push or remote runtime action occurred. Existing user changes were preserved.
+
+STATUS: VIDEO_UNIVERSAL_OWNER_LIFECYCLE_LOCAL_READY / INTEGRATION_ENVIRONMENT_GATED / NO_SERVER_ACTION
+
+# Audit — 2026-09-25 — Runtime acceptance readiness evidence
+
+OPTIONAL_SUBJECT_AUDIT: The existing governed Video owner executor accepts a
+valid external Video identity without a resolved subject and persists the
+canonical owner; sparse editorial, enrichment and publication blockers remain
+on the Video metadata. The coordinated Capture provenance planner deliberately
+requires a resolved subject before creating Source/Claim/Evidence/about
+dependencies, and the Video eligibility evaluator preserves SUBJECT_UNRESOLVED
+for that dependency path. No Subject, Classification, Knowledge or relation is
+silently created. This is the current contract boundary, not a fixture
+exception.
+
+APPROVAL_AUDIT: The first-request approval path is covered by the generic
+Capture Video continuation regression: approval_confirmed propagates through
+the same Proposal, Eligibility, staging scope issuance and Controlled Apply
+path, while replay reuses the same four governed identities.
+
+MCP_WIDGET_AUDIT: The two MCP Apps failures reproduce in isolation (4 tests /
+20 assertions, 2 failures). Both fail because the current bundled
+resources/ui/image-upload.html lacks the exact Vietnamese UI sentence required
+by McpAppsImageUploadTest lines 34 and 53. The current working diff does not
+touch that test, registry, transport, widget source or resource; the resource
+was last changed by 7e345d3e before this slice. Classified PRE_EXISTING /
+UNRELATED.

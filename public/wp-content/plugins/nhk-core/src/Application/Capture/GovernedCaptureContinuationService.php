@@ -1316,6 +1316,9 @@ final class GovernedCaptureContinuationService
         if ($error instanceof VideoRelationEvidenceRequired) {
             return ['proposal_id' => (string) ($plan['proposal_id'] ?? ''), 'status' => 'REVIEW_REQUIRED', 'blockers' => [VideoRelationEvidenceRequired::ERROR_CODE]];
         }
+        if ($error instanceof VideoException && $error->getMessage() === 'STAGING_SCOPE_NOT_APPROVED') {
+            return ['proposal_id' => (string) ($plan['proposal_id'] ?? ''), 'status' => 'SYSTEM_BLOCKED', 'blockers' => ['STAGING_SCOPE_NOT_APPROVED'], 'error' => $error->getMessage()];
+        }
         if ($error instanceof VideoException && $error->getMessage() === 'VIDEO_INTENDED_CATEGORY_INVALID') {
             return ['proposal_id' => (string) ($plan['proposal_id'] ?? ''), 'status' => 'SYSTEM_BLOCKED', 'blockers' => ['VIDEO_INTENDED_CATEGORY_INVALID'], 'error' => $error->getMessage()];
         }

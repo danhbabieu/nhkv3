@@ -15,7 +15,7 @@ use NHK\Core\Application\Video\{VideoEditorialGenerator, VideoEditorialResumePla
 use NHK\Core\Contracts\Governance\{AutomationPolicyStorage, GovernedLifecycle, PendingVideoProposalLookup, VideoProposalReconciliationPort};
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Governance\{Proposal, ProposalState};
-use NHK\Core\Domain\Video\Video;
+use NHK\Core\Domain\Video\{Video, VideoException};
 use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim, Source};
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
 use NHK\Core\Shared\Uuid\UuidCodec;
@@ -582,6 +582,38 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
         self::assertTrue($applied);
         self::assertSame('APPLIED', $result['status']);
         self::assertSame($proposalId, $result['writes'][0]['proposal_id']);
+        self::assertSame(['PROPOSAL', 'ELIGIBILITY', 'CONTROLLED_APPLY'], $result['governance']['lifecycle']);
+    }
+
+    public function test_video_staging_scope_denial_remains_an_exact_fail_closed_blocker(): void
+    {
+        $proposalId = UuidCodec::newV7();
+        $videoId = UuidCodec::newV7();
+        $governance = $this->createMock(GovernedLifecycle::class);
+        $governance->expects(self::once())->method('review')->with($proposalId)->willReturn([
+            'state' => 'approved',
+            'entity_type' => 'video',
+            'operation' => 'ingest',
+            'subject_id' => $videoId,
+            'target_uuid' => $videoId,
+            'payload' => ['canonical_id' => $videoId],
+            'content_fingerprint' => 'content',
+            'dependency_fingerprint' => 'dependency',
+        ]);
+        $governance->expects(self::once())->method('eligibility')->with($proposalId)->willReturn(['ready' => true]);
+
+        $service = new GovernedCaptureContinuationService(
+            $governance,
+            static fn (): array => throw new VideoException('STAGING_SCOPE_NOT_APPROVED'),
+            $this->policies(['video'], ['video' => 'AUTO_PUBLISH']),
+            static fn (): bool => true,
+        );
+
+        $result = $service->execute('capture-video', 'continuation', [], ['proposal_ids' => [$proposalId]]);
+
+        self::assertSame('SYSTEM_BLOCKED', $result['status']);
+        self::assertSame(['STAGING_SCOPE_NOT_APPROVED'], $result['blockers']);
+        self::assertSame(['STAGING_SCOPE_NOT_APPROVED'], $result['writes'][0]['blockers']);
     }
 
     public function test_stale_relation_binding_reenters_generic_governed_reconciliation_boundary(): void
