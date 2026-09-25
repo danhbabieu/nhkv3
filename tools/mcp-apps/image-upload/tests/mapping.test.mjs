@@ -194,7 +194,7 @@ test("unwraps a documentation checkpoint from the Ability result envelope", () =
   });
 });
 
-test("keeps diagnostic error messages safe and never persists signed URLs", () => {
+test("keeps diagnostic state typed and never persists signed URLs or raw errors", () => {
   const state = buildWidgetState([], [{
     stage: "ERROR",
     status: "ERROR",
@@ -206,7 +206,7 @@ test("keeps diagnostic error messages safe and never persists signed URLs", () =
 
   assert.equal(JSON.stringify(state).includes("files.openai.test"), false);
   assert.equal(JSON.stringify(state).includes("secret"), false);
-  assert.equal(state.privateContent.diagnostics[0].error, "[redacted-url]");
+  assert.equal(state.privateContent.diagnostics[0].error, undefined);
 });
 
 test("preserves multi-image upload order in rendered and persisted mapping", () => {

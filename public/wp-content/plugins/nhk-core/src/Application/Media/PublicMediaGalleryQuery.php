@@ -60,6 +60,7 @@ final class PublicMediaGalleryQuery
         return [
             'title' => $media->canonicalName,
             'image_url' => $image['image_url'] ?? null,
+            'thumbnail_url' => $image['thumbnail_url'] ?? ($image['image_url'] ?? null),
             'alt' => $media->canonicalName,
             'summary' => $this->summary($media),
             'width' => $image['width'] ?? null,
@@ -96,6 +97,9 @@ final class PublicMediaGalleryQuery
         $attachmentId = (int) ($asset->metadata['wordpress_attachment_id'] ?? 0);
         return [
             'image_url' => function_exists('home_url') ? (string) home_url($path) : $path,
+            'thumbnail_url' => $attachmentId > 0 && function_exists('wp_get_attachment_image_url')
+                ? (string) (wp_get_attachment_image_url($attachmentId, 'medium') ?: (function_exists('home_url') ? home_url($path) : $path))
+                : (function_exists('home_url') ? (string) home_url($path) : $path),
             'width' => $asset->width,
             'height' => $asset->height,
             'attachment_id' => $attachmentId > 0 ? $attachmentId : null,

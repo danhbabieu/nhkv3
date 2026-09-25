@@ -148,6 +148,19 @@ final class MediaLibraryFrontendContractTest extends TestCase
         self::assertStringContainsString('event.key !== \'Tab\'', $script);
     }
 
+    public function test_article_album_is_thumbnail_first_and_hydrates_full_asset_on_demand(): void
+    {
+        $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
+        $template = (string) file_get_contents($theme . '/single.php');
+        $script = (string) file_get_contents($theme . '/album.js');
+        $projection = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/Media/PublicMediaGalleryQuery.php');
+
+        self::assertStringContainsString('data-full-src', $template);
+        self::assertStringContainsString("['thumbnail_url']", $template);
+        self::assertStringContainsString('dataset.fullSrc', $script);
+        self::assertStringContainsString("'thumbnail_url'", $projection);
+    }
+
     private function mediaRepository(array $items): MediaRepository
     {
         return new class($items) implements MediaRepository {

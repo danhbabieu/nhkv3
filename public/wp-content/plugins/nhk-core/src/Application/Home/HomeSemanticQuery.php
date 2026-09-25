@@ -106,7 +106,7 @@ final class HomeSemanticQuery
                 $visual['_canonical_id'] = $item->canonicalId;
                 $heroCandidates[] = $visual;
             }
-            $modules['hero_media'] = (new HomeHeroMediaSelector())->select((array) $manualIds, $heroCandidates);
+            $modules['hero_media'] = (new HomeHeroMediaSelector())->select((array) $manualIds, $heroCandidates, 1, 1);
         }
 
         if ($this->ready('video')) {

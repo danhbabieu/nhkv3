@@ -1,5 +1,6 @@
 import { App } from "@modelcontextprotocol/ext-apps";
 import { assertCaptureArticleReadback, assertMediaArticleReadback, assertUploadManifestCounts, buildCaptureAssetInputs, buildWidgetState, extractUploadManifest, inspectToolResult, mergeUploadManifest, normalizeSelectedFiles, shouldProcessToolResultNotification, type BatchContext, type SelectedImage, type ToolResult, type ToolResultNotificationSource, type UploadedItem, type UploadManifest, type WidgetDiagnostic, type WidgetUploadStatus } from "./contract";
+import { uploadSelectedFiles, type HostUploadOutcome } from "./host-upload";
 
 // Easy MCP exposes the internal/admin boundary under the registered
 // WordPress Ability name. callServerTool must use that exact runtime name;
@@ -13,7 +14,7 @@ const IMAGE_TYPES = /^(image\/jpeg|image\/png|image\/gif|image\/webp)$/;
 const IMAGE_ACCEPT = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 const STATES = ["CONNECTING", "READY", "UPLOADING", "SUCCESS", "PARTIAL", "ERROR"] as const;
 type WidgetState = (typeof STATES)[number];
-const USER_ERROR_MESSAGE = "Không thể hoàn tất xử lý. Bạn có thể thử lại.";
+const HOST_UPLOAD_ERROR_MESSAGE = "Chưa tải được ảnh lên hệ thống. Bạn có thể thử lại.";
 const MEDIA_SAVED_ERROR_MESSAGE = "Ảnh đã được lưu, nhưng phần tạo bài viết chưa hoàn tất. Có thể thử lại mà không tải lại ảnh.";
 
 type ChatGptFileApi = {
@@ -112,12 +113,13 @@ async function start(): Promise<void> {
     });
   }
 
-  function recordDiagnostic(stage: string, statusValue: WidgetDiagnostic["status"], code: string, error?: unknown): void {
+  function recordDiagnostic(stage: string, statusValue: WidgetDiagnostic["status"], code: string, error?: unknown, context: Partial<WidgetDiagnostic> = {}): void {
+    void error;
     diagnostics.push({
       stage,
       status: statusValue,
       code,
-      ...(error ? { error: safeErrorMessage(error) } : {}),
+      ...context,
       uri: RESOURCE_URI,
       tool: SERVER_TOOL_NAME,
     });
@@ -251,32 +253,55 @@ async function start(): Promise<void> {
       .map((_item, index) => index)
       .filter((index) => !retryingPartialBatch || batchManifest?.items[index]?.status !== "SUCCESS");
     if (retryingPartialBatch && sourceOrdinals.length === 0) return batchManifest!;
-    const references: Array<{ download_url: string; file_id: string; mime_type: string; file_name: string; ordinal: number; media: Record<string, string> }> = [];
-    for (const index of sourceOrdinals) {
+    const outcomes = await uploadSelectedFiles(sourceOrdinals.map((index) => {
       const item = selected[index];
-      const fileName = item.kind === "local" ? item.file.name : item.fileName;
-      recordDiagnostic("HOST_FILE_UPLOAD_START", "START", "HOST_FILE_UPLOAD_REQUESTED");
-      setState("UPLOADING", `Đang tải ${fileName}…`);
-      const fileId = item.kind === "local"
-        ? (await host!.uploadFile!(item.file, { library: false })).fileId
-        : item.fileId;
-      if (!fileId) throw new Error(`Upload did not return a file ID for ${fileName}.`);
-      recordDiagnostic("HOST_FILE_UPLOAD_DONE", "DONE", "HOST_FILE_UPLOAD_VERIFIED");
-      const download = await host!.getFileDownloadUrl!({ fileId });
-      if (!download.downloadUrl) throw new Error(`Download URL was not returned for ${fileName}.`);
-      references.push({ download_url: download.downloadUrl, file_id: fileId, mime_type: item.kind === "local" ? item.file.type : item.mimeType, file_name: fileName, ordinal: index, media: { title: item.name.trim() } });
-      recordDiagnostic("TRUSTED_FILE_REF_READY", "DONE", "TRUSTED_FILE_REFERENCE_READY");
-    }
-
-    recordDiagnostic("SERVER_TOOL_CALL_START", "START", "SERVER_TOOL_CALL_REQUESTED");
-    const result = await app.callServerTool({
-      name: SERVER_TOOL_NAME,
-      arguments: { idempotency_key: `${operationKey}${retryingPartialBatch ? `:retry:${attempt}` : ":media"}`, metadata: {}, items: references.map((item) => ({ client_file_id: item.file_id, filename: item.file_name, sort_order: item.ordinal, ordinal: item.ordinal, media: item.media })), files: references },
+      return item.kind === "local"
+        ? { ordinal: index, file: item.file }
+        : { ordinal: index, file: null, fileId: item.fileId, fileName: item.fileName, mimeType: item.mimeType };
+    }), {
+      uploadFile: host!.uploadFile!,
+      getFileDownloadUrl: host!.getFileDownloadUrl!,
+      concurrency: 2,
+      maxRetries: 2,
+      onAttempt: (input, number) => {
+        const item = selected[input.ordinal];
+        const fileName = item.kind === "local" ? item.file.name : item.fileName;
+        recordDiagnostic("HOST_FILE_UPLOAD_START", "START", "HOST_FILE_UPLOAD_REQUESTED", undefined, { file_ordinal: input.ordinal, mime_type: item.kind === "local" ? item.file.type : item.mimeType, byte_size: item.kind === "local" ? item.file.size : undefined, attempt_number: number });
+        setState("UPLOADING", `Đang tải ${fileName}…`);
+      },
     });
-    recordDiagnostic("SERVER_TOOL_CALL_RESULT", "DONE", "SERVER_TOOL_RESULT_RECEIVED");
-    const manifest = extractUploadManifest(result as ToolResult);
-    assertUploadManifestCounts(manifest);
-    const logicalManifest = retryingPartialBatch ? mergeUploadManifest(batchManifest!, manifest, sourceOrdinals) : manifest;
+    const references: Array<{ download_url: string; file_id: string; mime_type: string; file_name: string; ordinal: number; media: Record<string, string> }> = [];
+    const hostFailures: UploadedItem[] = [];
+    outcomes.forEach((outcome: HostUploadOutcome) => {
+      const item = selected[outcome.ordinal];
+      const diagnosticContext = { file_ordinal: outcome.ordinal, mime_type: outcome.mimeType, byte_size: outcome.file?.size, attempt_number: outcome.attempts };
+      if (outcome.status === "HOST_UPLOADED") {
+        recordDiagnostic("HOST_FILE_UPLOAD_DONE", "DONE", "HOST_FILE_UPLOAD_VERIFIED", undefined, diagnosticContext);
+        references.push({ download_url: outcome.downloadUrl, file_id: outcome.fileId, mime_type: outcome.mimeType, file_name: outcome.fileName, ordinal: outcome.ordinal, media: { title: item.name.trim() } });
+        recordDiagnostic("TRUSTED_FILE_REF_READY", "DONE", "TRUSTED_FILE_REFERENCE_READY", undefined, diagnosticContext);
+      } else {
+        recordDiagnostic("HOST_FILE_UPLOAD_FAILED", "ERROR", outcome.error.code, undefined, diagnosticContext);
+        hostFailures.push({ ordinal: outcome.ordinal, status: outcome.status, error_code: outcome.error.code, original_filename: outcome.fileName, mime: outcome.mimeType, filesize: outcome.file?.size });
+      }
+    });
+
+    let manifest: UploadManifest = { status: "success", requested_count: references.length, success_count: 0, failure_count: 0, items: [] };
+    if (references.length > 0) {
+      recordDiagnostic("SERVER_TOOL_CALL_START", "START", "SERVER_TOOL_CALL_REQUESTED");
+      const result = await app.callServerTool({
+        name: SERVER_TOOL_NAME,
+        arguments: { idempotency_key: `${operationKey}${retryingPartialBatch ? `:retry:${attempt}` : ":media"}`, metadata: {}, items: references.map((item) => ({ client_file_id: item.file_id, filename: item.file_name, sort_order: item.ordinal, ordinal: item.ordinal, media: item.media })), files: references },
+      });
+      recordDiagnostic("SERVER_TOOL_CALL_RESULT", "DONE", "SERVER_TOOL_RESULT_RECEIVED");
+      manifest = extractUploadManifest(result as ToolResult);
+      assertUploadManifestCounts(manifest);
+    }
+    const serverItems = manifest.items.map((item, position) => ({ ...item, ordinal: item.ordinal ?? references[position]?.ordinal }));
+    const combinedItems = [...serverItems, ...hostFailures].sort((left, right) => (left.ordinal ?? 0) - (right.ordinal ?? 0));
+    const combinedSuccess = combinedItems.filter((item) => item.status === "SUCCESS").length;
+    const combinedFailure = combinedItems.length - combinedSuccess;
+    const combined: UploadManifest = { status: combinedFailure === 0 && combinedItems.length === selected.length ? "success" : "partial_success", requested_count: selected.length, success_count: combinedSuccess, failure_count: selected.length - combinedSuccess, items: combinedItems, user_context: namingContext };
+    const logicalManifest = retryingPartialBatch ? mergeUploadManifest(batchManifest!, combined, sourceOrdinals) : combined;
     const returned = handleToolResult({ structuredContent: logicalManifest }, undefined, "widget-upload");
     batchManifest = logicalManifest;
     enrichmentStatus = "NOT_RUN";
@@ -330,7 +355,13 @@ async function start(): Promise<void> {
       retryOperationKey = operationKey;
       recordDiagnostic("ERROR", "ERROR", diagnosticCode(error), error);
       publishBatchContext();
-      setState("ERROR", uploaded.some((item) => item.status === "SUCCESS" && item.media_id) ? MEDIA_SAVED_ERROR_MESSAGE : USER_ERROR_MESSAGE);
+      if (batchManifest?.status === "partial_success") {
+        setState("PARTIAL", `Đã tải được ${batchManifest.success_count}/${batchManifest.requested_count} ảnh. Các ảnh còn lỗi có thể thử lại.`);
+      } else if (uploaded.some((item) => item.status === "SUCCESS" && item.media_id)) {
+        setState("ERROR", MEDIA_SAVED_ERROR_MESSAGE);
+      } else {
+        setState("ERROR", HOST_UPLOAD_ERROR_MESSAGE);
+      }
     } finally {
       uploading = false;
       renderSelection();
@@ -352,7 +383,7 @@ async function start(): Promise<void> {
       setState("READY", "Đã khôi phục đủ ảnh. Bấm TẢI LÊN để gửi submission.");
     } catch (error) {
       recordDiagnostic("ERROR", "ERROR", diagnosticCode(error), error);
-      setState("PARTIAL", USER_ERROR_MESSAGE);
+      setState("PARTIAL", HOST_UPLOAD_ERROR_MESSAGE);
     } finally {
       uploading = false;
       renderSelection();
@@ -371,7 +402,7 @@ async function start(): Promise<void> {
   };
   app.onerror = (error) => {
     recordDiagnostic("ERROR", "ERROR", "MCP_APPS_CONNECTION_ERROR", error);
-    setState("ERROR", USER_ERROR_MESSAGE);
+    setState("ERROR", HOST_UPLOAD_ERROR_MESSAGE);
   };
   input.addEventListener("change", () => {
     uploaded = [];
@@ -400,7 +431,7 @@ async function start(): Promise<void> {
       renderSelection();
     } catch (error) {
       recordDiagnostic("ERROR", "ERROR", "FILE_SELECTION_FAILED", error);
-      setState("ERROR", USER_ERROR_MESSAGE);
+      setState("ERROR", HOST_UPLOAD_ERROR_MESSAGE);
     }
   });
   previews.addEventListener("input", (event) => {
@@ -439,7 +470,7 @@ async function start(): Promise<void> {
     select.disabled = true;
     upload.disabled = true;
     recordDiagnostic("ERROR", "ERROR", "MCP_APPS_CONNECT_FAILED", error);
-    setState("ERROR", USER_ERROR_MESSAGE);
+    setState("ERROR", HOST_UPLOAD_ERROR_MESSAGE);
   }
 }
 

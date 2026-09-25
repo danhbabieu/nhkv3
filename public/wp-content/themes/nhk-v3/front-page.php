@@ -2,7 +2,7 @@
 $home = (new NHK_V3_Home_Page_Query())->read();
 $GLOBALS['nhk_v3_home_data'] = $home;
 $semantic = is_array($home['semantic'] ?? null) ? $home['semantic'] : [];
-$heroMedia = is_array($semantic['hero_media'] ?? null) ? array_slice($semantic['hero_media'], 0, 5) : [];
+$heroMedia = is_array($semantic['hero_media'] ?? null) ? array_slice($semantic['hero_media'], 0, 1) : [];
 $latestFeed = is_array($home['latest_feed'] ?? null) ? $home['latest_feed'] : [];
 $fallback = get_theme_file_uri('/assets/default-archive.svg');
 get_header();
@@ -42,12 +42,6 @@ get_header();
       </div><div class="hero-slider-controls"><button type="button" data-hero-prev aria-label="Ảnh trước">←</button><span data-hero-status aria-live="polite">1 / <?php echo esc_html((string) count($heroMedia)); ?></span><button type="button" data-hero-next aria-label="Ảnh tiếp theo">→</button></div><div class="hero-slider-dots" role="tablist" aria-label="Chọn ảnh nổi bật"><?php foreach ($heroMedia as $index => $_item): ?><button type="button" role="tab" data-hero-dot="<?php echo esc_attr((string) $index); ?>" aria-label="Ảnh <?php echo esc_attr((string) ($index + 1)); ?>" aria-selected="<?php echo $index === 0 ? 'true' : 'false'; ?>"></button><?php endforeach; ?></div>
       <?php else: ?><div class="hero-slider-empty" role="status">Kho ảnh đang được bổ sung.</div><?php endif; ?>
     </div>
-    <aside class="hero-index" aria-label="Lối vào nhanh">
-      <?php /* Canonical discovery paths remain /thuong-hieu/, /loai-dong-ho/, /mau/, /bo-may/, /ban-nhac/, /so-sanh/, /linh-kien/, /hien-vat/ and /video/ (including home_url('/so-sanh/')); labels and rendering come from the shared navigation definition. */ ?>
-      <?php $quickLinks = nhk_v3_navigation_items(); $quickIndex = 0; foreach ($quickLinks as $quickLabel => $quickPath): $quickIndex++; ?>
-      <a href="<?php echo esc_url(home_url($quickPath)); ?>"><span><?php echo esc_html(str_pad((string) $quickIndex, 2, '0', STR_PAD_LEFT)); ?></span><strong><?php echo esc_html($quickLabel); ?></strong></a>
-      <?php endforeach; ?>
-    </aside>
     </div>
   </section>
 

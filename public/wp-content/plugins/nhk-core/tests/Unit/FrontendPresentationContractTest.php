@@ -49,7 +49,9 @@ final class FrontendPresentationContractTest extends TestCase
     public function test_homepage_prioritizes_only_the_hero_lcp_image(): void
     {
         $source = $this->read('front-page.php');
+        $query = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/Home/HomeSemanticQuery.php');
         self::assertStringContainsString('$index === 0 ? \'loading="eager" fetchpriority="high"\' : \'loading="lazy"\'', $source);
+        self::assertStringContainsString('select((array) $manualIds, $heroCandidates, 1, 1)', $query);
         self::assertStringContainsString("['loading' => 'lazy', 'alt' => get_the_title()]", $source);
         self::assertStringNotContainsString("['loading' => 'eager', 'fetchpriority' => 'high', 'alt' => get_the_title()]", $source);
     }

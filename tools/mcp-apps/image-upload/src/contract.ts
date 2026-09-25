@@ -39,6 +39,10 @@ export type WidgetDiagnostic = {
   status: "START" | "DONE" | "ERROR";
   code?: string;
   error?: string;
+  file_ordinal?: number;
+  mime_type?: string;
+  byte_size?: number;
+  attempt_number?: number;
   uri?: string;
   tool?: string;
 };
@@ -396,10 +400,6 @@ export function extractUploads(result: ToolResult): UploadedItem[] {
   }
 }
 
-function redactDiagnostic(value: string): string {
-  return value.replace(/https?:\/\/[^\s)]+/gi, "[redacted-url]");
-}
-
 export function buildBatchContext(items: UploadedItem[], manifest: Pick<UploadManifest, "batch_id" | "user_context" | "requested_count" | "failure_count"> | null = null, enrichmentStatus: BatchContext["enrichment_status"] = "NOT_RUN"): BatchContext {
   return {
     ...(manifest?.batch_id ? { batch_id: manifest.batch_id } : {}),
@@ -433,14 +433,11 @@ export function buildWidgetState(items: UploadedItem[], diagnostics: WidgetDiagn
       })),
       batch_context: batchContext,
     },
-    privateContent: {
+      privateContent: {
       upload_status: uploadStatus,
       media_commit_status: batchContext.media_commit_status,
       enrichment_status: batchContext.enrichment_status,
-      diagnostics: diagnostics.map((diagnostic) => ({
-        ...diagnostic,
-        ...(diagnostic.error ? { error: redactDiagnostic(diagnostic.error) } : {}),
-      })),
+      diagnostics: diagnostics.map(({ error: _error, ...diagnostic }) => diagnostic),
     },
     imageIds: items.map((item) => item.file_id).filter((id): id is string => Boolean(id)),
   };

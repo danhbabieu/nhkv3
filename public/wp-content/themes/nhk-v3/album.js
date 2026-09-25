@@ -30,7 +30,7 @@
     function syncDialog() {
       var image = slides[current].querySelector('img');
       var link = slides[current].querySelector('[data-album-open]');
-      if (dialogImage && image) { dialogImage.src = link ? link.href : image.src; dialogImage.alt = image.alt; }
+      if (dialogImage && image) { dialogImage.src = link ? (link.dataset.fullSrc || link.href) : image.src; dialogImage.alt = image.alt; }
       if (dialogCaption) dialogCaption.textContent = (slides[current].querySelector('figcaption') || {}).textContent || '';
     }
     function openDialog(event, index) {

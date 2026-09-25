@@ -134,7 +134,7 @@ final class PublicEntityCollectionQuery
             if ($definition instanceof EntityProfileDefinition) $item += ['profile_key' => $definition->key, 'profile_label' => $definition->visitorLabel, 'profile_badge' => $definition->toArray()['admin_badge'], 'profile_status' => $profile->status];
         }
         if ($this->entityMedia !== null) {
-            $media = $this->entityMedia->forEntity($entity->entityType, $entity->canonicalId);
+            $media = $detail ? $this->entityMedia->forEntity($entity->entityType, $entity->canonicalId) : ['representative' => $this->entityMedia->representativeForEntity($entity->entityType, $entity->canonicalId), 'evidence' => [], 'gallery' => []];
             $item['media'] = [
                 'representative' => $this->publicMediaItem($media['representative'] ?? null),
                 'evidence' => array_values(array_filter(array_map(fn(array $entry): ?array => $this->publicMediaItem($entry), $media['evidence'] ?? []))),
@@ -143,7 +143,8 @@ final class PublicEntityCollectionQuery
         }
         $description = trim((string) ($payload['description'] ?? $payload['summary'] ?? ''));
         $item['description'] = $description;
-        if ($profile->resolved() || $profile->status === EntityProfileResolution::COMPATIBILITY_READ) {
+        $includeReadiness = $detail || $requirePersistedIdentity;
+        if ($includeReadiness && ($profile->resolved() || $profile->status === EntityProfileResolution::COMPATIBILITY_READ)) {
             $hasRepresentative = is_array($item['media']['representative'] ?? null) && trim((string) ($item['media']['representative']['url'] ?? '')) !== '';
             $knowledge = $this->entityKnowledge?->forSubject($entity->canonicalId) ?? [];
             $signals = [

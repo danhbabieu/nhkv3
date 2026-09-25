@@ -33,6 +33,20 @@ final class EntityMediaProjection
     }
 
     /** @return array<string,mixed>|null */
+    public function representativeForEntity(string $endpointType, string $endpointKey): ?array
+    {
+        $candidate = null;
+        foreach ($this->usages->listByEndpoint($endpointType, $endpointKey) as $usage) {
+            if ($usage->activeSlot === 'retired') continue;
+            if (!(($usage->role === MediaUsageRoleRegistry::REPRESENTATIVE && ($usage->activeSlot === null || $usage->activeSlot === 'representative')) || ($endpointType === 'wp_post' && in_array($usage->role, [MediaUsageRoleRegistry::FEATURED_PRIMARY, 'featured'], true)))) continue;
+            $item = $this->item($usage);
+            if ($item === null) continue;
+            if ($candidate === null || [$item['sort_order'], $item['stable_key']] < [$candidate['sort_order'], $candidate['stable_key']]) $candidate = $item;
+        }
+        return $candidate;
+    }
+
+    /** @return array<string,mixed>|null */
     private function item(MediaUsage $usage): ?array
     {
         $media = $this->media->findByCanonicalId($usage->mediaId);

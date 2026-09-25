@@ -25,10 +25,11 @@ final class FrontendContractTest extends TestCase
         $header = (string) file_get_contents($theme . '/header.php');
         $home = (string) file_get_contents($theme . '/front-page.php');
         $sidebar = (string) file_get_contents($theme . '/sidebar.php');
-        self::assertStringContainsString("'Thương hiệu' => '/thuong-hieu/'", $functions);
-        self::assertStringContainsString("'Mẫu' => '/mau/'", $functions);
+        $definition = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/Presentation/PublicNavigationDefinition.php');
+        self::assertStringContainsString("'label' => 'Thương hiệu'", $definition);
+        self::assertStringContainsString("'label' => 'Mẫu'", $definition);
         foreach (['/thuong-hieu/', '/mau/', '/bo-may/', '/ban-nhac/', '/so-sanh/', '/linh-kien/', '/hien-vat/', '/video/'] as $path) {
-            self::assertStringContainsString($path, $home);
+            self::assertStringContainsString($path, $definition);
         }
         self::assertStringNotContainsString("home_url('/brand/')", $home);
         self::assertStringNotContainsString("home_url('/model/')", $sidebar);
@@ -229,8 +230,70 @@ final class FrontendContractTest extends TestCase
         }
         self::assertStringContainsString('EntityPresentationViewModel', $dossier);
         self::assertStringContainsString('function nhk_v3_navigation_items', $functions);
-        self::assertStringContainsString("'Nhóm đồng hồ' => '/loai-dong-ho/'", $functions);
+        self::assertStringContainsString("'label' => 'Nhóm đồng hồ'", (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/Presentation/PublicNavigationDefinition.php'));
         self::assertStringContainsString('nhk_v3_nav_fallback()', $header);
+    }
+
+    public function test_public_navigation_exposes_canonical_groups_for_theme_consumers(): void
+    {
+        $definition = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/Presentation/PublicNavigationDefinition.php');
+        $functions = (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/functions.php');
+        $footer = (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/footer.php');
+        $home = (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/front-page.php');
+
+        self::assertStringContainsString('public static function groups(): array', $definition);
+        self::assertStringContainsString("'primary'", $definition);
+        self::assertStringContainsString("'discovery'", $definition);
+        self::assertStringContainsString("'footer'", $definition);
+        self::assertStringContainsString('PublicNavigationDefinition::groups()', $functions);
+        self::assertStringContainsString('nhk_v3_navigation_groups()', $footer);
+        self::assertStringNotContainsString('hero-index', $home);
+        self::assertStringNotContainsString('array_slice(nhk_v3_navigation_items()', $footer);
+    }
+
+    public function test_mobile_navigation_has_an_explicit_keyboard_close_contract(): void
+    {
+        $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
+        $header = (string) file_get_contents($theme . '/header.php');
+        $navigation = (string) file_get_contents($theme . '/navigation.js');
+        $style = (string) file_get_contents($theme . '/style.css');
+
+        self::assertStringContainsString('aria-haspopup="dialog"', $header);
+        self::assertStringContainsString("event.key === 'Escape'", $navigation);
+        self::assertStringContainsString('nav-toggle-label{min-width:44px;min-height:44px', $style);
+    }
+
+    public function test_related_media_visuals_have_a_canonical_destination_or_are_not_actionable_cards(): void
+    {
+        $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
+        $single = (string) file_get_contents($theme . '/single.php');
+        $video = (string) file_get_contents($theme . '/video.php');
+
+        self::assertStringContainsString('$mediaDestination = nhk_v3_public_url', $single);
+        self::assertStringContainsString('$mediaDestination = nhk_v3_public_url', $video);
+        self::assertStringContainsString("if (\$mediaDestination === '') continue", $single);
+        self::assertStringContainsString("if (\$mediaDestination === '') continue", $video);
+    }
+
+    public function test_video_detail_defers_external_player_until_user_intent(): void
+    {
+        $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
+        $video = (string) file_get_contents($theme . '/video.php');
+        $navigation = (string) file_get_contents($theme . '/navigation.js');
+
+        self::assertStringContainsString('data-video-embed', $video);
+        self::assertStringContainsString('data-video-load', $video);
+        self::assertStringContainsString('data-video-embed', $navigation);
+    }
+
+    public function test_theme_assets_are_conditionally_enqueued_by_public_surface(): void
+    {
+        $functions = (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/functions.php');
+
+        self::assertStringContainsString('$needsPresentation', $functions);
+        self::assertStringContainsString('if ($needsEntity)', $functions);
+        self::assertStringContainsString('if ($needsMediaVideo)', $functions);
+        self::assertStringContainsString('if ($needsKnowledge)', $functions);
     }
 
     public function test_visual_preview_ctas_are_data_driven_and_do_not_render_dead_links(): void
@@ -753,7 +816,7 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString("comparison/?$", $routes);
         self::assertStringContainsString('ComparisonPageQuery', $plugin);
         self::assertStringContainsString('name="a"', $template);
-        self::assertStringContainsString("home_url('/so-sanh/')", $home);
+        self::assertStringContainsString("'/so-sanh/'", (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/functions.php'));
         self::assertStringContainsString("'/so-sanh/' => 200", (string) file_get_contents(dirname(__DIR__, 6) . '/tools/frontend-route-smoke.php'));
         $routeSmoke = (string) file_get_contents(dirname(__DIR__, 6) . '/tools/frontend-route-smoke.php');
         self::assertStringContainsString("'movement-url', 'music-url', 'component-url', 'classification-url', 'variant-url'", $routeSmoke);

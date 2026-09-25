@@ -12256,9 +12256,6 @@ function mergeUploadManifest(previous, retry, retriedOrdinals) {
     user_context: retry.user_context || previous.user_context
   };
 }
-function redactDiagnostic(value) {
-  return value.replace(/https?:\/\/[^\s)]+/gi, "[redacted-url]");
-}
 function buildBatchContext(items, manifest = null, enrichmentStatus = "NOT_RUN") {
   return {
     ...manifest?.batch_id ? { batch_id: manifest.batch_id } : {},
@@ -12291,13 +12288,92 @@ function buildWidgetState(items, diagnostics = [], uploadStatus = items.length >
       upload_status: uploadStatus,
       media_commit_status: batchContext.media_commit_status,
       enrichment_status: batchContext.enrichment_status,
-      diagnostics: diagnostics.map((diagnostic) => ({
-        ...diagnostic,
-        ...diagnostic.error ? { error: redactDiagnostic(diagnostic.error) } : {}
-      }))
+      diagnostics: diagnostics.map(({ error: _error, ...diagnostic }) => diagnostic)
     },
     imageIds: items.map((item) => item.file_id).filter((id) => Boolean(id))
   };
+}
+const DEFAULT_CONCURRENCY = 2;
+const DEFAULT_TIMEOUT_MS = 3e4;
+const DEFAULT_MAX_RETRIES = 2;
+const SAFE_CODE = /^[A-Z][A-Z0-9_]{2,}$/;
+function errorText(error2) {
+  if (error2 instanceof Error) return error2.message;
+  if (typeof error2 === "string") return error2;
+  if (error2 && typeof error2 === "object") {
+    const value = error2;
+    return [value.code, value.reason_code, value.reasonCode, value.error_code, value.name, value.message].find((candidate) => typeof candidate === "string" && candidate !== "") ?? "HOST_FILE_UPLOAD_FAILED";
+  }
+  return "HOST_FILE_UPLOAD_FAILED";
+}
+function codeFrom(error2) {
+  const text = errorText(error2);
+  const match = text.match(/[A-Z][A-Z0-9_]{2,}/);
+  return match && SAFE_CODE.test(match[0]) ? match[0] : "HOST_FILE_UPLOAD_FAILED";
+}
+function classify(error2) {
+  const code = codeFrom(error2);
+  const upper = `${code} ${errorText(error2)}`.toUpperCase();
+  if (upper.includes("TIMEOUT") || upper.includes("TIMED_OUT") || upper.includes("ABORT")) {
+    return { code: "HOST_FILE_UPLOAD_TIMEOUT", class: "TIMEOUT", retryable: true };
+  }
+  if (upper.includes("REJECT") || upper.includes("NOT_ALLOWED") || upper.includes("PERMISSION_DENIED") || upper.includes("UNSUPPORTED") || upper.includes("INVALID_FILE") || upper.includes("QUOTA") || upper.includes("SIZE_LIMIT") || upper.includes("FILE_TOO_LARGE")) {
+    return { code, class: "REJECTED", retryable: false };
+  }
+  return { code, class: "FAILED", retryable: true };
+}
+function invalidReference(code) {
+  return { code, class: "INVALID_REFERENCE", retryable: true };
+}
+async function withTimeout(operation, timeoutMs) {
+  let timer;
+  try {
+    return await Promise.race([
+      operation,
+      new Promise((_resolve, reject) => {
+        timer = setTimeout(() => reject(new Error("HOST_FILE_UPLOAD_TIMEOUT")), timeoutMs);
+      })
+    ]);
+  } finally {
+    if (timer !== void 0) clearTimeout(timer);
+  }
+}
+async function uploadOne(input, options) {
+  const maxAttempts = (options.maxRetries ?? DEFAULT_MAX_RETRIES) + 1;
+  let attempts = 0;
+  while (attempts < maxAttempts) {
+    attempts += 1;
+    options.onAttempt?.(input, attempts);
+    try {
+      const uploaded = input.file ? await withTimeout(options.uploadFile(input.file, { library: false }), options.timeoutMs ?? DEFAULT_TIMEOUT_MS) : { fileId: input.fileId };
+      const fileId = typeof uploaded?.fileId === "string" && uploaded.fileId !== "" ? uploaded.fileId : null;
+      if (!fileId) throw Object.assign(new Error("HOST_FILE_UPLOAD_INVALID_REFERENCE"), { reference: true });
+      const download = await withTimeout(options.getFileDownloadUrl({ fileId }), options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+      const downloadUrl = typeof download?.downloadUrl === "string" ? download.downloadUrl : "";
+      if (!downloadUrl || !/^https:\/\//i.test(downloadUrl)) throw Object.assign(new Error("HOST_FILE_UPLOAD_INVALID_REFERENCE"), { reference: true });
+      return { ordinal: input.ordinal, status: "HOST_UPLOADED", fileId, downloadUrl, file: input.file, fileName: input.file?.name ?? input.fileName ?? "", mimeType: input.file?.type ?? input.mimeType ?? "", attempts };
+    } catch (error2) {
+      const classified = error2 && typeof error2 === "object" && "reference" in error2 ? invalidReference("HOST_FILE_UPLOAD_INVALID_REFERENCE") : classify(error2);
+      if (!classified.retryable || attempts >= maxAttempts) {
+        return { ordinal: input.ordinal, status: classified.retryable ? "FAILED_RETRYABLE" : "FAILED_PERMANENT", file: input.file, fileName: input.file?.name ?? input.fileName ?? "", mimeType: input.file?.type ?? input.mimeType ?? "", attempts, error: classified };
+      }
+    }
+  }
+  throw new Error("HOST_FILE_UPLOAD_INTERNAL_UNREACHABLE");
+}
+async function uploadSelectedFiles(inputs, options) {
+  const concurrency = Math.max(1, Math.min(4, Math.floor(options.concurrency ?? DEFAULT_CONCURRENCY)));
+  const outcomes = [];
+  let cursor = 0;
+  async function worker() {
+    while (true) {
+      const index = cursor++;
+      if (index >= inputs.length) return;
+      outcomes[index] = await uploadOne(inputs[index], options);
+    }
+  }
+  await Promise.allSettled(Array.from({ length: Math.min(concurrency, inputs.length) }, () => worker()));
+  return outcomes;
 }
 const SERVER_TOOL_NAME = "wp_ability_nhk_v3_media_widget_upload";
 const CAPTURE_TOOL_NAME = "wp_ability_nhk_v3_capture_ingest";
@@ -12305,7 +12381,7 @@ const MEDIA_GET_TOOL_NAME = "wp_ability_nhk_v3_media_get";
 const DOCUMENTATION_TOOL_NAME = "wp_ability_nhk_v3_documentation_bootstrap";
 const RESOURCE_URI = "ui://nhk/image-upload/v3.html";
 const IMAGE_TYPES = /^(image\/jpeg|image\/png|image\/gif|image\/webp)$/;
-const USER_ERROR_MESSAGE = "Không thể hoàn tất xử lý. Bạn có thể thử lại.";
+const HOST_UPLOAD_ERROR_MESSAGE = "Chưa tải được ảnh lên hệ thống. Bạn có thể thử lại.";
 const MEDIA_SAVED_ERROR_MESSAGE = "Ảnh đã được lưu, nhưng phần tạo bài viết chưa hoàn tất. Có thể thử lại mà không tải lại ảnh.";
 function byId(id) {
   const element = document.getElementById(id);
@@ -12382,12 +12458,12 @@ async function start() {
       diagnosticsView.append(row);
     });
   }
-  function recordDiagnostic(stage, statusValue, code, error2) {
+  function recordDiagnostic(stage, statusValue, code, error2, context2 = {}) {
     diagnostics.push({
       stage,
       status: statusValue,
       code,
-      ...error2 ? { error: safeErrorMessage(error2) } : {},
+      ...context2,
       uri: RESOURCE_URI,
       tool: SERVER_TOOL_NAME
     });
@@ -12507,29 +12583,52 @@ async function start() {
     const retryingPartialBatch = batchManifest?.status === "partial_success";
     const sourceOrdinals = selected.map((_item, index) => index).filter((index) => !retryingPartialBatch || batchManifest?.items[index]?.status !== "SUCCESS");
     if (retryingPartialBatch && sourceOrdinals.length === 0) return batchManifest;
-    const references = [];
-    for (const index of sourceOrdinals) {
+    const outcomes = await uploadSelectedFiles(sourceOrdinals.map((index) => {
       const item = selected[index];
-      const fileName = item.kind === "local" ? item.file.name : item.fileName;
-      recordDiagnostic("HOST_FILE_UPLOAD_START", "START", "HOST_FILE_UPLOAD_REQUESTED");
-      setState("UPLOADING", `Đang tải ${fileName}…`);
-      const fileId = item.kind === "local" ? (await host.uploadFile(item.file, { library: false })).fileId : item.fileId;
-      if (!fileId) throw new Error(`Upload did not return a file ID for ${fileName}.`);
-      recordDiagnostic("HOST_FILE_UPLOAD_DONE", "DONE", "HOST_FILE_UPLOAD_VERIFIED");
-      const download = await host.getFileDownloadUrl({ fileId });
-      if (!download.downloadUrl) throw new Error(`Download URL was not returned for ${fileName}.`);
-      references.push({ download_url: download.downloadUrl, file_id: fileId, mime_type: item.kind === "local" ? item.file.type : item.mimeType, file_name: fileName, ordinal: index, media: { title: item.name.trim() } });
-      recordDiagnostic("TRUSTED_FILE_REF_READY", "DONE", "TRUSTED_FILE_REFERENCE_READY");
-    }
-    recordDiagnostic("SERVER_TOOL_CALL_START", "START", "SERVER_TOOL_CALL_REQUESTED");
-    const result = await app.callServerTool({
-      name: SERVER_TOOL_NAME,
-      arguments: { idempotency_key: `${operationKey}${retryingPartialBatch ? `:retry:${attempt}` : ":media"}`, metadata: {}, items: references.map((item) => ({ client_file_id: item.file_id, filename: item.file_name, sort_order: item.ordinal, ordinal: item.ordinal, media: item.media })), files: references }
+      return item.kind === "local" ? { ordinal: index, file: item.file } : { ordinal: index, file: null, fileId: item.fileId, fileName: item.fileName, mimeType: item.mimeType };
+    }), {
+      uploadFile: host.uploadFile,
+      getFileDownloadUrl: host.getFileDownloadUrl,
+      concurrency: 2,
+      maxRetries: 2,
+      onAttempt: (input2, number2) => {
+        const item = selected[input2.ordinal];
+        const fileName = item.kind === "local" ? item.file.name : item.fileName;
+        recordDiagnostic("HOST_FILE_UPLOAD_START", "START", "HOST_FILE_UPLOAD_REQUESTED", void 0, { file_ordinal: input2.ordinal, mime_type: item.kind === "local" ? item.file.type : item.mimeType, byte_size: item.kind === "local" ? item.file.size : void 0, attempt_number: number2 });
+        setState("UPLOADING", `Đang tải ${fileName}…`);
+      }
     });
-    recordDiagnostic("SERVER_TOOL_CALL_RESULT", "DONE", "SERVER_TOOL_RESULT_RECEIVED");
-    const manifest = extractUploadManifest(result);
-    assertUploadManifestCounts(manifest);
-    const logicalManifest = retryingPartialBatch ? mergeUploadManifest(batchManifest, manifest, sourceOrdinals) : manifest;
+    const references = [];
+    const hostFailures = [];
+    outcomes.forEach((outcome) => {
+      const item = selected[outcome.ordinal];
+      const diagnosticContext = { file_ordinal: outcome.ordinal, mime_type: outcome.mimeType, byte_size: outcome.file?.size, attempt_number: outcome.attempts };
+      if (outcome.status === "HOST_UPLOADED") {
+        recordDiagnostic("HOST_FILE_UPLOAD_DONE", "DONE", "HOST_FILE_UPLOAD_VERIFIED", void 0, diagnosticContext);
+        references.push({ download_url: outcome.downloadUrl, file_id: outcome.fileId, mime_type: outcome.mimeType, file_name: outcome.fileName, ordinal: outcome.ordinal, media: { title: item.name.trim() } });
+        recordDiagnostic("TRUSTED_FILE_REF_READY", "DONE", "TRUSTED_FILE_REFERENCE_READY", void 0, diagnosticContext);
+      } else {
+        recordDiagnostic("HOST_FILE_UPLOAD_FAILED", "ERROR", outcome.error.code, void 0, diagnosticContext);
+        hostFailures.push({ ordinal: outcome.ordinal, status: outcome.status, error_code: outcome.error.code, original_filename: outcome.fileName, mime: outcome.mimeType, filesize: outcome.file?.size });
+      }
+    });
+    let manifest = { requested_count: references.length, success_count: 0, failure_count: 0, items: [] };
+    if (references.length > 0) {
+      recordDiagnostic("SERVER_TOOL_CALL_START", "START", "SERVER_TOOL_CALL_REQUESTED");
+      const result = await app.callServerTool({
+        name: SERVER_TOOL_NAME,
+        arguments: { idempotency_key: `${operationKey}${retryingPartialBatch ? `:retry:${attempt}` : ":media"}`, metadata: {}, items: references.map((item) => ({ client_file_id: item.file_id, filename: item.file_name, sort_order: item.ordinal, ordinal: item.ordinal, media: item.media })), files: references }
+      });
+      recordDiagnostic("SERVER_TOOL_CALL_RESULT", "DONE", "SERVER_TOOL_RESULT_RECEIVED");
+      manifest = extractUploadManifest(result);
+      assertUploadManifestCounts(manifest);
+    }
+    const serverItems = manifest.items.map((item, position) => ({ ...item, ordinal: item.ordinal ?? references[position]?.ordinal }));
+    const combinedItems = [...serverItems, ...hostFailures].sort((left, right) => (left.ordinal ?? 0) - (right.ordinal ?? 0));
+    const combinedSuccess = combinedItems.filter((item) => item.status === "SUCCESS").length;
+    const combinedFailure = combinedItems.length - combinedSuccess;
+    const combined = { status: combinedFailure === 0 && combinedItems.length === selected.length ? "success" : "partial_success", requested_count: selected.length, success_count: combinedSuccess, failure_count: selected.length - combinedSuccess, items: combinedItems, user_context: namingContext };
+    const logicalManifest = retryingPartialBatch ? mergeUploadManifest(batchManifest, combined, sourceOrdinals) : combined;
     const returned = handleToolResult({ structuredContent: logicalManifest }, void 0, "widget-upload");
     batchManifest = logicalManifest;
     enrichmentStatus = "NOT_RUN";
@@ -12580,9 +12679,15 @@ async function start() {
       enrichmentStatus = "PARTIAL";
       uploadStatus = uploaded.some((item) => item.status === "SUCCESS") ? "complete" : "error";
       retryOperationKey = operationKey;
-      recordDiagnostic("ERROR", "ERROR", diagnosticCode(error2), error2);
+      recordDiagnostic("ERROR", "ERROR", diagnosticCode(error2));
       publishBatchContext();
-      setState("ERROR", uploaded.some((item) => item.status === "SUCCESS" && item.media_id) ? MEDIA_SAVED_ERROR_MESSAGE : USER_ERROR_MESSAGE);
+      if (batchManifest?.status === "partial_success") {
+        setState("PARTIAL", `Đã tải được ${batchManifest.success_count}/${batchManifest.requested_count} ảnh. Các ảnh còn lỗi có thể thử lại.`);
+      } else if (uploaded.some((item) => item.status === "SUCCESS" && item.media_id)) {
+        setState("ERROR", MEDIA_SAVED_ERROR_MESSAGE);
+      } else {
+        setState("ERROR", HOST_UPLOAD_ERROR_MESSAGE);
+      }
     } finally {
       uploading = false;
       renderSelection();
@@ -12602,8 +12707,8 @@ async function start() {
       publishBatchContext();
       setState("READY", "Đã khôi phục đủ ảnh. Bấm TẢI LÊN để gửi submission.");
     } catch (error2) {
-      recordDiagnostic("ERROR", "ERROR", diagnosticCode(error2), error2);
-      setState("PARTIAL", USER_ERROR_MESSAGE);
+      recordDiagnostic("ERROR", "ERROR", diagnosticCode(error2));
+      setState("PARTIAL", HOST_UPLOAD_ERROR_MESSAGE);
     } finally {
       uploading = false;
       renderSelection();
@@ -12616,8 +12721,8 @@ async function start() {
     }
   };
   app.onerror = (error2) => {
-    recordDiagnostic("ERROR", "ERROR", "MCP_APPS_CONNECTION_ERROR", error2);
-    setState("ERROR", USER_ERROR_MESSAGE);
+    recordDiagnostic("ERROR", "ERROR", "MCP_APPS_CONNECTION_ERROR");
+    setState("ERROR", HOST_UPLOAD_ERROR_MESSAGE);
   };
   input.addEventListener("change", () => {
     uploaded = [];
@@ -12643,8 +12748,8 @@ async function start() {
       recordDiagnostic("FILE_PREVIEW_READY", "DONE", "LIBRARY_FILE_PREVIEW_READY");
       renderSelection();
     } catch (error2) {
-      recordDiagnostic("ERROR", "ERROR", "FILE_SELECTION_FAILED", error2);
-      setState("ERROR", USER_ERROR_MESSAGE);
+      recordDiagnostic("ERROR", "ERROR", "FILE_SELECTION_FAILED");
+      setState("ERROR", HOST_UPLOAD_ERROR_MESSAGE);
     }
   });
   previews.addEventListener("input", (event) => {
@@ -12679,8 +12784,8 @@ async function start() {
     input.disabled = true;
     select.disabled = true;
     upload.disabled = true;
-    recordDiagnostic("ERROR", "ERROR", "MCP_APPS_CONNECT_FAILED", error2);
-    setState("ERROR", USER_ERROR_MESSAGE);
+    recordDiagnostic("ERROR", "ERROR", "MCP_APPS_CONNECT_FAILED");
+    setState("ERROR", HOST_UPLOAD_ERROR_MESSAGE);
   }
 }
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => void boot(), { once: true });

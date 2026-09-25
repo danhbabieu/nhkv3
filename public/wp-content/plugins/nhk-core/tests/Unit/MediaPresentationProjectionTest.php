@@ -30,6 +30,22 @@ final class MediaPresentationProjectionTest extends TestCase
         self::assertNotSame($result['representative']['media_id'], $result['evidence'][0]['media_id']);
     }
 
+    public function test_collection_projection_can_request_only_the_representative_media(): void
+    {
+        [$media, $assets, $usages, $service] = $this->stores();
+        $representative = $service->create('collection-front', 'Collection front', 'ready');
+        $evidence = $service->create('collection-evidence', 'Collection evidence', 'ready');
+        $service->addAsset($representative->canonicalId, 'original', 'uploads/collection-front.webp', hash('sha256', 'collection-front'), 'image/webp', 10, 1200, 675, 'PUBLIC', ['canonical_filename' => 'collection-front.webp']);
+        $service->addAsset($evidence->canonicalId, 'original', 'uploads/collection-evidence.webp', hash('sha256', 'collection-evidence'), 'image/webp', 10, 1200, 800, 'PUBLIC', ['canonical_filename' => 'collection-evidence.webp']);
+        $service->addUsage($representative->canonicalId, 'brand', 'collection-brand', 'representative', 0, 'Front');
+        $service->addUsage($evidence->canonicalId, 'brand', 'collection-brand', 'evidence', 1, 'Evidence');
+
+        $result = (new \NHK\Core\Application\Entity\EntityMediaProjection($media, $assets, $usages))->representativeForEntity('brand', 'collection-brand');
+
+        self::assertSame($representative->canonicalId, $result['media_id'] ?? null);
+        self::assertSame('Front', $result['alt'] ?? null);
+    }
+
     public function test_explicit_pinned_usage_is_projected_without_re_running_auto_suitability(): void
     {
         [$media, $assets, $usages, $service] = $this->stores();

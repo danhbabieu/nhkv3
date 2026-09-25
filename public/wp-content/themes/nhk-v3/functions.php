@@ -28,33 +28,69 @@ function nhk_v3_allow_semantic_search_pages(mixed $handled, \WP_Query $query): m
 }
 add_filter('pre_handle_404', 'nhk_v3_allow_semantic_search_pages', 10, 2);
 
-function nhk_v3_assets(): void { wp_enqueue_style('nhk-v3-style', get_stylesheet_uri(), [], '1.2.0'); wp_enqueue_style('nhk-v3-entity', get_theme_file_uri('entity.css'), ['nhk-v3-style'], '1.0.5'); wp_enqueue_style('nhk-v3-media-video', get_theme_file_uri('media-video.css'), ['nhk-v3-entity'], '1.0.1'); wp_enqueue_style('nhk-v3-knowledge', get_theme_file_uri('knowledge.css'), ['nhk-v3-media-video'], '1.0.0'); wp_enqueue_style('nhk-v3-presentation', get_theme_file_uri('presentation.css'), ['nhk-v3-knowledge'], '1.0.1'); wp_enqueue_script('nhk-v3-navigation', get_theme_file_uri('navigation.js'), [], '1.0.0', true); if (is_front_page()) wp_enqueue_script('nhk-v3-hero-slider', get_theme_file_uri('hero-slider.js'), [], '1.0.0', true); if (is_singular('post')) { wp_enqueue_style('nhk-v3-album-style', get_theme_file_uri('album.css'), ['nhk-v3-entity'], '1.0.0'); wp_enqueue_script('nhk-v3-album', get_theme_file_uri('album.js'), [], '1.0.0', true); } }
+function nhk_v3_assets_legacy(): void { wp_enqueue_style('nhk-v3-style', get_stylesheet_uri(), [], '1.2.0'); wp_enqueue_style('nhk-v3-entity', get_theme_file_uri('entity.css'), ['nhk-v3-style'], '1.0.5'); wp_enqueue_style('nhk-v3-media-video', get_theme_file_uri('media-video.css'), ['nhk-v3-entity'], '1.0.1'); wp_enqueue_style('nhk-v3-knowledge', get_theme_file_uri('knowledge.css'), ['nhk-v3-media-video'], '1.0.0'); wp_enqueue_style('nhk-v3-presentation', get_theme_file_uri('presentation.css'), ['nhk-v3-knowledge'], '1.0.1'); wp_enqueue_script('nhk-v3-navigation', get_theme_file_uri('navigation.js'), [], '1.0.0', true); if (is_front_page()) wp_enqueue_script('nhk-v3-hero-slider', get_theme_file_uri('hero-slider.js'), [], '1.0.0', true); if (is_singular('post')) { wp_enqueue_style('nhk-v3-album-style', get_theme_file_uri('album.css'), ['nhk-v3-entity'], '1.0.0'); wp_enqueue_script('nhk-v3-album', get_theme_file_uri('album.js'), [], '1.0.0', true); } }
+
+function nhk_v3_assets(): void
+{
+    wp_enqueue_style('nhk-v3-style', get_stylesheet_uri(), [], '1.3.0');
+    wp_enqueue_script('nhk-v3-navigation', get_theme_file_uri('navigation.js'), [], '1.1.0', true);
+    $needsMediaVideo = is_front_page() || is_singular('post') || (int) get_query_var('nhk_media_page', 0) > 0 || (int) get_query_var('nhk_video_page', 0) > 0;
+    $needsKnowledge = is_front_page() || (int) get_query_var('nhk_knowledge_page', 0) > 0;
+    $needsEntity = is_front_page() || is_singular('post') || (int) get_query_var('nhk_entity_page', 0) > 0 || $needsMediaVideo || $needsKnowledge;
+    $needsPresentation = $needsEntity || $needsMediaVideo || $needsKnowledge;
+    if ($needsEntity) wp_enqueue_style('nhk-v3-entity', get_theme_file_uri('entity.css'), ['nhk-v3-style'], '1.0.6');
+    if ($needsMediaVideo) wp_enqueue_style('nhk-v3-media-video', get_theme_file_uri('media-video.css'), ['nhk-v3-entity'], '1.0.2');
+    if ($needsKnowledge) wp_enqueue_style('nhk-v3-knowledge', get_theme_file_uri('knowledge.css'), ['nhk-v3-media-video'], '1.0.1');
+    if ($needsPresentation) wp_enqueue_style('nhk-v3-presentation', get_theme_file_uri('presentation.css'), ['nhk-v3-knowledge'], '1.0.2');
+    if (is_singular('post')) {
+        wp_enqueue_style('nhk-v3-album-style', get_theme_file_uri('album.css'), ['nhk-v3-entity'], '1.0.1');
+        wp_enqueue_script('nhk-v3-album', get_theme_file_uri('album.js'), [], '1.1.0', true);
+    }
+}
 add_action('wp_enqueue_scripts', 'nhk_v3_assets');
+
+function nhk_v3_navigation_groups(): array
+{
+    // Nhóm đồng hồ remains a profile-driven public entry point at /loai-dong-ho/.
+    if (class_exists('NHK\\Core\\Application\\Presentation\\PublicNavigationDefinition')) {
+        $groups = \NHK\Core\Application\Presentation\PublicNavigationDefinition::groups();
+        if (is_array($groups) && $groups !== []) return $groups;
+    }
+    return ['primary' => [], 'discovery' => [], 'footer' => []];
+}
 
 /** @return array<string,string> */
 function nhk_v3_navigation_items(): array
 {
-    if (class_exists('NHK\\Core\\Application\\Presentation\\PublicNavigationDefinition')) {
-        $items = [];
-        foreach (\NHK\Core\Application\Presentation\PublicNavigationDefinition::items() as $item) {
+    $items = [];
+    foreach (['primary', 'discovery'] as $group) {
+        foreach ((array) (nhk_v3_navigation_groups()[$group] ?? []) as $item) {
             if (!is_array($item) || trim((string) ($item['label'] ?? '')) === '' || trim((string) ($item['path'] ?? '')) === '') continue;
             $items[(string) $item['label']] = (string) $item['path'];
         }
-        if ($items !== []) return $items;
     }
-    return ['Tri thức' => '/tri-thuc/', 'Thương hiệu' => '/thuong-hieu/', 'Nhóm đồng hồ' => '/loai-dong-ho/', 'Mẫu' => '/mau/', 'Bộ máy' => '/bo-may/', 'Bản nhạc' => '/ban-nhac/', 'So sánh' => '/so-sanh/', 'Linh kiện' => '/linh-kien/', 'Hiện vật' => '/hien-vat/', 'Video' => '/video/', 'Góc chia sẻ' => '/goc-chia-se/'];
+    return $items;
+}
+
+/** @param list<array{label:string,path:string}> $items */
+function nhk_v3_render_nav_items(array $items): void
+{
+    $requestPath = (string) wp_parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
+    echo '<ul class="nav-list">';
+    foreach ($items as $item) {
+        $label = (string) ($item['label'] ?? '');
+        $path = (string) ($item['path'] ?? '');
+        if ($label === '' || $path === '') continue;
+        $isCurrent = rtrim($requestPath, '/') === rtrim($path, '/') || ($path === '/' && $requestPath === '/');
+        printf('<li%s><a href="%s"%s>%s</a></li>', $isCurrent ? ' class="current-menu-item"' : '', esc_url(home_url($path)), $isCurrent ? ' aria-current="page"' : '', esc_html($label));
+    }
+    echo '</ul>';
 }
 
 function nhk_v3_nav_fallback(): void
 {
-    $items = nhk_v3_navigation_items();
-    $requestPath = (string) wp_parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
-    echo '<ul class="nav-list">';
-    foreach ($items as $label => $path) {
-        $isCurrent = rtrim($requestPath, '/') === rtrim((string) $path, '/') || ($path === '/' && $requestPath === '/');
-        printf('<li%s><a href="%s"%s>%s</a></li>', $isCurrent ? ' class="current-menu-item"' : '', esc_url(home_url($path)), $isCurrent ? ' aria-current="page"' : '', esc_html($label));
-    }
-    echo '</ul>';
+    $groups = nhk_v3_navigation_groups();
+    nhk_v3_render_nav_items(array_merge((array) ($groups['primary'] ?? []), (array) ($groups['discovery'] ?? [])));
 }
 
 function nhk_v3_public_brand_text(string $text): string
