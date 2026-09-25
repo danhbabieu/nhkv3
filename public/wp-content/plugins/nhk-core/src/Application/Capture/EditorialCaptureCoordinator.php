@@ -95,6 +95,7 @@ final class EditorialCaptureCoordinator
                 'title' => trim((string) ($input['title'] ?? '')),
                 'excerpt' => trim((string) ($input['excerpt'] ?? '')),
                 'metadata' => is_array($input['metadata'] ?? null) ? $input['metadata'] : [],
+                'asset_inputs' => $this->safeAssetInputs((array) ($input['asset_inputs'] ?? [])),
                 'media_bindings' => is_array($input['media_bindings'] ?? null) ? $input['media_bindings'] : [],
                 'media_operations' => is_array($input['media_operations'] ?? null) ? $input['media_operations'] : [],
                 'documentation_checkpoint' => is_array($input['documentation_checkpoint'] ?? null) ? $input['documentation_checkpoint'] : [],
@@ -318,6 +319,14 @@ final class EditorialCaptureCoordinator
         try {
             $followupItems = array_values(array_filter((array) ($input['asset_followup_items'] ?? []), 'is_array'));
             if ($followupItems !== []) {
+                $orderedFollowup = [];
+                foreach ($followupItems as $index => $item) $orderedFollowup[] = ['index' => $index, 'item' => $item];
+                usort($orderedFollowup, static function (array $left, array $right): int {
+                    $leftOrder = array_key_exists('sort_order', $left['item']) ? max(0, (int) $left['item']['sort_order']) : PHP_INT_MAX;
+                    $rightOrder = array_key_exists('sort_order', $right['item']) ? max(0, (int) $right['item']['sort_order']) : PHP_INT_MAX;
+                    return [$leftOrder, $left['index']] <=> [$rightOrder, $right['index']];
+                });
+                $followupItems = array_values(array_map(static fn (array $entry): array => $entry['item'], $orderedFollowup));
                 $existingKeys = array_fill_keys(array_map([$this, 'assetIdentity'], $assets), true);
                 foreach ($followupItems as $item) {
                     $key = $this->assetIdentity($item);
@@ -687,7 +696,7 @@ final class EditorialCaptureCoordinator
             $diagnostics['visual_support'] = ['status' => $visualRequirements === [] && $visualDiagnostics === [] ? 'not_requested' : 'optional_enrichment', 'requirements' => $visualRequirements, 'diagnostics' => $visualDiagnostics];
 
             $inputMetadata = is_array($input['metadata'] ?? null) ? $input['metadata'] : [];
-            $semanticContext = ['capture_id' => $record->captureId, 'article_id' => $record->articleId, 'article_endpoint_key' => $record->articleId !== null ? ((function_exists('get_current_blog_id') ? (int) get_current_blog_id() : 1) . ':' . (int) $record->articleId) : '', 'raw_input' => $text, 'continuation_delta_text' => trim((string) ($input['continuation_delta_text'] ?? '')), 'assets' => $assets, 'media_bindings' => is_array($input['media_bindings'] ?? null) ? $input['media_bindings'] : [], 'media_operations' => is_array($input['media_operations'] ?? null) ? $input['media_operations'] : [], 'interpretation' => $interpretation, 'subject_resolution' => $resolution, 'subject_resolution_packet' => $subjectPacket->toArray(), 'content_intent' => $intent, 'visual_opportunities' => $visualOpportunities, 'visual_support' => $diagnostics['visual_support'], 'visual_context' => is_array($input['visual_context'] ?? null) ? $input['visual_context'] : [], 'observations' => is_array($input['observations'] ?? null) ? $input['observations'] : [], 'components' => is_array($input['components'] ?? $record->context['components'] ?? null) ? ($input['components'] ?? $record->context['components']) : [], 'provenance_packets' => is_array($inputMetadata['provenance_packets'] ?? null) ? $inputMetadata['provenance_packets'] : [], 'existing_capture_continuation' => ($input['existing_capture_continuation'] ?? false) === true, 'continuation_idempotency_key' => (string) ($input['continuation_idempotency_key'] ?? ''), 'governance' => is_array($input['governance'] ?? null) ? $input['governance'] : [], 'prior_diagnostics' => $diagnostics, 'phase_receipts' => $receipts];
+            $semanticContext = ['capture_id' => $record->captureId, 'article_id' => $record->articleId, 'article_endpoint_key' => $record->articleId !== null ? ((function_exists('get_current_blog_id') ? (int) get_current_blog_id() : 1) . ':' . (int) $record->articleId) : '', 'raw_input' => $text, 'editorial_copy' => (string) ($interpretation['article_intent'] ?? ''), 'non_semantic_context' => is_array($interpretation['non_semantic_context'] ?? null) ? $interpretation['non_semantic_context'] : [], 'continuation_delta_text' => trim((string) ($input['continuation_delta_text'] ?? '')), 'assets' => $assets, 'media_bindings' => is_array($input['media_bindings'] ?? null) ? $input['media_bindings'] : [], 'media_operations' => is_array($input['media_operations'] ?? null) ? $input['media_operations'] : [], 'interpretation' => $interpretation, 'subject_resolution' => $resolution, 'subject_resolution_packet' => $subjectPacket->toArray(), 'content_intent' => $intent, 'visual_opportunities' => $visualOpportunities, 'visual_support' => $diagnostics['visual_support'], 'visual_context' => is_array($input['visual_context'] ?? null) ? $input['visual_context'] : [], 'observations' => is_array($input['observations'] ?? null) ? $input['observations'] : [], 'components' => is_array($input['components'] ?? $record->context['components'] ?? null) ? ($input['components'] ?? $record->context['components']) : [], 'provenance_packets' => is_array($inputMetadata['provenance_packets'] ?? null) ? $inputMetadata['provenance_packets'] : [], 'existing_capture_continuation' => ($input['existing_capture_continuation'] ?? false) === true, 'continuation_idempotency_key' => (string) ($input['continuation_idempotency_key'] ?? ''), 'governance' => is_array($input['governance'] ?? null) ? $input['governance'] : [], 'prior_diagnostics' => $diagnostics, 'phase_receipts' => $receipts];
             $sharedEnrichment = $this->buildSharedEnrichment($record, $input, $intent, $resolution, $text, $interpretation, $preparationResult);
             if ($sharedEnrichment !== null) {
                 $semanticContext['shared_enrichment'] = $sharedEnrichment;
@@ -788,6 +797,15 @@ final class EditorialCaptureCoordinator
                     : ['status' => 'not_requested', 'items' => [], 'blockers' => []];
                 $diagnostics['video_publication'] = $this->withoutBody($videoPublication);
                 $diagnostics['deep_enrichment'] = $this->deepEnrichment($retrieved, $writes, [], $visualOpportunities, $sharedEnrichment);
+                // Persist the semantic checkpoint before entering MediaUsage
+                // reconciliation so a media failure can recover all already
+                // resolved owner diagnostics without pretending Article
+                // composition completed.
+                $checkpointStatus = strtoupper(trim((string) ($writes['status'] ?? ''))) === 'PARTIAL' && (array) ($writes['blockers'] ?? []) !== [] ? 'PARTIAL' : 'IN_PROGRESS';
+                $record = $this->save($record, CaptureStage::SEMANTICS_RECONCILED, $assets, $diagnostics, $receipts, 'SEMANTICS_RECONCILED', $record->articleId, $record->articleStateToken, $checkpointStatus, $checkpointStatus === 'PARTIAL' ? 'PARTIAL' : null);
+                $assets = $record->assets;
+                $diagnostics = $record->diagnostics;
+                $receipts = $record->phaseReceipts;
             }
 
             if (!$articleRequired && $record->articleId === null) {
@@ -822,11 +840,23 @@ final class EditorialCaptureCoordinator
             $videoThumbnailFallback = $isVideoIntent ? $this->eligibleVideoThumbnailFallback($assets, $videoPublication) : null;
 
             $observations = array_merge($semanticContext['observations'], is_array($interpretation['media_observations'] ?? null) ? $interpretation['media_observations'] : []);
+            // Canonical MediaUsage is the preparation boundary for Article
+            // prose. WordPress featured/inline state is only a later
+            // projection and must not be used as the input to composition.
+            $mediaContext = ['capture' => $record->toArray(), 'capture_record' => $record, 'article_id' => $record->articleId, 'assets' => $assets, 'media_bindings' => is_array($input['media_bindings'] ?? null) ? $input['media_bindings'] : [], 'article_media_bindings' => is_array($input['article_media_bindings'] ?? null) ? $input['article_media_bindings'] : [], 'media_operations' => is_array($input['media_operations'] ?? null) ? $input['media_operations'] : [], 'subject_resolution' => $resolution, 'subject_resolution_packet' => $subjectPacket->toArray(), 'content_intent' => $intent, 'visual_opportunities' => $visualOpportunities, 'visual_support' => $diagnostics['visual_support'], 'capture_fingerprint' => $record->requestFingerprint, 'staging_acceptance' => is_array($input['staging_acceptance'] ?? null) ? $input['staging_acceptance'] : null, 'shared_enrichment' => $sharedEnrichment];
+            if (is_array($mediaContext['staging_acceptance']) && isset($mediaContext['staging_acceptance']['payload_fingerprint'])) $mediaContext['payload_fingerprint'] = $mediaContext['staging_acceptance']['payload_fingerprint'];
+            if ($videoThumbnailFallback !== null) $mediaContext['video_thumbnail_fallback'] = $videoThumbnailFallback;
+            $media = ($this->mediaReconcile)($mediaContext);
+            $diagnostics['media_usage'] = $this->withoutBody($media);
+            $diagnostics['deep_enrichment'] = $this->deepEnrichment($retrieved, $writes, $media, $visualOpportunities, $sharedEnrichment);
+            if (trim((string) ($media['editorial_state_token'] ?? '')) !== '' && $media['editorial_state_token'] !== $record->articleStateToken) {
+                $record = $this->save($record, CaptureStage::COMPOSED, $assets, $diagnostics, $receipts, 'COMPOSED', $record->articleId, (string) $media['editorial_state_token']);
+            }
             $this->beginPhase('COMPOSED');
             $sharedDraft = is_array($sharedEditorial ?? null) ? ($sharedEditorial['draft'] ?? null) : null;
             $composition = is_object($sharedDraft)
                 ? ['title' => $sharedDraft->title, 'excerpt' => $sharedDraft->summary, 'content' => $sharedDraft->body, 'claim_trace' => $sharedDraft->claimTrace, 'research_snapshot' => ['source' => 'shared_editorial_pipeline', 'profile' => $sharedDraft->profile], 'managed_sections' => [], 'seo_projection' => is_object($sharedEditorial['seo_plan'] ?? null) ? $sharedEditorial['seo_plan']->toArray() : []]
-                : $this->composer->compose($text, $observations, $retrieved['selected_claims'] ?? [], ['title' => (string) ($input['title'] ?? ''), 'excerpt' => (string) ($input['excerpt'] ?? ''), 'asset_count' => count($assets), 'assets' => $assets, 'visual_opportunities' => $visualOpportunities, 'prior_composition' => is_array($diagnostics['composition'] ?? null) ? $diagnostics['composition'] : []]);
+                : $this->composer->compose($text, $observations, $retrieved['selected_claims'] ?? [], ['title' => (string) ($input['title'] ?? ''), 'excerpt' => (string) ($input['excerpt'] ?? ''), 'editorial_copy' => (string) ($interpretation['article_intent'] ?? ''), 'non_semantic_context' => is_array($interpretation['non_semantic_context'] ?? null) ? $interpretation['non_semantic_context'] : [], 'subject_resolution' => $resolution, 'asset_count' => count($assets), 'assets' => $assets, 'media_usages' => $media['media_usage'] ?? $media['usages'] ?? [], 'visual_opportunities' => $visualOpportunities, 'prior_composition' => is_array($diagnostics['composition'] ?? null) ? $diagnostics['composition'] : []]);
             $diagnostics['composition'] = ['title' => $composition['title'], 'claim_trace' => $composition['claim_trace'], 'research_snapshot' => $composition['research_snapshot'], 'managed_sections' => $composition['managed_sections'] ?? []];
             $diagnostics['article_draft'] = ['title' => $composition['title'], 'excerpt' => $composition['excerpt'], 'content_available' => true];
             if (is_callable($this->draftUpdater) && $record->articleId !== null && $record->articleStateToken !== null) {
@@ -847,16 +877,6 @@ final class EditorialCaptureCoordinator
                 $record = $this->save($record, CaptureStage::COMPOSED, $assets, $diagnostics, $receipts, 'COMPOSED', $record->articleId, (string) ($updatedDraft['state_token'] ?? $record->articleStateToken));
             } elseif (!$this->hasStage($record, CaptureStage::COMPOSED)) {
                 $record = $this->save($record, CaptureStage::COMPOSED, $assets, $diagnostics, $receipts, 'COMPOSED', $record->articleId, $record->articleStateToken);
-            }
-
-            $mediaContext = ['capture' => $record->toArray(), 'capture_record' => $record, 'article_id' => $record->articleId, 'assets' => $assets, 'media_bindings' => is_array($input['media_bindings'] ?? null) ? $input['media_bindings'] : [], 'article_media_bindings' => is_array($input['article_media_bindings'] ?? null) ? $input['article_media_bindings'] : [], 'media_operations' => is_array($input['media_operations'] ?? null) ? $input['media_operations'] : [], 'subject_resolution' => $resolution, 'subject_resolution_packet' => $subjectPacket->toArray(), 'content_intent' => $intent, 'composition' => $this->withoutBody($composition), 'visual_opportunities' => $visualOpportunities, 'visual_support' => $diagnostics['visual_support'], 'capture_fingerprint' => $record->requestFingerprint, 'staging_acceptance' => is_array($input['staging_acceptance'] ?? null) ? $input['staging_acceptance'] : null, 'shared_enrichment' => $sharedEnrichment];
-            if (is_array($mediaContext['staging_acceptance']) && isset($mediaContext['staging_acceptance']['payload_fingerprint'])) $mediaContext['payload_fingerprint'] = $mediaContext['staging_acceptance']['payload_fingerprint'];
-            if ($videoThumbnailFallback !== null) $mediaContext['video_thumbnail_fallback'] = $videoThumbnailFallback;
-            $media = ($this->mediaReconcile)($mediaContext);
-            $diagnostics['media_usage'] = $this->withoutBody($media);
-            $diagnostics['deep_enrichment'] = $this->deepEnrichment($retrieved, $writes, $media, $visualOpportunities, $sharedEnrichment);
-            if (trim((string) ($media['editorial_state_token'] ?? '')) !== '' && $media['editorial_state_token'] !== $record->articleStateToken) {
-                $record = $this->save($record, CaptureStage::COMPOSED, $assets, $diagnostics, $receipts, 'COMPOSED', $record->articleId, (string) $media['editorial_state_token']);
             }
             $this->beginPhase('PUBLICATION');
             $record = $this->startReceipt($record, $assets, $diagnostics, $receipts, 'PUBLICATION');
@@ -1054,6 +1074,25 @@ final class EditorialCaptureCoordinator
             if ($value !== '') return $key . ':' . $value;
         }
         return '';
+    }
+
+    /** @param list<array<string,mixed>> $inputs @return list<array<string,mixed>> */
+    private function safeAssetInputs(array $inputs): array
+    {
+        $result = [];
+        foreach ($inputs as $input) {
+            if (!is_array($input)) continue;
+            $name = trim((string) ($input['name'] ?? ''));
+            if ($name === '') continue;
+            $result[] = [
+                'client_file_id' => trim((string) ($input['client_file_id'] ?? '')),
+                'ordinal' => max(0, (int) ($input['ordinal'] ?? count($result))),
+                'name' => $name,
+                'feature_requests' => array_values(array_filter(array_map(static fn (mixed $value): string => trim((string) $value), (array) ($input['feature_requests'] ?? [])), static fn (string $value): bool => $value !== '')),
+            ];
+        }
+        usort($result, static fn (array $left, array $right): int => [$left['ordinal'], $left['client_file_id']] <=> [$right['ordinal'], $right['client_file_id']]);
+        return $result;
     }
 
     private function hasDeferredArticleBindings(array $input): bool

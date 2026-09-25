@@ -275,6 +275,14 @@ creation alone is never `COMPLETE`.
 
 ### Editorial Capture and Semantic Enrichment
 
+The NHK image uploader sends one shared `text` description plus an additive
+`asset_inputs[]` packet. Each item is ordered and carries only
+`client_file_id`, `ordinal`, user-entered `name` and zero or more literal
+`feature_requests`. The packet is input context, not canonical Media metadata,
+Authority identity or Knowledge truth. The server preserves the packet on the
+same Capture and associates it with the verified Media asset by ordinal; it
+must not create one Capture or Article per item.
+
 `nhk.capture.ingest` is the shared editorial boundary for one user submission.
 It persists one Capture identity and idempotency key, stores the raw editorial
 intent and subject hints, accepts text-only, multipart images or the registered

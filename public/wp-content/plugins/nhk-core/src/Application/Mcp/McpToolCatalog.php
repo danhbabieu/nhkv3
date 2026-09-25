@@ -165,6 +165,17 @@ final class McpToolCatalog
                     'additionalProperties' => false,
                 ],
                 'items' => ['type' => 'array', 'items' => ['type' => 'object']],
+                'asset_inputs' => ['type' => 'array', 'maxItems' => 20, 'items' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'client_file_id' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 191],
+                        'ordinal' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 19],
+                        'name' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 500],
+                        'feature_requests' => ['type' => 'array', 'maxItems' => 20, 'items' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 500]],
+                    ],
+                    'required' => ['client_file_id', 'ordinal', 'name', 'feature_requests'],
+                    'additionalProperties' => false,
+                ]],
                 'media_ids' => ['type' => 'array', 'items' => self::uuidField()],
                 'existing_media_urls' => ['type' => 'array', 'maxItems' => 20, 'items' => ['type' => 'string', 'format' => 'uri', 'minLength' => 1]],
                 'media_bindings' => ['type' => 'array', 'maxItems' => 20, 'items' => self::mediaBindingField()],

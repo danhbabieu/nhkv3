@@ -14,6 +14,50 @@ use PHPUnit\Framework\TestCase;
 
 final class EditorialCaptureSemanticCoreTest extends TestCase
 {
+    public function test_instruction_is_not_composed_when_typed_editorial_context_is_present(): void
+    {
+        $result = (new ArticleComposer())->compose(
+            'Tạo bài viết về Junghans W64.',
+            [],
+            [],
+            [
+                'non_semantic_context' => [
+                    'instructions' => ['Tạo bài viết về Junghans W64.'],
+                    'instruction_classes' => [['text' => 'Tạo bài viết về Junghans W64.', 'classification' => 'EDITORIAL_INSTRUCTION']],
+                ],
+                'editorial_copy' => '',
+                'subject_resolution' => [
+                    'status' => 'resolved',
+                    'primary' => ['name' => 'Junghans W64'],
+                ],
+            ],
+        );
+
+        self::assertSame('Junghans W64', $result['title']);
+        self::assertStringNotContainsString('Tạo bài viết về Junghans W64', $result['content']);
+    }
+
+    public function test_typed_editorial_copy_remains_composable_while_instruction_stays_context_only(): void
+    {
+        $result = (new ArticleComposer())->compose(
+            'Tạo bài viết về Junghans W64.',
+            [],
+            [],
+            [
+                'non_semantic_context' => ['instructions' => ['Tạo bài viết về Junghans W64.']],
+                'editorial_copy' => 'Đây là ghi chú biên tập về chiếc đồng hồ thực tế.',
+                'subject_resolution' => [
+                    'status' => 'resolved',
+                    'primary' => ['name' => 'Junghans W64'],
+                ],
+            ],
+        );
+
+        self::assertSame('Junghans W64', $result['title']);
+        self::assertStringContainsString('Đây là ghi chú biên tập', $result['content']);
+        self::assertStringNotContainsString('Tạo bài viết về Junghans W64', $result['content']);
+    }
+
     public function test_composer_projects_markdown_headings_as_wordpress_heading_blocks(): void
     {
         $result = (new ArticleComposer())->compose(

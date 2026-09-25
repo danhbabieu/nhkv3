@@ -15,7 +15,11 @@ final class SharedEditorialComposer
     public function compose(EditorialPlan $plan): EditorialDraft
     {
         $guard = $this->publicCopyGuard ?? new PublicEditorialCopyGuard();
-        $input = $this->normalizeInput((string) ($plan->inputContext['raw_input'] ?? $plan->inputContext['text'] ?? ''));
+        // Capture keeps raw instructions for orchestration, but only typed
+        // editorial copy may enter public Article prose.
+        $input = $this->normalizeInput((string) (array_key_exists('editorial_copy', $plan->inputContext)
+            ? $plan->inputContext['editorial_copy']
+            : ($plan->inputContext['raw_input'] ?? $plan->inputContext['text'] ?? '')));
         $title = $this->title($plan->topic, $input);
         $paragraphs = [];
         $opening = $input !== '' ? $input : $this->normalizeSentence($plan->topic);

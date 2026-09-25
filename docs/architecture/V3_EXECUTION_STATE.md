@@ -89,6 +89,26 @@ STATUS: `CONFIRMED_SUBJECT_RECONCILIATION_MIXED_ROUTING_LOCAL_READY / INTEGRATIO
 
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-25 — Mobile Capture image input contract/UI (LOCAL / NO LIVE MUTATION)
+
+IMPLEMENTED: The NHK image uploader now presents a mobile-first, vertical
+per-asset card with preview, full-width `Tên ảnh`, full-width `Feature`, one
+shared `Mô tả chung` textarea and one `TẢI LÊN` action. The client preserves
+stable per-file identity and order, sends one physical Media batch followed by
+one idempotent Capture request, and retains the existing retry/read-back
+diagnostics. The Capture contract additively accepts ordered `asset_inputs[]`
+with user name and `feature_requests[]`; these remain scoped input context and
+are not canonical facts, UUIDs or direct MediaUsage bindings.
+
+VERIFICATION: Uploader typecheck, Vite single-file build and 34 JavaScript
+tests passed. Focused PHP `McpContractTest` passed 40 tests / 649 assertions;
+`McpWidgetUploadTest` plus `EditorialCaptureAssetFollowUpTest` passed 12 tests
+/ 104 assertions. Changed PHP files lint clean and `git diff --check` passed.
+No database, staging/production data, Governance Apply, deployment or live
+mutation was performed. Build emitted only existing Rollup annotation warnings.
+
+STATUS: `MOBILE_CAPTURE_INPUT_LOCAL_READY / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-25 — YouTube Video retry embed contract repair (LOCAL / NO LIVE MUTATION)
 
 ROOT_CAUSE_CONFIRMED: The source adapter and initial Video intake generated the
@@ -19238,3 +19258,34 @@ or runtime Capture mutation occurred. Staging @v51 verification for the
 historical Capture remains an external deployment/infrastructure gate.
 
 STATUS: `MEDIA_ENRICHMENT_COMPLETION_RECOVERY_READY_WITH_INTEGRATION_AND_RUNTIME_ENVIRONMENT_GATES / NO_SERVER_ACTION`
+
+# Checkpoint — 2026-09-25 — Image Capture → Media → Knowledge → Article → Public convergence (LOCAL / NO SERVER ACTION)
+
+IMPLEMENTED: Capture asset ordering is preserved across continuation; typed
+instruction/editorial separation prevents workflow instructions from becoming
+Article prose; canonical MediaUsage reconciliation now precedes Article
+composition and draft update; existing Authority/Governance remains the only
+Specimen lifecycle; public Media reverse context preserves all published
+Article URLs without inventing a Media route; Article diagnostics can expose
+exact supplied Capture/Article/media/completion/public evidence read-only with
+editorial-body redaction.
+
+DESIGN_BOUNDARY: No Album entity, image pipeline, new semantic owner, schema,
+WordPress semantic writer or case-specific Article/Capture repair was added.
+Model/Variant/Specimen distinction remains registry- and Governance-bound;
+visual observations remain non-canonical until governed.
+
+VERIFICATION: Focused Task 4 suite passed 40 tests / 217 assertions; focused
+Authority/Specimen, completion, diagnostic and public suites passed 97 tests /
+415 assertions; Contract suite passed 6 tests / 48 assertions. Full suite ran
+2,756 tests / 15,203 assertions with 24 environment/fixture-gated failures,
+20 warnings, 45 deprecations and 33 PHPUnit deprecations under 512M. The
+remaining failures are missing WP upload fixtures or require
+`NHK_WP_TEST_PATH=public` and `NHK_WP_TEST_DB=nhk_v3_test`; no changed-test
+failure remains. PHP lint and `git diff --check` passed.
+
+SAFETY: No migration, database write, Capture 01a0d5c4-35b1-7ac6-b060-971bdf6dad85
+mutation, Article 711 mutation, staging/production mutation, deployment or
+push occurred.
+
+STATUS: `IMAGE_CAPTURE_MEDIA_ARTICLE_PUBLIC_LOCAL_READY / INTEGRATION_ENVIRONMENT_GATED / NO_SERVER_ACTION`

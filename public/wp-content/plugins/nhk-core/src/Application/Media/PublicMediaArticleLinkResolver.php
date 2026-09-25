@@ -25,13 +25,21 @@ final class PublicMediaArticleLinkResolver
     /** @param list<MediaUsage> $usages */
     public function firstPublished(array $usages): ?string
     {
+        $resolved = $this->allPublished($usages);
+        return count($resolved) === 1 ? $resolved[0] : null;
+    }
+
+    /** @param list<MediaUsage> $usages @return list<string> */
+    public function allPublished(array $usages): array
+    {
         usort($usages, static fn (MediaUsage $left, MediaUsage $right): int => [$left->sortOrder, $left->usageId] <=> [$right->sortOrder, $right->usageId]);
         $resolved = [];
         foreach ($usages as $usage) {
+            if ($usage->activeSlot === 'retired') continue;
             $url = $this->resolve($usage);
             if ($url !== null) $resolved[$url] = true;
         }
-        return count($resolved) === 1 ? (string) array_key_first($resolved) : null;
+        return array_values(array_keys($resolved));
     }
 
     public function resolve(MediaUsage $usage): ?string

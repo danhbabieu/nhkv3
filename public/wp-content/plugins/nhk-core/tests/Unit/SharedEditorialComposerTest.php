@@ -10,6 +10,20 @@ final class SharedEditorialComposerTest extends TestCase
 {
     private const SUBJECT = '4cbe5aa1-4222-46bd-a140-6ab66d2da199';
 
+    public function test_typed_editorial_copy_replaces_raw_instruction_in_shared_article_composition(): void
+    {
+        $pack = $this->pack('article', [], [
+            'raw_input' => 'Tạo bài viết về Junghans W64.',
+            'editorial_copy' => 'Đây là ghi chú biên tập về chiếc đồng hồ thực tế.',
+            'non_semantic_context' => ['instructions' => ['Tạo bài viết về Junghans W64.']],
+        ]);
+
+        $draft = (new SharedEditorialComposer())->compose((new ReaderJourneyPlanner())->plan($pack));
+
+        self::assertStringContainsString('Đây là ghi chú biên tập', $draft->body);
+        self::assertStringNotContainsString('Tạo bài viết về Junghans W64', $draft->body);
+    }
+
     public function test_context_pack_becomes_deterministic_subject_first_plan_and_traceable_article_draft(): void
     {
         $pack = $this->pack('article', [

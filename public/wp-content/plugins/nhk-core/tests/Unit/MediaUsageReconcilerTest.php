@@ -10,6 +10,23 @@ use PHPUnit\Framework\TestCase;
 
 final class MediaUsageReconcilerTest extends TestCase
 {
+    public function test_three_image_article_plan_keeps_featured_inline_and_supporting_usage_distinct(): void
+    {
+        $featured = UuidCodec::newV7();
+        $inline = UuidCodec::newV7();
+        $detail = UuidCodec::newV7();
+        $result = (new MediaUsageReconciler())->plan('wp_post', '1:711', [], [
+            ['role' => 'featured_primary', 'media_id' => $featured, 'placement_key' => 'capture:front'],
+            ['role' => 'inline_primary', 'media_id' => $inline, 'placement_key' => 'capture:back'],
+            ['role' => 'inline_supporting', 'media_id' => $detail, 'sort_order' => 2, 'placement_key' => 'capture:dial'],
+        ]);
+
+        self::assertSame('PLANNED', $result['status']);
+        self::assertSame(['featured_primary', 'inline_primary', 'inline_supporting'], array_column($result['actions'], 'role'));
+        self::assertSame([$featured, $inline, $detail], array_column($result['actions'], 'media_id'));
+        self::assertSame(['ADD', 'ADD', 'ADD'], array_column($result['actions'], 'action'));
+    }
+
     public function test_plan_is_deterministic_and_exposes_keep_add_update_and_retire(): void
     {
         $old = new MediaUsage(UuidCodec::newV7(), UuidCodec::newV7(), 'wp_post', '1:300', 'inline_primary', 0, 'Alt cũ');

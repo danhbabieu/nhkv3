@@ -36,26 +36,23 @@ test("the View uses the official server-tool call path and live tool name", asyn
   assert.doesNotMatch(html, /openai\.callTool/);
 });
 
-test("the final UI exposes exactly the two Vietnamese image actions", async () => {
+test("the final UI exposes one Vietnamese submission action", async () => {
   const html = await resource();
 
-  assert.match(html, /id="upload"[^>]*>Tải ảnh lên<\/button>/);
-  assert.match(html, /id="create"[^>]*>Tạo bài viết<\/button>/);
+  assert.match(html, /id="upload"[^>]*>TẢI LÊN<\/button>/);
+  assert.doesNotMatch(html, /id="create"/);
   assert.doesNotMatch(html, /Dùng ảnh trong chat/);
   assert.doesNotMatch(html, /Tải ảnh đã chọn/);
 });
 
-test("the View keeps upload-only fast and hands off to Capture only for Article", async () => {
+test("the View sends one submission through Media then Capture", async () => {
   const view = await source();
 
-  assert.match(view, /async function uploadOnly/);
   assert.match(view, /async function createArticle/);
-  assert.doesNotMatch(view, /uploadOnly[\s\S]{0,500}CAPTURE_TOOL_NAME/);
+  assert.match(view, /asset_inputs:\s*buildCaptureAssetInputs\(selected\)/);
   assert.match(view, /media_ids:/);
   assert.match(view, /wp_ability_nhk_v3_capture_ingest/);
-  assert.match(view, /title: articleTitle\.value\.trim\(\)/);
-  assert.match(view, /text: articleText\.value/);
-  assert.match(view, /metadata: \{ image_context: namingContext \}/);
+  assert.doesNotMatch(view, /intent:\s*"IMAGE_ARTICLE"/);
   assert.match(view, /publish: false/);
 });
 
@@ -86,11 +83,11 @@ test("the View requires operator naming context and emits the required diagnosti
   const html = await resource();
   const view = await source();
 
-  assert.match(html, /id="context"/);
-  assert.match(html, /Ngữ cảnh bộ ảnh/);
-  assert.match(html, /id="article-title"/);
-  assert.match(html, /id="article-text"/);
-  assert.match(html, /<details id="article-panel">/);
+  assert.match(html, /id="description"/);
+  assert.match(html, /Mô tả chung/);
+  assert.match(html, /multiple/);
+  assert.match(html, /asset-name/);
+  assert.match(html, /asset-feature/);
   for (const stage of [
     "BOOT", "RESOURCE_LOADED", "HOST_CAPABILITIES_READ", "FILE_SELECTED",
     "FILE_PREVIEW_READY", "HOST_FILE_UPLOAD_START", "HOST_FILE_UPLOAD_DONE",

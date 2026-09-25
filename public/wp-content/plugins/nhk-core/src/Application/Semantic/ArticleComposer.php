@@ -13,6 +13,14 @@ final class ArticleComposer
     /** @param list<array<string,mixed>> $observations @param list<array<string,mixed>> $selectedClaims @return array<string,mixed> */
     public function compose(string $userInput, array $observations, array $selectedClaims, array $context = []): array
     {
+        // Once Capture has classified the input, only the typed editorial copy
+        // may enter public prose. Raw input remains orchestration context so an
+        // instruction such as "Tạo bài viết về ..." cannot become Article
+        // title/body by accident. Legacy callers without classification retain
+        // the existing userInput behavior for compatibility.
+        if (array_key_exists('editorial_copy', $context) || array_key_exists('non_semantic_context', $context)) {
+            $userInput = trim((string) ($context['editorial_copy'] ?? ''));
+        }
         $userInput = trim($userInput);
         $priorSections = array_values(array_filter((array) ($context['prior_composition']['managed_sections'] ?? []), 'is_array'));
         $sectionParser = $this->sectionParser ?? new ManagedArticleSectionParser();
@@ -23,6 +31,12 @@ final class ArticleComposer
         $userInput = $sectionParser->removeOwned($userInput, $priorSections);
         $userInput = EditorialContentProjection::toWordPressBlocks($userInput);
         $title = trim((string) ($context['title'] ?? ''));
+        if ($title === '') {
+            $resolution = is_array($context['subject_resolution'] ?? null) ? $context['subject_resolution'] : [];
+            $primary = is_array($resolution['primary'] ?? null) ? $resolution['primary'] : [];
+            $title = trim((string) ($primary['name'] ?? $primary['canonical_name'] ?? ''));
+        }
+        if ($title === '') $title = trim((string) (($context['subject_context']['subject'] ?? $context['subject'] ?? '')));
         if ($title === '') $title = $this->title($userInput);
         $guard = $this->publicCopyGuard ?? new PublicEditorialCopyGuard();
         $projectionEligibility = $this->projectionEligibility ?? new EditorialProjectionEligibility();

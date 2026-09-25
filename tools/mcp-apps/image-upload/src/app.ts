@@ -1,5 +1,5 @@
 import { App } from "@modelcontextprotocol/ext-apps";
-import { assertUploadManifestCounts, buildWidgetState, extractUploadManifest, inspectToolResult, mergeUploadManifest, normalizeSelectedFiles, shouldProcessToolResultNotification, type BatchContext, type SelectedImage, type ToolResult, type ToolResultNotificationSource, type UploadedItem, type UploadManifest, type WidgetDiagnostic, type WidgetUploadStatus } from "./contract";
+import { assertUploadManifestCounts, buildCaptureAssetInputs, buildWidgetState, extractUploadManifest, inspectToolResult, mergeUploadManifest, normalizeSelectedFiles, shouldProcessToolResultNotification, type BatchContext, type SelectedImage, type ToolResult, type ToolResultNotificationSource, type UploadedItem, type UploadManifest, type WidgetDiagnostic, type WidgetUploadStatus } from "./contract";
 
 // Easy MCP exposes the internal/admin boundary under the registered
 // WordPress Ability name. callServerTool must use that exact runtime name;
@@ -80,15 +80,12 @@ async function start(): Promise<void> {
   const input = byId<HTMLInputElement>("files");
   const select = byId<HTMLButtonElement>("select");
   const upload = byId<HTMLButtonElement>("upload");
-  const create = byId<HTMLButtonElement>("create");
   const summary = byId<HTMLDivElement>("summary");
   const previews = byId<HTMLDivElement>("previews");
   const state = byId<HTMLSpanElement>("state");
   const status = byId<HTMLDivElement>("status");
   const results = byId<HTMLDivElement>("results");
-  const context = byId<HTMLInputElement>("context");
-  const articleTitle = byId<HTMLInputElement>("article-title");
-  const articleText = byId<HTMLTextAreaElement>("article-text");
+  const context = byId<HTMLTextAreaElement>("description");
   const diagnosticsView = byId<HTMLDivElement>("diagnostics");
   const host = window.openai;
   const app = new App({ name: "NHK Image Upload", version: "1.0.0" });
@@ -138,30 +135,50 @@ async function start(): Promise<void> {
 
   function renderSelection(): void {
     previews.replaceChildren();
-    let total = 0;
-    selected.forEach((item) => {
+    selected.forEach((item, ordinal) => {
       const file = item.kind === "local" ? item.file : null;
       const fileName = item.kind === "local" ? item.file.name : item.fileName;
-      const fileSize = file?.size ?? 0;
-      total += fileSize;
       const figure = document.createElement("figure");
+      figure.dataset.clientFileId = item.clientFileId;
       if (file) {
         const image = document.createElement("img");
-        image.alt = file.name;
+        image.alt = item.name || file.name;
         image.src = URL.createObjectURL(file);
         figure.append(image);
       }
+      const label = document.createElement("div");
+      label.className = "asset-label";
+      label.textContent = `Ảnh ${ordinal + 1}`;
+      figure.append(label);
+      const name = document.createElement("input");
+      name.type = "text";
+      name.className = "asset-name";
+      name.placeholder = "Tên ảnh";
+      name.value = item.name;
+      name.required = true;
+      name.dataset.field = "name";
+      figure.append(name);
+      const feature = document.createElement("input");
+      feature.type = "text";
+      feature.className = "asset-feature";
+      feature.placeholder = "Feature (nhiều mục cách nhau bằng dấu phẩy)";
+      feature.value = item.feature;
+      feature.dataset.field = "feature";
+      figure.append(feature);
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "remove-asset";
+      remove.dataset.clientFileId = item.clientFileId;
+      remove.textContent = "Bỏ ảnh này";
+      figure.append(remove);
       const caption = document.createElement("figcaption");
-      caption.textContent = file
-        ? `${fileName} (${(fileSize / 1048576).toFixed(2)} MB)`
-        : `${fileName} (ChatGPT Library)`;
+      caption.textContent = file ? fileName : `${fileName} (Thư viện ChatGPT)`;
       figure.append(caption);
       previews.append(figure);
     });
-    summary.textContent = `${selected.length} ảnh, ${(total / 1048576).toFixed(2)} MB`;
+    summary.textContent = selected.length ? `${selected.length} ảnh đã chọn.` : "Chưa chọn ảnh.";
     const disabled = !connected || uploading || selected.length === 0 || !supportsFileUpload();
     upload.disabled = disabled;
-    create.disabled = disabled;
   }
 
   function renderUploads(items: UploadedItem[]): void {
@@ -236,10 +253,11 @@ async function start(): Promise<void> {
       recordDiagnostic("HOST_FILE_UPLOAD_DONE", "DONE", "HOST_FILE_UPLOAD_VERIFIED");
       const download = await host!.getFileDownloadUrl!({ fileId });
       if (!download.downloadUrl) throw new Error(`Download URL was not returned for ${fileName}.`);
-      references.push({ download_url: download.downloadUrl, file_id: fileId, mime_type: item.kind === "local" ? item.file.type : item.mimeType, file_name: fileName, ordinal: index, media: item.metadata ?? {} });
+      references.push({ download_url: download.downloadUrl, file_id: fileId, mime_type: item.kind === "local" ? item.file.type : item.mimeType, file_name: fileName, ordinal: index, media: { title: item.name.trim() } });
       recordDiagnostic("TRUSTED_FILE_REF_READY", "DONE", "TRUSTED_FILE_REFERENCE_READY");
     }
 
+    recordDiagnostic("SERVER_TOOL_CALL_START", "START", "SERVER_TOOL_CALL_REQUESTED");
     const result = await app.callServerTool({
       name: SERVER_TOOL_NAME,
       arguments: { idempotency_key: `${operationKey}${retryingPartialBatch ? `:retry:${attempt}` : ":media"}`, metadata: { description: namingContext }, items: references.map((item) => ({ client_file_id: item.file_id, filename: item.file_name, sort_order: item.ordinal, ordinal: item.ordinal, media: item.media })), files: references },
@@ -259,55 +277,9 @@ async function start(): Promise<void> {
     return logicalManifest;
   }
 
-  async function uploadOnly(): Promise<void> {
-    if (!connected || uploading || !supportsFileUpload() || selected.length === 0) return;
-    const namingContext = context.value.trim();
-    if (namingContext === "") {
-      recordDiagnostic("ERROR", "ERROR", "TRUSTWORTHY_FILENAME_CONTEXT_REQUIRED");
-      setState("ERROR", "Hãy nhập ngữ cảnh bộ ảnh trước khi tải ảnh lên.");
-      return;
-    }
-    uploading = true;
-    uploadStatus = "idle";
-    enrichmentStatus = "NOT_RUN";
-    renderSelection();
-    setState("UPLOADING", "Đang xử lý ảnh đã chọn…");
-    const operationKey = retryOperationKey ?? createIdempotencyKey();
-
-    try {
-      recordDiagnostic("SERVER_TOOL_CALL_START", "START", "SERVER_TOOL_CALL_REQUESTED");
-      const isRetry = batchManifest?.status === "partial_success";
-      if (isRetry) retryAttempt += 1;
-      const manifest = await materializeSelectedImages(operationKey, namingContext, retryAttempt);
-      uploadStatus = manifest.status === "success" ? "complete" : "partial";
-      publishBatchContext();
-      retryOperationKey = manifest.status === "partial_success" ? operationKey : null;
-      if (manifest.status === "success") retryAttempt = 0;
-      recordDiagnostic("MEDIA_COMMITTED", "DONE", manifest.status === "success" ? "MEDIA_COMMIT_COMPLETE" : "MEDIA_COMMIT_PARTIAL");
-      if (manifest.status === "success") {
-        setState("SUCCESS", `Đã tải ${manifest.success_count}/${manifest.requested_count} ảnh. Có thể tạo bài viết ở mục bên dưới.`);
-      } else {
-        setState("PARTIAL", `Đã tải ${manifest.success_count}/${manifest.requested_count} ảnh. Vui lòng thử lại ảnh lỗi.`);
-      }
-    } catch (error) {
-      uploadStatus = "error";
-      retryOperationKey = operationKey;
-      recordDiagnostic("ERROR", "ERROR", diagnosticCode(error), error);
-      setState("ERROR", `Tải ảnh thất bại: ${safeErrorMessage(error)}`);
-    } finally {
-      uploading = false;
-      renderSelection();
-    }
-  }
-
   async function createArticle(): Promise<void> {
     if (!connected || uploading || !supportsFileUpload() || selected.length === 0) return;
     const namingContext = context.value.trim();
-    if (namingContext === "") {
-      recordDiagnostic("ERROR", "ERROR", "TRUSTWORTHY_FILENAME_CONTEXT_REQUIRED");
-      setState("ERROR", "Hãy nhập ngữ cảnh bộ ảnh trước khi tạo bài viết.");
-      return;
-    }
     uploading = true;
     enrichmentStatus = "PENDING";
     renderSelection();
@@ -324,10 +296,8 @@ async function start(): Promise<void> {
         arguments: {
           idempotency_key: `${operationKey}:capture`,
           documentation_checkpoint: checkpoint,
-          intent: "IMAGE_ARTICLE",
-          title: articleTitle.value.trim(),
-          text: articleText.value,
-          metadata: { image_context: namingContext },
+          text: namingContext,
+          asset_inputs: buildCaptureAssetInputs(selected),
           media_ids: uploaded.map((item) => item.media_id).filter((id): id is string => Boolean(id)),
           publish: false,
         },
@@ -341,7 +311,7 @@ async function start(): Promise<void> {
       retryOperationKey = null;
       retryAttempt = 0;
       recordDiagnostic("READY_FOR_USE", "DONE", "MEDIA_COMMIT_READY");
-      setState("SUCCESS", "Đã tạo bài viết từ Media đã tải.");
+      setState("SUCCESS", "Đã gửi một submission gồm toàn bộ ảnh.");
     } catch (error) {
       enrichmentStatus = "PARTIAL";
       uploadStatus = uploaded.some((item) => item.status === "SUCCESS") ? "complete" : "error";
@@ -349,6 +319,28 @@ async function start(): Promise<void> {
       recordDiagnostic("ERROR", "ERROR", diagnosticCode(error), error);
       publishBatchContext();
       setState("ERROR", `Tạo bài viết thất bại: ${safeErrorMessage(error)}`);
+    } finally {
+      uploading = false;
+      renderSelection();
+    }
+  }
+
+  async function retryPartialSubmission(): Promise<void> {
+    if (!connected || uploading || !batchManifest || batchManifest.status !== "partial_success") return;
+    uploading = true;
+    setState("UPLOADING", "Đang thử lại các ảnh chưa hoàn tất…");
+    try {
+      const key = retryOperationKey ?? createIdempotencyKey();
+      retryOperationKey = key;
+      const next = await materializeSelectedImages(key, context.value.trim(), retryAttempt + 1);
+      if (next.status !== "success") throw new Error("PARTIAL_BATCH_NOT_READY");
+      retryAttempt += 1;
+      uploadStatus = "complete";
+      publishBatchContext();
+      setState("READY", "Đã khôi phục đủ ảnh. Bấm TẢI LÊN để gửi submission.");
+    } catch (error) {
+      recordDiagnostic("ERROR", "ERROR", diagnosticCode(error), error);
+      setState("PARTIAL", `Chưa thể thử lại toàn bộ ảnh: ${safeErrorMessage(error)}`);
     } finally {
       uploading = false;
       renderSelection();
@@ -377,7 +369,7 @@ async function start(): Promise<void> {
     retryAttempt = 0;
     selected = asFiles(input.files)
       .filter((file) => IMAGE_TYPES.test(file.type))
-      .map((file) => ({ kind: "local" as const, file }));
+      .map((file) => ({ kind: "local" as const, clientFileId: `${file.name}:${file.size}:${file.lastModified}`, file, name: file.name, feature: "" }));
     recordDiagnostic("FILE_SELECTED", "DONE", "LOCAL_FILE_SELECTED");
     recordDiagnostic("FILE_PREVIEW_READY", "DONE", "LOCAL_FILE_PREVIEW_READY");
     renderSelection();
@@ -399,8 +391,21 @@ async function start(): Promise<void> {
       setState("ERROR", `Chọn ảnh thất bại: ${safeErrorMessage(error)}`);
     }
   });
-  create.addEventListener("click", () => void createArticle());
-  upload.addEventListener("click", () => void uploadOnly());
+  previews.addEventListener("input", (event) => {
+    const target = event.target as HTMLInputElement;
+    const figure = target.closest<HTMLElement>("figure");
+    const item = selected.find((candidate) => candidate.clientFileId === figure?.dataset.clientFileId);
+    if (!item || !target.dataset.field) return;
+    if (target.dataset.field === "name") item.name = target.value;
+    if (target.dataset.field === "feature") item.feature = target.value;
+  });
+  previews.addEventListener("click", (event) => {
+    const target = event.target as HTMLElement;
+    if (!target.matches(".remove-asset")) return;
+    selected = selected.filter((item) => item.clientFileId !== target.dataset.clientFileId);
+    renderSelection();
+  });
+  upload.addEventListener("click", () => void (batchManifest?.status === "partial_success" ? retryPartialSubmission() : createArticle()));
 
   setState("CONNECTING", "Đang kết nối tới MCP Apps host…");
   recordDiagnostic("BOOT", "DONE", "WIDGET_BOOT");
@@ -421,7 +426,6 @@ async function start(): Promise<void> {
     input.disabled = true;
     select.disabled = true;
     upload.disabled = true;
-    create.disabled = true;
     recordDiagnostic("ERROR", "ERROR", "MCP_APPS_CONNECT_FAILED", error);
     setState("ERROR", `Không thể kết nối MCP Apps: ${safeErrorMessage(error)}`);
   }

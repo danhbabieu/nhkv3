@@ -12,6 +12,53 @@ use PHPUnit\Framework\TestCase;
 
 final class EditorialCaptureAssetFollowUpTest extends TestCase
 {
+    public function test_asset_manifest_is_sorted_by_capture_order_and_keeps_each_child_disposition(): void
+    {
+        $captures = new AssetFollowUpCaptureRepository();
+        $addenda = new AssetFollowUpAddendumRepository();
+        $capture = new CaptureRecord(
+            UuidCodec::newV7(), 'capture-ordered-assets', hash('sha256', 'capture-ordered-assets'),
+            CaptureStage::READY_FOR_PUBLICATION->value, 'PARTIAL', null, null, [],
+            ['raw_input' => 'Bộ ảnh.', 'subject_hints' => ['Junghans W64'], 'content_intent' => ['intent' => 'KNOWLEDGE_DELTA', 'article_required' => false]],
+            ['media_adoption' => ['status' => 'verified']], [],
+        );
+        $captures->create($capture);
+        $coordinator = new EditorialCaptureCoordinator(
+            $captures,
+            static fn (array $input): array => ['items' => []],
+            static fn (array $input): array => ['post_id' => 512, 'state_token' => 'state-512'],
+            new TextInputInterpreter(),
+            new SubjectResolutionService(static fn (string $hint): array => []),
+            new ClaimRetrievalEngine(static fn (array $subject): array => ['status' => 'available', 'items' => []], static fn (array $subject, array $neighborhood): array => []),
+            static fn (array $context): array => ['status' => 'PLANNED', 'writes' => []],
+            new ArticleComposer(),
+            static fn (array $context): array => ['status' => 'RECONCILED'],
+            static fn (array $context): array => ['eligible' => false, 'blockers' => ['OWNER_PUBLICATION_REQUIRED']],
+            static fn (array $context): array => ['status' => 'verified'],
+        );
+        $service = new EditorialCaptureContinuationService($captures, $addenda, $coordinator, static fn (array $input): array => [
+            'items' => [
+                ['client_file_id' => 'back', 'sort_order' => 2, 'media_id' => 'media-back', 'disposition' => 'technical_detail', 'attachment_readback_status' => 'verified'],
+                ['client_file_id' => 'front', 'sort_order' => 0, 'media_id' => 'media-front', 'disposition' => 'representative', 'attachment_readback_status' => 'verified'],
+                ['client_file_id' => 'dial', 'sort_order' => 1, 'media_id' => 'media-dial', 'disposition' => 'gallery', 'attachment_readback_status' => 'verified'],
+            ],
+        ]);
+
+        $result = $service->execute([
+            'capture_id' => $capture->captureId,
+            'idempotency_key' => 'ordered-assets-followup',
+            'followup_mode' => 'ATTACH_ASSETS',
+            'files' => [
+                ['name' => 'front.webp', 'tmp_name' => '/private/tmp/front.webp', 'size' => 4, 'type' => 'image/webp'],
+                ['name' => 'dial.webp', 'tmp_name' => '/private/tmp/dial.webp', 'size' => 4, 'type' => 'image/webp'],
+                ['name' => 'back.webp', 'tmp_name' => '/private/tmp/back.webp', 'size' => 4, 'type' => 'image/webp'],
+            ],
+        ]);
+
+        self::assertSame(['media-front', 'media-dial', 'media-back'], array_column($result['capture']['assets'], 'media_id'));
+        self::assertSame(['representative', 'gallery', 'technical_detail'], array_column($result['capture']['assets'], 'disposition'));
+    }
+
     public function test_asset_followup_reuses_capture_and_article_and_is_idempotent(): void
     {
         $captures = new AssetFollowUpCaptureRepository();
