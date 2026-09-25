@@ -1,9 +1,27 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { assertCaptureArticleReadback, assertMediaArticleReadback, assertUploadManifestCount, assertUploadManifestCounts, buildCaptureAssetInputs, buildWidgetState, extractPayload, extractUploadManifest, extractUploads, inspectToolResult, mergeUploadManifest, normalizeSelectedFiles, shouldProcessToolResultNotification, splitFeatureRequests } from "../src/contract.ts";
+import { assertCaptureArticleReadback, assertMediaArticleReadback, assertUploadManifestCount, assertUploadManifestCounts, buildCaptureAssetInputs, buildWidgetState, extractPayload, extractUploadManifest, extractUploads, inspectToolResult, mergeUploadManifest, normalizeCaptureReadback, normalizeSelectedFiles, shouldProcessToolResultNotification, splitFeatureRequests } from "../src/contract.ts";
+
+test("normalizes the canonical capture.ingest continuation envelope", () => {
+  const readback = normalizeCaptureReadback({
+    capture: { capture_id: "capture-canonical" },
+    content_intent: "IMAGE_ARTICLE",
+    article: { post_id: 711 },
+    per_media_disposition: [{ media_id: "media-one", status: "APPLIED" }],
+    canonical_usage_readback: [{ media_id: "media-one", endpoint_type: "wp_post", active: true }],
+  });
+
+  assert.equal(readback.capture_id, "capture-canonical");
+  assert.doesNotThrow(() => assertCaptureArticleReadback(readback, ["media-one"]));
+});
+
+test("fails closed when the canonical capture identity is missing", () => {
+  assert.throws(() => normalizeCaptureReadback({ content_intent: "IMAGE_ARTICLE" }), /CAPTURE_READBACK_UNAVAILABLE/);
+});
 
 test("rejects an Article capture readback without per-media canonical Article usages", () => {
   assert.throws(() => assertCaptureArticleReadback({
+    capture_id: "capture-article-media",
     capture_status: "COMPLETE",
     content_intent: "IMAGE_ARTICLE",
     article: { post_id: 711 },

@@ -13,7 +13,8 @@ const IMAGE_TYPES = /^(image\/jpeg|image\/png|image\/gif|image\/webp)$/;
 const IMAGE_ACCEPT = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 const STATES = ["CONNECTING", "READY", "UPLOADING", "SUCCESS", "PARTIAL", "ERROR"] as const;
 type WidgetState = (typeof STATES)[number];
-const USER_ERROR_MESSAGE = "Không thể xử lý mô tả. Dữ liệu chưa được ghi, bạn có thể thử lại.";
+const USER_ERROR_MESSAGE = "Không thể hoàn tất xử lý. Bạn có thể thử lại.";
+const MEDIA_SAVED_ERROR_MESSAGE = "Ảnh đã được lưu, nhưng phần tạo bài viết chưa hoàn tất. Có thể thử lại mà không tải lại ảnh.";
 
 type ChatGptFileApi = {
   selectFiles?: () => Promise<unknown>;
@@ -229,11 +230,7 @@ async function start(): Promise<void> {
   function assertCaptureResult(result: ToolResult): ReturnType<typeof assertCaptureArticleReadback> {
     const inspection = inspectToolResult(result);
     if (inspection.kind !== "success") throw new Error(inspection.code);
-    const payload = inspection.payload;
-    if (!payload || typeof payload !== "object") throw new Error("CAPTURE_READBACK_UNAVAILABLE");
-    const record = payload as { capture_id?: unknown; capture?: { capture_id?: unknown } };
-    if (typeof record.capture_id !== "string" && typeof record.capture?.capture_id !== "string") throw new Error("CAPTURE_READBACK_UNAVAILABLE");
-    return assertCaptureArticleReadback(payload, uploaded.map((item) => item.media_id).filter((id): id is string => Boolean(id)));
+    return assertCaptureArticleReadback(inspection.payload, uploaded.map((item) => item.media_id).filter((id): id is string => Boolean(id)));
   }
 
   async function assertArticleMediaReadback(capture: ReturnType<typeof assertCaptureArticleReadback>): Promise<void> {
@@ -333,7 +330,7 @@ async function start(): Promise<void> {
       retryOperationKey = operationKey;
       recordDiagnostic("ERROR", "ERROR", diagnosticCode(error), error);
       publishBatchContext();
-      setState("ERROR", USER_ERROR_MESSAGE);
+      setState("ERROR", uploaded.some((item) => item.status === "SUCCESS" && item.media_id) ? MEDIA_SAVED_ERROR_MESSAGE : USER_ERROR_MESSAGE);
     } finally {
       uploading = false;
       renderSelection();

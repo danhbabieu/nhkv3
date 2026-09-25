@@ -57,6 +57,7 @@ export type CaptureAssetInput = {
 };
 
 export type CaptureReadback = {
+  capture_id: string;
   capture_status?: string;
   article?: { post_id?: number | string | null } | null;
   article_id?: number | string | null;
@@ -66,9 +67,23 @@ export type CaptureReadback = {
   canonical_usage_readback?: Array<{ media_id?: string; endpoint_type?: string; endpoint_key?: string; active?: boolean }>;
 };
 
-export function assertCaptureArticleReadback(payload: unknown, expectedMediaIds: string[]): CaptureReadback {
+/**
+ * Normalize the two server-owned capture.ingest success projections at the
+ * transport boundary. A new ingest returns the readback flat; continuation
+ * returns the same CaptureRecord under `capture` with a retry envelope.
+ */
+export function normalizeCaptureReadback(payload: unknown): CaptureReadback {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) throw new Error("CAPTURE_READBACK_UNAVAILABLE");
-  const record = payload as CaptureReadback;
+  const record = payload as CaptureReadback & { capture?: unknown };
+  if (typeof record.capture_id === "string" && record.capture_id !== "") return record;
+  if (!record.capture || typeof record.capture !== "object" || Array.isArray(record.capture)) throw new Error("CAPTURE_READBACK_UNAVAILABLE");
+  const nested = record.capture as Record<string, unknown>;
+  if (typeof nested.capture_id !== "string" || nested.capture_id === "") throw new Error("CAPTURE_READBACK_UNAVAILABLE");
+  return { ...record, capture_id: nested.capture_id };
+}
+
+export function assertCaptureArticleReadback(payload: unknown, expectedMediaIds: string[]): CaptureReadback {
+  const record = normalizeCaptureReadback(payload);
   const intent = typeof record.content_intent === "string" ? record.content_intent : record.content_intent?.intent;
   if (intent?.toUpperCase() !== "IMAGE_ARTICLE") return record;
   const postId = record.article?.post_id ?? record.article_id;

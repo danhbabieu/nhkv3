@@ -12010,9 +12010,17 @@ class l extends Protocol {
     }
   }
 }
-function assertCaptureArticleReadback(payload, expectedMediaIds) {
+function normalizeCaptureReadback(payload) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) throw new Error("CAPTURE_READBACK_UNAVAILABLE");
   const record2 = payload;
+  if (typeof record2.capture_id === "string" && record2.capture_id !== "") return record2;
+  if (!record2.capture || typeof record2.capture !== "object" || Array.isArray(record2.capture)) throw new Error("CAPTURE_READBACK_UNAVAILABLE");
+  const nested = record2.capture;
+  if (typeof nested.capture_id !== "string" || nested.capture_id === "") throw new Error("CAPTURE_READBACK_UNAVAILABLE");
+  return { ...record2, capture_id: nested.capture_id };
+}
+function assertCaptureArticleReadback(payload, expectedMediaIds) {
+  const record2 = normalizeCaptureReadback(payload);
   const intent = typeof record2.content_intent === "string" ? record2.content_intent : record2.content_intent?.intent;
   if (intent?.toUpperCase() !== "IMAGE_ARTICLE") return record2;
   const postId = record2.article?.post_id ?? record2.article_id;
@@ -12297,7 +12305,8 @@ const MEDIA_GET_TOOL_NAME = "wp_ability_nhk_v3_media_get";
 const DOCUMENTATION_TOOL_NAME = "wp_ability_nhk_v3_documentation_bootstrap";
 const RESOURCE_URI = "ui://nhk/image-upload/v3.html";
 const IMAGE_TYPES = /^(image\/jpeg|image\/png|image\/gif|image\/webp)$/;
-const USER_ERROR_MESSAGE = "Không thể xử lý mô tả. Dữ liệu chưa được ghi, bạn có thể thử lại.";
+const USER_ERROR_MESSAGE = "Không thể hoàn tất xử lý. Bạn có thể thử lại.";
+const MEDIA_SAVED_ERROR_MESSAGE = "Ảnh đã được lưu, nhưng phần tạo bài viết chưa hoàn tất. Có thể thử lại mà không tải lại ảnh.";
 function byId(id) {
   const element = document.getElementById(id);
   if (!element) throw new Error(`Missing widget element: ${id}`);
@@ -12481,11 +12490,7 @@ async function start() {
   function assertCaptureResult(result) {
     const inspection = inspectToolResult(result);
     if (inspection.kind !== "success") throw new Error(inspection.code);
-    const payload = inspection.payload;
-    if (!payload || typeof payload !== "object") throw new Error("CAPTURE_READBACK_UNAVAILABLE");
-    const record2 = payload;
-    if (typeof record2.capture_id !== "string" && typeof record2.capture?.capture_id !== "string") throw new Error("CAPTURE_READBACK_UNAVAILABLE");
-    return assertCaptureArticleReadback(payload, uploaded.map((item) => item.media_id).filter((id) => Boolean(id)));
+    return assertCaptureArticleReadback(inspection.payload, uploaded.map((item) => item.media_id).filter((id) => Boolean(id)));
   }
   async function assertArticleMediaReadback(capture) {
     const articleId = Number(capture.article?.post_id ?? capture.article_id ?? 0);
@@ -12577,7 +12582,7 @@ async function start() {
       retryOperationKey = operationKey;
       recordDiagnostic("ERROR", "ERROR", diagnosticCode(error2), error2);
       publishBatchContext();
-      setState("ERROR", USER_ERROR_MESSAGE);
+      setState("ERROR", uploaded.some((item) => item.status === "SUCCESS" && item.media_id) ? MEDIA_SAVED_ERROR_MESSAGE : USER_ERROR_MESSAGE);
     } finally {
       uploading = false;
       renderSelection();

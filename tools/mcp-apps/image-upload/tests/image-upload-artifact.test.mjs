@@ -70,7 +70,7 @@ test("the View keeps shared description in Capture semantic input and out of Med
   assert.match(view, /text:\s*namingContext/);
   assert.match(view, /metadata:\s*\{\s*\}/);
   assert.doesNotMatch(view, /metadata:\s*\{\s*description:\s*namingContext/);
-  assert.match(view, /Không thể xử lý mô tả\. Dữ liệu chưa được ghi, bạn có thể thử lại\./);
+  assert.match(view, /Ảnh đã được lưu, nhưng phần tạo bài viết chưa hoàn tất\. Có thể thử lại mà không tải lại ảnh\./);
   assert.doesNotMatch(view, /Tạo bài viết thất bại:\s*\$\{safeErrorMessage\(error\)\}/);
 });
 
