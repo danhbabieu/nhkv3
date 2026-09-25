@@ -25,7 +25,7 @@ use NHK\Core\Application\Governance\GovernanceCapabilities;
 use NHK\Core\Application\Governance\{AuthorityStagingAdmission, CaptureChildRelationStagingAdmission, CaptureDependencyStagingAdmission, MediaBindingStagingAdmission, MediaMetadataStagingAdmission, VideoStagingAdmission};
 use NHK\Core\Application\Runtime\SemanticWritePolicyResolver;
 use NHK\Core\Application\Mcp\{McpAbilityRegistration, McpArticleIngestHandler, McpGovernanceHandler, McpReadHandler, McpSemanticContextResolver, McpToolCatalog, McpTransport, McpDocumentationRegistry};
-use NHK\Core\Application\Media\{ImageIngestEntrypoint, MediaBatchUploadService, MediaBindingService};
+use NHK\Core\Application\Media\{ImageIngestEntrypoint, MediaBatchUploadService, MediaBindingService, MediaTargetNormalizer};
 use NHK\Core\Application\Capture\{CaptureArticlePreflightHandoff, CaptureEditorialWriteGuard, CapturePhaseReceiptReducer, CaptureVideoProvenancePlanner, CaptureVideoPublicationVerifier, ClockTypeShadowClassifier, ContentPreparationOrchestrator, EditorialCaptureContinuationService, EditorialCaptureCoordinator, GovernedCaptureContinuationService, RelationProposalReconciliationService};
 use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, ClaimReusePolicy, EditorialClaimRetrievalService, EditorialKnowledgeSelector, EditorialQualityGate, KnowledgeWriterPreviewService, ReaderJourneyPlanner, SharedEditorialComposer, SharedEnrichmentBoundary, SubjectResolutionService, TextInputInterpreter};
 use NHK\Core\Application\Article\{ArticleEditorialAdapter, ArticleIngestCoordinator, ArticleIngestPreflight, ArticleResearchPreflight, ArticleVerificationReader, SemanticProposalPlanner, OwnerPublicationApplicationService};
@@ -175,7 +175,13 @@ final class Plugin {
         global $wpdb;
         if (isset($wpdb) && is_object($wpdb)) SnapshotRuntimeComposition::register($wpdb);
         if (isset($wpdb) && is_object($wpdb)) {
-            $stagingAdmission = new MediaBindingStagingAdmission(new WpdbMediaRepository($wpdb), new WpdbAuthorityRepository($wpdb));
+            $admissionMedia = new WpdbMediaRepository($wpdb);
+            $admissionAuthority = new WpdbAuthorityRepository($wpdb);
+            $admissionTypes = new EntityTypeRegistry();
+            CanonicalEntityTypeCatalog::registerInto($admissionTypes);
+            $admissionEndpoints = new EndpointTypeRegistry();
+            CoreEndpointResolverRegistrar::register($admissionEndpoints, $admissionTypes, $admissionAuthority, $admissionMedia, new WpdbVideoRepository($wpdb));
+            $stagingAdmission = new MediaBindingStagingAdmission($admissionMedia, $admissionAuthority, targetNormalizer: new MediaTargetNormalizer($admissionEndpoints, $admissionTypes, $admissionAuthority));
             add_filter('nhk_v3_staging_acceptance_admission', new AuthorityStagingAdmission(), 10, 5);
             add_filter('nhk_v3_staging_acceptance_admission', $stagingAdmission, 20, 5);
             add_filter('nhk_v3_staging_acceptance_admission', new MediaMetadataStagingAdmission(new WpdbMediaRepository($wpdb)), 22, 5);

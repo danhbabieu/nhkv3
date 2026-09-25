@@ -5,12 +5,13 @@ namespace NHK\Core\Application\Governance;
 
 use NHK\Core\Domain\Governance\CommandCanonicalizer;
 use NHK\Core\Shared\Uuid\UuidCodec;
+use NHK\Core\Application\Media\MediaTargetNormalizer;
 
 /** Fail-closed staging scope for direct canonical MediaBindingService calls. */
 final class MediaBindingStagingGuard
 {
     /** @param callable():string $environment @param callable(array<string,mixed>,array<string,mixed>):bool|null $scopeVerifier @param callable(string):bool|null $can */
-    public function __construct(private $environment, private $scopeVerifier = null, private $can = null) {}
+    public function __construct(private $environment, private $scopeVerifier = null, private $can = null, private ?MediaTargetNormalizer $targetNormalizer = null) {}
 
     /** @param array<string,mixed> $request */
     public function __invoke(array $request): void
@@ -36,6 +37,9 @@ final class MediaBindingStagingGuard
 
         $mediaId = trim((string) (($request['media']['id'] ?? '')));
         $target = is_array($request['target'] ?? null) ? $request['target'] : [];
+        if ($this->targetNormalizer !== null) {
+            try { $target = $this->targetNormalizer->normalizeRequestTarget($target); } catch (\Throwable) { throw new \RuntimeException('STAGING_EXACT_TARGET_REQUIRED'); }
+        }
         $targetId = trim((string) ($target['id'] ?? ''));
         $targetType = strtolower(trim((string) ($target['type'] ?? '')));
         $exactTarget = $targetType === 'wp_post'
@@ -62,6 +66,9 @@ final class MediaBindingStagingGuard
         if (!in_array($operation, ['add', 'replace', 'remove'], true)) throw new \RuntimeException('PRODUCTION_OPERATION_UNREGISTERED');
         if (!UuidCodec::isValid(trim((string) (($request['media']['id'] ?? ''))))) throw new \RuntimeException('PRODUCTION_EXACT_MEDIA_REQUIRED');
         $target = is_array($request['target'] ?? null) ? $request['target'] : [];
+        if ($this->targetNormalizer !== null) {
+            try { $target = $this->targetNormalizer->normalizeRequestTarget($target); } catch (\Throwable) { throw new \RuntimeException('PRODUCTION_EXACT_TARGET_REQUIRED'); }
+        }
         $type = strtolower(trim((string) ($target['type'] ?? '')));
         $id = trim((string) ($target['id'] ?? ''));
         if ($type === 'wp_post' ? preg_match('/^[1-9][0-9]*:[1-9][0-9]*$/', $id) !== 1 : !UuidCodec::isValid($id)) throw new \RuntimeException('PRODUCTION_EXACT_TARGET_REQUIRED');
@@ -76,9 +83,8 @@ final class MediaBindingStagingGuard
     private function mediaUsagePayloadFingerprint(array $request, array $scope): string
     {
         $target = is_array($request['target'] ?? null) ? $request['target'] : [];
-        if (strtolower(trim((string) ($target['type'] ?? ''))) === 'wp_post') {
-            $target = ['type' => 'wp_post', 'id' => ((int) ($target['blog_id'] ?? 1)) . ':' . (int) ($target['post_id'] ?? $target['id'] ?? 0)];
-        }
+        if ($this->targetNormalizer !== null) $target = $this->targetNormalizer->normalizeRequestTarget($target);
+        elseif (strtolower(trim((string) ($target['type'] ?? ''))) === 'wp_post') $target = ['type' => 'wp_post', 'id' => ((int) ($target['blog_id'] ?? 1)) . ':' . (int) ($target['post_id'] ?? $target['id'] ?? 0)];
         $media = is_array($request['media'] ?? null) ? $request['media'] : [];
         $payload = array_replace($request, [
             'operation' => strtolower(trim((string) ($scope['operation'] ?? ($request['operation'] ?? '')))),

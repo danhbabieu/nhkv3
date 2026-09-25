@@ -8,6 +8,7 @@ use NHK\Core\Domain\Governance\{CommandCanonicalizer, Proposal};
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Video\YouTubeSourceSnapshot;
 use NHK\Core\Shared\Uuid\UuidCodec;
+use NHK\Core\Application\Media\MediaTargetNormalizer;
 
 /**
  * The single owner of server-issued, Capture-derived staging acceptance.
@@ -26,6 +27,7 @@ final class StagingAcceptanceScopeVerifier
         private int $ttlSeconds = 900,
         private $can = null,
         private ?VideoRepository $videos = null,
+        private ?MediaTargetNormalizer $targetNormalizer = null,
     ) {}
 
     /** @param list<array<string,mixed>> $assets @return array<string,mixed> */
@@ -86,7 +88,11 @@ final class StagingAcceptanceScopeVerifier
         $targetType = strtolower(trim((string) ($target['type'] ?? '')));
         $targetId = trim((string) ($target['id'] ?? ''));
         if (!UuidCodec::isValid($mediaId) || $targetType === '') throw new \RuntimeException('STAGING_EXACT_MEDIA_USAGE_REFERENCE_REQUIRED');
-        if ($targetType === 'wp_post') {
+        if ($this->targetNormalizer !== null) {
+            try { $target = $this->targetNormalizer->normalizeRequestTarget($target); } catch (\Throwable $error) { throw new \RuntimeException('STAGING_EXACT_MEDIA_USAGE_REFERENCE_REQUIRED', 0, $error); }
+            $targetType = (string) $target['type'];
+            $targetId = (string) $target['id'];
+        } elseif ($targetType === 'wp_post') {
             $blog = (int) ($target['blog_id'] ?? 1);
             $post = (int) ($target['post_id'] ?? $targetId);
             if ($blog < 1 || $post < 1) throw new \RuntimeException('STAGING_EXACT_MEDIA_USAGE_REFERENCE_REQUIRED');
@@ -642,6 +648,11 @@ final class StagingAcceptanceScopeVerifier
             $target = is_array($binding['target'] ?? null) ? $binding['target'] : [];
             $targetType = strtolower(trim((string) ($target['type'] ?? '')));
             $targetId = trim((string) ($target['id'] ?? ''));
+            if ($this->targetNormalizer !== null) {
+                try { $target = $this->targetNormalizer->normalizeRequestTarget($target); } catch (\Throwable) { throw new \RuntimeException('STAGING_SCOPE_EXACT_REFERENCE_REQUIRED'); }
+                $targetType = (string) $target['type'];
+                $targetId = (string) $target['id'];
+            }
             $exactTarget = $targetType === 'wp_post'
                 ? preg_match('/^[1-9][0-9]*:[1-9][0-9]*$/', $targetId) === 1
                 : UuidCodec::isValid($targetId);

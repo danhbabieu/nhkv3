@@ -128,6 +128,7 @@ final class GovernanceRuntimeFactory
             },
             can: static fn (string $capability): bool => function_exists('current_user_can') && current_user_can($capability),
             videos: $videos,
+            targetNormalizer: new MediaTargetNormalizer($endpoints, $types, $authority),
         );
         $authorityScopeResolver = static function (\NHK\Core\Domain\Governance\Proposal $proposal) use ($captureRepository, $stagingScopeVerifier): ?array {
             $authorityTypes = ['brand', 'model', 'variant', 'movement', 'music', 'component', 'classification', 'specimen', 'product'];
@@ -155,7 +156,7 @@ final class GovernanceRuntimeFactory
         });
         $eligibility->setStagingScopeResolver($authorityScopeResolver);
         $eligibility->setStagingScopeDiagnosticProvider([$stagingScopeVerifier, 'proposalDescriptorDiagnostic']);
-        $mediaBinding = new MediaBindingService($media, $assets, $usages, $authority, $types, new \NHK\Core\Infrastructure\Media\WpdbMediaBindingOperationRepository($wpdb), stagingGuard: new MediaBindingStagingGuard($environment, [$stagingScopeVerifier, 'verifyBindingRequest'], static fn (string $capability): bool => function_exists('current_user_can') && current_user_can($capability)), capabilities: $mediaCapabilities, targetResolver: $mediaTargetResolver, targetNormalizer: new MediaTargetNormalizer($endpoints, $types, $authority));
+        $mediaBinding = new MediaBindingService($media, $assets, $usages, $authority, $types, new \NHK\Core\Infrastructure\Media\WpdbMediaBindingOperationRepository($wpdb), stagingGuard: new MediaBindingStagingGuard($environment, [$stagingScopeVerifier, 'verifyBindingRequest'], static fn (string $capability): bool => function_exists('current_user_can') && current_user_can($capability), targetNormalizer: new MediaTargetNormalizer($endpoints, $types, $authority)), capabilities: $mediaCapabilities, targetResolver: $mediaTargetResolver, targetNormalizer: new MediaTargetNormalizer($endpoints, $types, $authority));
         $stagingGuard = new OperationScopedStagingGuard(
             $environment,
             static fn (string $capability): bool => function_exists('current_user_can') && current_user_can($capability),

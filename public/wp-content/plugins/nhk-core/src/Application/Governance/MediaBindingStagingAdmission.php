@@ -7,6 +7,7 @@ use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Contracts\Media\MediaRepository;
 use NHK\Core\Domain\Capture\CaptureRecord;
 use NHK\Core\Domain\Media\RepresentativeEligibilityRegistry;
+use NHK\Core\Application\Media\MediaTargetNormalizer;
 use NHK\Core\Shared\Uuid\UuidCodec;
 
 /**
@@ -22,6 +23,7 @@ final class MediaBindingStagingAdmission
         private MediaRepository $media,
         private AuthorityRepository $authority,
         private RepresentativeEligibilityRegistry $eligibility = new RepresentativeEligibilityRegistry(),
+        private ?MediaTargetNormalizer $targetNormalizer = null,
     ) {}
 
     /** @param array<string,mixed> $scope @param array<string,mixed> $input @param list<array<string,mixed>> $assets */
@@ -86,9 +88,10 @@ final class MediaBindingStagingAdmission
         $media = is_array($operation['media'] ?? null) ? $operation['media'] : (array) ($operation['media_ref'] ?? []);
         if ((string) ($media['id'] ?? '') !== (string) ($scope['subject_id'] ?? '')) return false;
         $target = is_array($operation['target'] ?? null) ? $operation['target'] : [];
-        $targetId = strtolower((string) ($target['type'] ?? '')) === 'wp_post'
-            ? ((int) ($target['blog_id'] ?? 1) . ':' . (int) ($target['post_id'] ?? $target['id'] ?? 0))
-            : (string) ($target['id'] ?? '');
+        if ($this->targetNormalizer !== null) {
+            try { $target = $this->targetNormalizer->normalizeRequestTarget($target); } catch (\Throwable) { return false; }
+        }
+        $targetId = (string) ($target['id'] ?? '');
         $scopedTarget = (array) ($scope['target'] ?? []);
         return $targetId === (string) ($scopedTarget['id'] ?? '')
             && strtolower((string) ($target['type'] ?? '')) === (string) ($scopedTarget['type'] ?? '')
