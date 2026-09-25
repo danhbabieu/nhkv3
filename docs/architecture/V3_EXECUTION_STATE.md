@@ -151,6 +151,31 @@ STATUS: `CAPTURE_MULTI_IMAGE_ARTICLE_PUBLIC_LOCAL_IMPLEMENTED / AUTOMATED_LOCAL_
 
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-25 — Generic Easy MCP tools/list gate repair (LOCAL / READ-ONLY)
+
+ROOT_CAUSE: `EasyMcpNativeFileCompatibilityAdapter` gated the entire Easy MCP
+descriptor projection behind the MCP Apps UI-version allowlist. When the
+installed Easy MCP bridge was outside that list, its dynamic registrar could
+still expose sibling Abilities, but the NHK generic materialization boundary
+never ran; the canonical `nhk.knowledge.writer.preview` Ability therefore had
+no connector descriptor and diagnostics stayed empty.
+
+FIRST_BROKEN_BOUNDARY: authenticated Easy MCP response projection before the
+wire `tools/list` response. The fix keeps MCP Apps protocol/resource projection
+version-gated, but makes generic descriptor normalization/materialization run for
+every Easy MCP version at both `rest_post_dispatch` and final echo boundaries.
+No Knowledge Writer-specific branch was added.
+
+REGRESSION: Added a version-unknown wire projection test that asserts exactly
+one `wp_ability_nhk_v3_knowledge_writer_preview` descriptor and a guarded
+production Easy MCP integration test that takes the descriptor from authenticated
+`tools/list`, calls that exact connector name, and asserts the read-only preview
+response.
+
+SAFETY: READ_ONLY only. No Capture, Article, Video, Media, Knowledge, Claim,
+Evidence or Relation mutation; no migration, runtime mutation or Brain 1/Brain 2
+change. `PRODUCTION_SPECIAL_CASES=0` for this fix.
+
 # Checkpoint — 2026-09-25 — Knowledge Writer MCP cross-chat descriptor discoverability (LOCAL / NO LIVE MUTATION)
 
 IMPLEMENTED: Strengthened the canonical `nhk.knowledge.writer.preview` MCP

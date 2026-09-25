@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace NHK\Tests\Integration;
 
 use NHK\Core\Infrastructure\Mcp\EasyMcpNativeFileCompatibilityAdapter;
-use NHK\Core\Application\Mcp\McpAppDiagnostics;
+use NHK\Core\Application\Mcp\{McpAbilityRegistration, McpAppDiagnostics};
 use NHK\Tests\Support\TestDatabaseGuard;
 use PHPUnit\Framework\TestCase;
 
@@ -75,6 +75,54 @@ final class EasyMcpNativeFileCompatibilityIntegrationTest extends TestCase
         self::assertSame(1, $event['contents_count']);
         self::assertSame(strlen('private body'), $event['contents_0_text_byte_length']);
         self::assertArrayNotHasKey('text', $event);
+    }
+
+    public function test_authenticated_tools_list_descriptor_drives_knowledge_writer_tools_call(): void
+    {
+        if (!defined('EASY_MCP_AI_VERSION') || !class_exists('Easy_MCP_AI\\Auth\\Token_Manager')) {
+            self::markTestSkipped('Authenticated Easy MCP runtime is required for the production tools/list/tools/call assertion.');
+        }
+
+        $users = get_users(['role' => 'administrator', 'number' => 1]);
+        self::assertNotEmpty($users);
+        $tokenManager = new \Easy_MCP_AI\Auth\Token_Manager();
+        $token = $tokenManager->create_token('nhk-knowledge-writer-wire-regression', (int) $users[0]->ID, ['*']);
+        self::assertIsArray($token);
+        $rawToken = (string) ($token['raw_token'] ?? '');
+        self::assertNotSame('', $rawToken);
+
+        try {
+            $list = $this->wireBody($this->dispatchAuthenticatedWire($rawToken, 'tools/list', 601, null));
+            $descriptors = array_values(array_filter(
+                (array) ($list['result']['tools'] ?? []),
+                static fn (mixed $tool): bool => is_array($tool)
+                    && McpAbilityRegistration::toolNameForConnectorTool((string) ($tool['name'] ?? '')) === 'nhk.knowledge.writer.preview',
+            ));
+            self::assertCount(1, $descriptors, (string) wp_json_encode($list));
+            $descriptor = $descriptors[0];
+            $connectorName = (string) $descriptor['name'];
+            self::assertSame('wp_ability_nhk_v3_knowledge_writer_preview', $connectorName);
+            self::assertArrayHasKey('inputSchema', $descriptor);
+
+            $call = $this->wireBody($this->dispatchAuthenticatedWire(
+                $rawToken,
+                'tools/call',
+                602,
+                null,
+                '2026-07-28',
+                $connectorName,
+                [
+                    'subject' => ['type' => 'brand', 'name' => 'Easy MCP wire subject'],
+                    'instruction' => 'Summarize only supported information in Vietnamese.',
+                    'purpose' => 'concise_answer',
+                ],
+            ));
+            self::assertArrayNotHasKey('error', $call, (string) wp_json_encode($call));
+            self::assertFalse($call['result']['isError'] ?? true, (string) wp_json_encode($call));
+            self::assertTrue($call['result']['structuredContent']['read_only'] ?? false, (string) wp_json_encode($call));
+        } finally {
+            $tokenManager->delete_token((int) ($token['id'] ?? 0));
+        }
     }
 
     public function test_unauthenticated_multipart_capture_is_denied_before_nhk_dispatch(): void
@@ -242,7 +290,7 @@ final class EasyMcpNativeFileCompatibilityIntegrationTest extends TestCase
         }
     }
 
-    private function dispatchAuthenticatedWire(string $rawToken, string $method, int $id, ?string $uri, string $protocolVersion = '2026-07-28'): mixed
+    private function dispatchAuthenticatedWire(string $rawToken, string $method, int $id, ?string $uri, string $protocolVersion = '2026-07-28', ?string $toolName = null, array $arguments = []): mixed
     {
         $request = new \WP_REST_Request('POST', '/easy-mcp-ai/v1/mcp');
         $params = [
@@ -252,6 +300,10 @@ final class EasyMcpNativeFileCompatibilityIntegrationTest extends TestCase
             ],
         ];
         if ($uri !== null) $params['uri'] = $uri;
+        if ($toolName !== null) {
+            $params['name'] = $toolName;
+            $params['arguments'] = $arguments;
+        }
         $request->set_header('Authorization', 'Bearer ' . $rawToken);
         $request->set_header('Content-Type', 'application/json');
         $request->set_header('Accept', 'application/json');

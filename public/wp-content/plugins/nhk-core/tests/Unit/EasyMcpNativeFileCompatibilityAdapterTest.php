@@ -724,6 +724,34 @@ final class EasyMcpNativeFileCompatibilityAdapterTest extends TestCase
         self::assertFalse(EasyMcpNativeFileCompatibilityAdapter::isUiResourceCompatibleVersion('2.0.0'));
     }
 
+    /**
+     * @runInSeparateProcess
+     * @preserveGlobalState disabled
+     */
+    public function test_tools_list_projection_remains_active_when_easy_mcp_ui_version_is_unknown(): void
+    {
+        define('EASY_MCP_AI_VERSION', '9.9.9');
+        $request = new class {
+            public function get_route(): string { return '/easy-mcp-ai/v1/mcp'; }
+            public function get_json_params(): array { return ['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/list']; }
+        };
+        $response = new class {
+            /** @var array<string,mixed> */
+            public array $data = ['jsonrpc' => '2.0', 'id' => 1, 'result' => ['tools' => []]];
+            public function get_status(): int { return 200; }
+            public function get_data(): array { return $this->data; }
+            public function set_data(array $data): void { $this->data = $data; }
+        };
+
+        EasyMcpNativeFileCompatibilityAdapter::projectToolsListDescriptor($response, null, $request);
+        $tools = array_column($response->data['result']['tools'], null, 'name');
+        self::assertArrayHasKey('wp_ability_nhk_v3_knowledge_writer_preview', $tools);
+        self::assertSame(
+            'nhk.knowledge.writer.preview',
+            \NHK\Core\Application\Mcp\McpAbilityRegistration::toolNameForConnectorTool('wp_ability_nhk_v3_knowledge_writer_preview'),
+        );
+    }
+
     private static function assertValidJsonSchemaNode(mixed $schema, string $toolName): void
     {
         if ($schema instanceof \stdClass) {

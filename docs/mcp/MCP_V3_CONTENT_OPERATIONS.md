@@ -546,7 +546,7 @@ availability; local HTTP wire smoke remains an environment check.
 | `nhk.video.get` | Video | READ | No | N/A | No raw edge | READY for active valid public reference |
 | `nhk.video.frontend.reconcile` | Existing canonical Video → frontend read-back | WRITE / INTERNAL lifecycle check | Yes | No owner, identity, editorial or SEO write; exact owner-bound read-back only | `MediaVideoPageQuery` detail/archive + `HomeSemanticQuery` homepage source | READY only when projection, route and required listing read-backs pass; otherwise `REVIEW_REQUIRED` |
 | `nhk.knowledge.get` | Knowledge + public evidence | READ | No | N/A | No raw edge | READY for active/public chain |
-| `nhk.knowledge.writer.preview` | Universal Enrichment + Editorial Intelligence read preview | READ | No | N/A | Bounded semantic read only | READY through `/nhk/v1/mcp`; no generic Ability |
+| `nhk.knowledge.writer.preview` | Universal Enrichment + Editorial Intelligence read preview | READ | No | N/A | Bounded semantic read only | READY through `/nhk/v1/mcp` and the generic Easy MCP Ability projection |
 | `nhk.source.get` | Source + public evidence | READ | No | N/A | No raw edge | READY for active/public chain |
 | `nhk.evidence.get` | Evidence + public endpoints | READ | No | N/A | No raw edge | READY for active/public chain |
 | `nhk.knowledge.ingest` | Knowledge claim | WRITE | Yes | Apply/revision governed | No edge by ingest | READY |

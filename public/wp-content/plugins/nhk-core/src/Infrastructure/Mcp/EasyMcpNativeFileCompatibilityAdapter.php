@@ -249,10 +249,14 @@ final class EasyMcpNativeFileCompatibilityAdapter
     public static function projectToolsListDescriptor(mixed $response, mixed $server, mixed $request): mixed
     {
         self::$authenticatedWireResponse = false;
-        if (!self::uiResourceProjectionEnabled()) return $response;
         if (!is_object($request) || !method_exists($request, 'get_route') || rtrim((string) $request->get_route(), '/') !== rtrim(self::ENDPOINT, '/')) return $response;
         $rpc = self::requestRpc($request);
         if ($rpc !== null && !in_array(($rpc['method'] ?? null), ['initialize', 'server/discover', 'tools/list', 'tools/call', 'resources/list', 'resources/read'], true)) return $response;
+        // Descriptor projection is a generic Easy MCP compatibility boundary,
+        // not an MCP Apps feature. It must remain active for every authenticated
+        // Easy MCP version so a newly registered public Ability cannot disappear
+        // from tools/list merely because the installed bridge has no UI resource
+        // compatibility entry.
         if (self::nativeResourceRegistrationActive() && in_array(($rpc['method'] ?? null), ['resources/list', 'resources/read'], true)) return $response;
         if (!is_object($response) || !method_exists($response, 'get_data') || !method_exists($response, 'set_data')) return $response;
         $status = method_exists($response, 'get_status') ? (int) $response->get_status() : 200;
@@ -271,10 +275,10 @@ final class EasyMcpNativeFileCompatibilityAdapter
 
         if (!is_array($data)) return $response;
         $projected = match ($rpc['method'] ?? 'tools/list') {
-            'initialize', 'server/discover' => self::projectProtocolCapabilities($data),
+            'initialize', 'server/discover' => self::uiResourceProjectionEnabled() ? self::projectProtocolCapabilities($data) : $data,
             'tools/call' => $data,
-            'resources/list' => self::projectResourceListData($data),
-            'resources/read' => self::projectResourceReadData($data, $rpc),
+            'resources/list' => self::uiResourceProjectionEnabled() ? self::projectResourceListData($data) : $data,
+            'resources/read' => self::uiResourceProjectionEnabled() ? self::projectResourceReadData($data, $rpc) : $data,
             default => self::projectToolsListData($data),
         };
         McpAppDiagnostics::record($rpc ?? [], is_array($projected) ? $projected : $data, $status, true);
@@ -389,15 +393,14 @@ final class EasyMcpNativeFileCompatibilityAdapter
 
     public static function projectFinalToolsListDescriptor(mixed $data, mixed $server, mixed $request): mixed
     {
-        if (!self::uiResourceProjectionEnabled()) return $data;
         if (defined('EASY_MCP_AI_VERSION') && !self::$authenticatedWireResponse) return $data;
         if (!is_object($request) || !method_exists($request, 'get_route') || rtrim((string) $request->get_route(), '/') !== rtrim(self::ENDPOINT, '/')) return $data;
         $rpc = self::requestRpc($request);
         if (self::nativeResourceRegistrationActive() && in_array(($rpc['method'] ?? null), ['resources/list', 'resources/read'], true)) return $data;
         return match ($rpc['method'] ?? 'tools/list') {
-            'initialize', 'server/discover' => self::projectProtocolCapabilities($data),
-            'resources/list' => self::projectResourceListData($data),
-            'resources/read' => self::projectResourceReadData($data, $rpc),
+            'initialize', 'server/discover' => self::uiResourceProjectionEnabled() ? self::projectProtocolCapabilities($data) : $data,
+            'resources/list' => self::uiResourceProjectionEnabled() ? self::projectResourceListData($data) : $data,
+            'resources/read' => self::uiResourceProjectionEnabled() ? self::projectResourceReadData($data, $rpc) : $data,
             default => self::projectToolsListData($data),
         };
     }
