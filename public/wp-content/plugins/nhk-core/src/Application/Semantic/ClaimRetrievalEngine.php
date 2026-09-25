@@ -311,6 +311,7 @@ final class ClaimRetrievalEngine
         $evidence = (string) ($row['evidence_status'] ?? 'NO_EVIDENCE');
         $text = (string) ($row['text'] ?? $row['claim_text'] ?? '');
         $topicOverlap = $intent !== '' ? $this->overlap($intent, strtolower($text)) : 0.0;
+        $subjectOverlap = $intent !== '' ? $this->overlap($intent, strtolower((string) ($subject['name'] ?? ''))) : 0.0;
         $registeredFacetMatch = $need !== null && in_array($need['facet_key'] ?? null, KnowledgeFacetProfile::FACETS, true)
             && ($need['concept_key'] ?? '') === ''
             && strtolower(trim((string) ($row['facet'] ?? $row['knowledge_facet'] ?? ''))) === (string) $need['facet_key'];
@@ -321,7 +322,7 @@ final class ClaimRetrievalEngine
         if ($id === '' || $text === '') { $decision = 'exclude'; $reason = 'claim identity or text is missing'; }
         elseif (!$this->applicableToSubject($claimSubject, $claimSubjectType, $subject, $path)) { $decision = 'exclude'; $reason = 'Claim has no explainable subject-scoped applicability path'; $warnings[] = 'SEMANTIC_SCOPE_NOT_APPLICABLE'; }
         elseif ($scope === 'specimen-only' && ($subject['type'] ?? '') !== 'specimen') { $decision = 'exclude'; $reason = 'specimen-scoped Claim cannot generalize to this subject'; $warnings[] = 'SPECIMEN_SCOPE_LIMIT'; }
-        elseif ($intent !== '' && $topicOverlap <= 0.0 && !$registeredFacetMatch) { $decision = 'exclude'; $reason = 'Claim is not relevant to the editorial topic'; $warnings[] = 'TOPIC_IRRELEVANT'; }
+        elseif ($intent !== '' && $topicOverlap <= 0.0 && !$registeredFacetMatch && !($claimSubject === $subjectId && $subjectOverlap > 0.0)) { $decision = 'exclude'; $reason = 'Claim is not relevant to the editorial topic'; $warnings[] = 'TOPIC_IRRELEVANT'; }
         elseif ($evidence !== 'SUPPORTED_WITHIN_SCOPE') { $decision = 'review'; $reason = 'evidence is absent or insufficient for direct prose'; $warnings[] = 'EVIDENCE_SCOPE_REVIEW'; }
         elseif ($provenance === '') { $decision = 'review'; $reason = 'provenance is unavailable'; $warnings[] = 'PROVENANCE_UNAVAILABLE'; }
         if ($decision === 'include') {
@@ -381,9 +382,11 @@ final class ClaimRetrievalEngine
         $first = $path[0] ?? [];
         $last = $path[array_key_last($path)] ?? [];
         if (!is_array($first) || !is_array($last)) return false;
-        if ((string) ($first['source'] ?? '') !== (string) ($subject['type'] ?? '') . ':' . $subjectId) return false;
-        $lastTarget = (string) ($last['target'] ?? '');
-        if ($claimSubjectType !== '' ? $lastTarget !== $claimSubjectType . ':' . $claimSubject : !str_ends_with($lastTarget, ':' . $claimSubject)) return false;
+        $rootKey = (string) ($subject['type'] ?? '') . ':' . $subjectId;
+        $traversedFrom = (string) ($first['traversed_from'] ?? $first['source'] ?? '');
+        if ($traversedFrom !== $rootKey) return false;
+        $traversedTo = (string) ($last['traversed_to'] ?? $last['target'] ?? '');
+        if ($claimSubjectType !== '' ? $traversedTo !== $claimSubjectType . ':' . $claimSubject : !str_ends_with($traversedTo, ':' . $claimSubject)) return false;
         $predicates = $this->predicates ?? new PredicateRegistry();
         foreach ($path as $step) {
             if (!is_array($step)) return false;

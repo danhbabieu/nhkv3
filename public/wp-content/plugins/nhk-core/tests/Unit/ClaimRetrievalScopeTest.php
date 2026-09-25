@@ -48,6 +48,29 @@ final class ClaimRetrievalScopeTest extends TestCase
         self::assertSame([], $engine->retrieve($this->context('chuông búa'))['selected_claims']);
     }
 
+    public function test_incoming_graph_traversal_keeps_persisted_edge_direction_and_is_applicable(): void
+    {
+        $variant = 'variant-w64';
+        $engine = $this->engine([
+            ['id' => 'variant-claim', 'subject_id' => $variant, 'subject_type' => 'variant',
+                'text' => 'Biến thể có cấu hình được ghi nhận.', 'scope' => 'variant',
+                'provenance' => 'CATALOG_SUPPORTED', 'evidence_status' => 'SUPPORTED_WITHIN_SCOPE',
+                'relation_path' => [[
+                    'source' => 'variant:' . $variant, 'predicate' => 'variant_of', 'target' => 'model:' . self::SUBJECT,
+                    'persisted_source' => 'variant:' . $variant, 'persisted_target' => 'model:' . self::SUBJECT,
+                    'traversed_from' => 'model:' . self::SUBJECT, 'traversed_to' => 'variant:' . $variant,
+                    'traversal_direction' => 'INCOMING', 'directional_semantics' => 'INVERSE_TRAVERSAL_OF_PERSISTED_EDGE',
+                ]]],
+        ]);
+
+        $result = $engine->retrieve([
+            'raw_input' => 'Chủ thể model',
+            'subject_resolution' => ['subjects' => [['id' => self::SUBJECT, 'type' => 'model', 'name' => 'Chủ thể model']]],
+        ]);
+
+        self::assertSame(['variant-claim'], array_column($result['selected_claims'], 'claim_id'));
+    }
+
     private function engine(array $rows): ClaimRetrievalEngine
     {
         return new ClaimRetrievalEngine(

@@ -1,3 +1,33 @@
+# Checkpoint — 2026-09-25 — Generic Knowledge Writer subject/applicability boundary (LOCAL / READ-ONLY)
+
+ROOT_CAUSE: Knowledge Writer passed a caller-supplied `type` into typed name
+resolution, so an exact name/alias on another eligible canonical subject type
+was hidden. Separately, Claim retrieval required topic-token overlap even for
+an evidence-supported direct Claim bound to the resolved canonical subject;
+incoming Graph traversal also compared persisted endpoints to traversal
+orientation and rejected valid reverse-discovered paths.
+
+FIRST_BROKEN_BOUNDARY: Generic Knowledge Writer subject normalization, followed
+by ClaimRetrievalEngine applicability/topic gating. UUID/stable-key resolution
+remains strict. Name/query resolution now uses the existing generic semantic
+resolver; direct Claims bypass topic drift only when the topic identifies the
+canonical subject. Applicability accepts explicit `traversed_from/to` while
+retaining persisted endpoint/predicate registry validation.
+
+REGRESSION: Added generic cross-type name resolution, direct-subject topic
+relevance, and incoming traversal tests. No Odo/W64 production mapping,
+observation promotion, Knowledge/Graph write, migration or database action.
+
+VERIFICATION: Focused semantic/Knowledge Writer/Article/Video/Media matrix
+passed 113 tests / 551 assertions; Contract passed 6 tests / 48 assertions.
+Full Unit under `memory_limit=512M` ran 2,637 tests / 15,326 assertions and
+has one unrelated existing `ClockTypeFrontendAcceptanceTest` fixture failure.
+Guarded Integration is `ENVIRONMENT_BLOCKED`: WordPress reports `Error
+establishing a database connection` for `nhk_v3_test`. Changed PHP lint and
+`git diff --check` pass. No mutation, deployment or production action occurred.
+
+STATUS: `KNOWLEDGE_WRITER_GENERIC_BOUNDARIES_LOCAL_READY / FULL_UNIT_EXISTING_FIXTURE_FAILURE / INTEGRATION_ENVIRONMENT_BLOCKED / NO_MUTATION`.
+
 # Checkpoint — 2026-09-25 — Capture Feature resolution and governed MediaUsage isolation (LOCAL / NO LIVE MUTATION)
 
 IMPLEMENTED: Added a capability-neutral Capture Feature binding coordinator. Each
@@ -19603,3 +19633,34 @@ Integration is `ENVIRONMENTAL_FAILURE` because `NHK_WP_TEST_PATH` and
 SSH, or deployment action was performed.
 
 STATUS: `CAPTURE_READBACK_NORMALIZATION_LOCAL_READY / INTEGRATION_ENVIRONMENT_GATED / NO_LIVE_MUTATION`.
+# Checkpoint — 2026-09-25 — Image widget host upload isolation and diagnostics (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE_CONFIRMED: The widget called the documented `window.openai.uploadFile(file,
+{library:false})` and then `getFileDownloadUrl({fileId})` directly inside one
+fail-fast sequential loop. Any host Promise rejection or malformed reference
+escaped the loop before `HOST_FILE_UPLOAD_DONE`, so the UI collapsed the real
+host classification into a submission-level `UPLOAD_FAILED` and never reached
+the server Media tool.
+
+FIXED_BOUNDARY: Added a bounded host-file worker queue (maximum two concurrent
+files) with per-file ordered outcomes, a 30-second timeout, at most two retry
+attempts for transient failures, no retry for typed permanent rejection, and
+trusted-reference validation before server-tool input. Browser `File` objects
+are reused within the widget session; library references only resolve their
+existing `fileId`. Successful files continue to the existing Media tool while
+failed files remain in the ordered retry manifest, so partial host success is
+preserved and completed Media is not uploaded again on Article/enrichment retry.
+
+DIAGNOSTICS: Host failures now retain only stage, typed class/code, ordinal,
+MIME, byte size and attempt number in widget state. Raw host error payloads,
+URLs, tokens and bytes are not persisted. User copy distinguishes host upload
+failure, partial X/Y success and post-Media Article/enrichment failure.
+
+VERIFICATION: Image widget tests pass 45/45, TypeScript typecheck passes and
+the Vite single-file build passes with only the existing Rollup annotation
+warnings. No Capture/Article/MediaUsage implementation was changed, and no
+database, staging/production data, deployment or live acceptance mutation was
+performed. HEIC/HEIF remain outside the current server allowlist (JPEG, PNG,
+GIF and WebP); no client binary conversion or MIME fabrication was added.
+
+STATUS: `IMAGE_WIDGET_HOST_UPLOAD_ISOLATION_FIXED_LOCAL / AUTOMATED_LOCAL_VERIFICATION_COMPLETE / NO_LIVE_MUTATION / DEPLOYMENT_PENDING`.

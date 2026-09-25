@@ -159,7 +159,7 @@ final class KnowledgeWriterPreviewService
         if ($locators === []) return ['status' => 'unresolved', 'primary' => null, 'diagnostics' => []];
         $primary = null;
         foreach ($locators as $key => $value) {
-            if ($key === 'name' && $type === '') {
+            if ($key === 'name') {
                 $text = $this->textResolver->resolveSources(['subject_hints' => [$value]]);
                 $matches = array_values((array) ($text['resolved'] ?? []));
                 $resolution = ['status' => $text['status'] ?? 'unresolved', 'primary' => count($matches) === 1 ? $matches[0] : null,

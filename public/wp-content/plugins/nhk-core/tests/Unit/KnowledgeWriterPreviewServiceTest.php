@@ -27,7 +27,8 @@ trait KnowledgeWriterPreviewFixture
         $this->authority = new InMemoryAuthorityRepository();
         foreach (['brand', 'model', 'variant', 'classification'] as $index => $type) {
             $id = sprintf('%08d-1111-4111-8111-111111111111', $index + 1);
-            $this->authority->create(new AuthorityEntity($id, $type, $type . ':sample', 'Chủ thể ' . $type, 1, []));
+            $payload = $type === 'variant' ? ['aliases' => ['Odo 36/10']] : [];
+            $this->authority->create(new AuthorityEntity($id, $type, $type . ':sample', 'Chủ thể ' . $type, 1, $payload));
             if ($type === 'variant') $this->subjectId = $id;
         }
         $this->rows = [[
@@ -110,6 +111,46 @@ final class KnowledgeWriterPreviewServiceTest extends TestCase
             self::assertSame($type, $result['subject']['type']);
             self::assertContains($result['status'], ['available', 'sparse']);
         }
+    }
+
+    public function test_name_locator_uses_exact_match_across_registered_subject_types(): void
+    {
+        $odo = $this->subjectId;
+        $this->rows = [[
+            'id' => 'odo-claim', 'revision' => 2, 'subject_id' => $odo, 'subject_type' => 'variant',
+            'facet' => 'recognition', 'text' => 'Chủ thể variant có mặt số với vòng chỉ giờ.', 'scope' => 'variant',
+            'provenance' => 'CATALOG_SUPPORTED', 'evidence_status' => 'SUPPORTED_WITHIN_SCOPE',
+        ]];
+
+        $result = $this->service()->preview([
+            'subject' => ['type' => 'model', 'name' => 'Odo 36/10', 'query' => 'Odo 36/10'],
+            'instruction' => 'Tóm tắt điểm nhận diện.', 'requested_facets' => ['recognition'],
+        ]);
+
+        self::assertCount(1, $this->retrievals, json_encode($result, JSON_UNESCAPED_UNICODE) ?: '');
+        self::assertNotContains('SUBJECT_NOT_FOUND', $result['diagnostics'], json_encode($result, JSON_UNESCAPED_UNICODE) ?: '');
+        self::assertSame($odo, $result['subject']['canonical_id']);
+        self::assertNotEmpty($result['used_knowledge'], json_encode($result, JSON_UNESCAPED_UNICODE) ?: '');
+        self::assertNotSame('', $result['answer']);
+    }
+
+    public function test_direct_subject_claim_is_not_rejected_only_for_missing_topic_word_overlap(): void
+    {
+        $w64 = '77777777-7777-4777-8777-777777777777';
+        $this->authority->create(new AuthorityEntity($w64, 'variant', 'nhk:variant:junghans.w64', 'Junghans W64', 1, []));
+        $this->rows = [[
+            'id' => 'w64-claim', 'revision' => 2, 'subject_id' => $w64, 'subject_type' => 'variant',
+            'facet' => 'configuration', 'text' => 'Cấu hình năm côn đồng bạch.', 'scope' => 'variant',
+            'provenance' => 'CATALOG_SUPPORTED', 'evidence_status' => 'SUPPORTED_WITHIN_SCOPE',
+        ]];
+
+        $result = $this->service()->preview([
+            'subject' => ['type' => 'variant', 'name' => 'Junghans W64', 'query' => 'Junghans W64'],
+            'instruction' => 'Tóm tắt chủ thể.',
+        ]);
+
+        self::assertSame('available', $result['status'], json_encode($result, JSON_UNESCAPED_UNICODE) ?: '');
+        self::assertSame(['w64-claim'], array_column($result['used_knowledge'], 'claim_id'));
     }
 
     public function test_unknown_purpose_and_facet_fail_closed(): void
