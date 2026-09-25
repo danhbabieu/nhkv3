@@ -137,7 +137,7 @@ final class MediaBindingServiceTest extends TestCase
         self::assertSame('REVIEW_REQUIRED', $result['status']);
     }
 
-    public function test_governed_article_media_usage_add_replace_and_remove_preserve_usage_identity(): void
+    public function test_governed_article_media_usage_replace_preserves_retired_history_and_creates_new_usage(): void
     {
         [$service, $usages] = $this->service();
         $target = ['type' => 'wp_post', 'blog_id' => 1, 'post_id' => 573];
@@ -155,18 +155,18 @@ final class MediaBindingServiceTest extends TestCase
             'target' => $target, 'usage_id' => $usageId, 'expected_usage_revision' => 1, 'role' => 'inline_supporting', 'placement_key' => 'inline-supporting-1',
             'selection_source' => 'USER_EXPLICIT', 'selection_policy' => 'PINNED',
         ]);
-        self::assertSame($usageId, $replaced['usage_id']);
+        self::assertNotSame($usageId, $replaced['usage_id']);
         self::assertSame('01a0ab0c-fde0-7c01-a89d-fc5eef832c90', $replaced['usage']['media_id']);
-        self::assertSame(2, $replaced['usage']['revision']);
+        self::assertSame(1, $replaced['usage']['revision']);
 
         $removed = $service->mutate([
             'operation' => 'remove', 'idempotency_key' => 'article-media-remove', 'target' => $target,
-            'usage_id' => $usageId, 'expected_usage_revision' => 2, 'role' => 'inline_supporting', 'placement_key' => 'inline-supporting-1',
+            'usage_id' => $replaced['usage_id'], 'expected_usage_revision' => 1, 'role' => 'inline_supporting', 'placement_key' => 'inline-supporting-1',
             'selection_source' => 'USER_EXPLICIT', 'selection_policy' => 'PINNED',
         ]);
-        self::assertSame($usageId, $removed['usage_id']);
+        self::assertSame($replaced['usage_id'], $removed['usage_id']);
         self::assertSame('retired', $removed['usage']['active_slot']);
-        self::assertCount(1, $usages->listByEndpoint('wp_post', '1:573', 'inline_supporting'));
+        self::assertCount(2, $usages->listByEndpoint('wp_post', '1:573', 'inline_supporting'));
     }
 
     public function test_governed_media_usage_replace_requires_current_revision_and_exact_target(): void
@@ -229,7 +229,7 @@ final class MemoryAssetRepository implements MediaAssetRepository
 final class MemoryUsageRepository implements MediaUsageRepository, MediaUsageUpdater
 {
     /** @var list<MediaUsage> */ private array $items = [];
-    public function create(MediaUsage $usage): MediaUsage { foreach ($this->items as $item) if ($item->endpointType === $usage->endpointType && $item->endpointKey === $usage->endpointKey && $item->role === $usage->role && $item->placementKey === $usage->placementKey) throw new MediaException('duplicate'); foreach ($this->items as $item) if ($usage->activeSlot !== null && $item->endpointType === $usage->endpointType && $item->endpointKey === $usage->endpointKey && $item->role === $usage->role && $item->activeSlot === $usage->activeSlot) throw new MediaException('active slot duplicate'); $this->items[] = $usage; return $usage; }
+    public function create(MediaUsage $usage): MediaUsage { foreach ($this->items as $item) if ($item->activeSlot !== 'retired' && $item->endpointType === $usage->endpointType && $item->endpointKey === $usage->endpointKey && $item->role === $usage->role && $item->placementKey === $usage->placementKey) throw new MediaException('duplicate'); foreach ($this->items as $item) if ($usage->activeSlot !== null && $item->activeSlot !== 'retired' && $item->endpointType === $usage->endpointType && $item->endpointKey === $usage->endpointKey && $item->role === $usage->role && $item->activeSlot === $usage->activeSlot) throw new MediaException('active slot duplicate'); $this->items[] = $usage; return $usage; }
     public function update(MediaUsage $usage): MediaUsage { foreach ($this->items as $index => $item) if ($item->usageId === $usage->usageId) { $updated = new MediaUsage($usage->usageId, $usage->mediaId, $usage->endpointType, $usage->endpointKey, $usage->role, $usage->sortOrder, $usage->altText, $usage->caption, $usage->keywordGroups, $usage->title, $usage->revision + 1, $usage->placementKey, $usage->selectionSource, $usage->selectionPolicy, $usage->activeSlot); $this->items[$index] = $updated; return $updated; } throw new MediaException('missing'); }
     public function listByMediaId(string $id, ?string $role = null): array { return array_values(array_filter($this->items, static fn (MediaUsage $item): bool => $item->mediaId === $id && ($role === null || $item->role === $role))); }
     public function listByEndpoint(string $type, string $key, ?string $role = null): array { return array_values(array_filter($this->items, static fn (MediaUsage $item): bool => $item->endpointType === $type && $item->endpointKey === $key && ($role === null || $item->role === $role))); }

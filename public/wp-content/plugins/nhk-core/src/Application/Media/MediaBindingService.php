@@ -133,6 +133,21 @@ final class MediaBindingService implements MediaBindingPort
         }
         $nextMedia = $operation === 'replace' ? $media : $this->resolveMedia(['id' => $existing->mediaId]);
         if (!$nextMedia instanceof Media) throw new MediaException('MEDIA_USAGE_MEDIA_REQUIRED');
+        if ($operation === 'replace') {
+            $updater->update(new MediaUsage(
+                $existing->usageId, $existing->mediaId, $existing->endpointType, $existing->endpointKey,
+                $existing->role, $existing->sortOrder, $existing->altText, $existing->caption,
+                $existing->keywordGroups, $existing->title, $existing->revision, $existing->placementKey,
+                $existing->selectionSource, $existing->selectionPolicy, 'retired',
+            ));
+            $replacement = $this->usages->create(new MediaUsage(
+                UuidCodec::newV7(), $nextMedia->canonicalId, $existing->endpointType, $existing->endpointKey,
+                $existing->role, $normalized['sort_order'], $normalized['seo']['alt_text'], $normalized['seo']['caption'],
+                $existing->keywordGroups, $normalized['seo']['title'], 1, $existing->placementKey,
+                $normalized['selection_source'], $normalized['selection_policy'], $existing->activeSlot,
+            ));
+            return $this->mutationResult($operation, $nextMedia->canonicalId, $replacement, $existing->usageId, $target);
+        }
         $usage = $updater->update(new MediaUsage(
             $existing->usageId, $nextMedia->canonicalId, $existing->endpointType, $existing->endpointKey,
             $existing->role, $operation === 'replace' ? $normalized['sort_order'] : $existing->sortOrder,
@@ -264,8 +279,9 @@ final class MediaBindingService implements MediaBindingPort
         if ($type === '') throw new MediaException('MEDIA_USAGE_TARGET_REQUIRED');
         $role = trim((string) ($request['role'] ?? ($type === 'wp_post' ? MediaUsageRoleRegistry::INLINE_SUPPORTING : MediaUsageRoleRegistry::REPRESENTATIVE)));
         MediaUsageRoleRegistry::assertKnown($role);
-        if ($type !== 'wp_post' && $role !== MediaUsageRoleRegistry::REPRESENTATIVE) throw new MediaException('MEDIA_USAGE_AUTHORITY_ROLE_INVALID');
+        if ($type !== 'wp_post' && $role !== MediaUsageRoleRegistry::REPRESENTATIVE && $this->targetNormalizer === null) throw new MediaException('MEDIA_USAGE_AUTHORITY_ROLE_INVALID');
         if ($type === 'wp_post' && $role === MediaUsageRoleRegistry::REPRESENTATIVE) throw new MediaException('MEDIA_USAGE_ARTICLE_ROLE_INVALID');
+        if ($this->targetNormalizer !== null && $this->capabilities?->forEndpoint($type)?->supportsRole($role) !== true) throw new MediaException('MEDIA_USAGE_ROLE_UNSUPPORTED');
         $media = is_array($request['media'] ?? null) ? $request['media'] : [];
         if ($operation !== 'remove' && $media === []) throw new MediaException('MEDIA_USAGE_MEDIA_REQUIRED');
         $source = strtoupper(trim((string) ($request['selection_source'] ?? 'USER_EXPLICIT')));
