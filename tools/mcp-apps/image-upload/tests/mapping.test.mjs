@@ -1,6 +1,139 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { assertCaptureArticleReadback, assertMediaArticleReadback, assertUploadManifestCount, assertUploadManifestCounts, buildCaptureAssetInputs, buildWidgetState, extractPayload, extractUploadManifest, extractUploads, inspectToolResult, mergeUploadManifest, normalizeCaptureReadback, normalizeSelectedFiles, shouldProcessToolResultNotification, splitFeatureRequests } from "../src/contract.ts";
+import { planSubmissionResume } from "../src/resume-policy.ts";
+
+function committedSubmission(count, overrides = {}) {
+  return {
+    media_commit_status: "COMPLETE",
+    enrichment_status: "PARTIAL",
+    intent: "IMAGE_ARTICLE",
+    items: Array.from({ length: count }, (_, ordinal) => ({
+      ordinal,
+      client_file_id: `client-${ordinal}`,
+      media_id: `media-${ordinal}`,
+      status: "MEDIA_COMMITTED",
+    })),
+    ...overrides,
+  };
+}
+
+for (const count of [1, 2, 3, 10]) {
+  test(`resumes enrichment without physical uploads for N=${count}`, () => {
+    const plan = planSubmissionResume(committedSubmission(count));
+
+    assert.equal(plan.phase, "CONTINUE_ENRICHMENT");
+    assert.deepEqual(plan.materializeOrdinals, []);
+    assert.deepEqual(plan.canonicalMediaIds, Array.from({ length: count }, (_, ordinal) => `media-${ordinal}`));
+    assert.equal(plan.captureAction, "ENSURE_ONE");
+    assert.equal(plan.articleAction, "ENSURE_ONE");
+  });
+}
+
+test("retries only failed media children and preserves canonical order", () => {
+  const plan = planSubmissionResume(committedSubmission(10, {
+    media_commit_status: "PARTIAL",
+    enrichment_status: "NOT_RUN",
+    items: Array.from({ length: 10 }, (_, ordinal) => ({
+      ordinal,
+      client_file_id: `client-${ordinal}`,
+      media_id: ordinal === 2 || ordinal === 7 ? undefined : `media-${ordinal}`,
+      status: ordinal === 2 || ordinal === 7 ? "FAILED_RETRYABLE" : "MEDIA_COMMITTED",
+    })),
+  }));
+
+  assert.equal(plan.phase, "MATERIALIZE_MEDIA");
+  assert.deepEqual(plan.materializeOrdinals, [2, 7]);
+  assert.deepEqual(plan.canonicalMediaIds, ["media-0", "media-1", "media-3", "media-4", "media-5", "media-6", "media-8", "media-9"]);
+  assert.equal(plan.articleAction, "ENSURE_ONE");
+});
+
+test("does not host-upload a failed Media commit when its stable host reference exists", () => {
+  const plan = planSubmissionResume(committedSubmission(10, {
+    media_commit_status: "PARTIAL",
+    enrichment_status: "NOT_RUN",
+    items: Array.from({ length: 10 }, (_, ordinal) => ({
+      ordinal,
+      client_file_id: `client-${ordinal}`,
+      file_id: ordinal === 2 || ordinal === 7 ? `file-${ordinal}` : undefined,
+      media_id: ordinal === 2 || ordinal === 7 ? undefined : `media-${ordinal}`,
+      status: ordinal === 2 || ordinal === 7 ? "FAILED_RETRYABLE" : "MEDIA_COMMITTED",
+    })),
+  }));
+
+  assert.deepEqual(plan.materializeOrdinals, [2, 7]);
+  assert.deepEqual(plan.hostUploadOrdinals, []);
+  assert.deepEqual(plan.mediaUploadOrdinals, [2, 7]);
+});
+
+test("host materialization is limited to LOCAL children without a stable file reference", () => {
+  const plan = planSubmissionResume({
+    media_commit_status: "PARTIAL",
+    items: [
+      { ordinal: 0, client_file_id: "client-a", status: "LOCAL" },
+      { ordinal: 1, client_file_id: "client-b", file_id: "file-b", status: "HOST_UPLOADED" },
+      { ordinal: 2, client_file_id: "client-c", file_id: "file-c", status: "FAILED_RETRYABLE" },
+    ],
+  });
+
+  assert.deepEqual(plan.hostUploadOrdinals, [0]);
+  assert.deepEqual(plan.mediaUploadOrdinals, [0, 1, 2]);
+});
+
+test("repairs only missing MediaUsage for an existing Article", () => {
+  const plan = planSubmissionResume(committedSubmission(10, {
+    capture: { id: "capture-1", exists: true },
+    article: { id: 77, exists: true },
+    media_usages: [
+      ...Array.from({ length: 8 }, (_, ordinal) => ({ media_id: `media-${ordinal}`, status: "COMPLETE" })),
+    ],
+  }));
+
+  assert.equal(plan.phase, "REPAIR_MEDIA_USAGE");
+  assert.deepEqual(plan.usageMediaIds, ["media-8", "media-9"]);
+  assert.equal(plan.captureAction, "REUSE");
+  assert.equal(plan.articleAction, "REUSE");
+  assert.deepEqual(plan.materializeOrdinals, []);
+});
+
+test("retries projection only after canonical MediaUsage is complete", () => {
+  const plan = planSubmissionResume(committedSubmission(10, {
+    article: { id: 77, exists: true },
+    media_usages: Array.from({ length: 10 }, (_, ordinal) => ({ media_id: `media-${ordinal}`, status: "COMPLETE" })),
+    projection: { status: "FAILED_RETRYABLE" },
+  }));
+
+  assert.equal(plan.phase, "RETRY_PROJECTION");
+  assert.deepEqual(plan.materializeOrdinals, []);
+  assert.deepEqual(plan.usageMediaIds, []);
+  assert.equal(plan.articleAction, "REUSE");
+});
+
+test("returns idempotent NOOP when every owner and projection is complete", () => {
+  const plan = planSubmissionResume(committedSubmission(3, {
+    enrichment_status: "COMPLETE",
+    article: { id: 77, exists: true },
+    media_usages: Array.from({ length: 3 }, (_, ordinal) => ({ media_id: `media-${ordinal}`, status: "COMPLETE" })),
+    projection: { status: "COMPLETE" },
+  }));
+
+  assert.equal(plan.phase, "NOOP");
+  assert.deepEqual(plan.materializeOrdinals, []);
+  assert.deepEqual(plan.usageMediaIds, []);
+  assert.equal(plan.articleAction, "REUSE");
+});
+
+test("orders canonical Media by stable ordinal instead of arrival order", () => {
+  const plan = planSubmissionResume(committedSubmission(3, {
+    items: [
+      { ordinal: 2, client_file_id: "client-c", media_id: "media-c", status: "MEDIA_COMMITTED" },
+      { ordinal: 0, client_file_id: "client-a", media_id: "media-a", status: "MEDIA_COMMITTED" },
+      { ordinal: 1, client_file_id: "client-b", media_id: "media-b", status: "MEDIA_COMMITTED" },
+    ],
+  }));
+
+  assert.deepEqual(plan.canonicalMediaIds, ["media-a", "media-b", "media-c"]);
+});
 
 test("normalizes the canonical capture.ingest continuation envelope", () => {
   const readback = normalizeCaptureReadback({

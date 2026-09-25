@@ -18,6 +18,71 @@ use PHPUnit\Framework\TestCase;
  */
 final class EditorialCaptureConvergenceE2ETest extends TestCase
 {
+    public static function imageCounts(): iterable
+    {
+        yield 'one image' => [1];
+        yield 'two images' => [2];
+        yield 'three images' => [3];
+        yield 'ten images' => [10];
+    }
+
+    /**
+     * @dataProvider imageCounts
+     */
+    public function test_image_article_uses_one_article_and_one_ordered_usage_per_media(int $count): void
+    {
+        $captures = new Pr5CaptureRepository();
+        $calls = ['draft' => 0, 'semantic' => 0, 'media' => 0, 'publication' => 0, 'final' => 0];
+        $events = [];
+        $mediaIds = array_map(static fn (int $ordinal): string => 'media-' . $ordinal, range(0, $count - 1));
+        $coordinator = $this->coordinator(
+            $captures,
+            $calls,
+            $events,
+            semanticStatus: 'COMPLETED',
+            physical: static fn (): array => ['items' => array_map(static fn (int $ordinal): array => [
+                'kind' => 'image',
+                'media_id' => 'media-' . $ordinal,
+                'client_file_id' => 'client-' . $ordinal,
+                'sort_order' => $ordinal,
+                'upload_status' => 'CREATED',
+            ], range(0, $count - 1))],
+            media: static function (array $context) use ($count, &$calls): array {
+                ++$calls['media'];
+                $mediaIds = array_map(static fn (int $ordinal): string => 'media-' . $ordinal, range(0, $count - 1));
+                return [
+                    'status' => 'RECONCILED',
+                    'media_ids' => $mediaIds,
+                    'media_dispositions' => array_map(static fn (string $mediaId): array => ['media_id' => $mediaId, 'status' => 'APPLIED'], $mediaIds),
+                    'media_usage' => array_map(static fn (string $mediaId, int $ordinal): array => ['media_id' => $mediaId, 'sort_order' => $ordinal, 'active' => true], $mediaIds, range(0, $count - 1)),
+                ];
+            },
+        );
+
+        $result = $coordinator->execute([
+            'idempotency_key' => 'generic-image-article-' . $count,
+            'intent' => 'IMAGE_ARTICLE',
+            'title' => 'Generic ordered image article',
+            'text' => 'Một submission có nhiều ảnh theo thứ tự canonical.',
+            'asset_inputs' => array_map(static fn (int $ordinal): array => [
+                'client_file_id' => 'client-' . $ordinal,
+                'ordinal' => $ordinal,
+                'name' => 'Ảnh ' . $ordinal,
+                'feature_requests' => [],
+            ], range(0, $count - 1)),
+        ]);
+
+        // This unit fixture does not publish or perform public readback. Assert
+        // semantic convergence independently from those downstream gates.
+        self::assertSame('PARTIAL', $result->status);
+        self::assertSame('COMPLETE', $result->diagnostics['completion']['relation_or_usage_state']);
+        self::assertSame(1, $calls['draft']);
+        self::assertSame(1, $calls['media']);
+        self::assertSame($count, count($result->diagnostics['media_usage']['media_ids'] ?? []));
+        self::assertSame($mediaIds, $result->diagnostics['media_usage']['media_ids'] ?? []);
+        self::assertSame($count, count($result->diagnostics['media_usage']['media_usage'] ?? []));
+    }
+
     public function test_capture_passes_shared_enrichment_into_real_semantic_lifecycle_context(): void
     {
         $captures = new Pr5CaptureRepository();

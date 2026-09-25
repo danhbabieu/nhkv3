@@ -43,6 +43,50 @@ final class FrontendPresentationContractTest extends TestCase
         self::assertSame(1, substr_count($source, 'class="home-latest-feed"'));
     }
 
+    public function test_homepage_latest_feed_is_bounded_and_image_led(): void
+    {
+        $source = $this->read('front-page.php');
+
+        self::assertStringContainsString('array_slice($latestFeed, 0, 4)', $source);
+        self::assertStringContainsString('class="latest-feed-card latest-feed-row"', $source);
+        self::assertStringContainsString('wp_get_attachment_image((int) $item[\'attachment_id\']', $source);
+        self::assertStringContainsString("\$item['image_srcset'] ?? \$item['srcset']", $source);
+        self::assertStringContainsString("\$item['image_sizes'] ?? \$item['sizes']", $source);
+        self::assertStringContainsString('latest-feed-card-link', $source);
+    }
+
+    public function test_homepage_featured_selection_remains_sticky_first_with_existing_fallbacks(): void
+    {
+        $query = $this->read('inc/class-nhk-home-page-query.php');
+
+        self::assertStringContainsString('sticky_posts are the editorial selection mechanism for homepage featured content', $query);
+        self::assertStringContainsString("get_option('sticky_posts')", $query);
+        self::assertStringContainsString("if (\$featured === []) \$featured = \$this->posts(['posts_per_page' => 3, 'offset' => 6, 'ignore_sticky_posts' => true]);", $query);
+        self::assertStringContainsString("if (\$featured === []) \$featured = array_slice(\$latest, 0, 3);", $query);
+    }
+
+    public function test_homepage_does_not_render_sidebar_or_empty_two_column_home_layout(): void
+    {
+        $source = $this->read('front-page.php');
+
+        self::assertStringNotContainsString('get_sidebar()', $source);
+        self::assertStringNotContainsString('class="content-layout home-layout"', $source);
+        self::assertStringContainsString('$renderableHomeSections', $source);
+        self::assertStringContainsString('if ($renderableHomeSections !== [])', $source);
+        self::assertStringNotContainsString('class="sidebar"', $source);
+    }
+
+    public function test_homepage_compact_layout_contracts_are_responsive(): void
+    {
+        $css = $this->read('entity.css');
+
+        self::assertStringContainsString('.home-latest-feed .latest-feed-list', $css);
+        self::assertStringContainsString('grid-template-columns:repeat(2,minmax(0,1fr))', $css);
+        self::assertStringContainsString('.latest-feed-card-link', $css);
+        self::assertStringContainsString('.featured-support', $css);
+        self::assertStringContainsString('line-clamp:2', $css);
+    }
+
     public function test_homepage_prioritizes_only_the_hero_lcp_image(): void
     {
         $source = $this->read('front-page.php');

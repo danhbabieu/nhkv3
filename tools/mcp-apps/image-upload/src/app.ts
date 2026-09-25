@@ -1,6 +1,7 @@
 import { App } from "@modelcontextprotocol/ext-apps";
-import { assertCaptureArticleReadback, assertMediaArticleReadback, assertUploadManifestCounts, buildCaptureAssetInputs, buildWidgetState, extractUploadManifest, inspectToolResult, mergeUploadManifest, normalizeSelectedFiles, shouldProcessToolResultNotification, type BatchContext, type SelectedImage, type ToolResult, type ToolResultNotificationSource, type UploadedItem, type UploadManifest, type WidgetDiagnostic, type WidgetUploadStatus } from "./contract";
+import { assertCaptureArticleReadback, assertMediaArticleReadback, assertUploadManifestCounts, buildCaptureAssetInputs, buildWidgetState, extractUploadManifest, inspectToolResult, mergeUploadManifest, normalizeSelectedFiles, orderUploadedItems, shouldProcessToolResultNotification, type BatchContext, type SelectedImage, type ToolResult, type ToolResultNotificationSource, type UploadedItem, type UploadManifest, type WidgetDiagnostic, type WidgetUploadStatus } from "./contract";
 import { uploadSelectedFiles, type HostUploadOutcome } from "./host-upload";
+import { planSubmissionResume } from "./resume-policy";
 
 // Easy MCP exposes the internal/admin boundary under the registered
 // WordPress Ability name. callServerTool must use that exact runtime name;
@@ -232,13 +233,13 @@ async function start(): Promise<void> {
   function assertCaptureResult(result: ToolResult): ReturnType<typeof assertCaptureArticleReadback> {
     const inspection = inspectToolResult(result);
     if (inspection.kind !== "success") throw new Error(inspection.code);
-    return assertCaptureArticleReadback(inspection.payload, uploaded.map((item) => item.media_id).filter((id): id is string => Boolean(id)));
+    return assertCaptureArticleReadback(inspection.payload, orderUploadedItems(uploaded).map((item) => item.media_id).filter((id): id is string => Boolean(id)));
   }
 
   async function assertArticleMediaReadback(capture: ReturnType<typeof assertCaptureArticleReadback>): Promise<void> {
     const articleId = Number(capture.article?.post_id ?? capture.article_id ?? 0);
     if (!(articleId > 0)) throw new Error("ARTICLE_READBACK_UNAVAILABLE");
-    for (const mediaId of uploaded.map((item) => item.media_id).filter((id): id is string => Boolean(id))) {
+    for (const mediaId of orderUploadedItems(uploaded).map((item) => item.media_id).filter((id): id is string => Boolean(id))) {
       recordDiagnostic("ARTICLE_MEDIA_READBACK_START", "START", "MEDIA_GET_READBACK_REQUESTED");
       const result = await app.callServerTool({ name: MEDIA_GET_TOOL_NAME, arguments: { id: mediaId } });
       assertMediaArticleReadback(result as ToolResult, mediaId, articleId);
@@ -247,16 +248,32 @@ async function start(): Promise<void> {
   }
 
   async function materializeSelectedImages(operationKey: string, namingContext: string, attempt: number): Promise<UploadManifest> {
-    if (batchManifest !== null && batchManifest.success_count === batchManifest.requested_count && uploaded.length === selected.length && uploaded.every((item) => Boolean(item.media_id))) return batchManifest;
-    const retryingPartialBatch = batchManifest?.status === "partial_success";
-    const sourceOrdinals = retryingPartialBatch
-      ? batchManifest!.items
-        .filter((item) => item.status !== "SUCCESS")
-        .flatMap((item) => typeof item.ordinal === "number" && Number.isInteger(item.ordinal) && item.ordinal >= 0 && item.ordinal < selected.length ? [item.ordinal] : [])
+    const priorItems = batchManifest?.items ?? [];
+    const resumePlan = planSubmissionResume({
+      media_commit_status: batchManifest === null ? "NOT_RUN" : batchManifest.failure_count > 0 ? "PARTIAL" : "COMPLETE",
+      enrichment_status: enrichmentStatus,
+      items: priorItems,
+    });
+    if (batchManifest !== null && resumePlan.phase !== "MATERIALIZE_MEDIA") {
+      uploaded = orderUploadedItems(batchManifest.items);
+      return batchManifest;
+    }
+    const retryingPartialBatch = resumePlan.materializeOrdinals.length > 0 && batchManifest?.status === "partial_success";
+    const sourceOrdinals = resumePlan.mediaUploadOrdinals.length > 0
+      ? resumePlan.mediaUploadOrdinals
       : selected.map((_item, index) => index);
-    if (retryingPartialBatch && sourceOrdinals.length === 0) return batchManifest!;
+    const hostUploadOrdinals = new Set(
+      resumePlan.hostUploadOrdinals.length > 0
+        ? resumePlan.hostUploadOrdinals
+        : sourceOrdinals,
+    );
+    if (batchManifest !== null && sourceOrdinals.length === 0) return batchManifest;
     const outcomes = await uploadSelectedFiles(sourceOrdinals.map((index) => {
       const item = selected[index];
+      const previous = priorItems.find((candidate) => candidate.ordinal === index);
+      if (!hostUploadOrdinals.has(index) && previous?.file_id) {
+        return { ordinal: index, file: null, fileId: previous.file_id, fileName: previous.original_filename ?? previous.public_filename, mimeType: previous.mime };
+      }
       return item.kind === "local"
         ? { ordinal: index, file: item.file }
         : { ordinal: index, file: null, fileId: item.fileId, fileName: item.fileName, mimeType: item.mimeType };
@@ -334,6 +351,12 @@ async function start(): Promise<void> {
       if (manifest.status !== "success") throw new Error("PARTIAL_BATCH_NOT_READY");
       const docs = await app.callServerTool({ name: DOCUMENTATION_TOOL_NAME, arguments: {} });
       const checkpoint = checkpointFrom(docs as ToolResult);
+      const canonicalMediaIds = planSubmissionResume({
+        media_commit_status: "COMPLETE",
+        enrichment_status: enrichmentStatus,
+        items: orderUploadedItems(uploaded),
+      }).canonicalMediaIds;
+      if (canonicalMediaIds.length !== selected.length) throw new Error("MEDIA_CANONICAL_READBACK_INCOMPLETE");
       const capture = await app.callServerTool({
         name: CAPTURE_TOOL_NAME,
         arguments: {
@@ -341,7 +364,7 @@ async function start(): Promise<void> {
           documentation_checkpoint: checkpoint,
           text: namingContext,
           asset_inputs: buildCaptureAssetInputs(selected),
-          media_ids: uploaded.map((item) => item.media_id).filter((id): id is string => Boolean(id)),
+          media_ids: canonicalMediaIds,
           publish: false,
         },
       });

@@ -1,5 +1,6 @@
 export type UploadedItem = {
   ordinal?: number;
+  client_file_id?: string;
   attachment_id?: number;
   media_id?: string;
   public_filename?: string;
@@ -308,6 +309,7 @@ function safeUploadedItem(value: unknown, fallbackStatus = "SUCCESS"): UploadedI
   const status = normalizedStatus === "CREATED" || normalizedStatus === "SUCCESS" ? "SUCCESS" : normalizedStatus !== "" ? normalizedStatus : fallbackStatus;
   const item: UploadedItem = {
     ...(Number.isInteger(record.ordinal) && (record.ordinal as number) >= 0 ? { ordinal: record.ordinal as number } : {}),
+    ...(typeof record.client_file_id === "string" ? { client_file_id: record.client_file_id } : {}),
     ...(typeof record.attachment_id === "number" ? { attachment_id: record.attachment_id } : {}),
     ...(typeof record.media_id === "string" ? { media_id: record.media_id } : {}),
     ...(typeof record.public_filename === "string" ? { public_filename: record.public_filename } : typeof record.filename === "string" ? { public_filename: record.filename } : {}),
@@ -324,6 +326,24 @@ function safeUploadedItem(value: unknown, fallbackStatus = "SUCCESS"): UploadedI
   const fileId = typeof record.file_id === "string" ? record.file_id : typeof record.client_file_id === "string" ? record.client_file_id : undefined;
   if (fileId && !fileId.includes("://")) item.file_id = fileId;
   return item;
+}
+
+export function orderUploadedItems(items: UploadedItem[]): UploadedItem[] {
+  return items
+    .map((item, index) => ({ item, index }))
+    .sort((left, right) => {
+      const leftOrdinal = Number.isInteger(left.item.ordinal) ? Number(left.item.ordinal) : Number.MAX_SAFE_INTEGER;
+      const rightOrdinal = Number.isInteger(right.item.ordinal) ? Number(right.item.ordinal) : Number.MAX_SAFE_INTEGER;
+      if (leftOrdinal !== rightOrdinal) return leftOrdinal - rightOrdinal;
+      const leftClient = left.item.client_file_id ?? left.item.file_id ?? "";
+      const rightClient = right.item.client_file_id ?? right.item.file_id ?? "";
+      if (leftClient !== rightClient) return leftClient.localeCompare(rightClient);
+      const leftMedia = left.item.media_id ?? "";
+      const rightMedia = right.item.media_id ?? "";
+      if (leftMedia !== rightMedia) return leftMedia.localeCompare(rightMedia);
+      return left.index - right.index;
+    })
+    .map(({ item }) => item);
 }
 
 export function extractUploadManifest(result: ToolResult): UploadManifest {
@@ -405,11 +425,13 @@ export function extractUploads(result: ToolResult): UploadedItem[] {
 }
 
 export function buildBatchContext(items: UploadedItem[], manifest: Pick<UploadManifest, "batch_id" | "user_context" | "requested_count" | "failure_count"> | null = null, enrichmentStatus: BatchContext["enrichment_status"] = "NOT_RUN"): BatchContext {
+  const ordered = orderUploadedItems(items);
   return {
     ...(manifest?.batch_id ? { batch_id: manifest.batch_id } : {}),
-    ordered_media_ids: items.filter((item) => item.status === "SUCCESS" && typeof item.media_id === "string").map((item) => item.media_id as string),
-    items: items.map((item, index) => ({
+    ordered_media_ids: ordered.filter((item) => item.status === "SUCCESS" && typeof item.media_id === "string").map((item) => item.media_id as string),
+    items: ordered.map((item, index) => ({
       position: (item.ordinal ?? index) + 1,
+      ...(item.client_file_id ? { client_file_id: item.client_file_id } : {}),
       ...(item.media_id ? { media_id: item.media_id } : {}),
       ...(item.attachment_id ? { attachment_id: item.attachment_id } : {}),
       status: item.status || "SUCCESS",
@@ -429,7 +451,7 @@ export function buildWidgetState(items: UploadedItem[], diagnostics: WidgetDiagn
   const batchContext = buildBatchContext(items, manifest, enrichmentStatus);
   return {
     modelContent: {
-      uploaded_media: items.map((item) => ({
+      uploaded_media: orderUploadedItems(items).map((item) => ({
         media_id: item.media_id,
         attachment_id: item.attachment_id,
         public_filename: item.public_filename,
@@ -443,6 +465,6 @@ export function buildWidgetState(items: UploadedItem[], diagnostics: WidgetDiagn
       enrichment_status: batchContext.enrichment_status,
       diagnostics: diagnostics.map(({ error: _error, ...diagnostic }) => diagnostic),
     },
-    imageIds: items.map((item) => item.file_id).filter((id): id is string => Boolean(id)),
+    imageIds: orderUploadedItems(items).map((item) => item.file_id).filter((id): id is string => Boolean(id)),
   };
 }
