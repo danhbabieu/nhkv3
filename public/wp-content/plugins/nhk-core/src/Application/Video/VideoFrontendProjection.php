@@ -14,7 +14,13 @@ use NHK\Core\Domain\Video\Video;
  */
 final class VideoFrontendProjection
 {
-    public function __construct(private ?PublicIdentityRepository $publicIdentities = null) {}
+    /** @var null|callable(Video,array<string,mixed>):?array<string,mixed> */
+    private $representativeThumbnail;
+
+    public function __construct(private ?PublicIdentityRepository $publicIdentities = null, ?callable $representativeThumbnail = null)
+    {
+        $this->representativeThumbnail = $representativeThumbnail;
+    }
 
     /** @return array{item:?array<string,mixed>,frontend_available:bool,public_eligible:bool,blockers:list<string>} */
     public function project(Video $video): array
@@ -31,7 +37,7 @@ final class VideoFrontendProjection
             : (is_array($metadata['source'] ?? null) ? $metadata['source'] : []);
         $editorial = is_array($metadata['editorial'] ?? null) ? $metadata['editorial'] : [];
         $title = trim((string) ($editorial['title'] ?? '')) ?: ($video->title ?: 'Video');
-        $thumbnail = (new VideoThumbnailSelector())->presentationFromSource($source);
+        $thumbnail = $this->thumbnail($video, $source);
 
         return [
             'item' => [
@@ -49,6 +55,37 @@ final class VideoFrontendProjection
             'public_eligible' => true,
             'blockers' => [],
         ];
+    }
+
+    /** @param array<string,mixed> $source @return array<string,mixed> */
+    private function thumbnail(Video $video, array $source): array
+    {
+        if (is_callable($this->representativeThumbnail)) {
+            $candidate = ($this->representativeThumbnail)($video, $source);
+            if (is_array($candidate)) {
+                $url = trim((string) ($candidate['thumbnail_url'] ?? $candidate['url'] ?? ''));
+                if ($url !== '') {
+                    return [
+                        'url' => $url,
+                        'full_url' => trim((string) ($candidate['url'] ?? $url)),
+                        'variant' => 'nhk_media_representative',
+                        'width' => isset($candidate['width']) ? (int) $candidate['width'] : null,
+                        'height' => isset($candidate['height']) ? (int) $candidate['height'] : null,
+                        'media_id' => trim((string) ($candidate['media_id'] ?? '')) ?: null,
+                        'asset_id' => trim((string) ($candidate['asset_id'] ?? '')) ?: null,
+                        'alt' => trim((string) ($candidate['alt'] ?? '')),
+                        'caption' => trim((string) ($candidate['caption'] ?? '')),
+                        'srcset' => trim((string) ($candidate['srcset'] ?? '')) ?: null,
+                        'sizes' => trim((string) ($candidate['sizes'] ?? '')) ?: null,
+                        'source' => 'media_usage',
+                    ];
+                }
+            }
+        }
+
+        $thumbnail = (new VideoThumbnailSelector())->presentationFromSource($source);
+        if (($thumbnail['url'] ?? '') !== '') $thumbnail['source'] = 'external_source';
+        return $thumbnail;
     }
 
     private function publishedAt(array $source): ?string
