@@ -1862,7 +1862,7 @@ final class EditorialCaptureCoordinator
         if ($singleMediaId !== '') $mediaIds[] = $singleMediaId;
         $mediaComplete = in_array(strtoupper(trim((string) ($media['status'] ?? ''))), ['COMPLETE', 'RECONCILED'], true)
             && (in_array(strtoupper(trim((string) ($record->context['content_intent']['intent'] ?? ''))), ['IMAGE_ARTICLE', 'TEXT_ARTICLE'], true)
-                ? $this->articleMediaDispositionsComplete($media)
+                ? $this->articleMediaDispositionsComplete($media, strtoupper(trim((string) ($record->context['content_intent']['intent'] ?? ''))) === 'IMAGE_ARTICLE')
                 : $this->canonicalMediaBindingReadbackComplete($media));
         $mediaFrontendVerified = $media['frontend_verified'] ?? ($final['frontend_verified'] ?? null);
         foreach (array_values(array_unique($mediaIds)) as $mediaId) {
@@ -1902,13 +1902,14 @@ final class EditorialCaptureCoordinator
     }
 
     /** @param array<string,mixed> $media */
-    private function articleMediaDispositionsComplete(array $media): bool
+    private function articleMediaDispositionsComplete(array $media, bool $required = false): bool
     {
         $expectedMediaIds = array_values(array_unique(array_filter(array_map(
             static fn (mixed $mediaId): string => trim((string) $mediaId),
             (array) ($media['media_ids'] ?? []),
         ), static fn (string $mediaId): bool => $mediaId !== '')));
         $dispositions = array_values(array_filter((array) ($media['media_dispositions'] ?? $media['article_media_dispositions'] ?? []), 'is_array'));
+        if ($required && $expectedMediaIds === []) return false;
         if ($expectedMediaIds !== [] && $dispositions === []) return false;
         $dispositionMediaIds = [];
         foreach ($dispositions as $disposition) {

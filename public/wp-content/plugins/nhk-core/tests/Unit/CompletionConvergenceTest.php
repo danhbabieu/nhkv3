@@ -58,6 +58,20 @@ final class CompletionConvergenceTest extends TestCase
         );
     }
 
+    public function test_image_article_media_branch_without_manifest_readback_is_not_complete(): void
+    {
+        $coordinator = (new \ReflectionClass(EditorialCaptureCoordinator::class))->newInstanceWithoutConstructor();
+        $method = new \ReflectionMethod($coordinator, 'articleMediaDispositionsComplete');
+        $method->setAccessible(true);
+
+        self::assertFalse($method->invoke($coordinator, [
+            'status' => 'RECONCILED',
+            'media_ids' => [],
+            'media_dispositions' => [],
+            'canonical_usage_readback' => [],
+        ], true));
+    }
+
     public function test_proposal_apply_can_be_canonical_complete_without_public_completion(): void
     {
         $packet = (new CompletionCoordinator())->finalize('video', 'video-1', [
