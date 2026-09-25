@@ -117,7 +117,7 @@ was performed.
 
 STATUS: `CONFIRMED_SUBJECT_RECONCILIATION_MIXED_ROUTING_LOCAL_READY / INTEGRATION_ENVIRONMENT_GATED / NO_LIVE_MUTATION`.
 
-# Checkpoint — 2026-09-25 — Native multi-image Capture → Article/public completion boundary (LOCAL / NO LIVE MUTATION)
+# Checkpoint — 2026-09-25 — Native multi-image Capture → Article/public completion boundary (FINAL LOCAL VERIFICATION / NO LIVE MUTATION)
 
 IMPLEMENTED: Shared editorial description aliases now enter the semantic Capture
 input and route multi-image requests to IMAGE_ARTICLE even when Feature is
@@ -137,12 +137,17 @@ Article and projection failures remain child/dependency isolated; retry paths
 reuse existing idempotency boundaries.
 
 VERIFICATION: Task 8 focused regression passed 80 tests / 399 assertions with
-9 pre-existing PHPUnit deprecations. Tasks 1–7 focused suites passed at their
-respective boundaries; no database, staging/production data, Governance Apply,
-deployment or live mutation was performed. Final full-suite gates remain
-pending in this checkpoint.
+9 pre-existing PHPUnit deprecations. Full Unit completed 2,615 tests / 15,195
+assertions with 5 existing fixture/physical-file failures, 20 warnings, 45
+deprecations and 32 PHPUnit deprecations; no new failure implicated this slice.
+Contract passed 6 tests / 48 assertions. JS tests passed 34/34, typecheck and
+Vite build passed (existing Rollup annotation warnings), changed-file PHP lint
+and full diff check passed. Integration was invoked and fail-closed because
+NHK_WP_TEST_PATH/nhk_v3_test are unavailable; 21 environment-gated failures
+and 120 skips were reported without database mutation. No deployment,
+staging/production data mutation or live Governance Apply occurred.
 
-STATUS: `CAPTURE_MULTI_IMAGE_ARTICLE_PUBLIC_LOCAL_IMPLEMENTED / FINAL_VERIFICATION_PENDING / NO_LIVE_MUTATION`.
+STATUS: `CAPTURE_MULTI_IMAGE_ARTICLE_PUBLIC_LOCAL_IMPLEMENTED / AUTOMATED_LOCAL_VERIFICATION_COMPLETE / INTEGRATION_ENVIRONMENT_GATED / NO_LIVE_MUTATION`.
 
 # NHK V3 Execution State
 
