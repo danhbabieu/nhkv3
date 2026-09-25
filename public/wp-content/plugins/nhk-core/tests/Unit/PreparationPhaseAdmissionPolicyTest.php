@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Tests\Unit;
 
-use NHK\Core\Application\Capture\{ContentPreparationOrchestrator, PreparationContinuationDecision, PreparationPhaseAdmissionPolicy};
+use NHK\Core\Application\Capture\{ContentPreparationOrchestrator, ContentPreparationResult, PreparationContinuationDecision, PreparationPhaseAdmissionPolicy};
 use NHK\Core\Application\Semantic\SubjectResolutionService;
 use NHK\Core\Domain\Capture\SubjectResolutionPacket;
 use PHPUnit\Framework\TestCase;
@@ -65,5 +65,64 @@ final class PreparationPhaseAdmissionPolicyTest extends TestCase
             $result,
         ));
         self::assertNotSame([], $result->candidates);
+    }
+
+    public function test_video_owner_is_admitted_when_optional_subject_is_unresolved(): void
+    {
+        $result = new ContentPreparationResult(
+            'REVIEW_REQUIRED',
+            hash('sha256', 'optional-subject'),
+            null,
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            ['PRIMARY_SUBJECT_NOT_RESOLVED'],
+            [],
+            [],
+            [],
+            'READY',
+            0,
+            [],
+            new PreparationContinuationDecision(false, [], [], 'BLOCKING_DEPENDENCY_REQUIRES_REVIEW'),
+        );
+
+        self::assertSame('REVIEW_REQUIRED', $result->status);
+        self::assertContains('PRIMARY_SUBJECT_NOT_RESOLVED', $result->reviewReasons);
+        self::assertNull($result->subjectResolutionPacket);
+        self::assertTrue((new PreparationPhaseAdmissionPolicy())->mayAdmitMinimumOwner(
+            ['intent' => 'VIDEO'],
+            $result,
+        ));
+    }
+
+    public function test_video_owner_admission_does_not_downgrade_mandatory_subject_review(): void
+    {
+        $result = new ContentPreparationResult(
+            'REVIEW_REQUIRED',
+            hash('sha256', 'mandatory-subject'),
+            null,
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            ['PRIMARY_SUBJECT_AMBIGUOUS'],
+            [],
+            [],
+            [],
+            'READY',
+            0,
+            [],
+            new PreparationContinuationDecision(false, ['PRIMARY_SUBJECT_AMBIGUOUS'], [], 'BLOCKING_DEPENDENCY_REQUIRES_REVIEW'),
+        );
+
+        self::assertFalse((new PreparationPhaseAdmissionPolicy())->mayAdmitMinimumOwner(
+            ['intent' => 'VIDEO'],
+            $result,
+        ));
     }
 }

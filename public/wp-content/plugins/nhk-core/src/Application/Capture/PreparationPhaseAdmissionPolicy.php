@@ -11,6 +11,8 @@ final class PreparationPhaseAdmissionPolicy
         if ($preparation->status === 'PREPARED') return true;
         if ($preparation->blockers !== []) return false;
         if (!in_array(strtoupper(trim((string) ($intent['intent'] ?? ''))), ['VIDEO', 'TEXT_ARTICLE', 'IMAGE_ARTICLE'], true)) return false;
+        if (strtoupper(trim((string) ($intent['intent'] ?? ''))) === 'VIDEO'
+            && $this->hasOptionalUnresolvedSubjectGap($preparation)) return true;
         if ($preparation->continuationDecision?->mayContinue === true) return true;
         if ($preparation->subjectResolutionPacket?->status !== 'resolved') return false;
         foreach ($preparation->dependencyFindings as $finding) {
@@ -21,4 +23,18 @@ final class PreparationPhaseAdmissionPolicy
         }
         return true;
     }
+
+    private function hasOptionalUnresolvedSubjectGap(ContentPreparationResult $preparation): bool
+    {
+        if ($preparation->subjectResolutionPacket !== null) return false;
+        if (!in_array('PRIMARY_SUBJECT_NOT_RESOLVED', $preparation->reviewReasons, true)) return false;
+        foreach ($preparation->dependencyFindings as $finding) {
+            if (!is_array($finding)) continue;
+            $escalation = strtoupper(trim((string) ($finding['escalation'] ?? '')));
+            $class = strtoupper(trim((string) ($finding['dependency_class'] ?? '')));
+            if ($escalation !== '' && !in_array($class, ['OPTIONAL_ENRICHMENT', 'PUBLICATION_ONLY'], true)) return false;
+        }
+        return true;
+    }
+
 }

@@ -19419,3 +19419,34 @@ by McpAppsImageUploadTest lines 34 and 53. The current working diff does not
 touch that test, registry, transport, widget source or resource; the resource
 was last changed by 7e345d3e before this slice. Classified PRE_EXISTING /
 UNRELATED.
+# Checkpoint — 2026-09-25 — Optional Video subject no longer blocks minimum owner admission (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE: `ContentPreparationOrchestrator` correctly retained
+`PRIMARY_SUBJECT_NOT_RESOLVED` as a review diagnostic, but
+`PreparationPhaseAdmissionPolicy::mayAdmitMinimumOwner()` treated a Video
+preparation result with no resolved subject as non-admissible whenever its
+continuation decision was already in review. `EditorialCaptureCoordinator`
+therefore returned at `INTERPRETED` before `SUBJECTS_RESOLVED`, Video child
+preparation, Governance, Controlled Apply and canonical owner read-back;
+required owner planning consequently remained empty.
+
+FIXED_BOUNDARY: The generic minimum-owner admission policy now admits only a
+VIDEO with the explicit `PRIMARY_SUBJECT_NOT_RESOLVED` gap, no preparation
+blocker, and no escalated non-optional dependency. The diagnostic remains
+unchanged. Ambiguous/conflicting mandatory subject review remains fail-closed.
+No Capture ID, Video UUID, external Video ID, title, brand/model name or
+fixture branch is referenced.
+
+CONTINUATION: Existing stuck Captures continue through the existing bounded
+Capture continuation/addendum path using the persisted Capture and Video
+identity; no retry-payload relaxation or new continuation mode was added.
+
+VERIFICATION: Focused admission, Capture continuation, Video owner lifecycle
+and Governance tests passed. Full Unit passed 2,623 tests / 15,278 assertions
+with 19 warnings, 45 deprecations and 33 PHPUnit deprecations under 512M;
+Contract passed 6 tests / 48 assertions. Changed PHP files lint clean and
+`git diff --check` passed. Integration is environment-gated because
+`NHK_WP_TEST_PATH`/`NHK_WP_TEST_DB` are unavailable. No database, staging or
+production mutation, deployment or runtime write was performed.
+
+STATUS: `OPTIONAL_VIDEO_SUBJECT_OWNER_ADMISSION_FIXED_LOCAL_READY / INTEGRATION_ENVIRONMENT_GATED / NO_LIVE_MUTATION`.
