@@ -40,6 +40,7 @@ Files below are the expected implementation surface. Existing services should be
 
 - Modify `public/wp-content/plugins/nhk-core/src/Application/Semantic/TextInputInterpreter.php` to expose typed non-semantic instruction/editorial separation without promoting candidates.
 - Modify `public/wp-content/plugins/nhk-core/src/Application/Semantic/ArticleComposer.php` to consume editorial copy and typed semantic context rather than raw instructions.
+- Modify `public/wp-content/plugins/nhk-core/src/Application/Mcp/McpToolCatalog.php`, `public/wp-content/plugins/nhk-core/src/Application/Mcp/McpAbilityRegistration.php` and the canonical multipart adapter only as needed to preserve shared Capture description and per-image names as typed Capture input instead of Media-only metadata.
 - Modify `public/wp-content/plugins/nhk-core/src/Application/Capture/ContentPreparationOrchestrator.php` and `public/wp-content/plugins/nhk-core/src/Application/Capture/EditorialCaptureCoordinator.php` to preserve the locked subject packet, asset manifest and composition ordering.
 - Modify `public/wp-content/plugins/nhk-core/src/Application/Capture/EditorialCaptureContinuationService.php` to preserve ordered assets and child dispositions across retry/follow-up.
 - Modify `public/wp-content/plugins/nhk-core/src/Application/Media/MediaUsageReconciler.php`, `ArticleMediaCoordinator.php` and the existing Media binding service only where required to reconcile all current-Capture assets.
@@ -55,6 +56,9 @@ Files below are the expected implementation surface. Existing services should be
 - Modify: `public/wp-content/plugins/nhk-core/src/Application/Semantic/TextInputInterpreter.php`
 - Modify: `public/wp-content/plugins/nhk-core/src/Application/Semantic/ArticleComposer.php`
 - Modify: `public/wp-content/plugins/nhk-core/src/Application/Capture/ContentPreparationOrchestrator.php`
+- Modify: `public/wp-content/plugins/nhk-core/src/Application/Mcp/McpToolCatalog.php`
+- Modify: `public/wp-content/plugins/nhk-core/src/Application/Mcp/McpAbilityRegistration.php` only if the connector projection drops the shared description or asset input packet
+- Test: `public/wp-content/plugins/nhk-core/tests/Unit/ContentIntentRouterTest.php`
 - Test: `public/wp-content/plugins/nhk-core/tests/Unit/SharedEditorialComposerTest.php`
 - Test: `public/wp-content/plugins/nhk-core/tests/Unit/EditorialCaptureSemanticCoreTest.php`
 
@@ -63,10 +67,13 @@ Files below are the expected implementation surface. Existing services should be
 - Produces explicit `editorial_copy`, `instructions`, `compliance_notes`, `instruction_classes`, user claim candidates and Media observations for downstream composition.
 
 - [ ] Write failing tests proving an instruction-only request produces no instruction paragraph and does not use the instruction as the title.
+- [ ] Write a failing multipart/adapter regression proving a shared description with three `asset_inputs` resolves to `IMAGE_ARTICLE` even when every `feature_requests` list is empty; assert names remain ordered scoped asset context.
+- [ ] Write the paired Feature-present regression: one explicit feature request may create only the representative branch, while the same three assets still enter the single Article plan.
 - [ ] Write failing tests proving user-authored editorial copy remains available to Article composition.
 - [ ] Write failing tests proving compliance/workflow instructions remain non-semantic context.
 - [ ] Run the focused tests and confirm failure at the current raw-input boundary.
 - [ ] Implement the smallest typed-input handoff while preserving existing claim candidate and provenance behavior.
+- [ ] Normalize the accepted shared-description aliases at the Capture boundary into the existing `text`/editorial-copy path; do not add a second description owner or let per-image metadata become Article body.
 - [ ] Change Article composition to select title from resolved subject/editorial context when no explicit editorial title exists.
 - [ ] Run the focused tests and then the existing Article semantic suite.
 - [ ] Commit only this slice with a message such as `fix: separate capture instructions from article prose`.
@@ -113,6 +120,7 @@ Files below are the expected implementation surface. Existing services should be
 - Produces governed MediaUsage binding requests and per-asset dispositions for featured, inline, supporting/gallery, technical detail, representative or evidence contexts.
 
 - [ ] Write failing tests for a three-image Article where one asset is featured and two are supporting/detail placements.
+- [ ] Include the required Feature-empty Hermle-shaped fixture without hard-coding the name in production code, plus a generic Feature-present variant using the same input contract.
 - [ ] Write failing tests proving all three assets have active canonical usage or an explicit non-success disposition.
 - [ ] Write failing tests rejecting an explicit Media whose subject scope is incompatible.
 - [ ] Write failing tests ensuring representative and Article featured usages remain distinct.
@@ -190,6 +198,7 @@ Files below are the expected implementation surface. Existing services should be
 - [ ] Add failing tests proving an existing WP featured attachment does not satisfy `featured_primary` when canonical scope/usage is missing.
 - [ ] Add failing tests proving a Gutenberg inline attachment without MediaUsage remains incomplete.
 - [ ] Add failing tests proving a valid canonical plan writes/read-backs featured and supporting placements in order.
+- [ ] Add the legacy single-image compatibility assertion: one asset still receives the existing featured/inline behavior and does not require a supporting disposition.
 - [ ] Add failing tests proving stale historical usage cannot override the current Capture manifest.
 - [ ] Implement canonical-first ordering without adding WordPress dual-write as a semantic owner.
 - [ ] Keep attachment mappings read-compatible and idempotent.
@@ -227,6 +236,8 @@ Files below are the expected implementation surface. Existing services should be
 - Inspect/modify: `public/wp-content/plugins/nhk-core/src/Application/Capture/CapturePhaseReceiptReducer.php`
 - Inspect/modify: `public/wp-content/plugins/nhk-core/src/Application/Article/ArticleDiagnosticReader.php`
 - Inspect/modify: `public/wp-content/plugins/nhk-core/src/Application/Article/ArticlePublicationGate.php`
+- Inspect/modify: `public/wp-content/plugins/nhk-core/src/Application/Mcp/McpReadHandler.php` and the existing Capture result serializer for the human-readable result packet
+- Inspect/modify: `public/wp-content/plugins/nhk-core/src/Infrastructure/Http/PublicMediaRoutes.php` or the existing `/thu-vien/` query/template boundary only where the public state derives from the wrong source
 - Test: `public/wp-content/plugins/nhk-core/tests/Unit/CaptureCurrentOutcomeReducerTest.php`
 - Test: `public/wp-content/plugins/nhk-core/tests/Unit/CapturePhaseReceiptReducerTest.php`
 - Test: `public/wp-content/plugins/nhk-core/tests/Unit/ArticleDiagnosticReaderTest.php`
@@ -240,8 +251,11 @@ Files below are the expected implementation surface. Existing services should be
 - [ ] Add failing tests proving `PARTIAL` retains child continuation state.
 - [ ] Add failing tests separating `PUBLICATION_READY` from `ENRICHMENT_COMPLETE`.
 - [ ] Add failing tests proving an asset without disposition yields an explicit blocker/partial state.
+- [ ] Add failing tests proving the result packet reports Article/Media/Knowledge states in visitor language, hides verbose phase receipts by default, and distinguishes canonical Article usage from “chưa gắn bài viết”.
+- [ ] Add a failing public gallery regression proving a published Article-backed Media card derives its Article context from active canonical MediaUsage, while a draft Article reports its persisted non-public state accurately.
 - [ ] Implement reducer changes through existing completion policy boundaries, not a domain-specific 711 fix.
 - [ ] Add a read-only diagnostic command/test fixture path that accepts exact supplied IDs and reports mismatches without mutating them.
+- [ ] Implement the bounded result packet and public read model changes through existing serializers/query services; do not expose internal UUIDs, raw phase receipts or debug vocabulary in the default visitor surface.
 - [ ] Run full Unit, Contract, PHP lint, `git diff --check` and secret review.
 - [ ] Run guarded Integration only when exact environment prerequisites are present; report unavailable infrastructure honestly.
 - [ ] Update execution state with commands, results and environment gates.
@@ -250,6 +264,7 @@ Files below are the expected implementation surface. Existing services should be
 ## Final verification and handoff
 
 - [ ] Read the final diff and confirm no Album/entity/schema or Junghans/711-specific logic was introduced.
+- [ ] Confirm the plan's WordPress projection tests cover canonical-first ordering and the public gallery derives its Article label from active canonical MediaUsage, not attachment-only state.
 - [ ] Confirm all changed files remain within the approved Capture/Media/Knowledge/Article/Public boundaries.
 - [ ] Run the focused Capture, MediaUsage, Article and public projection suites.
 - [ ] Run the full Unit and Contract suites with the repository-approved memory setting.

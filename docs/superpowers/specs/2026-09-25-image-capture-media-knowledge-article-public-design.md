@@ -1,6 +1,6 @@
 # Image Capture → Media → Knowledge/Entity → Article → Public Design
 
-**Status:** Proposed architectural design, approved for specification drafting on 2026-09-25.
+**Status:** Design approved by user on 2026-09-25; implementation plan review pending.
 
 **Scope:** Redesign the semantic/editorial interpretation of one Capture containing one or more images. This document does not authorize code changes, schema migrations, data repair, Governance Apply, staging mutation or production publication.
 
@@ -295,4 +295,3 @@ Tests must cover:
 8. Extend public Media reverse context and direct-subject gallery projections.
 9. Converge completion/read-back states.
 10. Perform a read-only audit of Capture `01a0d5c4-35b1-7ac6-b060-971bdf6dad85` and Article `711` before any separately approved repair.
-
