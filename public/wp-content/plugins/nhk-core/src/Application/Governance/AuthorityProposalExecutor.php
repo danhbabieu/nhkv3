@@ -9,6 +9,7 @@ use NHK\Core\Application\Authority\SemanticRekeyMediaIsolation;
 use NHK\Core\Application\Graph\GraphService;
 use NHK\Core\Application\Graph\ClassifiedAsPolicy;
 use NHK\Core\Application\Media\{MediaBindingService, MediaIngestGateway, MediaService};
+use NHK\Core\Infrastructure\Media\WordPressMediaAttachmentBridge;
 use NHK\Core\Application\Video\{HistoricalVideoRelationEvidenceReconciliation, VideoCompletenessPolicy, VideoCompletenessReconciliationService, VideoService};
 use NHK\Core\Application\Knowledge\KnowledgeService;
 use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
@@ -23,7 +24,7 @@ use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim, Source};
 
 final class AuthorityProposalExecutor
 {
-    public function __construct(private AuthorityService $authority, private ?GraphService $graph = null, private ?MediaService $media = null, private ?VideoService $video = null, private ?KnowledgeService $knowledge = null, private ?MediaIngestGateway $mediaGateway = null, private ?SemanticMergeService $merge = null, private ?OperationCompatibility $operationCompatibility = null, private ?CanonicalDependencyValidator $dependencies = null, private ?VideoCompletenessPolicy $completeness = null, private ?ApprovedRelationProposalRepository $relationProposals = null, private ?HistoricalVideoRelationEvidenceReconciliation $historicalEvidence = null, private $collectorFacetExecutor = null, private ?VideoCompletenessReconciliationService $videoCompletenessReconciliation = null, private ?ClassifiedAsPolicy $classifiedAs = null, private ?MediaBindingService $mediaBinding = null) {}
+    public function __construct(private AuthorityService $authority, private ?GraphService $graph = null, private ?MediaService $media = null, private ?VideoService $video = null, private ?KnowledgeService $knowledge = null, private ?MediaIngestGateway $mediaGateway = null, private ?SemanticMergeService $merge = null, private ?OperationCompatibility $operationCompatibility = null, private ?CanonicalDependencyValidator $dependencies = null, private ?VideoCompletenessPolicy $completeness = null, private ?ApprovedRelationProposalRepository $relationProposals = null, private ?HistoricalVideoRelationEvidenceReconciliation $historicalEvidence = null, private $collectorFacetExecutor = null, private ?VideoCompletenessReconciliationService $videoCompletenessReconciliation = null, private ?ClassifiedAsPolicy $classifiedAs = null, private ?MediaBindingService $mediaBinding = null, private ?WordPressMediaAttachmentBridge $mediaProjection = null) {}
 
     public function __invoke(Proposal $proposal): AuthorityEntity|GraphEdge|Media|Video|KnowledgeClaim|Source|Evidence|MediaRepresentativeApplyResult|MediaUsageApplyResult|\NHK\Core\Domain\Authority\SemanticMergeReceipt
     {
@@ -82,6 +83,16 @@ final class AuthorityProposalExecutor
             $usageId = trim((string) ($mutation['usage_id'] ?? ($mutation['usage']['id'] ?? '')));
             $readback = is_array($mutation['readback'] ?? null) ? $mutation['readback'] : [];
             if ($mediaId === '' || $usageId === '' || $readback === []) throw new \RuntimeException('MEDIA_USAGE_FINAL_READBACK_FAILED');
+            $target = is_array($proposal->payload['target'] ?? null) ? $proposal->payload['target'] : [];
+            if (strtolower(trim((string) ($target['type'] ?? ''))) === 'wp_post' && (string) ($proposal->payload['role'] ?? '') === 'featured_primary') {
+                if (!$this->mediaProjection instanceof WordPressMediaAttachmentBridge) throw new \RuntimeException('WORDPRESS_FEATURED_PROJECTION_UNAVAILABLE');
+                $parts = explode(':', trim((string) ($target['id'] ?? '')), 2);
+                $postId = (int) ($parts[1] ?? 0);
+                if ($postId < 1) throw new \RuntimeException('WORDPRESS_FEATURED_TARGET_INVALID');
+                $projection = $this->mediaProjection->projectFeaturedOnly($postId, $mediaId, (string) ($proposal->payload['editorial_state_token'] ?? ''));
+                $mutation['projection'] = $projection['featured_projection'] ?? [];
+                $readback['featured_projection'] = $projection['featured_projection'] ?? [];
+            }
             return new MediaUsageApplyResult($mediaId, $usageId, $mutation, $readback);
         }
         if ($proposal->entityType === 'video' && $proposal->operation === 'ingest') {

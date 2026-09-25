@@ -136,6 +136,28 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
         return $this->read($postId);
     }
 
+    /**
+     * Project only an already-mapped canonical Media as the Post's featured
+     * attachment. This owner never enters Article composition or writes body
+     * fields, and it fails closed when the Media has no existing attachment.
+     */
+    public function projectFeaturedOnly(int $postId, string $mediaId, string $expectedEditorialToken = '', array $resolvedAttachment = []): array
+    {
+        $current = $this->read($postId);
+        if ($expectedEditorialToken !== '' && !hash_equals((string) ($current['state_token'] ?? ''), $expectedEditorialToken)) throw new \RuntimeException('EDITORIAL_STATE_CHANGED');
+        $before = $this->editorialSnapshot($postId);
+        $attachment = $resolvedAttachment !== [] ? $resolvedAttachment : $this->existingAttachmentRepresentationForMediaId($mediaId);
+        $attachmentId = (int) ($attachment['attachment_id'] ?? 0);
+        if ($attachmentId < 1) throw new \RuntimeException('WORDPRESS_FEATURED_ATTACHMENT_UNAVAILABLE');
+        if ((int) ($current['featured_attachment_id'] ?? 0) !== $attachmentId) {
+            if (!function_exists('set_post_thumbnail')) throw new \RuntimeException('WORDPRESS_FEATURED_SYNC_UNAVAILABLE');
+            if (!set_post_thumbnail($postId, $attachmentId)) throw new \RuntimeException('WORDPRESS_FEATURED_SYNC_FAILED');
+        }
+        $after = $this->read($postId);
+        if ($before !== $this->editorialSnapshot($postId)) throw new \RuntimeException('WORDPRESS_FEATURED_EDITORIAL_MUTATION_DETECTED');
+        return $after + ['featured_projection' => ['status' => 'verified', 'media_id' => $mediaId, 'attachment_id' => $attachmentId, 'editorial_state_token' => $after['state_token'] ?? '']];
+    }
+
     public function attachmentForMedia(Media $media, MediaAsset $asset, string $contextualAlt = '', array $context = []): array
     {
         $existing = $this->attachmentIdForMedia($media->canonicalId);
@@ -482,6 +504,35 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
         $asset = $this->assets->listByMediaId($mediaId)[0] ?? null;
         if (!$media instanceof Media || !$asset instanceof MediaAsset) throw new \RuntimeException('WORDPRESS_MEDIA_ASSET_UNAVAILABLE');
         return $this->attachmentForMedia($media, $asset, $alt, $context);
+    }
+
+    /** @return array<string,mixed> */
+    private function existingAttachmentRepresentationForMediaId(string $mediaId): array
+    {
+        $media = $this->media->findByCanonicalId($mediaId);
+        $asset = $this->assets->listByMediaId($mediaId)[0] ?? null;
+        $attachmentId = $this->attachmentIdForMedia($mediaId);
+        if (!$media instanceof Media || !$asset instanceof MediaAsset || $attachmentId < 1) throw new \RuntimeException('WORDPRESS_FEATURED_ATTACHMENT_UNAVAILABLE');
+        return $this->representation($attachmentId, $asset, '');
+    }
+
+    /** @return array<string,mixed> */
+    private function editorialSnapshot(int $postId): array
+    {
+        if (!function_exists('get_post')) return [];
+        $post = get_post($postId);
+        if (!is_object($post)) return [];
+        return [
+            'title' => (string) ($post->post_title ?? ''),
+            'content' => (string) ($post->post_content ?? ''),
+            'excerpt' => (string) ($post->post_excerpt ?? ''),
+            'slug' => (string) ($post->post_name ?? ''),
+            'categories' => function_exists('wp_get_post_categories') ? array_values(array_map('intval', (array) wp_get_post_categories($postId, ['fields' => 'ids']))) : [],
+            'semantic_subject' => function_exists('get_post_meta') ? [
+                (string) get_post_meta($postId, '_nhk_subject_id', true),
+                (string) get_post_meta($postId, '_nhk_semantic_subject', true),
+            ] : ['', ''],
+        ];
     }
 
     /** @return array<string,mixed> */

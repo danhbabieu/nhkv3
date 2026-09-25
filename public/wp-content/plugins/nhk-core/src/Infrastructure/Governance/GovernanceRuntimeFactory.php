@@ -167,7 +167,7 @@ final class GovernanceRuntimeFactory
             $proposalRepository,
             $applyAttempts = new WpdbApplyAttemptRepository($wpdb),
             $transactionManager,
-            new AuthorityProposalExecutor($authorityService, $graphService, $mediaService, new VideoService($videos), $knowledgeService, new MediaIngestGateway($mediaService, $attachmentBridge), $merge, dependencies: $dependencyValidator, completeness: new VideoCompletenessPolicy(), relationProposals: $proposalRepository, historicalEvidence: $historicalEvidence, collectorFacetExecutor: $collectorExecutor, videoCompletenessReconciliation: $videoCompleteness, classifiedAs: $classifiedAsPolicy, mediaBinding: $mediaBinding),
+            new AuthorityProposalExecutor($authorityService, $graphService, $mediaService, new VideoService($videos), $knowledgeService, new MediaIngestGateway($mediaService, $attachmentBridge), $merge, dependencies: $dependencyValidator, completeness: new VideoCompletenessPolicy(), relationProposals: $proposalRepository, historicalEvidence: $historicalEvidence, collectorFacetExecutor: $collectorExecutor, videoCompletenessReconciliation: $videoCompleteness, classifiedAs: $classifiedAsPolicy, mediaBinding: $mediaBinding, mediaProjection: $attachmentBridge),
             $governanceAudit,
             $eligibility,
             new NoOpApplyExecutionHook(),
