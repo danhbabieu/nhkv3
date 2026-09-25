@@ -149,6 +149,24 @@
                 var title = document.createElement('h3'); title.textContent = video.title || 'Video'; output.appendChild(title);
                 var meta = document.createElement('p'); meta.textContent = [video.platform, video.external_id, video.id, 'revision ' + video.revision].join(' · '); output.appendChild(meta);
                 function block(label, value) { var section = document.createElement('section'); var heading = document.createElement('h4'); heading.textContent = label; section.appendChild(heading); var body = document.createElement('p'); body.textContent = value; section.appendChild(body); output.appendChild(section); }
+                var representative = data.representative_usage || null;
+                block('Ảnh đại diện', representative ? ['Media ' + representative.media_id, representative.selection_source, representative.selection_policy, 'revision ' + representative.revision].filter(Boolean).join(' · ') : 'Chưa có ảnh NHK gắn làm đại diện; frontend sẽ dùng thumbnail nguồn nếu có.');
+                var usageForm = document.getElementById('nhk-media-usage-form');
+                if (usageForm) {
+                    var setRepresentative = document.createElement('button');
+                    setRepresentative.type = 'button';
+                    setRepresentative.className = 'button button-primary';
+                    setRepresentative.textContent = representative ? 'Thay ảnh đại diện' : 'Đặt ảnh đại diện';
+                    setRepresentative.addEventListener('click', function () {
+                        document.getElementById('nhk-media-usage-target-type').value = 'video';
+                        document.getElementById('nhk-media-usage-target-id').value = video.id || id;
+                        document.getElementById('nhk-media-usage-operation').value = 'representative_bind';
+                        document.getElementById('nhk-media-usage-role').value = 'representative';
+                        usageForm.scrollIntoView({block: 'center', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'});
+                        document.getElementById('nhk-media-usage-media').focus();
+                    });
+                    output.appendChild(setRepresentative);
+                }
                 var editorial = metadata.editorial || {};
                 block('Metadata', [editorial.title || video.title || '', editorial.summary || '', metadata.category && metadata.category.primary ? (metadata.category.primary.label || metadata.category.primary.key || '') : ''].filter(Boolean).join(' · ') || 'Chưa có metadata.');
                 var relations = data.relations || [];
@@ -215,7 +233,15 @@
         var config = window.nhkV3Admin || {};
         var base = config.root || (window.location.origin + '/wp-json/');
         var headers = {'X-WP-Nonce': config.nonce || ''};
+        var targetType = document.getElementById('nhk-media-usage-target-type');
         function show(value) { output.textContent = typeof value === 'string' ? value : JSON.stringify(value, null, 2); }
+        function syncTargetMode() {
+            if (!targetType || targetType.value !== 'video') return;
+            document.getElementById('nhk-media-usage-operation').value = 'representative_bind';
+            document.getElementById('nhk-media-usage-role').value = 'representative';
+        }
+        if (targetType) targetType.addEventListener('change', syncTargetMode);
+        syncTargetMode();
         if (uploadForm) uploadForm.addEventListener('submit', function (event) {
             event.preventDefault();
             var data = new FormData(uploadForm);
