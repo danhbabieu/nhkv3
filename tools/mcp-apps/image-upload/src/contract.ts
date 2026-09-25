@@ -374,11 +374,15 @@ export function assertUploadManifestCount(manifest: UploadManifest, expected: nu
 export function mergeUploadManifest(previous: UploadManifest, retry: UploadManifest, retriedOrdinals: number[]): UploadManifest {
   if (retry.items.length !== retriedOrdinals.length) throw new Error("MEDIA_READBACK_COUNT_MISMATCH");
   const merged = previous.items.map((item, index) => ({ ...item, ordinal: item.ordinal ?? index }));
-  retry.items.forEach((item, index) => {
-    const ordinal = retriedOrdinals[index];
-    if (!Number.isInteger(ordinal) || ordinal < 0 || ordinal >= previous.requested_count) throw new Error("MEDIA_READBACK_COUNT_MISMATCH");
+  const retried = new Set(retriedOrdinals);
+  if (retried.size !== retriedOrdinals.length) throw new Error("MEDIA_READBACK_COUNT_MISMATCH");
+  retry.items.forEach((item) => {
+    const ordinal = item.ordinal;
+    if (typeof ordinal !== "number" || !Number.isInteger(ordinal) || ordinal < 0 || ordinal >= previous.requested_count) throw new Error("MEDIA_READBACK_COUNT_MISMATCH");
+    if (!retried.has(ordinal)) throw new Error("MEDIA_READBACK_COUNT_MISMATCH");
     merged[ordinal] = { ...item, ordinal };
   });
+  if (retry.items.some((item) => item.ordinal === undefined) || retry.items.length !== retried.size) throw new Error("MEDIA_READBACK_COUNT_MISMATCH");
   const successCount = merged.filter((item) => item.status === "SUCCESS").length;
   const failureCount = merged.length - successCount;
   return {

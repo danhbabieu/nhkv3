@@ -12239,11 +12239,15 @@ function assertUploadManifestCounts(manifest) {
 function mergeUploadManifest(previous, retry, retriedOrdinals) {
   if (retry.items.length !== retriedOrdinals.length) throw new Error("MEDIA_READBACK_COUNT_MISMATCH");
   const merged = previous.items.map((item, index) => ({ ...item, ordinal: item.ordinal ?? index }));
-  retry.items.forEach((item, index) => {
-    const ordinal = retriedOrdinals[index];
-    if (!Number.isInteger(ordinal) || ordinal < 0 || ordinal >= previous.requested_count) throw new Error("MEDIA_READBACK_COUNT_MISMATCH");
+  const retried = new Set(retriedOrdinals);
+  if (retried.size !== retriedOrdinals.length) throw new Error("MEDIA_READBACK_COUNT_MISMATCH");
+  retry.items.forEach((item) => {
+    const ordinal = item.ordinal;
+    if (typeof ordinal !== "number" || !Number.isInteger(ordinal) || ordinal < 0 || ordinal >= previous.requested_count) throw new Error("MEDIA_READBACK_COUNT_MISMATCH");
+    if (!retried.has(ordinal)) throw new Error("MEDIA_READBACK_COUNT_MISMATCH");
     merged[ordinal] = { ...item, ordinal };
   });
+  if (retry.items.some((item) => item.ordinal === void 0) || retry.items.length !== retried.size) throw new Error("MEDIA_READBACK_COUNT_MISMATCH");
   const successCount = merged.filter((item) => item.status === "SUCCESS").length;
   const failureCount = merged.length - successCount;
   return {
@@ -12293,9 +12297,6 @@ function buildWidgetState(items, diagnostics = [], uploadStatus = items.length >
     imageIds: items.map((item) => item.file_id).filter((id) => Boolean(id))
   };
 }
-const DEFAULT_CONCURRENCY = 2;
-const DEFAULT_TIMEOUT_MS = 3e4;
-const DEFAULT_MAX_RETRIES = 2;
 const SAFE_CODE = /^[A-Z][A-Z0-9_]{2,}$/;
 function errorText(error2) {
   if (error2 instanceof Error) return error2.message;
@@ -12325,54 +12326,27 @@ function classify(error2) {
 function invalidReference(code) {
   return { code, class: "INVALID_REFERENCE", retryable: true };
 }
-async function withTimeout(operation, timeoutMs) {
-  let timer;
-  try {
-    return await Promise.race([
-      operation,
-      new Promise((_resolve, reject) => {
-        timer = setTimeout(() => reject(new Error("HOST_FILE_UPLOAD_TIMEOUT")), timeoutMs);
-      })
-    ]);
-  } finally {
-    if (timer !== void 0) clearTimeout(timer);
-  }
-}
 async function uploadOne(input, options) {
-  const maxAttempts = (options.maxRetries ?? DEFAULT_MAX_RETRIES) + 1;
-  let attempts = 0;
-  while (attempts < maxAttempts) {
-    attempts += 1;
-    options.onAttempt?.(input, attempts);
-    try {
-      const uploaded = input.file ? await withTimeout(options.uploadFile(input.file, { library: false }), options.timeoutMs ?? DEFAULT_TIMEOUT_MS) : { fileId: input.fileId };
-      const fileId = typeof uploaded?.fileId === "string" && uploaded.fileId !== "" ? uploaded.fileId : null;
-      if (!fileId) throw Object.assign(new Error("HOST_FILE_UPLOAD_INVALID_REFERENCE"), { reference: true });
-      const download = await withTimeout(options.getFileDownloadUrl({ fileId }), options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
-      const downloadUrl = typeof download?.downloadUrl === "string" ? download.downloadUrl : "";
-      if (!downloadUrl || !/^https:\/\//i.test(downloadUrl)) throw Object.assign(new Error("HOST_FILE_UPLOAD_INVALID_REFERENCE"), { reference: true });
-      return { ordinal: input.ordinal, status: "HOST_UPLOADED", fileId, downloadUrl, file: input.file, fileName: input.file?.name ?? input.fileName ?? "", mimeType: input.file?.type ?? input.mimeType ?? "", attempts };
-    } catch (error2) {
-      const classified = error2 && typeof error2 === "object" && "reference" in error2 ? invalidReference("HOST_FILE_UPLOAD_INVALID_REFERENCE") : classify(error2);
-      if (!classified.retryable || attempts >= maxAttempts) {
-        return { ordinal: input.ordinal, status: classified.retryable ? "FAILED_RETRYABLE" : "FAILED_PERMANENT", file: input.file, fileName: input.file?.name ?? input.fileName ?? "", mimeType: input.file?.type ?? input.mimeType ?? "", attempts, error: classified };
-      }
-    }
+  const attempts = 1;
+  options.onAttempt?.(input, attempts);
+  try {
+    const uploaded = input.file ? await options.uploadFile(input.file, { library: false }) : { fileId: input.fileId };
+    const fileId = typeof uploaded?.fileId === "string" && uploaded.fileId !== "" ? uploaded.fileId : null;
+    if (!fileId) throw Object.assign(new Error("HOST_FILE_UPLOAD_INVALID_REFERENCE"), { reference: true });
+    const download = await options.getFileDownloadUrl({ fileId });
+    const downloadUrl = typeof download?.downloadUrl === "string" ? download.downloadUrl : "";
+    if (!downloadUrl || !/^https:\/\//i.test(downloadUrl)) throw Object.assign(new Error("HOST_FILE_UPLOAD_INVALID_REFERENCE"), { reference: true });
+    return { ordinal: input.ordinal, status: "HOST_UPLOADED", fileId, downloadUrl, file: input.file, fileName: input.file?.name ?? input.fileName ?? "", mimeType: input.file?.type ?? input.mimeType ?? "", attempts };
+  } catch (error2) {
+    const classified = error2 && typeof error2 === "object" && "reference" in error2 ? invalidReference("HOST_FILE_UPLOAD_INVALID_REFERENCE") : classify(error2);
+    return { ordinal: input.ordinal, status: classified.retryable ? "FAILED_RETRYABLE" : "FAILED_PERMANENT", file: input.file, fileName: input.file?.name ?? input.fileName ?? "", mimeType: input.file?.type ?? input.mimeType ?? "", attempts, error: classified };
   }
-  throw new Error("HOST_FILE_UPLOAD_INTERNAL_UNREACHABLE");
 }
 async function uploadSelectedFiles(inputs, options) {
-  const concurrency = Math.max(1, Math.min(4, Math.floor(options.concurrency ?? DEFAULT_CONCURRENCY)));
   const outcomes = [];
-  let cursor = 0;
-  async function worker() {
-    while (true) {
-      const index = cursor++;
-      if (index >= inputs.length) return;
-      outcomes[index] = await uploadOne(inputs[index], options);
-    }
+  for (const [index, input] of inputs.entries()) {
+    outcomes[index] = await uploadOne(input, options);
   }
-  await Promise.allSettled(Array.from({ length: Math.min(concurrency, inputs.length) }, () => worker()));
   return outcomes;
 }
 const SERVER_TOOL_NAME = "wp_ability_nhk_v3_media_widget_upload";
@@ -12581,7 +12555,7 @@ async function start() {
   async function materializeSelectedImages(operationKey, namingContext, attempt) {
     if (batchManifest !== null && batchManifest.success_count === batchManifest.requested_count && uploaded.length === selected.length && uploaded.every((item) => Boolean(item.media_id))) return batchManifest;
     const retryingPartialBatch = batchManifest?.status === "partial_success";
-    const sourceOrdinals = selected.map((_item, index) => index).filter((index) => !retryingPartialBatch || batchManifest?.items[index]?.status !== "SUCCESS");
+    const sourceOrdinals = retryingPartialBatch ? batchManifest.items.filter((item) => item.status !== "SUCCESS").flatMap((item) => typeof item.ordinal === "number" && Number.isInteger(item.ordinal) && item.ordinal >= 0 && item.ordinal < selected.length ? [item.ordinal] : []) : selected.map((_item, index) => index);
     if (retryingPartialBatch && sourceOrdinals.length === 0) return batchManifest;
     const outcomes = await uploadSelectedFiles(sourceOrdinals.map((index) => {
       const item = selected[index];
@@ -12589,8 +12563,6 @@ async function start() {
     }), {
       uploadFile: host.uploadFile,
       getFileDownloadUrl: host.getFileDownloadUrl,
-      concurrency: 2,
-      maxRetries: 2,
       onAttempt: (input2, number2) => {
         const item = selected[input2.ordinal];
         const fileName = item.kind === "local" ? item.file.name : item.fileName;
@@ -12623,7 +12595,12 @@ async function start() {
       manifest = extractUploadManifest(result);
       assertUploadManifestCounts(manifest);
     }
-    const serverItems = manifest.items.map((item, position) => ({ ...item, ordinal: item.ordinal ?? references[position]?.ordinal }));
+    const serverItems = manifest.items.map((item) => {
+      const referenceOrdinal = typeof item.file_id === "string" ? references.find((reference) => reference.file_id === item.file_id)?.ordinal : void 0;
+      const ordinal = item.ordinal ?? referenceOrdinal;
+      if (!Number.isInteger(ordinal)) throw new Error("MEDIA_READBACK_COUNT_MISMATCH");
+      return { ...item, ordinal };
+    });
     const combinedItems = [...serverItems, ...hostFailures].sort((left, right) => (left.ordinal ?? 0) - (right.ordinal ?? 0));
     const combinedSuccess = combinedItems.filter((item) => item.status === "SUCCESS").length;
     const combinedFailure = combinedItems.length - combinedSuccess;

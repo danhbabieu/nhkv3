@@ -19760,3 +19760,49 @@ staging, production, semantic relation, schema or deployment action was
 performed.
 
 STATUS: `FRONTEND_NAVIGATION_MEDIA_ARCHIVE_BOUNDARIES_LOCAL_READY / INTEGRATION_ENVIRONMENT_GATED / NO_LIVE_MUTATION / NO_DEPLOY`.
+
+# Checkpoint — 2026-09-25 — Restore sequential ChatGPT host image transport (LOCAL / NO MUTATION)
+
+ROOT_CAUSE_CONFIRMED: Commit `1f1e8bc7` replaced the previously working
+`host.uploadFile(file, { library: false })` → validate `fileId` →
+`getFileDownloadUrl({ fileId })` sequence with a worker pool, `Promise.race`
+timeouts and automatic retries on the same `File`. On iPhone this failed at
+the host boundary before the server Media/Capture path. Partial retry selection
+also indexed `batchManifest.items` by array position instead of persisted
+ordinal.
+
+FIXED_BOUNDARY: Host uploads now run in one awaited loop. Each local file is
+uploaded once, its `fileId` and HTTPS download URL are validated, and only then
+is its trusted reference emitted; library references use their existing file ID
+and the same serial URL-read path. Failure is isolated per ordinal outside the
+host call, preserving sibling success. Automatic timeout wrappers, worker
+queues and same-execution host retries were removed. Explicit retry uses failed
+persisted ordinals only, merges returned items by explicit ordinal and keeps the
+operation/idempotency key; successful Media/ordinals are not re-uploaded.
+Capture, Media ingest, Article, canonical MediaUsage read-back, normalization
+and public projection code were not rolled back or changed.
+
+DIAGNOSTICS: `HOST_FILE_UPLOAD_START`, `HOST_FILE_UPLOAD_DONE`,
+`HOST_FILE_UPLOAD_FAILED` and `TRUSTED_FILE_REF_READY` remain typed and
+secret-safe; signed URLs, raw exceptions and tokens are not persisted.
+
+REGRESSION: Added tests for one-image legacy transport order, three-image
+max-concurrency=1, sibling failure isolation, no automatic host retry,
+explicit failed-ordinal retry, successful-ordinal exclusion, explicit-ordinal
+partial merge, preserved 0/1/2 ordering and absence of worker/timeout code in
+the served widget.
+
+VERIFICATION: Image widget JS passed 49/49; TypeScript typecheck passed; Vite
+build regenerated `public/wp-content/plugins/nhk-core/resources/ui/image-upload.html`
+with only existing Rollup annotation warnings. Focused PHP passed 221 tests /
+1,086 assertions; Contract passed 6 tests / 48 assertions; full Unit with
+`memory_limit=512M` reached 2,639 tests / 15,334 assertions with one existing
+unrelated `FrontendSemanticProjectionV2Test` failure about the current
+homepage responsive-image implementation, plus warnings/deprecations. The
+default 128M Unit run was environmental memory exhaustion at an existing
+fixture. PHP lint and `git diff --check` passed. Guarded Integration is
+`ENVIRONMENTAL_FAILURE`: `NHK_WP_TEST_PATH` and `NHK_WP_TEST_DB` are unset.
+No database, staging/production data, deployment or live acceptance mutation
+was performed.
+
+STATUS: `IMAGE_WIDGET_HOST_TRANSPORT_SEQUENTIAL_LOCAL_READY / FULL_UNIT_ONE_PREEXISTING_FRONTEND_FAILURE / INTEGRATION_ENVIRONMENT_GATED / NO_MUTATION / IOS_LIVE_ACCEPTANCE_PENDING`.

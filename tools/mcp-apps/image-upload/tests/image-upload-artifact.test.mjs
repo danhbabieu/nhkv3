@@ -116,6 +116,17 @@ test("the View requires operator naming context and emits the required diagnosti
   assert.match(view, /metadata:\s*\{\s*\}/);
 });
 
+test("the View keeps host upload calls sequential and single-attempt", async () => {
+  const view = await source();
+
+  assert.match(view, /uploadSelectedFiles/);
+  assert.doesNotMatch(view, /concurrency\s*:/);
+  assert.doesNotMatch(view, /maxRetries\s*:/);
+  assert.doesNotMatch(view, /Promise\.race/);
+  assert.doesNotMatch(view, /Promise\.allSettled/);
+  assert.match(view, /mergeUploadManifest\(batchManifest!?,\s*combined,\s*sourceOrdinals\)/);
+});
+
 test("the View catches bootstrap failures and leaves a visible error state", async () => {
   const view = await source();
 

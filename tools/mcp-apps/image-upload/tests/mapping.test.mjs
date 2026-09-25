@@ -267,12 +267,38 @@ test("retries only failed children while retaining successful batch items", () =
     requested_count: 1,
     success_count: 1,
     failure_count: 0,
-    items: [{ ordinal: 0, status: "SUCCESS", media_id: "media-two", attachment_id: 42 }],
+    items: [{ ordinal: 1, status: "SUCCESS", media_id: "media-two", attachment_id: 42 }],
     user_context: "máy ảnh",
   }, [1]);
 
   assert.equal(merged.status, "success");
   assert.deepEqual(merged.items.map((item) => item.media_id), ["media-one", "media-two", "media-three"]);
+  assert.deepEqual(merged.items.map((item) => item.ordinal), [0, 1, 2]);
+});
+
+test("merges a partial retry by explicit returned ordinal rather than subset position", () => {
+  const merged = mergeUploadManifest({
+    status: "partial_success",
+    requested_count: 3,
+    success_count: 1,
+    failure_count: 2,
+    items: [
+      { ordinal: 0, status: "SUCCESS", media_id: "media-zero" },
+      { ordinal: 1, status: "FAILED", error_code: "HOST_FILE_UPLOAD_FAILED" },
+      { ordinal: 2, status: "FAILED", error_code: "HOST_FILE_UPLOAD_FAILED" },
+    ],
+  }, {
+    status: "partial_success",
+    requested_count: 2,
+    success_count: 1,
+    failure_count: 1,
+    items: [
+      { ordinal: 2, status: "SUCCESS", media_id: "media-two" },
+      { ordinal: 1, status: "FAILED", error_code: "HOST_FILE_UPLOAD_FAILED" },
+    ],
+  }, [1, 2]);
+
+  assert.deepEqual(merged.items.map((item) => item.media_id), ["media-zero", undefined, "media-two"]);
   assert.deepEqual(merged.items.map((item) => item.ordinal), [0, 1, 2]);
 });
 

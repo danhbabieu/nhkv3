@@ -249,9 +249,11 @@ async function start(): Promise<void> {
   async function materializeSelectedImages(operationKey: string, namingContext: string, attempt: number): Promise<UploadManifest> {
     if (batchManifest !== null && batchManifest.success_count === batchManifest.requested_count && uploaded.length === selected.length && uploaded.every((item) => Boolean(item.media_id))) return batchManifest;
     const retryingPartialBatch = batchManifest?.status === "partial_success";
-    const sourceOrdinals = selected
-      .map((_item, index) => index)
-      .filter((index) => !retryingPartialBatch || batchManifest?.items[index]?.status !== "SUCCESS");
+    const sourceOrdinals = retryingPartialBatch
+      ? batchManifest!.items
+        .filter((item) => item.status !== "SUCCESS")
+        .flatMap((item) => typeof item.ordinal === "number" && Number.isInteger(item.ordinal) && item.ordinal >= 0 && item.ordinal < selected.length ? [item.ordinal] : [])
+      : selected.map((_item, index) => index);
     if (retryingPartialBatch && sourceOrdinals.length === 0) return batchManifest!;
     const outcomes = await uploadSelectedFiles(sourceOrdinals.map((index) => {
       const item = selected[index];
@@ -261,8 +263,6 @@ async function start(): Promise<void> {
     }), {
       uploadFile: host!.uploadFile!,
       getFileDownloadUrl: host!.getFileDownloadUrl!,
-      concurrency: 2,
-      maxRetries: 2,
       onAttempt: (input, number) => {
         const item = selected[input.ordinal];
         const fileName = item.kind === "local" ? item.file.name : item.fileName;
@@ -296,7 +296,14 @@ async function start(): Promise<void> {
       manifest = extractUploadManifest(result as ToolResult);
       assertUploadManifestCounts(manifest);
     }
-    const serverItems = manifest.items.map((item, position) => ({ ...item, ordinal: item.ordinal ?? references[position]?.ordinal }));
+    const serverItems = manifest.items.map((item) => {
+      const referenceOrdinal = typeof item.file_id === "string"
+        ? references.find((reference) => reference.file_id === item.file_id)?.ordinal
+        : undefined;
+      const ordinal = item.ordinal ?? referenceOrdinal;
+      if (!Number.isInteger(ordinal)) throw new Error("MEDIA_READBACK_COUNT_MISMATCH");
+      return { ...item, ordinal };
+    });
     const combinedItems = [...serverItems, ...hostFailures].sort((left, right) => (left.ordinal ?? 0) - (right.ordinal ?? 0));
     const combinedSuccess = combinedItems.filter((item) => item.status === "SUCCESS").length;
     const combinedFailure = combinedItems.length - combinedSuccess;
