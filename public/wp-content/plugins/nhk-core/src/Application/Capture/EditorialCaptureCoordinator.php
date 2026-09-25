@@ -318,6 +318,14 @@ final class EditorialCaptureCoordinator
         try {
             $followupItems = array_values(array_filter((array) ($input['asset_followup_items'] ?? []), 'is_array'));
             if ($followupItems !== []) {
+                $orderedFollowup = [];
+                foreach ($followupItems as $index => $item) $orderedFollowup[] = ['index' => $index, 'item' => $item];
+                usort($orderedFollowup, static function (array $left, array $right): int {
+                    $leftOrder = array_key_exists('sort_order', $left['item']) ? max(0, (int) $left['item']['sort_order']) : PHP_INT_MAX;
+                    $rightOrder = array_key_exists('sort_order', $right['item']) ? max(0, (int) $right['item']['sort_order']) : PHP_INT_MAX;
+                    return [$leftOrder, $left['index']] <=> [$rightOrder, $right['index']];
+                });
+                $followupItems = array_values(array_map(static fn (array $entry): array => $entry['item'], $orderedFollowup));
                 $existingKeys = array_fill_keys(array_map([$this, 'assetIdentity'], $assets), true);
                 foreach ($followupItems as $item) {
                     $key = $this->assetIdentity($item);
