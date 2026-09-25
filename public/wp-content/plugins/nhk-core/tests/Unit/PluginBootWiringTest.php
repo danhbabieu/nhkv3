@@ -22,6 +22,16 @@ final class PluginBootWiringTest extends TestCase
         self::assertLessThan($projection, $usages);
     }
 
+    public function test_public_media_delivery_is_imported_from_the_application_media_namespace(): void
+    {
+        $plugin = (string) file_get_contents(__DIR__ . '/../../src/Plugin.php');
+
+        self::assertStringContainsString(
+            'use NHK\\Core\\Application\\Media\\{ArticleMediaCoordinator, ArticleMediaSeoProjection, MediaEnrichmentFinalReadbackPolicy, MediaIngestGateway, MediaService, MediaVideoPageQuery, PublicMediaAssetDelivery, PublicMediaArticleLinkResolver, PublicMediaGalleryQuery, VisualOpportunityDetector, VisualSupportRequirementService};',
+            $plugin,
+        );
+    }
+
     public function test_article_research_inventory_captures_every_required_media_dependency_and_uses_input_resolution(): void
     {
         $plugin = (string) file_get_contents(__DIR__ . '/../../src/Plugin.php');
