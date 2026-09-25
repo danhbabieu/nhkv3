@@ -279,7 +279,7 @@ final class EasyMcpNativeFileCompatibilityAdapter
             'tools/call' => $data,
             'resources/list' => self::uiResourceProjectionEnabled() ? self::projectResourceListData($data) : $data,
             'resources/read' => self::uiResourceProjectionEnabled() ? self::projectResourceReadData($data, $rpc) : $data,
-            default => self::projectToolsListData($data),
+            default => self::projectSerializedToolsListData($data),
         };
         McpAppDiagnostics::record($rpc ?? [], is_array($projected) ? $projected : $data, $status, true);
         if ($projected !== $data) $response->set_data($projected);
@@ -393,16 +393,38 @@ final class EasyMcpNativeFileCompatibilityAdapter
 
     public static function projectFinalToolsListDescriptor(mixed $data, mixed $server, mixed $request): mixed
     {
-        if (defined('EASY_MCP_AI_VERSION') && !self::$authenticatedWireResponse) return $data;
         if (!is_object($request) || !method_exists($request, 'get_route') || rtrim((string) $request->get_route(), '/') !== rtrim(self::ENDPOINT, '/')) return $data;
         $rpc = self::requestRpc($request);
+        // Most Easy MCP versions pass through rest_post_dispatch first, but a
+        // serializer-only path can reach this final filter directly. For
+        // tools/list, the successful result envelope itself is the
+        // authenticated boundary: an error response has no result.tools and
+        // therefore remains untouched. Do not make descriptor projection
+        // depend on process-local filter ordering.
+        if (defined('EASY_MCP_AI_VERSION') && !self::$authenticatedWireResponse) {
+            if (($rpc['method'] ?? null) !== 'tools/list' || !self::isSuccessfulSerializedToolsList($data)) return $data;
+        }
         if (self::nativeResourceRegistrationActive() && in_array(($rpc['method'] ?? null), ['resources/list', 'resources/read'], true)) return $data;
         return match ($rpc['method'] ?? 'tools/list') {
             'initialize', 'server/discover' => self::uiResourceProjectionEnabled() ? self::projectProtocolCapabilities($data) : $data,
             'resources/list' => self::uiResourceProjectionEnabled() ? self::projectResourceListData($data) : $data,
             'resources/read' => self::uiResourceProjectionEnabled() ? self::projectResourceReadData($data, $rpc) : $data,
-            default => self::projectToolsListData($data),
+            default => self::projectSerializedToolsListData($data),
         };
+    }
+
+    private static function isSuccessfulSerializedToolsList(mixed $data): bool
+    {
+        if (is_string($data)) {
+            try {
+                $data = json_decode($data, true, 512, JSON_THROW_ON_ERROR);
+            } catch (\JsonException) {
+                return false;
+            }
+        }
+        return is_array($data)
+            && is_array($data['result'] ?? null)
+            && is_array($data['result']['tools'] ?? null);
     }
 
     /**
@@ -443,6 +465,33 @@ final class EasyMcpNativeFileCompatibilityAdapter
         // one invalid entry makes strict clients reject the whole list.
         $data['result']['tools'] = self::projectTools($result['tools']);
         return $data;
+    }
+
+    /**
+     * Easy MCP versions do not agree on whether the final REST response data
+     * is still the decoded JSON-RPC array or an already-serialized JSON body.
+     * Keep the generic catalog projection on both sides of that boundary.
+     * Invalid/non-JSON strings remain untouched and fail closed.
+     */
+    private static function projectSerializedToolsListData(mixed $data): mixed
+    {
+        if (!is_string($data)) return self::projectToolsListData($data);
+
+        try {
+            $decoded = json_decode($data, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return $data;
+        }
+        if (!is_array($decoded)) return $data;
+
+        $projected = self::projectToolsListData($decoded);
+        if ($projected === $decoded) return $data;
+
+        try {
+            return json_encode($projected, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return $data;
+        }
     }
 
     /** @param array<string,mixed> $data @return array<string,mixed> */

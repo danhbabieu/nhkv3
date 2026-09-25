@@ -752,6 +752,63 @@ final class EasyMcpNativeFileCompatibilityAdapterTest extends TestCase
         );
     }
 
+    /**
+     * @runInSeparateProcess
+     * @preserveGlobalState disabled
+     */
+    public function test_final_echo_projects_a_serialized_authenticated_tools_list_before_chatgpt_receives_it(): void
+    {
+        define('EASY_MCP_AI_VERSION', '9.9.9');
+        $request = new class {
+            public function get_route(): string { return '/easy-mcp-ai/v1/mcp'; }
+            public function get_json_params(): array { return ['jsonrpc' => '2.0', 'id' => 9, 'method' => 'tools/list']; }
+        };
+        $serialized = json_encode([
+            'jsonrpc' => '2.0',
+            'id' => 9,
+            'result' => ['tools' => []],
+        ], JSON_THROW_ON_ERROR);
+
+        $projected = EasyMcpNativeFileCompatibilityAdapter::projectFinalToolsListDescriptor($serialized, null, $request);
+
+        self::assertIsString($projected);
+        $wire = json_decode($projected, true, 512, JSON_THROW_ON_ERROR);
+        $names = array_column($wire['result']['tools'], 'name');
+        self::assertCount(1, array_filter($names, static fn (string $name): bool => $name === 'wp_ability_nhk_v3_knowledge_writer_preview'));
+    }
+
+    /**
+     * @runInSeparateProcess
+     * @preserveGlobalState disabled
+     */
+    public function test_final_serialization_projection_keeps_sibling_descriptors_unique_and_generic(): void
+    {
+        define('EASY_MCP_AI_VERSION', '9.9.9');
+        $request = new class {
+            public function get_route(): string { return '/easy-mcp-ai/v1/mcp'; }
+            public function get_json_params(): array { return ['jsonrpc' => '2.0', 'id' => 10, 'method' => 'tools/list']; }
+        };
+        $serialized = json_encode([
+            'jsonrpc' => '2.0',
+            'id' => 10,
+            'result' => ['tools' => [
+                ['name' => 'wp_ability_nhk_v3_article_preflight', 'inputSchema' => ['type' => 'object']],
+                ['name' => 'wp_ability_nhk_v3_semantic_resolve', 'inputSchema' => ['type' => 'object']],
+            ]],
+        ], JSON_THROW_ON_ERROR);
+
+        $wire = json_decode(
+            EasyMcpNativeFileCompatibilityAdapter::projectFinalToolsListDescriptor($serialized, null, $request),
+            true,
+            512,
+            JSON_THROW_ON_ERROR,
+        );
+        $names = array_column($wire['result']['tools'], 'name');
+        foreach (['wp_ability_nhk_v3_article_preflight', 'wp_ability_nhk_v3_semantic_resolve', 'wp_ability_nhk_v3_knowledge_writer_preview'] as $name) {
+            self::assertCount(1, array_filter($names, static fn (string $candidate): bool => $candidate === $name), $name);
+        }
+    }
+
     private static function assertValidJsonSchemaNode(mixed $schema, string $toolName): void
     {
         if ($schema instanceof \stdClass) {

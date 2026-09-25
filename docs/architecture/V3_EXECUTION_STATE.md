@@ -151,6 +151,35 @@ STATUS: `CAPTURE_MULTI_IMAGE_ARTICLE_PUBLIC_LOCAL_IMPLEMENTED / AUTOMATED_LOCAL_
 
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-25 — Easy MCP final serialized tools/list boundary repair (LOCAL / READ-ONLY)
+
+ROOT_CAUSE: the 28d4dc49 generic projection was reachable through the
+`rest_post_dispatch` path, but `rest_pre_echo_response` still required the
+process-local `authenticatedWireResponse` flag. Easy MCP serializer-only
+requests can reach final echo with an already-serialized successful JSON-RPC
+`tools/list` envelope, so projection was skipped and diagnostics remained
+empty even though the canonical Ability/catalog were present.
+
+FIRST_BROKEN_PRODUCTION_BOUNDARY: final Easy MCP response serialization
+before the ChatGPT authenticated `tools/list` inventory.
+
+FIX: final serialization now recognizes only a successful `tools/list` result
+containing `result.tools`, decodes/project-normalizes/materializes the generic
+catalog-owned public read descriptors, and re-serializes the same envelope.
+Error/unauthenticated payloads and invalid JSON remain untouched. No
+Knowledge Writer-specific branch, descriptor, allowlist, or service change
+was added.
+
+REGRESSION: production-boundary unit coverage now runs a serialized final
+`tools/list` payload and asserts exactly one Knowledge Writer descriptor plus
+exactly one each for `nhk.article.preflight` and `nhk.semantic.resolve`.
+The guarded integration test remains the authoritative Easy MCP authenticated
+`rest_get_server()->dispatch()` tools/list → descriptor-derived tools/call
+check; local WordPress/Easy MCP dependency availability is environment-gated.
+
+SAFETY: READ_ONLY=true; NO_MUTATION=true; PRODUCTION_SPECIAL_CASES=0;
+MIGRATION=NONE; RUNTIME_MUTATION=NONE.
+
 # Checkpoint — 2026-09-25 — Generic Easy MCP tools/list gate repair (LOCAL / READ-ONLY)
 
 ROOT_CAUSE: `EasyMcpNativeFileCompatibilityAdapter` gated the entire Easy MCP
