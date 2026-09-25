@@ -1,3 +1,42 @@
+# Checkpoint — 2026-09-25 — Governed Video representative thumbnail override (LOCAL / NO LIVE MUTATION)
+
+IMPLEMENTED: Existing canonical Video owners can now receive or replace a
+representative image through the existing governed MediaUsage boundary. Manual
+selection remains `USER_EXPLICIT / PINNED`; no Video re-ingest, duplicate Video,
+new schema, direct writer or second semantic image owner was introduced. Admin
+Video read-back derives the active representative from MediaUsage and preserves
+the historical Video thumbnail field only as legacy diagnostic context.
+
+PUBLIC_PRECEDENCE: Video presentation now resolves in the order active eligible
+NHK representative MediaUsage → external source thumbnail → existing frontend
+fallback. The same governed representative flows through homepage Video
+projection, `/video/` archive cards, the detail-page pre-play poster and current
+Video SEO/Open Graph/VideoObject projection. Source thumbnail data remains
+separately readable as fallback/provenance and does not override a pinned NHK
+representative.
+
+ADMIN_WORKFLOW: The existing MediaUsage workbench now accepts `video` as a
+target. From Video detail, “Đặt ảnh đại diện” / “Thay ảnh đại diện” pre-fills
+the exact Video UUID, `representative_bind` operation and `representative`
+role, then continues through the existing Governance lifecycle and canonical
+read-back.
+
+REGRESSION_AND_CI: Added coverage for VideoFrontendProjection precedence,
+MediaVideoPageQuery representative/fallback separation, Video SEO image
+selection, Admin adapter read-back and Admin workbench wiring. CI additionally
+removed two test-only dependencies on a developer-machine upload fixture and
+fixed one pre-existing test parse error so the repository gate can execute
+cleanly. Canonical public URL verification passed 79 tests / 387 assertions;
+full Unit passed 2,652 tests / 15,405 assertions. Composer validation, PHP lint
+and `git diff --check` passed in the PR workflows.
+
+DELIVERY_STATE: Implemented on
+`feat/video-representative-thumbnail` in draft PR #14. No merge, deployment,
+production mutation, staging semantic mutation or live Video/Media change was
+performed.
+
+STATUS: `VIDEO_REPRESENTATIVE_MEDIA_LOCAL_READY / CI_GREEN / NO_LIVE_MUTATION / NOT_DEPLOYED`.
+
 # Checkpoint — 2026-09-25 — Generic Knowledge Writer subject/applicability boundary (LOCAL / READ-ONLY)
 
 ROOT_CAUSE: Knowledge Writer passed a caller-supplied `type` into typed name
@@ -19806,3 +19845,69 @@ No database, staging/production data, deployment or live acceptance mutation
 was performed.
 
 STATUS: `IMAGE_WIDGET_HOST_TRANSPORT_SEQUENTIAL_LOCAL_READY / FULL_UNIT_ONE_PREEXISTING_FRONTEND_FAILURE / INTEGRATION_ENVIRONMENT_GATED / NO_MUTATION / IOS_LIVE_ACCEPTANCE_PENDING`.
+
+# Checkpoint — 2026-09-25 — Generic canonical submission resume and N-image convergence (LOCAL / NO MUTATION)
+
+ROOT_CAUSE_CONFIRMED: Resume decisions were not represented by one canonical
+state policy at the widget boundary, so a committed Media batch could re-enter
+physical upload work while Article/enrichment was only partially complete.
+
+FIXED_BOUNDARY: Added a pure, identifier-agnostic resume policy that orders
+Media by persisted ordinal/client identity, materializes only incomplete Media,
+continues enrichment from ordered canonical Media IDs, reuses Capture/Article,
+repairs only missing MediaUsage, retries projection independently, and returns
+an idempotent NOOP when all layers are complete. The widget now consumes this
+policy before host or Media upload and Capture input is built from the same
+ordered canonical IDs. The served single-file widget was regenerated.
+
+REGRESSION: Added parameterized-equivalent coverage for N=1, 2, 3 and 10;
+partial N=10 with exactly two retryable Media; existing Article with exactly two
+missing MediaUsage rows; projection-only retry; canonical ordering independent
+of arrival order; and one Article/N ordered MediaUsage convergence in the PHP
+Capture coordinator. No acceptance-specific identifier, filename, brand,
+batch, capture or image count is used.
+
+VERIFICATION: Image widget tests pass 58/58; TypeScript typecheck and Vite build
+pass with only the existing Rollup zod annotation warnings. Focused PHP passes
+39 tests / 227 assertions. Full PHPUnit with `memory_limit=512M` reaches 2,792
+tests / 15,433 assertions with one unrelated existing frontend marker failure,
+environment-gated integration failures because `NHK_WP_TEST_PATH` and
+`NHK_WP_TEST_DB` are unset, and existing warnings/deprecations/skips. The
+default 128M run also hits an existing large-fixture memory limit. PHP lint and
+`git diff --check` pass. No database, staging/production data, deployment or
+live acceptance mutation was performed.
+
+STATUS: `GENERIC_SUBMISSION_RESUME_LOCAL_READY / N_IMAGE_CONVERGENCE_VERIFIED / FULL_UNIT_BASELINE_GATED / NO_LIVE_MUTATION / LIVE_ACCEPTANCE_NOT_RUN`.
+
+# Checkpoint — 2026-09-25 — Separate host reference reuse from Media retry (LOCAL / NO MUTATION)
+
+ROOT_CAUSE_CONFIRMED: The generic resume planner selected failed Media
+ordinals, but the widget then passed those ordinals through the host upload
+adapter again. A retryable Media commit with an already durable host
+reference could therefore repeat `uploadFile`, violating independent child
+lifecycle and failure isolation.
+
+FIXED_BOUNDARY: Resume planning now returns separate host-upload and Media
+upload ordinals. Existing `file_id` references are read back through the
+trusted download-reference path and never passed to host `uploadFile`; only
+children without a stable host reference are uploaded. This remains driven by
+canonical item state and stable identity, with no acceptance fixture values or
+fixed image count.
+
+REGRESSION: Added red/green tests proving a partial N=10 retry with two
+retryable Media commits and existing host references makes zero host upload
+calls, while LOCAL children without a host reference are the only host-upload
+inputs. Existing N=1/2/3/10, usage repair, projection retry, NOOP, ordering
+and one-Article convergence coverage remains in place.
+
+VERIFICATION: Image widget tests pass 60/60; TypeScript typecheck and Vite
+build pass with only existing Rollup annotation warnings; focused Capture,
+continuation, Media identity and MCP Apps PHP tests pass 78 tests / 473
+assertions. Full Unit with `memory_limit=512M` reaches 2,643 tests / 15,362
+assertions with one pre-existing unrelated
+`FrontendSemanticProjectionV2Test::test_home_latest_article_thumbnails_use_wordpress_responsive_image_api`
+failure. The default 128M run is additionally limited by an existing large
+fixture memory exhaustion. `git diff --check` passes. No database, staging,
+production data, deployment or live acceptance mutation was performed.
+
+STATUS: `GENERIC_SUBMISSION_RESUME_LOCAL_READY / HOST_RETRY_ISOLATION_VERIFIED / FULL_UNIT_ONE_PREEXISTING_FRONTEND_FAILURE / NO_LIVE_MUTATION / LIVE_ACCEPTANCE_NOT_RUN`.
