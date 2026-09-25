@@ -22,6 +22,27 @@ final class AdminDomainAdapterTest extends TestCase
         self::assertArrayHasKey('frontend_state', $rows[0]);
     }
 
+    public function test_video_adapter_reads_representative_thumbnail_from_media_usage_instead_of_legacy_video_field(): void
+    {
+        $video = Video::fromUrl('https://youtu.be/truOChTNbwA', 'Video thử', [], null, '01a07af5-3303-7a73-9f15-b7f675293dc5');
+        $usage = new MediaUsage(
+            '01a07af5-3303-7a73-9f15-b7f675293dc8',
+            '01a07af5-3303-7a73-9f15-b7f675293dc6',
+            'video',
+            $video->canonicalId,
+            'representative',
+            selectionSource: 'USER_EXPLICIT',
+            selectionPolicy: 'PINNED',
+            activeSlot: 'representative',
+        );
+
+        $row = (new AdminVideoAdapter([$video], [$usage]))->find('truochtnbwa')[0];
+
+        self::assertSame($usage->mediaId, $row['thumbnail_media_id']);
+        self::assertSame('media_usage', $row['thumbnail_source']);
+        self::assertSame($video->thumbnailMediaId, $row['legacy_thumbnail_media_id']);
+    }
+
     public function test_video_detail_projection_exposes_readback_layers_and_gates_frontend_link(): void
     {
         $video = Video::fromUrl('https://youtu.be/truOChTNbwA', 'Video thử', [
