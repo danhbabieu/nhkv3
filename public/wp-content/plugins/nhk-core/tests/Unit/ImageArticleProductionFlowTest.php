@@ -86,6 +86,18 @@ final class ImageArticleProductionFlowTest extends TestCase
         self::assertCount(1, $flow->usages);
         self::assertSame('media-existing', $flow->usages[0]['media_id']);
     }
+
+    public function test_article_draft_is_composed_after_canonical_media_usage_reconciliation(): void
+    {
+        $flow = new ImageArticleFlowFixture([
+            ['media_id' => 'media-featured', 'attachment_id' => 612, 'upload_status' => 'REUSED', 'sort_order' => 0],
+            ['media_id' => 'media-detail', 'attachment_id' => 613, 'upload_status' => 'REUSED', 'sort_order' => 1],
+        ]);
+
+        $flow->run();
+
+        self::assertSame(['media', 'draft_update'], $flow->events);
+    }
 }
 
 final class ImageArticleFlowFixture
@@ -96,6 +108,7 @@ final class ImageArticleFlowFixture
     /** @var list<array<string,mixed>> */
     public array $usages = [];
     public array $packetIds = [];
+    public array $events = [];
     public string $subjectHintSeen = '';
     private ImageArticleTestCaptureRepository $captures;
     private bool $failMediaOnce;
@@ -125,6 +138,7 @@ final class ImageArticleFlowFixture
             },
             new ArticleComposer(),
             function (array $context): array {
+                $this->events[] = 'media';
                 $this->packetIds[] = (string) (($context['subject_resolution_packet']['id'] ?? ''));
                 if ($this->failMediaOnce) { $this->failMediaOnce = false; throw new \RuntimeException('IMAGE_ARTICLE_MEDIA_TEST_FAILURE'); }
                 $this->usages = [];
@@ -147,6 +161,10 @@ final class ImageArticleFlowFixture
             publisher: function (array $context): array {
                 $this->packetIds[] = (string) (($context['subject_resolution_packet']['id'] ?? ''));
                 return ['ok' => true, 'status' => 'publish', 'post' => ['status' => 'publish', 'permalink' => '/anh-kiem-thu/'], 'state_token' => 'published-token'];
+            },
+            draftUpdater: function (array $context): array {
+                $this->events[] = 'draft_update';
+                return ['ok' => true, 'state_token' => 'article-state-2'];
             },
         );
     }
