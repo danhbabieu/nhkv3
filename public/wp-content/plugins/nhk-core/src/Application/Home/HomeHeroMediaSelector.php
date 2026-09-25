@@ -17,7 +17,7 @@ final class HomeHeroMediaSelector
             if (!is_array($candidate)) continue;
             $id = trim((string) ($candidate['_canonical_id'] ?? ''));
             $url = trim((string) ($candidate['image_url'] ?? ''));
-            if ($id === '' || $url === '' || isset($byId[$id]) || isset($seenUrls[$url])) continue;
+            if ($id === '' || $url === '' || ($candidate['has_real_image'] ?? false) !== true || (int) ($candidate['width'] ?? 0) < 1 || (int) ($candidate['height'] ?? 0) < 1 || isset($byId[$id]) || isset($seenUrls[$url])) continue;
             $byId[$id] = $candidate;
             $seenUrls[$url] = true;
         }

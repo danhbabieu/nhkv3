@@ -98,7 +98,12 @@ function nhk_v3_render_nav_items(array $items): void
 function nhk_v3_nav_fallback(): void
 {
     $groups = nhk_v3_navigation_groups();
-    nhk_v3_render_nav_items(array_merge((array) ($groups['primary'] ?? []), (array) ($groups['discovery'] ?? [])));
+    nhk_v3_render_nav_items((array) ($groups['primary'] ?? []));
+    $discovery = array_values(array_filter((array) ($groups['discovery'] ?? []), static fn (mixed $item): bool => is_array($item)));
+    if ($discovery === []) return;
+    echo '<details class="nav-discovery"><summary aria-expanded="false">Khám phá</summary>';
+    nhk_v3_render_nav_items($discovery);
+    echo '</details>';
 }
 
 function nhk_v3_public_brand_text(string $text): string

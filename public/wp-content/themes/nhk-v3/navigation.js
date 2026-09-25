@@ -25,7 +25,7 @@
     if (!toggle.checked || !mobileQuery.matches) return;
     if (event.key === 'Escape') { event.preventDefault(); close(true); return; }
     if (event.key !== 'Tab' || !panel) return;
-    var focusable = panel.querySelectorAll('a[href], input, button, select, textarea, summary, [tabindex]:not([tabindex="-1"])');
+    var focusable = panel.querySelectorAll('a[href], summary, input, button, select, textarea, [tabindex]:not([tabindex="-1"])');
     if (!focusable.length) return;
     var first = focusable[0];
     var last = focusable[focusable.length - 1];
@@ -41,6 +41,12 @@
   document.querySelectorAll('#primary-navigation a').forEach(function (link) {
     link.addEventListener('click', function () {
       close(false);
+    });
+  });
+  document.querySelectorAll('#primary-navigation details').forEach(function (details) {
+    details.addEventListener('toggle', function () {
+      if (details.open) details.querySelector('summary').setAttribute('aria-expanded', 'true');
+      else details.querySelector('summary').setAttribute('aria-expanded', 'false');
     });
   });
   mobileQuery.addEventListener('change', function () { if (!mobileQuery.matches) close(false); else sync(); });

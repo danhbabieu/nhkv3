@@ -111,6 +111,45 @@ final class FrontendPresentationContractTest extends TestCase
         self::assertStringNotContainsString('fetchpriority="high"', $video);
     }
 
+    public function test_desktop_navigation_exposes_primary_and_groups_discovery_behind_a_control(): void
+    {
+        $header = $this->read('header.php');
+        $functions = $this->read('functions.php');
+
+        self::assertStringContainsString('nhk_v3_render_nav_items((array) ($groups[\'primary\'] ?? []))', $functions);
+        self::assertStringNotContainsString('array_merge((array) ($groups[\'primary\'] ?? []), (array) ($groups[\'discovery\'] ?? []))', $functions);
+        self::assertStringContainsString('Khám phá', $functions);
+        self::assertStringContainsString("\$groups['discovery']", $functions);
+    }
+
+    public function test_homepage_gallery_is_bound_to_public_asset_delivery_before_projection(): void
+    {
+        $plugin = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Plugin.php');
+
+        self::assertStringContainsString('PublicMediaAssetDelivery::fromEnvironment($publicAssets, $publicMedia)', $plugin);
+        self::assertStringContainsString('$homeGallery = new PublicMediaGalleryQuery', $plugin);
+    }
+
+    public function test_homepage_hero_uses_a_clean_fallback_and_separate_entry_controls(): void
+    {
+        $source = $this->read('front-page.php');
+
+        self::assertStringContainsString('hero-entry-points', $source);
+        self::assertStringContainsString('hero-empty', $source);
+        self::assertStringContainsString('($item[\'image_url\'] ?? \'\')', $source);
+        self::assertStringContainsString("trim((string) (\$heroMedia[0]['image_url'] ?? '')) !== ''", $source);
+    }
+
+    public function test_homepage_hero_layout_has_a_bounded_media_column_without_fixed_viewport_height(): void
+    {
+        $css = $this->read('style.css') . $this->read('presentation.css') . $this->read('entity.css');
+
+        self::assertStringContainsString('home-hero-v2', $css);
+        self::assertStringContainsString('max-height:520px', $css);
+        self::assertStringContainsString('grid-template-columns:minmax(0,1fr) minmax(32%,38%)', $css);
+        self::assertStringNotContainsString('height:100vh', $css);
+    }
+
     public function test_entity_detail_renders_dossier_knowledge_gallery_and_path_aware_related_content(): void
     {
         $source = $this->read('entity.php');

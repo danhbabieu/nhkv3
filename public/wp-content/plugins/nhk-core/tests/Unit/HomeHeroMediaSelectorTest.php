@@ -27,8 +27,25 @@ final class HomeHeroMediaSelectorTest extends TestCase
         self::assertSame(['a', 'b'], array_column($selected, 'title'));
     }
 
-    private function item(string $id): array
+    public function test_candidates_without_a_real_public_visual_are_skipped_before_selection(): void
     {
-        return ['_canonical_id' => $id, 'title' => $id, 'image_url' => '/' . $id . '.webp'];
+        $selected = (new HomeHeroMediaSelector())->select([], [
+            $this->item('broken', false),
+            $this->item('valid'),
+        ], 1, 1);
+
+        self::assertSame(['valid'], array_column($selected, 'title'));
+    }
+
+    private function item(string $id, bool $real = true): array
+    {
+        return [
+            '_canonical_id' => $id,
+            'title' => $id,
+            'image_url' => $real ? '/anh/' . $id . '.webp' : null,
+            'has_real_image' => $real,
+            'width' => 1200,
+            'height' => 800,
+        ];
     }
 }
