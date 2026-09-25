@@ -19664,3 +19664,26 @@ performed. HEIC/HEIF remain outside the current server allowlist (JPEG, PNG,
 GIF and WebP); no client binary conversion or MIME fabrication was added.
 
 STATUS: `IMAGE_WIDGET_HOST_UPLOAD_ISOLATION_FIXED_LOCAL / AUTOMATED_LOCAL_VERIFICATION_COMPLETE / NO_LIVE_MUTATION / DEPLOYMENT_PENDING`.
+
+# Checkpoint — 2026-09-25 — Frontend architecture convergence Slice 1–3 (LOCAL / NO LIVE MUTATION)
+
+FIXED_BOUNDARIES: Canonical public navigation now exposes grouped primary,
+discovery and footer projections; mobile navigation closes through Escape,
+outside click and link activation. Collection entity projections request only
+representative media, while detail projections retain full media/dossier
+enrichment. Homepage hero selection is bounded to one visual candidate and the
+latest feed now sits after the compact hero. Article gallery markup is
+thumbnail-first and hydrates the canonical full asset only on viewer
+activation. Related media requires an owner/context or canonical asset
+destination. Video detail defers the external iframe until explicit playback
+intent. Theme CSS is conditionally enqueued by public surface.
+
+VERIFICATION: Focused frontend/entity/media/home suite passed 124 tests / 974
+assertions. PHP lint, JavaScript syntax checks and git diff check passed. Full
+PHPUnit reached 2,786 tests with one legacy frontend marker fixed; remaining
+failures are environment-gated integration prerequisites (`NHK_WP_TEST_PATH`
+and `NHK_WP_TEST_DB`) plus existing integration requirements. No database,
+staging, production, semantic relation, schema or deployment action was
+performed.
+
+STATUS: `FRONTEND_NAVIGATION_MEDIA_ARCHIVE_BOUNDARIES_LOCAL_READY / INTEGRATION_ENVIRONMENT_GATED / NO_LIVE_MUTATION / NO_DEPLOY`.

@@ -33,17 +33,14 @@ final class FrontendPresentationContractTest extends TestCase
         self::assertStringContainsString('$hubLabel', $source);
     }
 
-    public function test_homepage_places_unified_latest_feed_inside_left_hero_column(): void
+    public function test_homepage_places_unified_latest_feed_after_the_compact_hero(): void
     {
         $source = $this->read('front-page.php');
-        self::assertStringContainsString('class="hero-latest-feed"', $source);
+        self::assertStringContainsString('class="home-latest-feed"', $source);
         self::assertStringContainsString('$home[\'latest_feed\']', $source);
         self::assertStringContainsString('latest-feed-row', $source);
-        self::assertStringContainsString('class="hero-copy-block"', $source);
-        self::assertLessThan(strpos($source, 'class="hero-media-column"'), strpos($source, 'class="hero-latest-feed"'));
-        self::assertSame(1, substr_count($source, 'class="hero-latest-feed"'));
-        self::assertStringContainsString('id="featured-title"', $source);
-        self::assertLessThan(strpos($source, 'class="featured-section"'), strpos($source, 'class="hero-latest-feed"'));
+        self::assertLessThan(strpos($source, 'class="featured-section"'), strpos($source, 'class="home-latest-feed"'));
+        self::assertSame(1, substr_count($source, 'class="home-latest-feed"'));
     }
 
     public function test_homepage_prioritizes_only_the_hero_lcp_image(): void

@@ -16,22 +16,6 @@ get_header();
       <p class="hero-copy">Khám phá thương hiệu, mẫu máy, bộ máy, bản nhạc, hình ảnh, video và những chi tiết giúp nhận diện từng hiện vật trong cùng một hệ thống tra cứu.</p>
       <ul class="hero-values"><li>Tra cứu thương hiệu và mẫu đồng hồ</li><li>Xem ảnh thực tế và video</li><li>Tìm hiểu bộ máy, bản nhạc, linh kiện</li><li>Kết nối tri thức với hiện vật sưu tầm</li></ul>
       <?php get_search_form(); ?>
-      <?php if ($latestFeed !== []): ?>
-      <section class="hero-latest-feed" aria-labelledby="home-latest-title">
-        <div class="hero-latest-head"><div><p class="eyebrow">Mới cập nhật</p><h2 id="home-latest-title">Mới nhất trong kho</h2><p class="hero-latest-subtitle">Những cập nhật mới nhất từ toàn bộ kho dữ liệu.</p></div><a class="text-link" href="<?php echo esc_url(home_url('/')); ?>#home-latest-title">Xem tất cả <span aria-hidden="true">→</span></a></div>
-        <div class="latest-feed-list">
-          <?php foreach (array_slice($latestFeed, 0, 5) as $item): $url = nhk_v3_public_url($item['url'] ?? null); if ($url === '') continue; $image = trim((string) ($item['image_url'] ?? '')); $width = max(1, (int) ($item['width'] ?? 0)); $height = max(1, (int) ($item['height'] ?? 0)); $displayTimestamp = trim((string) ($item['timestamp'] ?? '')) ?: trim((string) ($item['created_at'] ?? '')); $visualKind = (string) ($item['visual_kind'] ?? ($image !== '' ? 'image' : 'fallback')); $visualType = (string) ($item['visual_type'] ?? $item['type'] ?? 'image'); ?>
-            <article class="latest-feed-row<?php echo $visualKind !== 'image' ? ' has-no-image' : ''; ?>">
-              <a class="latest-feed-thumb" href="<?php echo esc_url($url); ?>" aria-label="<?php echo esc_attr((string) ($item['title'] ?? '')); ?>">
-                <?php if ($visualKind === 'image' && $image !== ''): ?><?php if (($item['type'] ?? '') === 'article' && (int) ($item['attachment_id'] ?? 0) > 0 && function_exists('wp_get_attachment_image')): ?><?php echo wp_get_attachment_image((int) $item['attachment_id'], 'medium_large', false, ['alt' => '', 'loading' => 'lazy', 'decoding' => 'async']); ?><?php else: ?><img src="<?php echo esc_url($image); ?>" alt="" width="<?php echo esc_attr((string) $width); ?>" height="<?php echo esc_attr((string) $height); ?>" loading="lazy" decoding="async"<?php if (trim((string) ($item['image_srcset'] ?? '')) !== ''): ?> srcset="<?php echo esc_attr((string) $item['image_srcset']); ?>"<?php endif; ?><?php if (trim((string) ($item['image_sizes'] ?? '')) !== ''): ?> sizes="<?php echo esc_attr((string) $item['image_sizes']); ?>"<?php endif; ?>><?php endif; ?><?php else: ?><span class="homepage-visual-fallback homepage-visual-fallback--<?php echo esc_attr($visualType); ?>" aria-hidden="true"><span class="homepage-visual-icon"><?php echo esc_html($visualType === 'video' ? '▶' : ($visualType === 'knowledge' ? '▤' : ($visualType === 'brand' ? '✦' : '◌'))); ?></span><small><?php echo esc_html((string) ($item['label'] ?? 'Nội dung')); ?></small></span><?php endif; ?>
-              </a>
-              <div class="latest-feed-row-body"><div class="latest-feed-row-meta"><span class="latest-feed-badge"><?php echo esc_html((string) ($item['label'] ?? 'Nội dung')); ?></span><time datetime="<?php echo esc_attr($displayTimestamp); ?>"><?php echo esc_html(nhk_v3_public_date(strtotime($displayTimestamp) ?: null)); ?></time></div><h3><a href="<?php echo esc_url($url); ?>"><?php echo esc_html((string) ($item['title'] ?? '')); ?></a></h3><?php if (trim((string) ($item['summary'] ?? '')) !== ''): ?><p><?php echo esc_html((string) ($item['summary'] ?? '')); ?></p><?php endif; ?></div>
-              <span class="latest-feed-arrow" aria-hidden="true">→</span>
-            </article>
-          <?php endforeach; ?>
-        </div>
-      </section>
-      <?php endif; ?>
     </div>
     <div class="hero-media-column">
     <div class="hero-visual-slider" data-nhk-hero-slider aria-label="Ảnh nổi bật từ kho NHK">
@@ -44,6 +28,20 @@ get_header();
     </div>
     </div>
   </section>
+
+  <?php if ($latestFeed !== []): ?>
+  <section class="home-latest-feed" aria-labelledby="home-latest-title">
+    <div class="section-head"><div><p class="eyebrow">Mới cập nhật</p><h2 id="home-latest-title">Mới nhất trong kho</h2><p class="section-deck">Những cập nhật mới nhất từ toàn bộ kho dữ liệu.</p></div></div>
+    <div class="latest-feed-list">
+      <?php foreach (array_slice($latestFeed, 0, 6) as $item): $url = nhk_v3_public_url($item['url'] ?? null); if ($url === '') continue; ?>
+        <article class="latest-feed-row">
+          <div class="latest-feed-row-body"><div class="latest-feed-row-meta"><span class="latest-feed-badge"><?php echo esc_html((string) ($item['label'] ?? 'Nội dung')); ?></span></div><h3><a href="<?php echo esc_url($url); ?>"><?php echo esc_html((string) ($item['title'] ?? '')); ?></a></h3><?php if (trim((string) ($item['summary'] ?? '')) !== ''): ?><p><?php echo esc_html((string) ($item['summary'] ?? '')); ?></p><?php endif; ?></div>
+          <a class="latest-feed-arrow" href="<?php echo esc_url($url); ?>" aria-label="Mở <?php echo esc_attr((string) ($item['title'] ?? 'nội dung')); ?>">→</a>
+        </article>
+      <?php endforeach; ?>
+    </div>
+  </section>
+  <?php endif; ?>
 
   <?php if (!empty($home['featured'])): $featured = $home['featured']; global $post; $post = $featured[0]; setup_postdata($post); ?>
   <section class="featured-section" aria-labelledby="featured-title">
