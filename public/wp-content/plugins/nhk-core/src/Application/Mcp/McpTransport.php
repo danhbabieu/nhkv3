@@ -791,8 +791,9 @@ final class McpTransport
         $target = $targetReference;
         if ($this->mediaTargetNormalizer !== null) {
             $normalized = $this->mediaTargetNormalizer->normalizeRequestTarget($targetReference);
-            $target = ['type' => $normalized['type'], 'id' => $normalized['id']];
+            $target = ['type' => $normalized['type'], 'id' => $normalized['id'], 'revision' => (int) $normalized['revision']];
             if (isset($normalized['canonical_uuid'])) $targetUuid = (string) $normalized['canonical_uuid'];
+            if (isset($normalized['stable_key'])) $target['stable_key'] = (string) $normalized['stable_key'];
         } elseif ($targetType !== 'wp_post') {
             $resolved = $this->mediaBinding->resolveTargetReference($targetReference);
             $targetUuid = $resolved->canonicalId;

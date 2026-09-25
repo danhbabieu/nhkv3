@@ -252,6 +252,7 @@ final class MediaBindingService implements MediaBindingPort
             $canonicalTarget = $this->targetNormalizer->normalizeRequestTarget($target);
             $target['id'] = (string) $canonicalTarget['id'];
             $target['stable_key'] = (string) ($canonicalTarget['stable_key'] ?? '');
+            $target['revision'] = (int) ($canonicalTarget['revision'] ?? 1);
             $targetId = $target['id'];
         }
         $capability = $this->capabilities?->forEndpoint($targetType);

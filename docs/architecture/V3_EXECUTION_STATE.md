@@ -20064,17 +20064,39 @@ FOCUSED_TESTS: 210 tests, 3,100 assertions; OK with 1 warning, 4
 deprecations and 38 PHPUnit deprecations.
 
 FULL_UNIT: `php -d memory_limit=512M vendor/bin/phpunit .../tests/Unit` —
-2,675 tests, 15,490 assertions, OK with 19 warnings, 46 deprecations and 46
+2,677 tests, 15,509 assertions, OK with 19 warnings, 46 deprecations and 46
 PHPUnit deprecations.
 
 INTEGRATION: BLOCKED, not passed. `NHK_WP_TEST_PATH=UNSET` and
 `NHK_WP_TEST_DB=UNSET`; guarded projection test skipped and no alternate
 database was used.
 
-COMMIT: Implementation slices `2013361b`, `2ef6c50f`, `cf783e0b`, `87caae7b`
-and `90d4e9e7`; final checkpoint commit contains this evidence and the reverse
-lookup acceptance test.
+COMMIT: Implementation slices `2013361b`, `2ef6c50f`, `cf783e0b`, `87caae7b`,
+`90d4e9e7` and `1951515c`; final MCP revision-preservation fix is committed
+after this checkpoint.
 
 REMAINING_BLOCKERS: Exact guarded WordPress integration environment is
 unavailable. Live/staging acceptance for the concrete external Post 18 was
 not authorized or performed. Existing PHPUnit warnings/deprecations remain.
+
+# Checkpoint — 2026-09-25 — Self-contained NHK Core PSR-4 bootstrap (LOCAL / NO MUTATION)
+
+ROOT_CAUSE_CONFIRMED: `nhk-core.php` registered the plugin's local PSR-4
+autoload callback only inside the Composer-missing `else` branch. A deployed
+runtime with an existing but stale/incomplete root Composer autoloader therefore
+skipped the callback and failed at `Plugin.php` when resolving
+`NHK\\Core\\Application\\Media\\PublicMediaAssetDelivery`, even though the
+case-exact source file was present in the release tree.
+
+FIXED_BOUNDARY: The plugin now always registers its own namespace-scoped PSR-4
+fallback after attempting Composer autoload. Composer remains first in the
+autoload chain; the local loader supplies plugin classes when the external
+loader does not map the current plugin tree. No domain, route, schema, or data
+boundary changed.
+
+REGRESSION: `PluginBootWiringTest` proves the local loader is not nested inside
+the Composer-missing branch. Focused Media/runtime suite passed 34 tests / 172
+assertions with 1 existing PHPUnit deprecation. `nhk-core.php` PHP lint and
+`git diff --check` passed.
+
+STATUS: `NHK_CORE_BOOTSTRAP_SELF_CONTAINED_LOCAL_READY / NO_MUTATION`.
