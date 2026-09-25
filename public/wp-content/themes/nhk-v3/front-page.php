@@ -16,14 +16,41 @@ get_header();
       <h1>Kho tri thức đồng hồ cổ<br> <em>dành cho người chơi và sưu tầm.</em></h1>
       <p class="hero-copy">Khám phá thương hiệu, nhóm đồng hồ và những câu chuyện trong kho NHK.</p>
       <?php get_search_form(); ?>
-      <?php if ($heroEntryPoints !== []): ?><nav class="hero-entry-points" aria-label="Khám phá chính"><?php foreach ($heroEntryPoints as $item): ?><a href="<?php echo esc_url(home_url((string) $item['path'])); ?>"><?php echo esc_html((string) $item['label']); ?><span aria-hidden="true">→</span></a><?php endforeach; ?></nav><?php endif; ?>
+      <?php if ($heroEntryPoints !== []): ?><nav class="hero-entry-points" aria-label="Khám phá chính"><?php foreach ($heroEntryPoints as $item): ?><a class="hero-entry-card" href="<?php echo esc_url(home_url((string) $item['path'])); ?>"><strong><?php echo esc_html((string) $item['label']); ?></strong><span aria-hidden="true">→</span></a><?php endforeach; ?></nav><?php endif; ?>
     </div>
     <div class="hero-media-column">
-    <div class="hero-visual" aria-label="Ảnh nổi bật từ kho NHK">
-      <?php if ($heroMedia !== []): $item = $heroMedia[0]; $dimensions = nhk_v3_media_dimensions($item); $orientation = nhk_v3_media_orientation_class($dimensions['width'], $dimensions['height']); $alt = trim((string) ($item['alt'] ?? $item['title'] ?? 'Ảnh tư liệu NHK')); ?>
-        <figure class="hero-image <?php echo esc_attr($orientation); ?>"><img src="<?php echo esc_url((string) $item['image_url']); ?>" alt="<?php echo esc_attr($alt); ?>" width="<?php echo esc_attr((string) max(1, $dimensions['width'])); ?>" height="<?php echo esc_attr((string) max(1, $dimensions['height'])); ?>"<?php if (trim((string) ($item['srcset'] ?? '')) !== ''): ?> srcset="<?php echo esc_attr((string) $item['srcset']); ?>"<?php endif; ?><?php if (trim((string) ($item['sizes'] ?? '')) !== ''): ?> sizes="<?php echo esc_attr((string) ($item['sizes'])); ?>"<?php endif; ?> loading="eager" fetchpriority="high"><figcaption><?php echo esc_html((string) ($item['title'] ?? 'Ảnh tư liệu NHK')); ?></figcaption></figure>
+      <div class="hero-visual" aria-label="Ảnh nổi bật từ kho NHK">
+      <?php if ($heroMedia !== []):
+        $item = $heroMedia[0];
+        $dimensions = nhk_v3_media_dimensions($item);
+        $orientation = nhk_v3_media_orientation_class($dimensions['width'], $dimensions['height']);
+        $alt = trim((string) ($item['alt'] ?? $item['title'] ?? 'Ảnh tư liệu NHK'));
+        $attachmentId = (int) ($item['attachment_id'] ?? 0);
+        $fallbackHeroUrl = trim((string) ($item['thumbnail_url'] ?? '')) ?: trim((string) ($item['image_url'] ?? ''));
+        $heroTag = '';
+        if ($attachmentId > 0 && function_exists('wp_get_attachment_image')) {
+            $heroTag = (string) wp_get_attachment_image($attachmentId, 'large', false, [
+                'class' => 'hero-image-element',
+                'loading' => 'eager',
+                'fetchpriority' => 'high',
+                'decoding' => 'async',
+                'alt' => $alt,
+                'sizes' => '(max-width: 767px) calc(100vw - 28px), (max-width: 1180px) 34vw, 400px',
+            ]);
+        }
+      ?>
+        <figure class="hero-image <?php echo esc_attr($orientation); ?>">
+          <?php if ($heroTag !== ''): ?>
+            <?php echo $heroTag; ?>
+          <?php elseif ($fallbackHeroUrl !== ''): ?>
+            <img class="hero-image-element" src="<?php echo esc_url($fallbackHeroUrl); ?>" alt="<?php echo esc_attr($alt); ?>"<?php if ($dimensions['width'] > 0): ?> width="<?php echo esc_attr((string) $dimensions['width']); ?>"<?php endif; ?><?php if ($dimensions['height'] > 0): ?> height="<?php echo esc_attr((string) $dimensions['height']); ?>"<?php endif; ?><?php if (trim((string) ($item['srcset'] ?? '')) !== ''): ?> srcset="<?php echo esc_attr((string) $item['srcset']); ?>"<?php endif; ?><?php if (trim((string) ($item['sizes'] ?? '')) !== ''): ?> sizes="<?php echo esc_attr((string) $item['sizes']); ?>"<?php endif; ?> loading="eager" fetchpriority="high" decoding="async">
+          <?php else: ?>
+            <img class="hero-image-element fallback-visual" src="<?php echo esc_url($fallback); ?>" alt="" width="640" height="800" loading="eager" fetchpriority="high">
+          <?php endif; ?>
+          <figcaption><?php echo esc_html((string) ($item['title'] ?? 'Ảnh tư liệu NHK')); ?></figcaption>
+        </figure>
       <?php else: ?><div class="hero-empty" role="status">Kho ảnh đang được bổ sung.</div><?php endif; ?>
-    </div>
+      </div>
     </div>
   </section>
 
