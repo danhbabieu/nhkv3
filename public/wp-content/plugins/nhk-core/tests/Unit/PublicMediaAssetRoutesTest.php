@@ -71,13 +71,12 @@ final class PublicMediaAssetRoutesTest extends TestCase
     {
         $root = sys_get_temp_dir() . '/nhk-media-route-' . bin2hex(random_bytes(4));
         mkdir($root);
-        $source = dirname(__DIR__, 4) . '/uploads/integration-source-original-5.webp';
         $path = $root . '/physical-attachment-name.webp';
-        self::assertTrue(copy($source, $path));
-        $bytes = file_get_contents($path);
+        $bytes = base64_decode('UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AA/vuUAAA=', true);
         self::assertIsString($bytes);
+        self::assertTrue(file_put_contents($path, $bytes) !== false);
         $mediaId = UuidCodec::newV7();
-        $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'derivative', 'uploads/physical-attachment-name.webp', hash('sha256', $bytes), 'image/webp', strlen($bytes), 16, 304, 'PUBLIC', ['canonical_filename' => 'example.webp', 'wordpress_attachment_id' => 86]);
+        $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'derivative', 'uploads/physical-attachment-name.webp', hash('sha256', $bytes), 'image/webp', strlen($bytes), 1, 1, 'PUBLIC', ['canonical_filename' => 'example.webp', 'wordpress_attachment_id' => 86]);
         return [$root, $path, $asset, new Media($mediaId, 'wp-attachment:1:86', 'Example', 'ready')];
     }
 
