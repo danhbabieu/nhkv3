@@ -483,51 +483,6 @@ final class EditorialCaptureCoordinator
                 $diagnostics['failure_code'] = 'SUBJECT_CONFLICT_REVIEW_REQUIRED';
                 return $this->save($record, CaptureStage::INTERPRETED, $assets, $diagnostics, $receipts, 'SUBJECT_CONFLICT_REVIEW_REQUIRED', $record->articleId, $record->articleStateToken, 'REVIEW_REQUIRED');
             }
-            if ($articleRequired && $record->articleId === null) {
-                $this->beginPhase('DRAFT_CREATED');
-                $draft = ($this->draftCreator)([
-                    'capture_id' => $record->captureId,
-                    'idempotency_key' => $record->captureId . ':article',
-                    'title' => trim((string) ($input['title'] ?? '')),
-                    'content' => $text,
-                    'excerpt' => trim((string) ($input['excerpt'] ?? '')),
-                    'research' => ['ready_for_draft' => true, 'capture_id' => $record->captureId],
-                ]);
-                $articleId = (int) ($draft['post_id'] ?? $draft['post']['post_id'] ?? 0);
-                if ($articleId < 1) throw new \RuntimeException('ARTICLE_DRAFT_READBACK_UNAVAILABLE');
-                $diagnostics['draft'] = $this->withoutBody($draft);
-                $record = $this->save($record, CaptureStage::DRAFT_CREATED, $assets, $diagnostics, $receipts, 'DRAFT_CREATED', $articleId, (string) ($draft['state_token'] ?? ''));
-            }
-            if ($articleRequired && $record->articleId !== null && $deferredArticleBindings) {
-                // Resolve the deferred Article reference from the server-owned
-                // draft/read-back identity.  The client never supplies or
-                // invents this target ID.
-                [$input, $articleBindings] = $this->resolveDeferredArticleBindings($input, $record);
-                foreach ($articleBindings as $binding) {
-                    if (!is_array($binding)) continue;
-                    $index = is_array($binding['media_ref'] ?? null) ? (int) ($binding['media_ref']['item_index'] ?? -1) : -1;
-                    if (!isset($assets[$index]) || !is_array($assets[$index])) continue;
-                    $seo = is_array($binding['seo'] ?? null) ? $binding['seo'] : [];
-                    $assets[$index]['media_context'] = array_replace(is_array($assets[$index]['media_context'] ?? null) ? $assets[$index]['media_context'] : [], array_filter([
-                        'title' => $seo['title'] ?? null,
-                        'alt_text' => $seo['alt_text'] ?? null,
-                        'caption' => $seo['caption'] ?? null,
-                    ], static fn (mixed $value): bool => $value !== null));
-                    if (array_key_exists('sort_order', $binding)) $assets[$index]['sort_order'] = max(0, (int) $binding['sort_order']);
-                }
-                if ($this->stagingScopeVerifier !== null && $articleBindings !== []) {
-                    $scopeInput = $input;
-                    $scopeInput['media_bindings'] = $articleBindings;
-                    $stagingScope = $this->stagingScopeVerifier->forCapture($record, $scopeInput, $assets);
-                    if ($stagingScope !== null) {
-                        $input['staging_acceptance'] = $stagingScope;
-                        $diagnostics['staging_acceptance'] = ['status' => 'verified', 'fingerprint' => (string) ($stagingScope['fingerprint'] ?? ''), 'deferred_article_reference' => true];
-                        $record = $this->save($record, CaptureStage::DRAFT_CREATED, $assets, $diagnostics, $receipts, 'DRAFT_CREATED', $record->articleId, $record->articleStateToken, 'IN_PROGRESS', null, $record->context + ['staging_acceptance' => $stagingScope]);
-                        $diagnostics = $record->diagnostics;
-                        $receipts = $record->phaseReceipts;
-                    }
-                }
-            }
             if (!array_key_exists('media_adoption', $diagnostics) || ($followupItems !== [] && ($input['asset_followup_replay'] ?? false) !== true)) {
                 $this->beginPhase('MEDIA_ADOPTED');
                 $adopted = [];
@@ -593,6 +548,30 @@ final class EditorialCaptureCoordinator
                 }
                 if ($record->status === 'IN_PROGRESS') {
                     $record = $this->save($record, $record->stage, $assets, $diagnostics, $receipts, 'CONTENT_PREPARATION_SAFE_CONTINUE', $record->articleId, $record->articleStateToken, 'REVIEW_REQUIRED', 'REVIEW_REQUIRED');
+                }
+                if ($articleRequired && $record->articleId === null && $preparationResult->blockers === []) {
+                    $safeComposition = $this->composer->compose($text, [], [], [
+                        'title' => (string) ($input['title'] ?? ''),
+                        'excerpt' => (string) ($input['excerpt'] ?? ''),
+                        'editorial_copy' => $text,
+                        'non_semantic_context' => [],
+                        'content_intent' => $intent,
+                        'asset_count' => count($assets),
+                        'assets' => $assets,
+                    ]);
+                    $draft = ($this->draftCreator)([
+                        'capture_id' => $record->captureId,
+                        'idempotency_key' => $record->captureId . ':article',
+                        'title' => (string) ($safeComposition['title'] ?? $input['title'] ?? ''),
+                        'content' => (string) ($safeComposition['content'] ?? ''),
+                        'excerpt' => (string) ($safeComposition['excerpt'] ?? ''),
+                        'research' => ['ready_for_draft' => true, 'capture_id' => $record->captureId, 'claim_trace' => $safeComposition['claim_trace'] ?? [], 'research_snapshot' => $safeComposition['research_snapshot'] ?? []],
+                    ]);
+                    $articleId = (int) ($draft['post_id'] ?? $draft['post']['post_id'] ?? 0);
+                    if ($articleId < 1) throw new \RuntimeException('ARTICLE_DRAFT_READBACK_UNAVAILABLE');
+                    $diagnostics['composition'] = ['title' => $safeComposition['title'], 'claim_trace' => $safeComposition['claim_trace'], 'research_snapshot' => $safeComposition['research_snapshot'], 'managed_sections' => $safeComposition['managed_sections'] ?? []];
+                    $diagnostics['draft'] = $this->withoutBody($draft);
+                    $record = $this->save($record, CaptureStage::DRAFT_CREATED, $assets, $diagnostics, $receipts, 'DRAFT_CREATED', $articleId, (string) ($draft['state_token'] ?? ''), 'REVIEW_REQUIRED', 'REVIEW_REQUIRED');
                 }
                 return $record;
             }
@@ -746,7 +725,7 @@ final class EditorialCaptureCoordinator
                                 'selected_knowledge' => $preparationResult?->enrichment['selected_knowledge'] ?? [],
                                 'governed_enrichment_readback' => $preparationResult?->enrichment ?? [],
                             ],
-                            'defer_composition' => true,
+                            'defer_composition' => false,
                             'public_identity' => [
                                 'canonical_url' => $permalink,
                                 'canonical_identity' => $permalink !== '',
@@ -819,6 +798,57 @@ final class EditorialCaptureCoordinator
                 $assets = $record->assets;
                 $diagnostics = $record->diagnostics;
                 $receipts = $record->phaseReceipts;
+            }
+
+            if ($articleRequired && $record->articleId === null) {
+                $this->beginPhase('COMPOSED');
+                $sharedDraft = is_array($sharedEditorial ?? null) ? ($sharedEditorial['draft'] ?? null) : null;
+                $composition = is_object($sharedDraft)
+                    ? ['title' => $sharedDraft->title, 'excerpt' => $sharedDraft->summary, 'content' => $sharedDraft->body, 'claim_trace' => $sharedDraft->claimTrace, 'research_snapshot' => ['source' => 'shared_editorial_pipeline', 'profile' => $sharedDraft->profile], 'managed_sections' => [], 'seo_projection' => is_object($sharedEditorial['seo_plan'] ?? null) ? $sharedEditorial['seo_plan']->toArray() : []]
+                    : $this->composer->compose($text, $semanticContext['observations'], $retrieved['selected_claims'] ?? [], ['title' => (string) ($input['title'] ?? ''), 'excerpt' => (string) ($input['excerpt'] ?? ''), 'editorial_copy' => (string) ($interpretation['article_intent'] ?? ''), 'non_semantic_context' => is_array($interpretation['non_semantic_context'] ?? null) ? $interpretation['non_semantic_context'] : [], 'subject_resolution' => $resolution, 'asset_count' => count($assets), 'assets' => $assets, 'visual_opportunities' => $visualOpportunities]);
+                $draft = ($this->draftCreator)([
+                    'capture_id' => $record->captureId,
+                    'idempotency_key' => $record->captureId . ':article',
+                    'title' => (string) ($composition['title'] ?? $input['title'] ?? ''),
+                    'content' => (string) ($composition['content'] ?? ''),
+                    'excerpt' => (string) ($composition['excerpt'] ?? ''),
+                    'research' => ['ready_for_draft' => true, 'capture_id' => $record->captureId, 'claim_trace' => $composition['claim_trace'] ?? [], 'research_snapshot' => $composition['research_snapshot'] ?? []],
+                ]);
+                $articleId = (int) ($draft['post_id'] ?? $draft['post']['post_id'] ?? 0);
+                if ($articleId < 1) throw new \RuntimeException('ARTICLE_DRAFT_READBACK_UNAVAILABLE');
+                $diagnostics['composition'] = ['title' => $composition['title'], 'claim_trace' => $composition['claim_trace'], 'research_snapshot' => $composition['research_snapshot'], 'managed_sections' => $composition['managed_sections'] ?? []];
+                $diagnostics['draft'] = $this->withoutBody($draft);
+                $record = $this->save($record, CaptureStage::DRAFT_CREATED, $assets, $diagnostics, $receipts, 'DRAFT_CREATED', $articleId, (string) ($draft['state_token'] ?? ''));
+            }
+            if ($articleRequired && $record->articleId !== null && $deferredArticleBindings) {
+                // Resolve the deferred Article reference from the server-owned
+                // draft/read-back identity.  The client never supplies or
+                // invents this target ID.
+                [$input, $articleBindings] = $this->resolveDeferredArticleBindings($input, $record);
+                foreach ($articleBindings as $binding) {
+                    if (!is_array($binding)) continue;
+                    $index = is_array($binding['media_ref'] ?? null) ? (int) ($binding['media_ref']['item_index'] ?? -1) : -1;
+                    if (!isset($assets[$index]) || !is_array($assets[$index])) continue;
+                    $seo = is_array($binding['seo'] ?? null) ? $binding['seo'] : [];
+                    $assets[$index]['media_context'] = array_replace(is_array($assets[$index]['media_context'] ?? null) ? $assets[$index]['media_context'] : [], array_filter([
+                        'title' => $seo['title'] ?? null,
+                        'alt_text' => $seo['alt_text'] ?? null,
+                        'caption' => $seo['caption'] ?? null,
+                    ], static fn (mixed $value): bool => $value !== null));
+                    if (array_key_exists('sort_order', $binding)) $assets[$index]['sort_order'] = max(0, (int) $binding['sort_order']);
+                }
+                if ($this->stagingScopeVerifier !== null && $articleBindings !== []) {
+                    $scopeInput = $input;
+                    $scopeInput['media_bindings'] = $articleBindings;
+                    $stagingScope = $this->stagingScopeVerifier->forCapture($record, $scopeInput, $assets);
+                    if ($stagingScope !== null) {
+                        $input['staging_acceptance'] = $stagingScope;
+                        $diagnostics['staging_acceptance'] = ['status' => 'verified', 'fingerprint' => (string) ($stagingScope['fingerprint'] ?? ''), 'deferred_article_reference' => true];
+                        $record = $this->save($record, CaptureStage::DRAFT_CREATED, $assets, $diagnostics, $receipts, 'DRAFT_CREATED', $record->articleId, $record->articleStateToken, 'IN_PROGRESS', null, $record->context + ['staging_acceptance' => $stagingScope]);
+                        $diagnostics = $record->diagnostics;
+                        $receipts = $record->phaseReceipts;
+                    }
+                }
             }
 
             if (!$articleRequired && $record->articleId === null) {

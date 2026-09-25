@@ -424,7 +424,7 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
         ]);
 
         self::assertSame('PREPARED', $prepared->diagnostics['content_preparation']['status']);
-        self::assertSame(['physical', 'draft', 'semantic', 'media', 'publication', 'final'], $events);
+        self::assertSame(['physical', 'semantic', 'draft', 'media', 'publication', 'final'], $events);
         self::assertSame(1001, $prepared->articleId);
 
         $reviewCalls = ['draft' => 0, 'semantic' => 0, 'media' => 0, 'publication' => 0, 'final' => 0];
@@ -636,7 +636,7 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
         self::assertSame($first->captureId, $replay->captureId);
         self::assertSame(1001, $first->articleId);
         self::assertSame(['draft' => 1, 'semantic' => 1, 'media' => 1, 'publication' => 1, 'final' => 1], $calls);
-        self::assertSame(['physical', 'draft', 'semantic', 'media', 'publication', 'final'], $events);
+        self::assertSame(['physical', 'semantic', 'draft', 'media', 'publication', 'final'], $events);
         self::assertSame('TEXT_ARTICLE', $first->diagnostics['content_intent']['intent']);
         self::assertSame([['owner_type' => 'wp_post', 'owner_id' => '1001']], $first->diagnostics['completion']['required_owners']);
         self::assertContains('ARTICLE_NOT_PUBLISHED', $first->diagnostics['completion']['blockers']);
@@ -729,6 +729,44 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
         self::assertStringContainsString('Một chiếc đồng hồ cơ', $seen['raw_input']);
         self::assertStringContainsString('Một chiếc đồng hồ cơ', $seen['editorial_copy']);
         self::assertSame(['Ảnh mặt trước', 'Ảnh vỏ', 'Ảnh bộ máy'], $seen['asset_names']);
+    }
+
+    public function test_image_article_composes_before_creating_its_single_article_draft(): void
+    {
+        $captures = new Pr5CaptureRepository();
+        $calls = ['draft' => 0, 'semantic' => 0, 'media' => 0, 'publication' => 0, 'final' => 0];
+        $events = [];
+        $draftPayload = [];
+        $coordinator = $this->coordinator(
+            $captures,
+            $calls,
+            $events,
+            semanticStatus: 'COMPLETED',
+            physical: static fn (): array => ['items' => [
+                ['kind' => 'image', 'media_id' => 'media-one', 'sort_order' => 0, 'capture_asset_input' => ['feature_requests' => []]],
+                ['kind' => 'image', 'media_id' => 'media-two', 'sort_order' => 1, 'capture_asset_input' => ['feature_requests' => []]],
+                ['kind' => 'image', 'media_id' => 'media-three', 'sort_order' => 2, 'capture_asset_input' => ['feature_requests' => []]],
+            ]],
+            draft: static function (array $input) use (&$draftPayload, &$calls, &$events): array {
+                ++$calls['draft'];
+                $events[] = 'draft';
+                $draftPayload = $input;
+                return ['post_id' => 1001, 'state_token' => 'article-token'];
+            },
+        );
+
+        $result = $coordinator->execute([
+            'idempotency_key' => 'image-article-composition-order',
+            'intent' => 'IMAGE_ARTICLE',
+            'title' => 'Ba góc chụp',
+            'text' => '# Mô tả chung cho ba ảnh.',
+        ]);
+
+        self::assertSame(1001, $result->articleId);
+        self::assertSame(1, $calls['draft']);
+        self::assertSame(['semantic', 'draft', 'media', 'publication', 'final'], $events);
+        self::assertNotSame('# Mô tả chung cho ba ảnh.', $draftPayload['content'] ?? null);
+        self::assertStringContainsString('Mô tả chung cho ba ảnh.', (string) ($draftPayload['content'] ?? ''));
     }
 
     public function test_knowledge_delta_without_image_has_no_article_and_is_not_semantically_complete_when_pending(): void
