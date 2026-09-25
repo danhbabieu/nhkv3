@@ -10,6 +10,24 @@ use PHPUnit\Framework\TestCase;
 
 final class CaptureFeatureBindingCoordinatorTest extends TestCase
 {
+    public function test_empty_feature_requests_are_explicitly_skipped_without_resolution(): void
+    {
+        $resolutionCalls = 0;
+        $resolver = new SubjectResolutionService(static function () use (&$resolutionCalls): array {
+            $resolutionCalls++;
+            return [];
+        });
+
+        $result = (new CaptureFeatureBindingCoordinator($resolver, new CaptureFeatureBindingTestPort()))->execute([
+            ['media_id' => 'media-empty-feature', 'upload_status' => 'REUSED', 'capture_asset_input' => ['feature_requests' => []]],
+        ], 'capture-empty-feature');
+
+        self::assertSame([], $result['feature_results']);
+        self::assertSame('NOT_REQUESTED', $result['status']);
+        self::assertSame('COMPLETE', $result['assets'][0]['disposition']);
+        self::assertSame(0, $resolutionCalls);
+    }
+
     public function test_resolves_each_feature_independently_and_binds_multiple_targets(): void
     {
         $first = '11111111-1111-4111-8111-111111111111';

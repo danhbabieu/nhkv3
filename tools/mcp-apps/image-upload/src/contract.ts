@@ -89,6 +89,9 @@ export type WidgetDiagnostic = {
   mime_type?: string;
   byte_size?: number;
   attempt_number?: number;
+  submission_id?: string;
+  attempt_id?: string;
+  phase?: string;
   uri?: string;
   tool?: string;
 };
@@ -117,6 +120,15 @@ export type CaptureReadback = {
   canonical_usage_readback?: Array<{ media_id?: string; endpoint_type?: string; endpoint_key?: string; active?: boolean }>;
 };
 
+export function captureIntent(record: Pick<CaptureReadback, "content_intent"> | null | undefined): string {
+  const intent = record?.content_intent;
+  return (typeof intent === "string" ? intent : intent?.intent ?? "").trim().toUpperCase();
+}
+
+export function captureRequiresArticleReadback(record: Pick<CaptureReadback, "content_intent"> | null | undefined): boolean {
+  return captureIntent(record) === "IMAGE_ARTICLE";
+}
+
 /**
  * Normalize the two server-owned capture.ingest success projections at the
  * transport boundary. A new ingest returns the readback flat; continuation
@@ -134,8 +146,7 @@ export function normalizeCaptureReadback(payload: unknown): CaptureReadback {
 
 export function assertCaptureArticleReadback(payload: unknown, expectedMediaIds: string[]): CaptureReadback {
   const record = normalizeCaptureReadback(payload);
-  const intent = typeof record.content_intent === "string" ? record.content_intent : record.content_intent?.intent;
-  if (intent?.toUpperCase() !== "IMAGE_ARTICLE") return record;
+  if (!captureRequiresArticleReadback(record)) return record;
   const postId = record.article?.post_id ?? record.article_id;
   if (!(Number(postId) > 0)) throw new Error("ARTICLE_READBACK_UNAVAILABLE");
   const dispositions = record.per_media_disposition ?? record.article_media_plan?.media_dispositions ?? [];

@@ -12044,6 +12044,13 @@ function buildWidgetUploadFailureManifest(references, userContext, errorCode2) {
     }))
   };
 }
+function captureIntent(record2) {
+  const intent = record2?.content_intent;
+  return (typeof intent === "string" ? intent : intent?.intent ?? "").trim().toUpperCase();
+}
+function captureRequiresArticleReadback(record2) {
+  return captureIntent(record2) === "IMAGE_ARTICLE";
+}
 function normalizeCaptureReadback(payload) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) throw new Error("CAPTURE_READBACK_UNAVAILABLE");
   const record2 = payload;
@@ -12055,8 +12062,7 @@ function normalizeCaptureReadback(payload) {
 }
 function assertCaptureArticleReadback(payload, expectedMediaIds) {
   const record2 = normalizeCaptureReadback(payload);
-  const intent = typeof record2.content_intent === "string" ? record2.content_intent : record2.content_intent?.intent;
-  if (intent?.toUpperCase() !== "IMAGE_ARTICLE") return record2;
+  if (!captureRequiresArticleReadback(record2)) return record2;
   const postId = record2.article?.post_id ?? record2.article_id;
   if (!(Number(postId) > 0)) throw new Error("ARTICLE_READBACK_UNAVAILABLE");
   const dispositions = record2.per_media_disposition ?? record2.article_media_plan?.media_dispositions ?? [];
@@ -12514,6 +12520,14 @@ function diagnosticCode(error2) {
   const match = errorMessage(error2).match(/^[A-Z][A-Z0-9_]{2,}/);
   return match?.[0] ?? "UPLOAD_FAILED";
 }
+function downstreamCode(error2, phase) {
+  const code = diagnosticCode(error2);
+  if (code !== "UPLOAD_FAILED") return code;
+  if (phase === "CAPTURE") return "CAPTURE_FAILED";
+  if (phase === "ARTICLE_MEDIA_USAGE") return "MEDIA_USAGE_INCOMPLETE";
+  if (phase === "PROJECTION") return "PROJECTION_FAILED";
+  return code;
+}
 function asFiles(value) {
   return Array.from(value ?? []);
 }
@@ -12567,11 +12581,15 @@ async function start() {
   let retryOperationKey = null;
   let retryAttempt = 0;
   let captureReadback = null;
+  let submissionId = null;
+  let attemptId = null;
+  let phase = "IDLE";
   function renderDiagnostics() {
     diagnosticsView.replaceChildren();
     diagnostics.slice(-12).forEach((diagnostic) => {
       const row = document.createElement("div");
-      row.textContent = [diagnostic.stage, diagnostic.status, diagnostic.code].filter(Boolean).join(" · ");
+      const attempt = diagnostic.attempt_number === void 0 ? "" : `Lần ${diagnostic.attempt_number}`;
+      row.textContent = [attempt, diagnostic.stage, diagnostic.status, diagnostic.code].filter(Boolean).join(" · ");
       diagnosticsView.append(row);
     });
   }
@@ -12582,7 +12600,10 @@ async function start() {
       code,
       ...context2,
       uri: RESOURCE_URI,
-      tool: SERVER_TOOL_NAME
+      tool: SERVER_TOOL_NAME,
+      ...submissionId ? { submission_id: submissionId } : {},
+      ...attemptId ? { attempt_id: attemptId } : {},
+      phase
     });
     renderDiagnostics();
     if (connected) saveWidgetState();
@@ -12686,6 +12707,7 @@ async function start() {
     return assertCaptureArticleReadback(inspection.payload, orderUploadedItems(uploaded).map((item) => item.media_id).filter((id) => Boolean(id)));
   }
   async function assertArticleMediaReadback(capture) {
+    if (!captureRequiresArticleReadback(capture)) return;
     const articleId = Number(capture.article?.post_id ?? capture.article_id ?? 0);
     if (!(articleId > 0)) throw new Error("ARTICLE_READBACK_UNAVAILABLE");
     for (const mediaId of orderUploadedItems(uploaded).map((item) => item.media_id).filter((id) => Boolean(id))) {
@@ -12711,6 +12733,8 @@ async function start() {
   async function retryCaptureConvergence() {
     if (!captureReadback?.capture_id || !retryOperationKey) throw new Error("CAPTURE_RETRY_CONTEXT_UNAVAILABLE");
     const plan = planSubmissionResume(captureResumeInput());
+    phase = plan.phase === "REPAIR_MEDIA_USAGE" ? "ARTICLE_MEDIA_USAGE" : plan.phase === "RETRY_PROJECTION" ? "PROJECTION" : "CAPTURE";
+    recordDiagnostic("RESUME_PLAN", "DONE", `RESUME_${plan.phase}`);
     const result = await executeResumePlan(plan, {
       captureId: captureReadback.capture_id,
       captureKey: `${retryOperationKey}:capture`,
@@ -12725,6 +12749,7 @@ async function start() {
     await assertArticleMediaReadback(captureReadback);
   }
   async function materializeSelectedImages(operationKey, namingContext, attempt) {
+    phase = "MATERIALIZE_MEDIA";
     const priorItems = batchManifest?.items ?? [];
     const resumePlan = planSubmissionResume({
       media_commit_status: batchManifest === null ? "NOT_RUN" : batchManifest.failure_count > 0 ? "PARTIAL" : "COMPLETE",
@@ -12815,6 +12840,9 @@ async function start() {
     renderSelection();
     setState("UPLOADING", "Đang chuẩn bị bài viết từ Media đã tải…");
     const operationKey = retryOperationKey ?? createIdempotencyKey();
+    submissionId = operationKey;
+    retryAttempt = 0;
+    attemptId = `${operationKey}:attempt:1`;
     try {
       if (batchManifest?.status === "partial_success") throw new Error("PARTIAL_BATCH_NOT_READY");
       const manifest = await materializeSelectedImages(operationKey, namingContext, 0);
@@ -12827,6 +12855,7 @@ async function start() {
         items: orderUploadedItems(uploaded)
       }).canonicalMediaIds;
       if (canonicalMediaIds.length !== selected.length) throw new Error("MEDIA_CANONICAL_READBACK_INCOMPLETE");
+      phase = "CAPTURE";
       const capture = await app.callServerTool({
         name: CAPTURE_TOOL_NAME,
         arguments: {
@@ -12851,6 +12880,7 @@ async function start() {
         }
         throw error2;
       }
+      phase = "ARTICLE_MEDIA_USAGE";
       await assertArticleMediaReadback(captureReadback);
       recordDiagnostic("CAPTURE_READBACK_DONE", "DONE", "CAPTURE_READBACK_VERIFIED");
       enrichmentStatus = "COMPLETE";
@@ -12864,7 +12894,7 @@ async function start() {
       enrichmentStatus = "PARTIAL";
       uploadStatus = uploaded.some((item) => item.status === "SUCCESS") ? "complete" : "error";
       retryOperationKey = operationKey;
-      recordDiagnostic("ERROR", "ERROR", diagnosticCode(error2));
+      recordDiagnostic("ERROR", "ERROR", downstreamCode(error2, phase), error2, { attempt_number: retryAttempt + 1 });
       publishBatchContext();
       if (batchManifest?.status === "partial_success") {
         setState("PARTIAL", `Đã tải được ${batchManifest.success_count}/${batchManifest.requested_count} ảnh. Các ảnh còn lỗi có thể thử lại.`);
@@ -12881,6 +12911,8 @@ async function start() {
   async function retryPartialSubmission() {
     if (!connected || uploading || !batchManifest || batchManifest.status !== "partial_success") return;
     uploading = true;
+    retryAttempt += 1;
+    attemptId = `${retryOperationKey}:attempt:${retryAttempt + 1}`;
     setState("UPLOADING", "Đang thử lại các ảnh chưa hoàn tất…");
     try {
       const key = retryOperationKey ?? createIdempotencyKey();
@@ -12892,7 +12924,7 @@ async function start() {
       publishBatchContext();
       setState("READY", "Đã khôi phục đủ ảnh. Bấm TẢI LÊN để gửi submission.");
     } catch (error2) {
-      recordDiagnostic("ERROR", "ERROR", diagnosticCode(error2));
+      recordDiagnostic("ERROR", "ERROR", downstreamCode(error2, phase), error2, { attempt_number: retryAttempt + 1 });
       setState("PARTIAL", HOST_UPLOAD_ERROR_MESSAGE);
     } finally {
       uploading = false;

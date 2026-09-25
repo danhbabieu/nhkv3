@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { assertCaptureArticleReadback, assertMediaArticleReadback, assertUploadManifestCount, assertUploadManifestCounts, buildCaptureAssetInputs, buildWidgetState, buildWidgetUploadArguments, buildWidgetUploadFailureManifest, extractPayload, extractUploadManifest, extractUploads, inspectToolResult, mergeUploadManifest, normalizeCaptureReadback, normalizeSelectedFiles, shouldProcessToolResultNotification, splitFeatureRequests } from "../src/contract.ts";
+import { assertCaptureArticleReadback, assertMediaArticleReadback, assertUploadManifestCount, assertUploadManifestCounts, buildCaptureAssetInputs, buildWidgetState, buildWidgetUploadArguments, buildWidgetUploadFailureManifest, captureRequiresArticleReadback, extractPayload, extractUploadManifest, extractUploads, inspectToolResult, mergeUploadManifest, normalizeCaptureReadback, normalizeSelectedFiles, shouldProcessToolResultNotification, splitFeatureRequests } from "../src/contract.ts";
 import { planSubmissionResume } from "../src/resume-policy.ts";
 
 function committedSubmission(count, overrides = {}) {
@@ -221,6 +221,17 @@ test("requires nhk.media.get to read back the Article usage for each Media", () 
     id: "media-one",
     usages: [],
   } }, "media-one", 711), /ARTICLE_MEDIA_USAGE_READBACK_INCOMPLETE/);
+});
+
+test("treats MEDIA_ENRICHMENT as durable Media completion without an Article", () => {
+  const readback = normalizeCaptureReadback({
+    capture_id: "capture-media-only",
+    content_intent: { intent: "MEDIA_ENRICHMENT", article_required: false },
+    article: null,
+  });
+
+  assert.equal(captureRequiresArticleReadback(readback), false);
+  assert.doesNotThrow(() => assertCaptureArticleReadback(readback, ["media-one"]));
 });
 
 test("does not parse the tool result that opened the widget as an upload result", () => {

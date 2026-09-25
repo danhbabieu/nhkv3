@@ -1,5 +1,5 @@
 import { App } from "@modelcontextprotocol/ext-apps";
-import { assertCaptureArticleReadback, assertMediaArticleReadback, assertUploadManifestCounts, buildCaptureAssetInputs, buildWidgetState, buildWidgetUploadArguments, buildWidgetUploadFailureManifest, extractUploadManifest, inspectToolResult, mergeUploadManifest, normalizeCaptureReadback, normalizeSelectedFiles, orderUploadedItems, shouldProcessToolResultNotification, type BatchContext, type SelectedImage, type ToolResult, type ToolResultNotificationSource, type UploadedItem, type UploadManifest, type WidgetDiagnostic, type WidgetUploadReference, type WidgetUploadStatus } from "./contract";
+import { assertCaptureArticleReadback, assertMediaArticleReadback, assertUploadManifestCounts, buildCaptureAssetInputs, buildWidgetState, buildWidgetUploadArguments, buildWidgetUploadFailureManifest, captureRequiresArticleReadback, extractUploadManifest, inspectToolResult, mergeUploadManifest, normalizeCaptureReadback, normalizeSelectedFiles, orderUploadedItems, shouldProcessToolResultNotification, type BatchContext, type SelectedImage, type ToolResult, type ToolResultNotificationSource, type UploadedItem, type UploadManifest, type WidgetDiagnostic, type WidgetUploadReference, type WidgetUploadStatus } from "./contract";
 import { uploadSelectedFiles, type HostUploadOutcome } from "./host-upload";
 import { planSubmissionResume } from "./resume-policy";
 import { executeResumePlan } from "./resume-executor";
@@ -47,6 +47,15 @@ function safeErrorMessage(error: unknown): string {
 function diagnosticCode(error: unknown): string {
   const match = errorMessage(error).match(/^[A-Z][A-Z0-9_]{2,}/);
   return match?.[0] ?? "UPLOAD_FAILED";
+}
+
+function downstreamCode(error: unknown, phase: string): string {
+  const code = diagnosticCode(error);
+  if (code !== "UPLOAD_FAILED") return code;
+  if (phase === "CAPTURE") return "CAPTURE_FAILED";
+  if (phase === "ARTICLE_MEDIA_USAGE") return "MEDIA_USAGE_INCOMPLETE";
+  if (phase === "PROJECTION") return "PROJECTION_FAILED";
+  return code;
 }
 
 function asFiles(value: File[] | FileList | null | undefined): File[] {
@@ -106,12 +115,16 @@ async function start(): Promise<void> {
   let retryOperationKey: string | null = null;
   let retryAttempt = 0;
   let captureReadback: ReturnType<typeof assertCaptureArticleReadback> | null = null;
+  let submissionId: string | null = null;
+  let attemptId: string | null = null;
+  let phase = "IDLE";
 
   function renderDiagnostics(): void {
     diagnosticsView.replaceChildren();
     diagnostics.slice(-12).forEach((diagnostic) => {
       const row = document.createElement("div");
-      row.textContent = [diagnostic.stage, diagnostic.status, diagnostic.code].filter(Boolean).join(" · ");
+      const attempt = diagnostic.attempt_number === undefined ? "" : `Lần ${diagnostic.attempt_number}`;
+      row.textContent = [attempt, diagnostic.stage, diagnostic.status, diagnostic.code].filter(Boolean).join(" · ");
       diagnosticsView.append(row);
     });
   }
@@ -125,6 +138,9 @@ async function start(): Promise<void> {
       ...context,
       uri: RESOURCE_URI,
       tool: SERVER_TOOL_NAME,
+      ...(submissionId ? { submission_id: submissionId } : {}),
+      ...(attemptId ? { attempt_id: attemptId } : {}),
+      phase,
     });
     renderDiagnostics();
     if (connected) saveWidgetState();
@@ -239,6 +255,7 @@ async function start(): Promise<void> {
   }
 
   async function assertArticleMediaReadback(capture: ReturnType<typeof assertCaptureArticleReadback>): Promise<void> {
+    if (!captureRequiresArticleReadback(capture)) return;
     const articleId = Number(capture.article?.post_id ?? capture.article_id ?? 0);
     if (!(articleId > 0)) throw new Error("ARTICLE_READBACK_UNAVAILABLE");
     for (const mediaId of orderUploadedItems(uploaded).map((item) => item.media_id).filter((id): id is string => Boolean(id))) {
@@ -266,6 +283,8 @@ async function start(): Promise<void> {
   async function retryCaptureConvergence(): Promise<void> {
     if (!captureReadback?.capture_id || !retryOperationKey) throw new Error("CAPTURE_RETRY_CONTEXT_UNAVAILABLE");
     const plan = planSubmissionResume(captureResumeInput());
+    phase = plan.phase === "REPAIR_MEDIA_USAGE" ? "ARTICLE_MEDIA_USAGE" : plan.phase === "RETRY_PROJECTION" ? "PROJECTION" : "CAPTURE";
+    recordDiagnostic("RESUME_PLAN", "DONE", `RESUME_${plan.phase}`);
     const result = await executeResumePlan(plan, {
       captureId: captureReadback.capture_id,
       captureKey: `${retryOperationKey}:capture`,
@@ -281,6 +300,7 @@ async function start(): Promise<void> {
   }
 
   async function materializeSelectedImages(operationKey: string, namingContext: string, attempt: number): Promise<UploadManifest> {
+    phase = "MATERIALIZE_MEDIA";
     const priorItems = batchManifest?.items ?? [];
     const resumePlan = planSubmissionResume({
       media_commit_status: batchManifest === null ? "NOT_RUN" : batchManifest.failure_count > 0 ? "PARTIAL" : "COMPLETE",
@@ -381,6 +401,9 @@ async function start(): Promise<void> {
     renderSelection();
     setState("UPLOADING", "Đang chuẩn bị bài viết từ Media đã tải…");
     const operationKey = retryOperationKey ?? createIdempotencyKey();
+    submissionId = operationKey;
+    retryAttempt = 0;
+    attemptId = `${operationKey}:attempt:1`;
     try {
       if (batchManifest?.status === "partial_success") throw new Error("PARTIAL_BATCH_NOT_READY");
       const manifest = await materializeSelectedImages(operationKey, namingContext, 0);
@@ -393,6 +416,7 @@ async function start(): Promise<void> {
         items: orderUploadedItems(uploaded),
       }).canonicalMediaIds;
       if (canonicalMediaIds.length !== selected.length) throw new Error("MEDIA_CANONICAL_READBACK_INCOMPLETE");
+      phase = "CAPTURE";
       const capture = await app.callServerTool({
         name: CAPTURE_TOOL_NAME,
         arguments: {
@@ -414,6 +438,7 @@ async function start(): Promise<void> {
         }
         throw error;
       }
+      phase = "ARTICLE_MEDIA_USAGE";
       await assertArticleMediaReadback(captureReadback);
       recordDiagnostic("CAPTURE_READBACK_DONE", "DONE", "CAPTURE_READBACK_VERIFIED");
       enrichmentStatus = "COMPLETE";
@@ -427,7 +452,7 @@ async function start(): Promise<void> {
       enrichmentStatus = "PARTIAL";
       uploadStatus = uploaded.some((item) => item.status === "SUCCESS") ? "complete" : "error";
       retryOperationKey = operationKey;
-      recordDiagnostic("ERROR", "ERROR", diagnosticCode(error), error);
+      recordDiagnostic("ERROR", "ERROR", downstreamCode(error, phase), error, { attempt_number: retryAttempt + 1 });
       publishBatchContext();
       if (batchManifest?.status === "partial_success") {
         setState("PARTIAL", `Đã tải được ${batchManifest.success_count}/${batchManifest.requested_count} ảnh. Các ảnh còn lỗi có thể thử lại.`);
@@ -445,6 +470,8 @@ async function start(): Promise<void> {
   async function retryPartialSubmission(): Promise<void> {
     if (!connected || uploading || !batchManifest || batchManifest.status !== "partial_success") return;
     uploading = true;
+    retryAttempt += 1;
+    attemptId = `${retryOperationKey}:attempt:${retryAttempt + 1}`;
     setState("UPLOADING", "Đang thử lại các ảnh chưa hoàn tất…");
     try {
       const key = retryOperationKey ?? createIdempotencyKey();
@@ -456,7 +483,7 @@ async function start(): Promise<void> {
       publishBatchContext();
       setState("READY", "Đã khôi phục đủ ảnh. Bấm TẢI LÊN để gửi submission.");
     } catch (error) {
-      recordDiagnostic("ERROR", "ERROR", diagnosticCode(error), error);
+      recordDiagnostic("ERROR", "ERROR", downstreamCode(error, phase), error, { attempt_number: retryAttempt + 1 });
       setState("PARTIAL", HOST_UPLOAD_ERROR_MESSAGE);
     } finally {
       uploading = false;
