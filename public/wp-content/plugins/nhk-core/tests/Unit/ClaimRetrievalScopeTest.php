@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Tests\Unit;
 
-use NHK\Core\Application\Semantic\ClaimRetrievalEngine;
+use NHK\Core\Application\Semantic\{ClaimRetrievalEngine, UniversalInputEnvelope};
 use PHPUnit\Framework\TestCase;
 
 final class ClaimRetrievalScopeTest extends TestCase
@@ -69,6 +69,23 @@ final class ClaimRetrievalScopeTest extends TestCase
         ]);
 
         self::assertSame(['variant-claim'], array_column($result['selected_claims'], 'claim_id'));
+    }
+
+    public function test_exact_subject_claim_survives_lexical_topic_drift_and_direct_rows_are_not_starved(): void
+    {
+        $rows = [];
+        for ($index = 0; $index < 25; $index++) {
+            $rows[] = ['id' => 'neighbor-' . $index, 'subject_id' => 'neighbor-' . $index, 'subject_type' => 'variant', 'text' => 'Unrelated context.', 'scope' => 'variant', 'provenance' => 'CATALOG_SUPPORTED', 'evidence_status' => 'SUPPORTED_WITHIN_SCOPE', 'relation_path' => [['source' => 'model:' . self::SUBJECT, 'predicate' => 'variant_of', 'target' => 'variant:neighbor-' . $index]]];
+        }
+        $rows[] = ['id' => 'direct', 'subject_id' => self::SUBJECT, 'subject_type' => 'model', 'text' => 'Cấu hình được ghi nhận trong tài liệu.', 'scope' => 'model', 'facet' => 'configuration', 'provenance' => 'CATALOG_SUPPORTED', 'evidence_status' => 'SUPPORTED_WITHIN_SCOPE'];
+        $engine = $this->engine($rows);
+        $result = $engine->retrieveForNeeds(
+            UniversalInputEnvelope::fromArray(['title' => 'model subject', 'subject_resolution' => ['primary' => ['id' => self::SUBJECT, 'type' => 'model', 'name' => 'Model subject']]]),
+            [['canonical_subject' => ['id' => self::SUBJECT, 'type' => 'model', 'name' => 'Model subject'], 'facet_key' => 'configuration', 'scope' => 'model'] ],
+            ['result_limit' => 20]
+        );
+
+        self::assertSame(['direct'], array_column($result['selected_claims'], 'claim_id'));
     }
 
     private function engine(array $rows): ClaimRetrievalEngine

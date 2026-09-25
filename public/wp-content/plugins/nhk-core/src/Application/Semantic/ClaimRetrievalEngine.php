@@ -35,7 +35,7 @@ final class ClaimRetrievalEngine
             $rows = ($this->claims)($subject, $neighborhood);
             if (!is_array($rows)) { $blockers[] = 'CLAIM_RETRIEVAL_UNAVAILABLE'; continue; }
             $rowLimit = min($this->limit, max(1, (int) ($context['result_limit'] ?? $this->limit)), 200);
-            foreach (array_slice($rows, 0, $rowLimit) as $row) {
+            foreach (array_slice($this->prioritizeDirectRows($rows, $subject), 0, $rowLimit) as $row) {
                 if (!is_array($row)) continue;
                 $candidate = $this->candidate($row, $subject, $neighborhood, $intent);
                 $candidate['_retrieval_order'] = $retrievalOrder++;
@@ -151,7 +151,7 @@ final class ClaimRetrievalEngine
             }
             $opportunity = $needDiagnostics[$needId]['opportunity_allocated'];
             $allocationCount += $opportunity;
-            $opportunityRows = array_values(array_filter($rows, function (mixed $row) use ($need): bool {
+            $opportunityRows = array_values(array_filter($this->prioritizeDirectRows($rows, $subject), function (mixed $row) use ($need): bool {
                 if (!is_array($row)) return false;
                 $rowFacet = strtolower(trim((string) ($row['facet'] ?? $row['knowledge_facet'] ?? '')));
                 return $need->facetKey() === '' || $rowFacet === '' || $rowFacet === $need->facetKey();
@@ -322,7 +322,7 @@ final class ClaimRetrievalEngine
         if ($id === '' || $text === '') { $decision = 'exclude'; $reason = 'claim identity or text is missing'; }
         elseif (!$this->applicableToSubject($claimSubject, $claimSubjectType, $subject, $path)) { $decision = 'exclude'; $reason = 'Claim has no explainable subject-scoped applicability path'; $warnings[] = 'SEMANTIC_SCOPE_NOT_APPLICABLE'; }
         elseif ($scope === 'specimen-only' && ($subject['type'] ?? '') !== 'specimen') { $decision = 'exclude'; $reason = 'specimen-scoped Claim cannot generalize to this subject'; $warnings[] = 'SPECIMEN_SCOPE_LIMIT'; }
-        elseif ($intent !== '' && $topicOverlap <= 0.0 && !$registeredFacetMatch && !($claimSubject === $subjectId && $subjectOverlap > 0.0)) { $decision = 'exclude'; $reason = 'Claim is not relevant to the editorial topic'; $warnings[] = 'TOPIC_IRRELEVANT'; }
+        elseif ($intent !== '' && $topicOverlap <= 0.0 && !$registeredFacetMatch && $claimSubject !== $subjectId) { $decision = 'exclude'; $reason = 'Claim is not relevant to the editorial topic'; $warnings[] = 'TOPIC_IRRELEVANT'; }
         elseif ($evidence !== 'SUPPORTED_WITHIN_SCOPE') { $decision = 'review'; $reason = 'evidence is absent or insufficient for direct prose'; $warnings[] = 'EVIDENCE_SCOPE_REVIEW'; }
         elseif ($provenance === '') { $decision = 'review'; $reason = 'provenance is unavailable'; $warnings[] = 'PROVENANCE_UNAVAILABLE'; }
         if ($decision === 'include') {
@@ -417,5 +417,18 @@ final class ClaimRetrievalEngine
             if (is_array($item) && (string) ($item['target_entity_id'] ?? '') === $claimSubject && is_array($item['best_path'] ?? null)) return $item['best_path'];
         }
         return [];
+    }
+
+    /** Keep exact-subject opportunities ahead of graph-neighbor rows before bounded retrieval. */
+    private function prioritizeDirectRows(array $rows, array $subject): array
+    {
+        $subjectId = trim((string) ($subject['id'] ?? ''));
+        if ($subjectId === '') return $rows;
+        usort($rows, static function (mixed $left, mixed $right) use ($subjectId): int {
+            $leftDirect = is_array($left) && (string) ($left['subject_id'] ?? '') === $subjectId;
+            $rightDirect = is_array($right) && (string) ($right['subject_id'] ?? '') === $subjectId;
+            return $rightDirect <=> $leftDirect;
+        });
+        return $rows;
     }
 }

@@ -154,6 +154,10 @@ final class SubjectResolutionService
         }
         $candidates = array_values($candidateMap);
         $identityMatches = array_values(array_filter($candidates, fn (array $candidate): bool => $this->matchClassRank($candidate) >= 3));
+        if ($identityMatches !== []) {
+            $specificity = max(array_map(fn (array $candidate): int => $this->matchSpecificityRank($candidate), $identityMatches));
+            $identityMatches = array_values(array_filter($identityMatches, fn (array $candidate): bool => $this->matchSpecificityRank($candidate) === $specificity));
+        }
         if ($identityMatches !== []) $candidates = $identityMatches;
         if ($candidates === []) return $this->finalize(['resolved' => [], 'candidates' => [], 'unresolved' => $unresolved, 'conflicts' => [], 'diagnostics' => [], 'primary_source' => 'explicit_subject_hint'], 'unresolved');
         $contexts = [];
@@ -296,6 +300,8 @@ final class SubjectResolutionService
             'uuid_exact' => 10000,
             'stable_key_exact' => 9000,
             'exact_variant_reference', 'exact_variant_name_reference' => 1200,
+            'exact_canonical_name' => 1100,
+            'exact_alias' => 1000,
             'exact_name_or_alias' => 1000,
             default => 0,
         };
@@ -324,7 +330,21 @@ final class SubjectResolutionService
         return match ((string) ($subject['match_class'] ?? $subject['match'] ?? '')) {
             'EXACT_CANONICAL_IDENTITY', 'uuid_exact' => 5,
             'EXACT_STABLE_KEY', 'stable_key_exact' => 4,
-            'EXACT_NORMALIZED_NAME_OR_ALIAS', 'exact_name_or_alias', 'EXACT_COMPOSITE_IDENTITY', 'composite_exact_identity', 'exact_variant_reference', 'exact_variant_name_reference' => 3,
+            'EXACT_CANONICAL_NAME', 'exact_canonical_name' => 4,
+            'EXACT_NORMALIZED_NAME_OR_ALIAS', 'exact_alias', 'exact_name_or_alias', 'EXACT_COMPOSITE_IDENTITY', 'composite_exact_identity', 'exact_variant_reference', 'exact_variant_name_reference' => 3,
+            'STRUCTURAL_COMPATIBLE_CONTEXT' => 2,
+            'PARTIAL_OR_EXPANDED_MATCH', 'composite_expanded_match' => 1,
+            default => 0,
+        };
+    }
+
+    private function matchSpecificityRank(array $subject): int
+    {
+        return match ((string) ($subject['match'] ?? $subject['match_class'] ?? '')) {
+            'EXACT_COMPOSITE_IDENTITY', 'composite_exact_identity' => 5,
+            'exact_variant_reference', 'exact_variant_name_reference' => 6,
+            'EXACT_CANONICAL_NAME', 'exact_canonical_name' => 4,
+            'EXACT_NORMALIZED_NAME_OR_ALIAS', 'exact_alias', 'exact_name_or_alias' => 3,
             'STRUCTURAL_COMPATIBLE_CONTEXT' => 2,
             'PARTIAL_OR_EXPANDED_MATCH', 'composite_expanded_match' => 1,
             default => 0,

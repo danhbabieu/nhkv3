@@ -109,6 +109,24 @@ final class HierarchicalSubjectResolutionVerificationTest extends TestCase
         self::assertSame($base, $result['primary']['id']);
     }
 
+    public function test_canonical_name_beats_specialized_aliases_without_suppressing_equal_canonical_ambiguity(): void
+    {
+        $base = '16161616-1616-4616-8616-161616161616';
+        $one = '17171717-1717-4717-8717-171717171717';
+        $two = '18181818-1818-4818-8818-181818181818';
+        [$resolver] = $this->resolver([
+            new AuthorityEntity($base, 'variant', 'nhk:variant:base', 'Base Identity', 1, []),
+            new AuthorityEntity($one, 'variant', 'nhk:variant:special-one', 'Special One', 1, ['aliases' => ['Base Identity']]),
+            new AuthorityEntity($two, 'variant', 'nhk:variant:special-two', 'Special Two', 1, ['aliases' => ['Base Identity']]),
+        ]);
+
+        $result = (new SubjectResolutionService($resolver, null, [$resolver, 'resolveComposite']))->resolve(['Base Identity']);
+
+        self::assertSame('resolved', $result['status']);
+        self::assertSame($base, $result['primary']['id']);
+        self::assertSame('composite_exact_identity', $result['primary']['match']);
+    }
+
     public function test_prefix_of_multiple_specialized_variants_without_exact_base_is_ambiguous(): void
     {
         $one = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';

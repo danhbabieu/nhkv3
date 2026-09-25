@@ -94,7 +94,7 @@ final class McpSemanticContextResolverTest extends TestCase
         self::assertSame($variant->stableKey, $report['resolved']['variant']['stable_key']);
         self::assertSame($variant->canonicalName, $report['resolved']['variant']['name']);
         self::assertSame(2, $report['resolved']['variant']['revision']);
-        self::assertSame('exact_name_or_alias', $report['resolved']['variant']['match']);
+        self::assertSame('exact_alias', $report['resolved']['variant']['match']);
     }
 
     public function test_canonical_locator_packet_is_normalized_before_typed_resolution(): void

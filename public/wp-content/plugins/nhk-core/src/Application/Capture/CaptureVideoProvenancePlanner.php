@@ -255,7 +255,7 @@ final class CaptureVideoProvenancePlanner
             $candidateId = strtolower(trim((string) $candidate['id']));
             $match = strtolower(trim((string) ($candidate['match'] ?? '')));
             $confidence = (float) ($candidate['confidence'] ?? 0);
-            if ($candidateId !== '' && $candidateId !== $explicitId && $confidence >= 0.9 && in_array($match, ['uuid_exact', 'stable_key_exact', 'exact_name_or_alias', 'exact_variant_reference', 'exact_variant_name_reference'], true)) {
+            if ($candidateId !== '' && $candidateId !== $explicitId && $confidence >= 0.9 && in_array($match, ['uuid_exact', 'stable_key_exact', 'exact_name_or_alias', 'exact_canonical_name', 'exact_alias', 'exact_variant_reference', 'exact_variant_name_reference'], true)) {
                 $conflicts[] = ['candidate' => $candidate, 'explicit_subject_id' => $explicitSubject['id'], 'reason' => 'Source metadata resolves strongly to another canonical entity.'];
             }
         }

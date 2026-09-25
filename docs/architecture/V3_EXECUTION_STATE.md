@@ -181,6 +181,43 @@ STATUS: `CAPTURE_MULTI_IMAGE_ARTICLE_PUBLIC_LOCAL_IMPLEMENTED / AUTOMATED_LOCAL_
 
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-25 — Knowledge Writer generic resolution/retrieval regression (LOCAL / READ-ONLY)
+
+ROOT_CAUSE: the canonical resolver collapsed canonical-name and alias matches
+into `exact_name_or_alias`, while composite matching treated an exact alias as
+composite identity. A canonical base identity could therefore be flattened
+with specialization aliases. Separately, ClaimRetrievalEngine applied lexical
+topic gating to direct canonical-subject Claims and bounded opportunities in
+read-model order, allowing graph-neighbor rows to starve exact candidates.
+
+FIRST_BROKEN_BOUNDARY: generic Authority identity match classification, then
+Universal Enrichment exact-subject opportunity/topic gating. Persisted Graph
+orientation and predicate validation were confirmed correct and unchanged.
+
+FIX: preserve `exact_canonical_name`, `exact_alias`, qualified Variant
+references and `composite_exact_identity` as distinct generic match strengths;
+prefer stronger canonical identity while retaining equal-identity ambiguity.
+Claim retrieval now prioritizes exact-subject rows before bounded slicing and
+does not require lexical topic overlap for a directly bound Claim; evidence,
+scope, provenance and applicability gates remain fail-closed.
+
+REGRESSION: generic canonical-vs-alias resolution, exact Variant reference,
+direct lexical topic drift, exact-opportunity starvation, incoming traversal,
+unrelated reachable Claim rejection and evidence-ineligible Claim behavior are
+covered without Odo/W64 production mappings or data mutation.
+
+VERIFICATION: focused Knowledge Writer/Universal Enrichment/subject/retrieval
+suite passed 63 tests / 317 assertions; Contract passed 6 tests / 48
+assertions; changed-file PHP lint and `git diff --check` passed; production
+special-case scan found no fixture-specific source conditions. Full Unit under
+`memory_limit=512M` ran 2,639 tests / 15,327 assertions with one pre-existing
+worktree failure in `FrontendSemanticProjectionV2Test` caused by the unrelated
+current `front-page.php` change. Local WordPress bootstrap is
+`ENVIRONMENT_BLOCKED` (`Error establishing a database connection`), so no live
+runtime read-back or integration acceptance is claimed.
+
+STATUS: `KNOWLEDGE_WRITER_GENERIC_BOUNDARIES_FIXED / FULL_UNIT_ONE_PREEXISTING_FRONTEND_FAILURE / INTEGRATION_ENVIRONMENT_BLOCKED / NO_MUTATION`.
+
 # Checkpoint — 2026-09-25 — Easy MCP final serialized tools/list boundary repair (LOCAL / READ-ONLY)
 
 ROOT_CAUSE: the 28d4dc49 generic projection was reachable through the

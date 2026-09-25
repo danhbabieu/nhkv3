@@ -35,7 +35,7 @@ final class EditorialClaimRetrievalServiceTest extends TestCase
         self::assertSame('eligible', $result['eligible_claims'][0]['eligibility']);
     }
 
-    public function test_reachable_topic_drift_and_missing_evidence_are_not_eligible(): void
+    public function test_direct_subject_binding_survives_topic_drift_but_missing_evidence_does_not(): void
     {
         $service = $this->service([
             ['id' => 'drift', 'subject_id' => self::SUBJECT, 'subject_type' => 'model', 'text' => 'Mặt số có họa tiết trang trí.', 'scope' => 'model', 'provenance' => 'CATALOG_SUPPORTED', 'evidence_status' => 'SUPPORTED_WITHIN_SCOPE'],
@@ -44,9 +44,8 @@ final class EditorialClaimRetrievalServiceTest extends TestCase
 
         $result = $service->retrieve(['id' => self::SUBJECT, 'type' => 'model'], '3 phiên bản vách máy Odo 36');
 
-        self::assertSame([], $result['eligible_claims']);
-        self::assertSame('ineligible', $result['items'][0]['eligibility']);
-        self::assertContains('TOPIC_IRRELEVANT', $result['items'][0]['exclusion_reasons']);
+        self::assertSame(['drift'], array_column($result['eligible_claims'], 'claim_id'));
+        self::assertSame('eligible', $result['items'][0]['eligibility']);
         self::assertSame('missing', $result['items'][1]['evidence']['status']);
         self::assertContains('EVIDENCE_MISSING', $result['items'][1]['exclusion_reasons']);
     }

@@ -61,10 +61,12 @@ final class CanonicalAuthoritySubjectResolver
             foreach ($hints as $hint) { $found = false; foreach ($fields as $field) if ($field !== '' && ($field === $hint || str_contains($field, $hint))) { $found = true; break; } if (!$found) { $valid = false; break; } }
             if ($valid) {
                 $combined = $this->normalize(implode(' ', $hints));
-                $exact = $combined !== '' && (
-                    $this->normalize($entity->canonicalName) === $combined
-                    || in_array($combined, $fields, true)
-                );
+                // Composite exactness belongs to canonical identity fields;
+                // an alias remains weaker evidence than the canonical name.
+                $exact = $combined !== '' && in_array($combined, [
+                    $this->normalize($entity->canonicalName),
+                    $this->normalize($entity->stableKey),
+                ], true);
                 $matches[$entity->canonicalId] = $this->packet($entity, $exact ? 'composite_exact_identity' : 'composite_expanded_match');
             }
         }
@@ -110,7 +112,8 @@ final class CanonicalAuthoritySubjectResolver
 
     private function matchName(AuthorityEntity $entity, string $needle): ?string
     {
-        if ($this->normalize($entity->canonicalName) === $needle || $this->hasAlias($entity, $needle)) return 'exact_name_or_alias';
+        if ($this->normalize($entity->canonicalName) === $needle) return 'exact_canonical_name';
+        if ($this->hasAlias($entity, $needle)) return 'exact_alias';
 
         // A qualified reference such as "36/8" may match the canonical
         // Variant name "Đồng hồ Odo 36/8". This remains an identity match,
@@ -143,7 +146,8 @@ final class CanonicalAuthoritySubjectResolver
             'match_class' => match ($match) {
                 'uuid_exact' => 'EXACT_CANONICAL_IDENTITY',
                 'stable_key_exact' => 'EXACT_STABLE_KEY',
-                'exact_name_or_alias', 'exact_variant_reference', 'exact_variant_name_reference' => 'EXACT_NORMALIZED_NAME_OR_ALIAS',
+                'exact_canonical_name' => 'EXACT_CANONICAL_NAME',
+                'exact_alias', 'exact_variant_reference', 'exact_variant_name_reference' => 'EXACT_NORMALIZED_NAME_OR_ALIAS',
                 'composite_exact_identity' => 'EXACT_COMPOSITE_IDENTITY',
                 'composite_expanded_match' => 'PARTIAL_OR_EXPANDED_MATCH',
                 default => 'STRUCTURAL_COMPATIBLE_CONTEXT',
