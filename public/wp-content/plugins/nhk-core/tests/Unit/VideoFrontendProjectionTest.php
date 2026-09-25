@@ -51,6 +51,36 @@ final class VideoFrontendProjectionTest extends TestCase
         self::assertSame(1, substr_count((string) json_encode($first['item']), $video->canonicalId));
     }
 
+    public function test_governed_representative_thumbnail_precedes_external_source_thumbnail(): void
+    {
+        $video = $this->video([
+            'source_snapshot' => [
+                'availability' => 'available',
+                'embeddable' => true,
+                'thumbnail_selection' => ['url' => 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg', 'width' => 480, 'height' => 360],
+            ],
+            'public_identity' => ['current_slug' => 'video-frontend'],
+        ]);
+        $identities = new FrontendProjectionIdentityRepository();
+        $identities->identity = ['identity_id' => UuidCodec::newV7(), 'owner_kind' => 'video', 'owner_id' => $video->canonicalId, 'route_type' => 'video', 'current_slug' => 'video-frontend', 'current_path' => '/video/video-frontend/', 'revision' => 1];
+        PublicIdentityReadRegistry::register($identities);
+
+        $projection = (new VideoFrontendProjection(null, static fn (Video $owner, array $source): array => [
+            'media_id' => '01a07af5-3303-7a73-9f15-b7f675293dc6',
+            'asset_id' => '01a07af5-3303-7a73-9f15-b7f675293dc7',
+            'url' => 'https://example.test/anh/video.webp',
+            'thumbnail_url' => 'https://example.test/anh/video-medium.webp',
+            'width' => 1200,
+            'height' => 800,
+            'alt' => 'Ảnh đại diện',
+        ]))->project($video);
+
+        self::assertSame('https://example.test/anh/video-medium.webp', $projection['item']['thumbnail_url']);
+        self::assertSame('https://example.test/anh/video.webp', $projection['item']['thumbnail']['full_url']);
+        self::assertSame('media_usage', $projection['item']['thumbnail']['source']);
+        self::assertSame('01a07af5-3303-7a73-9f15-b7f675293dc6', $projection['item']['thumbnail']['media_id']);
+    }
+
     private function video(array $metadata): Video
     {
         return Video::fromUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'Frontend video', $metadata + [
