@@ -64,6 +64,25 @@ final class MediaLibraryFrontendContractTest extends TestCase
         )))->archive()['items'][0];
 
         self::assertNull($item['article_url']);
+        self::assertSame(['/bai-viet/42/', '/bai-viet/43/'], $item['article_urls']);
+    }
+
+    public function test_gallery_preserves_all_valid_article_contexts_without_retired_usage(): void
+    {
+        $mediaId = UuidCodec::newV7();
+        $media = new Media($mediaId, 'shared-context', 'Ảnh dùng chung', 'ready');
+        $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'derivative', 'shared-context.webp', hash('sha256', 'shared-context'), 'image/webp', 5, 1200, 800, 'PUBLIC', ['canonical_filename' => 'shared-context.webp']);
+        $usages = [
+            new MediaUsage(UuidCodec::newV7(), $mediaId, 'wp_post', '1:42', 'featured', 0),
+            new MediaUsage(UuidCodec::newV7(), $mediaId, 'wp_post', '1:43', 'gallery', 1),
+            new MediaUsage(UuidCodec::newV7(), $mediaId, 'wp_post', '1:44', 'gallery', 2, '', '', [], '', 1, '', 'SYSTEM_AUTO', 'AUTO', 'retired'),
+        ];
+        $item = (new PublicMediaGalleryQuery($this->mediaRepository([$media]), $this->assetRepository([$asset]), null, $this->usageRepository($usages), new PublicMediaArticleLinkResolver(
+            static fn (int $postId): object => (object) ['ID' => $postId, 'post_status' => 'publish', 'post_type' => 'post'],
+            static fn (object $post): string => '/bai-viet/' . $post->ID . '/',
+        )))->forMedia($mediaId);
+
+        self::assertSame(['/bai-viet/42/', '/bai-viet/43/'], $item['article_urls']);
     }
 
     public function test_gallery_uses_short_fallback_summary_without_inventing_semantics(): void

@@ -56,6 +56,7 @@ final class PublicMediaGalleryQuery
         $image = $this->firstImage($media);
         $usages = $this->usagesForMedia($media);
         $articleUrl = $this->articleLinks?->firstPublished($usages);
+        $articleUrls = $this->articleLinks?->allPublished($usages) ?? [];
         return [
             'title' => $media->canonicalName,
             'image_url' => $image['image_url'] ?? null,
@@ -65,6 +66,7 @@ final class PublicMediaGalleryQuery
             'height' => $image['height'] ?? null,
             'has_real_image' => $image !== null,
             'article_url' => $articleUrl,
+            'article_urls' => $articleUrls,
             'attachment_id' => $image['attachment_id'] ?? null,
             'srcset' => $image['srcset'] ?? null,
             'sizes' => $image['sizes'] ?? null,
