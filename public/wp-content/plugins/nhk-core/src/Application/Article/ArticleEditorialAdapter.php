@@ -44,9 +44,19 @@ final class ArticleEditorialAdapter
     {
         $resolution = is_array($context['subject_resolution'] ?? null) ? $context['subject_resolution'] : [];
         $subject = is_array($resolution['primary'] ?? null) ? $resolution['primary'] : [];
-        $topic = trim((string) ($context['topic'] ?? $context['raw_input'] ?? $context['title'] ?? ''));
+        $typedInput = array_key_exists('editorial_copy', $context)
+            || array_key_exists('non_semantic_context', $context)
+            || is_array($context['interpretation']['non_semantic_context'] ?? null);
+        $editorialCopy = $typedInput
+            ? trim((string) ($context['editorial_copy'] ?? $context['interpretation']['article_intent'] ?? ''))
+            : trim((string) ($context['raw_input'] ?? $context['text'] ?? ''));
+        $topic = $typedInput
+            ? trim((string) ($context['topic'] ?? $subject['name'] ?? $subject['canonical_name'] ?? $context['title'] ?? $editorialCopy))
+            : trim((string) ($context['topic'] ?? $context['raw_input'] ?? $context['title'] ?? ''));
         $inputContext = [
-            'raw_input' => trim((string) ($context['raw_input'] ?? $context['text'] ?? '')),
+            'raw_input' => $editorialCopy,
+            'editorial_copy' => $editorialCopy,
+            'non_semantic_context' => is_array($context['non_semantic_context'] ?? null) ? $context['non_semantic_context'] : (is_array($context['interpretation']['non_semantic_context'] ?? null) ? $context['interpretation']['non_semantic_context'] : []),
             'title' => trim((string) ($context['title'] ?? '')),
             'observations' => is_array($context['observations'] ?? null) ? $context['observations'] : [],
         ];
