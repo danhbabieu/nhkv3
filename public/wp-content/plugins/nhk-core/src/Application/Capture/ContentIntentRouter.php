@@ -25,8 +25,8 @@ final class ContentIntentRouter
 
         $signals = $this->signals($input, $interpretation, $assets);
         if ($signals['valid_video_url']) return $this->result(ContentIntent::VIDEO, 'HEURISTIC', $signals);
-        if ($signals['atomic_delta']) return $this->result(ContentIntent::KNOWLEDGE_DELTA, 'HEURISTIC', $signals);
         if ($signals['has_assets'] && $signals['has_text']) return $this->result(ContentIntent::IMAGE_ARTICLE, 'HEURISTIC', $signals);
+        if ($signals['atomic_delta']) return $this->result(ContentIntent::KNOWLEDGE_DELTA, 'HEURISTIC', $signals);
         if ($signals['has_text']) return $this->result(ContentIntent::TEXT_ARTICLE, 'HEURISTIC', $signals);
 
         return [
@@ -56,7 +56,7 @@ final class ContentIntentRouter
     /** @return array<string,mixed> */
     private function signals(array $input, array $interpretation, array $assets): array
     {
-        $text = trim((string) ($input['text'] ?? $input['content'] ?? ''));
+        $text = $this->editorialText($input);
         $metadata = is_array($input['metadata'] ?? null) ? $input['metadata'] : [];
         $sentences = array_values(array_filter(array_map('trim', preg_split('/(?<=[.!?。！？])\s+/u', $text) ?: []), static fn (string $item): bool => $item !== ''));
         if ($sentences === [] && $text !== '') $sentences = [$text];
@@ -89,7 +89,19 @@ final class ContentIntentRouter
             'standalone_readability' => $text !== '' && (count($sentences) > 1 || $candidateCount > 1 || trim((string) ($input['title'] ?? '')) !== ''),
             'user_article_marker' => $userArticleMarker,
             'atomic_delta' => $atomicDelta,
+            'asset_count' => count($assets),
         ];
+    }
+
+    /** @param array<string,mixed> $input */
+    private function editorialText(array $input): string
+    {
+        foreach (['text', 'content', 'shared_description', 'description'] as $key) {
+            $value = trim((string) ($input[$key] ?? ''));
+            if ($value !== '') return $value;
+        }
+        $media = is_array($input['media'] ?? null) ? $input['media'] : [];
+        return trim((string) ($media['description'] ?? ''));
     }
 
     private function assertExplicitIntentIsValid(ContentIntent $intent, array $input, array $assets): void
@@ -109,7 +121,7 @@ final class ContentIntentRouter
         if (in_array($intent, [ContentIntent::IMAGE_ARTICLE, ContentIntent::MEDIA_ENRICHMENT], true) && $assets === []) {
             throw new \InvalidArgumentException($intent === ContentIntent::IMAGE_ARTICLE ? 'IMAGE_ARTICLE_REQUIRES_IMAGE' : 'MEDIA_ENRICHMENT_REQUIRES_IMAGE');
         }
-        if ($intent->requiresArticle() && trim((string) ($input['text'] ?? $input['content'] ?? $input['title'] ?? '')) === '') {
+        if ($intent->requiresArticle() && $this->editorialText($input) === '' && trim((string) ($input['title'] ?? '')) === '') {
             throw new \InvalidArgumentException('ARTICLE_INTENT_REQUIRES_EDITORIAL_CONTENT');
         }
     }

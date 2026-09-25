@@ -297,6 +297,26 @@ final class ContentIntentRouterTest extends TestCase
         self::assertTrue($route['article_required']);
     }
 
+    public function test_shared_description_with_multiple_assets_defaults_to_image_article_without_feature_requests(): void
+    {
+        $description = 'Đây là cùng một chiếc đồng hồ cơ với mặt trước, thiết kế vỏ và bộ máy chuông được chụp ở ba góc.';
+        $assets = [
+            ['kind' => 'image', 'media_id' => 'media-front', 'sort_order' => 0, 'capture_asset_input' => ['name' => 'Ảnh mặt trước', 'feature_requests' => []]],
+            ['kind' => 'image', 'media_id' => 'media-case', 'sort_order' => 1, 'capture_asset_input' => ['name' => 'Ảnh vỏ', 'feature_requests' => []]],
+            ['kind' => 'image', 'media_id' => 'media-movement', 'sort_order' => 2, 'capture_asset_input' => ['name' => 'Ảnh bộ máy', 'feature_requests' => []]],
+        ];
+
+        $route = (new ContentIntentRouter())->route(
+            ['description' => $description],
+            (new TextInputInterpreter())->interpret($description, $assets),
+            $assets,
+        );
+
+        self::assertSame('IMAGE_ARTICLE', $route['intent']);
+        self::assertTrue($route['article_required']);
+        self::assertSame(3, $route['signals']['asset_count'] ?? count($assets));
+    }
+
     public function test_text_with_multiple_independent_facts_defaults_to_text_article(): void
     {
         $text = 'Chiếc đồng hồ có mặt số xanh. Bộ máy dùng cấu hình 36/4.';

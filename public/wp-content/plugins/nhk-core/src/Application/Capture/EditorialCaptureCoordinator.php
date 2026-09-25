@@ -66,6 +66,7 @@ final class EditorialCaptureCoordinator
     /** @param array<string,mixed> $input */
     public function execute(array $input): CaptureRecord
     {
+        $input = $this->normalizeEditorialInput($input);
         if (CapturePurposePolicy::resolve($input) !== CapturePurpose::EDITORIAL) throw new \InvalidArgumentException('AUTHORITY_CAPTURE_REQUIRES_AUTHORITY_OWNER');
         $key = trim((string) ($input['idempotency_key'] ?? ''));
         if ($key === '') throw new \InvalidArgumentException('Capture idempotency key is required.');
@@ -118,7 +119,7 @@ final class EditorialCaptureCoordinator
     public function retry(CaptureRecord $record, array $input): CaptureRecord
     {
         $this->documentation?->assertCheckpoint((array) ($input['documentation_checkpoint'] ?? []));
-        $input = $this->rehydrateRetryInput($record, $input);
+        $input = $this->normalizeEditorialInput($this->rehydrateRetryInput($record, $input));
         return $this->run($record, $input);
     }
 
@@ -1015,6 +1016,27 @@ final class EditorialCaptureCoordinator
         }
         $input['existing_capture_retry'] = true;
         $input['existing_capture_continuation'] = true;
+        return $input;
+    }
+
+    /** @param array<string,mixed> $input @return array<string,mixed> */
+    private function normalizeEditorialInput(array $input): array
+    {
+        $hasEditorialText = trim((string) ($input['text'] ?? $input['content'] ?? '')) !== '';
+        if (!$hasEditorialText) {
+            foreach (['shared_description', 'description'] as $key) {
+                $value = trim((string) ($input[$key] ?? ''));
+                if ($value !== '') {
+                    $input['text'] = $value;
+                    break;
+                }
+            }
+        }
+        if (trim((string) ($input['text'] ?? $input['content'] ?? '')) === '' && is_array($input['media'] ?? null)) {
+            $value = trim((string) (($input['media']['description'] ?? '')));
+            if ($value !== '') $input['text'] = $value;
+        }
+        if (!isset($input['asset_inputs']) && is_array($input['items'] ?? null)) $input['asset_inputs'] = $input['items'];
         return $input;
     }
 
