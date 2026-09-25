@@ -56,6 +56,14 @@ test("the View sends one submission through Media then Capture", async () => {
   assert.match(view, /publish: false/);
 });
 
+test("the View reads every Article Media usage through nhk.media.get before completion", async () => {
+  const view = await source();
+
+  assert.match(view, /wp_ability_nhk_v3_media_get/);
+  assert.match(view, /assertMediaArticleReadback/);
+  assert.match(view, /enrichmentStatus = "COMPLETE"/);
+});
+
 test("the View keeps shared description in Capture semantic input and out of Media metadata", async () => {
   const view = await source();
 

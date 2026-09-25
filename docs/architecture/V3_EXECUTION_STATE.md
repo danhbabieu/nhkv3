@@ -19462,3 +19462,28 @@ VERIFICATION: Focused Capture/Article/Media/Completion tests passed 143 tests / 
 SAFETY: No migration, database write, Capture/Article mutation, staging/production mutation, deployment, SSH or live runtime action occurred. The branch remains on `main`; remote synchronization was separately verified.
 
 STATUS: `IMAGE_CAPTURE_MEDIA_ARTICLE_CONVERGENCE_LOCAL_READY / INTEGRATION_ENVIRONMENT_GATED / NO_LIVE_MUTATION`.
+
+# Checkpoint — 2026-09-25 — Widget Article MediaUsage read-back gate (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE: The image-upload widget treated a successful `nhk.capture.ingest`
+response as sufficient enrichment read-back. It did not independently call
+`nhk.media.get` for each submitted Media, so a submission could have complete
+physical Media while Article-scoped canonical MediaUsage remained unverified;
+the widget then collapsed that dependency failure into `enrichment_status=PARTIAL`.
+
+FIXED_BOUNDARY: The widget now keeps the one Capture/one Article flow and, after
+Capture read-back, calls the registered Media read boundary once per ordered
+Media. Completion is allowed only when each response contains an active
+`wp_post` usage for the server-created Article. Missing/error usage remains a
+retryable failure and never promotes `COMPLETE`. The helper is endpoint-key
+agnostic and contains no acceptance IDs, batch IDs, attachment IDs or fixture
+data.
+
+VERIFICATION: Focused Capture/Article/Media/Completion tests passed 105 tests /
+424 assertions. Unit passed 2,624 tests / 15,281 assertions. Contract passed 6
+tests / 48 assertions. MCP Apps passed 38 tests; TypeScript typecheck and Vite
+build passed. PHP lint and `git diff --check` passed. Integration prerequisites
+`NHK_WP_TEST_PATH` and `NHK_WP_TEST_DB` are unset, so guarded Integration was
+not run. No batch runtime, database, staging or production state was mutated.
+
+STATUS: `IMAGE_CAPTURE_MEDIA_ARTICLE_READBACK_GATE_LOCAL_READY / INTEGRATION_ENVIRONMENT_GATED / NO_LIVE_MUTATION`.

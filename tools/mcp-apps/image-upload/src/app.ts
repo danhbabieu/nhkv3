@@ -1,11 +1,12 @@
 import { App } from "@modelcontextprotocol/ext-apps";
-import { assertCaptureArticleReadback, assertUploadManifestCounts, buildCaptureAssetInputs, buildWidgetState, extractUploadManifest, inspectToolResult, mergeUploadManifest, normalizeSelectedFiles, shouldProcessToolResultNotification, type BatchContext, type SelectedImage, type ToolResult, type ToolResultNotificationSource, type UploadedItem, type UploadManifest, type WidgetDiagnostic, type WidgetUploadStatus } from "./contract";
+import { assertCaptureArticleReadback, assertMediaArticleReadback, assertUploadManifestCounts, buildCaptureAssetInputs, buildWidgetState, extractUploadManifest, inspectToolResult, mergeUploadManifest, normalizeSelectedFiles, shouldProcessToolResultNotification, type BatchContext, type SelectedImage, type ToolResult, type ToolResultNotificationSource, type UploadedItem, type UploadManifest, type WidgetDiagnostic, type WidgetUploadStatus } from "./contract";
 
 // Easy MCP exposes the internal/admin boundary under the registered
 // WordPress Ability name. callServerTool must use that exact runtime name;
 // the canonical NHK name remains the server-side catalog name.
 const SERVER_TOOL_NAME = "wp_ability_nhk_v3_media_widget_upload";
 const CAPTURE_TOOL_NAME = "wp_ability_nhk_v3_capture_ingest";
+const MEDIA_GET_TOOL_NAME = "wp_ability_nhk_v3_media_get";
 const DOCUMENTATION_TOOL_NAME = "wp_ability_nhk_v3_documentation_bootstrap";
 const RESOURCE_URI = "ui://nhk/image-upload/v3.html";
 const IMAGE_TYPES = /^(image\/jpeg|image\/png|image\/gif|image\/webp)$/;
@@ -225,14 +226,25 @@ async function start(): Promise<void> {
     return { manifest_hash: value.manifest_hash, documentation_version: value.documentation_version };
   }
 
-  function assertCaptureResult(result: ToolResult): void {
+  function assertCaptureResult(result: ToolResult): ReturnType<typeof assertCaptureArticleReadback> {
     const inspection = inspectToolResult(result);
     if (inspection.kind !== "success") throw new Error(inspection.code);
     const payload = inspection.payload;
     if (!payload || typeof payload !== "object") throw new Error("CAPTURE_READBACK_UNAVAILABLE");
     const record = payload as { capture_id?: unknown; capture?: { capture_id?: unknown } };
     if (typeof record.capture_id !== "string" && typeof record.capture?.capture_id !== "string") throw new Error("CAPTURE_READBACK_UNAVAILABLE");
-    assertCaptureArticleReadback(payload, uploaded.map((item) => item.media_id).filter((id): id is string => Boolean(id)));
+    return assertCaptureArticleReadback(payload, uploaded.map((item) => item.media_id).filter((id): id is string => Boolean(id)));
+  }
+
+  async function assertArticleMediaReadback(capture: ReturnType<typeof assertCaptureArticleReadback>): Promise<void> {
+    const articleId = Number(capture.article?.post_id ?? capture.article_id ?? 0);
+    if (!(articleId > 0)) throw new Error("ARTICLE_READBACK_UNAVAILABLE");
+    for (const mediaId of uploaded.map((item) => item.media_id).filter((id): id is string => Boolean(id))) {
+      recordDiagnostic("ARTICLE_MEDIA_READBACK_START", "START", "MEDIA_GET_READBACK_REQUESTED");
+      const result = await app.callServerTool({ name: MEDIA_GET_TOOL_NAME, arguments: { id: mediaId } });
+      assertMediaArticleReadback(result as ToolResult, mediaId, articleId);
+      recordDiagnostic("ARTICLE_MEDIA_READBACK_DONE", "DONE", "MEDIA_GET_ARTICLE_USAGE_VERIFIED");
+    }
   }
 
   async function materializeSelectedImages(operationKey: string, namingContext: string, attempt: number): Promise<UploadManifest> {
@@ -305,7 +317,8 @@ async function start(): Promise<void> {
         },
       });
       recordDiagnostic("CAPTURE_READBACK_START", "START", "CAPTURE_READBACK_REQUESTED");
-      assertCaptureResult(capture as ToolResult);
+      const captureReadback = assertCaptureResult(capture as ToolResult);
+      await assertArticleMediaReadback(captureReadback);
       recordDiagnostic("CAPTURE_READBACK_DONE", "DONE", "CAPTURE_READBACK_VERIFIED");
       enrichmentStatus = "COMPLETE";
       uploadStatus = "complete";

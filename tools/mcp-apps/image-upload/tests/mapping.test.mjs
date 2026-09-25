@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { assertCaptureArticleReadback, assertUploadManifestCount, assertUploadManifestCounts, buildCaptureAssetInputs, buildWidgetState, extractPayload, extractUploadManifest, extractUploads, inspectToolResult, mergeUploadManifest, normalizeSelectedFiles, shouldProcessToolResultNotification, splitFeatureRequests } from "../src/contract.ts";
+import { assertCaptureArticleReadback, assertMediaArticleReadback, assertUploadManifestCount, assertUploadManifestCounts, buildCaptureAssetInputs, buildWidgetState, extractPayload, extractUploadManifest, extractUploads, inspectToolResult, mergeUploadManifest, normalizeSelectedFiles, shouldProcessToolResultNotification, splitFeatureRequests } from "../src/contract.ts";
 
 test("rejects an Article capture readback without per-media canonical Article usages", () => {
   assert.throws(() => assertCaptureArticleReadback({
@@ -14,6 +14,17 @@ test("rejects an Article capture readback without per-media canonical Article us
     ],
     canonical_usage_readback: [],
   }, ["media-717", "media-718", "media-719"]), /ARTICLE_MEDIA_USAGE_READBACK_INCOMPLETE/);
+});
+
+test("requires nhk.media.get to read back the Article usage for each Media", () => {
+  assert.doesNotThrow(() => assertMediaArticleReadback({ structuredContent: {
+    id: "media-one",
+    usages: [{ media_id: "media-one", target_type: "wp_post", target_id: "7:711", active: true }],
+  } }, "media-one", 711));
+  assert.throws(() => assertMediaArticleReadback({ structuredContent: {
+    id: "media-one",
+    usages: [],
+  } }, "media-one", 711), /ARTICLE_MEDIA_USAGE_READBACK_INCOMPLETE/);
 });
 
 test("does not parse the tool result that opened the widget as an upload result", () => {

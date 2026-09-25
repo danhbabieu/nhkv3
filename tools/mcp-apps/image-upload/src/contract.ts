@@ -85,6 +85,22 @@ export function assertCaptureArticleReadback(payload: unknown, expectedMediaIds:
   return record;
 }
 
+export function assertMediaArticleReadback(result: ToolResult, mediaId: string, articleId: number): void {
+  const inspection = inspectToolResult(result);
+  if (inspection.kind !== "success") throw new Error(inspection.code);
+  if (!inspection.payload || typeof inspection.payload !== "object" || Array.isArray(inspection.payload)) throw new Error("MEDIA_READBACK_UNAVAILABLE");
+  const record = inspection.payload as { id?: unknown; usages?: unknown };
+  if (record.id !== mediaId || !Array.isArray(record.usages)) throw new Error("MEDIA_READBACK_UNAVAILABLE");
+  const usage = record.usages.find((item) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return false;
+    const value = item as { media_id?: unknown; target_type?: unknown; target_id?: unknown; active?: unknown };
+    const targetId = typeof value.target_id === "string" ? value.target_id : "";
+    const articleTarget = targetId === String(articleId) || targetId.endsWith(`:${articleId}`);
+    return value.media_id === mediaId && value.target_type === "wp_post" && articleTarget && value.active !== false;
+  });
+  if (!usage) throw new Error("ARTICLE_MEDIA_USAGE_READBACK_INCOMPLETE");
+}
+
 export function normalizeSelectedFiles(value: unknown): SelectedImage[] {
   if (!Array.isArray(value)) return [];
 

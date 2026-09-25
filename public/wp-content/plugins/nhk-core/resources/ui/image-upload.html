@@ -12028,6 +12028,21 @@ function assertCaptureArticleReadback(payload, expectedMediaIds) {
   if (record2.capture_status && !["COMPLETE", "READY_FOR_PUBLICATION", "PUBLISHED"].includes(record2.capture_status.toUpperCase())) throw new Error("CAPTURE_ENRICHMENT_INCOMPLETE");
   return record2;
 }
+function assertMediaArticleReadback(result, mediaId, articleId) {
+  const inspection = inspectToolResult(result);
+  if (inspection.kind !== "success") throw new Error(inspection.code);
+  if (!inspection.payload || typeof inspection.payload !== "object" || Array.isArray(inspection.payload)) throw new Error("MEDIA_READBACK_UNAVAILABLE");
+  const record2 = inspection.payload;
+  if (record2.id !== mediaId || !Array.isArray(record2.usages)) throw new Error("MEDIA_READBACK_UNAVAILABLE");
+  const usage = record2.usages.find((item) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return false;
+    const value = item;
+    const targetId = typeof value.target_id === "string" ? value.target_id : "";
+    const articleTarget = targetId === String(articleId) || targetId.endsWith(`:${articleId}`);
+    return value.media_id === mediaId && value.target_type === "wp_post" && articleTarget && value.active !== false;
+  });
+  if (!usage) throw new Error("ARTICLE_MEDIA_USAGE_READBACK_INCOMPLETE");
+}
 function normalizeSelectedFiles(value) {
   if (!Array.isArray(value)) return [];
   return value.flatMap((item) => {
@@ -12278,6 +12293,7 @@ function buildWidgetState(items, diagnostics = [], uploadStatus = items.length >
 }
 const SERVER_TOOL_NAME = "wp_ability_nhk_v3_media_widget_upload";
 const CAPTURE_TOOL_NAME = "wp_ability_nhk_v3_capture_ingest";
+const MEDIA_GET_TOOL_NAME = "wp_ability_nhk_v3_media_get";
 const DOCUMENTATION_TOOL_NAME = "wp_ability_nhk_v3_documentation_bootstrap";
 const RESOURCE_URI = "ui://nhk/image-upload/v3.html";
 const IMAGE_TYPES = /^(image\/jpeg|image\/png|image\/gif|image\/webp)$/;
@@ -12469,7 +12485,17 @@ async function start() {
     if (!payload || typeof payload !== "object") throw new Error("CAPTURE_READBACK_UNAVAILABLE");
     const record2 = payload;
     if (typeof record2.capture_id !== "string" && typeof record2.capture?.capture_id !== "string") throw new Error("CAPTURE_READBACK_UNAVAILABLE");
-    assertCaptureArticleReadback(payload, uploaded.map((item) => item.media_id).filter((id) => Boolean(id)));
+    return assertCaptureArticleReadback(payload, uploaded.map((item) => item.media_id).filter((id) => Boolean(id)));
+  }
+  async function assertArticleMediaReadback(capture) {
+    const articleId = Number(capture.article?.post_id ?? capture.article_id ?? 0);
+    if (!(articleId > 0)) throw new Error("ARTICLE_READBACK_UNAVAILABLE");
+    for (const mediaId of uploaded.map((item) => item.media_id).filter((id) => Boolean(id))) {
+      recordDiagnostic("ARTICLE_MEDIA_READBACK_START", "START", "MEDIA_GET_READBACK_REQUESTED");
+      const result = await app.callServerTool({ name: MEDIA_GET_TOOL_NAME, arguments: { id: mediaId } });
+      assertMediaArticleReadback(result, mediaId, articleId);
+      recordDiagnostic("ARTICLE_MEDIA_READBACK_DONE", "DONE", "MEDIA_GET_ARTICLE_USAGE_VERIFIED");
+    }
   }
   async function materializeSelectedImages(operationKey, namingContext, attempt) {
     if (batchManifest !== null && batchManifest.success_count === batchManifest.requested_count && uploaded.length === selected.length && uploaded.every((item) => Boolean(item.media_id))) return batchManifest;
@@ -12535,7 +12561,8 @@ async function start() {
         }
       });
       recordDiagnostic("CAPTURE_READBACK_START", "START", "CAPTURE_READBACK_REQUESTED");
-      assertCaptureResult(capture);
+      const captureReadback = assertCaptureResult(capture);
+      await assertArticleMediaReadback(captureReadback);
       recordDiagnostic("CAPTURE_READBACK_DONE", "DONE", "CAPTURE_READBACK_VERIFIED");
       enrichmentStatus = "COMPLETE";
       uploadStatus = "complete";
