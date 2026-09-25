@@ -30,14 +30,14 @@ add_filter('pre_handle_404', 'nhk_v3_allow_semantic_search_pages', 10, 2);
 
 function nhk_v3_assets(): void
 {
-    wp_register_style('nhk-v3-style', get_stylesheet_uri(), [], '1.3.0');
-    wp_register_style('nhk-v3-entity', get_theme_file_uri('entity.css'), ['nhk-v3-style'], '1.0.7');
+    wp_register_style('nhk-v3-style', get_stylesheet_uri(), [], '1.3.1');
+    wp_register_style('nhk-v3-entity', get_theme_file_uri('entity.css'), ['nhk-v3-style'], '1.0.8');
     wp_register_style('nhk-v3-media-video', get_theme_file_uri('media-video.css'), ['nhk-v3-entity'], '1.0.3');
     wp_register_style('nhk-v3-knowledge', get_theme_file_uri('knowledge.css'), ['nhk-v3-media-video'], '1.0.2');
     wp_register_style('nhk-v3-presentation', get_theme_file_uri('presentation.css'), ['nhk-v3-knowledge'], '1.0.3');
     wp_register_style('nhk-v3-album-style', get_theme_file_uri('album.css'), ['nhk-v3-entity'], '1.0.2');
     wp_enqueue_style('nhk-v3-style');
-    wp_enqueue_script('nhk-v3-navigation', get_theme_file_uri('navigation.js'), [], '1.1.0', true);
+    wp_enqueue_script('nhk-v3-navigation', get_theme_file_uri('navigation.js'), [], '1.1.1', true);
     $needsMediaVideo = is_front_page() || is_singular('post') || (int) get_query_var('nhk_media_page', 0) > 0 || (int) get_query_var('nhk_video_page', 0) > 0;
     $needsKnowledge = is_front_page() || (int) get_query_var('nhk_knowledge_page', 0) > 0;
     $needsEntity = is_front_page() || is_singular('post') || (int) get_query_var('nhk_entity_page', 0) > 0 || $needsMediaVideo || $needsKnowledge;
