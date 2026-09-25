@@ -26,6 +26,14 @@ final class HomepageVisualPolicy
             return $this->fallback($item, $type, 'missing_visual');
         }
 
+        // Canonical Media representative paths are local application-owned
+        // delivery, so their source dimensions do not make them remote-card
+        // candidates. Responsive delivery, when available, remains attached
+        // to the same Media identity.
+        if (trim((string) ($item['media_id'] ?? '')) !== '') {
+            return $this->image($item, $type, 'representative_local', $url, $width, $height, $srcset, $sizes);
+        }
+
         // An attachment-backed responsive path is safe regardless of source dimensions.
         if ((int) ($item['attachment_id'] ?? 0) > 0 && $srcset !== '') {
             return $this->image($item, $type, 'local_responsive', $url, $width, $height, $srcset, $sizes);

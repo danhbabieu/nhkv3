@@ -39,4 +39,17 @@ final class VideoSeoProjectionTest extends TestCase
         self::assertSame(1280, $result['video_object']['thumbnailWidth']);
         self::assertSame('https://i.ytimg.com/vi/VwP1AH9E3HA/hqdefault.jpg', $result['open_graph']['image']);
     }
+
+    public function test_video_object_prefers_canonical_representative_thumbnail_over_source_selection(): void
+    {
+        $result = (new VideoSeoProjection())->project([
+            'source' => ['external_video_id' => 'VwP1AH9E3HA', 'thumbnail_selection' => ['url' => 'https://i.ytimg.com/source.jpg', 'width' => 640, 'height' => 360]],
+            'thumbnail' => ['url' => '/anh/video-cover.webp', 'width' => 1200, 'height' => 675],
+            'editorial' => ['title' => 'Video', 'summary' => 'Summary'],
+            'seo' => ['title' => 'Video', 'description' => 'Summary'],
+        ], ['path' => '/video/test/', 'eligible' => true, 'blockers' => []]);
+
+        self::assertSame(['/anh/video-cover.webp'], $result['video_object']['thumbnailUrl']);
+        self::assertSame('/anh/video-cover.webp', $result['open_graph']['image']);
+    }
 }

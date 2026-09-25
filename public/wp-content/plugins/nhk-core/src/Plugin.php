@@ -208,7 +208,8 @@ final class Plugin {
             $publicEvidence = new WpdbEvidenceRepository($wpdb);
             $publicKnowledge = new EntityKnowledgeProjection($publicClaims, $publicEvidence, $publicSources, $publicStatus);
             $publicCollection = new PublicEntityCollectionQuery($publicAuthority, $publicTypes, new PublicIdentityContract($publicTypes), $publicEligibility, $publicRoutes, $publicAggregation, static fn (): bool => $publicStatus->authorityStorageReady(), new EntityMediaProjection($publicMedia, $publicAssets, $publicUsages), $publicKnowledge);
-            $homeSemanticQuery = new HomeSemanticQuery($publicAuthority, $publicMedia, $publicVideos, $publicTypes, $publicStatus, $publicRoutes, $publicCollection, new PublicMediaGalleryQuery($publicMedia, $publicAssets), null, $publicClaims);
+            $homeGallery = new PublicMediaGalleryQuery($publicMedia, $publicAssets, PublicMediaAssetDelivery::fromEnvironment($publicAssets, $publicMedia), $publicUsages, PublicMediaArticleLinkResolver::fromWordPress());
+            $homeSemanticQuery = new HomeSemanticQuery($publicAuthority, $publicMedia, $publicVideos, $publicTypes, $publicStatus, $publicRoutes, $publicCollection, $homeGallery, null, $publicClaims, new \NHK\Core\Application\Video\VideoFrontendProjection(null, new \NHK\Core\Application\Video\VideoMediaPresentationResolver($publicMedia, $publicAssets, $publicUsages)));
             add_filter('nhk_v3_home_semantic_modules', [$homeSemanticQuery, 'extend']);
             $claimOwnerUrl = static function (\NHK\Core\Domain\Knowledge\KnowledgeClaim $claim) use ($publicAuthority, $publicRoutes, $publicEligibility): ?string {
                 $metadata = $claim->provenance['metadata'] ?? [];

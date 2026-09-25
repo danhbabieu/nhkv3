@@ -1,3 +1,25 @@
+# Checkpoint — 2026-09-25 — Video representative MediaUsage administration (LOCAL / NO LIVE MUTATION)
+
+IMPLEMENTED: Added a shared Video representative-media presentation resolver
+with canonical precedence `MediaUsage(endpoint=video, role=representative)` →
+existing source thumbnail → missing state. Admin Video maintenance now lists
+existing Videos with explicit representative/source/missing filters and uses
+the existing governed Media upload, bind, replace and logical-remove flows.
+
+PUBLIC_CONSUMERS: The same projection is consumed by Video detail/archive,
+homepage semantic projection and Video SEO/OG projection. No new Video ingest,
+duplicate Media creation, direct writer, database write, schema change or
+responsive-derivative pipeline was introduced.
+
+VERIFICATION: NHK Unit passed 2,655 tests / 15,413 assertions under
+`memory_limit=512M`. Focused Admin/Media suite passed 80 tests / 647
+assertions. Changed PHP lint, admin JavaScript syntax check and `git diff
+--check` are required final gates. Full suite remains environment-gated by
+missing `NHK_WP_TEST_PATH` / `nhk_v3_test` runtime; no live mutation was
+performed. No commit, push or deploy.
+
+STATUS: `VIDEO_REPRESENTATIVE_MEDIA_ADMIN_LOCAL_READY / INTEGRATION_ENVIRONMENT_BLOCKED / NO_MUTATION / NO_COMMIT`.
+
 # Checkpoint — 2026-09-25 — Generic Knowledge Writer subject/applicability boundary (LOCAL / READ-ONLY)
 
 ROOT_CAUSE: Knowledge Writer passed a caller-supplied `type` into typed name
@@ -19940,3 +19962,48 @@ because `NHK_WP_TEST_PATH` and `NHK_WP_TEST_DB` are unset. No database,
 staging/production data, deployment or live acceptance mutation occurred.
 
 STATUS: `ARTICLE_MEDIA_USAGE_REPAIR_EXECUTABLE_LOCAL_READY / N_IMAGE_POLICY_VERIFIED / FULL_UNIT_PASS_512M / INTEGRATION_ENVIRONMENT_GATED / NO_LIVE_MUTATION`.
+# Checkpoint — 2026-09-25 — Image upload durable Media continuation and attempt-scoped diagnostics (LOCAL / NO LIVE MUTATION)
+
+ROOT_CAUSE_CONFIRMED: The post-Media failure boundary is the widget's
+`assertCaptureArticleReadback()` contract, specifically
+`ARTICLE_MEDIA_DISPOSITION_INCOMPLETE` when an IMAGE_ARTICLE Capture returns a
+missing/non-APPLIED per-Media disposition. The prior widget then classified the
+downstream exception through a generic submission error path, while its
+Article Media read-back helper was unconditional and therefore also rejected
+valid `MEDIA_ENRICHMENT` Captures that intentionally have no Article.
+
+EXECUTION_MAP: `local File/library reference → sequential host.uploadFile (or
+existing file_id) → getFileDownloadUrl → trusted provided-file reference →
+governed Media widget tool → attachment read-back → canonical Media read-back →
+Capture ingest/continuation → intent-gated Article/MediaUsage read-back →
+terminal UI state`. Persisted ordinal/file_id/media_id/Capture id and the same
+logical operation key remain the retry identity. After the durable Media
+boundary, retry planning and executor dispatch re-enter only enrichment,
+MediaUsage repair or projection; no host upload, attachment creation or Media
+creation is re-entered.
+
+FIXED_BOUNDARY: Added one normalized Capture intent predicate so Article
+MediaUsage read-back runs only for IMAGE_ARTICLE. MEDIA_ENRICHMENT now reaches
+terminal Media completion without manufacturing or waiting for an Article.
+Diagnostics now carry submission/attempt/phase scope and render the attempt
+number, and downstream fallback labels distinguish Capture, MediaUsage and
+projection failures from host upload failures. Existing Feature-empty handling
+is covered explicitly as `NOT_REQUESTED` with zero resolver calls.
+
+REGRESSION: Added executor coverage for CONTINUE_ENRICHMENT and
+RETRY_PROJECTION handlers plus durable N=1/2/3/10 continuation call-count
+checks. Existing policy coverage still proves failed ordinals, canonical order,
+Article MediaUsage repair, projection retry and NOOP behavior.
+
+VERIFICATION: Image widget tests passed 70/70; TypeScript typecheck and Vite
+single-file build passed, regenerating the canonical served resource. Focused
+PHP Capture/Media/MCP suite passed 116 tests / 674 assertions; Feature-empty
+suite passed 3 tests / 12 assertions; Contract passed 6 tests / 48 assertions;
+Unit directory passed 2,661 tests / 15,438 assertions with existing warnings
+and deprecations. Full repository PHPUnit reached 2,810 tests / 15,509
+assertions but is `ENVIRONMENTAL_BLOCKER` with 21 integration failures because
+`NHK_WP_TEST_PATH` and `NHK_WP_TEST_DB` are absent. PHP lint, diff check and
+secret review passed. No live acceptance, database mutation, staging/production
+mutation, deployment or push occurred in this checkpoint.
+
+STATUS: `IMAGE_UPLOAD_DURABLE_MEDIA_CONTINUATION_LOCAL_READY / ATTEMPT_SCOPED_DIAGNOSTICS / UNIT_GREEN / INTEGRATION_ENVIRONMENT_BLOCKED / NO_MUTATION`.

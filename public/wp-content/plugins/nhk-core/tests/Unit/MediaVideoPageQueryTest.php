@@ -131,6 +131,24 @@ final class MediaVideoPageQueryTest extends TestCase
         self::assertSame('truOChTNbwA', $detail['provenance']['external_id']);
     }
 
+    public function test_video_representative_usage_precedes_source_thumbnail_in_public_projection(): void
+    {
+        $video = Video::fromUrl('https://www.youtube.com/watch?v=truOChTNbwA', 'Stored source title', [
+            'public_identity' => ['current_slug' => 'stored-video'],
+            'source_snapshot' => ['availability' => 'available', 'embeddable' => true, 'thumbnail_selection' => ['url' => 'https://img.youtube.com/source.jpg', 'width' => 640, 'height' => 360]],
+            'editorial' => ['title' => 'NHK editorial title', 'summary' => 'Summary'], 'hub' => ['primary' => '06'], 'provenance' => ['kind' => 'TEST'], 'semantic_attachments' => [['target_id' => '22222222-2222-4222-8222-222222222222']],
+        ]);
+        $mediaId = UuidCodec::newV7();
+        $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'original', 'cover.jpg', hash('sha256', 'cover'), 'image/jpeg', 5, 1200, 675, 'PUBLIC', ['canonical_filename' => 'cover.webp']);
+        $usage = new MediaUsage(UuidCodec::newV7(), $mediaId, 'video', $video->canonicalId, 'representative', activeSlot: 'representative', selectionSource: 'USER_EXPLICIT', selectionPolicy: 'PINNED');
+
+        $detail = $this->query([new Media($mediaId, 'cover', 'Cover', 'ready')], [$video], [$asset], [$usage])->videoDetail($video->canonicalId);
+
+        self::assertSame('representative', $detail['thumbnail_status']);
+        self::assertSame('/anh/cover.webp', $detail['thumbnail_url']);
+        self::assertSame($mediaId, $detail['thumbnail']['media_id']);
+    }
+
     public function test_video_detail_and_archive_hide_invalid_persisted_external_references(): void
     {
         $invalid = new Video(UuidCodec::newV7(), 'vimeo', 'bad-reference', 'https://vimeo.com/bad-reference', 'Invalid');
@@ -192,7 +210,7 @@ final class MediaVideoPageQueryTest extends TestCase
             public function __construct(private array $items) {}
             public function create(MediaUsage $usage): MediaUsage { return $usage; }
             public function listByMediaId(string $mediaId, ?string $role = null): array { return array_values(array_filter($this->items, static fn (MediaUsage $item): bool => $item->mediaId === $mediaId && ($role === null || $item->role === $role))); }
-            public function listByEndpoint(string $endpointType, string $endpointKey, ?string $role = null): array { return []; }
+            public function listByEndpoint(string $endpointType, string $endpointKey, ?string $role = null): array { return array_values(array_filter($this->items, static fn (MediaUsage $item): bool => $item->endpointType === $endpointType && $item->endpointKey === $endpointKey && ($role === null || $item->role === $role))); }
         };
         return new MediaVideoPageQuery($mediaRepository, $assetRepository, $usageRepository, $videoRepository);
     }

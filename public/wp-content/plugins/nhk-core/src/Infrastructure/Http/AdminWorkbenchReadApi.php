@@ -14,6 +14,7 @@ use NHK\Core\Application\Governance\ProposalEligibilityService;
 use NHK\Core\Application\Entity\EntityProfileAdminProjection;
 use NHK\Core\Application\Graph\GraphService;
 use NHK\Core\Application\Video\{VideoPublicContextSelector, VideoUrlPolicy};
+use NHK\Core\Application\Video\VideoMediaPresentationResolver;
 use NHK\Core\Domain\Graph\NodeReference;
 use NHK\Core\Infrastructure\Admin\{AdminMediaAdapter, AdminVideoAdapter};
 use NHK\Core\Domain\Authority\{AuthorityEntity, CanonicalEntityTypeCatalog, EntityTypeRegistry};
@@ -41,6 +42,7 @@ final class AdminWorkbenchReadApi
     public function register(): void
     {
         register_rest_route('nhk/v1', '/admin/workbench/search', ['methods' => 'GET', 'permission_callback' => fn (): bool => current_user_can('nhk_view_governance') || current_user_can('manage_options'), 'args' => ['q' => ['required' => true], 'domain' => ['default' => 'all']], 'callback' => fn (\WP_REST_Request $request) => $this->search($request)]);
+        register_rest_route('nhk/v1', '/admin/workbench/videos', ['methods' => 'GET', 'permission_callback' => fn (): bool => current_user_can('nhk_view_governance') || current_user_can('manage_options'), 'args' => ['status' => ['default' => 'all']], 'callback' => fn (\WP_REST_Request $request) => $this->videos((string) $request['status'])]);
         register_rest_route('nhk/v1', '/admin/workbench/video/(?P<id>[0-9A-Fa-f-]{36})', ['methods' => 'GET', 'permission_callback' => fn (): bool => current_user_can('nhk_view_governance') || current_user_can('manage_options'), 'callback' => fn (\WP_REST_Request $request) => $this->video((string) $request['id'])]);
         register_rest_route('nhk/v1', '/admin/workbench/media/(?P<id>[0-9A-Fa-f-]{36})', ['methods' => 'GET', 'permission_callback' => fn (): bool => current_user_can('nhk_view_governance') || current_user_can('manage_options'), 'callback' => fn (\WP_REST_Request $request) => $this->media((string) $request['id'])]);
         register_rest_route('nhk/v1', '/admin/workbench/entity/(?P<id>[0-9A-Fa-f-]{36})', ['methods' => 'GET', 'permission_callback' => fn (): bool => current_user_can('nhk_view_governance') || current_user_can('manage_options'), 'callback' => fn (\WP_REST_Request $request) => $this->entity((string) $request['id'])]);
@@ -64,6 +66,19 @@ final class AdminWorkbenchReadApi
         $media = $this->media->findByCanonicalId($id);
         if (!$media instanceof Media) return new \WP_Error('nhk_admin_media_not_found', 'Không tìm thấy Media canonical.', ['status' => 404]);
         return (new AdminMediaAdapter([$media], $this->assets?->listByMediaId($id) ?? [], $this->usages?->listByMediaId($id) ?? []))->detail($media);
+    }
+
+    private function videos(string $status = 'all'): array
+    {
+        $resolver = $this->presentationResolver();
+        $adapter = new AdminVideoAdapter($this->videos->list(true), $resolver);
+        $rows = AdminVideoAdapter::filterThumbnailStatus($adapter->find(), $status);
+        $order = ['missing' => 0, 'source' => 1, 'representative' => 2];
+        usort($rows, static fn (array $left, array $right): int => (($order[$left['thumbnail_status'] ?? ''] ?? 9) <=> ($order[$right['thumbnail_status'] ?? ''] ?? 9)) ?: strcmp((string) ($left['title'] ?? ''), (string) ($right['title'] ?? '')));
+        $all = $adapter->find();
+        $counts = ['all' => count($all), 'representative' => 0, 'source' => 0, 'missing' => 0];
+        foreach ($all as $row) if (isset($counts[$row['thumbnail_status'] ?? ''])) $counts[$row['thumbnail_status']]++;
+        return ['status' => strtolower(trim($status)) ?: 'all', 'counts' => $counts, 'items' => $rows];
     }
 
     private function video(string $id): array|\WP_Error
@@ -108,7 +123,7 @@ final class AdminWorkbenchReadApi
         }
 
         $frontendProjection = (new VideoUrlPolicy())->project($video, new VideoPublicContextSelector());
-        return (new AdminVideoAdapter([$video]))->detail($video, $relations, $evidence, $governance, $frontendProjection);
+        return (new AdminVideoAdapter([$video], $this->presentationResolver()))->detail($video, $relations, $evidence, $governance, $frontendProjection);
     }
 
     private function entity(string $id): array|\WP_Error
@@ -120,6 +135,11 @@ final class AdminWorkbenchReadApi
     }
 
     /** @return array<string,mixed> */
-    private function videoRow(Video $item): array { return array_merge(['type' => 'video'], (new AdminVideoAdapter([$item]))->find($item->externalVideoId)[0] ?? []); }
+    private function videoRow(Video $item): array { return array_merge(['type' => 'video'], (new AdminVideoAdapter([$item], $this->presentationResolver()))->find($item->externalVideoId)[0] ?? []); }
+    private function presentationResolver(): VideoMediaPresentationResolver
+    {
+        if (!$this->assets instanceof MediaAssetRepository || !$this->usages instanceof MediaUsageRepository) throw new \RuntimeException('MEDIA_VIDEO_PRESENTATION_UNAVAILABLE');
+        return new VideoMediaPresentationResolver($this->media, $this->assets, $this->usages);
+    }
     private function matches(string $query, string ...$values): bool { foreach ($values as $value) if (str_contains(strtolower($value), $query)) return true; return false; }
 }

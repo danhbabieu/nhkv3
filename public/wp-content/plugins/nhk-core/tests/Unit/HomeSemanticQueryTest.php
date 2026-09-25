@@ -7,11 +7,12 @@ use NHK\Core\Application\Home\HomeSemanticQuery;
 use NHK\Core\Application\Presentation\PublicNavigationDefinition;
 use NHK\Core\Application\Entity\{PublicEntityCollectionQuery, PublicEntityEligibilityPolicy, PublicIdentityContract, PublicRouteResolver};
 use NHK\Core\Application\Media\PublicMediaGalleryQuery;
-use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository};
+use NHK\Core\Application\Video\{VideoFrontendProjection, VideoMediaPresentationResolver};
+use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository, MediaUsageRepository};
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Contracts\Home\BoundedLatestFeedReader;
 use NHK\Core\Domain\Authority\{AuthorityEntity, AuthorityState, CanonicalEntityTypeCatalog, EntityTypeRegistry};
-use NHK\Core\Domain\Media\{Media, MediaAsset};
+use NHK\Core\Domain\Media\{Media, MediaAsset, MediaUsage};
 use NHK\Core\Domain\Video\Video;
 use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Tests\Support\InMemoryAuthorityRepository;
@@ -54,6 +55,27 @@ final class HomeSemanticQueryTest extends TestCase
         self::assertArrayNotHasKey('url', $modules['media'][0]);
         self::assertSame($video->canonicalId, $modules['videos'][0]['canonical_id'] ?? null);
         self::assertSame('https://img.example.test/video.jpg', $modules['videos'][0]['thumbnail_url'] ?? null);
+    }
+
+    public function test_home_video_card_uses_representative_media_before_source_thumbnail(): void
+    {
+        $mediaId = UuidCodec::newV7();
+        $video = new Video(UuidCodec::newV7(), 'youtube', 'dQw4w9WgXcQ', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'Video đại diện', ['public_identity' => ['current_slug' => 'video-dai-dien'], 'source_snapshot' => ['availability' => 'available', 'embeddable' => true, 'thumbnail_selection' => ['url' => 'https://img.example.test/source.jpg', 'width' => 640, 'height' => 360]], 'editorial' => ['title' => 'Video đại diện', 'summary' => 'Tóm tắt'], 'hub' => ['primary' => '06'], 'provenance' => ['kind' => 'TEST'], 'semantic_attachments' => [['target_id' => UuidCodec::newV7()]]]);
+        $usage = new MediaUsage(UuidCodec::newV7(), $mediaId, 'video', $video->canonicalId, 'representative', activeSlot: 'representative', selectionSource: 'USER_EXPLICIT', selectionPolicy: 'PINNED');
+        $usages = new class([$usage]) implements MediaUsageRepository {
+            public function __construct(private array $items) {}
+            public function create(MediaUsage $usage): MediaUsage { return $usage; }
+            public function listByMediaId(string $mediaId, ?string $role = null): array { return []; }
+            public function listByEndpoint(string $type, string $key, ?string $role = null): array { return array_values(array_filter($this->items, static fn (MediaUsage $item): bool => $item->endpointType === $type && $item->endpointKey === $key && ($role === null || $item->role === $role))); }
+        };
+        $mediaRepository = $this->media([new Media($mediaId, 'video-cover', 'Video cover', 'ready')]);
+        $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'original', 'cover.jpg', hash('sha256', 'cover'), 'image/jpeg', 5, 1200, 675, 'PUBLIC', ['canonical_filename' => 'cover.webp']);
+        $projection = new VideoFrontendProjection(null, new VideoMediaPresentationResolver($mediaRepository, $this->assets([$asset]), $usages));
+        $query = new HomeSemanticQuery(new InMemoryAuthorityRepository(), $mediaRepository, $this->videos([$video]), new EntityTypeRegistry(), null, null, null, null, null, null, $projection);
+
+        $modules = $query->extend(['entities' => [], 'media' => [], 'videos' => []]);
+
+        self::assertSame('/anh/cover.webp', $modules['videos'][0]['thumbnail_url']);
     }
 
     public function test_home_clock_groups_are_profile_driven_and_skip_incomplete_presentation_records(): void

@@ -81,6 +81,17 @@ final class AdminWorkbenchArchitectureTest extends TestCase
         foreach (['loadMediaDetail', 'Xem trên web', 'Mở nguồn gốc'] as $needle) self::assertStringContainsString($needle, $js);
     }
 
+    public function test_video_media_workspace_exposes_representative_status_filter_and_guided_actions(): void
+    {
+        $page = (string) file_get_contents($this->repo() . '/public/wp-content/plugins/nhk-core/src/Infrastructure/Admin/AdminWorkbenchPage.php');
+        $api = (string) file_get_contents($this->repo() . '/public/wp-content/plugins/nhk-core/src/Infrastructure/Http/AdminWorkbenchReadApi.php');
+        $js = (string) file_get_contents($this->repo() . '/public/wp-content/plugins/nhk-core/assets/admin/admin-workbench.js');
+
+        foreach (['Có ảnh đại diện', 'Đang dùng ảnh nguồn', 'Thiếu ảnh đại diện', 'Cập nhật ảnh đại diện'] as $needle) self::assertStringContainsString($needle, $page . $js);
+        self::assertStringContainsString('/admin/workbench/videos', $api);
+        foreach (['Tải ảnh mới', 'Chọn từ Media', 'Bỏ ảnh đại diện'] as $needle) self::assertStringContainsString($needle, $js);
+    }
+
     /** @return list<string> */
     private function productionFiles(): array
     {

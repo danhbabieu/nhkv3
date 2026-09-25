@@ -11,6 +11,18 @@ use PHPUnit\Framework\TestCase;
 
 final class AdminDomainAdapterTest extends TestCase
 {
+    public function test_video_thumbnail_filter_keeps_only_requested_operator_state(): void
+    {
+        $rows = [
+            ['id' => 'missing', 'thumbnail_status' => 'missing'],
+            ['id' => 'source', 'thumbnail_status' => 'source'],
+            ['id' => 'representative', 'thumbnail_status' => 'representative'],
+        ];
+
+        self::assertSame(['missing'], array_column(AdminVideoAdapter::filterThumbnailStatus($rows, 'missing'), 'id'));
+        self::assertCount(3, AdminVideoAdapter::filterThumbnailStatus($rows, 'all'));
+    }
+
     public function test_video_adapter_finds_by_external_id_and_returns_read_only_projection(): void
     {
         $video = Video::fromUrl('https://youtu.be/truOChTNbwA', 'Video thử', [], null, '01a07af5-3303-7a73-9f15-b7f675293dc5');

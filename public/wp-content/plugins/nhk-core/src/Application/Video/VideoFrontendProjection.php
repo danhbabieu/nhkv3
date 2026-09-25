@@ -14,7 +14,7 @@ use NHK\Core\Domain\Video\Video;
  */
 final class VideoFrontendProjection
 {
-    public function __construct(private ?PublicIdentityRepository $publicIdentities = null) {}
+    public function __construct(private ?PublicIdentityRepository $publicIdentities = null, private ?VideoMediaPresentationResolver $mediaPresentation = null) {}
 
     /** @return array{item:?array<string,mixed>,frontend_available:bool,public_eligible:bool,blockers:list<string>} */
     public function project(Video $video): array
@@ -31,7 +31,10 @@ final class VideoFrontendProjection
             : (is_array($metadata['source'] ?? null) ? $metadata['source'] : []);
         $editorial = is_array($metadata['editorial'] ?? null) ? $metadata['editorial'] : [];
         $title = trim((string) ($editorial['title'] ?? '')) ?: ($video->title ?: 'Video');
-        $thumbnail = (new VideoThumbnailSelector())->presentationFromSource($source);
+        $presentation = $this->mediaPresentation?->resolve($video);
+        $thumbnail = is_array($presentation) && is_array($presentation['thumbnail'] ?? null) && ($presentation['thumbnail']['url'] ?? '') !== ''
+            ? $presentation['thumbnail']
+            : (new VideoThumbnailSelector())->presentationFromSource($source);
 
         return [
             'item' => [

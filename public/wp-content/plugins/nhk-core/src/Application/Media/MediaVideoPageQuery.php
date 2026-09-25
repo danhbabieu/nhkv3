@@ -12,12 +12,14 @@ use NHK\Core\Domain\Video\Video;
 use NHK\Core\Shared\Migration\MigrationStatus;
 use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Core\Application\Video\{VideoFrontendProjection, VideoPublicContextSelector, VideoSeoProjection, VideoUrlPolicy};
+use NHK\Core\Application\Video\VideoMediaPresentationResolver;
 use NHK\Core\Application\Presentation\LatestFirstOrder;
 
 final class MediaVideoPageQuery
 {
     private PublicMediaGalleryQuery $gallery;
     private VideoFrontendProjection $frontendProjection;
+    private VideoMediaPresentationResolver $videoMediaPresentation;
 
     public function __construct(
         private MediaRepository $media,
@@ -31,10 +33,12 @@ final class MediaVideoPageQuery
         private ?KnowledgeRepository $claims = null,
         private ?EvidenceRepository $evidence = null,
         private ?SourceRepository $sources = null,
+        ?VideoMediaPresentationResolver $videoMediaPresentation = null,
     ) {
         $this->delivery ??= PublicMediaAssetDelivery::fromEnvironment($assets, $media);
         $this->gallery = $gallery ?? new PublicMediaGalleryQuery($media, $assets, $this->delivery, $usages, PublicMediaArticleLinkResolver::fromWordPress());
-        $this->frontendProjection = new VideoFrontendProjection();
+        $this->videoMediaPresentation = $videoMediaPresentation ?? new VideoMediaPresentationResolver($media, $assets, $usages);
+        $this->frontendProjection = new VideoFrontendProjection(null, $this->videoMediaPresentation);
     }
 
     public function mediaDetail(string $id): ?array
@@ -135,6 +139,7 @@ final class MediaVideoPageQuery
         $category = is_array($metadata['category'] ?? null) ? $metadata['category'] : [];
         $sourceAvailable = !isset($source['availability']) || $source['availability'] === 'available';
         $projection = $this->frontendProjection->project($video);
+        $presentation = $this->videoMediaPresentation->resolve($video);
         $urlResult = (new VideoUrlPolicy())->project($video, new VideoPublicContextSelector());
         $publicUrl = is_array($projection['item'] ?? null) ? (string) ($projection['item']['public_url'] ?? '') : null;
         $seoProjection = null;
@@ -145,7 +150,7 @@ final class MediaVideoPageQuery
             // rebuilt as well, so a correction cannot serve stale copy/SEO.
             $seoProjection = $storedProjection !== null && (int) ($storedProjection['source_revision'] ?? 0) === $video->revision
                 ? $storedProjection
-                : (new VideoSeoProjection())->project(['source' => array_merge($source, ['external_video_id' => $video->externalVideoId]), 'editorial' => $editorial, 'seo' => is_array($metadata['seo'] ?? null) ? $metadata['seo'] : []], function_exists('home_url') ? home_url((string) $publicUrl) : (string) $publicUrl);
+                : (new VideoSeoProjection())->project(['source' => array_merge($source, ['external_video_id' => $video->externalVideoId]), 'thumbnail' => $presentation['thumbnail'], 'editorial' => $editorial, 'seo' => is_array($metadata['seo'] ?? null) ? $metadata['seo'] : []], function_exists('home_url') ? home_url((string) $publicUrl) : (string) $publicUrl);
         }
         $result = [
             'canonical_id' => $video->canonicalId,
@@ -162,6 +167,12 @@ final class MediaVideoPageQuery
             'source_available' => $sourceAvailable,
             'source_thumbnail_url' => ($thumbnail = $this->sourceThumbnail($source))['url'] ?? null,
             'source_thumbnail' => $thumbnail,
+            'thumbnail_url' => $presentation['thumbnail_url'],
+            'thumbnail' => $presentation['thumbnail'],
+            'thumbnail_status' => $presentation['status'],
+            'thumbnail_status_label' => $presentation['status_label'],
+            'representative_media_id' => $presentation['media_id'],
+            'representative_usage_id' => $presentation['usage_id'],
             'source_status' => (string) ($source['availability'] ?? 'unknown'),
             'seo_projection' => $seoProjection,
             'provenance' => $this->publicProvenance($metadata, $source),

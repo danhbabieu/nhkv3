@@ -45,6 +45,7 @@ final class HomeSemanticQuery
         private ?PublicMediaGalleryQuery $gallery = null,
         private ?KnowledgePageQuery $knowledge = null,
         private ?KnowledgeRepository $claims = null,
+        private ?VideoFrontendProjection $videoProjectionOverride = null,
     ) {}
 
     public function extend(array $modules): array
@@ -114,7 +115,7 @@ final class HomeSemanticQuery
             $modules['videos_total'] = 0;
             $videoItems = $this->videoItems();
             foreach ($videoItems as $item) {
-                $projection = ($this->videoProjection ??= new VideoFrontendProjection())->project($item);
+                $projection = ($this->videoProjection ??= ($this->videoProjectionOverride ?? new VideoFrontendProjection()))->project($item);
                 if (!$item->active || !$item->hasValidPublicReference() || ($projection['frontend_available'] ?? false) !== true) continue;
                 $metadata = is_array($item->metadata) ? $item->metadata : [];
                 $source = is_array($metadata['source_snapshot'] ?? null)
@@ -123,8 +124,10 @@ final class HomeSemanticQuery
                 if (isset($source['availability']) && !in_array($source['availability'], ['available','unknown'], true)) continue;
                 $editorial = is_array($metadata['editorial'] ?? null) ? $metadata['editorial'] : [];
                 $title = trim((string) ($editorial['title'] ?? '')) ?: ($item->title ?: 'Video');
-                $thumbnail = (new \NHK\Core\Application\Video\VideoThumbnailSelector())->presentationFromSource($source);
-                $visual = $this->visualPolicy()->resolve(['type' => 'video', 'image_url' => $thumbnail['url'] ?? null, 'width' => $thumbnail['width'] ?? null, 'height' => $thumbnail['height'] ?? null]);
+                $thumbnail = is_array($projection['item']['thumbnail'] ?? null) && ($projection['item']['thumbnail']['url'] ?? '') !== ''
+                    ? $projection['item']['thumbnail']
+                    : (new \NHK\Core\Application\Video\VideoThumbnailSelector())->presentationFromSource($source);
+                $visual = $this->visualPolicy()->resolve(['type' => 'video', 'image_url' => $thumbnail['url'] ?? null, 'width' => $thumbnail['width'] ?? null, 'height' => $thumbnail['height'] ?? null, 'media_id' => $thumbnail['media_id'] ?? null]);
                 $modules['videos_total']++;
                 if (count($modules['videos']) >= 6) continue;
                 $modules['videos'][] = [

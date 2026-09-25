@@ -185,6 +185,59 @@
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', workspaceSearch);
     else workspaceSearch();
 
+    function videoMediaWorkspace() {
+        var root = document.querySelector('[data-nhk-video-media-workspace]');
+        if (!root) return;
+        var list = document.getElementById('nhk-video-media-list');
+        var panel = document.getElementById('nhk-video-media-panel');
+        var base = (window.nhkV3Admin && window.nhkV3Admin.root) || (window.location.origin + '/wp-json/');
+        var headers = {'X-WP-Nonce': (window.nhkV3Admin && window.nhkV3Admin.nonce) || ''};
+        var currentStatus = 'all';
+        var currentItems = [];
+        function request(url, options) { return fetch(url, Object.assign({headers: headers}, options || {})).then(function (response) { return response.json().then(function (data) { if (!response.ok) throw new Error(data.message || data.code || 'Không thể đọc dữ liệu.'); return data; }); }); }
+        function load(status) {
+            currentStatus = status || 'all';
+            list.textContent = 'Đang tải danh sách Video…';
+            request(base + 'nhk/v1/admin/workbench/videos?status=' + encodeURIComponent(currentStatus)).then(function (data) { currentItems = data.items || []; render(data); }).catch(function (error) { list.textContent = error.message; });
+        }
+        function render(data) {
+            list.textContent = '';
+            (data.items || []).forEach(function (item) {
+                var card = document.createElement('article'); card.className = 'nhk-admin-result-card nhk-video-media-card';
+                if (item.thumbnail_url) { var image = document.createElement('img'); image.src = item.thumbnail_url; image.alt = item.title || 'Ảnh đại diện Video'; image.loading = 'lazy'; card.appendChild(image); }
+                else { var placeholder = document.createElement('div'); placeholder.className = 'nhk-video-media-placeholder'; placeholder.textContent = 'Chưa có ảnh'; card.appendChild(placeholder); }
+                var body = document.createElement('div'); var title = document.createElement('h3'); title.textContent = item.title; body.appendChild(title);
+                var state = document.createElement('p'); state.textContent = item.thumbnail_status_label; body.appendChild(state);
+                var update = document.createElement('button'); update.type = 'button'; update.className = 'button button-primary'; update.textContent = 'Cập nhật ảnh đại diện'; update.addEventListener('click', function () { openPanel(item); }); body.appendChild(update);
+                if (item.public_url) { var web = document.createElement('a'); web.className = 'button'; web.href = item.public_url; web.target = '_blank'; web.rel = 'noopener'; web.textContent = 'Xem trên web'; body.appendChild(web); }
+                if (item.url) { var source = document.createElement('a'); source.className = 'button button-secondary'; source.href = item.url; source.target = '_blank'; source.rel = 'noopener noreferrer'; source.textContent = 'Mở nguồn gốc'; body.appendChild(source); }
+                card.appendChild(body); list.appendChild(card);
+            });
+            if (!currentItems.length) list.innerHTML = '<p class="nhk-admin-empty">Không có Video phù hợp với bộ lọc này.</p>';
+        }
+        function openPanel(item) {
+            panel.hidden = false; panel.textContent = '';
+            var heading = document.createElement('h3'); heading.textContent = 'Cập nhật ảnh đại diện · ' + item.title; panel.appendChild(heading);
+            var current = document.createElement('p'); current.textContent = item.thumbnail_status_label + (item.thumbnail_url ? ' · Ảnh hiện tại đang được hiển thị.' : ''); panel.appendChild(current);
+            var uploadLabel = document.createElement('label'); uploadLabel.textContent = 'Tải ảnh mới'; var upload = document.createElement('input'); upload.type = 'file'; upload.accept = 'image/jpeg,image/png,image/gif,image/webp'; uploadLabel.appendChild(upload); panel.appendChild(uploadLabel);
+            var uploadButton = document.createElement('button'); uploadButton.type = 'button'; uploadButton.className = 'button button-primary'; uploadButton.textContent = 'Tải ảnh mới'; panel.appendChild(uploadButton);
+            var searchLabel = document.createElement('label'); searchLabel.textContent = 'Chọn từ Media'; var search = document.createElement('input'); search.type = 'search'; search.placeholder = 'Tìm Media hiện có'; searchLabel.appendChild(search); panel.appendChild(searchLabel);
+            var searchButton = document.createElement('button'); searchButton.type = 'button'; searchButton.className = 'button'; searchButton.textContent = 'Tìm Media'; panel.appendChild(searchButton);
+            var results = document.createElement('div'); results.className = 'nhk-video-media-picker'; panel.appendChild(results);
+            var remove = document.createElement('button'); remove.type = 'button'; remove.className = 'button-link-delete'; remove.textContent = 'Bỏ ảnh đại diện'; panel.appendChild(remove);
+            var close = document.createElement('button'); close.type = 'button'; close.className = 'button-secondary'; close.textContent = 'Đóng'; close.addEventListener('click', function () { panel.hidden = true; }); panel.appendChild(close);
+            function bind(mediaId) { panel.insertAdjacentHTML('beforeend', '<p class="nhk-admin-state">Đang bind qua Governance và đọc lại canonical…</p>'); request(base + 'nhk/v1/admin/media/usage', {method: 'POST', headers: Object.assign({'Content-Type': 'application/json'}, headers), body: JSON.stringify({idempotency_key: 'nhk-video-representative-' + item.id + '-' + Date.now(), operation: 'representative_bind', media: {id: mediaId}, target: {type: 'video', id: item.id}, role: 'representative', selection_source: 'USER_EXPLICIT', selection_policy: 'PINNED'})}).then(function () { panel.hidden = true; load(currentStatus); }).catch(function (error) { panel.insertAdjacentHTML('beforeend', '<p class="notice notice-error">' + error.message.replace(/</g, '&lt;') + '</p>'); }); }
+            uploadButton.addEventListener('click', function () { if (!upload.files || !upload.files[0]) return; var data = new FormData(); data.append('files[]', upload.files[0]); data.append('idempotency_key', 'nhk-video-upload-' + item.id + '-' + Date.now()); data.append('metadata[description]', 'NHK V3 Video representative'); request(base + 'nhk/v1/admin/media/upload', {method: 'POST', headers: headers, body: data}).then(function (body) { var uploaded = body.items && body.items[0] ? body.items[0] : null; if (!uploaded || !uploaded.media_id) throw new Error('MEDIA_UPLOAD_READBACK_FAILED'); bind(uploaded.media_id); }).catch(function (error) { panel.insertAdjacentHTML('beforeend', '<p class="notice notice-error">' + error.message.replace(/</g, '&lt;') + '</p>'); }); });
+            searchButton.addEventListener('click', function () { var query = search.value.trim(); if (query.length < 2) return; request(base + 'nhk/v1/admin/workbench/search?q=' + encodeURIComponent(query) + '&domain=media').then(function (data) { results.textContent = ''; (data.groups && data.groups.media || []).forEach(function (media) { var button = document.createElement('button'); button.type = 'button'; button.className = 'button'; button.textContent = media.title || media.name || 'Media'; button.addEventListener('click', function () { bind(media.id); }); results.appendChild(button); }); }).catch(function (error) { results.textContent = error.message; }); });
+            remove.addEventListener('click', function () { if (!item.representative_usage_id || !item.representative_media_id || !window.confirm('Bỏ ảnh đại diện của Video này? Media và file sẽ được giữ lại.')) return; request(base + 'nhk/v1/admin/media/usage', {method: 'POST', headers: Object.assign({'Content-Type': 'application/json'}, headers), body: JSON.stringify({idempotency_key: 'nhk-video-remove-' + item.id + '-' + Date.now(), operation: 'remove', media: {id: item.representative_media_id}, target: {type: 'video', id: item.id}, role: 'representative', usage_id: item.representative_usage_id, expected_usage_revision: Number(item.representative_usage_revision || 1), selection_source: 'USER_EXPLICIT', selection_policy: 'PINNED'})}).then(function () { panel.hidden = true; load(currentStatus); }).catch(function (error) { panel.insertAdjacentHTML('beforeend', '<p class="notice notice-error">' + error.message.replace(/</g, '&lt;') + '</p>'); }); });
+        }
+        root.querySelectorAll('[data-nhk-video-filter]').forEach(function (button) { button.addEventListener('click', function () { root.querySelectorAll('[data-nhk-video-filter]').forEach(function (item) { item.classList.remove('is-active'); }); button.classList.add('is-active'); load(button.getAttribute('data-nhk-video-filter')); }); });
+        load('missing');
+    }
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', videoMediaWorkspace);
+    else videoMediaWorkspace();
+
     function governanceQueueControls() {
         var selectAll = document.querySelector('[data-nhk-select-all]');
         var form = document.querySelector('[data-nhk-governance-bulk-form]');
