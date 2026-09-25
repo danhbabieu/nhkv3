@@ -49,7 +49,7 @@ final class VideoSeoProjection
         if (($source['published_at'] ?? null) !== null && (string) $source['published_at'] !== '') $object['uploadDate'] = (string) $source['published_at'];
         if (isset($source['duration_seconds']) && (int) $source['duration_seconds'] > 0) $object['duration'] = $this->duration((int) $source['duration_seconds']);
         $presentationThumbnail = is_array($package['presentation_thumbnail'] ?? null) ? $package['presentation_thumbnail'] : [];
-        $presentationUrl = trim((string) ($presentationThumbnail['full_url'] ?? $presentationThumbnail['url'] ?? ''));
+        $presentationUrl = ($presentationThumbnail['source'] ?? '') === 'media_usage' ? trim((string) ($presentationThumbnail['full_url'] ?? $presentationThumbnail['url'] ?? '')) : '';
         $thumbnail = $presentationUrl !== ''
             ? [
                 'url' => $presentationUrl,
