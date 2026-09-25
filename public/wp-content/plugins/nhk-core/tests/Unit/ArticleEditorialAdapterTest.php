@@ -32,6 +32,24 @@ final class ArticleEditorialAdapterTest extends TestCase
         self::assertArrayHasKey('plan', $result);
     }
 
+    public function test_article_adapter_can_lock_semantic_pack_without_composing_before_media_readback(): void
+    {
+        $adapter = $this->adapter([
+            ['id' => 'claim-1', 'subject_id' => self::SUBJECT, 'subject_type' => 'model', 'text' => 'Odo 36 có ba phiên bản vách máy.', 'scope' => 'model', 'provenance' => 'CATALOG_SUPPORTED', 'evidence_status' => 'SUPPORTED_WITHIN_SCOPE'],
+        ]);
+
+        $result = $adapter->prepare([
+            'raw_input' => 'Bài viết về Odo 36',
+            'subject_resolution' => ['primary' => ['id' => self::SUBJECT, 'type' => 'model']],
+            'defer_composition' => true,
+        ]);
+
+        self::assertSame('DEFERRED', $result['status']);
+        self::assertNull($result['draft']);
+        self::assertArrayHasKey('pack', $result);
+        self::assertArrayHasKey('plan', $result);
+    }
+
     public function test_article_adapter_fail_closed_when_shared_quality_is_blocked(): void
     {
         $adapter = $this->adapter([

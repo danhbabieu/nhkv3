@@ -746,6 +746,7 @@ final class EditorialCaptureCoordinator
                                 'selected_knowledge' => $preparationResult?->enrichment['selected_knowledge'] ?? [],
                                 'governed_enrichment_readback' => $preparationResult?->enrichment ?? [],
                             ],
+                            'defer_composition' => true,
                             'public_identity' => [
                                 'canonical_url' => $permalink,
                                 'canonical_identity' => $permalink !== '',
@@ -861,6 +862,25 @@ final class EditorialCaptureCoordinator
             $media = ($this->mediaReconcile)($mediaContext);
             $diagnostics['media_usage'] = $this->withoutBody($media);
             $diagnostics['deep_enrichment'] = $this->deepEnrichment($retrieved, $writes, $media, $visualOpportunities, $sharedEnrichment);
+            if ($this->articleEditorialAdapter !== null) {
+                try {
+                    $sharedEditorial = $this->articleEditorialAdapter->prepare($semanticContext + [
+                        'shared_enrichment' => $sharedEnrichment,
+                        'media_usage' => is_array($media['media_usage'] ?? null) ? $media['media_usage'] : (array) ($media['usages'] ?? []),
+                        'canonical_media_readback' => is_array($media['canonical_readback'] ?? null) ? $media['canonical_readback'] : [],
+                        'prepared_context' => [
+                            'subject_resolution_packet' => $preparationResult?->subjectResolutionPacket?->toArray() ?? $subjectPacket->toArray(),
+                            'selected_related_entities' => $preparationResult?->plan['related_entities'] ?? [],
+                            'selected_knowledge' => $preparationResult?->enrichment['selected_knowledge'] ?? [],
+                            'governed_enrichment_readback' => $preparationResult?->enrichment ?? [],
+                        ],
+                        'defer_composition' => false,
+                    ]);
+                } catch (\Throwable) {
+                    $sharedEditorial = null;
+                    $diagnostics['shared_editorial'] = ['status' => 'FALLBACK', 'failure_code' => 'SHARED_EDITORIAL_COMPOSITION_UNAVAILABLE'];
+                }
+            }
             if (trim((string) ($media['editorial_state_token'] ?? '')) !== '' && $media['editorial_state_token'] !== $record->articleStateToken) {
                 $record = $this->save($record, CaptureStage::COMPOSED, $assets, $diagnostics, $receipts, 'COMPOSED', $record->articleId, (string) $media['editorial_state_token']);
             }
