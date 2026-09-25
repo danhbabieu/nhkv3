@@ -1254,6 +1254,7 @@ final class Plugin {
                     return is_array($governed) ? $governed : ['status' => 'REVIEW_REQUIRED'];
                 },
             );
+            $captureFeatureBindings = new \NHK\Core\Application\Media\CaptureFeatureBindingCoordinator($captureSubjectResolver, $mediaBindingService);
             $capture = new EditorialCaptureCoordinator(
                 $captureRepository,
                 static function (array $input) use ($imageIngest, $existingMediaResolver, $existingAttachmentUrlResolver, $wordpressAttachments, $mediaBindingService, $assets): array {
@@ -1322,7 +1323,28 @@ final class Plugin {
                             $trace('PHYSICAL_INGEST', 'VERIFIED', ['items' => count($items)]);
                             return ['status' => 'verified', 'items' => $items, 'count' => count($items), 'reused' => true, 'physical_input' => 'existing_wordpress_media_url'];
                         }
-                        $items = $existingMediaResolver->resolve($mediaIds);
+                        $items = [];
+                        foreach ($mediaIds as $ordinal => $mediaId) {
+                            try {
+                                $resolved = $existingMediaResolver->resolve([(string) $mediaId]);
+                                $resolvedItems = array_values(array_filter($resolved, 'is_array'));
+                                foreach ($resolvedItems as $item) {
+                                    $item['sort_order'] = $ordinal;
+                                    $items[] = $item;
+                                }
+                                $last = $items[array_key_last($items)] ?? [];
+                                if ((string) ($last['media_id'] ?? '') !== (string) $mediaId) throw new \RuntimeException('MEDIA_READBACK_NOT_FOUND');
+                            } catch (\Throwable $error) {
+                                $items[] = [
+                                    'media_id' => (string) $mediaId,
+                                    'sort_order' => $ordinal,
+                                    'upload_status' => 'FAILED_RETRYABLE',
+                                    'attachment_readback_status' => 'failed',
+                                    'disposition' => 'FAILED_RETRYABLE',
+                                    'failure_code' => preg_replace('/[^A-Z0-9_:-]+/', '_', strtoupper(trim($error->getMessage()))) ?: 'MEDIA_READBACK_FAILED',
+                                ];
+                            }
+                        }
                         foreach ((array) ($input['asset_inputs'] ?? []) as $assetInput) {
                             if (!is_array($assetInput)) continue;
                             $ordinal = (int) ($assetInput['ordinal'] ?? -1);
@@ -1869,6 +1891,7 @@ final class Plugin {
                 $articleEditorialAdapter,
                 $contentPreparation,
                 $sharedEnrichment,
+                $captureFeatureBindings,
             );
             $captureContinuation = new EditorialCaptureContinuationService($captureRepository, $captureAddendumRepository, $capture, static function (array $input) use ($imageIngest, $existingMediaResolver): array {
                 $mediaIds = is_array($input['media_ids'] ?? null) ? array_values($input['media_ids']) : [];

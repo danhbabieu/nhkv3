@@ -1,3 +1,33 @@
+# Checkpoint — 2026-09-25 — Capture Feature resolution and governed MediaUsage isolation (LOCAL / NO LIVE MUTATION)
+
+IMPLEMENTED: Added a capability-neutral Capture Feature binding coordinator. Each
+`asset_inputs[].feature_requests[]` is resolved independently through the existing
+SubjectResolutionService precedence and only a resolved canonical target is sent
+to the existing governed MediaBindingService/MediaUsage boundary. Results retain
+normalized input, resolution method/evidence, binding status, usage read-back,
+reason and terminal disposition. Multiple targets keep independent usages;
+duplicate inputs are explicit and do not create another binding.
+
+FAILURE_ISOLATION: Feature ambiguity/not-found, transient binding failure and
+canonical read-back failure are isolated to the child feature. Asset dispositions
+are persisted on the manifest, including retryable physical read-back failures.
+Existing Media ID ingestion is now per-item so sibling assets continue when one
+item cannot be resolved. Completed feature children reuse their persisted result
+on retry; failed/review children remain retryable/reviewable. No Article or
+Knowledge writer was changed, and no successful MediaUsage is rolled back.
+
+VERIFICATION: Feature coordinator focused tests passed 2 tests / 8 assertions;
+Capture/media/article focused suite passed 32 tests / 143 assertions; Contract
+passed 6 tests / 48 assertions. JS typecheck passed, Vite build passed with the
+existing Rollup zod annotation warnings, and JS tests passed 34/34. Changed PHP
+files lint clean and `git diff --check` passed. Full Unit executed 2,610 tests /
+15,164 assertions with 5 failures in existing UI/media fixture expectations
+(stale bundled-copy text assertion and missing physical upload fixtures); no
+failure implicated the new Feature coordinator. Integration was not run against
+live/staging data; no database mutation, deployment or production action occurred.
+
+STATUS: `CAPTURE_FEATURE_USAGE_ISOLATION_LOCAL_READY / FULL_UNIT_FIXTURES_EXISTING / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-24 — Generic MediaEnrichment projection/public completion (LOCAL / INTEGRATION ENVIRONMENT-GATED)
 
 ROOT_CAUSE_CONFIRMED: Canonical MediaUsage was verified, but the enrichment
