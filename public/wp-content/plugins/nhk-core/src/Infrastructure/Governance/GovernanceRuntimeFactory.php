@@ -8,7 +8,7 @@ use NHK\Core\Application\Collector\CollectorFacetMaintenanceExecutor;
 use NHK\Core\Application\Governance\{AuthorityProposalExecutor, CanonicalApplyReadBackVerifier, ControlledApplyService, GovernanceAutomationPolicyRegistry, GovernanceAutomationPolicyResolver, GovernanceAutomationTypeRegistry, GovernanceService, MediaBindingStagingGuard, OperationScopedStagingGuard, ProposalEligibilityService, StagingAcceptanceScopeVerifier, VideoProposalEligibilityEvaluator, WordPressGovernanceAuthorizer};
 use NHK\Core\Application\Graph\{ClassifiedAsPolicy, ClassificationHierarchyPolicy, GraphService};
 use NHK\Core\Application\Knowledge\{CanonicalDependencyValidator, KnowledgeService};
-use NHK\Core\Application\Media\{MediaBindingService, MediaIngestGateway, MediaOwnerCapabilityRegistry, MediaService};
+use NHK\Core\Application\Media\{MediaBindingService, MediaIngestGateway, MediaOwnerCapabilityRegistry, MediaService, MediaTargetNormalizer};
 use NHK\Core\Application\Video\{HistoricalVideoRelationEvidenceReconciliation, VideoCompletenessPolicy, VideoService};
 use NHK\Core\Application\Semantic\{CanonicalAuthoritySubjectResolver, SubjectResolutionService};
 use NHK\Core\Contracts\Governance\ProposalRepository;
@@ -155,7 +155,7 @@ final class GovernanceRuntimeFactory
         });
         $eligibility->setStagingScopeResolver($authorityScopeResolver);
         $eligibility->setStagingScopeDiagnosticProvider([$stagingScopeVerifier, 'proposalDescriptorDiagnostic']);
-        $mediaBinding = new MediaBindingService($media, $assets, $usages, $authority, $types, new \NHK\Core\Infrastructure\Media\WpdbMediaBindingOperationRepository($wpdb), stagingGuard: new MediaBindingStagingGuard($environment, [$stagingScopeVerifier, 'verifyBindingRequest'], static fn (string $capability): bool => function_exists('current_user_can') && current_user_can($capability)), capabilities: $mediaCapabilities, targetResolver: $mediaTargetResolver);
+        $mediaBinding = new MediaBindingService($media, $assets, $usages, $authority, $types, new \NHK\Core\Infrastructure\Media\WpdbMediaBindingOperationRepository($wpdb), stagingGuard: new MediaBindingStagingGuard($environment, [$stagingScopeVerifier, 'verifyBindingRequest'], static fn (string $capability): bool => function_exists('current_user_can') && current_user_can($capability)), capabilities: $mediaCapabilities, targetResolver: $mediaTargetResolver, targetNormalizer: new MediaTargetNormalizer($endpoints, $types, $authority));
         $stagingGuard = new OperationScopedStagingGuard(
             $environment,
             static fn (string $capability): bool => function_exists('current_user_can') && current_user_can($capability),

@@ -29,6 +29,7 @@ final class MediaBindingService implements MediaBindingPort
         private $stagingGuard = null,
         private ?MediaOwnerCapabilityRegistry $capabilities = null,
         private $targetResolver = null,
+        private ?MediaTargetNormalizer $targetNormalizer = null,
     ) {}
 
     /** @param array<string,mixed> $request @return array<string,mixed> */
@@ -232,6 +233,12 @@ final class MediaBindingService implements MediaBindingPort
         if (trim((string) ($request['idempotency_key'] ?? '')) === '' || !is_array($media) || !is_array($target)) throw new MediaException('MEDIA_BINDING_REQUEST_INVALID');
         MediaUsageRoleRegistry::assertKnown($role);
         $targetType = strtolower(trim((string) ($target['type'] ?? '')));
+        if ($this->targetNormalizer !== null && $this->types->has($targetType)) {
+            $canonicalTarget = $this->targetNormalizer->normalizeRequestTarget($target);
+            $target['id'] = (string) $canonicalTarget['id'];
+            $target['stable_key'] = (string) ($canonicalTarget['stable_key'] ?? '');
+            $targetId = $target['id'];
+        }
         $capability = $this->capabilities?->forEndpoint($targetType);
         if ($this->capabilities !== null && $capability === null) throw new MediaException('MEDIA_BINDING_TARGET_CAPABILITY_UNAVAILABLE');
         if ($capability !== null && !$capability->supportsRole($role)) throw new MediaException('MEDIA_BINDING_ROLE_UNSUPPORTED');
@@ -271,6 +278,9 @@ final class MediaBindingService implements MediaBindingPort
         $requestedPlacement = trim((string) ($request['placement_key'] ?? ''));
         $placement = $requestedPlacement !== '' ? $requestedPlacement : ($type === 'wp_post' ? $role : ($role === MediaUsageRoleRegistry::REPRESENTATIVE ? 'representative' : ''));
         if ($role === MediaUsageRoleRegistry::REPRESENTATIVE && $placement === '') throw new MediaException('MEDIA_USAGE_PLACEMENT_REQUIRED');
+        if ($this->targetNormalizer !== null) {
+            $target = $this->targetNormalizer->normalizeRequestTarget($target);
+        }
         return ['operation' => $operation, 'target' => $target, 'media' => $media, 'role' => $role, 'selection_source' => $source, 'selection_policy' => $policy, 'seo' => ['alt_text' => (string) ($seo['alt_text'] ?? ''), 'caption' => (string) ($seo['caption'] ?? ''), 'title' => (string) ($seo['title'] ?? '')], 'sort_order' => max(0, (int) ($request['sort_order'] ?? 0)), 'placement_key' => $placement, 'active_slot' => $operation === 'remove' ? 'retired' : ($role === MediaUsageRoleRegistry::REPRESENTATIVE ? 'representative' : null), 'usage_id' => trim((string) ($request['usage_id'] ?? '')), 'expected_usage_revision' => $expected];
     }
 
@@ -278,6 +288,10 @@ final class MediaBindingService implements MediaBindingPort
     private function resolveMutationTarget(array $reference): array
     {
         $type = strtolower(trim((string) ($reference['type'] ?? '')));
+        if ($this->targetNormalizer !== null) {
+            $normalized = $this->targetNormalizer->normalize($reference);
+            return ['type' => $normalized->endpointType, 'key' => $normalized->endpointKey];
+        }
         if ($type === 'wp_post') {
             $blog = (int) ($reference['blog_id'] ?? (function_exists('get_current_blog_id') ? get_current_blog_id() : 1));
             $post = (int) ($reference['post_id'] ?? $reference['id'] ?? 0);
