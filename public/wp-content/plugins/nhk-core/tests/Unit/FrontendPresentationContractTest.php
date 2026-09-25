@@ -47,7 +47,9 @@ final class FrontendPresentationContractTest extends TestCase
     {
         $source = $this->read('front-page.php');
         $query = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/Home/HomeSemanticQuery.php');
-        self::assertStringContainsString('$index === 0 ? \'loading="eager" fetchpriority="high"\' : \'loading="lazy"\'', $source);
+        self::assertStringContainsString('loading="eager" fetchpriority="high"', $source);
+        self::assertStringNotContainsString('data-nhk-hero-slider', $source);
+        self::assertStringNotContainsString('hero-slider-controls', $source);
         self::assertStringContainsString('select((array) $manualIds, $heroCandidates, 1, 1)', $query);
         self::assertStringContainsString("['loading' => 'lazy', 'alt' => get_the_title()]", $source);
         self::assertStringNotContainsString("['loading' => 'eager', 'fetchpriority' => 'high', 'alt' => get_the_title()]", $source);
@@ -91,8 +93,8 @@ final class FrontendPresentationContractTest extends TestCase
         $source = $this->read('presentation.css');
         self::assertStringNotContainsString('minmax(170px,220px) minmax(0,1fr) minmax(230px,290px)', $source);
         self::assertStringNotContainsString('minmax(160px,190px) minmax(0,1fr) minmax(210px,250px)', $source);
-        self::assertStringContainsString("wp_enqueue_style('nhk-v3-presentation', get_theme_file_uri('presentation.css'), ['nhk-v3-knowledge'], '1.0.1')", $this->read('functions.php'));
-        self::assertStringContainsString("if (is_singular('post')) { wp_enqueue_style('nhk-v3-album-style'", $this->read('functions.php'));
+        self::assertStringContainsString("wp_register_style('nhk-v3-presentation', get_theme_file_uri('presentation.css'), ['nhk-v3-knowledge']", $this->read('functions.php'));
+        self::assertStringContainsString("wp_enqueue_style('nhk-v3-album-style')", $this->read('functions.php'));
     }
 
     public function test_entity_archive_intro_explains_the_reader_purpose_of_each_profile_family(): void

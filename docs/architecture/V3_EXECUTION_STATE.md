@@ -181,6 +181,42 @@ STATUS: `CAPTURE_MULTI_IMAGE_ARTICLE_PUBLIC_LOCAL_IMPLEMENTED / AUTOMATED_LOCAL_
 
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-25 — Frontend corrective boundary cleanup (LOCAL / NO MUTATION)
+
+CORRECTIVE_FINDINGS: The previous frontend convergence left a legacy asset
+function containing the removed hero slider, CSS dependency handles were
+enqueued before registration on some route families, video click-to-load was
+owned by navigation.js, and the mobile checkbox menu lacked focus containment,
+body-scroll lifecycle and resize recovery. The homepage still emitted slider
+controls/status semantics for one server-rendered hero image.
+
+CORRECTIVE_FIX: All theme styles are registered before route-specific enqueue
+closure; video-player.js is loaded only for canonical Video detail context;
+navigation.js now owns only navigation plus the mobile focus/close lifecycle;
+the homepage renders one eager, dimensioned hero image and canonical Brand /
+Clock Group entry links; article representative/gallery projections retain
+thumbnail-first behavior and expose responsive image metadata. The article
+representative is removed from the gallery view when the canonical IDs match.
+No Media detail route, Video route, Specimen/Product identity, dossier owner,
+semantic relation or route resolver was changed.
+
+CONTRACT_STATUS: Clock Type runtime and current frontend archive remain
+/loai-dong-ho/; the profile's disabled public-identity route-prefix note is
+not activated and no route was invented. The active constitution/P6 media
+long-edge rule is 1920px; MEDIA_IMAGE_SEO_PROJECTION_CONTRACT.md still says
+1200px in its public projection text and separately describes 1920px scaling.
+This documentation conflict is BLOCKED_CONTRACT_DECISION and was not resolved
+by changing code.
+
+VERIFICATION: Focused frontend/projection suite passed 124 tests / 978
+assertions with 1 warning and 37 PHPUnit deprecations. Changed PHP files lint
+clean; navigation.js, album.js and video-player.js passed Node syntax checks;
+git diff --check passed. Browser responsive/runtime evidence remains
+NOT_VERIFIED in this local corrective pass; no staging or production runtime
+was used.
+
+STATUS: `FRONTEND_CORRECTIVE_LOCAL_READY / CONTRACT_DECISION_BLOCKED_FOR_DOC_RECONCILIATION / BROWSER_NOT_VERIFIED / NO_MUTATION`.
+
 # Checkpoint — 2026-09-25 — Knowledge Writer generic resolution/retrieval regression (LOCAL / READ-ONLY)
 
 ROOT_CAUSE: the canonical resolver collapsed canonical-name and alias matches

@@ -258,8 +258,10 @@ final class FrontendContractTest extends TestCase
         $navigation = (string) file_get_contents($theme . '/navigation.js');
         $style = (string) file_get_contents($theme . '/style.css');
 
-        self::assertStringContainsString('aria-haspopup="dialog"', $header);
+        self::assertStringNotContainsString('aria-haspopup="dialog"', $header);
         self::assertStringContainsString("event.key === 'Escape'", $navigation);
+        self::assertStringContainsString('document.body.classList.toggle', $navigation);
+        self::assertStringContainsString('focusable = panel.querySelectorAll', $navigation);
         self::assertStringContainsString('nav-toggle-label{min-width:44px;min-height:44px', $style);
     }
 
@@ -283,7 +285,8 @@ final class FrontendContractTest extends TestCase
 
         self::assertStringContainsString('data-video-embed', $video);
         self::assertStringContainsString('data-video-load', $video);
-        self::assertStringContainsString('data-video-embed', $navigation);
+        self::assertStringNotContainsString('data-video-embed', $navigation);
+        self::assertStringContainsString('data-video-embed', (string) file_get_contents($theme . '/video-player.js'));
     }
 
     public function test_theme_assets_are_conditionally_enqueued_by_public_surface(): void
@@ -291,9 +294,11 @@ final class FrontendContractTest extends TestCase
         $functions = (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/functions.php');
 
         self::assertStringContainsString('$needsPresentation', $functions);
+        self::assertStringContainsString("wp_register_style('nhk-v3-presentation'", $functions);
         self::assertStringContainsString('if ($needsEntity)', $functions);
-        self::assertStringContainsString('if ($needsMediaVideo)', $functions);
+        self::assertStringContainsString('if ($needsMediaVideo || $needsKnowledge)', $functions);
         self::assertStringContainsString('if ($needsKnowledge)', $functions);
+        self::assertStringContainsString("nhk-v3-video-player", $functions);
     }
 
     public function test_visual_preview_ctas_are_data_driven_and_do_not_render_dead_links(): void

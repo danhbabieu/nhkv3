@@ -4,27 +4,25 @@ $GLOBALS['nhk_v3_home_data'] = $home;
 $semantic = is_array($home['semantic'] ?? null) ? $home['semantic'] : [];
 $heroMedia = is_array($semantic['hero_media'] ?? null) ? array_slice($semantic['hero_media'], 0, 1) : [];
 $latestFeed = is_array($home['latest_feed'] ?? null) ? $home['latest_feed'] : [];
+$primaryNavigation = (array) (nhk_v3_navigation_groups()['primary'] ?? []);
+$heroEntryPoints = array_values(array_filter($primaryNavigation, static fn (mixed $item): bool => is_array($item) && in_array((string) ($item['label'] ?? ''), ['Thương hiệu', 'Nhóm đồng hồ'], true)));
 $fallback = get_theme_file_uri('/assets/default-archive.svg');
 get_header();
 ?>
 <main id="main-content" class="site-main home-page-v2">
-  <section class="hero home-hero-v2 home-hero-with-slider">
+  <section class="hero home-hero-v2">
     <div class="hero-copy-block">
       <p class="eyebrow">Kho tri thức · hiện vật thật · nghiên cứu thật</p>
       <h1>Kho tri thức đồng hồ cổ<br> <em>dành cho người chơi và sưu tầm.</em></h1>
-      <p class="hero-tagline">Mỗi chiếc đồng hồ cổ mang một câu chuyện.</p>
-      <p class="hero-copy">Khám phá thương hiệu, mẫu máy, bộ máy, bản nhạc, hình ảnh, video và những chi tiết giúp nhận diện từng hiện vật trong cùng một hệ thống tra cứu.</p>
-      <ul class="hero-values"><li>Tra cứu thương hiệu và mẫu đồng hồ</li><li>Xem ảnh thực tế và video</li><li>Tìm hiểu bộ máy, bản nhạc, linh kiện</li><li>Kết nối tri thức với hiện vật sưu tầm</li></ul>
+      <p class="hero-copy">Khám phá thương hiệu, nhóm đồng hồ và những câu chuyện trong kho NHK.</p>
       <?php get_search_form(); ?>
+      <?php if ($heroEntryPoints !== []): ?><nav class="hero-entry-points" aria-label="Khám phá chính"><?php foreach ($heroEntryPoints as $item): ?><a href="<?php echo esc_url(home_url((string) $item['path'])); ?>"><?php echo esc_html((string) $item['label']); ?><span aria-hidden="true">→</span></a><?php endforeach; ?></nav><?php endif; ?>
     </div>
     <div class="hero-media-column">
-    <div class="hero-visual-slider" data-nhk-hero-slider aria-label="Ảnh nổi bật từ kho NHK">
-      <?php if ($heroMedia !== []): ?><div class="hero-slides">
-        <?php foreach ($heroMedia as $index => $item): $dimensions = nhk_v3_media_dimensions($item); $orientation = nhk_v3_media_orientation_class($dimensions['width'], $dimensions['height']); $alt = trim((string) ($item['alt'] ?? $item['title'] ?? 'Ảnh tư liệu NHK')); ?>
-          <figure class="hero-slide <?php echo esc_attr($orientation); ?><?php echo $index === 0 ? ' is-active' : ''; ?>" data-hero-slide="<?php echo esc_attr((string) $index); ?>"<?php echo $index === 0 ? '' : ' hidden'; ?>><img src="<?php echo esc_url((string) $item['image_url']); ?>" alt="<?php echo esc_attr($alt); ?>" width="<?php echo esc_attr((string) max(1, $dimensions['width'])); ?>" height="<?php echo esc_attr((string) max(1, $dimensions['height'])); ?>"<?php if (trim((string) ($item['srcset'] ?? '')) !== ''): ?> srcset="<?php echo esc_attr((string) $item['srcset']); ?>"<?php endif; ?><?php if (trim((string) ($item['sizes'] ?? '')) !== ''): ?> sizes="<?php echo esc_attr((string) $item['sizes']); ?>"<?php endif; ?> <?php echo $index === 0 ? 'loading="eager" fetchpriority="high"' : 'loading="lazy"'; ?>><figcaption><?php echo esc_html((string) ($item['title'] ?? 'Ảnh tư liệu NHK')); ?></figcaption></figure>
-        <?php endforeach; ?>
-      </div><div class="hero-slider-controls"><button type="button" data-hero-prev aria-label="Ảnh trước">←</button><span data-hero-status aria-live="polite">1 / <?php echo esc_html((string) count($heroMedia)); ?></span><button type="button" data-hero-next aria-label="Ảnh tiếp theo">→</button></div><div class="hero-slider-dots" role="tablist" aria-label="Chọn ảnh nổi bật"><?php foreach ($heroMedia as $index => $_item): ?><button type="button" role="tab" data-hero-dot="<?php echo esc_attr((string) $index); ?>" aria-label="Ảnh <?php echo esc_attr((string) ($index + 1)); ?>" aria-selected="<?php echo $index === 0 ? 'true' : 'false'; ?>"></button><?php endforeach; ?></div>
-      <?php else: ?><div class="hero-slider-empty" role="status">Kho ảnh đang được bổ sung.</div><?php endif; ?>
+    <div class="hero-visual" aria-label="Ảnh nổi bật từ kho NHK">
+      <?php if ($heroMedia !== []): $item = $heroMedia[0]; $dimensions = nhk_v3_media_dimensions($item); $orientation = nhk_v3_media_orientation_class($dimensions['width'], $dimensions['height']); $alt = trim((string) ($item['alt'] ?? $item['title'] ?? 'Ảnh tư liệu NHK')); ?>
+        <figure class="hero-image <?php echo esc_attr($orientation); ?>"><img src="<?php echo esc_url((string) $item['image_url']); ?>" alt="<?php echo esc_attr($alt); ?>" width="<?php echo esc_attr((string) max(1, $dimensions['width'])); ?>" height="<?php echo esc_attr((string) max(1, $dimensions['height'])); ?>"<?php if (trim((string) ($item['srcset'] ?? '')) !== ''): ?> srcset="<?php echo esc_attr((string) $item['srcset']); ?>"<?php endif; ?><?php if (trim((string) ($item['sizes'] ?? '')) !== ''): ?> sizes="<?php echo esc_attr((string) ($item['sizes'])); ?>"<?php endif; ?> loading="eager" fetchpriority="high"><figcaption><?php echo esc_html((string) ($item['title'] ?? 'Ảnh tư liệu NHK')); ?></figcaption></figure>
+      <?php else: ?><div class="hero-empty" role="status">Kho ảnh đang được bổ sung.</div><?php endif; ?>
     </div>
     </div>
   </section>

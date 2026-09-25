@@ -12,5 +12,6 @@ Version: 1.2.0
 .nav-toggle:focus-visible{outline:3px solid var(--nhk-accent-secondary);outline-offset:3px}.card h3 a{color:var(--nhk-text)}.semantic-card strong{color:var(--nhk-text)}.entity-card h2 a,.media-card h2 a,.knowledge-card h2 a,.related-card strong{color:var(--nhk-text)}
 /* Semantic product/editorial visuals preserve the complete source asset. */
 .footer-inner nav.footer-groups{display:grid;grid-template-columns:repeat(3,minmax(110px,1fr));gap:28px}.footer-group{display:flex;flex-direction:column;gap:8px}.footer-group h2{margin:0 0 4px;color:#b9afa5;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase}.footer-inner nav.footer-groups{margin-top:0}.nav-toggle-label{min-width:44px;min-height:44px;justify-content:center;align-items:center}
+@media(max-width:48rem){body.nhk-nav-open{overflow:hidden}.header-actions[hidden]{display:none}.hero-entry-points{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.hero-entry-points a{min-height:44px;padding:11px 12px;border:1px solid var(--nhk-border);display:flex;align-items:center;justify-content:space-between;color:var(--nhk-text);font-weight:700}}
 .card-image img,.featured-image img{object-fit:contain}
 .section-deck{max-width:620px;margin:10px 0 0;color:var(--nhk-muted)}

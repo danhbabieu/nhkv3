@@ -19,6 +19,8 @@ $relationLabels = ['brands' => 'Thương hiệu', 'models' => 'Mẫu đồng h�
   $mediaProjection = is_array($mediaProjection) ? $mediaProjection : ['representative' => null, 'evidence' => [], 'gallery' => []];
   $representative = is_array($postDossier['primary_media'] ?? null) ? $postDossier['primary_media'] : (is_array($mediaProjection['representative'] ?? null) ? $mediaProjection['representative'] : null);
   $gallery = is_array($postDossier['media_gallery'] ?? null) ? $postDossier['media_gallery'] : (is_array($mediaProjection['gallery'] ?? null) ? $mediaProjection['gallery'] : []);
+  $representativeKey = trim((string) ($representative['media_id'] ?? $representative['asset_id'] ?? ''));
+  if ($representativeKey !== '') $gallery = array_values(array_filter($gallery, static fn (mixed $item): bool => !is_array($item) || trim((string) ($item['media_id'] ?? $item['asset_id'] ?? '')) !== $representativeKey));
   $relationSections = is_array($postDossier['relation_sections'] ?? null) ? $postDossier['relation_sections'] : [];
   $legacyRelated = $postDossier === null ? apply_filters('nhk_v3_post_related_content', ['entities' => [], 'articles' => [], 'media' => [], 'videos' => []], $postId) : [];
   $legacyRelated = is_array($legacyRelated) ? $legacyRelated : [];
@@ -40,7 +42,7 @@ $relationLabels = ['brands' => 'Thương hiệu', 'models' => 'Mẫu đồng h�
           <?php the_post_thumbnail('large', ['loading' => 'eager', 'fetchpriority' => 'high', 'alt' => $featuredAlt !== '' ? $featuredAlt : get_the_title()]); ?>
           <?php if (get_the_post_thumbnail_caption()): ?><figcaption><?php echo esc_html(get_the_post_thumbnail_caption()); ?></figcaption><?php endif; ?>
         <?php elseif (trim((string) ($representative['url'] ?? '')) !== ''): ?>
-          <img src="<?php echo esc_url((string) $representative['url']); ?>" alt="<?php echo esc_attr((string) (($representative['alt'] ?? '') ?: get_the_title())); ?>" loading="eager" fetchpriority="high">
+          <img src="<?php echo esc_url((string) $representative['url']); ?>" alt="<?php echo esc_attr((string) (($representative['alt'] ?? '') ?: get_the_title())); ?>" loading="eager" fetchpriority="high"<?php echo !empty($representative['width']) ? ' width="' . esc_attr((string) $representative['width']) . '"' : ''; ?><?php echo !empty($representative['height']) ? ' height="' . esc_attr((string) $representative['height']) . '"' : ''; ?><?php echo trim((string) ($representative['srcset'] ?? '')) !== '' ? ' srcset="' . esc_attr((string) $representative['srcset']) . '"' : ''; ?><?php echo trim((string) ($representative['sizes'] ?? '')) !== '' ? ' sizes="' . esc_attr((string) $representative['sizes']) . '"' : ''; ?>>
         <?php else: ?>
           <img class="fallback-visual" src="<?php echo esc_url($fallback); ?>" alt="" width="1200" height="750">
         <?php endif; ?>
@@ -66,7 +68,7 @@ $relationLabels = ['brands' => 'Thương hiệu', 'models' => 'Mẫu đồng h�
             ?>
               <figure class="album-slide<?php echo $index === 0 ? ' is-active' : ''; ?>" data-album-slide aria-hidden="<?php echo $index === 0 ? 'false' : 'true'; ?>">
                 <a href="<?php echo esc_url($fullUrl); ?>" data-album-open data-full-src="<?php echo esc_url($fullUrl); ?>" aria-label="Mở ảnh <?php echo esc_attr((string) ($index + 1)); ?> ở kích thước đầy đủ">
-                  <img src="<?php echo esc_url($thumbnailUrl); ?>" alt="<?php echo esc_attr($alt); ?>" loading="<?php echo $index === 0 ? 'eager' : 'lazy'; ?>"<?php if (!empty($item['width'])): ?> width="<?php echo esc_attr((string) $item['width']); ?>"<?php endif; ?><?php if (!empty($item['height'])): ?> height="<?php echo esc_attr((string) $item['height']); ?>"<?php endif; ?>>
+                  <img src="<?php echo esc_url($thumbnailUrl); ?>" alt="<?php echo esc_attr($alt); ?>" loading="<?php echo $index === 0 ? 'eager' : 'lazy'; ?>"<?php if (!empty($item['width'])): ?> width="<?php echo esc_attr((string) $item['width']); ?>"<?php endif; ?><?php if (!empty($item['height'])): ?> height="<?php echo esc_attr((string) $item['height']); ?>"<?php endif; ?><?php if (trim((string) ($item['srcset'] ?? '')) !== ''): ?> srcset="<?php echo esc_attr((string) $item['srcset']); ?>" sizes="<?php echo esc_attr((string) ($item['sizes'] ?? '100vw')); ?>"<?php endif; ?>>
                 </a>
                 <figcaption><strong><?php echo esc_html(trim((string) ($item['title'] ?? '')) ?: ('Ảnh ' . ($index + 1))); ?></strong><span> · <?php echo esc_html((string) ($index + 1)); ?> / <?php echo esc_html((string) count($galleryImages)); ?></span><?php echo esc_html($caption); ?></figcaption>
               </figure>
