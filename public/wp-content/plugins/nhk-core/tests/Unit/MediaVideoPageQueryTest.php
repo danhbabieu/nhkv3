@@ -131,6 +131,35 @@ final class MediaVideoPageQueryTest extends TestCase
         self::assertSame('truOChTNbwA', $detail['provenance']['external_id']);
     }
 
+    public function test_video_detail_prefers_representative_media_usage_and_keeps_source_thumbnail_as_fallback_metadata(): void
+    {
+        $mediaId = UuidCodec::newV7();
+        $video = Video::fromUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'Reference', [
+            'public_identity' => ['current_slug' => 'reference'],
+            'source_snapshot' => [
+                'availability' => 'available',
+                'embeddable' => true,
+                'thumbnail_selection' => ['url' => 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg', 'width' => 480, 'height' => 360],
+            ],
+            'editorial' => ['title' => 'Reference', 'summary' => 'Summary'],
+            'hub' => ['primary' => '06'],
+            'provenance' => ['kind' => 'TEST'],
+            'semantic_attachments' => [['target_id' => '22222222-2222-4222-8222-222222222222']],
+        ]);
+        $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'derivative', 'video-cover.webp', hash('sha256', 'video-cover'), 'image/webp', 11, 1200, 800, 'PUBLIC');
+        $usage = new MediaUsage(UuidCodec::newV7(), $mediaId, 'video', $video->canonicalId, 'representative');
+
+        $detail = $this->query([new Media($mediaId, 'video-cover', 'Video cover', 'ready')], [$video], [$asset], [$usage])->videoDetail($video->canonicalId);
+
+        self::assertSame($mediaId, $detail['representative_media_id']);
+        self::assertSame('media_usage', $detail['thumbnail_source']);
+        self::assertSame($mediaId, $detail['thumbnail']['media_id']);
+        self::assertStringContainsString('/anh/', $detail['thumbnail_url']);
+        self::assertSame('https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg', $detail['source_thumbnail_url']);
+        self::assertSame($detail['thumbnail']['full_url'], $detail['seo_projection']['open_graph']['image']);
+        self::assertSame([$detail['thumbnail']['full_url']], $detail['seo_projection']['video_object']['thumbnailUrl']);
+    }
+
     public function test_video_detail_and_archive_hide_invalid_persisted_external_references(): void
     {
         $invalid = new Video(UuidCodec::newV7(), 'vimeo', 'bad-reference', 'https://vimeo.com/bad-reference', 'Invalid');
@@ -192,7 +221,7 @@ final class MediaVideoPageQueryTest extends TestCase
             public function __construct(private array $items) {}
             public function create(MediaUsage $usage): MediaUsage { return $usage; }
             public function listByMediaId(string $mediaId, ?string $role = null): array { return array_values(array_filter($this->items, static fn (MediaUsage $item): bool => $item->mediaId === $mediaId && ($role === null || $item->role === $role))); }
-            public function listByEndpoint(string $endpointType, string $endpointKey, ?string $role = null): array { return []; }
+            public function listByEndpoint(string $endpointType, string $endpointKey, ?string $role = null): array { return array_values(array_filter($this->items, static fn (MediaUsage $item): bool => $item->endpointType === $endpointType && $item->endpointKey === $endpointKey && ($role === null || $item->role === $role))); }
         };
         return new MediaVideoPageQuery($mediaRepository, $assetRepository, $usageRepository, $videoRepository);
     }
@@ -227,7 +256,7 @@ final class MediaVideoPageQueryTest extends TestCase
             public function __construct(private array $items) {}
             public function create(MediaUsage $usage): MediaUsage { return $usage; }
             public function listByMediaId(string $mediaId, ?string $role = null): array { return []; }
-            public function listByEndpoint(string $endpointType, string $endpointKey, ?string $role = null): array { return []; }
+            public function listByEndpoint(string $endpointType, string $endpointKey, ?string $role = null): array { return array_values(array_filter($this->items, static fn (MediaUsage $item): bool => $item->endpointType === $endpointType && $item->endpointKey === $endpointKey && ($role === null || $item->role === $role))); }
         };
     }
 
