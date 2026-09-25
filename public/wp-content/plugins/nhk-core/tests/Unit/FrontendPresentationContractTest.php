@@ -78,7 +78,7 @@ final class FrontendPresentationContractTest extends TestCase
 
     public function test_homepage_compact_layout_contracts_are_responsive(): void
     {
-        $css = $this->read('entity.css');
+        $css = $this->read('style.css') . $this->read('entity.css');
 
         self::assertStringContainsString('.home-latest-feed .latest-feed-list', $css);
         self::assertStringContainsString('grid-template-columns:repeat(2,minmax(0,1fr))', $css);
@@ -93,6 +93,15 @@ final class FrontendPresentationContractTest extends TestCase
 
         self::assertStringContainsString('.nav-primary{display:flex;align-items:center;gap:17px;min-width:0}', $css);
         self::assertStringContainsString('.nav{display:flex;align-items:center;gap:14px;min-width:0}', $css);
+    }
+
+    public function test_base_stylesheet_protects_latest_feed_from_intrinsic_image_layout(): void
+    {
+        $css = $this->read('style.css');
+
+        self::assertStringContainsString('.home-latest-feed .latest-feed-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))', $css);
+        self::assertStringContainsString('.latest-feed-card-link{display:grid;grid-template-columns:120px minmax(0,1fr)', $css);
+        self::assertStringContainsString('.latest-feed-card-image{display:block;width:100%;height:100%;object-fit:contain}', $css);
     }
 
     public function test_homepage_prioritizes_only_the_hero_lcp_image(): void
@@ -110,7 +119,7 @@ final class FrontendPresentationContractTest extends TestCase
     public function test_homepage_presentation_css_keeps_only_active_hero_and_uncropped_thumbnails(): void
     {
         $source = $this->read('front-page.php');
-        $css = $this->read('entity.css');
+        $css = $this->read('style.css') . $this->read('entity.css');
 
         self::assertStringNotContainsString('hero-slider-controls', $css);
         self::assertStringNotContainsString('hero-slider-dots', $css);

@@ -30,7 +30,7 @@ add_filter('pre_handle_404', 'nhk_v3_allow_semantic_search_pages', 10, 2);
 
 function nhk_v3_assets(): void
 {
-    wp_register_style('nhk-v3-style', get_stylesheet_uri(), [], '1.3.1');
+    wp_register_style('nhk-v3-style', get_stylesheet_uri(), [], '1.3.2');
     wp_register_style('nhk-v3-entity', get_theme_file_uri('entity.css'), ['nhk-v3-style'], '1.0.8');
     wp_register_style('nhk-v3-media-video', get_theme_file_uri('media-video.css'), ['nhk-v3-entity'], '1.0.3');
     wp_register_style('nhk-v3-knowledge', get_theme_file_uri('knowledge.css'), ['nhk-v3-media-video'], '1.0.2');

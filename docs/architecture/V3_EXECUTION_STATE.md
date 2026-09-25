@@ -1,3 +1,27 @@
+# Checkpoint — 2026-09-25 — Latest feed intrinsic-image layout repair (LOCAL / NO MUTATION)
+
+ROOT_CAUSE_CONFIRMED: The staging screenshot showed the `.latest-feed-list`
+markup rendered in normal flow because the critical grid/card rules lived only
+in the secondary `entity.css` asset that was stale or absent on the inspected
+staging build. Images therefore kept intrinsic dimensions, text sat beside the
+wrong image boundary and the feed created a large blank canvas.
+
+FIXED_BOUNDARY: Moved the latest-feed layout rules to the base theme stylesheet
+that is always registered, retaining `object-fit: contain`, bounded thumbnail
+dimensions, desktop two-column/mobile one-column behavior and text clamping.
+Removed the duplicate latest-feed rules from `entity.css` and bumped the base
+stylesheet asset version to `1.3.2` for cache invalidation. No content,
+semantic owner, route, schema or database boundary changed.
+
+REGRESSION: Added a presentation contract proving the base stylesheet owns the
+latest-feed grid, fixed thumbnail track and uncropped image rule. Focused
+homepage suite passed 7 tests / 49 assertions. Local WordPress browser
+verification remains blocked by unavailable MySQL at `127.0.0.1:3306`; the
+attached staging screenshots are the reproduced visual evidence. No deploy or
+live/staging mutation was performed.
+
+STATUS: `LATEST_FEED_LAYOUT_LOCAL_READY / BROWSER_LOCAL_BLOCKED / NO_MUTATION / NO_COMMIT`.
+
 # Checkpoint — 2026-09-25 — Homepage visual balance refinement (LOCAL / NO MUTATION)
 
 VISUAL_FINDINGS: Browser review of `https://demo.1945.vn/` found the staging
