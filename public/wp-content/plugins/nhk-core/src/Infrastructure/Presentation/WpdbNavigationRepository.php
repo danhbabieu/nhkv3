@@ -33,12 +33,20 @@ final class WpdbNavigationRepository implements NavigationRepository
         $canonical = UuidCodec::toBinary($node->canonicalUuid);
         $parent = $node->parentId !== null && ctype_digit($node->parentId) ? (int) $node->parentId : null;
         if ($node->id === '' || $node->id === '0') {
-            $ok = $this->database->query($this->database->prepare("INSERT INTO {$this->table} (navigation_key,canonical_type,canonical_uuid,parent_id,sort_order,enabled,show_in_type_index,show_in_header_menu,show_in_mobile_menu,show_in_sidebar,featured,revision,created_at,updated_at) VALUES (%s,%s,%s,%s,%d,%d,%d,%d,%d,%d,%d,1,%s,%s)", $node->navigationKey, $node->canonicalType, $canonical, $parent, $node->sortOrder, $node->enabled ? 1 : 0, $node->showInTypeIndex ? 1 : 0, $node->showInHeaderMenu ? 1 : 0, $node->showInMobileMenu ? 1 : 0, $node->showInSidebar ? 1 : 0, $node->featured ? 1 : 0, $now, $now));
+            $parentSql = $parent === null ? 'NULL' : '%d';
+            $args = [$node->navigationKey, $node->canonicalType, $canonical];
+            if ($parent !== null) $args[] = $parent;
+            array_push($args, $node->sortOrder, $node->enabled ? 1 : 0, $node->showInTypeIndex ? 1 : 0, $node->showInHeaderMenu ? 1 : 0, $node->showInMobileMenu ? 1 : 0, $node->showInSidebar ? 1 : 0, $node->featured ? 1 : 0, $now, $now);
+            $ok = $this->database->query($this->database->prepare("INSERT INTO {$this->table} (navigation_key,canonical_type,canonical_uuid,parent_id,sort_order,enabled,show_in_type_index,show_in_header_menu,show_in_mobile_menu,show_in_sidebar,featured,revision,created_at,updated_at) VALUES (%s,%s,%s,{$parentSql},%d,%d,%d,%d,%d,%d,%d,1,%s,%s)", ...$args));
             if ($ok !== 1) throw new \RuntimeException('NAVIGATION_INSERT_FAILED');
             $id = (string) $this->database->insert_id;
             return $this->findById($id) ?? throw new \RuntimeException('NAVIGATION_INSERT_READBACK_FAILED');
         }
-        $ok = $this->database->query($this->database->prepare("UPDATE {$this->table} SET parent_id=%s,sort_order=%d,enabled=%d,show_in_type_index=%d,show_in_header_menu=%d,show_in_mobile_menu=%d,show_in_sidebar=%d,featured=%d,revision=revision+1,updated_at=%s WHERE id=%d AND navigation_key=%s AND revision=%d", $parent, $node->sortOrder, $node->enabled ? 1 : 0, $node->showInTypeIndex ? 1 : 0, $node->showInHeaderMenu ? 1 : 0, $node->showInMobileMenu ? 1 : 0, $node->showInSidebar ? 1 : 0, $node->featured ? 1 : 0, $now, (int) $node->id, $node->navigationKey, $expectedRevision));
+        $parentSql = $parent === null ? 'NULL' : '%d';
+        $args = [];
+        if ($parent !== null) $args[] = $parent;
+        array_push($args, $node->sortOrder, $node->enabled ? 1 : 0, $node->showInTypeIndex ? 1 : 0, $node->showInHeaderMenu ? 1 : 0, $node->showInMobileMenu ? 1 : 0, $node->showInSidebar ? 1 : 0, $node->featured ? 1 : 0, $now, (int) $node->id, $node->navigationKey, $expectedRevision);
+        $ok = $this->database->query($this->database->prepare("UPDATE {$this->table} SET parent_id={$parentSql},sort_order=%d,enabled=%d,show_in_type_index=%d,show_in_header_menu=%d,show_in_mobile_menu=%d,show_in_sidebar=%d,featured=%d,revision=revision+1,updated_at=%s WHERE id=%d AND navigation_key=%s AND revision=%d", ...$args));
         if ($ok !== 1) throw new \RuntimeException('NAVIGATION_REVISION_CONFLICT');
         return $this->findById($node->id) ?? throw new \RuntimeException('NAVIGATION_UPDATE_READBACK_FAILED');
     }
@@ -54,7 +62,9 @@ final class WpdbNavigationRepository implements NavigationRepository
     {
         $uuid = (string) ($row['canonical_uuid'] ?? '');
         try { $uuid = UuidCodec::fromBinary($uuid); } catch (\Throwable) {}
-        return NavigationNode::fromArray([...$row, 'id' => (string) ($row['id'] ?? ''), 'canonical_uuid' => $uuid]);
+        $parentId = $row['parent_id'] ?? null;
+        if ($parentId === null || (string) $parentId === '' || (int) $parentId === 0) $parentId = null;
+        return NavigationNode::fromArray([...$row, 'id' => (string) ($row['id'] ?? ''), 'canonical_uuid' => $uuid, 'parent_id' => $parentId]);
     }
 
     private function validate(NavigationNode $node): void

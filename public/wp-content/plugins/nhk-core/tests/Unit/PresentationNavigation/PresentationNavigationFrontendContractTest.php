@@ -23,4 +23,10 @@ final class PresentationNavigationFrontendContractTest extends TestCase
         $definition = (string) file_get_contents(dirname(__DIR__, 3) . '/src/Application/Presentation/PublicNavigationDefinition.php');
         foreach (['Đồng hồ tủ', 'Đồng hồ treo tường', 'Đồng hồ Pháp', 'Đồng hồ Đức', 'Đồng hồ chim cúc cu', 'Đồng hồ 400 ngày', 'Đồng hồ công cộng', 'Đồng hồ vai bò', 'Đồng hồ để bàn'] as $label) self::assertStringNotContainsString($label, $definition);
     }
+
+    public function test_curated_archive_does_not_filter_origin_nodes_by_clock_type_profile(): void
+    {
+        $collection = (string) file_get_contents(dirname(__DIR__, 3) . '/src/Application/Entity/PublicEntityCollectionQuery.php');
+        self::assertStringNotContainsString('($item[\'profile_key\'] ?? \'\') !== \'clock_type\'', $collection);
+    }
 }

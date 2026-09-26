@@ -119,6 +119,25 @@ final class PublicEntityCollectionQueryTest extends TestCase
         self::assertArrayNotHasKey('stable_key', $archive['items'][0]);
     }
 
+    public function test_curated_origin_classification_is_rendered_without_clock_type_profile_filter(): void
+    {
+        $types = new EntityTypeRegistry();
+        CanonicalEntityTypeCatalog::registerInto($types);
+        $repository = new InMemoryAuthorityRepository();
+        $authority = new AuthorityService($repository, $types);
+        $france = $authority->create('classification', 'nhk:classification:origin.france', 'Đồng hồ Pháp', ['family' => 'origin']);
+        $identity = new FixturePublicIdentityRepository(['authority|' . $france->canonicalId . '|classification' => ['current_slug' => 'dong-ho-phap']]);
+        $routes = new PublicRouteResolver($repository, $types, null, null, $identity);
+        $query = new PublicEntityCollectionQuery($repository, $types, new PublicIdentityContract($types, $identity), new PublicEntityEligibilityPolicy($repository, $types, $routes), $routes, null, null, null, null, null, $this->navigation($france->canonicalId));
+
+        $archive = $query->archiveProfile('clock_type');
+
+        self::assertSame(1, $archive['total']);
+        self::assertSame('Đồng hồ Pháp', $archive['items'][0]['name']);
+        self::assertSame('origin', $archive['items'][0]['payload']['family']);
+        self::assertArrayNotHasKey('profile_key', $archive['items'][0]);
+    }
+
     public function test_clock_type_profile_archive_fails_closed_without_persisted_public_identity(): void
     {
         $types = new EntityTypeRegistry();

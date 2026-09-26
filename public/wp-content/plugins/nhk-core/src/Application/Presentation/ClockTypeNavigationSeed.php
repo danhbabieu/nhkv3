@@ -22,7 +22,7 @@ final class ClockTypeNavigationSeed
         $reports = [];
         foreach (self::INITIAL_LABELS as $index => $label) {
             $matches = ($this->resolver)($label);
-            $valid = array_values(array_filter($matches, static fn (array $candidate): bool => ($candidate['canonical_type'] ?? '') === 'classification' && ($candidate['family'] ?? '') === 'clock_type' && ($candidate['active'] ?? false) === true));
+            $valid = array_values(array_filter($matches, static fn (array $candidate): bool => ($candidate['canonical_type'] ?? '') === 'classification' && ($candidate['active'] ?? false) === true));
             if (count($valid) !== 1) {
                 $reports[] = ['label' => $label, 'status' => $matches === [] ? 'REVIEW_REQUIRED' : 'BLOCKED'];
                 continue;

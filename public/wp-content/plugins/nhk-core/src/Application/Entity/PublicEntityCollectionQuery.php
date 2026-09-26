@@ -76,7 +76,7 @@ final class PublicEntityCollectionQuery
             $entity = $this->authority->findByCanonicalId((string) ($node['canonical_uuid'] ?? ''));
             if ($entity === null || $entity->entityType !== 'classification') continue;
             $item = $this->item($entity, '', false, true);
-            if ($item === null || ($item['profile_key'] ?? '') !== 'clock_type') continue;
+            if ($item === null) continue;
             $items[] = $item;
         }
         $empty['available'] = $this->navigation->available();
