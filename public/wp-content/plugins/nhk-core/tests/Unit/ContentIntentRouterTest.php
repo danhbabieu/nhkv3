@@ -156,6 +156,30 @@ final class ContentIntentRouterTest extends TestCase
         self::assertTrue($route['media_required']);
     }
 
+    public function test_explicit_media_enrichment_allows_existing_media_operation_without_physical_asset(): void
+    {
+        $route = (new ContentIntentRouter())->route(
+            [
+                'intent' => 'MEDIA_ENRICHMENT',
+                'media_operations' => [[
+                    'operation' => 'replace',
+                    'media' => ['id' => '01a0d7ee-3e33-7366-88c6-287112b34936'],
+                    'target' => ['type' => 'wp_post', 'id' => '1:18'],
+                    'usage_id' => '01a06e2e-73a1-7550-b0e8-168aafdc6ceb',
+                    'expected_usage_revision' => 1,
+                    'role' => 'featured_primary',
+                ]],
+            ],
+            [],
+            [],
+        );
+
+        self::assertSame('resolved', $route['status']);
+        self::assertSame('MEDIA_ENRICHMENT', $route['intent']);
+        self::assertFalse($route['article_required']);
+        self::assertTrue($route['media_required']);
+    }
+
     public function test_media_enrichment_fails_closed_without_media(): void
     {
         $this->expectException(\InvalidArgumentException::class);

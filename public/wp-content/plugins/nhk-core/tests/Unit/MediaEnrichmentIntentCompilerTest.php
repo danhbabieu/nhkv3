@@ -48,6 +48,47 @@ final class MediaEnrichmentIntentCompilerTest extends TestCase
         self::assertTrue($result['_nhk_exact_media_operations']);
     }
 
+    public function test_legacy_empty_featured_placement_is_reused_for_replace_cas(): void
+    {
+        $usages = new class implements MediaUsageRepository {
+            public function create(MediaUsage $usage): MediaUsage { return $usage; }
+            public function listByEndpoint(string $type, string $key, ?string $role = null): array {
+                return [new MediaUsage(
+                    '01a06e2e-73a1-7550-b0e8-168aafdc6ceb',
+                    '01a0d7ee-3e33-7366-88c6-287112b34937',
+                    'wp_post',
+                    '1:18',
+                    'featured_primary',
+                    0,
+                    '',
+                    '',
+                    [],
+                    '',
+                    1,
+                    '',
+                    'USER_EXPLICIT',
+                    'PINNED',
+                )];
+            }
+            public function listByMediaId(string $id, ?string $role = null): array { return []; }
+        };
+
+        $operation = $this->compiler($usages)->compile([
+            'intent' => 'MEDIA_ENRICHMENT',
+            'idempotency_key' => 'legacy-slot-1',
+            'media_operations' => [[
+                'operation' => 'set_featured',
+                'media_ref' => ['url' => 'https://demo.1945.vn/anh/bo-suu-tap-dong-ho-co.webp'],
+                'target' => ['type' => 'wp_post', 'url' => 'https://demo.1945.vn/carillon-la-gi-trong-dong-ho-co-phap-dung-nham-carillon-la-ten-hang/'],
+            ]],
+        ])['media_operations'][0];
+
+        self::assertSame('replace', $operation['operation']);
+        self::assertSame(self::USAGE, $operation['usage_id']);
+        self::assertSame(1, $operation['expected_usage_revision']);
+        self::assertSame('featured_primary', $operation['placement_key']);
+    }
+
     public function test_replay_of_same_featured_media_compiles_to_keep_without_new_cas_write(): void
     {
         $usages = new class implements MediaUsageRepository {

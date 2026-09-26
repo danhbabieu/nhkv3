@@ -118,12 +118,53 @@ final class ContentIntentRouter
                 throw new \InvalidArgumentException('VIDEO_INTENT_REQUIRES_VALID_YOUTUBE_URL');
             }
         }
-        if (in_array($intent, [ContentIntent::IMAGE_ARTICLE, ContentIntent::MEDIA_ENRICHMENT], true) && $assets === []) {
-            throw new \InvalidArgumentException($intent === ContentIntent::IMAGE_ARTICLE ? 'IMAGE_ARTICLE_REQUIRES_IMAGE' : 'MEDIA_ENRICHMENT_REQUIRES_IMAGE');
+        if ($intent === ContentIntent::IMAGE_ARTICLE && $assets === []) {
+            throw new \InvalidArgumentException('IMAGE_ARTICLE_REQUIRES_IMAGE');
+        }
+        if ($intent === ContentIntent::MEDIA_ENRICHMENT && $assets === [] && !$this->hasExistingMediaOperation($input)) {
+            throw new \InvalidArgumentException('MEDIA_ENRICHMENT_REQUIRES_IMAGE');
         }
         if ($intent->requiresArticle() && $this->editorialText($input) === '' && trim((string) ($input['title'] ?? '')) === '') {
             throw new \InvalidArgumentException('ARTICLE_INTENT_REQUIRES_EDITORIAL_CONTENT');
         }
+    }
+
+    /** @param array<string,mixed> $input */
+    private function hasExistingMediaOperation(array $input): bool
+    {
+        foreach ((array) ($input['media_operations'] ?? []) as $operation) {
+            if (!is_array($operation)) continue;
+            $kind = strtolower(trim((string) ($operation['operation'] ?? '')));
+            if (!in_array($kind, ['update', 'add', 'replace', 'remove', 'keep', 'representative_bind'], true)) continue;
+
+            $target = is_array($operation['target'] ?? null) ? $operation['target'] : [];
+            if ($kind === 'remove') {
+                if (trim((string) ($operation['usage_id'] ?? '')) !== '' && trim((string) ($target['type'] ?? '')) !== '') return true;
+                continue;
+            }
+
+            $reference = is_array($operation['media'] ?? null)
+                ? $operation['media']
+                : (is_array($operation['media_ref'] ?? null) ? $operation['media_ref'] : []);
+            if ($this->hasExistingMediaReference($reference)) return true;
+        }
+
+        foreach ((array) ($input['media_bindings'] ?? []) as $binding) {
+            if (!is_array($binding)) continue;
+            $reference = is_array($binding['media_ref'] ?? null) ? $binding['media_ref'] : [];
+            if ($this->hasExistingMediaReference($reference)) return true;
+        }
+
+        return false;
+    }
+
+    /** @param array<string,mixed> $reference */
+    private function hasExistingMediaReference(array $reference): bool
+    {
+        foreach (['id', 'media_id', 'stable_key', 'url'] as $key) {
+            if (trim((string) ($reference[$key] ?? '')) !== '') return true;
+        }
+        return (int) ($reference['attachment_id'] ?? 0) > 0;
     }
 
     /** @param array<string,mixed> $signals @return array<string,mixed> */

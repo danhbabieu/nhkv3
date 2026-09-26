@@ -36,12 +36,13 @@ final class MediaEnrichmentIntentCompiler
             $target = $this->resolvePostTarget((array) ($operation['target'] ?? []));
             $mediaRef = is_array($operation['media_ref'] ?? null) ? $operation['media_ref'] : (array) ($operation['media'] ?? []);
             $media = $this->media->resolveMediaReference($mediaRef);
+            $canonicalPlacement = MediaUsageRoleRegistry::FEATURED_PRIMARY;
             $current = array_values(array_filter(
                 $this->usages->listByEndpoint('wp_post', (string) $target['id']),
                 static fn (mixed $usage): bool => $usage instanceof MediaUsage
                     && $usage->activeSlot !== 'retired'
                     && $usage->role === $role
-                    && $usage->placementKey === MediaUsageRoleRegistry::FEATURED_PRIMARY,
+                    && in_array($usage->placementKey, ['', $canonicalPlacement], true),
             ));
             if (count($current) > 1) throw new MediaException('MEDIA_USAGE_SLOT_AMBIGUOUS');
             $existing = $current[0] ?? null;
@@ -50,12 +51,12 @@ final class MediaEnrichmentIntentCompiler
                 'media' => ['id' => $media->canonicalId],
                 'target' => $target,
                 'role' => $role,
-                'placement_key' => MediaUsageRoleRegistry::FEATURED_PRIMARY,
+                'placement_key' => $canonicalPlacement,
                 'selection_source' => 'USER_EXPLICIT',
                 'selection_policy' => 'PINNED',
                 'seo' => is_array($operation['seo'] ?? null) ? $operation['seo'] : [],
             ];
-            if ($existing instanceof MediaUsage && $existing->mediaId === $media->canonicalId) {
+            if ($existing instanceof MediaUsage && $existing->mediaId === $media->canonicalId && $existing->placementKey === $canonicalPlacement) {
                 $compiled[] = $base + ['operation' => 'keep', 'usage_id' => $existing->usageId, 'expected_usage_revision' => $existing->revision];
             } elseif ($existing instanceof MediaUsage) {
                 $compiled[] = $base + ['operation' => 'replace', 'usage_id' => $existing->usageId, 'expected_usage_revision' => $existing->revision];
