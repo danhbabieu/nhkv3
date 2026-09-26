@@ -29,12 +29,34 @@ final class SharedEnrichmentBoundary
         );
     }
 
+    /**
+     * Shared bounded policy for editorial surfaces. Physical Media ingest,
+     * canonical ownership and Governance remain outside this read-only policy.
+     *
+     * @return array<string,int>
+     */
+    public static function comprehensiveEditorialPolicy(string $profile): array
+    {
+        $profile = strtolower(trim($profile));
+        if (!in_array($profile, ['article', 'video', 'image', 'media'], true)) return [];
+        return [
+            'result_limit' => 200,
+            'selection_limit' => 20,
+            'aspect_target' => 12,
+            'token_budget' => 3000,
+        ];
+    }
+
     /** @param array<string,mixed> $request @return array<string,mixed> */
     public function enrich(array $request): array
     {
+        $profile = strtolower(trim((string) ($request['profile'] ?? '')));
+        if (($request['comprehensive_editorial'] ?? false) === true) {
+            $request = array_replace(self::comprehensiveEditorialPolicy($profile), $request);
+        }
         $pack = $this->core->enrich(UniversalInputEnvelope::fromArray($request), $request);
         $result = $pack->toArray();
-        $result['profile'] = strtolower(trim((string) ($request['profile'] ?? '')));
+        $result['profile'] = $profile;
         return $result;
     }
 }
