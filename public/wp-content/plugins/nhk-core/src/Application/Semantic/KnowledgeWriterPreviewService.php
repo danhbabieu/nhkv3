@@ -91,8 +91,17 @@ final class KnowledgeWriterPreviewService
         ])->toArray(), array_values(array_unique($facets)));
         try {
             $shared = $this->enrichment->enrich($envelope->toArray() + [
-                'profile' => $policy['profile'], 'topic' => $topic, 'retrieval_topic' => $topic . ' ' . trim($instruction),
+                'profile' => $policy['profile'],
+                'topic' => $topic,
+                'retrieval_topic' => $topic . ' ' . trim($instruction),
                 'semantic_needs' => $needs,
+                // Writer is the comprehensive read consumer: gather broadly,
+                // then let the shared applicability/evidence/coverage policies
+                // select a rich but bounded context before composition.
+                'result_limit' => 200,
+                'selection_limit' => 20,
+                'aspect_target' => 12,
+                'token_budget' => 3000,
             ]);
         } catch (\Throwable) {
             return $this->fail($base, 'unavailable', 'PREVIEW_PIPELINE_UNAVAILABLE');

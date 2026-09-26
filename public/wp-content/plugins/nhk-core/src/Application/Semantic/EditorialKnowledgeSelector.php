@@ -52,6 +52,8 @@ final class EditorialKnowledgeSelector
 
         $build = $this->unitBuilder->build($eligible, $primarySubject, $topic, ['profile' => $profileName] + $profile, $inputContext);
         $policy = $this->coveragePolicy->for($profileName, $topic, $inputContext);
+        if (array_key_exists('aspect_target', $profile)) $policy['aspect_target'] = max(1, min(12, (int) $profile['aspect_target']));
+        if (array_key_exists('token_budget', $profile)) $policy['token_budget'] = max(120, min(3000, (int) $profile['token_budget']));
         $explicitCeiling = array_key_exists('selection_limit', $profile) ? max(1, min(20, (int) $profile['selection_limit'])) : null;
         $units = $build->units;
         $excluded = array_merge($excluded, $build->excluded);
