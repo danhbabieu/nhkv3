@@ -70,6 +70,7 @@ final class VideoEditorialAdapter
             'observations' => $inputContext['observations'], 'components' => (array) ($context['components'] ?? $context['semantic_components'] ?? []), 'hints' => (array) ($context['hints'] ?? []),
             'semantic_needs' => (array) ($context['semantic_needs'] ?? $context['needs'] ?? []),
             'relations' => is_array($context['relations'] ?? null) ? $context['relations'] : [],
+            'comprehensive_editorial' => true,
         ]);
         $retrieved = is_array($shared['content']['retrieval'] ?? null) ? $shared['content']['retrieval'] : $this->retrieval->retrieve($subject, $topic, (array) ($context['hints'] ?? []), $profile);
         $pack = $shared['content']['pack'] ?? $this->selector->select($retrieved, $topic, $subject, $profile, $inputContext);

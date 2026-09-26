@@ -1313,6 +1313,10 @@ final class EditorialCaptureCoordinator
             'operation_id' => $record->captureId . ':shared-enrichment',
             'generated' => false,
             'context' => is_array($input['knowledge_context'] ?? null) ? $input['knowledge_context'] : [],
+            // Article, Video and image/media editorial surfaces share the same
+            // broad read-only enrichment policy. MEDIA_ENRICHMENT still owns
+            // only Media/MediaUsage and never enters semantic write-back.
+            'comprehensive_editorial' => in_array($profile, ['article', 'video', 'image', 'media'], true),
         ];
         $relationHints = is_array($interpretation['relation_hints'] ?? null) ? $interpretation['relation_hints'] : [];
         $video = is_array($input['video'] ?? null) ? $input['video'] : [];

@@ -28,6 +28,24 @@ final class SharedEnrichmentBoundaryTest extends TestCase
         self::assertSame([], $article['knowledge']['candidates']);
     }
 
+    public function test_comprehensive_editorial_policy_is_shared_by_article_video_image_and_media_without_changing_defaults(): void
+    {
+        $expected = ['result_limit' => 200, 'selection_limit' => 20, 'aspect_target' => 12, 'token_budget' => 3000];
+        foreach (['article', 'video', 'image', 'media'] as $profile) {
+            self::assertSame($expected, SharedEnrichmentBoundary::comprehensiveEditorialPolicy($profile));
+        }
+        self::assertSame([], SharedEnrichmentBoundary::comprehensiveEditorialPolicy('knowledge_delta'));
+
+        $boundary = $this->boundary();
+        $base = ['subject_resolution' => ['primary' => ['id' => self::SUBJECT, 'type' => 'model']], 'topic' => 'Odo 36'];
+        $normal = $boundary->enrich($base + ['profile' => 'article']);
+        $rich = $boundary->enrich($base + ['profile' => 'article', 'comprehensive_editorial' => true]);
+
+        self::assertSame(50, $normal['content']['retrieval']['diagnostics']['result_limit']);
+        self::assertSame(200, $rich['content']['retrieval']['diagnostics']['result_limit']);
+        self::assertSame(3000, $rich['content']['pack']->diagnostics['context_budget']);
+    }
+
     public function test_prepared_subject_context_bounds_shared_content_and_sparse_content_is_local(): void
     {
         $boundary = $this->boundary();

@@ -67,6 +67,7 @@ final class ArticleEditorialAdapter
             'observations' => $inputContext['observations'], 'components' => (array) ($context['components'] ?? $context['semantic_components'] ?? []), 'hints' => (array) ($context['hints'] ?? []),
             'semantic_needs' => (array) ($context['semantic_needs'] ?? $context['needs'] ?? []),
             'prepared_context' => is_array($context['prepared_context'] ?? null) ? $context['prepared_context'] : [],
+            'comprehensive_editorial' => true,
         ]);
         $retrieved = is_array($shared['content']['retrieval'] ?? null) ? $shared['content']['retrieval'] : $this->retrieval->retrieve($subject, $topic, (array) ($context['hints'] ?? []), $profile);
         $pack = $shared['content']['pack'] ?? $this->selector->select($retrieved, $topic, $subject, $profile, $inputContext);
