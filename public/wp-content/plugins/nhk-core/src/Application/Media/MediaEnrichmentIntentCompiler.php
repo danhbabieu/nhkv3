@@ -27,13 +27,25 @@ final class MediaEnrichmentIntentCompiler
         $compiled = [];
         foreach ($operations as $index => $operation) {
             $kind = strtolower(trim((string) ($operation['operation'] ?? '')));
+            if ($kind === 'representative_bind') {
+                $representativeTarget = $this->canonicalTarget((array) ($operation['target'] ?? []));
+                $operation['target'] = $representativeTarget;
+                if (($representativeTarget['type'] ?? '') === 'wp_post') {
+                    // Natural-language "use this as the representative image"
+                    // maps to native WordPress featured media for an Article.
+                    $operation['operation'] = 'set_featured';
+                    $operation['role'] = MediaUsageRoleRegistry::FEATURED_PRIMARY;
+                    $kind = 'set_featured';
+                }
+            }
             if ($kind !== 'set_featured') {
                 $compiled[] = $this->canonicalOperation($operation, $index, (string) ($input['idempotency_key'] ?? ''));
                 continue;
             }
             $role = strtolower(trim((string) ($operation['role'] ?? MediaUsageRoleRegistry::FEATURED_PRIMARY)));
             if ($role !== MediaUsageRoleRegistry::FEATURED_PRIMARY) throw new MediaException('MEDIA_FEATURED_ROLE_INVALID');
-            $target = $this->resolvePostTarget((array) ($operation['target'] ?? []));
+            $target = $this->canonicalTarget((array) ($operation['target'] ?? []));
+            if (($target['type'] ?? '') !== 'wp_post') throw new MediaException('MEDIA_FEATURED_TARGET_INVALID');
             $mediaRef = is_array($operation['media_ref'] ?? null) ? $operation['media_ref'] : (array) ($operation['media'] ?? []);
             $media = $this->media->resolveMediaReference($mediaRef);
             $canonicalPlacement = MediaUsageRoleRegistry::FEATURED_PRIMARY;
@@ -75,7 +87,7 @@ final class MediaEnrichmentIntentCompiler
         $media = is_array($operation['media'] ?? null) ? $operation['media'] : (array) ($operation['media_ref'] ?? []);
         if (isset($media['url'])) $media = ['id' => $this->media->resolveMediaReference($media)->canonicalId];
         $target = (array) ($operation['target'] ?? []);
-        if (isset($target['url'])) $target = $this->resolvePostTarget($target);
+        if (isset($target['url'])) $target = $this->resolveUrlTarget($target);
         elseif (strtolower(trim((string) ($target['type'] ?? ''))) === 'wp_post') $target = $this->targets->normalizeRequestTarget($target);
         $operation['media'] = $media;
         unset($operation['media_ref']);
@@ -85,18 +97,36 @@ final class MediaEnrichmentIntentCompiler
     }
 
     /** @param array<string,mixed> $target @return array<string,mixed> */
-    private function resolvePostTarget(array $target): array
+    private function canonicalTarget(array $target): array
+    {
+        if (isset($target['url'])) return $this->resolveUrlTarget($target);
+        $normalized = $this->targets->normalizeRequestTarget($target);
+        unset($normalized['revision']);
+        return $normalized;
+    }
+
+    /** @param array<string,mixed> $target @return array<string,mixed> */
+    private function resolveUrlTarget(array $target): array
     {
         $url = trim((string) ($target['url'] ?? ''));
         if ($url === '' || !is_callable($this->postUrlResolver)) throw new MediaException('MEDIA_TARGET_URL_REQUIRED');
-        $resolved = ($this->postUrlResolver)($url);
+        try {
+            $resolved = ($this->postUrlResolver)($url);
+        } catch (\Throwable $error) {
+            $code = trim($error->getMessage());
+            throw new MediaException($code !== '' ? $code : 'MEDIA_TARGET_NOT_FOUND');
+        }
         if (!is_array($resolved)) throw new MediaException('MEDIA_TARGET_NOT_FOUND');
         $type = strtolower(trim((string) ($resolved['type'] ?? '')));
         $id = trim((string) ($resolved['id'] ?? ''));
-        if ($type !== 'wp_post' || preg_match('/^[1-9][0-9]*:[1-9][0-9]*$/', $id) !== 1) throw new MediaException('MEDIA_TARGET_NOT_FOUND');
-        $normalized = $this->targets->normalizeRequestTarget(['type' => 'wp_post', 'id' => $id]);
-        // Post revision is an execution snapshot, not part of the stable user
-        // intent fingerprint. MediaUsage CAS is supplied separately below.
+        if ($type === '' || $id === '') throw new MediaException('MEDIA_TARGET_NOT_FOUND');
+
+        $requestedType = strtolower(trim((string) ($target['type'] ?? '')));
+        if ($requestedType !== '' && $requestedType !== $type) throw new MediaException('MEDIA_TARGET_TYPE_MISMATCH');
+
+        $normalized = $this->targets->normalizeRequestTarget(['type' => $type, 'id' => $id]);
+        // Target revision is an execution snapshot, not part of stable user
+        // intent. The owning mutation boundary supplies its own CAS/read-back.
         unset($normalized['revision']);
         return $normalized;
     }
