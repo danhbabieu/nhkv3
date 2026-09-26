@@ -192,6 +192,9 @@ final class FrontendPresentationContractTest extends TestCase
         $functions = $this->read('functions.php');
 
         self::assertStringContainsString('.hero-visual{width:min(100%,400px)', $css);
+        self::assertStringContainsString('.hero-media-column{min-width:0', $css);
+        self::assertStringContainsString('max-width:100%', $css);
+        self::assertStringContainsString('overflow:hidden', $css);
         self::assertStringContainsString('width:100%;height:min(430px,42vw);max-height:430px;object-fit:contain', $css);
         self::assertStringContainsString("wp_register_style('nhk-v3-entity', get_theme_file_uri('entity.css'), ['nhk-v3-style'], '1.0.9')", $functions);
     }
