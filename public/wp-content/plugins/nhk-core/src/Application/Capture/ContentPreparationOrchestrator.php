@@ -160,7 +160,7 @@ final class ContentPreparationOrchestrator
         foreach ($operations as $operation) {
             if (!is_array($operation)) return false;
             $kind = strtolower(trim((string) ($operation['operation'] ?? '')));
-            if (!in_array($kind, ['add', 'replace', 'remove', 'representative_bind'], true)) return false;
+            if (!in_array($kind, ['add', 'replace', 'remove', 'keep', 'representative_bind'], true)) return false;
 
             $target = is_array($operation['target'] ?? null) ? $operation['target'] : [];
             $type = strtolower(trim((string) ($target['type'] ?? '')));

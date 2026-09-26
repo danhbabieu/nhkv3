@@ -55,6 +55,7 @@ final class McpTransport
         private ?VideoFrontendReconciliationService $videoFrontendReconciliation = null,
         private ?KnowledgeWriterPreviewService $knowledgeWriterPreview = null,
         private ?MediaTargetNormalizer $mediaTargetNormalizer = null,
+        private ?\NHK\Core\Application\Media\MediaEnrichmentIntentCompiler $mediaIntentCompiler = null,
     ) {}
 
     /** @return array{status:int,body:?array} */
@@ -502,6 +503,7 @@ final class McpTransport
     private function captureIngest(array $arguments, array $files): array
     {
         if (is_callable($this->runtimeWriteReady) && !(bool) ($this->runtimeWriteReady)()) throw new \RuntimeException('REQUIRED_SCHEMA_NOT_READY');
+        if ($this->mediaIntentCompiler !== null) $arguments = $this->mediaIntentCompiler->compile($arguments);
         $hasMediaIds = isset($arguments['media_ids']) && (array) $arguments['media_ids'] !== [];
         $hasExistingMediaUrls = isset($arguments['existing_media_urls']) && (array) $arguments['existing_media_urls'] !== [];
         $hasProvidedFiles = isset($arguments['files']) && (array) $arguments['files'] !== [];

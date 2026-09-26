@@ -25,7 +25,7 @@ use NHK\Core\Application\Governance\GovernanceCapabilities;
 use NHK\Core\Application\Governance\{AuthorityStagingAdmission, CaptureChildRelationStagingAdmission, CaptureDependencyStagingAdmission, MediaBindingStagingAdmission, MediaMetadataStagingAdmission, VideoStagingAdmission};
 use NHK\Core\Application\Runtime\SemanticWritePolicyResolver;
 use NHK\Core\Application\Mcp\{McpAbilityRegistration, McpArticleIngestHandler, McpGovernanceHandler, McpReadHandler, McpSemanticContextResolver, McpToolCatalog, McpTransport, McpDocumentationRegistry};
-use NHK\Core\Application\Media\{ImageIngestEntrypoint, MediaBatchUploadService, MediaBindingService, MediaTargetNormalizer};
+use NHK\Core\Application\Media\{ImageIngestEntrypoint, MediaBatchUploadService, MediaBindingService, MediaEnrichmentIntentCompiler, MediaTargetNormalizer};
 use NHK\Core\Application\Capture\{CaptureArticlePreflightHandoff, CaptureEditorialWriteGuard, CapturePhaseReceiptReducer, CaptureVideoProvenancePlanner, CaptureVideoPublicationVerifier, ClockTypeShadowClassifier, ContentPreparationOrchestrator, EditorialCaptureContinuationService, EditorialCaptureCoordinator, GovernedCaptureContinuationService, RelationProposalReconciliationService};
 use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, ClaimReusePolicy, EditorialClaimRetrievalService, EditorialKnowledgeSelector, EditorialQualityGate, KnowledgeWriterPreviewService, ReaderJourneyPlanner, SharedEditorialComposer, SharedEnrichmentBoundary, SubjectResolutionService, TextInputInterpreter};
 use NHK\Core\Application\Article\{ArticleEditorialAdapter, ArticleIngestCoordinator, ArticleIngestPreflight, ArticleResearchPreflight, ArticleVerificationReader, SemanticProposalPlanner, OwnerPublicationApplicationService};
@@ -78,7 +78,7 @@ use NHK\Core\Application\Knowledge\KnowledgeService;
 use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
 use NHK\Core\Application\Collector\{CollectorFacetMaintenanceExecutor, CollectorFacetMaintenanceService};
 use NHK\Core\Application\WordPress\{CategoryGateway, EditorialDraftGateway};
-use NHK\Core\Infrastructure\WordPress\{WpCategoryStore, WpEditorialPostStore};
+use NHK\Core\Infrastructure\WordPress\{WpCategoryStore, WpEditorialPostStore, WordPressPostUrlResolver};
 use NHK\Core\Infrastructure\Capture\{WpdbCaptureAddendumRepository, WpdbCaptureRepository};
 use NHK\Core\Infrastructure\Snapshot\SnapshotRuntimeComposition;
 
@@ -1485,6 +1485,16 @@ final class Plugin {
                         $operation = strtolower(trim((string) ($mediaOperation['operation'] ?? '')));
                         $mediaRef = is_array($mediaOperation['media'] ?? null) ? $mediaOperation['media'] : (is_array($mediaOperation['media_ref'] ?? null) ? $mediaOperation['media_ref'] : []);
                         $media = $mediaBindingService->resolveMediaReference($mediaRef);
+                        if ($operation === 'keep') {
+                            $governedMediaOperations[] = [
+                                'status' => 'KEEP',
+                                'operation' => 'keep',
+                                'media_id' => $media->canonicalId,
+                                'usage_id' => (string) ($mediaOperation['usage_id'] ?? ''),
+                                'readback' => ['status' => 'verified', 'media_id' => $media->canonicalId, 'usage_id' => (string) ($mediaOperation['usage_id'] ?? ''), 'target' => $mediaOperation['target'] ?? []],
+                            ];
+                            continue;
+                        }
                         if ($operation === 'update') {
                             $expectedRevision = max(1, (int) ($mediaOperation['expected_revision'] ?? $media->revision));
                             $payload = array_replace($mediaOperation, ['operation' => $operation, 'media' => ['id' => $media->canonicalId], 'capture_id' => (string) ($context['capture']['capture_id'] ?? ''), 'capture_fingerprint' => (string) ($context['capture_fingerprint'] ?? '')]);
@@ -1546,6 +1556,18 @@ final class Plugin {
                         $mediaIds = array_values(array_unique(array_column($readback, 'media_id')));
                         $trace('MEDIA_METADATA_RECONCILIATION', 'VERIFIED', ['capture_id' => (string) ($context['capture']['capture_id'] ?? ''), 'media_count' => count($mediaIds)]);
                         return ['status' => 'RECONCILED', 'media_ids' => $mediaIds, 'media_complete' => true, 'blockers' => [], 'media_usage' => [], 'media_readback' => $readback, 'canonical_readback' => ['media' => $readback, 'media_usage' => []], 'frontend_verified' => null, 'binding_results' => [], 'governed_media_operations' => $governedMediaOperations, 'metadata_only' => true];
+                    }
+                    if (($context['_nhk_exact_media_operations'] ?? false) === true && strtoupper(trim((string) ($context['content_intent']['intent'] ?? ''))) === 'MEDIA_ENRICHMENT') {
+                        $mediaIds = [];
+                        $usageReadback = [];
+                        foreach ((array) ($context['media_operations'] ?? []) as $mediaOperation) {
+                            $mediaRef = is_array($mediaOperation['media'] ?? null) ? $mediaOperation['media'] : [];
+                            $canonicalMedia = $mediaBindingService->resolveMediaReference($mediaRef);
+                            $mediaIds[] = $canonicalMedia->canonicalId;
+                            $usageReadback[] = ['status' => 'verified', 'media_id' => $canonicalMedia->canonicalId, 'usage_id' => (string) ($mediaOperation['usage_id'] ?? ''), 'target_type' => (string) (($mediaOperation['target']['type'] ?? '')), 'target_id' => (string) (($mediaOperation['target']['id'] ?? '')), 'role' => (string) ($mediaOperation['role'] ?? '')];
+                        }
+                        $mediaIds = array_values(array_unique($mediaIds));
+                        return ['status' => 'RECONCILED', 'media_ids' => $mediaIds, 'media_complete' => true, 'blockers' => [], 'media_usage' => $usageReadback, 'media_readback' => [], 'canonical_readback' => ['media_ids' => $mediaIds, 'media_usage' => $usageReadback], 'frontend_verified' => null, 'binding_results' => [], 'governed_media_operations' => $governedMediaOperations, 'exact_media_operations' => true];
                     }
                     if (strtoupper(trim((string) ($context['content_intent']['intent'] ?? ''))) === 'MEDIA_ENRICHMENT') {
                         $trace('MEDIA_USAGE_RECONCILIATION', 'STARTED', ['capture_id' => (string) ($context['capture']['capture_id'] ?? '')]);
@@ -1928,7 +1950,7 @@ final class Plugin {
                 new SharedEditorialComposer(),
                 new EditorialQualityGate(),
             );
-            (new McpApi(new McpTransport($mcpRead, $mcpGovernance, static fn (string $capability): bool => current_user_can($capability), static fn (string $value): bool => in_array($value, $allowedOrigins, true), $articleHandler, $videoIntake, $wordpressAttachments, $categoryGateway, $draftGateway, new CanonicalDependencyValidator($claims, $sources, $evidence), $publicUrlMaintenance, $mediaBatchUpload, $documentation, $capture, $captureContinuation, $authorityCapture, static function (): bool { return (new MigrationStatus())->runtimeSchemaReady(); }, $imageIngest, semanticWritePolicy: $semanticWritePolicy, mediaBinding: $mediaBindingService, videoSourceRefresh: $videoSourceRefresh, knowledgeRepairPreview: $knowledgeRepairPreview, videoFrontendReconciliation: $videoFrontendReconciliation, knowledgeWriterPreview: $knowledgeWriterPreview, mediaTargetNormalizer: new \NHK\Core\Application\Media\MediaTargetNormalizer($endpoints, $types, $authority)), $recoveryBinding))->register();
+            (new McpApi(new McpTransport($mcpRead, $mcpGovernance, static fn (string $capability): bool => current_user_can($capability), static fn (string $value): bool => in_array($value, $allowedOrigins, true), $articleHandler, $videoIntake, $wordpressAttachments, $categoryGateway, $draftGateway, new CanonicalDependencyValidator($claims, $sources, $evidence), $publicUrlMaintenance, $mediaBatchUpload, $documentation, $capture, $captureContinuation, $authorityCapture, static function (): bool { return (new MigrationStatus())->runtimeSchemaReady(); }, $imageIngest, semanticWritePolicy: $semanticWritePolicy, mediaBinding: $mediaBindingService, videoSourceRefresh: $videoSourceRefresh, knowledgeRepairPreview: $knowledgeRepairPreview, videoFrontendReconciliation: $videoFrontendReconciliation, knowledgeWriterPreview: $knowledgeWriterPreview, mediaTargetNormalizer: new \NHK\Core\Application\Media\MediaTargetNormalizer($endpoints, $types, $authority), mediaIntentCompiler: new MediaEnrichmentIntentCompiler($mediaBindingService, $usages, new MediaTargetNormalizer($endpoints, $types, $authority), [new WordPressPostUrlResolver(), 'resolve'])), $recoveryBinding))->register();
             do_action('nhk_mcp_register_tools', McpToolCatalog::tools(), $mcpRead, $mcpGovernance);
         });
         add_action('admin_menu', [AdminPage::class, 'register']);

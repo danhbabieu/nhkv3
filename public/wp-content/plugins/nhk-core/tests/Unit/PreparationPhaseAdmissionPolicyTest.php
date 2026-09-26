@@ -92,6 +92,25 @@ final class PreparationPhaseAdmissionPolicyTest extends TestCase
         self::assertNotContains('PRIMARY_SUBJECT_NOT_RESOLVED', $result->reviewReasons);
     }
 
+    public function test_idempotent_exact_media_replay_without_subject_remains_admissible(): void
+    {
+        $result = (new ContentPreparationOrchestrator(new SubjectResolutionService(static fn (string $value): array => [])))->prepare(
+            ['intent' => 'MEDIA_ENRICHMENT', 'media_operations' => [[
+                'operation' => 'keep',
+                'media' => ['id' => '01a0d7ee-3e33-7366-88c6-287112b34936'],
+                'target' => ['type' => 'wp_post', 'id' => '1:18'],
+                'usage_id' => '01a06e2e-73a1-7550-b0e8-168aafdc6ceb',
+                'expected_usage_revision' => 1,
+            ]]],
+            [],
+            [['media_id' => '01a0d7ee-3e33-7366-88c6-287112b34936']],
+            ['content_intent' => ['intent' => 'MEDIA_ENRICHMENT']],
+        );
+
+        self::assertSame('PREPARED', $result->status);
+        self::assertNotContains('PRIMARY_SUBJECT_NOT_RESOLVED', $result->reviewReasons);
+    }
+
     public function test_media_enrichment_without_exact_target_still_requires_subject_review(): void
     {
         $resolver = new SubjectResolutionService(static fn (string $value): array => []);

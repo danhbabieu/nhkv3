@@ -182,8 +182,10 @@ final class McpToolCatalog
                 'existing_media_urls' => ['type' => 'array', 'maxItems' => 20, 'items' => ['type' => 'string', 'format' => 'uri', 'minLength' => 1]],
                 'media_bindings' => ['type' => 'array', 'maxItems' => 20, 'items' => self::mediaBindingField()],
                 'media_operations' => ['type' => 'array', 'maxItems' => 20, 'items' => ['type' => 'object', 'properties' => [
-                    'operation' => ['type' => 'string', 'enum' => ['update', 'add', 'replace', 'remove', 'representative_bind']],
-                    'media_ref' => ['type' => 'object'], 'media' => ['type' => 'object'], 'target' => ['type' => 'object'],
+                    'operation' => ['type' => 'string', 'enum' => ['update', 'add', 'replace', 'remove', 'representative_bind', 'set_featured']],
+                    'media_ref' => ['type' => 'object', 'properties' => ['id' => self::uuidField(), 'stable_key' => ['type' => 'string'], 'attachment_id' => ['type' => 'integer', 'minimum' => 1], 'url' => ['type' => 'string', 'format' => 'uri']], 'additionalProperties' => false],
+                    'media' => ['type' => 'object'],
+                    'target' => ['type' => 'object', 'properties' => ['type' => ['type' => 'string'], 'id' => ['type' => 'string'], 'blog_id' => ['type' => 'integer', 'minimum' => 1], 'post_id' => ['type' => 'integer', 'minimum' => 1], 'stable_key' => ['type' => 'string'], 'url' => ['type' => 'string', 'format' => 'uri']], 'additionalProperties' => false],
                     'usage_id' => self::uuidField(), 'expected_usage_revision' => ['type' => 'integer', 'minimum' => 1], 'expected_revision' => ['type' => 'integer', 'minimum' => 1],
                     'name' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 255], 'readiness' => ['type' => 'string', 'enum' => ['draft', 'ready', 'blocked']], 'provenance' => ['type' => 'object'],
                     'role' => ['type' => 'string'], 'placement_key' => ['type' => 'string', 'maxLength' => 191],

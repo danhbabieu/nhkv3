@@ -1,3 +1,5 @@
+# NHK V3 Execution State
+
 # Checkpoint — 2026-09-25 — Latest feed intrinsic-image layout repair (LOCAL / NO MUTATION)
 
 ROOT_CAUSE_CONFIRMED: The staging screenshot showed the `.latest-feed-list`
@@ -20150,3 +20152,49 @@ assertions with 1 existing PHPUnit deprecation. `nhk-core.php` PHP lint and
 `git diff --check` passed.
 
 STATUS: `NHK_CORE_BOOTSTRAP_SELF_CONTAINED_LOCAL_READY / NO_MUTATION`.
+
+# Checkpoint — 2026-09-26 — URL-to-URL featured MediaUsage Capture compiler (LOCAL / NO LIVE MUTATION)
+
+DESIGN_REVIEW: The existing path already owns Media identity resolution,
+MediaTarget endpoint normalization, Governance Apply and the narrow featured
+WordPress projection. The architectural gap was at the MCP/Capture adapter:
+user URL refs were not compiled into exact canonical MediaUsage operations, and
+Plugin continued into the default semantic MediaEnrichment planner after
+explicit operations had been governed. Commit `356949a1` correctly identified
+that a pure exact Media target need not resolve a semantic subject, but its
+preparation result invariant still rejected the unresolved packet.
+
+CHOSEN_ARCHITECTURE: Added a thin `MediaEnrichmentIntentCompiler` at the MCP
+transport boundary. It reuses `MediaBindingService::resolveMediaReference`,
+resolves first-party WordPress permalinks through native `url_to_postid` plus
+canonical permalink read-back, snapshots the exact `target + role + placement`
+slot and compiles `set_featured` to governed `add`, `replace` or idempotent
+`keep`. Existing canonical operation callers remain supported. Explicit plans
+are marked authoritative so the default subject/assets planner is skipped.
+Governance, signed staging scope, usage CAS and the narrow featured projection
+remain the durable mutation owners. No schema or database/data mutation was
+introduced.
+
+SEMANTIC_BOUNDARIES: MediaUsage is still contextual placement only; no Graph
+edge, subject, claim, Article relation or Article composition is created by
+this lane. The exact-media preparation result may carry an unresolved packet
+only when its diagnostic is `OPTIONAL_EXACT_MEDIA_TARGET`; fake semantic
+subjects are never synthesized.
+
+REGRESSION_TESTS: URL media/article resolution, server-owned replacement
+lookup and usage revision, idempotent keep replay, unresolved exact-media
+preparation, target normalization, target-local replacement and featured-only
+projection tests. MCP catalog now advertises typed `set_featured` URL refs.
+
+FOCUSED_TESTS: 73 tests / 752 assertions, OK with 2 deprecations. Additional
+compiler/target/reuse slice: 9 tests / 40 assertions, OK.
+
+FULL_UNIT: `vendor/bin/phpunit -d memory_limit=512M -c phpunit.xml.dist public/wp-content/plugins/nhk-core/tests/Unit` — 2,687 tests / 15,567 assertions, 1 pre-existing frontend fallback assertion failure. The documentation-registry failure from the first run is fixed by the execution-state title/checkpoint and its focused test now passes. Warnings/deprecations remain non-failing.
+
+INTEGRATION: NOT RUN in this checkpoint; required `NHK_WP_TEST_PATH` and
+`NHK_WP_TEST_DB` environment is not available. No alternate DB was used.
+
+LIVE_ACCEPTANCE: NOT RUN. No staging/production deployment or mutation was
+authorized or performed.
+
+STATUS: `URL_TO_URL_MEDIA_USAGE_COMPILER_LOCAL_READY / FULL_UNIT_ENVIRONMENT_AND_BASELINE_FAILURES / NO_LIVE_MUTATION`.

@@ -49,7 +49,8 @@ final readonly class ContentPreparationResult
         if (!preg_match('/^[a-f0-9]{64}$/i', $preparationFingerprint)) {
             throw new \InvalidArgumentException('Content preparation fingerprint is invalid.');
         }
-        if ($status === 'PREPARED' && ($subjectResolutionPacket === null || $subjectResolutionPacket->status !== 'resolved')) {
+        $subjectOptional = ($diagnostics['subject_requirement'] ?? '') === 'OPTIONAL_EXACT_MEDIA_TARGET';
+        if ($status === 'PREPARED' && ($subjectResolutionPacket === null || ($subjectResolutionPacket->status !== 'resolved' && !$subjectOptional))) {
             throw new \InvalidArgumentException('Prepared content requires a resolved subject packet.');
         }
         if (!in_array($this->qualityDecision, ['READY', 'REVIEW_REQUIRED', 'HARD_BLOCK'], true)) throw new \InvalidArgumentException('Content quality decision is invalid.');
