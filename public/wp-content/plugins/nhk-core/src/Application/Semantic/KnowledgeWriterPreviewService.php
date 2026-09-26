@@ -95,13 +95,9 @@ final class KnowledgeWriterPreviewService
                 'topic' => $topic,
                 'retrieval_topic' => $topic . ' ' . trim($instruction),
                 'semantic_needs' => $needs,
-                // Writer is the comprehensive read consumer: gather broadly,
-                // then let the shared applicability/evidence/coverage policies
-                // select a rich but bounded context before composition.
-                'result_limit' => 200,
-                'selection_limit' => 20,
-                'aspect_target' => 12,
-                'token_budget' => 3000,
+                // Use the same broad read-only enrichment policy as the
+                // Article, Video and image/media editorial surfaces.
+                'comprehensive_editorial' => true,
             ]);
         } catch (\Throwable) {
             return $this->fail($base, 'unavailable', 'PREVIEW_PIPELINE_UNAVAILABLE');
