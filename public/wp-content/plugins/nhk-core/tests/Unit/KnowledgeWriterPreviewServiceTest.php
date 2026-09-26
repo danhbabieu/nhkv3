@@ -134,6 +134,27 @@ final class KnowledgeWriterPreviewServiceTest extends TestCase
         self::assertNotSame('', $result['answer']);
     }
 
+    public function test_qualified_base_variant_name_does_not_match_specialized_descendants(): void
+    {
+        $base = '88888888-1111-4111-8111-111111111111';
+        $specialized = '88888888-2222-4222-8222-222222222222';
+        $this->authority->create(new AuthorityEntity($base, 'variant', 'variant:test.36.10', 'Đồng hồ Test 36/10', 1, []));
+        $this->authority->create(new AuthorityEntity($specialized, 'variant', 'variant:test.36.10.two-tune', 'Đồng hồ Test 36/10 hai bài', 1, []));
+        $this->rows = [[
+            'id' => 'base-claim', 'revision' => 1, 'subject_id' => $base, 'subject_type' => 'variant',
+            'facet' => 'recognition', 'text' => 'Chủ thể cơ sở có dấu hiệu nhận diện riêng.',
+            'scope' => 'variant', 'provenance' => 'CATALOG_SUPPORTED', 'evidence_status' => 'SUPPORTED_WITHIN_SCOPE',
+        ]];
+
+        $result = $this->service()->preview([
+            'subject' => ['query' => 'Test 36/10'],
+            'instruction' => 'Tóm tắt chủ thể.',
+        ]);
+
+        self::assertSame('available', $result['status'], json_encode($result, JSON_UNESCAPED_UNICODE) ?: '');
+        self::assertSame($base, $result['subject']['canonical_id']);
+    }
+
     public function test_direct_subject_claim_is_not_rejected_only_for_missing_topic_word_overlap(): void
     {
         $w64 = '77777777-7777-4777-8777-777777777777';
