@@ -121,7 +121,7 @@ final class CanonicalAuthoritySubjectResolver
         if ($entity->entityType === 'variant') {
             $reference = $this->normalize((string) ($entity->payload['reference'] ?? ''));
             if ($reference !== '' && $reference === $needle) return 'exact_variant_reference';
-            if (str_contains($needle, '/') && str_contains($this->normalize($entity->canonicalName), $needle)) return 'exact_variant_name_reference';
+            if (str_contains($needle, '/') && str_ends_with($this->normalize($entity->canonicalName), $needle)) return 'exact_variant_name_reference';
         }
 
         return null;
