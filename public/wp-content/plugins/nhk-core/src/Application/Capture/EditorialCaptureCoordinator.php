@@ -860,16 +860,28 @@ final class EditorialCaptureCoordinator
                     $assets = $record->assets;
                     $diagnostics = $record->diagnostics;
                     $receipts = $record->phaseReceipts;
-                    $media = ($this->mediaReconcile)([
+                    $mediaContext = [
                         'capture' => $record->toArray(),
+                        'capture_record' => $record,
+                        'capture_fingerprint' => $record->requestFingerprint,
                         'article_id' => null,
                         'assets' => $assets,
+                        'media_bindings' => is_array($input['media_bindings'] ?? null) ? $input['media_bindings'] : [],
+                        'article_media_bindings' => is_array($input['article_media_bindings'] ?? null) ? $input['article_media_bindings'] : [],
+                        'media_operations' => is_array($input['media_operations'] ?? null) ? $input['media_operations'] : [],
+                        '_nhk_exact_media_operations' => ($input['_nhk_exact_media_operations'] ?? false) === true
+                            || (is_array($input['media_operations'] ?? null) && $input['media_operations'] !== []),
+                        'staging_acceptance' => is_array($input['staging_acceptance'] ?? null) ? $input['staging_acceptance'] : null,
                         'subject_resolution' => $resolution,
                         'content_intent' => $intent,
                         'semantic' => $retrieved,
                         'semantic_write_back' => $writes,
                         'shared_enrichment' => $sharedEnrichment,
-                    ]);
+                    ];
+                    if (is_array($mediaContext['staging_acceptance']) && isset($mediaContext['staging_acceptance']['payload_fingerprint'])) {
+                        $mediaContext['payload_fingerprint'] = (string) $mediaContext['staging_acceptance']['payload_fingerprint'];
+                    }
+                    $media = ($this->mediaReconcile)($mediaContext);
                     $diagnostics['media_enrichment'] = $this->withoutBody($media);
                     $mediaStatus = strtoupper(trim((string) ($media['status'] ?? '')));
                     $record = $this->save($record, 'MEDIA_RECONCILED', $assets, $diagnostics, $receipts, 'MEDIA_RECONCILED', $record->articleId, $record->articleStateToken, $mediaStatus === 'RECONCILED' ? 'COMPLETED' : 'PARTIAL');

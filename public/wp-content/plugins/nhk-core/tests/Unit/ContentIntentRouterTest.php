@@ -450,6 +450,83 @@ final class ContentIntentRouterTest extends TestCase
         self::assertSame('RECONCILED', $result->diagnostics['media_enrichment']['status']);
     }
 
+    public function test_non_article_media_enrichment_propagates_exact_operations_and_capture_scope_to_reconciler(): void
+    {
+        $captured = null;
+        $mediaId = '01a0d7ee-3e33-7366-88c6-287112b34936';
+        $usageId = '01a06e2e-73a1-7550-b0e8-168aafdc6ceb';
+        $coordinator = new EditorialCaptureCoordinator(
+            new IntentCaptureRepository(),
+            static fn (array $input): array => ['items' => [[
+                'kind' => 'image',
+                'media_id' => $mediaId,
+                'attachment_id' => 739,
+                'attachment_readback_status' => 'verified',
+            ]]],
+            static fn (array $input): array => throw new \RuntimeException('ARTICLE_DRAFT_MUST_NOT_RUN'),
+            new TextInputInterpreter(),
+            new SubjectResolutionService(static fn (string $hint): array => []),
+            new ClaimRetrievalEngine(static fn (array $subject): array => ['status' => 'available', 'items' => []], static fn (array $subject, array $neighborhood): array => []),
+            static fn (array $context): array => ['status' => 'SKIPPED', 'writes' => [], 'blockers' => []],
+            new ArticleComposer(),
+            static function (array $context) use (&$captured, $mediaId, $usageId): array {
+                $captured = $context;
+                return [
+                    'status' => 'RECONCILED',
+                    'media_ids' => [$mediaId],
+                    'media_complete' => true,
+                    'media_usage' => [[
+                        'status' => 'verified',
+                        'media_id' => $mediaId,
+                        'usage_id' => $usageId,
+                        'target_type' => 'wp_post',
+                        'target_id' => '1:18',
+                        'role' => 'featured_primary',
+                        'placement_key' => '',
+                    ]],
+                    'blockers' => [],
+                ];
+            },
+            static fn (array $context): array => throw new \RuntimeException('PUBLICATION_MUST_NOT_RUN'),
+            static fn (array $context): array => ['status' => 'verified'],
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            new ContentIntentRouter(),
+        );
+
+        $result = $coordinator->execute([
+            'idempotency_key' => 'exact-media-operation-context',
+            'intent' => 'MEDIA_ENRICHMENT',
+            '_nhk_exact_media_operations' => true,
+            'media_operations' => [[
+                'operation' => 'replace',
+                'media' => ['id' => $mediaId],
+                'target' => ['type' => 'wp_post', 'id' => '1:18'],
+                'usage_id' => $usageId,
+                'expected_usage_revision' => 1,
+                'role' => 'featured_primary',
+                'placement_key' => '',
+            ]],
+        ]);
+
+        self::assertNull($result->articleId);
+        self::assertIsArray($captured);
+        self::assertInstanceOf(CaptureRecord::class, $captured['capture_record'] ?? null);
+        self::assertSame($result->captureId, $captured['capture_record']->captureId);
+        self::assertSame($result->requestFingerprint, $captured['capture_fingerprint'] ?? null);
+        self::assertTrue($captured['_nhk_exact_media_operations'] ?? false);
+        self::assertSame('replace', $captured['media_operations'][0]['operation'] ?? null);
+        self::assertSame($usageId, $captured['media_operations'][0]['usage_id'] ?? null);
+        self::assertSame('1:18', $captured['media_operations'][0]['target']['id'] ?? null);
+        self::assertSame('RECONCILED', $result->diagnostics['media_enrichment']['status']);
+    }
+
     public function test_typed_media_enrichment_uses_one_binding_port_and_completes_only_after_verified_receipt(): void
     {
         $mediaId = '01a0aefd-7e93-772c-98df-33f7abbc11e8';
