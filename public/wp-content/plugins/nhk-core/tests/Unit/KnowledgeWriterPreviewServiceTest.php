@@ -209,6 +209,31 @@ final class KnowledgeWriterPreviewServiceTest extends TestCase
         self::assertSame('complete', $complete['coverage']['status']);
     }
 
+    public function test_writer_collects_broad_multi_facet_context_before_composition(): void
+    {
+        $facets = ['identity', 'chronology', 'recognition', 'configuration', 'movement', 'music', 'component', 'provenance'];
+        $this->rows = [];
+        foreach ($facets as $index => $facet) {
+            $this->rows[] = [
+                'id' => 'claim-' . $facet, 'revision' => 1, 'subject_id' => $this->subjectId,
+                'subject_type' => 'variant', 'facet' => $facet,
+                'text' => 'Thông tin ' . ($index + 1) . ' thuộc khía cạnh ' . $facet . '.',
+                'scope' => 'variant', 'provenance' => 'CATALOG_SUPPORTED',
+                'evidence_status' => 'SUPPORTED_WITHIN_SCOPE',
+            ];
+        }
+
+        $result = $this->service()->preview($this->request([
+            'requested_facets' => $facets,
+            'instruction' => 'Tra cứu đầy đủ các khía cạnh rồi viết lại thành nội dung liền mạch.',
+        ]));
+
+        self::assertSame('available', $result['status'], json_encode($result, JSON_UNESCAPED_UNICODE) ?: '');
+        self::assertSame($facets, $result['coverage']['covered_facets']);
+        self::assertCount(count($facets), $result['used_knowledge']);
+        self::assertSame([], $result['coverage']['uncovered_facets']);
+    }
+
     public function test_sparse_knowledge_does_not_repeat_instruction_as_fact(): void
     {
         $this->rows = [];
