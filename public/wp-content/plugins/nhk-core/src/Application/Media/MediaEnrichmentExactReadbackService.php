@@ -18,6 +18,8 @@ final class MediaEnrichmentExactReadbackService
     public function __construct(
         private MediaUsageRepository $usages,
         private WordPressArticleMediaAdapter $wordpress,
+        /** @param callable(string,string):(?array<string,mixed>)|null $authorityProjection */
+        private $authorityProjection = null,
     ) {}
 
     /** @param list<array<string,mixed>> $operations @param list<array<string,mixed>> $governedResults */
@@ -103,6 +105,21 @@ final class MediaEnrichmentExactReadbackService
                     continue;
                 }
                 $entry['featured_projection'] = ['status' => 'verified', 'media_id' => $usage->mediaId, 'post_id' => $postId];
+            }
+            if ($role === 'representative' && $targetType !== 'wp_post') {
+                if (!is_callable($this->authorityProjection)) {
+                    $blockers[] = 'REPRESENTATIVE_PROJECTION_READBACK_UNAVAILABLE';
+                    continue;
+                }
+                $projection = ($this->authorityProjection)($targetType, $targetId);
+                $representative = is_array($projection) && is_array($projection['representative'] ?? null)
+                    ? $projection['representative']
+                    : null;
+                if ($representative === null || (string) ($representative['media_id'] ?? '') !== $usage->mediaId) {
+                    $blockers[] = 'REPRESENTATIVE_PROJECTION_READBACK_MISMATCH';
+                    continue;
+                }
+                $entry['representative_projection'] = ['status' => 'verified', 'media_id' => $usage->mediaId, 'target_type' => $targetType, 'target_id' => $targetId];
             }
             $readback[] = $entry;
         }

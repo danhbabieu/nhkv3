@@ -359,7 +359,7 @@ final class Plugin {
             $mediaBindingService = $governanceRuntime->mediaBinding ?? new MediaBindingService($media, $assets, $usages, $authority, $types, new WpdbMediaBindingOperationRepository($wpdb), stagingGuard: new \NHK\Core\Application\Governance\MediaBindingStagingGuard(static function (): string { return defined('WP_ENVIRONMENT_TYPE') ? strtolower((string) constant('WP_ENVIRONMENT_TYPE')) : (function_exists('wp_get_environment_type') ? strtolower((string) wp_get_environment_type()) : strtolower((string) (getenv('WP_ENVIRONMENT_TYPE') ?: 'unknown'))); }, [$stagingScopeVerifier, 'verifyBindingRequest'], static fn (string $capability): bool => function_exists('current_user_can') && current_user_can($capability)), targetNormalizer: new \NHK\Core\Application\Media\MediaTargetNormalizer($endpoints, $types, $authority));
             $attachmentBridge = $sharedAttachmentBridge ?? new WordPressMediaAttachmentBridge($wpdb, $mediaService, $media, $assets);
             $sharedAttachmentBridge = $attachmentBridge;
-            $mediaEnrichmentExactReadback = new MediaEnrichmentExactReadbackService($usages, $attachmentBridge);
+            $mediaEnrichmentExactReadback = new MediaEnrichmentExactReadbackService($usages, $attachmentBridge, [$entityMediaProjection, 'representativeForEntity']);
             $knowledgeService = new KnowledgeService($claims, $sources, $evidence);
             $collectorBranchReader = static function (string $classificationId) use ($authority, $claims, $graphService): array {
                 $classification = $authority->findByCanonicalId($classificationId);

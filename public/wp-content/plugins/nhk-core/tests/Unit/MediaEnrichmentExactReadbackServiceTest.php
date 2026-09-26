@@ -92,8 +92,50 @@ final class MediaEnrichmentExactReadbackServiceTest extends TestCase
         self::assertContains('FEATURED_PROJECTION_READBACK_MISMATCH', $result['blockers']);
     }
 
+    public function test_authority_representative_requires_exact_projection_readback(): void
+    {
+        $authorityId = '018f2f1e-7b2c-7abc-8def-0123456789af';
+        $service = $this->service(
+            [$this->usageFor(self::USAGE_NEW, self::MEDIA_A, 'classification', $authorityId, 1, 'representative', 'representative')],
+            null,
+            static fn (string $type, string $id): array => ['representative' => ['media_id' => self::MEDIA_A]],
+        );
+
+        $result = $service->verify([[
+            'operation' => 'representative_bind',
+            'media' => ['id' => self::MEDIA_A],
+            'target' => ['type' => 'classification', 'id' => $authorityId],
+            'role' => 'representative',
+            'placement_key' => 'representative',
+        ]], [['status' => 'applied', 'canonical_readback' => ['canonical_id' => self::MEDIA_A]]]);
+
+        self::assertTrue($result['complete']);
+        self::assertSame('verified', $result['media_usage'][0]['representative_projection']['status']);
+    }
+
+    public function test_authority_representative_projection_drift_is_not_complete(): void
+    {
+        $authorityId = '018f2f1e-7b2c-7abc-8def-0123456789af';
+        $service = $this->service(
+            [$this->usageFor(self::USAGE_NEW, self::MEDIA_A, 'classification', $authorityId, 1, 'representative', 'representative')],
+            null,
+            static fn (string $type, string $id): array => ['representative' => ['media_id' => self::MEDIA_B]],
+        );
+
+        $result = $service->verify([[
+            'operation' => 'representative_bind',
+            'media' => ['id' => self::MEDIA_A],
+            'target' => ['type' => 'classification', 'id' => $authorityId],
+            'role' => 'representative',
+            'placement_key' => 'representative',
+        ]], [['status' => 'applied', 'canonical_readback' => ['canonical_id' => self::MEDIA_A]]]);
+
+        self::assertFalse($result['complete']);
+        self::assertContains('REPRESENTATIVE_PROJECTION_READBACK_MISMATCH', $result['blockers']);
+    }
+
     /** @param list<MediaUsage> $usages */
-    private function service(array $usages, ?string $featuredMedia = null): MediaEnrichmentExactReadbackService
+    private function service(array $usages, ?string $featuredMedia = null, ?callable $authorityProjection = null): MediaEnrichmentExactReadbackService
     {
         $repository = new class($usages) implements MediaUsageRepository {
             public function __construct(private array $usages) {}
@@ -111,7 +153,7 @@ final class MediaEnrichmentExactReadbackServiceTest extends TestCase
             public function attachmentForMedia(\NHK\Core\Domain\Media\Media $media, \NHK\Core\Domain\Media\MediaAsset $asset, string $contextualAlt = '', array $context = []): array { return []; }
             public function adoptAttachment(int $attachmentId): ?string { return null; }
         };
-        return new MediaEnrichmentExactReadbackService($repository, $adapter);
+        return new MediaEnrichmentExactReadbackService($repository, $adapter, $authorityProjection);
     }
 
     private function operation(string $operation, string $mediaId, string $usageId, int $revision): array
@@ -122,5 +164,10 @@ final class MediaEnrichmentExactReadbackServiceTest extends TestCase
     private function usage(string $usageId, string $mediaId, int $revision, ?string $activeSlot = null, string $role = 'featured_primary', string $placement = 'featured_primary'): MediaUsage
     {
         return new MediaUsage($usageId, $mediaId, 'wp_post', '1:18', $role, revision: $revision, placementKey: $placement, activeSlot: $activeSlot);
+    }
+
+    private function usageFor(string $usageId, string $mediaId, string $type, string $id, int $revision, string $role, string $placement): MediaUsage
+    {
+        return new MediaUsage($usageId, $mediaId, $type, $id, $role, revision: $revision, placementKey: $placement, activeSlot: $role === 'representative' ? 'representative' : null);
     }
 }
