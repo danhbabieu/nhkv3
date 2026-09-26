@@ -33,3 +33,12 @@ Version: 1.2.0
 .latest-feed-card-summary{display:-webkit-box;overflow:hidden;margin-top:6px;color:var(--nhk-muted);font-size:.82rem;line-height:1.3;-webkit-box-orient:vertical;-webkit-line-clamp:2}
 @media(max-width:47.999rem){.home-latest-feed .latest-feed-list{grid-template-columns:1fr;gap:10px}.latest-feed-card-link{grid-template-columns:104px minmax(0,1fr);min-height:104px;gap:12px}.latest-feed-card-thumb{width:104px;height:104px}.latest-feed-card-link .latest-feed-row-body{padding:11px 12px 11px 0}.latest-feed-card-title{font-size:1rem}.latest-feed-card-summary{font-size:.78rem}}
 .nav-type-menu-mobile{display:none}@media(max-width:48rem){.nav-type-menu-mobile{display:block}}
+
+/* Keep the homepage hero inside the site container even when the entity asset is stale. */
+.home-hero-v2{grid-template-columns:minmax(0,1.28fr) minmax(0,.72fr);gap:48px;align-items:center}
+.hero-copy-block,.hero-media-column{min-width:0}
+.hero-visual{width:min(100%,400px);max-width:100%;margin-inline:auto;overflow:hidden}
+.hero-image{display:grid;grid-template-rows:minmax(0,1fr) auto;width:100%;min-width:0;margin:0}
+.hero-image-frame{display:grid;place-items:center;width:100%;aspect-ratio:4/3;overflow:hidden}
+.hero-image-frame img{display:block;width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;object-position:center center}
+@media(max-width:48rem){.home-hero-v2{display:block}.hero-media-column{margin-top:24px}.hero-visual{width:100%;max-width:none;margin:0}}

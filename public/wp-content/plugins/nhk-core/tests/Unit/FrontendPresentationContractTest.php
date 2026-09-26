@@ -104,6 +104,19 @@ final class FrontendPresentationContractTest extends TestCase
         self::assertStringContainsString('.latest-feed-card-image{display:block;width:100%;height:100%;object-fit:contain}', $css);
     }
 
+    public function test_base_stylesheet_bounds_home_hero_horizontal_layout(): void
+    {
+        $css = $this->read('style.css');
+
+        self::assertStringContainsString('.home-hero-v2{grid-template-columns:minmax(0,1.28fr) minmax(0,.72fr)', $css);
+        self::assertStringContainsString('.hero-copy-block,.hero-media-column{min-width:0}', $css);
+        self::assertStringContainsString('.hero-visual{width:min(100%,400px);max-width:100%;margin-inline:auto;overflow:hidden}', $css);
+        self::assertStringContainsString('.hero-image{display:grid;grid-template-rows:minmax(0,1fr) auto;width:100%;min-width:0;margin:0}', $css);
+        self::assertStringContainsString('.hero-image-frame{display:grid;place-items:center;width:100%;aspect-ratio:4/3;overflow:hidden}', $css);
+        self::assertStringContainsString('.hero-image-frame img{display:block;width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;object-position:center center}', $css);
+        self::assertStringNotContainsString('overflow-x:hidden', $css);
+    }
+
     public function test_homepage_prioritizes_only_the_hero_lcp_image(): void
     {
         $source = $this->read('front-page.php');

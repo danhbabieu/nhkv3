@@ -1,5 +1,38 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-26 — Homepage hero horizontal overflow repair (LOCAL / NO MUTATION)
+
+ROOT_OVERFLOW_ELEMENT: Staging runtime reported `figure.hero-image` and its
+`hero-image-frame`/`img`/`figcaption` descendants at 900px wide inside a
+`339.797px` media column, ending at x=1906.70 on a 1513px viewport
+(`clientWidth=1513`, `scrollWidth=1906`, `body.scrollWidth=1907`). Header,
+main and hero container all remained inside the shared 1180px container at
+x=166.50; no negative offset or full-viewport breakout was present.
+
+ROOT_CSS_RULE: The deployed hero base boundary did not include the bounded
+horizontal rules for `.home-hero-v2`, `.hero-media-column`, `.hero-visual`,
+`.hero-image`, `.hero-image-frame` and the image child. The image's intrinsic
+900px width therefore became the grid item's intrinsic track and expanded the
+page scroll width.
+
+FIXED_BOUNDARY: Added the minimal responsive hero horizontal guard to the
+always-registered base `style.css`: flexible `minmax(0, …)` tracks, `min-width:0`
+on both grid children, bounded visual/frame/image widths and mobile single-column
+behavior. No markup, Media, object-fit policy, body overflow rule, semantic
+owner, route, schema or database boundary changed.
+
+REGRESSION: Added a frontend contract that fails when the base stylesheet no
+longer carries the hero horizontal bounds. The new test was observed failing
+before the CSS change and passes afterward.
+
+VERIFICATION: Frontend Presentation + Frontend Contract suites passed 95 tests /
+936 assertions with one existing PHPUnit warning. PHP lint, `git diff --check`
+and changed-diff secret scan passed. Staging baseline remains browser-unfixed
+until this local patch is deployed; no staging/live mutation or deployment was
+performed.
+
+STATUS: `HOMEPAGE_HERO_HORIZONTAL_LAYOUT_LOCAL_READY / STAGING_REDEPLOY_REQUIRED / NO_MUTATION / UNCOMMITTED`
+
 # Checkpoint — 2026-09-26 — Admin submenu bootstrap fatal-error repair (LOCAL / NO MUTATION)
 
 ROOT_CAUSE_CONFIRMED: `ClockTypeNavigationAdminPage::register()` called
