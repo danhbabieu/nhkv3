@@ -70,6 +70,7 @@ use NHK\Core\Infrastructure\Governance\WpdbDependencyRepository;
 use NHK\Core\Infrastructure\Governance\GovernanceRuntimeFactory;
 use NHK\Core\Application\Entity\{ComparisonPageQuery, EntityMediaProjection, EntityPageQuery, EntityProfileAdminProjection, PublicEndpointEligibilityResolver, PublicEntityCollectionQuery, PublicEntityEligibilityPolicy, PublicIdentityContract, PublicRouteResolver, RelatedContentQuery};
 use NHK\Core\Application\Media\{ArticleMediaCoordinator, ArticleMediaSeoProjection, MediaEnrichmentFinalReadbackPolicy, MediaIngestGateway, MediaService, MediaVideoPageQuery, PublicMediaAssetDelivery, PublicMediaArticleLinkResolver, PublicMediaGalleryQuery, VisualOpportunityDetector, VisualSupportRequirementService};
+use NHK\Core\Application\Media\MediaEnrichmentExactReadbackService;
 use NHK\Core\Application\Video\{VideoCompletenessPolicy, VideoEditorialAdapter, VideoEditorialGenerator, VideoHubClassifier, VideoIntakeService, VideoInternalSemanticResearcher, VideoKnowledgeEnrichmentPlanner, VideoRelationCandidatePlanner, VideoSeoProjection, VideoService, VideoSourceRefreshCommand, YouTubeDataApiClient, YouTubeSourceAdapter};
 use NHK\Core\Application\Home\HomeSemanticQuery;
 use NHK\Core\Application\Search\SearchSemanticQuery;
@@ -342,6 +343,7 @@ final class Plugin {
             $mediaBindingService = $governanceRuntime->mediaBinding ?? new MediaBindingService($media, $assets, $usages, $authority, $types, new WpdbMediaBindingOperationRepository($wpdb), stagingGuard: new \NHK\Core\Application\Governance\MediaBindingStagingGuard(static function (): string { return defined('WP_ENVIRONMENT_TYPE') ? strtolower((string) constant('WP_ENVIRONMENT_TYPE')) : (function_exists('wp_get_environment_type') ? strtolower((string) wp_get_environment_type()) : strtolower((string) (getenv('WP_ENVIRONMENT_TYPE') ?: 'unknown'))); }, [$stagingScopeVerifier, 'verifyBindingRequest'], static fn (string $capability): bool => function_exists('current_user_can') && current_user_can($capability)), targetNormalizer: new \NHK\Core\Application\Media\MediaTargetNormalizer($endpoints, $types, $authority));
             $attachmentBridge = $sharedAttachmentBridge ?? new WordPressMediaAttachmentBridge($wpdb, $mediaService, $media, $assets);
             $sharedAttachmentBridge = $attachmentBridge;
+            $mediaEnrichmentExactReadback = new MediaEnrichmentExactReadbackService($usages, $attachmentBridge);
             $knowledgeService = new KnowledgeService($claims, $sources, $evidence);
             $collectorBranchReader = static function (string $classificationId) use ($authority, $claims, $graphService): array {
                 $classification = $authority->findByCanonicalId($classificationId);
@@ -1422,7 +1424,7 @@ final class Plugin {
                     return $governanceResult + ['candidate_writes' => array_merge($candidates, $videoCandidates), 'reused_claims' => $reusedClaims, 'relation_hints' => (array) ($interpretation['relation_hints'] ?? []), 'subject_resolution' => $context['subject_resolution'] ?? [], 'governance_available' => $mcpGovernance instanceof McpGovernanceHandler];
                 },
                 new ArticleComposer(),
-                static function (array $context) use ($articleMedia, $mediaService, $usages, $media, $assets, $mediaBindingService, $mediaCapabilities, $mcpGovernance, $wordpressAttachments, $stagingScopeVerifier): array {
+                static function (array $context) use ($articleMedia, $mediaService, $usages, $media, $assets, $mediaBindingService, $mediaCapabilities, $mcpGovernance, $wordpressAttachments, $stagingScopeVerifier, $mediaEnrichmentExactReadback): array {
                     $trace = static function (string $stage, string $status, array $details = []): void {
                         $payload = array_merge(['stage' => $stage, 'status' => $status, 'at' => gmdate('c')], $details);
                         if (function_exists('do_action')) { try { do_action('nhk_v3_capture_stage_trace', $payload); } catch (\Throwable) { } }
@@ -1487,11 +1489,10 @@ final class Plugin {
                         $media = $mediaBindingService->resolveMediaReference($mediaRef);
                         if ($operation === 'keep') {
                             $governedMediaOperations[] = [
-                                'status' => 'KEEP',
+                                'status' => 'PENDING_READBACK',
                                 'operation' => 'keep',
                                 'media_id' => $media->canonicalId,
                                 'usage_id' => (string) ($mediaOperation['usage_id'] ?? ''),
-                                'readback' => ['status' => 'verified', 'media_id' => $media->canonicalId, 'usage_id' => (string) ($mediaOperation['usage_id'] ?? ''), 'target' => $mediaOperation['target'] ?? []],
                             ];
                             continue;
                         }
@@ -1558,16 +1559,10 @@ final class Plugin {
                         return ['status' => 'RECONCILED', 'media_ids' => $mediaIds, 'media_complete' => true, 'blockers' => [], 'media_usage' => [], 'media_readback' => $readback, 'canonical_readback' => ['media' => $readback, 'media_usage' => []], 'frontend_verified' => null, 'binding_results' => [], 'governed_media_operations' => $governedMediaOperations, 'metadata_only' => true];
                     }
                     if (($context['_nhk_exact_media_operations'] ?? false) === true && strtoupper(trim((string) ($context['content_intent']['intent'] ?? ''))) === 'MEDIA_ENRICHMENT') {
-                        $mediaIds = [];
-                        $usageReadback = [];
-                        foreach ((array) ($context['media_operations'] ?? []) as $mediaOperation) {
-                            $mediaRef = is_array($mediaOperation['media'] ?? null) ? $mediaOperation['media'] : [];
-                            $canonicalMedia = $mediaBindingService->resolveMediaReference($mediaRef);
-                            $mediaIds[] = $canonicalMedia->canonicalId;
-                            $usageReadback[] = ['status' => 'verified', 'media_id' => $canonicalMedia->canonicalId, 'usage_id' => (string) ($mediaOperation['usage_id'] ?? ''), 'target_type' => (string) (($mediaOperation['target']['type'] ?? '')), 'target_id' => (string) (($mediaOperation['target']['id'] ?? '')), 'role' => (string) ($mediaOperation['role'] ?? '')];
-                        }
-                        $mediaIds = array_values(array_unique($mediaIds));
-                        return ['status' => 'RECONCILED', 'media_ids' => $mediaIds, 'media_complete' => true, 'blockers' => [], 'media_usage' => $usageReadback, 'media_readback' => [], 'canonical_readback' => ['media_ids' => $mediaIds, 'media_usage' => $usageReadback], 'frontend_verified' => null, 'binding_results' => [], 'governed_media_operations' => $governedMediaOperations, 'exact_media_operations' => true];
+                        $exact = $mediaEnrichmentExactReadback->verify((array) ($context['media_operations'] ?? []), $governedMediaOperations);
+                        $usageReadback = is_array($exact['media_usage'] ?? null) ? $exact['media_usage'] : [];
+                        $mediaIds = array_values(array_unique(array_filter(array_map(static fn (mixed $usage): string => is_array($usage) ? trim((string) ($usage['media_id'] ?? '')) : '', $usageReadback))));
+                        return ['status' => (string) ($exact['status'] ?? 'PARTIAL'), 'media_ids' => $mediaIds, 'media_complete' => ($exact['media_complete'] ?? false) === true, 'blockers' => (array) ($exact['blockers'] ?? []), 'media_usage' => $usageReadback, 'media_readback' => [], 'canonical_readback' => ['media_ids' => $mediaIds, 'media_usage' => $usageReadback], 'frontend_verified' => ($exact['complete'] ?? false) === true, 'binding_results' => [], 'governed_media_operations' => $governedMediaOperations, 'exact_media_operations' => true];
                     }
                     if (strtoupper(trim((string) ($context['content_intent']['intent'] ?? ''))) === 'MEDIA_ENRICHMENT') {
                         $trace('MEDIA_USAGE_RECONCILIATION', 'STARTED', ['capture_id' => (string) ($context['capture']['capture_id'] ?? '')]);

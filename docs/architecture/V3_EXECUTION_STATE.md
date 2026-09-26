@@ -20198,3 +20198,32 @@ LIVE_ACCEPTANCE: NOT RUN. No staging/production deployment or mutation was
 authorized or performed.
 
 STATUS: `URL_TO_URL_MEDIA_USAGE_COMPILER_LOCAL_READY / FULL_UNIT_ENVIRONMENT_AND_BASELINE_FAILURES / NO_LIVE_MUTATION`.
+
+# Checkpoint — 2026-09-26 — Exact MediaEnrichment canonical readback review
+
+REVIEW_FIX: Added a read-only exact-operation verification boundary after
+Governance execution. It now rejects blocked/not-applied Governance results,
+fresh-reads the canonical MediaUsage slot, validates target/type/id, role,
+placement, active state, media identity, usage UUID and revision, verifies old
+usage retirement for REPLACE, and verifies WordPress featured projection for
+`featured_primary`. KEEP is no longer reported from the compiler snapshot
+alone; it requires matching usage UUID and revision from fresh state.
+
+REGRESSION_TESTS: Added six focused tests covering Governance failure, ADD
+resulting UUID, REPLACE retirement, KEEP readback and drift, and featured
+projection mismatch. Existing URL compiler, media binding, preparation and
+featured projection tests remain passing. No schema, Graph, Article
+composition, direct WordPress writer or live data mutation was introduced.
+
+VALIDATION: Focused slice 41 tests / 126 assertions passed; Contract suite 6
+tests / 48 assertions passed; full Unit 2,697 tests / 15,594 assertions with
+one failure. The remaining `FrontendContractTest` failure is demonstrated on
+both this revision and parent `058dd72e7789382ce9efb7dc6652ec677005d7a5`:
+`header.php` uses `nhk_v3_navigation_groups()` while the test requires the
+older `nhk_v3_nav_fallback()` text. It is a pre-existing baseline failure and
+outside this review scope. PHP lint and `git diff --check` pass.
+
+INTEGRATION: BLOCKED because `NHK_WP_TEST_PATH` and `NHK_WP_TEST_DB` are not
+available. No alternate database or live/staging mutation was used.
+
+STATUS: `EXACT_MEDIA_READBACK_FAIL_CLOSED / BASELINE_FAILURE_DOCUMENTED / NO_LIVE_MUTATION`.
