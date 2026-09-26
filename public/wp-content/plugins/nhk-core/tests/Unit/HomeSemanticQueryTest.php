@@ -5,6 +5,7 @@ namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Home\HomeSemanticQuery;
 use NHK\Core\Application\Presentation\PublicNavigationDefinition;
+use NHK\Core\Application\Presentation\{ClockTypeNavigationProjection, NavigationTreeProjector};
 use NHK\Core\Application\Entity\{PublicEntityCollectionQuery, PublicEntityEligibilityPolicy, PublicIdentityContract, PublicRouteResolver};
 use NHK\Core\Application\Media\PublicMediaGalleryQuery;
 use NHK\Core\Application\Video\{VideoFrontendProjection, VideoMediaPresentationResolver};
@@ -14,6 +15,8 @@ use NHK\Core\Contracts\Home\BoundedLatestFeedReader;
 use NHK\Core\Domain\Authority\{AuthorityEntity, AuthorityState, CanonicalEntityTypeCatalog, EntityTypeRegistry};
 use NHK\Core\Domain\Media\{Media, MediaAsset, MediaUsage};
 use NHK\Core\Domain\Video\Video;
+use NHK\Core\Infrastructure\Presentation\InMemoryNavigationRepository;
+use NHK\Core\Domain\PresentationNavigation\NavigationNode;
 use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Tests\Support\InMemoryAuthorityRepository;
 use PHPUnit\Framework\TestCase;
@@ -96,7 +99,13 @@ final class HomeSemanticQueryTest extends TestCase
             public function slugExists(string $routeType, string $scope, string $slug, ?string $excludeIdentityId = null): bool { return false; }
             public function resolveHistoric(string $path): array { return []; }
         };
-        $collection = new PublicEntityCollectionQuery($authority, $types, new PublicIdentityContract($types, $identity), new PublicEntityEligibilityPolicy($authority, $types, $routes), $routes);
+        $navigationNode = NavigationNode::fromArray([
+            'id' => 'clock-type', 'navigation_key' => 'clock_type', 'canonical_type' => 'classification',
+            'canonical_uuid' => $clockType->canonicalId, 'sort_order' => 1, 'enabled' => true,
+            'show_in_type_index' => true, 'show_in_header_menu' => true, 'show_in_mobile_menu' => true, 'show_in_sidebar' => true,
+        ]);
+        $navigation = new ClockTypeNavigationProjection(new NavigationTreeProjector(new InMemoryNavigationRepository([$navigationNode])));
+        $collection = new PublicEntityCollectionQuery($authority, $types, new PublicIdentityContract($types, $identity), new PublicEntityEligibilityPolicy($authority, $types, $routes), $routes, null, null, null, null, null, $navigation);
         $modules = (new HomeSemanticQuery($authority, $this->media([]), $this->videos([]), $types, null, $routes, $collection))->extend([]);
 
         self::assertSame(['Đồng hồ công cộng'], array_column($modules['clock_groups'], 'title'));

@@ -54,7 +54,7 @@ final class HomeSemanticQuery
         foreach (['clock_groups_total', 'media_total', 'videos_total'] as $key) if (!isset($modules[$key])) $modules[$key] = 0;
 
         if ($this->ready('authority')) {
-            $clockGroups = $this->collection()->archiveProfile('clock_type', 1, 6);
+            $clockGroups = $this->collection()->curatedClockTypeArchive(6);
             if ((int) ($clockGroups['total'] ?? 0) > 0) {
                 $modules['clock_groups_total'] = (int) $clockGroups['total'];
                 $modules['hubs'][] = ['type' => 'clock_type', 'label' => 'Nhóm đồng hồ', 'total' => (int) $clockGroups['total'], 'url' => $this->routes()->archivePathForProfile('clock_type')];

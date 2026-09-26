@@ -7,17 +7,27 @@ use NHK\Core\Application\Authority\AuthorityService;
 use NHK\Core\Application\Entity\{PublicEntityCollectionQuery, PublicEntityEligibilityPolicy, PublicIdentityContract, PublicRouteResolver};
 use NHK\Core\Application\Graph\{BrandAggregationQuery, GraphService};
 use NHK\Core\Application\Knowledge\EntityKnowledgeProjection;
+use NHK\Core\Application\Presentation\{ClockTypeNavigationProjection, NavigationTreeProjector};
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
 use NHK\Core\Domain\Authority\{CanonicalEntityTypeCatalog, EntityTypeRegistry};
 use NHK\Core\Domain\Graph\{EndpointTypeRegistry, FakeEndpointResolver, NodeReference, PredicateRegistry};
 use NHK\Core\Domain\Knowledge\KnowledgeClaim;
 use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Core\Infrastructure\Graph\InMemoryAuditSink;
+use NHK\Core\Infrastructure\Presentation\InMemoryNavigationRepository;
+use NHK\Core\Domain\PresentationNavigation\NavigationNode;
 use NHK\Tests\Support\{InMemoryAuthorityRepository, InMemoryGraphRepository};
 use PHPUnit\Framework\TestCase;
 
 final class PublicEntityCollectionQueryTest extends TestCase
 {
+    private function navigation(string $canonicalId): ClockTypeNavigationProjection
+    {
+        $repository = new InMemoryNavigationRepository();
+        $repository->save(NavigationNode::fromArray(['navigation_key' => 'clock_type', 'canonical_type' => 'classification', 'canonical_uuid' => $canonicalId, 'enabled' => true, 'show_in_type_index' => true]), 0);
+        return new ClockTypeNavigationProjection(new NavigationTreeProjector($repository));
+    }
+
     /** @return array{query:PublicEntityCollectionQuery,repository:InMemoryAuthorityRepository} */
     private function query(): array
     {
@@ -96,7 +106,7 @@ final class PublicEntityCollectionQueryTest extends TestCase
         $authority->create('classification', 'nhk:classification:case-form.public', 'Đồng hồ công cộng', ['family' => 'case_form']);
         $routes = new PublicRouteResolver($repository, $types);
         $identity = new FixturePublicIdentityRepository(['authority|' . $clockType->canonicalId . '|classification' => ['current_slug' => 'dong-ho-cong-cong']]);
-        $query = new PublicEntityCollectionQuery($repository, $types, new PublicIdentityContract($types, $identity), new PublicEntityEligibilityPolicy($repository, $types, $routes), $routes);
+        $query = new PublicEntityCollectionQuery($repository, $types, new PublicIdentityContract($types, $identity), new PublicEntityEligibilityPolicy($repository, $types, $routes), $routes, null, null, null, null, null, $this->navigation($clockType->canonicalId));
 
         $archive = $query->archiveProfile('clock_type');
 
@@ -160,6 +170,8 @@ final class PublicEntityCollectionQueryTest extends TestCase
             null,
             null,
             $knowledge,
+            null,
+            $this->navigation($clockType->canonicalId),
         );
 
         $archive = $query->archiveProfile('clock_type');
@@ -205,6 +217,8 @@ final class PublicEntityCollectionQueryTest extends TestCase
             null,
             null,
             $knowledge,
+            null,
+            $this->navigation($root->canonicalId),
         );
 
         $archive = $query->archiveProfile('clock_type');

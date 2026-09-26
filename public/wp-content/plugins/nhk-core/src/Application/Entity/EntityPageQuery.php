@@ -9,12 +9,13 @@ use NHK\Core\Domain\Authority\{AuthorityEntity, EntityTypeRegistry};
 use NHK\Core\Domain\Seo\SeoReadinessResult;
 use NHK\Core\Shared\Migration\MigrationStatus;
 use NHK\Core\Application\Presentation\LatestFirstOrder;
+use NHK\Core\Application\Presentation\ClockTypeNavigationProjection;
 
 final class EntityPageQuery
 {
     private const EMPTY_RELATED = ['entities' => [], 'articles' => [], 'media' => [], 'videos' => []];
 
-    public function __construct(private AuthorityRepository $authority, private EntityTypeRegistry $types, private ?RelatedContentQuery $related = null, private ?MigrationStatus $status = null, private ?PublicRouteResolver $routes = null, private ?PublicEntityCollectionQuery $collection = null) {}
+    public function __construct(private AuthorityRepository $authority, private EntityTypeRegistry $types, private ?RelatedContentQuery $related = null, private ?MigrationStatus $status = null, private ?PublicRouteResolver $routes = null, private ?PublicEntityCollectionQuery $collection = null, private ?ClockTypeNavigationProjection $navigation = null) {}
 
     public function publicPath(AuthorityEntity $entity): ?string { return ($this->routes ??= new PublicRouteResolver($this->authority, $this->types))->path($entity); }
     public function archivePath(string $type): ?string { return ($this->routes ??= new PublicRouteResolver($this->authority, $this->types))->archivePath($type); }
@@ -89,8 +90,24 @@ final class EntityPageQuery
             $enriched = apply_filters('nhk_v3_entity_detail_projection', $item, $entity);
             if (is_array($enriched)) $item = $enriched;
         }
+        if ($entity !== null && $this->navigation !== null && (new EntityProfileResolver())->resolveProfile($entity)->profileKey === 'clock_type') {
+            $item['navigation_children'] = $this->navigationItems($this->navigation->children($entity->canonicalId));
+            $item['navigation_breadcrumb'] = array_merge($this->navigationItems($this->navigation->breadcrumb($entity->canonicalId)), [['canonical_id' => $entity->canonicalId, 'name' => $entity->canonicalName, 'url' => $this->publicPath($entity), 'sort_order' => 0]]);
+        }
         unset($item['_created_at'], $item['_updated_at']);
         return $item;
+    }
+
+    /** @param list<array<string,mixed>> $nodes @return list<array<string,mixed>> */
+    private function navigationItems(array $nodes): array
+    {
+        $items = [];
+        foreach ($nodes as $node) {
+            $entity = $this->authority->findByCanonicalId((string) ($node['canonical_uuid'] ?? ''));
+            if ($entity === null || !$entity->active()) continue;
+            $items[] = ['canonical_id' => $entity->canonicalId, 'name' => $entity->canonicalName, 'url' => $this->publicPath($entity), 'sort_order' => (int) ($node['sort_order'] ?? 0)];
+        }
+        return $items;
     }
 
     private function serialize(AuthorityEntity $entity): array

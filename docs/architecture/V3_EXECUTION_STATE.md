@@ -1,5 +1,40 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-26 — Curated LOẠI Presentation Navigation (LOCAL / NO MUTATION)
+
+IMPLEMENTED: Added an independent Presentation Navigation boundary for
+`clock_type`: immutable navigation node/value contracts, placement-aware tree
+projection, nearest-visible-ancestor/root fallback for hidden parents, WPDB
+Migration 023/repository with optimistic revision checks, idempotent initial
+seed service, public LOẠI roots/direct-child/breadcrumb projection, curated
+homepage/header/mobile/sidebar consumers, and an admin tree workbench. The
+semantic owner remains `classification + family=clock_type`; Graph
+`subtype_of` remains independent and no WordPress taxonomy or semantic payload
+fields were introduced.
+
+REGRESSION: Added projection, visibility, sort, disabled/hidden-parent,
+seed-blocked/replay, repository/schema/CAS, admin-tree and frontend contract
+tests. Existing Home/Frontend contracts were updated to provide an explicit
+curated navigation node rather than relying on a full semantic Clock Type
+archive.
+
+VERIFICATION: Focused Presentation Navigation suite passed 14 tests / 55
+assertions. Existing Home/Frontend route/presentation subset passed 84 tests /
+795 assertions. Full Unit passed 2,708 tests / 15,652 assertions under
+`memory_limit=512M` with 19 warnings and 46 deprecations. PHP lint, diff check
+and secret scan passed. The default 128M full Unit run is environment/tool
+memory-gated by an existing TrustedProvidedFileMaterializer test; the 512M
+run is the authoritative result.
+
+ENVIRONMENT_GATES: Migration/seed read-back was not executed because
+`NHK_RUN_MIGRATIONS`, `NHK_WP_TEST_PATH` and `NHK_WP_TEST_DB` are unset.
+Local HTTP route smoke is blocked because no server is listening on
+`localhost:80`. No database, staging/production mutation, deployment, push or
+commit was performed; `.git/index.lock` creation is blocked by the managed
+filesystem. Existing unrelated worktree changes remain untouched.
+
+STATUS: `CLOCK_TYPE_PRESENTATION_NAVIGATION_LOCAL_READY / RUNTIME_AND_BROWSER_BLOCKED / NO_MUTATION / UNCOMMITTED`
+
 # Checkpoint — 2026-09-26 — Homepage hero and Video archive media-frame repair (LOCAL / NO MUTATION)
 
 ROOT_CAUSE_CONFIRMED: Presentation CSS rendered the homepage hero image without
@@ -20253,3 +20288,26 @@ INTEGRATION: BLOCKED because `NHK_WP_TEST_PATH` and `NHK_WP_TEST_DB` are not
 available. No alternate database or live/staging mutation was used.
 
 STATUS: `EXACT_MEDIA_READBACK_FAIL_CLOSED / BASELINE_FAILURE_DOCUMENTED / NO_LIVE_MUTATION`.
+
+# Checkpoint — 2026-09-26 — Curated LOẠI Presentation Navigation final local verification
+
+IMPLEMENTATION: Clock Type now reads a dedicated `clock_type` Presentation
+Navigation projection. Classification remains the semantic owner; no WordPress
+taxonomy, Authority clone, semantic-family mutation, or Graph mutation was
+introduced. Index uses enabled/type-index roots only; detail uses direct
+children; header, mobile, sidebar and homepage use placement-specific flags.
+Hidden parents are reprojected to the nearest visible ancestor or root without
+mutating stored navigation or Classification. Admin writes use optimistic
+revision and the seed is resolver-only, idempotent, and never creates missing
+Classification.
+
+VALIDATION: Full NHK Unit passed: 2708 tests / 15652 assertions, 19 warnings,
+46 deprecations. PresentationNavigation/frontend focused slice passed: 39 tests
+/ 142 assertions. PHP lint and `git diff --check` passed.
+
+RUNTIME_GATES: Integration migration/seed read-back was not executed because
+`NHK_WP_TEST_PATH`, `NHK_WP_TEST_DB`, and an authorized runtime are unavailable.
+Frontend route smoke against localhost:80 could not connect. No staging,
+production, migration, seed, or semantic data mutation was performed.
+
+STATUS: `CLOCK_TYPE_PRESENTATION_NAVIGATION_LOCAL_READY / RUNTIME_AND_BROWSER_GATE_BLOCKED / NO_LIVE_MUTATION / UNCOMMITTED`.

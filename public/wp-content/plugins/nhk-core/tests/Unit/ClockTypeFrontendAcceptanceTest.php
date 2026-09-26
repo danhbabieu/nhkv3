@@ -4,13 +4,24 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Authority\AuthorityService;
+use NHK\Core\Application\Presentation\{ClockTypeNavigationProjection, NavigationTreeProjector};
 use NHK\Core\Application\Entity\{PublicEntityCollectionQuery, PublicEntityEligibilityPolicy, PublicIdentityContract, PublicRouteResolver};
 use NHK\Core\Domain\Authority\{AuthorityEntity, CanonicalEntityTypeCatalog, EntityTypeRegistry};
 use NHK\Tests\Support\InMemoryAuthorityRepository;
+use NHK\Core\Infrastructure\Presentation\InMemoryNavigationRepository;
+use NHK\Core\Domain\PresentationNavigation\NavigationNode;
 use PHPUnit\Framework\TestCase;
 
 final class ClockTypeFrontendAcceptanceTest extends TestCase
 {
+    /** @param list<string> $canonicalIds */
+    private function navigation(string ...$canonicalIds): ClockTypeNavigationProjection
+    {
+        $repository = new InMemoryNavigationRepository();
+        foreach ($canonicalIds as $canonicalId) $repository->save(NavigationNode::fromArray(['navigation_key' => 'clock_type', 'canonical_type' => 'classification', 'canonical_uuid' => $canonicalId, 'enabled' => true, 'show_in_type_index' => true]), 0);
+        return new ClockTypeNavigationProjection(new NavigationTreeProjector($repository));
+    }
+
     public function test_synthetic_clock_type_fixture_uses_profile_archive_and_persisted_identity(): void
     {
         $types = new EntityTypeRegistry();
@@ -23,7 +34,7 @@ final class ClockTypeFrontendAcceptanceTest extends TestCase
             'authority|' . $clockType->canonicalId . '|classification' => ['current_slug' => 'dong-ho-cong-cong'],
         ]);
         $routes = new PublicRouteResolver($authorityRepository, $types, null, null, $identities);
-        $query = new PublicEntityCollectionQuery($authorityRepository, $types, new PublicIdentityContract($types, $identities), new PublicEntityEligibilityPolicy($authorityRepository, $types, $routes), $routes);
+        $query = new PublicEntityCollectionQuery($authorityRepository, $types, new PublicIdentityContract($types, $identities), new PublicEntityEligibilityPolicy($authorityRepository, $types, $routes), $routes, null, null, null, null, null, $this->navigation($clockType->canonicalId));
 
         $before = count($authorityRepository->listByType('classification', true));
         $archive = $query->archiveProfile('clock_type');
@@ -84,7 +95,7 @@ final class ClockTypeFrontendAcceptanceTest extends TestCase
         }
         $identities = new ClockTypeFrontendFixtureIdentityRepository($identityRows);
         $routes = new PublicRouteResolver($repository, $types, null, null, $identities);
-        $query = new PublicEntityCollectionQuery($repository, $types, new PublicIdentityContract($types, $identities), new PublicEntityEligibilityPolicy($repository, $types, $routes), $routes);
+        $query = new PublicEntityCollectionQuery($repository, $types, new PublicIdentityContract($types, $identities), new PublicEntityEligibilityPolicy($repository, $types, $routes), $routes, null, null, null, null, null, $this->navigation($future[0]['id'], $future[1]['id']));
         $before = count($repository->listByType('classification', true));
 
         $archive = $query->archiveProfile('clock_type');

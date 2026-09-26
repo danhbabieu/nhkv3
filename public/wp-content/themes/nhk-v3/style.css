@@ -32,3 +32,4 @@ Version: 1.2.0
 .latest-feed-card-title{display:-webkit-box;overflow:hidden;margin-top:6px;font:700 1.05rem/1.15 Georgia,serif;-webkit-box-orient:vertical;-webkit-line-clamp:2}
 .latest-feed-card-summary{display:-webkit-box;overflow:hidden;margin-top:6px;color:var(--nhk-muted);font-size:.82rem;line-height:1.3;-webkit-box-orient:vertical;-webkit-line-clamp:2}
 @media(max-width:47.999rem){.home-latest-feed .latest-feed-list{grid-template-columns:1fr;gap:10px}.latest-feed-card-link{grid-template-columns:104px minmax(0,1fr);min-height:104px;gap:12px}.latest-feed-card-thumb{width:104px;height:104px}.latest-feed-card-link .latest-feed-row-body{padding:11px 12px 11px 0}.latest-feed-card-title{font-size:1rem}.latest-feed-card-summary{font-size:.78rem}}
+.nav-type-menu-mobile{display:none}@media(max-width:48rem){.nav-type-menu-mobile{display:block}}

@@ -19,7 +19,7 @@ use NHK\Core\Infrastructure\Migration\OwnerPublicationDecisionMigration013;
 use NHK\Core\Infrastructure\Migration\PublicIdentityMigration014;
 use NHK\Core\Infrastructure\Migration\DictionaryMigration015;
 use NHK\Core\Infrastructure\Migration\ClaimProjectionMigration016;
-use NHK\Core\Infrastructure\Migration\{EditorialCaptureAddendumMigration018, EditorialCaptureMigration017, GovernanceSubjectBindingMigration020, MediaBindingOperationMigration022, MediaUsageMetadataMigration021, VisualSupportRequirementMigration019};
+use NHK\Core\Infrastructure\Migration\{EditorialCaptureAddendumMigration018, EditorialCaptureMigration017, GovernanceSubjectBindingMigration020, MediaBindingOperationMigration022, MediaUsageMetadataMigration021, PresentationNavigationMigration023, VisualSupportRequirementMigration019};
 use NHK\Core\Infrastructure\Migration\MigrationDatabaseGuard;
 use NHK\Core\Application\Governance\GovernanceCapabilities;
 use NHK\Core\Application\Governance\{AuthorityStagingAdmission, CaptureChildRelationStagingAdmission, CaptureDependencyStagingAdmission, MediaBindingStagingAdmission, MediaMetadataStagingAdmission, VideoStagingAdmission};
@@ -73,6 +73,7 @@ use NHK\Core\Application\Media\{ArticleMediaCoordinator, ArticleMediaSeoProjecti
 use NHK\Core\Application\Media\MediaEnrichmentExactReadbackService;
 use NHK\Core\Application\Video\{VideoCompletenessPolicy, VideoEditorialAdapter, VideoEditorialGenerator, VideoHubClassifier, VideoIntakeService, VideoInternalSemanticResearcher, VideoKnowledgeEnrichmentPlanner, VideoRelationCandidatePlanner, VideoSeoProjection, VideoService, VideoSourceRefreshCommand, YouTubeDataApiClient, YouTubeSourceAdapter};
 use NHK\Core\Application\Home\HomeSemanticQuery;
+use NHK\Core\Application\Presentation\{ClockTypeNavigationProjection, NavigationTreeProjector};
 use NHK\Core\Application\Search\SearchSemanticQuery;
 use NHK\Core\Application\Knowledge\{EntityKnowledgeProjection, KnowledgePageQuery};
 use NHK\Core\Application\Knowledge\KnowledgeService;
@@ -80,6 +81,7 @@ use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
 use NHK\Core\Application\Collector\{CollectorFacetMaintenanceExecutor, CollectorFacetMaintenanceService};
 use NHK\Core\Application\WordPress\{CategoryGateway, EditorialDraftGateway};
 use NHK\Core\Infrastructure\WordPress\{WpCategoryStore, WpEditorialPostStore, WordPressPostUrlResolver};
+use NHK\Core\Infrastructure\Presentation\WpdbNavigationRepository;
 use NHK\Core\Infrastructure\Capture\{WpdbCaptureAddendumRepository, WpdbCaptureRepository};
 use NHK\Core\Infrastructure\Snapshot\SnapshotRuntimeComposition;
 
@@ -90,7 +92,7 @@ final class Plugin {
         $captureRepository = isset($wpdb) && is_object($wpdb) ? new WpdbCaptureRepository($wpdb) : null;
         // Keep an already-installed site aware of the code's migration target;
         // activation is not required for an upgrade health check to be honest.
-        update_option('nhk_core_migration_target', MediaBindingOperationMigration022::VERSION, false);
+        update_option('nhk_core_migration_target', PresentationNavigationMigration023::VERSION, false);
         if (self::runtimeMigrationsEnabled()) self::runPendingMigrations();
         add_action('nhk_v3_media_canonical_readback', static function (\NHK\Core\Domain\Media\Media $media, array $assets, array $contexts = []): void {
             global $wpdb;
@@ -214,7 +216,21 @@ final class Plugin {
             $publicSources = new WpdbSourceRepository($wpdb);
             $publicEvidence = new WpdbEvidenceRepository($wpdb);
             $publicKnowledge = new EntityKnowledgeProjection($publicClaims, $publicEvidence, $publicSources, $publicStatus);
-            $publicCollection = new PublicEntityCollectionQuery($publicAuthority, $publicTypes, new PublicIdentityContract($publicTypes), $publicEligibility, $publicRoutes, $publicAggregation, static fn (): bool => $publicStatus->authorityStorageReady(), new EntityMediaProjection($publicMedia, $publicAssets, $publicUsages), $publicKnowledge);
+            $navigationProjection = new ClockTypeNavigationProjection(new NavigationTreeProjector(new WpdbNavigationRepository($wpdb, static function (\NHK\Core\Domain\PresentationNavigation\NavigationNode $node) use ($publicAuthority): bool {
+                $entity = $publicAuthority->findByCanonicalId($node->canonicalUuid);
+                return $entity !== null && $entity->entityType === 'classification' && $entity->active() && (($entity->payload['family'] ?? null) === 'clock_type');
+            })));
+            $publicCollection = new PublicEntityCollectionQuery($publicAuthority, $publicTypes, new PublicIdentityContract($publicTypes), $publicEligibility, $publicRoutes, $publicAggregation, static fn (): bool => $publicStatus->authorityStorageReady(), new EntityMediaProjection($publicMedia, $publicAssets, $publicUsages), $publicKnowledge, null, $navigationProjection);
+            add_filter('nhk_v3_clock_type_navigation_items', static function (array $items, string $placement) use ($navigationProjection, $publicAuthority, $publicRoutes, $publicEligibility): array {
+                foreach ($navigationProjection->menu($placement) as $node) {
+                    $entity = $publicAuthority->findByCanonicalId((string) ($node['canonical_uuid'] ?? ''));
+                    if ($entity === null || !$entity->active() || !$publicEligibility->evaluate($entity)->eligible) continue;
+                    $path = $publicRoutes->path($entity);
+                    if ($path === null) continue;
+                    $items[] = ['label' => $entity->canonicalName, 'path' => $path, 'canonical_uuid' => $entity->canonicalId, 'featured' => (bool) ($node['featured'] ?? false), 'sort_order' => (int) ($node['sort_order'] ?? 0)];
+                }
+                return $items;
+            }, 10, 2);
             $homeGallery = new PublicMediaGalleryQuery($publicMedia, $publicAssets, PublicMediaAssetDelivery::fromEnvironment($publicAssets, $publicMedia), $publicUsages, PublicMediaArticleLinkResolver::fromWordPress());
             $homeSemanticQuery = new HomeSemanticQuery($publicAuthority, $publicMedia, $publicVideos, $publicTypes, $publicStatus, $publicRoutes, $publicCollection, $homeGallery, null, $publicClaims, new \NHK\Core\Application\Video\VideoFrontendProjection(null, new \NHK\Core\Application\Video\VideoMediaPresentationResolver($publicMedia, $publicAssets, $publicUsages)));
             add_filter('nhk_v3_home_semantic_modules', [$homeSemanticQuery, 'extend']);
@@ -228,7 +244,7 @@ final class Plugin {
             add_filter('nhk_v3_search_semantic_results', [new SearchSemanticQuery($publicAuthority, $publicMedia, $publicVideos, $publicClaims, $publicTypes, $publicStatus, $publicRoutes, $publicCollection, $claimOwnerUrl), 'extend'], 10, 3);
             $publicRelated = new RelatedContentQuery($publicGraph, $publicAuthority, $publicMedia, $publicVideos, $publicTypes, $publicStatus, $publicEligibility);
             add_filter('nhk_v3_post_related_content', static function (array $value, int $postId) use ($publicRelated): array { return $publicRelated->forPost($postId); }, 10, 2);
-            $publicEntityQuery = new EntityPageQuery($publicAuthority, $publicTypes, $publicRelated, $publicStatus, $publicRoutes, $publicCollection);
+            $publicEntityQuery = new EntityPageQuery($publicAuthority, $publicTypes, $publicRelated, $publicStatus, $publicRoutes, $publicCollection, $navigationProjection);
             $publicIdentityRepository = new WpdbPublicIdentityRepository($wpdb);
             \NHK\Core\Application\PublicIdentity\PublicIdentityReadRegistry::register($publicIdentityRepository);
             $historicPublicRouteService = new HistoricPublicRouteService($publicIdentityRepository);
@@ -2035,12 +2051,13 @@ final class Plugin {
         if ((int) get_option('nhk_core_migration_current', 0) < GovernanceSubjectBindingMigration020::VERSION || !GovernanceSubjectBindingMigration020::schemaReady($wpdb)) (new GovernanceSubjectBindingMigration020())->up();
         if ((int) get_option('nhk_core_migration_current', 0) < MediaUsageMetadataMigration021::VERSION || !MediaUsageMetadataMigration021::schemaReady($wpdb)) (new MediaUsageMetadataMigration021())->up();
         if ((int) get_option('nhk_core_migration_current', 0) < MediaBindingOperationMigration022::VERSION || !MediaBindingOperationMigration022::schemaReady($wpdb)) (new MediaBindingOperationMigration022())->up();
+        if ((int) get_option('nhk_core_migration_current', 0) < PresentationNavigationMigration023::VERSION || !PresentationNavigationMigration023::schemaReady($wpdb)) (new PresentationNavigationMigration023())->up();
     }
     public static function activate(): void {
         global $wpdb;
         MigrationDatabaseGuard::assertUpAllowed((string) $wpdb->get_var('SELECT DATABASE()'), 'PLUGIN_ACTIVATION_MIGRATIONS');
         add_option('nhk_core_migration_current', 0, '', false);
-        add_option('nhk_core_migration_target', MediaBindingOperationMigration022::VERSION, '', false);
+        add_option('nhk_core_migration_target', PresentationNavigationMigration023::VERSION, '', false);
         (new GraphMigration001())->up();
         (new AuthorityMigration002())->up();
         (new GovernanceMigration003())->up();

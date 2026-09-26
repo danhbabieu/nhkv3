@@ -11,8 +11,11 @@ $discoveryNav = is_array($navGroups['discovery'] ?? null) ? $navGroups['discover
   <div class="header-actions">
     <nav class="nav" id="primary-navigation" aria-label="Điều hướng chính">
       <div class="nav-primary"><?php nhk_v3_render_nav_items($primaryNav); ?></div>
+      <?php $typeNav = nhk_v3_clock_type_navigation_items('header_menu'); if ($typeNav !== []): ?><details class="nav-discovery nav-type-menu"><summary>LOẠI <span aria-hidden="true">⌄</span></summary><div class="nav-discovery-panel"><?php nhk_v3_render_nav_items($typeNav); ?></div></details><?php endif; ?>
+      <?php $mobileTypeNav = nhk_v3_clock_type_navigation_items('mobile_menu'); if ($mobileTypeNav !== []): ?><details class="nav-discovery nav-type-menu-mobile"><summary>LOẠI trên điện thoại <span aria-hidden="true">⌄</span></summary><div class="nav-discovery-panel"><?php nhk_v3_render_nav_items($mobileTypeNav); ?></div></details><?php endif; ?>
       <?php if ($discoveryNav !== []): ?><details class="nav-discovery"><summary>Khám phá <span aria-hidden="true">⌄</span></summary><div class="nav-discovery-panel"><?php nhk_v3_render_nav_items($discoveryNav); ?></div></details><?php endif; ?>
     </nav>
+    <?php if ($primaryNav === [] && $discoveryNav === []) nhk_v3_nav_fallback(); ?>
     <form class="global-search" role="search" method="get" action="<?php echo esc_url(home_url('/')); ?>"><label class="screen-reader-text" for="nhk-search">Tìm kiếm toàn hệ thống</label><input id="nhk-search" type="search" name="s" value="<?php echo esc_attr(get_search_query()); ?>" placeholder="Tìm trong NHK..." /><button type="submit">Tìm</button></form>
   </div>
 </div></header>

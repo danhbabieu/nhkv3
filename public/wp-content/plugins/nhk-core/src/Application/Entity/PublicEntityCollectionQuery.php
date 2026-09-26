@@ -10,6 +10,7 @@ use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Domain\Authority\{AuthorityEntity, EntityTypeRegistry};
 use NHK\Core\Application\Presentation\LatestFirstOrder;
 use NHK\Core\Application\Presentation\PresentationReadiness;
+use NHK\Core\Application\Presentation\ClockTypeNavigationProjection;
 
 final class PublicEntityCollectionQuery
 {
@@ -24,9 +25,18 @@ final class PublicEntityCollectionQuery
         private ?EntityMediaProjection $entityMedia = null,
         private ?EntityKnowledgeProjection $entityKnowledge = null,
         private ?\Closure $presentationSignals = null,
+        private ?ClockTypeNavigationProjection $navigation = null,
     ) {}
 
     public function types(): EntityTypeRegistry { return $this->types; }
+
+    /** @return array<string,mixed> */
+    public function curatedClockTypeArchive(int $perPage = 24): array
+    {
+        $definition = (new EntityProfileRegistry())->get('clock_type');
+        if (!$definition instanceof EntityProfileDefinition || $this->navigation === null) return ['available' => false, 'type' => 'classification', 'profile_key' => 'clock_type', 'page' => 1, 'per_page' => $perPage, 'total' => 0, 'query' => '', 'items' => []];
+        return $this->buildCuratedClockTypeArchive(['available' => $this->isAvailable(), 'type' => 'classification', 'profile_key' => 'clock_type', 'page' => 1, 'per_page' => min(100, max(1, $perPage)), 'total' => 0, 'query' => '', 'items' => []]);
+    }
 
     /** @return array{available:bool,type:string,profile_key:string,page:int,per_page:int,total:int,query:string,items:list<array<string,mixed>>} */
     public function archiveProfile(string $profileKey, int $page = 1, int $perPage = 24, string $query = ''): array
@@ -36,6 +46,9 @@ final class PublicEntityCollectionQuery
         $type = $definition instanceof EntityProfileDefinition ? (string) ($definition->matchingRule['entity_type'] ?? '') : '';
         $empty = ['available' => $this->isAvailable(), 'type' => $type, 'profile_key' => $profileKey, 'page' => $page, 'per_page' => $perPage, 'total' => 0, 'query' => $query, 'items' => []];
         if (!$this->isAvailable() || !$definition instanceof EntityProfileDefinition || $type === '') return $empty;
+
+        // Search is a permitted semantic surface for non-curated Classification; the LOẠI index itself never takes this branch because it has no query.
+        if ($profileKey === 'clock_type' && $query === '') return $this->navigation === null ? $empty : $this->buildCuratedClockTypeArchive($empty);
 
         $items = [];
         $resolver = new EntityProfileResolver();
@@ -52,6 +65,23 @@ final class PublicEntityCollectionQuery
         $empty['available'] = true;
         $empty['total'] = count($items);
         $empty['items'] = array_slice($items, ($page - 1) * $perPage, $perPage);
+        return $empty;
+    }
+
+    /** @param array<string,mixed> $empty @return array<string,mixed> */
+    private function buildCuratedClockTypeArchive(array $empty): array
+    {
+        $items = [];
+        foreach ($this->navigation->roots() as $node) {
+            $entity = $this->authority->findByCanonicalId((string) ($node['canonical_uuid'] ?? ''));
+            if ($entity === null || $entity->entityType !== 'classification') continue;
+            $item = $this->item($entity, '', false, true);
+            if ($item === null || ($item['profile_key'] ?? '') !== 'clock_type') continue;
+            $items[] = $item;
+        }
+        $empty['available'] = $this->navigation->available();
+        $empty['total'] = count($items);
+        $empty['items'] = $items;
         return $empty;
     }
 

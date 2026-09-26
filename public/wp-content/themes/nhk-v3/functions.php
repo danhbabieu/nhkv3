@@ -80,6 +80,13 @@ function nhk_v3_navigation_items(): array
     return $items;
 }
 
+/** @return list<array<string,mixed>> */
+function nhk_v3_clock_type_navigation_items(string $placement): array
+{
+    $items = apply_filters('nhk_v3_clock_type_navigation_items', [], $placement);
+    return is_array($items) ? array_values(array_filter($items, static fn (mixed $item): bool => is_array($item) && trim((string) ($item['label'] ?? '')) !== '' && trim((string) ($item['path'] ?? '')) !== '')) : [];
+}
+
 /** @param list<array{label:string,path:string}> $items */
 function nhk_v3_render_nav_items(array $items): void
 {

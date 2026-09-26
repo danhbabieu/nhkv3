@@ -17,6 +17,7 @@ final class AdminWorkbenchPage
         add_action('admin_post_nhk_governance_automation_policy', [self::class, 'saveAutomationPolicy']);
         HomeHeroAdminPage::register();
         GovernanceQueueAdminPage::register();
+        ClockTypeNavigationAdminPage::register();
     }
 
     public static function registerMenu(): void
