@@ -113,8 +113,12 @@ final class ContentPreparationOrchestrator
         ];
         $diagnostics['phase'] = 'LOCK_FINAL_SUBJECT_PACKET';
         $diagnostics['candidate_count'] = count($candidates);
+        $subjectOptionalForExactMediaTarget = $this->subjectOptionalForExactMediaTarget($input, $dependencyContext, $resolution, $candidates);
+        $diagnostics['subject_requirement'] = $subjectOptionalForExactMediaTarget
+            ? 'OPTIONAL_EXACT_MEDIA_TARGET'
+            : 'REQUIRED';
 
-        if (($resolution['status'] ?? '') !== 'resolved' && $reviewReasons === [] && $blockers === []) {
+        if (($resolution['status'] ?? '') !== 'resolved' && $reviewReasons === [] && $blockers === [] && !$subjectOptionalForExactMediaTarget) {
             $reviewReasons[] = 'PRIMARY_SUBJECT_NOT_RESOLVED';
         }
         $packet = SubjectResolutionPacket::fromResolution($resolution);
@@ -125,11 +129,52 @@ final class ContentPreparationOrchestrator
             return new ContentPreparationResult('REVIEW_REQUIRED', $fingerprint, $packet?->status === 'resolved' ? $packet : null, $candidates, $gaps, $plan, $enrichment, $diagnostics, [], $reviewReasons, [], $decisionTrace, $constraintFindings, $qualityDecision, $repairRounds, $dependencyFindings, $continuationDecision);
         }
 
-        if ($packet === null || $packet->status !== 'resolved') {
+        if ($packet === null || ($packet->status !== 'resolved' && !$subjectOptionalForExactMediaTarget)) {
             return new ContentPreparationResult('REVIEW_REQUIRED', $fingerprint, null, $candidates, $gaps, $plan, $enrichment, $diagnostics, [], ['FINAL_SUBJECT_PACKET_INVALID'], [], $decisionTrace, $constraintFindings, $qualityDecision, $repairRounds, $dependencyFindings, $continuationDecision);
         }
         $diagnostics['phase'] = 'PREPARED';
         return new ContentPreparationResult('PREPARED', $fingerprint, $packet, $candidates, $gaps, $plan, $enrichment, $diagnostics, [], [], [], $decisionTrace, $constraintFindings, $qualityDecision, $repairRounds, $dependencyFindings, $continuationDecision);
+    }
+
+    /**
+     * Exact MediaUsage work owns its target identity independently of semantic
+     * subject resolution. An absent subject may therefore be optional only
+     * when MEDIA_ENRICHMENT carries explicit target locators and no competing
+     * subject candidate/conflict was supplied.
+     *
+     * @param array<string,mixed> $input
+     * @param array<string,mixed> $context
+     * @param array<string,mixed> $resolution
+     * @param list<array<string,mixed>> $candidates
+     */
+    private function subjectOptionalForExactMediaTarget(array $input, array $context, array $resolution, array $candidates): bool
+    {
+        $intent = strtoupper(trim((string) (($context['content_intent']['intent'] ?? null) ?: ($input['intent'] ?? ''))));
+        if ($intent !== 'MEDIA_ENRICHMENT' || strtolower(trim((string) ($resolution['status'] ?? 'unresolved'))) !== 'unresolved' || $candidates !== []) {
+            return false;
+        }
+
+        $operations = is_array($input['media_operations'] ?? null) ? array_values($input['media_operations']) : [];
+        if ($operations === []) return false;
+
+        foreach ($operations as $operation) {
+            if (!is_array($operation)) return false;
+            $kind = strtolower(trim((string) ($operation['operation'] ?? '')));
+            if (!in_array($kind, ['add', 'replace', 'remove', 'representative_bind'], true)) return false;
+
+            $target = is_array($operation['target'] ?? null) ? $operation['target'] : [];
+            $type = strtolower(trim((string) ($target['type'] ?? '')));
+            if ($type === '') return false;
+
+            $id = trim((string) ($target['id'] ?? ''));
+            $stableKey = trim((string) ($target['stable_key'] ?? ''));
+            $blog = filter_var($target['blog_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+            $post = filter_var($target['post_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+            $hasWpLocator = $type === 'wp_post' && $blog !== false && $blog !== null && $post !== false && $post !== null;
+            if ($id === '' && $stableKey === '' && !$hasWpLocator) return false;
+        }
+
+        return true;
     }
 
     /** @param array<string,mixed> $input @param array<string,mixed> $interpretation @param list<array<string,mixed>> $assets @param array<string,mixed> $context */
