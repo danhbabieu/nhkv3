@@ -49,6 +49,37 @@ final class MediaEnrichmentIntentCompilerTest extends TestCase
         self::assertTrue($result['_nhk_exact_media_operations']);
     }
 
+    public function test_representative_wording_for_article_url_compiles_to_featured_replace(): void
+    {
+        $usages = new class implements MediaUsageRepository {
+            public function __construct() { $this->items = [new MediaUsage('01a06e2e-73a1-7550-b0e8-168aafdc6ceb', '01a0d7ee-3e33-7366-88c6-287112b34937', 'wp_post', '1:18', 'featured_primary', 0, '', '', [], '', 1, 'featured_primary', 'USER_EXPLICIT', 'PINNED')]; }
+            private array $items;
+            public function create(MediaUsage $usage): MediaUsage { $this->items[] = $usage; return $usage; }
+            public function listByEndpoint(string $type, string $key, ?string $role = null): array { return array_values(array_filter($this->items, static fn (MediaUsage $u): bool => $u->endpointType === $type && $u->endpointKey === $key && ($role === null || $u->role === $role))); }
+            public function listByMediaId(string $id, ?string $role = null): array { return []; }
+        };
+
+        $operation = $this->compiler($usages)->compile([
+            'intent' => 'MEDIA_ENRICHMENT',
+            'idempotency_key' => 'natural-representative-article-1',
+            'media_operations' => [[
+                'operation' => 'representative_bind',
+                'media_ref' => ['url' => 'https://demo.1945.vn/anh/bo-suu-tap-dong-ho-co.webp'],
+                'target' => ['url' => 'https://demo.1945.vn/carillon-la-gi-trong-dong-ho-co-phap-dung-nham-carillon-la-ten-hang/'],
+                'role' => 'representative',
+            ]],
+        ])['media_operations'][0];
+
+        self::assertSame('replace', $operation['operation']);
+        self::assertSame('featured_primary', $operation['role']);
+        self::assertSame('featured_primary', $operation['placement_key']);
+        self::assertSame(self::MEDIA, $operation['media']['id']);
+        self::assertSame('wp_post', $operation['target']['type']);
+        self::assertSame('1:18', $operation['target']['id']);
+        self::assertSame(self::USAGE, $operation['usage_id']);
+        self::assertSame(1, $operation['expected_usage_revision']);
+    }
+
     public function test_legacy_empty_featured_placement_is_reused_for_replace_cas(): void
     {
         $usages = new class implements MediaUsageRepository {
