@@ -156,6 +156,16 @@ final class ContentIntentRouterTest extends TestCase
         self::assertTrue($route['media_required']);
     }
 
+    public function test_natural_representative_command_is_media_enrichment_without_an_article(): void
+    {
+        $text = 'Dùng ảnh https://demo.1945.vn/anh/bo-suu-tap-dong-ho-co.webp làm đại diện cho https://demo.1945.vn/carillon-la-gi-trong-dong-ho-co-phap-dung-nham-carillon-la-ten-hang/';
+        $route = (new ContentIntentRouter())->route(['text' => $text], (new TextInputInterpreter())->interpret($text), []);
+
+        self::assertSame('MEDIA_ENRICHMENT', $route['intent']);
+        self::assertFalse($route['article_required']);
+        self::assertTrue($route['media_required']);
+    }
+
     public function test_explicit_media_enrichment_allows_existing_media_operation_without_physical_asset(): void
     {
         $route = (new ContentIntentRouter())->route(

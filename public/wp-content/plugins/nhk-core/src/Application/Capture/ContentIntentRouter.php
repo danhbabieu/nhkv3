@@ -24,6 +24,7 @@ final class ContentIntentRouter
         }
 
         $signals = $this->signals($input, $interpretation, $assets);
+        if ($signals['media_representative_command']) return $this->result(ContentIntent::MEDIA_ENRICHMENT, 'HEURISTIC', $signals);
         if ($signals['valid_video_url']) return $this->result(ContentIntent::VIDEO, 'HEURISTIC', $signals);
         if ($signals['has_assets'] && $signals['has_text']) return $this->result(ContentIntent::IMAGE_ARTICLE, 'HEURISTIC', $signals);
         if ($signals['atomic_delta']) return $this->result(ContentIntent::KNOWLEDGE_DELTA, 'HEURISTIC', $signals);
@@ -72,6 +73,7 @@ final class ContentIntentRouter
             }
         }
         $lower = function_exists('mb_strtolower') ? mb_strtolower($text) : strtolower($text);
+        $mediaRepresentativeCommand = preg_match('~^Dùng\s+ảnh\s+https://\S+\s+làm\s+(?:ảnh\s+)?đại\s+diện\s+cho\s+https://\S+\s*[.!?]?$~iu', $text) === 1;
         $userArticleMarker = trim((string) ($metadata['editorial_intent'] ?? '')) !== ''
             || strtolower((string) ($metadata['content_kind'] ?? '')) === 'article'
             || preg_match('/\b(?:bài viết|tìm hiểu|giới thiệu)\b/u', $lower) === 1;
@@ -84,6 +86,7 @@ final class ContentIntentRouter
             'has_text' => $text !== '',
             'has_assets' => $assets !== [],
             'valid_video_url' => $validVideoUrl,
+            'media_representative_command' => $mediaRepresentativeCommand,
             'sentence_count' => count($sentences),
             'independent_fact_count' => $candidateCount,
             'standalone_readability' => $text !== '' && (count($sentences) > 1 || $candidateCount > 1 || trim((string) ($input['title'] ?? '')) !== ''),
