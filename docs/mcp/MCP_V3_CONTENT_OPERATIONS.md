@@ -33,6 +33,23 @@ This shared guide describes the MCP V3 runtime actually present for ChatGPT and
 Codex. It does not authorize new entity types, predicates, relation types,
 fields, operations, taxonomy or data population.
 
+## First-party Media target URL resolution — 2026-09-26
+
+The normal `nhk.capture.ingest` path accepts the registered representative
+command `Dùng ảnh <Media URL> làm đại diện cho <target URL>`. URLs are
+locators, never canonical identity. The resolver accepts only one active,
+first-party, exact current Post or registered Authority route and fails closed
+on malformed, foreign, ambiguous, inactive, stale or route-drifted input.
+
+The compiler reuses the existing canonical Media and emits typed operations:
+`wp_post` uses `featured_primary` plus native featured projection; Authority
+owners use `representative` plus the registered representative projection.
+MediaUsage remains the sole consumer relation owner, so one shared Media can
+have independent Article and Authority usages without a Graph edge. Governance
+CAS/idempotency and fresh target-specific read-back are required before the
+Capture reports completion. No schema migration, data population, deployment
+or live acceptance is implied.
+
 ## Single canonical submission entry point — 2026-09-09
 
 `nhk.capture.ingest` is the only normal MCP entry point for a new submission.

@@ -158,6 +158,17 @@ input then uses the same Media adoption, source-original retention, derivative,
 MediaUsage and reconciliation boundary as a native upload. Foreign hosts,
 ambiguous metadata, traversal paths and non-image attachments fail closed.
 
+For representative intent, the operator may use the registered natural form
+`Dùng ảnh <first-party Media URL> làm đại diện cho <first-party target URL>`.
+Both URLs are locators only: the server resolves the existing canonical Media
+and exactly one active Post or registered Authority route, then Capture emits
+the typed governed operation. A Post uses `featured_primary` and must converge
+both its MediaUsage and native featured attachment; an Authority owner uses
+`representative` and must pass fresh representative projection read-back.
+Malformed, foreign, ambiguous, inactive or route-drifted targets fail closed.
+The same Media may serve independent Article and Authority usages; this does
+not create a Graph edge.
+
 ### Public image sizing
 
 The governed image adapter applies `PUBLIC IMAGE MAX LONG EDGE = 1920 PX` to

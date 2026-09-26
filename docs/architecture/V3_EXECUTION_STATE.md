@@ -20370,3 +20370,26 @@ Frontend route smoke against localhost:80 could not connect. No staging,
 production, migration, seed, or semantic data mutation was performed.
 
 STATUS: `CLOCK_TYPE_PRESENTATION_NAVIGATION_LOCAL_READY / RUNTIME_AND_BROWSER_GATE_BLOCKED / NO_LIVE_MUTATION / UNCOMMITTED`.
+
+# Checkpoint — 2026-09-26 — Universal Media target URL resolution
+
+IMPLEMENTATION: Added a first-party URL locator resolver for exact active
+WordPress Post and registered Authority routes, strict natural-language
+representative compilation, production Capture wiring, and target-specific
+fresh read-back. Posts use `featured_primary` plus native featured projection;
+Authority owners use `representative` plus `EntityMediaProjection` proof.
+MediaUsage remains the sole relation owner and shared Media creates no Graph
+edge. URLs are never persisted as canonical identity.
+
+VALIDATION: Resolver/compiler/wiring/readback focused suites passed in Tasks 1–4;
+the latest read-back slice passed 18 tests / 44 assertions with one PHPUnit
+deprecation. PHP lint and `git diff --check` passed. Contract documentation was
+updated without schema or data mutation.
+
+INTEGRATION: NOT RUN; required `NHK_WP_TEST_PATH` and `NHK_WP_TEST_DB` are not
+available. No alternate database was used.
+
+LIVE_ACCEPTANCE: NOT RUN. No staging/production deployment or mutation was
+authorized or performed.
+
+STATUS: `UNIVERSAL_MEDIA_TARGET_URL_LOCAL_READY / INTEGRATION_ENVIRONMENT_UNAVAILABLE / NO_LIVE_MUTATION`.

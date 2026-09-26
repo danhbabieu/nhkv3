@@ -232,6 +232,21 @@ The binding receipt stages are `VALIDATE`, `RESOLVE_MEDIA`, `RESOLVE_TARGET`,
 `PROJECTION_INVALIDATE`, `FINAL_READBACK`, and `COMPLETE`; retries never create a
 second Usage for the same idempotent request.
 
+### Universal representative target URL — 2026-09-26
+
+Capture may normalize the registered Vietnamese command `Dùng ảnh <Media URL>
+làm đại diện cho <target URL>` into the existing typed Media enrichment
+operations. The first-party resolver treats both URLs as locators and requires
+one exact active canonical route: native WordPress Posts map to
+`featured_primary` and native featured read-back; registered Authority owners
+map to `representative` and exact representative projection read-back. A
+shared Media keeps independent MediaUsage rows for each target; no Graph edge
+is created from reuse. Any missing/ambiguous/inactive/route-drifted target,
+CAS or idempotency conflict, or projection/attachment drift remains a
+non-success diagnostic. The flow remains Capture → Governance → fresh
+canonical read-back; it does not authorize direct writers, migration or live
+acceptance.
+
 Text-only input is valid. Multipart files remain binary transport data and are
 never put into JSON, Knowledge, Evidence or Graph storage. The Capture stores
 editorial intent, observations, candidate provenance and phase receipts; the
