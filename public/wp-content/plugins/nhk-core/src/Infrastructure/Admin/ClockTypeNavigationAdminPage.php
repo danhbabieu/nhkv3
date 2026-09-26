@@ -11,8 +11,13 @@ final class ClockTypeNavigationAdminPage
 {
     public static function register(): void
     {
-        add_submenu_page('nhk-v3', 'LOẠI đồng hồ', 'LOẠI đồng hồ', 'manage_options', 'nhk-v3-clock-type-navigation', [self::class, 'render']);
+        add_action('admin_menu', [self::class, 'registerMenu'], 12);
         add_action('admin_post_nhk_clock_type_navigation_save', [self::class, 'save']);
+    }
+
+    public static function registerMenu(): void
+    {
+        add_submenu_page('nhk-v3', 'LOẠI đồng hồ', 'LOẠI đồng hồ', 'manage_options', 'nhk-v3-clock-type-navigation', [self::class, 'render']);
     }
 
     public static function render(): void

@@ -1,5 +1,31 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-26 — Admin submenu bootstrap fatal-error repair (LOCAL / NO MUTATION)
+
+ROOT_CAUSE_CONFIRMED: `ClockTypeNavigationAdminPage::register()` called
+`add_submenu_page()` while the plugin entrypoint was still loading, before
+WordPress had initialized the current-user boundary. WordPress capability
+resolution then called the unavailable `wp_get_current_user()` and aborted the
+request.
+
+FIXED_BOUNDARY: Deferred only the Clock Type submenu creation to the
+`admin_menu` hook at priority 12. The existing admin-post save registration,
+capability checks, navigation repository and semantic/presentation boundaries
+are unchanged.
+
+REGRESSION: Added a test proving menu registration is deferred to
+`admin_menu`; the test was observed failing before the production change and
+passes after it.
+
+VERIFICATION: Focused Presentation Navigation test passed 2 tests / 14
+assertions. Full PHPUnit with `memory_limit=512M` completed 2,861 tests /
+15,734 assertions; 21 integration failures are environment-gated by missing
+`NHK_WP_TEST_PATH` and/or `NHK_WP_TEST_DB`, with no changed-path assertion
+failure. PHP lint, diff check and secret scan passed. No database, staging,
+production, deployment, push or commit was performed.
+
+STATUS: `ADMIN_BOOTSTRAP_FATAL_ERROR_LOCAL_READY / INTEGRATION_ENVIRONMENT_BLOCKED / NO_MUTATION / UNCOMMITTED`
+
 # Checkpoint — 2026-09-26 — Curated LOẠI Presentation Navigation (LOCAL / NO MUTATION)
 
 IMPLEMENTED: Added an independent Presentation Navigation boundary for
