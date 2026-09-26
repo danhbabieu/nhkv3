@@ -1,5 +1,31 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-26 — Homepage hero and Video archive media-frame repair (LOCAL / NO MUTATION)
+
+ROOT_CAUSE_CONFIRMED: Presentation CSS rendered the homepage hero image without
+an independent bounded frame, while shared Video cards let the thumbnail frame
+change by source orientation and did not force the card link into a vertical
+layout. Valid source/derivative dimensions were already supplied by the
+read-only Media/Video presentation projections; no ingest or MediaUsage defect
+was found.
+
+FIXED_BOUNDARY: Added a centered 4:3 hero image frame with `contain` and
+`object-position:center center`. Video archive cards now share a 16:9 frame,
+centered `contain` thumbnails, flex-column card links, frame-anchored play
+controls and copy below the frame. Removed orientation-specific Video frame
+ratios and bumped the entity stylesheet version for cache invalidation. No
+content, Media, MediaUsage, semantic owner, route, schema or database boundary
+changed.
+
+REGRESSION: Added frontend presentation contracts for stable hero/video frames
+and responsive-safe structure. Focused frontend/media/video policy suite passed
+46 tests / 249 assertions. PHP lint, diff check and secret scan passed. Browser
+staging was used to reproduce `/` and `/video/`; local WordPress browser
+verification remains environment-gated by the unavailable local MySQL service.
+No staging/live mutation or deployment was performed.
+
+STATUS: `HOMEPAGE_VIDEO_MEDIA_FRAMES_LOCAL_READY / BROWSER_LOCAL_BLOCKED / NO_MUTATION / NO_DEPLOY`.
+
 # Checkpoint — 2026-09-25 — Latest feed intrinsic-image layout repair (LOCAL / NO MUTATION)
 
 ROOT_CAUSE_CONFIRMED: The staging screenshot showed the `.latest-feed-list`

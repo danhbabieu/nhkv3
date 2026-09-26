@@ -181,8 +181,8 @@ final class FrontendPresentationContractTest extends TestCase
         $css = $this->read('style.css') . $this->read('presentation.css') . $this->read('entity.css');
 
         self::assertStringContainsString('home-hero-v2', $css);
-        self::assertStringContainsString('max-height:520px', $css);
-        self::assertStringContainsString('grid-template-columns:minmax(0,1fr) minmax(32%,38%)', $css);
+        self::assertStringContainsString('aspect-ratio:4/3', $css);
+        self::assertStringContainsString('grid-template-columns:minmax(0,1.28fr) minmax(300px,.72fr)', $css);
         self::assertStringNotContainsString('height:100vh', $css);
     }
 
@@ -195,8 +195,26 @@ final class FrontendPresentationContractTest extends TestCase
         self::assertStringContainsString('.hero-media-column{min-width:0', $css);
         self::assertStringContainsString('max-width:100%', $css);
         self::assertStringContainsString('overflow:hidden', $css);
-        self::assertStringContainsString('width:100%;height:min(430px,42vw);max-height:430px;object-fit:contain', $css);
-        self::assertStringContainsString("wp_register_style('nhk-v3-entity', get_theme_file_uri('entity.css'), ['nhk-v3-style'], '1.0.9')", $functions);
+        self::assertStringContainsString('.hero-image-frame{display:grid;place-items:center;width:100%;aspect-ratio:4/3;overflow:hidden', $css);
+        self::assertStringContainsString('object-position:center center', $css);
+        self::assertStringContainsString("wp_register_style('nhk-v3-entity', get_theme_file_uri('entity.css'), ['nhk-v3-style'], '1.1.0')", $functions);
+    }
+
+    public function test_homepage_hero_and_video_archive_use_stable_centered_media_frames(): void
+    {
+        $home = $this->read('front-page.php');
+        $video = $this->read('template-parts/presentation/video-card.php');
+        $css = $this->read('presentation.css');
+
+        self::assertStringContainsString('<span class="hero-image-frame">', $home);
+        self::assertStringContainsString('video-card-link', $video);
+        self::assertStringContainsString('.video-card-link{display:flex;flex-direction:column;height:100%', $css);
+        self::assertStringContainsString('.video-poster{display:flex;align-items:center;justify-content:center;width:100%;aspect-ratio:16/9', $css);
+        self::assertStringContainsString('.video-poster img{display:block;width:100%;height:100%;object-fit:contain;object-position:center center', $css);
+        self::assertStringContainsString('.video-card-copy{display:flex;min-width:0;flex:1;flex-direction:column', $css);
+        self::assertStringNotContainsString('.nhk-media--portrait .video-poster{aspect-ratio:4/5}', $css);
+        self::assertStringNotContainsString('.nhk-media--square .video-poster{aspect-ratio:1}', $css);
+        self::assertStringNotContainsString('.nhk-media--landscape .video-poster{aspect-ratio:4/3}', $css);
     }
 
     public function test_entity_detail_renders_dossier_knowledge_gallery_and_path_aware_related_content(): void
