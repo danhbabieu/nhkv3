@@ -95,6 +95,17 @@ final class McpTransportBoundaryTest extends TestCase
         ]]]);
     }
 
+    public function test_capture_ingest_compiles_media_intent_before_entering_capture_boundary(): void
+    {
+        $transport = (string) file_get_contents(__DIR__ . '/../../src/Application/Mcp/McpTransport.php');
+        $compile = strpos($transport, 'if ($this->mediaIntentCompiler !== null) $arguments = $this->mediaIntentCompiler->compile($arguments);');
+        $capture = strpos($transport, 'return $this->capture->execute($arguments)->toArray();');
+
+        self::assertNotFalse($compile);
+        self::assertNotFalse($capture);
+        self::assertLessThan($capture, $compile);
+    }
+
     public function test_oneof_reports_deterministic_ambiguity_and_combined_no_match(): void
     {
         $ambiguous = [

@@ -80,7 +80,7 @@ use NHK\Core\Application\Knowledge\KnowledgeService;
 use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
 use NHK\Core\Application\Collector\{CollectorFacetMaintenanceExecutor, CollectorFacetMaintenanceService};
 use NHK\Core\Application\WordPress\{CategoryGateway, EditorialDraftGateway};
-use NHK\Core\Infrastructure\WordPress\{WpCategoryStore, WpEditorialPostStore, WordPressPostUrlResolver};
+use NHK\Core\Infrastructure\WordPress\{WpCategoryStore, WpEditorialPostStore, WordPressMediaTargetUrlResolver};
 use NHK\Core\Infrastructure\Presentation\WpdbNavigationRepository;
 use NHK\Core\Infrastructure\Capture\{WpdbCaptureAddendumRepository, WpdbCaptureRepository};
 use NHK\Core\Infrastructure\Snapshot\SnapshotRuntimeComposition;
@@ -1961,7 +1961,7 @@ final class Plugin {
                 new SharedEditorialComposer(),
                 new EditorialQualityGate(),
             );
-            (new McpApi(new McpTransport($mcpRead, $mcpGovernance, static fn (string $capability): bool => current_user_can($capability), static fn (string $value): bool => in_array($value, $allowedOrigins, true), $articleHandler, $videoIntake, $wordpressAttachments, $categoryGateway, $draftGateway, new CanonicalDependencyValidator($claims, $sources, $evidence), $publicUrlMaintenance, $mediaBatchUpload, $documentation, $capture, $captureContinuation, $authorityCapture, static function (): bool { return (new MigrationStatus())->runtimeSchemaReady(); }, $imageIngest, semanticWritePolicy: $semanticWritePolicy, mediaBinding: $mediaBindingService, videoSourceRefresh: $videoSourceRefresh, knowledgeRepairPreview: $knowledgeRepairPreview, videoFrontendReconciliation: $videoFrontendReconciliation, knowledgeWriterPreview: $knowledgeWriterPreview, mediaTargetNormalizer: new \NHK\Core\Application\Media\MediaTargetNormalizer($endpoints, $types, $authority), mediaIntentCompiler: new MediaEnrichmentIntentCompiler($mediaBindingService, $usages, new MediaTargetNormalizer($endpoints, $types, $authority), [new WordPressPostUrlResolver(), 'resolve'])), $recoveryBinding))->register();
+            (new McpApi(new McpTransport($mcpRead, $mcpGovernance, static fn (string $capability): bool => current_user_can($capability), static fn (string $value): bool => in_array($value, $allowedOrigins, true), $articleHandler, $videoIntake, $wordpressAttachments, $categoryGateway, $draftGateway, new CanonicalDependencyValidator($claims, $sources, $evidence), $publicUrlMaintenance, $mediaBatchUpload, $documentation, $capture, $captureContinuation, $authorityCapture, static function (): bool { return (new MigrationStatus())->runtimeSchemaReady(); }, $imageIngest, semanticWritePolicy: $semanticWritePolicy, mediaBinding: $mediaBindingService, videoSourceRefresh: $videoSourceRefresh, knowledgeRepairPreview: $knowledgeRepairPreview, videoFrontendReconciliation: $videoFrontendReconciliation, knowledgeWriterPreview: $knowledgeWriterPreview, mediaTargetNormalizer: new \NHK\Core\Application\Media\MediaTargetNormalizer($endpoints, $types, $authority), mediaIntentCompiler: new MediaEnrichmentIntentCompiler($mediaBindingService, $usages, new MediaTargetNormalizer($endpoints, $types, $authority), new WordPressMediaTargetUrlResolver($publicRoutes, historicRoutes: new HistoricPublicRouteService($publicIdentityRepository)))), $recoveryBinding))->register();
             do_action('nhk_mcp_register_tools', McpToolCatalog::tools(), $mcpRead, $mcpGovernance);
         });
         add_action('admin_menu', [AdminPage::class, 'register']);

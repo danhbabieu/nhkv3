@@ -137,6 +137,17 @@ final class PluginBootWiringTest extends TestCase
         self::assertStringContainsString('rest_do_request($request)', (string) file_get_contents(__DIR__ . '/../../src/Application/Mcp/McpAbilityRegistration.php'));
     }
 
+    public function test_capture_media_compiler_uses_first_party_target_url_resolver(): void
+    {
+        $plugin = (string) file_get_contents(__DIR__ . '/../../src/Plugin.php');
+
+        self::assertStringContainsString('new WordPressMediaTargetUrlResolver($publicRoutes', $plugin);
+        self::assertStringNotContainsString(
+            'mediaIntentCompiler: new MediaEnrichmentIntentCompiler($mediaBindingService, $usages, new MediaTargetNormalizer($endpoints, $types, $authority), [new WordPressPostUrlResolver(), \'resolve\'])',
+            $plugin,
+        );
+    }
+
     public function test_capture_owned_draft_write_suppresses_generic_post_media_hook_until_capture_reconciliation(): void
     {
         $plugin = (string) file_get_contents(__DIR__ . '/../../src/Plugin.php');
