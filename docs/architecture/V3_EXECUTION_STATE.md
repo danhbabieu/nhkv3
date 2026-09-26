@@ -1,5 +1,31 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-26 — Media representative natural-command routing (LOCAL / NO MUTATION)
+
+ROOT_CAUSE_CONFIRMED: `ContentIntentRouter` and `MediaEnrichmentIntentCompiler`
+recognized only the `Dùng ảnh ... làm đại diện cho ...` ordering. The requested
+target-first forms therefore fell through the atomic-delta heuristic and were
+classified as `KNOWLEDGE_DELTA`.
+
+FIXED_BOUNDARY: Extended only the natural-command recognition and existing
+operation normalization to support the four registered Vietnamese forms. Media
+URLs remain Media locators; Article URLs remain target locators. The existing
+compiler, `featured_primary` Article role, Capture, Governance and MediaUsage
+paths are unchanged. No Article or Knowledge owner is created by this intent.
+
+REGRESSION: Focused router/compiler tests cover all four forms, assert
+`MEDIA_ENRICHMENT`, `media_representative_command=true`, no semantic delta,
+correct locator direction, Article `featured_primary` compilation and replay
+idempotency.
+
+VERIFICATION: Focused Media/Capture/contract suite passed 92 tests / 904
+assertions; Contract suite passed 6 tests / 48 assertions; full Unit passed
+2,736 tests / 15,776 assertions with existing warnings/deprecations. PHP lint,
+`composer lint` and `git diff --check` passed. No database, staging,
+production, deployment or MediaBinding architecture change was performed.
+
+STATUS: `MEDIA_REPRESENTATIVE_ROUTING_LOCAL_READY / NO_MUTATION / UNCOMMITTED`
+
 # Checkpoint — 2026-09-26 — Homepage hero horizontal overflow repair (LOCAL / NO MUTATION)
 
 ROOT_OVERFLOW_ELEMENT: Staging runtime reported `figure.hero-image` and its

@@ -19,7 +19,8 @@ final class MediaEnrichmentIntentCompilerTest extends TestCase
     private const USAGE = '01a06e2e-73a1-7550-b0e8-168aafdc6ceb';
     public const MODEL = '01a07614-832d-7f27-959c-74eb0cd63f3e';
 
-    public function test_natural_representative_command_compiles_to_featured_article_operation(): void
+    /** @dataProvider naturalRepresentativeCommandProvider */
+    public function test_natural_representative_commands_compile_to_featured_article_operation(string $text): void
     {
         $result = $this->compiler(new class implements MediaUsageRepository {
             public function create(MediaUsage $usage): MediaUsage { return $usage; }
@@ -27,13 +28,54 @@ final class MediaEnrichmentIntentCompilerTest extends TestCase
             public function listByMediaId(string $id, ?string $role = null): array { return []; }
         })->compile([
             'idempotency_key' => 'natural-article-1',
-            'text' => 'Dùng ảnh https://demo.1945.vn/anh/bo-suu-tap-dong-ho-co.webp làm đại diện cho https://demo.1945.vn/carillon-la-gi-trong-dong-ho-co-phap-dung-nham-carillon-la-ten-hang/',
+            'text' => $text,
         ]);
 
         self::assertSame('MEDIA_ENRICHMENT', $result['intent']);
         self::assertSame('add', $result['media_operations'][0]['operation']);
         self::assertSame('featured_primary', $result['media_operations'][0]['role']);
         self::assertSame('1:18', $result['media_operations'][0]['target']['id']);
+        self::assertSame(self::MEDIA, $result['media_operations'][0]['media']['id']);
+        self::assertSame('1:18', $result['media_operations'][0]['target']['id']);
+    }
+
+    public static function naturalRepresentativeCommandProvider(): array
+    {
+        $article = 'https://demo.1945.vn/carillon-la-gi-trong-dong-ho-co-phap-dung-nham-carillon-la-ten-hang/';
+        $media = 'https://demo.1945.vn/anh/bo-suu-tap-dong-ho-co.webp';
+
+        return [
+            ['Ảnh đại diện của ' . $article . ' thay bằng ' . $media],
+            ['Thay ảnh đại diện của ' . $article . ' bằng ' . $media],
+            ['Dùng ' . $media . ' làm ảnh đại diện cho ' . $article],
+            ['Dùng ảnh ' . $media . ' làm đại diện cho ' . $article],
+        ];
+    }
+
+    public function test_replay_of_same_natural_representative_command_preserves_idempotency_and_keeps_usage(): void
+    {
+        $usages = new class implements MediaUsageRepository {
+            public function create(MediaUsage $usage): MediaUsage { return $usage; }
+            public function listByEndpoint(string $type, string $key, ?string $role = null): array
+            {
+                return [new MediaUsage('01a06e2e-73a1-7550-b0e8-168aafdc6ceb', '01a0d7ee-3e33-7366-88c6-287112b34936', 'wp_post', '1:18', 'featured_primary', 0, '', '', [], '', 1, 'featured_primary', 'USER_EXPLICIT', 'PINNED')];
+            }
+            public function listByMediaId(string $id, ?string $role = null): array { return []; }
+        };
+        $input = [
+            'intent' => 'MEDIA_ENRICHMENT',
+            'idempotency_key' => 'natural-replay-1',
+            'text' => 'Ảnh đại diện của https://demo.1945.vn/carillon-la-gi-trong-dong-ho-co-phap-dung-nham-carillon-la-ten-hang/ thay bằng https://demo.1945.vn/anh/bo-suu-tap-dong-ho-co.webp',
+        ];
+
+        $first = $this->compiler($usages)->compile($input)['media_operations'][0];
+        $second = $this->compiler($usages)->compile($input)['media_operations'][0];
+
+        self::assertSame('keep', $first['operation']);
+        self::assertSame('keep', $second['operation']);
+        self::assertSame($first['idempotency_key'], $second['idempotency_key']);
+        self::assertSame(self::MEDIA, $first['media']['id']);
+        self::assertSame('1:18', $first['target']['id']);
     }
 
     public function test_semantic_target_url_compiles_to_representative_bind_without_url_identity(): void

@@ -157,13 +157,28 @@ final class MediaEnrichmentIntentCompiler
     {
         if ((array) ($input['media_operations'] ?? []) !== []) return $input;
         $text = trim((string) ($input['text'] ?? $input['content'] ?? ''));
-        if ($text === '' || preg_match('~^Dùng\s+ảnh\s+(https://\S+)\s+làm\s+(?:ảnh\s+)?đại\s+diện\s+cho\s+(https://\S+)\s*[.!?]?$~iu', $text, $matches) !== 1) return $input;
-        $mediaUrl = rtrim($matches[1], '.,!?');
-        $targetUrl = rtrim($matches[2], '.,!?');
+        [$mediaUrl, $targetUrl] = $this->naturalRepresentativeLocators($text);
+        if ($mediaUrl === null || $targetUrl === null) return $input;
         $input['intent'] = 'MEDIA_ENRICHMENT';
         $input['media_operations'] = [[
             'operation' => 'representative_bind', 'media_ref' => ['url' => $mediaUrl], 'target' => ['url' => $targetUrl], 'role' => 'representative',
         ]];
         return $input;
+    }
+
+    /** @return array{0:?string,1:?string} */
+    private function naturalRepresentativeLocators(string $text): array
+    {
+        $patterns = [
+            ['~^Ảnh\s+đại\s+diện\s+của\s+(https://\S+)\s+thay\s+bằng\s+(https://\S+)\s*[.!?]?$~iu', 2, 1],
+            ['~^Thay\s+ảnh\s+đại\s+diện\s+của\s+(https://\S+)\s+bằng\s+(https://\S+)\s*[.!?]?$~iu', 2, 1],
+            ['~^Dùng\s+(https://\S+)\s+làm\s+ảnh\s+đại\s+diện\s+cho\s+(https://\S+)\s*[.!?]?$~iu', 1, 2],
+            ['~^Dùng\s+ảnh\s+(https://\S+)\s+làm\s+đại\s+diện\s+cho\s+(https://\S+)\s*[.!?]?$~iu', 1, 2],
+        ];
+        foreach ($patterns as [$pattern, $mediaIndex, $targetIndex]) {
+            if (preg_match($pattern, $text, $matches) !== 1) continue;
+            return [rtrim($matches[$mediaIndex], '.,!?'), rtrim($matches[$targetIndex], '.,!?')];
+        }
+        return [null, null];
     }
 }

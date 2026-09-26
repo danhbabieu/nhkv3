@@ -156,14 +156,29 @@ final class ContentIntentRouterTest extends TestCase
         self::assertTrue($route['media_required']);
     }
 
-    public function test_natural_representative_command_is_media_enrichment_without_an_article(): void
+    /** @dataProvider naturalRepresentativeCommandProvider */
+    public function test_natural_representative_commands_are_media_enrichment_without_an_article(string $text): void
     {
-        $text = 'Dùng ảnh https://demo.1945.vn/anh/bo-suu-tap-dong-ho-co.webp làm đại diện cho https://demo.1945.vn/carillon-la-gi-trong-dong-ho-co-phap-dung-nham-carillon-la-ten-hang/';
         $route = (new ContentIntentRouter())->route(['text' => $text], (new TextInputInterpreter())->interpret($text), []);
 
         self::assertSame('MEDIA_ENRICHMENT', $route['intent']);
         self::assertFalse($route['article_required']);
         self::assertTrue($route['media_required']);
+        self::assertTrue($route['signals']['media_representative_command']);
+        self::assertSame('NONE', $route['semantic_delta']['status']);
+    }
+
+    public static function naturalRepresentativeCommandProvider(): array
+    {
+        $article = 'https://demo.1945.vn/con-111-bo-con-pho-bien-tren-dong-may-odo-24/';
+        $media = 'https://demo.1945.vn/anh/anh-chup-mat-truoc-bo-khuon-111-voi-so-111.webp';
+
+        return [
+            ['Ảnh đại diện của ' . $article . ' thay bằng ' . $media],
+            ['Thay ảnh đại diện của ' . $article . ' bằng ' . $media],
+            ['Dùng ' . $media . ' làm ảnh đại diện cho ' . $article],
+            ['Dùng ảnh ' . $media . ' làm đại diện cho ' . $article],
+        ];
     }
 
     public function test_explicit_media_enrichment_allows_existing_media_operation_without_physical_asset(): void

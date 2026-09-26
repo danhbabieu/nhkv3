@@ -73,7 +73,7 @@ final class ContentIntentRouter
             }
         }
         $lower = function_exists('mb_strtolower') ? mb_strtolower($text) : strtolower($text);
-        $mediaRepresentativeCommand = preg_match('~^Dùng\s+ảnh\s+https://\S+\s+làm\s+(?:ảnh\s+)?đại\s+diện\s+cho\s+https://\S+\s*[.!?]?$~iu', $text) === 1;
+        $mediaRepresentativeCommand = $this->isNaturalMediaRepresentativeCommand($text);
         $userArticleMarker = trim((string) ($metadata['editorial_intent'] ?? '')) !== ''
             || strtolower((string) ($metadata['content_kind'] ?? '')) === 'article'
             || preg_match('/\b(?:bài viết|tìm hiểu|giới thiệu)\b/u', $lower) === 1;
@@ -105,6 +105,19 @@ final class ContentIntentRouter
         }
         $media = is_array($input['media'] ?? null) ? $input['media'] : [];
         return trim((string) ($media['description'] ?? ''));
+    }
+
+    private function isNaturalMediaRepresentativeCommand(string $text): bool
+    {
+        foreach ([
+            '~^Ảnh\s+đại\s+diện\s+của\s+https://\S+\s+thay\s+bằng\s+https://\S+\s*[.!?]?$~iu',
+            '~^Thay\s+ảnh\s+đại\s+diện\s+của\s+https://\S+\s+bằng\s+https://\S+\s*[.!?]?$~iu',
+            '~^Dùng\s+https://\S+\s+làm\s+ảnh\s+đại\s+diện\s+cho\s+https://\S+\s*[.!?]?$~iu',
+            '~^Dùng\s+ảnh\s+https://\S+\s+làm\s+đại\s+diện\s+cho\s+https://\S+\s*[.!?]?$~iu',
+        ] as $pattern) {
+            if (preg_match($pattern, $text) === 1) return true;
+        }
+        return false;
     }
 
     private function assertExplicitIntentIsValid(ContentIntent $intent, array $input, array $assets): void
