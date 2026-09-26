@@ -134,6 +134,36 @@ final class KnowledgeWriterPreviewServiceTest extends TestCase
         self::assertNotSame('', $result['answer']);
     }
 
+    public function test_freeform_input_resolves_subject_and_keeps_detail_terms_for_retrieval(): void
+    {
+        $base = '77777777-1111-4111-8111-111111111111';
+        $this->authority->create(new AuthorityEntity($base, 'variant', 'variant:odo.36.10', 'Odo 36/10', 1, []));
+        foreach ([
+            ['configuration', 'Cấu hình dùng côn M.'],
+            ['recognition', 'Mặt số nổi là một đặc điểm nhận diện.'],
+        ] as $index => [$facet, $text]) {
+            $this->rows[] = [
+                'id' => 'freeform-' . $index, 'revision' => 1, 'subject_id' => $base, 'subject_type' => 'variant',
+                'facet' => $facet, 'text' => $text, 'scope' => 'variant',
+                'provenance' => 'CATALOG_SUPPORTED', 'evidence_status' => 'SUPPORTED_WITHIN_SCOPE',
+            ];
+        }
+
+        $result = $this->service()->preview([
+            'subject' => ['query' => 'Odo 36/10 côn M mặt số nổi'],
+            'instruction' => 'Tra cứu rồi viết lại.',
+            'purpose' => 'collector_explanation',
+            'depth' => 'deep',
+            'requested_facets' => ['configuration', 'recognition'],
+        ]);
+
+        self::assertSame('available', $result['status'], json_encode($result, JSON_UNESCAPED_UNICODE) ?: '');
+        self::assertSame($base, $result['subject']['canonical_id']);
+        self::assertSame(['configuration', 'recognition'], $result['coverage']['covered_facets']);
+        self::assertStringContainsString('côn M', $result['answer']);
+        self::assertStringContainsString('Mặt số nổi', $result['answer']);
+    }
+
     public function test_qualified_base_variant_name_does_not_match_specialized_descendants(): void
     {
         $base = '88888888-1111-4111-8111-111111111111';
