@@ -6,10 +6,10 @@ namespace NHK\Tests\Unit;
 use NHK\Core\Application\Media\{MediaBindingService, MediaEnrichmentIntentCompiler, MediaOwnerCapabilityRegistry, MediaTargetNormalizer};
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository, MediaUsageRepository};
-use NHK\Core\Domain\Authority\{AuthorityEntity, EntityTypeRegistry};
+use NHK\Core\Domain\Authority\{AuthorityEntity, EntityTypeDefinition, EntityTypeRegistry};
 use NHK\Core\Domain\Graph\EndpointTypeRegistry;
 use NHK\Core\Domain\Media\{Media, MediaAsset, MediaUsage};
-use NHK\Core\Infrastructure\Graph\WpPostEndpointResolver;
+use NHK\Core\Infrastructure\Graph\{AuthorityEndpointResolver, WpPostEndpointResolver};
 use PHPUnit\Framework\TestCase;
 
 final class MediaEnrichmentIntentCompilerTest extends TestCase
@@ -17,6 +17,7 @@ final class MediaEnrichmentIntentCompilerTest extends TestCase
     private const MEDIA = '01a0d7ee-3e33-7366-88c6-287112b34936';
     private const OLD_MEDIA = '01a0d7ee-3e33-7366-88c6-287112b34937';
     private const USAGE = '01a06e2e-73a1-7550-b0e8-168aafdc6ceb';
+    private const MODEL = '01a07614-832d-7f27-959c-74eb0cd63f3e';
 
     public function test_url_intent_resolves_media_and_article_and_snapshots_replace_cas(): void
     {
@@ -127,7 +128,37 @@ final class MediaEnrichmentIntentCompilerTest extends TestCase
         self::assertArrayNotHasKey('expected_usage_revision', $operation);
     }
 
-    private function compiler(MediaUsageRepository $usages): MediaEnrichmentIntentCompiler
+    public function test_authority_url_intent_resolves_to_canonical_representative_target(): void
+    {
+        $usages = new class implements MediaUsageRepository {
+            public function create(MediaUsage $usage): MediaUsage { return $usage; }
+            public function listByEndpoint(string $type, string $key, ?string $role = null): array { return []; }
+            public function listByMediaId(string $id, ?string $role = null): array { return []; }
+        };
+
+        $operation = $this->compiler(
+            $usages,
+            static fn (string $url): array => ['type' => 'model', 'id' => self::MODEL],
+        )->compile([
+            'intent' => 'MEDIA_ENRICHMENT',
+            'idempotency_key' => 'authority-url-1',
+            'media_operations' => [[
+                'operation' => 'representative_bind',
+                'media_ref' => ['url' => 'https://demo.1945.vn/anh/bo-suu-tap-dong-ho-co.webp'],
+                'target' => ['url' => 'https://demo.1945.vn/hermle/model-test/'],
+                'role' => 'representative',
+            ]],
+        ])['media_operations'][0];
+
+        self::assertSame('representative_bind', $operation['operation']);
+        self::assertSame(self::MEDIA, $operation['media']['id']);
+        self::assertSame('model', $operation['target']['type']);
+        self::assertSame(self::MODEL, $operation['target']['id']);
+        self::assertSame('nhk:model:test', $operation['target']['stable_key']);
+        self::assertArrayNotHasKey('revision', $operation['target']);
+    }
+
+    private function compiler(MediaUsageRepository $usages, ?callable $targetUrlResolver = null): MediaEnrichmentIntentCompiler
     {
         $media = new class implements MediaRepository {
             public function findByCanonicalId(string $id): ?Media { return in_array($id, [MediaEnrichmentIntentCompilerTest::MEDIA, MediaEnrichmentIntentCompilerTest::OLD_MEDIA], true) ? new Media($id, 'key:' . $id, 'media', 'ready') : null; }
@@ -147,18 +178,21 @@ final class MediaEnrichmentIntentCompilerTest extends TestCase
             public function findByChecksum(string $checksum): array { return []; }
         };
         $authority = new class implements AuthorityRepository {
-            public function findByCanonicalId(string $id): ?AuthorityEntity { return null; }
-            public function findByStableKey(string $type, string $key): ?AuthorityEntity { return null; }
+            private function model(): AuthorityEntity { return new AuthorityEntity(MediaEnrichmentIntentCompilerTest::MODEL, 'model', 'nhk:model:test', 'Model test', 1, [], \NHK\Core\Domain\Authority\AuthorityState::ACTIVE, 3); }
+            public function findByCanonicalId(string $id): ?AuthorityEntity { return $id === MediaEnrichmentIntentCompilerTest::MODEL ? $this->model() : null; }
+            public function findByStableKey(string $type, string $key): ?AuthorityEntity { return $type === 'model' && $key === 'nhk:model:test' ? $this->model() : null; }
             public function create(AuthorityEntity $entity): AuthorityEntity { return $entity; }
             public function update(AuthorityEntity $entity, int $expectedRevision): AuthorityEntity { return $entity; }
             public function rekey(AuthorityEntity $entity, string $oldStableKey, string $newStableKey, int $expectedRevision): AuthorityEntity { return $entity; }
-            public function listByType(string $type, bool $includeRetired = false): array { return []; }
+            public function listByType(string $type, bool $includeRetired = false): array { return $type === 'model' ? [$this->model()] : []; }
         };
         $types = new EntityTypeRegistry();
+        $types->register(new EntityTypeDefinition('model', 1, true));
         $endpoints = new EndpointTypeRegistry();
+        $endpoints->register('model', new AuthorityEndpointResolver($types, $authority));
         $endpoints->register('wp_post', new WpPostEndpointResolver(static fn (int $id): ?object => $id === 18 ? (object) ['post_status' => 'publish', 'post_modified_gmt' => '2023-11-14 22:13:20'] : null, static fn (): int => 1));
         $normalizer = new MediaTargetNormalizer($endpoints, $types, $authority);
         $binding = new MediaBindingService($media, $assets, $usages, $authority, $types, targetNormalizer: $normalizer, capabilities: MediaOwnerCapabilityRegistry::fromEndpointRegistry($endpoints));
-        return new MediaEnrichmentIntentCompiler($binding, $usages, $normalizer, static fn (string $url): array => ['type' => 'wp_post', 'id' => '1:18']);
+        return new MediaEnrichmentIntentCompiler($binding, $usages, $normalizer, $targetUrlResolver ?? static fn (string $url): array => ['type' => 'wp_post', 'id' => '1:18']);
     }
 }
