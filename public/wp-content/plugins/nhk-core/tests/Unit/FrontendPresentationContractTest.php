@@ -186,6 +186,16 @@ final class FrontendPresentationContractTest extends TestCase
         self::assertStringNotContainsString('height:100vh', $css);
     }
 
+    public function test_homepage_hero_asset_is_bounded_and_cache_busted_for_live_deploy(): void
+    {
+        $css = $this->read('entity.css');
+        $functions = $this->read('functions.php');
+
+        self::assertStringContainsString('.hero-visual{width:min(100%,400px)', $css);
+        self::assertStringContainsString('width:100%;height:min(430px,42vw);max-height:430px;object-fit:contain', $css);
+        self::assertStringContainsString("wp_register_style('nhk-v3-entity', get_theme_file_uri('entity.css'), ['nhk-v3-style'], '1.0.9')", $functions);
+    }
+
     public function test_entity_detail_renders_dossier_knowledge_gallery_and_path_aware_related_content(): void
     {
         $source = $this->read('entity.php');
