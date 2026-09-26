@@ -78,6 +78,12 @@ final class UniversalEnrichmentCore
         $selectorProfile = in_array($profile, ['article', 'video', 'media', 'image'], true) ? $profile : 'generic';
         $profileData = ['profile' => $selectorProfile, 'owner_profile' => $profile, 'result_limit' => max(1, min(200, (int) ($options['result_limit'] ?? 50)))];
         if (array_key_exists('selection_limit', $options)) $profileData['selection_limit'] = max(1, min(20, (int) $options['selection_limit']));
+        // Optional bounded coverage overrides let read-only consumers request a
+        // richer editorial context without changing canonical truth or the
+        // default behavior of other surfaces.
+        foreach (['aspect_target', 'token_budget'] as $key) {
+            if (array_key_exists($key, $options)) $profileData[$key] = (int) $options[$key];
+        }
         $needs = array_values(array_filter((array) ($options['semantic_needs'] ?? $options['needs'] ?? []), static fn (mixed $need): bool => $need instanceof SemanticNeed || is_array($need)));
         $decomposition = null;
         if ($needs === [] && $this->decomposer !== null) {
