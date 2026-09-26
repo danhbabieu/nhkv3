@@ -64,6 +64,13 @@ final class KnowledgeWriterPreviewService
                 || mb_strlen($observation['value']) > 500) return $this->fail($base, 'blocked', 'INVALID_PREVIEW_OBSERVATIONS');
         }
         $resolution = $this->resolveSubject($locator);
+        $inputTerms = [];
+        $freeformInput = trim((string) ($locator['query'] ?? $locator['name'] ?? ''));
+        if (($resolution['status'] ?? '') === 'unresolved' && $freeformInput !== '') {
+            $freeform = $this->resolveFreeformSubject($freeformInput);
+            $resolution = $freeform['resolution'];
+            $inputTerms = $freeform['terms'];
+        }
         $status = (string) ($resolution['status'] ?? 'unresolved');
         $primary = is_array($resolution['primary'] ?? null) ? $resolution['primary'] : [];
         if ($status !== 'resolved' || $primary === []) {
@@ -81,9 +88,12 @@ final class KnowledgeWriterPreviewService
         if (mb_strlen($base['subject']['name']) > 200) return $this->fail($this->emptyResult($purpose, $policy['profile'], ''), 'blocked', 'SUBJECT_PROJECTION_UNSAFE');
         $base['context_used'] = array_map(static fn (array $item): array => ['treatment' => 'context', 'value' => trim($item['value'])], $observations);
         $topic = (string) ($primary['name'] ?? '');
+        $retrievalTerms = $inputTerms !== [] ? $inputTerms : array_values(array_filter([$freeformInput]));
+        $rawInput = $freeformInput !== '' ? $freeformInput : $topic;
         $envelope = UniversalInputEnvelope::fromArray([
             'owner_or_source_type' => 'preview', 'subject_resolution' => ['primary' => $primary],
-            'observations' => $observations, 'title' => $topic,
+            'observations' => $observations, 'title' => $this->editorialTitle($topic, $retrievalTerms),
+            'raw_text' => $rawInput, 'editorial_copy' => '',
         ]);
         $needs = array_map(static fn (string $facet): array => SemanticNeed::fromArray([
             'canonical_subject' => $primary, 'facet_key' => $facet, 'origin' => 'USER_EXPLICIT',
@@ -93,7 +103,7 @@ final class KnowledgeWriterPreviewService
             $shared = $this->enrichment->enrich($envelope->toArray() + [
                 'profile' => $policy['profile'],
                 'topic' => $topic,
-                'retrieval_topic' => $topic . ' ' . trim($instruction),
+                'retrieval_topic' => trim($topic . ' ' . implode(' ', $retrievalTerms) . ' ' . trim($instruction)),
                 'semantic_needs' => $needs,
                 // Use the same broad read-only enrichment policy as the
                 // Article, Video and image/media editorial surfaces.
@@ -190,6 +200,56 @@ final class KnowledgeWriterPreviewService
             $primary ??= $candidate;
         }
         return ['status' => 'resolved', 'primary' => $primary, 'diagnostics' => []];
+    }
+
+    /** @return array{resolution:array<string,mixed>,terms:list<string>} */
+    private function resolveFreeformSubject(string $input): array
+    {
+        $terms = $this->freeformTerms($input);
+        // Longest prefixes first: canonical identity is normally the leading
+        // brand/model/variant phrase; remaining terms stay retrieval context.
+        for ($end = count($terms); $end >= 1; $end--) {
+            $candidate = implode(' ', array_slice($terms, 0, $end));
+            $resolution = $this->resolveSubject(['query' => $candidate]);
+            if (($resolution['status'] ?? '') === 'resolved') {
+                return ['resolution' => $resolution, 'terms' => $terms];
+            }
+        }
+        return ['resolution' => ['status' => 'unresolved', 'primary' => null, 'diagnostics' => ['SUBJECT_FREEFORM_UNRESOLVED']], 'terms' => $terms];
+    }
+
+    /** @return list<string> */
+    private function freeformTerms(string $input): array
+    {
+        $tokens = array_values(array_filter(preg_split('/\s+/u', trim($input)) ?: [], static fn (string $v): bool => $v !== ''));
+        $terms = [];
+        for ($i = 0; $i < count($tokens); $i++) {
+            $token = $tokens[$i];
+            $lower = mb_strtolower($token);
+            if ($lower === 'côn' && isset($tokens[$i + 1])) {
+                $terms[] = $token . ' ' . $tokens[++$i];
+                continue;
+            }
+            if ($lower === 'mặt' && isset($tokens[$i + 2]) && mb_strtolower($tokens[$i + 1]) === 'số') {
+                $terms[] = $token . ' ' . $tokens[++$i] . ' ' . $tokens[++$i];
+                continue;
+            }
+            $terms[] = $token;
+        }
+        return array_values(array_unique($terms));
+    }
+
+    /** @param list<string> $terms */
+    private function editorialTitle(string $topic, array $terms): string
+    {
+        $details = [];
+        $topicKey = mb_strtolower($topic);
+        foreach ($terms as $term) {
+            $term = trim($term);
+            if ($term === '' || str_contains($topicKey, mb_strtolower($term))) continue;
+            $details[] = $term;
+        }
+        return trim($topic . ($details !== [] ? ' – ' . implode(', ', $details) : ''));
     }
 
     /** @return list<array<string,mixed>> */
