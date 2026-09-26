@@ -27,13 +27,25 @@ final class MediaEnrichmentIntentCompiler
         $compiled = [];
         foreach ($operations as $index => $operation) {
             $kind = strtolower(trim((string) ($operation['operation'] ?? '')));
+            if ($kind === 'representative_bind') {
+                $representativeTarget = $this->canonicalTarget((array) ($operation['target'] ?? []));
+                $operation['target'] = $representativeTarget;
+                if (($representativeTarget['type'] ?? '') === 'wp_post') {
+                    // Natural-language "use this as the representative image"
+                    // maps to native WordPress featured media for an Article.
+                    $operation['operation'] = 'set_featured';
+                    $operation['role'] = MediaUsageRoleRegistry::FEATURED_PRIMARY;
+                    $kind = 'set_featured';
+                }
+            }
             if ($kind !== 'set_featured') {
                 $compiled[] = $this->canonicalOperation($operation, $index, (string) ($input['idempotency_key'] ?? ''));
                 continue;
             }
             $role = strtolower(trim((string) ($operation['role'] ?? MediaUsageRoleRegistry::FEATURED_PRIMARY)));
             if ($role !== MediaUsageRoleRegistry::FEATURED_PRIMARY) throw new MediaException('MEDIA_FEATURED_ROLE_INVALID');
-            $target = $this->resolvePostTarget((array) ($operation['target'] ?? []));
+            $target = $this->canonicalTarget((array) ($operation['target'] ?? []));
+            if (($target['type'] ?? '') !== 'wp_post') throw new MediaException('MEDIA_FEATURED_TARGET_INVALID');
             $mediaRef = is_array($operation['media_ref'] ?? null) ? $operation['media_ref'] : (array) ($operation['media'] ?? []);
             $media = $this->media->resolveMediaReference($mediaRef);
             $canonicalPlacement = MediaUsageRoleRegistry::FEATURED_PRIMARY;
@@ -85,10 +97,11 @@ final class MediaEnrichmentIntentCompiler
     }
 
     /** @param array<string,mixed> $target @return array<string,mixed> */
-    private function resolvePostTarget(array $target): array
+    private function canonicalTarget(array $target): array
     {
-        $normalized = $this->resolveUrlTarget($target);
-        if (($normalized['type'] ?? '') !== 'wp_post') throw new MediaException('MEDIA_FEATURED_TARGET_INVALID');
+        if (isset($target['url'])) return $this->resolveUrlTarget($target);
+        $normalized = $this->targets->normalizeRequestTarget($target);
+        unset($normalized['revision']);
         return $normalized;
     }
 
