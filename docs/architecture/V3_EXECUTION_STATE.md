@@ -1,5 +1,28 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-28 — Exact MediaUsage staging apply scope verification (LOCAL / NO MUTATION)
+
+ROOT_CAUSE_CONFIRMED: The exact replace scope was issued as
+`writer=canonical_governed`, but `verifyBindingRequest()` only accepted the
+legacy `representative_bind` writer/operation. Governed Apply therefore
+returned `STAGING_SCOPE_NOT_APPROVED` before MediaBindingService could mutate.
+The apply fingerprint also needed to exclude execution-only fields injected
+by AuthorityProposalExecutor (`governed_apply`, `proposal_id`,
+`proposal_fingerprint`).
+
+FIXED_BOUNDARY: Exact `add`/`replace`/`remove` requests now validate the
+server-signed canonical governed packet, exact Media/target/usage/revision
+identity and canonical payload fingerprint. Canonical `wp_post` endpoint keys
+are preserved in the guard fallback. Legacy representative binding remains on
+its existing writer/verification path. No scope broadening, direct writer,
+Graph mutation, schema change or live mutation was performed.
+
+REGRESSION: Exact issue → verifyBindingRequest → MediaBindingStagingGuard
+replace path passes with apply execution fields; scope/guard suite passes 83
+tests / 269 assertions, and focused preparation/compiler/scope suite passes.
+
+STATUS: `ARTICLE_FEATURED_MEDIA_STAGING_APPLY_SCOPE_LOCAL_READY / NO_MUTATION / UNCOMMITTED`
+
 # Checkpoint — 2026-09-28 — Exact Article Media command Content Preparation gate (LOCAL / NO MUTATION)
 
 ROOT_CAUSE_CONFIRMED: The natural command was correctly routed and compiled,

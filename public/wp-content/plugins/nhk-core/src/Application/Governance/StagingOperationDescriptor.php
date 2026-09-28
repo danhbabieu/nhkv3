@@ -92,7 +92,7 @@ final readonly class StagingOperationDescriptor
     /** @param array<string,mixed> $value @return array<string,mixed> */
     public static function withoutAuthorization(array $value): array
     {
-        foreach (['staging_acceptance', 'signature', 'fingerprint', 'approved', 'scope_fingerprint', 'proposal_command_fingerprint'] as $key) unset($value[$key]);
+        foreach (['staging_acceptance', 'signature', 'fingerprint', 'approved', 'scope_fingerprint', 'proposal_command_fingerprint', 'governed_apply', 'proposal_id', 'proposal_fingerprint'] as $key) unset($value[$key]);
         return $value;
     }
 

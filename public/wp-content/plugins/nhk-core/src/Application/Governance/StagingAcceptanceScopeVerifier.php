@@ -542,11 +542,33 @@ final class StagingAcceptanceScopeVerifier
     /** @param array<string,mixed> $scope @param array<string,mixed> $request */
     public function verifyBindingRequest(array $scope, array $request): bool
     {
-        if (!$this->verifyPacket($scope) || ($scope['writer'] ?? '') !== 'canonical_media_binding') return false;
+        if (!$this->verifyPacket($scope)) return false;
         if (!hash_equals((string) $scope['capture_id'], trim((string) ($request['capture_id'] ?? '')))) return false;
         if (!hash_equals((string) ($scope['capture_fingerprint'] ?? ''), trim((string) ($request['capture_fingerprint'] ?? $scope['capture_fingerprint'] ?? '')))) return false;
+        $operation = strtolower(trim((string) ($request['operation'] ?? $scope['operation'] ?? '')));
+        if (in_array($operation, ['add', 'replace', 'remove'], true)) {
+            if (($scope['writer'] ?? '') !== 'canonical_governed' || ($scope['operation'] ?? '') !== $operation) return false;
+            $mediaId = trim((string) ($request['media']['id'] ?? ''));
+            $scopeMediaIds = array_values(array_map('strval', (array) ($scope['media_ids'] ?? [])));
+            $requestTarget = is_array($request['target'] ?? null) ? $request['target'] : [];
+            $scopeTarget = is_array($scope['target'] ?? null) ? $scope['target'] : [];
+            if (!UuidCodec::isValid($mediaId) || !in_array($mediaId, $scopeMediaIds, true) || !$this->sameTarget($requestTarget, $scopeTarget)) return false;
+            if (in_array($operation, ['replace', 'remove'], true)
+                && ((string) ($scope['usage_id'] ?? '') !== (string) ($request['usage_id'] ?? '')
+                    || (int) ($scope['expected_usage_revision'] ?? 0) !== (int) ($request['expected_usage_revision'] ?? 0))) return false;
+            $payload = array_replace($request, [
+                'operation' => $operation,
+                'media' => ['id' => $mediaId],
+                'target' => $requestTarget,
+                'capture_id' => (string) ($scope['capture_id'] ?? ''),
+                'capture_fingerprint' => (string) ($scope['capture_fingerprint'] ?? ''),
+            ]);
+            unset($payload['staging_acceptance']);
+            $payload = StagingAcceptanceScope::withoutAuthorization($payload);
+            return hash_equals((string) ($scope['payload_fingerprint'] ?? ''), hash('sha256', CommandCanonicalizer::canonicalize($payload)));
+        }
+        if (($scope['writer'] ?? '') !== 'canonical_media_binding' || $operation !== 'representative_bind') return false;
         if (!isset($scope['payload_fingerprint'], $request['payload_fingerprint']) || !hash_equals((string) $scope['payload_fingerprint'], trim((string) $request['payload_fingerprint']))) return false;
-        if (!in_array((string) ($request['operation'] ?? 'representative_bind'), ['representative_bind'], true)) return false;
         $mediaId = trim((string) ($request['media']['id'] ?? ''));
         $target = is_array($request['target'] ?? null) ? $request['target'] : [];
         foreach ((array) ($scope['bindings'] ?? []) as $binding) {

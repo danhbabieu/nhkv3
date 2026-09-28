@@ -191,6 +191,45 @@ final class StagingAcceptanceScopeVerifierTest extends TestCase
         self::assertTrue($verifier->verifyProposal($scope, $proposal));
     }
 
+    public function test_exact_media_usage_replace_scope_is_accepted_by_media_binding_apply_guard(): void
+    {
+        $capture = new CaptureRecord(UuidCodec::newV7(), 'article-media-apply-guard', hash('sha256', 'article-media-apply-guard'), 'MEDIA_RECONCILED', 'IN_PROGRESS', 618, null, [], ['purpose' => 'EDITORIAL', 'content_intent' => ['intent' => 'MEDIA_ENRICHMENT']], [], [], 7);
+        $mediaId = UuidCodec::newV7();
+        $operation = [
+            'operation' => 'replace',
+            'idempotency_key' => 'capture:618:featured-replace',
+            'media' => ['id' => $mediaId],
+            'target' => ['type' => 'wp_post', 'blog_id' => 1, 'post_id' => 618],
+            'usage_id' => UuidCodec::newV7(),
+            'expected_usage_revision' => 1,
+            'role' => 'featured_primary',
+            'placement_key' => 'featured_primary',
+            'selection_source' => 'USER_EXPLICIT',
+            'selection_policy' => 'PINNED',
+        ];
+        $verifier = new StagingAcceptanceScopeVerifier(static fn (): string => 'staging', 'test-secret', static fn (): bool => true, can: static fn (): bool => true);
+        $scope = $verifier->issueForMediaUsageOperation($capture, $operation);
+        $request = array_replace($operation, [
+            'target' => ['type' => 'wp_post', 'id' => '1:618'],
+            'capture_id' => $capture->captureId,
+            'capture_fingerprint' => $capture->requestFingerprint,
+            'staging_acceptance' => $scope,
+        ]);
+
+        self::assertTrue($verifier->verifyBindingRequest($scope, $request));
+        $guard = new MediaBindingStagingGuard(
+            static fn (): string => 'staging',
+            [$verifier, 'verifyBindingRequest'],
+            static fn (): bool => true,
+        );
+        $applyRequest = array_replace($request, [
+            'governed_apply' => true,
+            'proposal_id' => UuidCodec::newV7(),
+            'proposal_fingerprint' => str_repeat('a', 64),
+        ]);
+        $guard($applyRequest);
+    }
+
     public function test_media_usage_scope_verifies_the_same_normalized_target_payload_used_at_apply(): void
     {
         $capture = new CaptureRecord(UuidCodec::newV7(), 'article-media-normalized', hash('sha256', 'article-media-normalized'), 'MEDIA_RECONCILED', 'IN_PROGRESS', 617, null, [], ['purpose' => 'EDITORIAL', 'content_intent' => ['intent' => 'MEDIA_ENRICHMENT']], [], [], 7);

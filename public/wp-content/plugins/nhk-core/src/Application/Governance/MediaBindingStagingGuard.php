@@ -84,7 +84,12 @@ final class MediaBindingStagingGuard
     {
         $target = is_array($request['target'] ?? null) ? $request['target'] : [];
         if ($this->targetNormalizer !== null) $target = $this->targetNormalizer->normalizeRequestTarget($target);
-        elseif (strtolower(trim((string) ($target['type'] ?? ''))) === 'wp_post') $target = ['type' => 'wp_post', 'id' => ((int) ($target['blog_id'] ?? 1)) . ':' . (int) ($target['post_id'] ?? $target['id'] ?? 0)];
+        elseif (strtolower(trim((string) ($target['type'] ?? ''))) === 'wp_post') {
+            $targetId = trim((string) ($target['id'] ?? ''));
+            $target = ['type' => 'wp_post', 'id' => preg_match('/^[1-9][0-9]*:[1-9][0-9]*$/', $targetId) === 1
+                ? $targetId
+                : ((int) ($target['blog_id'] ?? 1)) . ':' . (int) ($target['post_id'] ?? 0)];
+        }
         $media = is_array($request['media'] ?? null) ? $request['media'] : [];
         $payload = array_replace($request, [
             'operation' => strtolower(trim((string) ($scope['operation'] ?? ($request['operation'] ?? '')))),
