@@ -102,7 +102,7 @@ final class StagingAcceptanceScopeVerifier
         } else {
             $target = ['type' => $targetType, 'id' => $targetId];
         }
-        $payload = StagingAcceptanceScope::withoutAuthorization(array_replace($operation, [
+        $payload = $this->canonicalizeMediaUsageOperation(array_replace($operation, [
             'operation' => $op,
             'media' => ['id' => $mediaId],
             'target' => $target,
@@ -125,6 +125,47 @@ final class StagingAcceptanceScopeVerifier
         if (!(bool) ($this->admission)($base, $capture, ['intent' => 'IMAGE_ARTICLE', 'media_operations' => [$payload]], [])) throw new \RuntimeException('STAGING_SCOPE_NOT_ADMITTED');
         $fingerprint = hash('sha256', CommandCanonicalizer::canonicalize($base));
         return $base + ['fingerprint' => $fingerprint, 'signature' => hash_hmac('sha256', $fingerprint, $this->secret())];
+    }
+
+    /**
+     * Return the exact semantic operation shape used by scope issuance and
+     * governed proposal verification. Authorization fields never enter this
+     * payload; endpoint normalization does.
+     *
+     * @param array<string,mixed> $operation
+     * @return array<string,mixed>
+     */
+    public function canonicalizeMediaUsageOperation(array $operation): array
+    {
+        $op = strtolower(trim((string) ($operation['operation'] ?? '')));
+        if (!in_array($op, ['add', 'replace', 'remove'], true)) throw new \RuntimeException('STAGING_MEDIA_USAGE_OPERATION_INVALID');
+        $media = is_array($operation['media'] ?? null) ? $operation['media'] : (is_array($operation['media_ref'] ?? null) ? $operation['media_ref'] : []);
+        $mediaId = trim((string) ($media['id'] ?? $media['media_id'] ?? ''));
+        $target = is_array($operation['target'] ?? null) ? $operation['target'] : [];
+        $targetType = strtolower(trim((string) ($target['type'] ?? '')));
+        $targetId = trim((string) ($target['id'] ?? ''));
+        if (!UuidCodec::isValid($mediaId) || $targetType === '') throw new \RuntimeException('STAGING_EXACT_MEDIA_USAGE_REFERENCE_REQUIRED');
+        if ($this->targetNormalizer !== null) {
+            try { $target = $this->targetNormalizer->normalizeRequestTarget($target); } catch (\Throwable $error) { throw new \RuntimeException('STAGING_EXACT_MEDIA_USAGE_REFERENCE_REQUIRED', 0, $error); }
+        } elseif ($targetType === 'wp_post') {
+            if (preg_match('/^[1-9][0-9]*:[1-9][0-9]*$/', $targetId) !== 1) {
+                $blog = (int) ($target['blog_id'] ?? 1);
+                $post = (int) ($target['post_id'] ?? 0);
+                if ($blog < 1 || $post < 1) throw new \RuntimeException('STAGING_EXACT_MEDIA_USAGE_REFERENCE_REQUIRED');
+                $target = ['type' => 'wp_post', 'id' => $blog . ':' . $post];
+            } else {
+                $target = ['type' => 'wp_post', 'id' => $targetId];
+            }
+        } elseif (!UuidCodec::isValid($targetId)) {
+            throw new \RuntimeException('STAGING_EXACT_MEDIA_USAGE_REFERENCE_REQUIRED');
+        } else {
+            $target = ['type' => $targetType, 'id' => $targetId];
+        }
+        return StagingAcceptanceScope::withoutAuthorization(array_replace($operation, [
+            'operation' => $op,
+            'media' => ['id' => $mediaId],
+            'target' => $target,
+        ]));
     }
 
     /** Issue one exact scope for an existing Media metadata update. */

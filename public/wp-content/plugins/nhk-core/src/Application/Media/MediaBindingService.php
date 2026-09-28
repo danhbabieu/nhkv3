@@ -30,6 +30,8 @@ final class MediaBindingService implements MediaBindingPort
         private ?MediaOwnerCapabilityRegistry $capabilities = null,
         private $targetResolver = null,
         private ?MediaTargetNormalizer $targetNormalizer = null,
+        private $attachmentUrlResolver = null,
+        private $invalidationDispatcher = null,
     ) {}
 
     /** @param array<string,mixed> $request @return array<string,mixed> */
@@ -72,9 +74,9 @@ final class MediaBindingService implements MediaBindingPort
             $usage = $this->applyUsage($media, $target->entityType, $target->canonicalId, $normalized, $operation);
             $operation = $this->advance($operation, MediaBindingOperation::APPLY_USAGE, 'IN_PROGRESS', $media->canonicalId, $usage['usage']->usageId, $usage['previous_usage_id']);
             $operation = $this->advance($operation, MediaBindingOperation::RECONCILE_REPRESENTATIVE, 'IN_PROGRESS', $media->canonicalId, $usage['usage']->usageId, $usage['previous_usage_id']);
-            if (function_exists('do_action')) do_action('nhk_v3_media_binding_seo_invalidate', $target->entityType, $target->canonicalId, $usage['usage']->usageId);
+            $this->emitInvalidation('nhk_v3_media_binding_seo_invalidate', $target->entityType, $target->canonicalId, $usage['usage']->usageId);
             $operation = $this->advance($operation, MediaBindingOperation::SEO_INVALIDATE, 'IN_PROGRESS', $media->canonicalId, $usage['usage']->usageId, $usage['previous_usage_id']);
-            if (function_exists('do_action')) do_action('nhk_v3_media_binding_projection_invalidate', $target->entityType, $target->canonicalId, $usage['usage']->usageId);
+            $this->emitInvalidation('nhk_v3_media_binding_projection_invalidate', $target->entityType, $target->canonicalId, $usage['usage']->usageId);
             $operation = $this->advance($operation, MediaBindingOperation::PROJECTION_INVALIDATE, 'IN_PROGRESS', $media->canonicalId, $usage['usage']->usageId, $usage['previous_usage_id']);
             $readback = $this->readback($media->canonicalId, $target->entityType, $target->canonicalId, $usage['usage']->usageId, $usage['usage']->role);
             $operation = $this->advance($operation, MediaBindingOperation::FINAL_READBACK, 'IN_PROGRESS', $media->canonicalId, $usage['usage']->usageId, $usage['previous_usage_id'], ['readback' => $readback]);
@@ -122,7 +124,7 @@ final class MediaBindingService implements MediaBindingPort
                 $normalized['seo']['title'], 1, $normalized['placement_key'], $normalized['selection_source'],
                 $normalized['selection_policy'], $normalized['active_slot'],
             ));
-            return $this->mutationResultWithInvalidation($operation, $media->canonicalId, $usage, null, $target);
+            return $this->mutationResult($operation, $media->canonicalId, $usage, null, $target);
         }
 
         if (!$existing instanceof MediaUsage) throw new MediaException('MEDIA_USAGE_NOT_FOUND');
@@ -143,10 +145,10 @@ final class MediaBindingService implements MediaBindingPort
             $replacement = $this->usages->create(new MediaUsage(
                 UuidCodec::newV7(), $nextMedia->canonicalId, $existing->endpointType, $existing->endpointKey,
                 $existing->role, $normalized['sort_order'], $normalized['seo']['alt_text'], $normalized['seo']['caption'],
-                $existing->keywordGroups, $normalized['seo']['title'], 1, $existing->placementKey,
+                $existing->keywordGroups, $normalized['seo']['title'], 1, $normalized['placement_key'],
                 $normalized['selection_source'], $normalized['selection_policy'], $existing->activeSlot,
             ));
-            return $this->mutationResultWithInvalidation($operation, $nextMedia->canonicalId, $replacement, $existing->usageId, $target);
+            return $this->mutationResult($operation, $nextMedia->canonicalId, $replacement, $existing->usageId, $target);
         }
         $usage = $updater->update(new MediaUsage(
             $existing->usageId, $nextMedia->canonicalId, $existing->endpointType, $existing->endpointKey,
@@ -157,7 +159,7 @@ final class MediaBindingService implements MediaBindingPort
             $existing->revision, $existing->placementKey, $existing->selectionSource, $existing->selectionPolicy,
             $operation === 'remove' ? 'retired' : $existing->activeSlot,
         ));
-        return $this->mutationResultWithInvalidation($operation, $nextMedia->canonicalId, $usage, $existing->usageId, $target);
+        return $this->mutationResult($operation, $nextMedia->canonicalId, $usage, $existing->usageId, $target);
     }
 
     /** @param list<array<string,mixed>> $bindings @param list<array<string,mixed>> $assets @return array<string,mixed> */
@@ -336,17 +338,18 @@ final class MediaBindingService implements MediaBindingPort
     /** @return array<string,mixed> */
     private function mutationResult(string $operation, string $mediaId, MediaUsage $usage, ?string $previousUsageId, array $target): array
     {
+        $this->emitInvalidation('nhk_v3_media_binding_seo_invalidate', (string) $target['type'], (string) $target['key'], $usage->usageId);
+        $this->emitInvalidation('nhk_v3_media_binding_projection_invalidate', (string) $target['type'], (string) $target['key'], $usage->usageId);
         return ['status' => 'COMPLETE', 'operation' => $operation, 'media_id' => $mediaId, 'usage_id' => $usage->usageId, 'previous_usage_id' => $previousUsageId, 'usage' => $this->usageArray($usage), 'readback' => ['status' => 'verified', 'media_id' => $mediaId, 'target_type' => $target['type'], 'target_id' => $target['key'], 'usage_id' => $usage->usageId, 'role' => $usage->role, 'active_slot' => $usage->activeSlot, 'revision' => $usage->revision]];
     }
 
-    /** @param array{type:string,key:string} $target @return array<string,mixed> */
-    private function mutationResultWithInvalidation(string $operation, string $mediaId, MediaUsage $usage, ?string $previousUsageId, array $target): array
+    private function emitInvalidation(string $hook, string $type, string $target, string $usageId): void
     {
-        if (function_exists('do_action')) {
-            do_action('nhk_v3_media_binding_seo_invalidate', $target['type'], $target['key'], $usage->usageId);
-            do_action('nhk_v3_media_binding_projection_invalidate', $target['type'], $target['key'], $usage->usageId);
+        if (is_callable($this->invalidationDispatcher)) {
+            ($this->invalidationDispatcher)($hook, $type, $target, $usageId);
+            return;
         }
-        return $this->mutationResult($operation, $mediaId, $usage, $previousUsageId, $target);
+        if (function_exists('do_action')) do_action($hook, $type, $target, $usageId);
     }
 
     /** @param array<string,mixed> $request */
@@ -374,6 +377,20 @@ final class MediaBindingService implements MediaBindingPort
             foreach ($this->media->list(true) as $candidate) foreach ($this->assets->listByMediaId($candidate->canonicalId) as $asset) {
                 $publicPath = (string) ($asset->metadata['public_url_path'] ?? '');
                 if ($publicPath !== '' && $publicPath === $path) { $media = $candidate; break 2; }
+            }
+            if (!$media instanceof Media && (is_callable($this->attachmentUrlResolver) || is_object($this->attachmentUrlResolver) && method_exists($this->attachmentUrlResolver, 'resolve'))) {
+                try {
+                    $attachmentId = is_callable($this->attachmentUrlResolver)
+                        ? (int) ($this->attachmentUrlResolver)($url)
+                        : (int) $this->attachmentUrlResolver->resolve($url);
+                } catch (\Throwable) {
+                    $attachmentId = 0;
+                }
+                if ($attachmentId > 0) {
+                    foreach ($this->media->list(true) as $candidate) foreach ($this->assets->listByMediaId($candidate->canonicalId) as $asset) {
+                        if ((int) ($asset->metadata['wordpress_attachment_id'] ?? 0) === $attachmentId) { $media = $candidate; break 2; }
+                    }
+                }
             }
         }
         if (!$media instanceof Media || !$media->active || $media->isSystemPlaceholder()) throw new MediaException('MEDIA_BINDING_MEDIA_NOT_FOUND');
@@ -464,6 +481,6 @@ final class MediaBindingService implements MediaBindingPort
     /** @return array<string,mixed> */
     private function usageArray(MediaUsage $usage): array
     {
-        return ['id' => $usage->usageId, 'media_id' => $usage->mediaId, 'endpoint_type' => $usage->endpointType, 'endpoint_key' => $usage->endpointKey, 'role' => $usage->role, 'revision' => $usage->revision, 'selection_source' => $usage->selectionSource, 'selection_policy' => $usage->selectionPolicy, 'active_slot' => $usage->activeSlot, 'alt_text' => $usage->altText, 'caption' => $usage->caption, 'title' => $usage->title];
+        return ['id' => $usage->usageId, 'media_id' => $usage->mediaId, 'endpoint_type' => $usage->endpointType, 'endpoint_key' => $usage->endpointKey, 'role' => $usage->role, 'placement_key' => $usage->placementKey, 'revision' => $usage->revision, 'selection_source' => $usage->selectionSource, 'selection_policy' => $usage->selectionPolicy, 'active_slot' => $usage->activeSlot, 'alt_text' => $usage->altText, 'caption' => $usage->caption, 'title' => $usage->title];
     }
 }

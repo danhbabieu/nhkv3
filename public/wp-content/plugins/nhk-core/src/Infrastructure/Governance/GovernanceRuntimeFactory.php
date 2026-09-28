@@ -20,7 +20,7 @@ use NHK\Core\Infrastructure\Database\WpdbTransactionManager;
 use NHK\Core\Infrastructure\Graph\{CoreEndpointResolverRegistrar, SemanticMergeGraphAdapter, WpdbAuditSink as GraphAuditSink, WpdbGraphRepository};
 use NHK\Core\Infrastructure\Governance\WpdbAuditSink as GovernanceAuditSink;
 use NHK\Core\Infrastructure\Knowledge\{WpdbEvidenceRepository, WpdbKnowledgeRepository, WpdbSourceRepository};
-use NHK\Core\Infrastructure\Media\{WpdbMediaAssetRepository, WpdbMediaRepository, WpdbMediaUsageRepository, WordPressMediaAttachmentBridge};
+use NHK\Core\Infrastructure\Media\{WpdbMediaAssetRepository, WpdbMediaRepository, WpdbMediaUsageRepository, WordPressAttachmentUrlResolver, WordPressMediaAttachmentBridge};
 use NHK\Core\Infrastructure\Video\WpdbVideoRepository;
 use NHK\Core\Infrastructure\Capture\WpdbCaptureRepository;
 use NHK\Core\Application\PublicIdentity\PublicIdentityService;
@@ -54,6 +54,20 @@ final class GovernanceRuntimeFactory
                 return ['active' => false];
             }
         };
+        $mediaAttachmentUrlResolver = new WordPressAttachmentUrlResolver(
+            $wpdb,
+            array_values(array_filter(array_unique(array_map(
+                static function (string $url): string {
+                    $parts = parse_url($url);
+                    if (!is_array($parts) || strtolower((string) ($parts['scheme'] ?? '')) !== 'https' || trim((string) ($parts['host'] ?? '')) === '') return '';
+                    return 'https://' . strtolower((string) $parts['host']) . (isset($parts['port']) ? ':' . (int) $parts['port'] : '');
+                },
+                array_values(array_filter([
+                    function_exists('site_url') ? (string) site_url() : '',
+                    function_exists('home_url') ? (string) home_url() : '',
+                ])),
+            )))),
+        );
         $graphRepository = new WpdbGraphRepository($wpdb);
         $predicates = new PredicateRegistry();
         $classifiedAsPolicy = new ClassifiedAsPolicy();
@@ -156,7 +170,7 @@ final class GovernanceRuntimeFactory
         });
         $eligibility->setStagingScopeResolver($authorityScopeResolver);
         $eligibility->setStagingScopeDiagnosticProvider([$stagingScopeVerifier, 'proposalDescriptorDiagnostic']);
-        $mediaBinding = new MediaBindingService($media, $assets, $usages, $authority, $types, new \NHK\Core\Infrastructure\Media\WpdbMediaBindingOperationRepository($wpdb), stagingGuard: new MediaBindingStagingGuard($environment, [$stagingScopeVerifier, 'verifyBindingRequest'], static fn (string $capability): bool => function_exists('current_user_can') && current_user_can($capability), targetNormalizer: new MediaTargetNormalizer($endpoints, $types, $authority)), capabilities: $mediaCapabilities, targetResolver: $mediaTargetResolver, targetNormalizer: new MediaTargetNormalizer($endpoints, $types, $authority));
+        $mediaBinding = new MediaBindingService($media, $assets, $usages, $authority, $types, new \NHK\Core\Infrastructure\Media\WpdbMediaBindingOperationRepository($wpdb), stagingGuard: new MediaBindingStagingGuard($environment, [$stagingScopeVerifier, 'verifyBindingRequest'], static fn (string $capability): bool => function_exists('current_user_can') && current_user_can($capability), targetNormalizer: new MediaTargetNormalizer($endpoints, $types, $authority)), capabilities: $mediaCapabilities, targetResolver: $mediaTargetResolver, targetNormalizer: new MediaTargetNormalizer($endpoints, $types, $authority), attachmentUrlResolver: $mediaAttachmentUrlResolver);
         $stagingGuard = new OperationScopedStagingGuard(
             $environment,
             static fn (string $capability): bool => function_exists('current_user_can') && current_user_can($capability),

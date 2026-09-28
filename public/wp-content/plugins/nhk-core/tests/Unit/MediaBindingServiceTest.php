@@ -62,6 +62,19 @@ final class MediaBindingServiceTest extends TestCase
         self::assertSame($mediaId, $usages->listByEndpoint('classification', '01a07614-832d-7f27-959c-74eb0cd63f40', 'representative')[0]->mediaId);
     }
 
+    public function test_wordpress_source_url_resolves_through_proven_attachment_mapping(): void
+    {
+        [$service, $usages] = $this->service(true, null, static fn (string $url): int => $url === 'https://demo.1945.vn/wp-content/uploads/2026/09/cuckoo.webp' ? 567 : 0);
+
+        $service->bind([
+            'idempotency_key' => 'source-url-locator',
+            'media' => ['url' => 'https://demo.1945.vn/wp-content/uploads/2026/09/cuckoo.webp'],
+            'target' => ['type' => 'classification', 'id' => '01a07614-832d-7f27-959c-74eb0cd63f3e'],
+        ]);
+
+        self::assertSame('01a0ab0c-fde0-7c01-a89d-fc5eef832c89', $usages->listByEndpoint('classification', '01a07614-832d-7f27-959c-74eb0cd63f3e', 'representative')[0]->mediaId);
+    }
+
     public function test_typed_batch_binds_uploaded_item_by_index_to_a_stable_target(): void
     {
         [$service, $usages] = $this->service();
@@ -169,6 +182,57 @@ final class MediaBindingServiceTest extends TestCase
         self::assertCount(2, $usages->listByEndpoint('wp_post', '1:573', 'inline_supporting'));
     }
 
+    public function test_replace_canonicalizes_legacy_empty_featured_placement_on_new_usage(): void
+    {
+        [$service, $usages] = $this->service();
+        $target = ['type' => 'wp_post', 'blog_id' => 1, 'post_id' => 574];
+        $added = $service->mutate([
+            'operation' => 'add', 'idempotency_key' => 'legacy-featured-add', 'media' => ['id' => '01a0ab0c-fde0-7c01-a89d-fc5eef832c89'],
+            'target' => $target, 'role' => 'featured_primary', 'placement_key' => '',
+            'selection_source' => 'USER_EXPLICIT', 'selection_policy' => 'PINNED',
+        ]);
+
+        $replaced = $service->mutate([
+            'operation' => 'replace', 'idempotency_key' => 'legacy-featured-replace', 'media' => ['id' => '01a0ab0c-fde0-7c01-a89d-fc5eef832c90'],
+            'target' => $target, 'usage_id' => $added['usage_id'], 'expected_usage_revision' => 1,
+            'role' => 'featured_primary', 'placement_key' => 'featured_primary',
+            'selection_source' => 'USER_EXPLICIT', 'selection_policy' => 'PINNED',
+        ]);
+
+        self::assertSame('featured_primary', $replaced['usage']['placement_key']);
+        self::assertSame('retired', $usages->listByEndpoint('wp_post', '1:574', 'featured_primary')[0]->activeSlot);
+    }
+
+    public function test_governed_mutations_emit_seo_and_projection_invalidations_for_each_operation(): void
+    {
+        $events = [];
+        [$service] = $this->service(true, null, null, static function (string $hook, string $type, string $target, string $usage) use (&$events): void {
+            $events[] = [$hook, $type, $target, $usage];
+        });
+        $target = ['type' => 'wp_post', 'blog_id' => 1, 'post_id' => 575];
+        $added = $service->mutate([
+            'operation' => 'add', 'idempotency_key' => 'invalidation-add', 'media' => ['id' => '01a0ab0c-fde0-7c01-a89d-fc5eef832c89'],
+            'target' => $target, 'role' => 'inline_supporting', 'placement_key' => 'inline-supporting-1',
+        ]);
+        $replaced = $service->mutate([
+            'operation' => 'replace', 'idempotency_key' => 'invalidation-replace', 'media' => ['id' => '01a0ab0c-fde0-7c01-a89d-fc5eef832c90'],
+            'target' => $target, 'usage_id' => $added['usage_id'], 'expected_usage_revision' => 1, 'role' => 'inline_supporting', 'placement_key' => 'inline-supporting-1',
+        ]);
+        $service->mutate([
+            'operation' => 'remove', 'idempotency_key' => 'invalidation-remove', 'target' => $target,
+            'usage_id' => $replaced['usage_id'], 'expected_usage_revision' => 1, 'role' => 'inline_supporting', 'placement_key' => 'inline-supporting-1',
+        ]);
+
+        self::assertSame([
+            ['nhk_v3_media_binding_seo_invalidate', 'wp_post', '1:575', $added['usage_id']],
+            ['nhk_v3_media_binding_projection_invalidate', 'wp_post', '1:575', $added['usage_id']],
+            ['nhk_v3_media_binding_seo_invalidate', 'wp_post', '1:575', $replaced['usage_id']],
+            ['nhk_v3_media_binding_projection_invalidate', 'wp_post', '1:575', $replaced['usage_id']],
+            ['nhk_v3_media_binding_seo_invalidate', 'wp_post', '1:575', $replaced['usage_id']],
+            ['nhk_v3_media_binding_projection_invalidate', 'wp_post', '1:575', $replaced['usage_id']],
+        ], $events);
+    }
+
     public function test_governed_media_usage_replace_requires_current_revision_and_exact_target(): void
     {
         [$service] = $this->service();
@@ -185,7 +249,7 @@ final class MediaBindingServiceTest extends TestCase
     }
 
     /** @return array{0:MediaBindingService,1:MemoryUsageRepository} */
-    private function service(bool $activeTarget = true, ?MediaBindingOperationRepository $operations = null): array
+    private function service(bool $activeTarget = true, ?MediaBindingOperationRepository $operations = null, ?callable $attachmentUrlResolver = null, ?callable $invalidationDispatcher = null): array
     {
         $mediaId = '01a0ab0c-fde0-7c01-a89d-fc5eef832c89';
         $media = new MemoryMediaRepository([
@@ -202,7 +266,7 @@ final class MediaBindingServiceTest extends TestCase
         $types = new EntityTypeRegistry();
         $types->register(new EntityTypeDefinition('classification', 1, true));
         $usages = new MemoryUsageRepository();
-        return [new MediaBindingService($media, $assets, $usages, $authority, $types, $operations ?? new MemoryOperationRepository()), $usages];
+        return [new MediaBindingService($media, $assets, $usages, $authority, $types, $operations ?? new MemoryOperationRepository(), attachmentUrlResolver: $attachmentUrlResolver, invalidationDispatcher: $invalidationDispatcher), $usages];
     }
 }
 

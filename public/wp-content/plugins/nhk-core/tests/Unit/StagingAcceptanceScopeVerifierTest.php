@@ -4,10 +4,15 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Governance\{CaptureChildRelationStagingAdmission, MediaBindingStagingGuard, OperationScopedStagingGuard, StagingAcceptanceScopeVerifier, VideoStagingAdmission};
+use NHK\Core\Application\Media\MediaTargetNormalizer;
+use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Contracts\Video\VideoRepository;
+use NHK\Core\Domain\Authority\EntityTypeRegistry;
 use NHK\Core\Domain\Capture\CaptureRecord;
+use NHK\Core\Domain\Graph\EndpointTypeRegistry;
 use NHK\Core\Domain\Governance\{Proposal, ProposalState};
 use NHK\Core\Domain\Video\Video;
+use NHK\Core\Infrastructure\Graph\WpPostEndpointResolver;
 use NHK\Core\Shared\Uuid\UuidCodec;
 use PHPUnit\Framework\TestCase;
 
@@ -183,6 +188,44 @@ final class StagingAcceptanceScopeVerifierTest extends TestCase
 
         self::assertSame('wp_post', $scope['target']['type']);
         self::assertSame('1:617', $scope['target']['id']);
+        self::assertTrue($verifier->verifyProposal($scope, $proposal));
+    }
+
+    public function test_media_usage_scope_verifies_the_same_normalized_target_payload_used_at_apply(): void
+    {
+        $capture = new CaptureRecord(UuidCodec::newV7(), 'article-media-normalized', hash('sha256', 'article-media-normalized'), 'MEDIA_RECONCILED', 'IN_PROGRESS', 617, null, [], ['purpose' => 'EDITORIAL', 'content_intent' => ['intent' => 'MEDIA_ENRICHMENT']], [], [], 7);
+        $mediaId = UuidCodec::newV7();
+        $operation = [
+            'operation' => 'replace',
+            'idempotency_key' => 'capture:617:normalized-replace',
+            'media' => ['id' => $mediaId],
+            'target' => ['type' => 'wp_post', 'id' => '1:617'],
+            'usage_id' => UuidCodec::newV7(),
+            'expected_usage_revision' => 3,
+            'role' => 'featured_primary',
+            'placement_key' => 'featured_primary',
+            'selection_source' => 'USER_EXPLICIT',
+            'selection_policy' => 'PINNED',
+        ];
+        $types = new EntityTypeRegistry();
+        $endpoints = new EndpointTypeRegistry();
+        $endpoints->register('wp_post', new WpPostEndpointResolver(static fn (int $id): ?object => $id === 617 ? (object) ['post_status' => 'publish', 'post_modified_gmt' => '2026-09-28 00:00:00'] : null, static fn (): int => 1));
+        $authority = new class implements AuthorityRepository {
+            public function findByCanonicalId(string $id): ?\NHK\Core\Domain\Authority\AuthorityEntity { return null; }
+            public function findByStableKey(string $type, string $key): ?\NHK\Core\Domain\Authority\AuthorityEntity { return null; }
+            public function create(\NHK\Core\Domain\Authority\AuthorityEntity $entity): \NHK\Core\Domain\Authority\AuthorityEntity { return $entity; }
+            public function update(\NHK\Core\Domain\Authority\AuthorityEntity $entity, int $expectedRevision): \NHK\Core\Domain\Authority\AuthorityEntity { return $entity; }
+            public function rekey(\NHK\Core\Domain\Authority\AuthorityEntity $entity, string $oldStableKey, string $newStableKey, int $expectedRevision): \NHK\Core\Domain\Authority\AuthorityEntity { return $entity; }
+            public function listByType(string $type, bool $includeRetired = false): array { return []; }
+        };
+        $normalizer = new MediaTargetNormalizer($endpoints, $types, $authority);
+        $verifier = new StagingAcceptanceScopeVerifier(static fn (): string => 'staging', 'test-secret', static fn (): bool => true, can: static fn (): bool => true, targetNormalizer: $normalizer);
+        $scope = $verifier->issueForMediaUsageOperation($capture, $operation);
+        $canonicalOperation = $verifier->canonicalizeMediaUsageOperation($operation);
+        $payload = $canonicalOperation + ['capture_id' => $capture->captureId, 'capture_fingerprint' => $capture->requestFingerprint, 'staging_acceptance' => $scope];
+        $proposal = new Proposal(UuidCodec::newV7(), $mediaId, 'replace', $payload, 'content', null, 'dependency', ProposalState::APPROVED, idempotencyKey: $operation['idempotency_key'], targetUuid: null, entityType: 'media');
+
+        self::assertSame($scope['target'], $canonicalOperation['target']);
         self::assertTrue($verifier->verifyProposal($scope, $proposal));
     }
 

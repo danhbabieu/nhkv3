@@ -20419,3 +20419,29 @@ LIVE_ACCEPTANCE: NOT RUN. No staging/production deployment or mutation was
 authorized or performed.
 
 STATUS: `UNIVERSAL_MEDIA_TARGET_URL_LOCAL_READY / INTEGRATION_ENVIRONMENT_UNAVAILABLE / NO_LIVE_MUTATION`.
+
+# Checkpoint — 2026-09-28 — Article featured-media enrichment governed path
+
+IMPLEMENTATION: Natural `MEDIA_ENRICHMENT` article commands now resolve a
+WordPress upload/source URL through the proven attachment mapping to the
+canonical Media record; public URL paths remain supported as exact locators.
+The production fallback and Governance runtime both wire the same
+`WordPressAttachmentUrlResolver`. Staging scope issuance and apply now share
+one canonical MediaUsage payload normalization, including preservation of
+canonical `blog:post` identifiers. Replace retires the prior MediaUsage and
+canonicalizes legacy empty featured placement to `featured_primary`; add,
+replace, and remove emit the shared SEO/projection invalidation hooks.
+
+VALIDATION: Focused enrichment/scope/binding/readback/projection slice passed
+74 tests / 194 assertions, with one skipped test, one warning and three
+PHPUnit deprecations. NHK Contract passed 6 tests / 48 assertions. Changed
+files pass PHP lint and `git diff --check`. Secret scan found no matching
+private-key or token patterns. Full NHK Unit ran with 512M memory and reached
+2,740 tests / 15,789 assertions; one unrelated pre-existing
+`KnowledgeWriterPreviewServiceTest` facet-coverage failure remains.
+
+RUNTIME_GATES: Integration database and authorized staging runtime were not
+available in this checkpoint. No staging, production, migration, seed, or
+semantic data mutation was performed.
+
+STATUS: `ARTICLE_FEATURED_MEDIA_GOVERNED_LOCAL_READY / BASELINE_FAILURE_DOCUMENTED / NO_LIVE_MUTATION / UNCOMMITTED`.
