@@ -25,7 +25,7 @@ public route, upload source URL, attachment locator, negative foreign host,
 legacy placement, replace/readback and invalidation behavior. Scope tamper
 matrix passed.
 
-STATUS: `ARTICLE_FEATURED_MEDIA_LOCATOR_LOCAL_READY / NO_MUTATION / UNCOMMITTED`
+STATUS: `ARTICLE_FEATURED_MEDIA_LOCATOR_LOCAL_READY / NO_MUTATION / COMMITTED / PUSH_BLOCKED_BY_POLICY`
 
 # Checkpoint — 2026-09-26 — Media representative natural-command routing (LOCAL / NO MUTATION)
 
