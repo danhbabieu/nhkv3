@@ -256,6 +256,42 @@ final class StagingAcceptanceScopeVerifierTest extends TestCase
         ]));
     }
 
+    public function test_media_usage_scope_rejects_every_identity_and_execution_field_tamper(): void
+    {
+        $capture = new CaptureRecord(UuidCodec::newV7(), 'article-media-tamper-matrix', hash('sha256', 'article-media-tamper-matrix'), 'MEDIA_RECONCILED', 'IN_PROGRESS', 618, null, [], ['purpose' => 'EDITORIAL', 'content_intent' => ['intent' => 'IMAGE_ARTICLE']], [], [], 7);
+        $mediaId = UuidCodec::newV7();
+        $operation = [
+            'operation' => 'replace', 'idempotency_key' => 'capture:618:featured-replace', 'media' => ['id' => $mediaId],
+            'target' => ['type' => 'wp_post', 'blog_id' => 1, 'post_id' => 618], 'usage_id' => UuidCodec::newV7(),
+            'expected_usage_revision' => 3, 'role' => 'featured_primary', 'placement_key' => 'featured_primary',
+            'selection_source' => 'USER_EXPLICIT', 'selection_policy' => 'PINNED',
+        ];
+        $verifier = new StagingAcceptanceScopeVerifier(static fn (): string => 'staging', 'test-secret', static fn (): bool => true, can: static fn (): bool => true);
+        $scope = $verifier->issueForMediaUsageOperation($capture, $operation);
+        $guard = new MediaBindingStagingGuard(static fn (): string => 'staging', static fn (array $scope, array $request): bool => true, static fn (): bool => true);
+
+        $mutations = [
+            'media' => ['media' => ['id' => UuidCodec::newV7()]],
+            'target' => ['target' => ['type' => 'wp_post', 'id' => '1:619']],
+            'usage' => ['usage_id' => UuidCodec::newV7()],
+            'revision' => ['expected_usage_revision' => 4],
+            'role' => ['role' => 'inline_supporting'],
+            'idempotency' => ['idempotency_key' => 'capture:618:other-operation'],
+        ];
+        foreach ($mutations as $label => $mutation) {
+            try {
+                $guard(array_replace($operation, $mutation, [
+                    'target' => $mutation['target'] ?? ['type' => 'wp_post', 'id' => '1:618'],
+                    'capture_id' => $capture->captureId,
+                    'staging_acceptance' => $scope,
+                ]));
+                self::fail('Tampered staging payload was accepted: ' . $label);
+            } catch (\RuntimeException $error) {
+                self::assertNotSame('', $error->getMessage(), $label);
+            }
+        }
+    }
+
     public function test_media_metadata_scope_binds_exact_capture_media_revision_and_payload(): void
     {
         $capture = new CaptureRecord(UuidCodec::newV7(), 'media-metadata-scope', hash('sha256', 'media-metadata-scope'), 'RECEIVED', 'IN_PROGRESS');

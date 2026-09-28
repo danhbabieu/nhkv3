@@ -75,6 +75,37 @@ final class MediaBindingServiceTest extends TestCase
         self::assertSame('01a0ab0c-fde0-7c01-a89d-fc5eef832c89', $usages->listByEndpoint('classification', '01a07614-832d-7f27-959c-74eb0cd63f3e', 'representative')[0]->mediaId);
     }
 
+    public function test_canonical_public_media_route_resolves_by_exact_asset_filename_when_route_metadata_is_legacy(): void
+    {
+        [$service, $usages] = $this->service(true, null, new class {
+            public function relativePublicPath(string $url): string { return (string) parse_url($url, PHP_URL_PATH); }
+            public function resolve(string $url): int { return 0; }
+        });
+
+        $service->bind([
+            'idempotency_key' => 'public-route-locator',
+            'media' => ['url' => 'https://demo.1945.vn/anh/second.webp'],
+            'target' => ['type' => 'classification', 'id' => '01a07614-832d-7f27-959c-74eb0cd63f3e'],
+        ]);
+
+        self::assertSame('01a0ab0c-fde0-7c01-a89d-fc5eef832c90', $usages->listByEndpoint('classification', '01a07614-832d-7f27-959c-74eb0cd63f3e', 'representative')[0]->mediaId);
+    }
+
+    public function test_foreign_public_media_route_fails_closed_before_path_matching(): void
+    {
+        [$service] = $this->service(true, null, new class {
+            public function relativePublicPath(string $url): string { throw new MediaException('EXISTING_MEDIA_URL_HOST_NOT_ALLOWED'); }
+            public function resolve(string $url): int { return 0; }
+        });
+
+        $this->expectExceptionMessage('MEDIA_BINDING_MEDIA_NOT_FOUND');
+        $service->bind([
+            'idempotency_key' => 'foreign-public-route',
+            'media' => ['url' => 'https://example.test/anh/cuckoo.webp'],
+            'target' => ['type' => 'classification', 'id' => '01a07614-832d-7f27-959c-74eb0cd63f3e'],
+        ]);
+    }
+
     public function test_typed_batch_binds_uploaded_item_by_index_to_a_stable_target(): void
     {
         [$service, $usages] = $this->service();
@@ -249,7 +280,7 @@ final class MediaBindingServiceTest extends TestCase
     }
 
     /** @return array{0:MediaBindingService,1:MemoryUsageRepository} */
-    private function service(bool $activeTarget = true, ?MediaBindingOperationRepository $operations = null, ?callable $attachmentUrlResolver = null, ?callable $invalidationDispatcher = null): array
+    private function service(bool $activeTarget = true, ?MediaBindingOperationRepository $operations = null, mixed $attachmentUrlResolver = null, ?callable $invalidationDispatcher = null): array
     {
         $mediaId = '01a0ab0c-fde0-7c01-a89d-fc5eef832c89';
         $media = new MemoryMediaRepository([
@@ -258,7 +289,7 @@ final class MediaBindingServiceTest extends TestCase
         ]);
         $assets = new MemoryAssetRepository([
             new MediaAsset(UuidCodec::newV7(), $mediaId, 'original', 'uploads/cuckoo.jpg', hash('sha256', 'cuckoo'), 'image/jpeg', 10, 1200, 800, 'PUBLIC', ['wordpress_attachment_id' => 567, 'public_url_path' => '/anh/cuckoo.webp']),
-            new MediaAsset(UuidCodec::newV7(), '01a0ab0c-fde0-7c01-a89d-fc5eef832c90', 'original', 'uploads/second.jpg', hash('sha256', 'second'), 'image/jpeg', 10, 1200, 800, 'PUBLIC', ['wordpress_attachment_id' => 568]),
+            new MediaAsset(UuidCodec::newV7(), '01a0ab0c-fde0-7c01-a89d-fc5eef832c90', 'original', 'uploads/second.jpg', hash('sha256', 'second'), 'image/jpeg', 10, 1200, 800, 'PUBLIC', ['wordpress_attachment_id' => 568, 'canonical_filename' => 'second.webp']),
         ]);
         $targetOne = new AuthorityEntity('01a07614-832d-7f27-959c-74eb0cd63f3e', 'classification', 'nhk:classification:clock-type.cuckoo-clock', 'Đồng hồ chim cúc cu', 1, ['family' => 'clock_type']);
         $targetTwo = new AuthorityEntity('01a07614-832d-7f27-959c-74eb0cd63f40', 'classification', 'nhk:classification:clock-type.second', 'Second clock', 1, ['family' => 'clock_type'], $activeTarget ? AuthorityState::ACTIVE : AuthorityState::RETIRED);

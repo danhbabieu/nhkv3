@@ -373,10 +373,17 @@ final class MediaBindingService implements MediaBindingPort
             foreach ($this->media->list(true) as $candidate) foreach ($this->assets->listByMediaId($candidate->canonicalId) as $asset) if ((int) ($asset->metadata['wordpress_attachment_id'] ?? 0) === (int) $reference['attachment_id']) { $media = $candidate; break 2; }
         } elseif (trim((string) ($reference['url'] ?? '')) !== '') {
             $url = trim((string) $reference['url']);
-            $path = (string) (parse_url($url, PHP_URL_PATH) ?: $url);
+            $path = null;
+            if (is_object($this->attachmentUrlResolver) && method_exists($this->attachmentUrlResolver, 'relativePublicPath')) {
+                try { $path = (string) $this->attachmentUrlResolver->relativePublicPath($url); } catch (\Throwable) { $path = null; }
+            } else {
+                $path = (string) (parse_url($url, PHP_URL_PATH) ?: $url);
+            }
             foreach ($this->media->list(true) as $candidate) foreach ($this->assets->listByMediaId($candidate->canonicalId) as $asset) {
                 $publicPath = (string) ($asset->metadata['public_url_path'] ?? '');
-                if ($publicPath !== '' && $publicPath === $path) { $media = $candidate; break 2; }
+                $canonicalFilename = (string) ($asset->metadata['canonical_filename'] ?? '');
+                $canonicalPath = $canonicalFilename !== '' ? (new PublicMediaAssetUrlResolver())->path($canonicalFilename) : '';
+                if ($path !== null && (($publicPath !== '' && $publicPath === $path) || ($canonicalPath !== '' && $canonicalPath === $path))) { $media = $candidate; break 2; }
             }
             if (!$media instanceof Media && (is_callable($this->attachmentUrlResolver) || is_object($this->attachmentUrlResolver) && method_exists($this->attachmentUrlResolver, 'resolve'))) {
                 try {

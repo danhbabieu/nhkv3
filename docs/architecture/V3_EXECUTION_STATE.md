@@ -1,5 +1,32 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-28 — Governed Article featured Media URL locator hardening (LOCAL / NO MUTATION)
+
+ROOT_CAUSE_CONFIRMED: Article Media enrichment accepted a public Media URL only
+when `MediaAsset.metadata.public_url_path` was already present. Legacy or
+partially reconciled assets whose exact canonical route was represented by
+`canonical_filename` therefore fell through to the WordPress upload-URL
+resolver, which cannot resolve `/anh/...` routes, and returned
+`MEDIA_BINDING_MEDIA_NOT_FOUND`. The prior staging payload mismatch path was
+already canonicalized at issuance; a tamper matrix now proves the signed
+MediaUsage guard rejects changed media, target, usage, revision, role and
+idempotency fields.
+
+FIXED_BOUNDARY: Added first-party public-route normalization to the existing
+WordPress locator policy, exact canonical filename → `/anh/...` lookup, and
+foreign-host fail-closed behavior in both the primary runtime and Plugin
+fallback wiring. Existing upload URL resolution remains supported. No fixture
+IDs, hostnames, direct writers, Graph edges, schema or Governance bypass were
+added.
+
+REGRESSION: Focused Article Media/Capture/Governance suite passed 130 tests /
+434 assertions; runtime wiring plus URL and binding tests include canonical
+public route, upload source URL, attachment locator, negative foreign host,
+legacy placement, replace/readback and invalidation behavior. Scope tamper
+matrix passed.
+
+STATUS: `ARTICLE_FEATURED_MEDIA_LOCATOR_LOCAL_READY / NO_MUTATION / UNCOMMITTED`
+
 # Checkpoint — 2026-09-26 — Media representative natural-command routing (LOCAL / NO MUTATION)
 
 ROOT_CAUSE_CONFIRMED: `ContentIntentRouter` and `MediaEnrichmentIntentCompiler`

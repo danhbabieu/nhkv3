@@ -356,14 +356,13 @@ final class Plugin {
             (new AdminWorkbenchReadApi($media, $videos, $claims, $authority, $sources, $evidence, $graphService, $proposalRepository, $eligibility, $assets, $usages, new EntityProfileAdminProjection()))->register();
             $authorityService = new \NHK\Core\Application\Authority\AuthorityService($authority, $types, new \NHK\Core\Infrastructure\Authority\WpdbAuditSink(new \NHK\Core\Infrastructure\Governance\WpdbAuditSink($wpdb)));
             $mediaService = new MediaService($media, $assets, $usages);
-            $mediaBindingService = $governanceRuntime->mediaBinding ?? new MediaBindingService($media, $assets, $usages, $authority, $types, new WpdbMediaBindingOperationRepository($wpdb), stagingGuard: new \NHK\Core\Application\Governance\MediaBindingStagingGuard(static function (): string { return defined('WP_ENVIRONMENT_TYPE') ? strtolower((string) constant('WP_ENVIRONMENT_TYPE')) : (function_exists('wp_get_environment_type') ? strtolower((string) wp_get_environment_type()) : strtolower((string) (getenv('WP_ENVIRONMENT_TYPE') ?: 'unknown'))); }, [$stagingScopeVerifier, 'verifyBindingRequest'], static fn (string $capability): bool => function_exists('current_user_can') && current_user_can($capability)), targetNormalizer: new \NHK\Core\Application\Media\MediaTargetNormalizer($endpoints, $types, $authority), attachmentUrlResolver: static function (string $url) use ($wpdb): int {
-                $origins = [];
-                foreach ([function_exists('site_url') ? (string) site_url() : '', function_exists('home_url') ? (string) home_url() : ''] as $origin) {
-                    $parts = parse_url($origin);
-                    if (is_array($parts) && strtolower((string) ($parts['scheme'] ?? '')) === 'https' && trim((string) ($parts['host'] ?? '')) !== '') $origins[] = 'https://' . strtolower((string) $parts['host']) . (isset($parts['port']) ? ':' . (int) $parts['port'] : '');
-                }
-                return (new \NHK\Core\Infrastructure\Media\WordPressAttachmentUrlResolver($wpdb, array_values(array_unique($origins))))->resolve($url);
-            });
+            $mediaBindingOrigins = [];
+            foreach ([function_exists('site_url') ? (string) site_url() : '', function_exists('home_url') ? (string) home_url() : ''] as $origin) {
+                $parts = parse_url($origin);
+                if (is_array($parts) && strtolower((string) ($parts['scheme'] ?? '')) === 'https' && trim((string) ($parts['host'] ?? '')) !== '') $mediaBindingOrigins[] = 'https://' . strtolower((string) $parts['host']) . (isset($parts['port']) ? ':' . (int) $parts['port'] : '');
+            }
+            $mediaBindingUrlResolver = new \NHK\Core\Infrastructure\Media\WordPressAttachmentUrlResolver($wpdb, array_values(array_unique($mediaBindingOrigins)));
+            $mediaBindingService = $governanceRuntime->mediaBinding ?? new MediaBindingService($media, $assets, $usages, $authority, $types, new WpdbMediaBindingOperationRepository($wpdb), stagingGuard: new \NHK\Core\Application\Governance\MediaBindingStagingGuard(static function (): string { return defined('WP_ENVIRONMENT_TYPE') ? strtolower((string) constant('WP_ENVIRONMENT_TYPE')) : (function_exists('wp_get_environment_type') ? strtolower((string) wp_get_environment_type()) : strtolower((string) (getenv('WP_ENVIRONMENT_TYPE') ?: 'unknown'))); }, [$stagingScopeVerifier, 'verifyBindingRequest'], static fn (string $capability): bool => function_exists('current_user_can') && current_user_can($capability)), targetNormalizer: new \NHK\Core\Application\Media\MediaTargetNormalizer($endpoints, $types, $authority), attachmentUrlResolver: $mediaBindingUrlResolver);
             $attachmentBridge = $sharedAttachmentBridge ?? new WordPressMediaAttachmentBridge($wpdb, $mediaService, $media, $assets);
             $sharedAttachmentBridge = $attachmentBridge;
             $mediaEnrichmentExactReadback = new MediaEnrichmentExactReadbackService($usages, $attachmentBridge, [$entityMediaProjection, 'representativeForEntity']);

@@ -36,21 +36,7 @@ final class WordPressAttachmentUrlResolver
      */
     public function relativeUploadPath(string $url): string
     {
-        $parts = parse_url(trim($url));
-        if (!is_array($parts) || strtolower((string) ($parts['scheme'] ?? '')) !== 'https' || trim((string) ($parts['host'] ?? '')) === '' || isset($parts['fragment']) || isset($parts['user']) || isset($parts['pass'])) {
-            throw new \InvalidArgumentException('EXISTING_MEDIA_URL_INVALID');
-        }
-
-        $origin = 'https://' . strtolower((string) $parts['host']) . (isset($parts['port']) ? ':' . (int) $parts['port'] : '');
-        $allowed = array_values(array_filter(array_map([$this, 'normalizeOrigin'], $this->allowedOrigins)));
-        if (!in_array($origin, $allowed, true)) throw new \InvalidArgumentException('EXISTING_MEDIA_URL_HOST_NOT_ALLOWED');
-
-        $path = (string) ($parts['path'] ?? '');
-        if ($path === '' || str_contains($path, "\0") || str_contains($path, '\\')) throw new \InvalidArgumentException('EXISTING_MEDIA_URL_INVALID');
-        $path = rawurldecode($path);
-        if (str_contains($path, "\0") || str_contains($path, '\\')) throw new \InvalidArgumentException('EXISTING_MEDIA_URL_PATH_TRAVERSAL');
-        $segments = explode('/', trim($path, '/'));
-        if (in_array('', $segments, true) || in_array('.', $segments, true) || in_array('..', $segments, true)) throw new \InvalidArgumentException('EXISTING_MEDIA_URL_PATH_TRAVERSAL');
+        $path = $this->relativePublicPath($url, true);
 
         $basePath = $this->uploadBasePath;
         if ($basePath === null) {
@@ -65,6 +51,25 @@ final class WordPressAttachmentUrlResolver
         $relative = ltrim(substr($path, strlen($basePath)), '/');
         if ($relative === '' || str_contains($relative, '..')) throw new \InvalidArgumentException('EXISTING_MEDIA_URL_PATH_TRAVERSAL');
         return $relative;
+    }
+
+    /** Normalize an exact first-party public Media route such as /anh/foo.webp. */
+    public function relativePublicPath(string $url, bool $allowQuery = false): string
+    {
+        $parts = parse_url(trim($url));
+        if (!is_array($parts) || strtolower((string) ($parts['scheme'] ?? '')) !== 'https' || trim((string) ($parts['host'] ?? '')) === '' || isset($parts['fragment']) || isset($parts['user']) || isset($parts['pass']) || (!$allowQuery && isset($parts['query']))) {
+            throw new \InvalidArgumentException('EXISTING_MEDIA_URL_INVALID');
+        }
+
+        $origin = 'https://' . strtolower((string) $parts['host']) . (isset($parts['port']) ? ':' . (int) $parts['port'] : '');
+        $allowed = array_values(array_filter(array_map([$this, 'normalizeOrigin'], $this->allowedOrigins)));
+        if (!in_array($origin, $allowed, true)) throw new \InvalidArgumentException('EXISTING_MEDIA_URL_HOST_NOT_ALLOWED');
+
+        $path = rawurldecode((string) ($parts['path'] ?? ''));
+        if ($path === '' || !str_starts_with($path, '/') || str_contains($path, "\0")) throw new \InvalidArgumentException('EXISTING_MEDIA_URL_INVALID');
+        if (str_contains($path, '\\')) throw new \InvalidArgumentException('EXISTING_MEDIA_URL_PATH_TRAVERSAL');
+        if (in_array('', explode('/', trim($path, '/')), true) || preg_match('#(?:^|/)\.\.?(?:/|$)#', $path) === 1) throw new \InvalidArgumentException('EXISTING_MEDIA_URL_PATH_TRAVERSAL');
+        return '/' . trim($path, '/');
     }
 
     private function findByAttachedFile(string $relative): array

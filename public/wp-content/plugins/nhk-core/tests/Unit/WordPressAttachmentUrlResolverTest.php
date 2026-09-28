@@ -44,4 +44,17 @@ final class WordPressAttachmentUrlResolverTest extends TestCase
         $this->expectExceptionMessage('EXISTING_MEDIA_URL_INVALID');
         $this->resolver()->relativeUploadPath('http://demo.1945.vn/wp-content/uploads/2026/09/image.jpeg');
     }
+
+    public function test_same_site_public_media_route_normalizes_without_treating_it_as_upload_path(): void
+    {
+        self::assertSame('/anh/bo-suu-tap-dong-ho-co.webp', $this->resolver()->relativePublicPath(
+            'https://demo.1945.vn/anh/bo-suu-tap-dong-ho-co.webp',
+        ));
+    }
+
+    public function test_foreign_public_media_route_is_rejected(): void
+    {
+        $this->expectExceptionMessage('EXISTING_MEDIA_URL_HOST_NOT_ALLOWED');
+        $this->resolver()->relativePublicPath('https://example.test/anh/bo-suu-tap-dong-ho-co.webp');
+    }
 }
