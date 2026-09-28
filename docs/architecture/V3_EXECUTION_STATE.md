@@ -1,5 +1,27 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-28 — Exact Article Media command Content Preparation gate (LOCAL / NO MUTATION)
+
+ROOT_CAUSE_CONFIRMED: The natural command was correctly routed and compiled,
+but Content Preparation rebuilt subject candidates from command text. The
+token `Thay` appeared as a body/entity candidate, so the existing
+`subjectOptionalForExactMediaTarget()` guard rejected the exact
+`MEDIA_ENRICHMENT` operation even though its canonical `wp_post / 1:18`
+target was already resolved.
+
+FIXED_BOUNDARY: Exact `MEDIA_ENRICHMENT` operations with validated target
+locators now remain `OPTIONAL_EXACT_MEDIA_TARGET` regardless of unrelated
+command-text candidates. Subject resolution remains required for
+`MEDIA_ENRICHMENT` without an exact target and for other intents. No semantic
+owner, Article, Graph edge, direct writer, or live data was mutated.
+
+REGRESSION: Red/green test reproduces the Vietnamese `Thay ảnh
+article-featured ... bằng ảnh ...` command with `entity_mentions: [Thay]` and
+canonical replace operation. Preparation/router/compiler convergence suite:
+108 tests / 524 assertions, 0 failures.
+
+STATUS: `ARTICLE_FEATURED_MEDIA_CONTENT_PREPARATION_GATE_LOCAL_READY / NO_MUTATION / UNCOMMITTED`
+
 # Checkpoint — 2026-09-28 — Governed Article featured Media URL locator hardening (LOCAL / NO MUTATION)
 
 ROOT_CAUSE_CONFIRMED: Article Media enrichment accepted a public Media URL only

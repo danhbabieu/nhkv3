@@ -73,6 +73,7 @@ final class PreparationPhaseAdmissionPolicyTest extends TestCase
         $result = (new ContentPreparationOrchestrator($resolver))->prepare(
             [
                 'intent' => 'MEDIA_ENRICHMENT',
+                'text' => 'Thay ảnh article-featured của https://demo.1945.vn/carillon-la-gi-trong-dong-ho-co-phap-dung-nham-carillon-la-ten-hang/ bằng ảnh https://demo.1945.vn/anh/bo-suu-tap-dong-ho-co.webp',
                 'media_operations' => [[
                     'operation' => 'replace',
                     'media' => ['id' => '01a0d7ee-3e33-7366-88c6-287112b34936'],
@@ -81,7 +82,7 @@ final class PreparationPhaseAdmissionPolicyTest extends TestCase
                     'expected_usage_revision' => 1,
                 ]],
             ],
-            [],
+            ['entity_mentions' => ['Thay']],
             [['media_id' => '01a0d7ee-3e33-7366-88c6-287112b34936']],
             ['content_intent' => ['intent' => 'MEDIA_ENRICHMENT']],
         );

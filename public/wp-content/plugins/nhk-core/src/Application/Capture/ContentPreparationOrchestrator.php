@@ -113,7 +113,7 @@ final class ContentPreparationOrchestrator
         ];
         $diagnostics['phase'] = 'LOCK_FINAL_SUBJECT_PACKET';
         $diagnostics['candidate_count'] = count($candidates);
-        $subjectOptionalForExactMediaTarget = $this->subjectOptionalForExactMediaTarget($input, $dependencyContext, $resolution, $candidates);
+        $subjectOptionalForExactMediaTarget = $this->subjectOptionalForExactMediaTarget($input, $dependencyContext, $resolution);
         $diagnostics['subject_requirement'] = $subjectOptionalForExactMediaTarget
             ? 'OPTIONAL_EXACT_MEDIA_TARGET'
             : 'REQUIRED';
@@ -139,18 +139,18 @@ final class ContentPreparationOrchestrator
     /**
      * Exact MediaUsage work owns its target identity independently of semantic
      * subject resolution. An absent subject may therefore be optional only
-     * when MEDIA_ENRICHMENT carries explicit target locators and no competing
-     * subject candidate/conflict was supplied.
+     * when MEDIA_ENRICHMENT carries explicit target locators. Subject hints
+     * extracted from the command text are not semantic dependencies of the
+     * exact MediaUsage operation and must not reintroduce subject resolution.
      *
      * @param array<string,mixed> $input
      * @param array<string,mixed> $context
      * @param array<string,mixed> $resolution
-     * @param list<array<string,mixed>> $candidates
      */
-    private function subjectOptionalForExactMediaTarget(array $input, array $context, array $resolution, array $candidates): bool
+    private function subjectOptionalForExactMediaTarget(array $input, array $context, array $resolution): bool
     {
         $intent = strtoupper(trim((string) (($context['content_intent']['intent'] ?? null) ?: ($input['intent'] ?? ''))));
-        if ($intent !== 'MEDIA_ENRICHMENT' || strtolower(trim((string) ($resolution['status'] ?? 'unresolved'))) !== 'unresolved' || $candidates !== []) {
+        if ($intent !== 'MEDIA_ENRICHMENT' || strtolower(trim((string) ($resolution['status'] ?? 'unresolved'))) !== 'unresolved') {
             return false;
         }
 
