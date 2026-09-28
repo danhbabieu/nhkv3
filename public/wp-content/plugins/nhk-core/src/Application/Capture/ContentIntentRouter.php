@@ -110,8 +110,8 @@ final class ContentIntentRouter
     private function isNaturalMediaRepresentativeCommand(string $text): bool
     {
         foreach ([
-            '~^Ảnh\s+đại\s+diện\s+của\s+https://\S+\s+thay\s+bằng\s+https://\S+\s*[.!?]?$~iu',
-            '~^Thay\s+ảnh\s+đại\s+diện\s+của\s+https://\S+\s+bằng\s+https://\S+\s*[.!?]?$~iu',
+            '~^(?:Ảnh\s+đại\s+diện|article[-\s]?featured|featured[-\s]?image)\s+của\s+https://\S+\s+thay\s+bằng\s+(?:ảnh\s+)?https://\S+\s*[.!?]?$~iu',
+            '~^Thay\s+(?:ảnh\s+)?(?:đại\s+diện|article[-\s]?featured|featured[-\s]?image)\s+của\s+https://\S+\s+bằng\s+(?:ảnh\s+)?https://\S+\s*[.!?]?$~iu',
             '~^Dùng\s+https://\S+\s+làm\s+ảnh\s+đại\s+diện\s+cho\s+https://\S+\s*[.!?]?$~iu',
             '~^Dùng\s+ảnh\s+https://\S+\s+làm\s+đại\s+diện\s+cho\s+https://\S+\s*[.!?]?$~iu',
         ] as $pattern) {

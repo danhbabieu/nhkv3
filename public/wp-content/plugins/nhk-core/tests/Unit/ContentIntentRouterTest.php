@@ -176,6 +176,10 @@ final class ContentIntentRouterTest extends TestCase
         return [
             ['Ảnh đại diện của ' . $article . ' thay bằng ' . $media],
             ['Thay ảnh đại diện của ' . $article . ' bằng ' . $media],
+            ['Thay ảnh article-featured của ' . $article . ' bằng ảnh ' . $media],
+            ['Thay article-featured của ' . $article . ' bằng ảnh ' . $media],
+            ['Thay ảnh featured-image của ' . $article . ' bằng ảnh ' . $media],
+            ['Thay featured-image của ' . $article . ' bằng ảnh ' . $media],
             ['Dùng ' . $media . ' làm ảnh đại diện cho ' . $article],
             ['Dùng ảnh ' . $media . ' làm đại diện cho ' . $article],
         ];

@@ -122,7 +122,7 @@ final class MediaBindingService implements MediaBindingPort
                 $normalized['seo']['title'], 1, $normalized['placement_key'], $normalized['selection_source'],
                 $normalized['selection_policy'], $normalized['active_slot'],
             ));
-            return $this->mutationResult($operation, $media->canonicalId, $usage, null, $target);
+            return $this->mutationResultWithInvalidation($operation, $media->canonicalId, $usage, null, $target);
         }
 
         if (!$existing instanceof MediaUsage) throw new MediaException('MEDIA_USAGE_NOT_FOUND');
@@ -146,7 +146,7 @@ final class MediaBindingService implements MediaBindingPort
                 $existing->keywordGroups, $normalized['seo']['title'], 1, $existing->placementKey,
                 $normalized['selection_source'], $normalized['selection_policy'], $existing->activeSlot,
             ));
-            return $this->mutationResult($operation, $nextMedia->canonicalId, $replacement, $existing->usageId, $target);
+            return $this->mutationResultWithInvalidation($operation, $nextMedia->canonicalId, $replacement, $existing->usageId, $target);
         }
         $usage = $updater->update(new MediaUsage(
             $existing->usageId, $nextMedia->canonicalId, $existing->endpointType, $existing->endpointKey,
@@ -157,7 +157,7 @@ final class MediaBindingService implements MediaBindingPort
             $existing->revision, $existing->placementKey, $existing->selectionSource, $existing->selectionPolicy,
             $operation === 'remove' ? 'retired' : $existing->activeSlot,
         ));
-        return $this->mutationResult($operation, $nextMedia->canonicalId, $usage, $existing->usageId, $target);
+        return $this->mutationResultWithInvalidation($operation, $nextMedia->canonicalId, $usage, $existing->usageId, $target);
     }
 
     /** @param list<array<string,mixed>> $bindings @param list<array<string,mixed>> $assets @return array<string,mixed> */
@@ -337,6 +337,16 @@ final class MediaBindingService implements MediaBindingPort
     private function mutationResult(string $operation, string $mediaId, MediaUsage $usage, ?string $previousUsageId, array $target): array
     {
         return ['status' => 'COMPLETE', 'operation' => $operation, 'media_id' => $mediaId, 'usage_id' => $usage->usageId, 'previous_usage_id' => $previousUsageId, 'usage' => $this->usageArray($usage), 'readback' => ['status' => 'verified', 'media_id' => $mediaId, 'target_type' => $target['type'], 'target_id' => $target['key'], 'usage_id' => $usage->usageId, 'role' => $usage->role, 'active_slot' => $usage->activeSlot, 'revision' => $usage->revision]];
+    }
+
+    /** @param array{type:string,key:string} $target @return array<string,mixed> */
+    private function mutationResultWithInvalidation(string $operation, string $mediaId, MediaUsage $usage, ?string $previousUsageId, array $target): array
+    {
+        if (function_exists('do_action')) {
+            do_action('nhk_v3_media_binding_seo_invalidate', $target['type'], $target['key'], $usage->usageId);
+            do_action('nhk_v3_media_binding_projection_invalidate', $target['type'], $target['key'], $usage->usageId);
+        }
+        return $this->mutationResult($operation, $mediaId, $usage, $previousUsageId, $target);
     }
 
     /** @param array<string,mixed> $request */
