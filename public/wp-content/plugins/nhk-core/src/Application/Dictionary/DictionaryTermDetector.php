@@ -53,6 +53,11 @@ final class DictionaryTermDetector
 
         if (preg_match_all('/\bbản\s+nhạc\s+(' . $word . '(?:\s+' . $word . '){0,3})\b/iu', $text, $music)) {
             foreach ($music[1] as $value) {
+                $knownName = $this->knownLabelInWindow((string) $value, $approvedLabels);
+                if ($knownName !== null) {
+                    $this->add($out, $knownName, 'MUSIC_NAME', 'STRONG');
+                    continue;
+                }
                 $phrase = $this->qualityGate->filter((string) $value);
                 if ($phrase !== null) $this->add($out, $phrase, 'MUSIC_NAME', 'NORMAL');
             }
@@ -79,6 +84,22 @@ final class DictionaryTermDetector
     private function present(string $text, string $term): bool
     {
         return preg_match('/(?<![\p{L}\p{N}_])' . preg_quote($term, '/') . '(?![\p{L}\p{N}_])/iu', $text) === 1;
+    }
+
+    private function knownLabelInWindow(string $window, array $approvedLabels): ?string
+    {
+        $matches = [];
+        foreach ($approvedLabels as $label) {
+            $label = trim((string) $label);
+            if ($label === '' || !$this->present($window, $label)) continue;
+            $matches[$this->normalizer->normalize($label)] = $label;
+        }
+        if ($matches === []) return null;
+
+        uasort($matches, static function (string $left, string $right): int {
+            return mb_strlen($right, 'UTF-8') <=> mb_strlen($left, 'UTF-8');
+        });
+        return (string) reset($matches);
     }
 
 }

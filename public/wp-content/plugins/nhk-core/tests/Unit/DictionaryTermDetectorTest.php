@@ -35,4 +35,40 @@ final class DictionaryTermDetectorTest extends TestCase
         self::assertContains('bộ thoát', $terms('Thiết bị có ngắt chuông đêm tự động và bộ thoát.'));
     }
 
+    public function test_quality_gate_cuts_multi_word_clause_boundary_without_losing_the_lexical_phrase(): void
+    {
+        $terms = static fn (string $text): array => array_column((new DictionaryTermDetector())->detect($text), 'normalized_term');
+
+        self::assertNotContains('côn thay', $terms('Tình trạng bộ côn thay vì dùng từ tuyệt đối.'));
+        self::assertContains('côn', $terms('Tình trạng bộ côn thay vì dùng từ tuyệt đối.'));
+    }
+
+    public function test_detector_keeps_known_music_name_but_drops_editorial_modifier_before_it(): void
+    {
+        $terms = array_column(
+            (new DictionaryTermDetector())->detect(
+                'Bản nhạc đầy đủ Gai-Carillon trên Odo 36/10.',
+                ['Gai-Carillon'],
+            ),
+            'normalized_term',
+        );
+
+        self::assertContains('gai-carillon', $terms);
+        self::assertNotContains('đầy đủ gai-carillon', $terms);
+    }
+
+    public function test_quality_gate_keeps_reusable_short_domain_phrases(): void
+    {
+        $terms = array_column(
+            (new DictionaryTermDetector())->detect(
+                'côn lòng máng trắng, ngắt chuông đêm tự động, mặt số lớn, bộ thoát, điểm giờ và vách mảnh.',
+            ),
+            'normalized_term',
+        );
+
+        foreach (['côn lòng máng trắng', 'ngắt chuông đêm tự động', 'mặt số lớn', 'bộ thoát', 'điểm giờ', 'vách mảnh'] as $term) {
+            self::assertContains($term, $terms);
+        }
+    }
+
 }

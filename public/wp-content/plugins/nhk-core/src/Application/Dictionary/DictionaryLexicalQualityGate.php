@@ -15,6 +15,9 @@ final class DictionaryLexicalQualityGate
         'thế', 'nào', 'nằm', 'ở', 'trở', 'nếu', 'vì', 'nên', 'khiến', 'tại', 'bởi',
         'cùng', 'tự', 'thường', 'phổ', 'biến', 'gặp', 'chúng', 'ta', 'họ', 'nó',
     ];
+    private const BOUNDARY_PHRASES = [
+        'thay vì', 'mặc dù', 'bởi vì', 'cho nên', 'vì vậy', 'do đó', 'để mà',
+    ];
     private const MODIFIER_PREFIX_WORDS = ['tự'];
 
     public function filter(string $phrase): ?string
@@ -25,6 +28,13 @@ final class DictionaryLexicalQualityGate
 
         foreach ($parts as $index => $part) {
             $word = $this->lower((string) preg_replace('/[^\p{L}\p{N}\-]/u', '', $part));
+            $nextWord = isset($parts[$index + 1])
+                ? $this->lower((string) preg_replace('/[^\p{L}\p{N}\-]/u', '', (string) $parts[$index + 1]))
+                : '';
+            if ($nextWord !== '' && in_array($word . ' ' . $nextWord, self::BOUNDARY_PHRASES, true)) {
+                $parts = array_slice($parts, 0, $index);
+                break;
+            }
             if ($word !== '' && in_array($word, self::MODIFIER_PREFIX_WORDS, true) && isset($parts[$index + 1])) continue;
             if ($word !== '' && in_array($word, self::BOUNDARY_WORDS, true)) {
                 $parts = array_slice($parts, 0, $index);

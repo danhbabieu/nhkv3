@@ -126,6 +126,35 @@ final class DictionaryPlanningServiceTest extends TestCase
         self::assertNotEmpty($candidateRepo->items[0]->suggestions);
     }
 
+    public function test_lexical_quality_does_not_resolve_ambiguous_vach_terms(): void
+    {
+        $candidateRepo = new class implements DictionaryCandidateRepository {
+            public function upsertObservation(DictionaryCandidate $candidate): DictionaryCandidate { return $candidate; }
+            public function suppressed(string $normalizedTerm, string $contextHash): bool { return false; }
+            public function listForReview(int $limit = 100): array { return []; }
+            public function findById(string $candidateId): ?DictionaryCandidate { return null; }
+            public function saveDecision(DictionaryCandidate $candidate, int $expectedRevision): DictionaryCandidate { return $candidate; }
+        };
+        $mentionRepo = new class implements DictionaryMentionRepository {
+            public function upsert(DictionaryMention $mention): DictionaryMention { return $mention; }
+            public function listBySource(string $sourceKind, string $sourceId): array { return []; }
+        };
+        $resolver = new DictionaryResolver(
+            static fn (string $term): array => in_array($term, ['vách trơn', 'vách hở'], true)
+                ? [['concept_id' => 'component-' . $term, 'destination_url' => '/component/'], ['concept_id' => 'classification-' . $term, 'destination_url' => '/classification/']]
+                : [],
+            static fn (): array => [], static fn (): array => [], static fn (): array => [], static fn (): bool => false,
+        );
+        $service = new DictionaryPlanningService(new DictionaryTermDetector(), $resolver, $candidateRepo, $mentionRepo, new DictionaryLinkPlanner());
+
+        foreach (['vách trơn', 'vách hở'] as $term) {
+            $plan = $service->preview('Mô tả ' . $term . ' trong tài liệu.', 'KNOWLEDGE', 'k1');
+            self::assertCount(1, $plan['ambiguous_terms']);
+            self::assertSame($term, $plan['ambiguous_terms'][0]['normalized_term']);
+            self::assertSame([], $plan['internal_link_candidates']);
+        }
+    }
+
     public function test_source_specific_fields_do_not_fragment_candidate_context(): void
     {
         $candidateRepo = new class implements DictionaryCandidateRepository {
