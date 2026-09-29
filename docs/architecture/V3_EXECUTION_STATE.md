@@ -20595,3 +20595,17 @@ defensive read-boundary fix.
 
 VALIDATION: provenance/UUID/MCP focused slice passes 31 tests / 156 assertions
 (one PHPUnit deprecation). PHP lint and `git diff --check` pass.
+
+# Checkpoint — 2026-09-29 — Final pre-push verification
+
+VALIDATION: HEAD `cba79432` passes the focused Dictionary/MCP/Admin/provenance
+slice with 31 tests / 156 assertions and the Contract suite with 6 tests / 48
+assertions. Full PHPUnit with `memory_limit=512M` reaches 2,920 tests / 16,506
+assertions, 23 failures, 19 warnings, 47 deprecations, 49 PHPUnit deprecations
+and 122 skips. The failures are unchanged from the proven baseline: two
+KnowledgeWriter pre-existing assertions and 21 integration failures caused by
+missing `NHK_WP_TEST_PATH` / `nhk_v3_test`; no new regression was observed.
+Full PHP lint, `git diff --check` and secret scan pass. No code or data was
+changed by verification; this checkpoint only records final evidence.
+
+STATUS: `DICTIONARY_ISSUE_21_VERIFIED / NO_NEW_REGRESSION / WORKTREE_PENDING_DOC_COMMIT / NO_PUSH / NO_DEPLOY`.
