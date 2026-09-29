@@ -71,4 +71,98 @@ final class DictionaryTermDetectorTest extends TestCase
         }
     }
 
+    public function test_generic_clause_continuations_are_not_lexical_tails(): void
+    {
+        $detector = new DictionaryTermDetector();
+        $terms = static fn (string $text): array => array_column($detector->detect($text), 'normalized_term');
+
+        self::assertContains('bộ alpha', $terms('“Bộ Alpha” thay vì Beta.'));
+        self::assertNotContains('bộ alpha thay vì beta', $terms('“Bộ Alpha” thay vì Beta.'));
+        self::assertContains('cụm gamma', $terms('“Cụm Gamma” dùng để Delta.'));
+        self::assertNotContains('cụm gamma dùng để delta', $terms('“Cụm Gamma” dùng để Delta.'));
+        self::assertContains('hệ epsilon', $terms('“Hệ Epsilon” đến phần Zeta.'));
+        self::assertNotContains('hệ epsilon đến phần zeta', $terms('“Hệ Epsilon” đến phần Zeta.'));
+    }
+
+    public function test_numeric_configuration_keeps_structural_configuration_without_following_clause(): void
+    {
+        $detector = new DictionaryTermDetector();
+        $terms = static fn (string $text): array => array_column($detector->detect($text), 'normalized_term');
+
+        foreach ([
+            ['7 rods 9 hammers', '7 rods 9 hammers are used'],
+            ['13 rods 14 hammers', '13 rods 14 hammers for the mechanism'],
+        ] as [$expected, $text]) {
+            self::assertContains($expected, $terms($text));
+            self::assertNotContains($expected . ' are used', $terms($text));
+            self::assertNotContains($expected . ' for the mechanism', $terms($text));
+        }
+    }
+
+    public function test_unknown_hyphenated_and_multi_token_names_are_retained_as_candidates(): void
+    {
+        $terms = array_column(
+            (new DictionaryTermDetector())->detect('“Alpha-Beta” và “Monte Verde”, Sonata-X.'),
+            'normalized_term',
+        );
+
+        self::assertContains('alpha-beta', $terms);
+        self::assertContains('monte verde', $terms);
+        self::assertContains('sonata-x', $terms);
+    }
+
+    public function test_approved_adjacent_units_are_not_collapsed_into_an_unbounded_phrase(): void
+    {
+        $terms = array_column(
+            (new DictionaryTermDetector())->detect(
+                'Alpha Beta Gamma Delta',
+                ['Alpha Beta', 'Gamma Delta'],
+            ),
+            'normalized_term',
+        );
+
+        self::assertContains('alpha beta', $terms);
+        self::assertContains('gamma delta', $terms);
+        self::assertNotContains('alpha beta gamma delta', $terms);
+    }
+
+    public function test_longest_approved_phrase_wins_over_nested_shorter_labels(): void
+    {
+        $terms = array_column(
+            (new DictionaryTermDetector())->detect(
+                'Alpha Beta Gamma',
+                ['Alpha', 'Alpha Beta', 'Alpha Beta Gamma'],
+            ),
+            'normalized_term',
+        );
+
+        self::assertSame(['alpha beta gamma'], $terms);
+    }
+
+    public function test_prose_after_a_trigger_does_not_become_a_dictionary_term(): void
+    {
+        $terms = array_column(
+            (new DictionaryTermDetector())->detect('Mặt số đẹp, sáng và phù hợp với căn phòng rộng rãi.'),
+            'normalized_term',
+        );
+
+        self::assertNotContains('mặt số đẹp sáng và phù hợp với căn phòng', $terms);
+    }
+
+    public function test_production_noise_is_trimmed_by_boundaries_and_adjacent_known_labels(): void
+    {
+        $labels = ['Westminster', 'mặt số nổi', 'côn đồng bạch', 'côn'];
+        $detector = new DictionaryTermDetector();
+        $terms = static fn (string $text): array => array_column($detector->detect($text, $labels), 'normalized_term');
+
+        self::assertNotContains('côn không bắt buộc', $terms('côn không bắt buộc'));
+        self::assertNotContains('côn 10 búa hai', $terms('côn 10 búa hai'));
+        self::assertNotContains('mặt số nổi avemaria loudes', $terms('mặt số nổi avemaria loudes'));
+        self::assertNotContains('côn 5 búa westminster', $terms('côn 5 búa westminster'));
+        self::assertNotContains('búa westminster', $terms('búa westminster'));
+        self::assertContains('côn 8 búa', $terms('côn 8 búa đến'));
+        self::assertContains('côn 111', $terms('côn 111 dùng'));
+        self::assertContains('côn đồng bạch', $terms('côn đồng bạch hiệu'));
+    }
+
 }

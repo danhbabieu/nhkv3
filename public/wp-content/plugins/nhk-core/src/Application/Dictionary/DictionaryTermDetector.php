@@ -16,14 +16,28 @@ final class DictionaryTermDetector
         if (trim($text) === '') return [];
         $out = [];
 
-        foreach ($approvedLabels as $label) $this->addIfPresent($out, $text, (string) $label, 'KNOWN_LABEL', 'STRONG');
+        foreach ($this->longestPresentLabels($text, $approvedLabels) as $label) {
+            $this->addIfPresent($out, $text, $label, 'KNOWN_LABEL', 'STRONG');
+        }
         foreach ($hints as $hint) $this->addIfPresent($out, $text, (string) $hint, 'HINT', 'NORMAL');
 
         if (preg_match_all('/[“"\']([^“”"\']{2,80})[”"\']/u', $text, $quoted)) {
-            foreach ($quoted[1] as $value) $this->add($out, (string) $value, 'QUOTED_PHRASE', 'NORMAL');
+            foreach ($quoted[1] as $value) {
+                $phrase = $this->qualityGate->filter((string) $value, array_merge($approvedLabels, $hints));
+                if ($phrase !== null) $this->add($out, $phrase, 'QUOTED_PHRASE', 'NORMAL');
+            }
         }
         if (preg_match_all('/\b[\p{L}]{1,12}[-\/]?\d{1,4}(?:[-\/]\d{1,4})*\b/u', $text, $models)) {
             foreach ($models[0] as $value) $this->add($out, (string) $value, 'TECHNICAL_PATTERN', 'WEAK');
+        }
+        if (preg_match_all('/(?<![\p{L}\p{N}])([\p{L}]{2,}(?:-[\p{L}\p{N}]+)+)(?![\p{L}\p{N}])/u', $text, $hyphenated)) {
+            foreach ($hyphenated[1] as $value) $this->add($out, (string) $value, 'HYPHENATED_NAME', 'WEAK');
+        }
+        if (preg_match_all('/(?<![\p{L}\p{N}]\s)\b(\d{1,3}\s+[\p{L}][\p{L}-]*(?:\s+\d{1,3}\s+[\p{L}][\p{L}-]*){0,2})\b/iu', $text, $configurations)) {
+            foreach ($configurations[1] as $value) {
+                $phrase = $this->qualityGate->filter((string) $value, array_merge($approvedLabels, $hints));
+                if ($phrase !== null) $this->add($out, $phrase, 'STRUCTURAL_CONFIGURATION', 'NORMAL');
+            }
         }
 
         $word = '[\p{L}\p{N}][\p{L}\p{N}\-]*';
@@ -46,7 +60,7 @@ final class DictionaryTermDetector
         foreach ($patterns as $pattern) {
             if (!preg_match_all($pattern, $text, $matches)) continue;
             foreach ($matches[1] as $value) {
-                $phrase = $this->qualityGate->filter((string) $value);
+                $phrase = $this->qualityGate->filter((string) $value, array_merge($approvedLabels, $hints));
                 if ($phrase !== null) $this->add($out, $phrase, 'DOMAIN_PHRASE', 'NORMAL');
             }
         }
@@ -58,7 +72,7 @@ final class DictionaryTermDetector
                     $this->add($out, $knownName, 'MUSIC_NAME', 'STRONG');
                     continue;
                 }
-                $phrase = $this->qualityGate->filter((string) $value);
+                $phrase = $this->qualityGate->filter((string) $value, array_merge($approvedLabels, $hints));
                 if ($phrase !== null) $this->add($out, $phrase, 'MUSIC_NAME', 'NORMAL');
             }
         }
@@ -100,6 +114,32 @@ final class DictionaryTermDetector
             return mb_strlen($right, 'UTF-8') <=> mb_strlen($left, 'UTF-8');
         });
         return (string) reset($matches);
+    }
+
+    private function longestPresentLabels(string $text, array $approvedLabels): array
+    {
+        $labels = [];
+        foreach ($approvedLabels as $label) {
+            $label = trim((string) $label);
+            if ($label === '' || !$this->present($text, $label)) continue;
+            $labels[$this->normalizer->normalize($label)] = $label;
+        }
+        uasort($labels, static function (string $left, string $right): int {
+            return mb_strlen($right, 'UTF-8') <=> mb_strlen($left, 'UTF-8');
+        });
+
+        $selected = [];
+        foreach ($labels as $label) {
+            $nested = false;
+            foreach ($selected as $longer) {
+                if ($this->present($longer, $label)) {
+                    $nested = true;
+                    break;
+                }
+            }
+            if (!$nested) $selected[] = $label;
+        }
+        return $selected;
     }
 
 }
