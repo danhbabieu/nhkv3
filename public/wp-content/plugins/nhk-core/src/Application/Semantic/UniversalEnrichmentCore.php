@@ -118,6 +118,11 @@ final class UniversalEnrichmentCore
         $observation = trim((string) ($options['observation'] ?? ''));
         $origin = strtoupper(trim((string) ($options['origin'] ?? '')));
         if ($observation === '') return array_merge($base, ['diagnostics' => ['OBSERVATION_REQUIRED']]);
+        $lineageContext = [
+            'source_kind' => $options['source_kind'] ?? $value['owner_or_source_type'] ?? '',
+            'lineage' => is_array($options['lineage'] ?? null) ? $options['lineage'] : (array) ($value['lineage'] ?? []),
+        ];
+        if (!(new DerivedLineageGuard())->isIndependent($lineageContext)) return array_merge($base, ['diagnostics' => ['DERIVED_PROSE_NOT_INDEPENDENT_EVIDENCE']]);
         if (($options['generated'] ?? false) === true || in_array($origin, ['GENERATED_ARTICLE_PROSE', 'GENERATED_VIDEO_PROSE', 'EDITORIAL_DRAFT'], true)) return array_merge($base, ['diagnostics' => ['GENERATED_PROSE_NOT_KNOWLEDGE']]);
         if ($this->knowledge === null || $this->proposalFactory === null) return array_merge($base, ['diagnostics' => ['KNOWLEDGE_ENRICHMENT_UNAVAILABLE']]);
         try {

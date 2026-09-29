@@ -802,3 +802,24 @@ eligible-recipe and scope-evidence based, with ties returning review.
 Local evidence: focused binding/MCP/Capture/Media regression passes, changed
 PHP lint and `git diff --check` pass. WordPress staging/live read-back remains
 UNVERIFIED; no staging or production mutation was performed.
+
+## Universal Structured Semantic Intake — 2026-09-30
+
+STATUS: `IMPLEMENTATION_PARTIAL / LOCAL_READY / NO_MUTATION`.
+
+The shared application seam now consists of the ephemeral
+`StructuredSemanticInterpreter` and `StructuredInterpretationPacket`. It
+reuses `DictionaryTermDetector` for lexical spans and is exposed through the
+legacy Capture `TextInputInterpreter`, `DictionaryPlanningService`, shared
+editorial enrichment and Article research preflight. The packet carries source
+kind, raw/derived lineage, locale, lexical/structural spans, unresolved and
+ambiguous terms, scope/provenance signals, reuse/planning candidates and
+bounded diagnostics. `DerivedLineageGuard` prevents generated Article,
+summary and SEO copies from being treated as independent Knowledge/Evidence.
+
+Synthetic/focused tests are green. Full Unit with `memory_limit=512M` reaches
+2,801 tests / 16,558 assertions with the two known pre-existing
+`KnowledgeWriterPreviewServiceTest` failures; the default 128M run is blocked
+by the existing large-file materializer memory test. WordPress/MySQL
+read-only corpus regression is not available in this workspace. No migration,
+schema change, semantic mutation, backfill, deploy or Graph write occurred.

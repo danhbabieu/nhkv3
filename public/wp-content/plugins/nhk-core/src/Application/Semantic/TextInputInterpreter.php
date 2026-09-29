@@ -6,10 +6,26 @@ namespace NHK\Core\Application\Semantic;
 /** Deterministic candidate extractor. It never promotes input to canonical truth. */
 final class TextInputInterpreter
 {
+    public function __construct(private ?StructuredSemanticInterpreter $structured = null)
+    {
+        $this->structured ??= new StructuredSemanticInterpreter();
+    }
+
     /** @param list<array<string,mixed>> $assets @param list<string> $subjectHints @param array<string,mixed> $metadata @return array<string,mixed> */
     public function interpret(string $text, array $assets = [], array $subjectHints = [], array $metadata = []): array
     {
         $text = trim($text);
+        $packet = $this->structured->interpret(UniversalInputEnvelope::fromArray([
+            'input_type' => (string) ($metadata['source_kind'] ?? $metadata['input_type'] ?? 'TEXT'),
+            'source_identity' => is_array($metadata['source_identity'] ?? null) ? $metadata['source_identity'] : [],
+            'raw_input_reference' => $metadata['raw_input_reference'] ?? null,
+            'locale' => $metadata['locale'] ?? 'vi-VN',
+            'text' => $text,
+            'subject_hints' => $subjectHints,
+            'metadata' => $metadata,
+            'observations' => array_values(array_filter($assets, 'is_array')),
+            'lineage' => is_array($metadata['lineage'] ?? null) ? $metadata['lineage'] : [],
+        ]))->toArray();
         $sentences = array_values(array_filter(array_map('trim', preg_split('/(?<=[.!?。！？])\s+/u', $text) ?: []), static fn (string $item): bool => $item !== ''));
         if ($sentences === [] && $text !== '') $sentences = [$text];
         $mentions = [];
@@ -65,9 +81,11 @@ final class TextInputInterpreter
             $mediaObservations[] = ['text' => $observation, 'provenance' => 'OBSERVED_FROM_MEDIA', 'media_id' => (string) ($asset['media_id'] ?? '')];
         }
         return [
+            'structured_interpretation_packet' => $packet,
+            'lexical_spans' => $packet['lexical_spans'],
             'primary_subject_hints' => array_values(array_unique(array_map('strval', $subjectHints))),
             'secondary_subject_hints' => [],
-            'entity_mentions' => $mentions,
+            'entity_mentions' => array_values(array_unique(array_merge($mentions, array_column($packet['proper_name_spans'], 'term')))),
             'user_claim_candidates' => $claims,
             'media_observations' => $mediaObservations,
             'relation_hints' => [],

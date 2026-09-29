@@ -5,6 +5,7 @@ namespace NHK\Core\Application\Article;
 
 use NHK\Core\Application\Compliance\PublicClaimCopyPolicy;
 use NHK\Core\Application\Dictionary\DictionaryObservationRegistry;
+use NHK\Core\Application\Semantic\StructuredSemanticInterpreter;
 use NHK\Core\Application\Seo\PublicSeoProjection;
 use NHK\Core\Domain\Article\ArticleResearchResult;
 use NHK\Core\Domain\Capture\SubjectResolutionPacket;
@@ -13,7 +14,7 @@ use NHK\Core\Domain\Capture\SubjectResolutionPacket;
 final class ArticleResearchPreflight
 {
     /** @param callable(array<string,mixed>):array $subjectResolver @param callable(array<string,mixed>):array $inventoryReader @param callable(array<string,mixed>):array $publicEligibility */
-    public function __construct(private $subjectResolver, private $inventoryReader, private $publicEligibility, private $dictionaryPlanner = null) {}
+    public function __construct(private $subjectResolver, private $inventoryReader, private $publicEligibility, private $dictionaryPlanner = null, private ?StructuredSemanticInterpreter $interpreter = null) {}
 
     public function research(string $topic, array $subject = [], array $articleContext = []): ArticleResearchResult
     {
@@ -74,6 +75,15 @@ final class ArticleResearchPreflight
 
         $parts = [$topic];
         foreach (['title', 'excerpt', 'body'] as $field) if (is_string($articleContext[$field] ?? null) && trim((string) $articleContext[$field]) !== '') $parts[] = (string) $articleContext[$field];
+        $structuredPacket = ($this->interpreter ?? new StructuredSemanticInterpreter())->interpret([
+            'input_type' => 'ARTICLE',
+            'source_identity' => ['source_id' => $postId > 0 ? 'post:' . $postId : 'article:preview'],
+            'text' => implode("\n", array_values(array_unique($parts))),
+            'subject_resolution' => $resolution,
+            'content_intent' => $articleContext['content_intent'] ?? 'TEXT_ARTICLE',
+            'metadata' => ['lineage' => $articleContext['lineage'] ?? []],
+            'lineage' => is_array($articleContext['lineage'] ?? null) ? $articleContext['lineage'] : [],
+        ])->toArray();
         $dictionaryContext = ['post_id' => $postId > 0 ? $postId : null, 'subject' => is_array($resolution['primary'] ?? null) ? $resolution['primary'] : null];
         try {
             $planned = is_callable($this->dictionaryPlanner)
@@ -83,6 +93,7 @@ final class ArticleResearchPreflight
         } catch (\Throwable) {
             $dictionaryPlan = ['status' => 'UNAVAILABLE', 'resolved_terms' => [], 'ambiguous_terms' => [], 'candidate_terms' => [], 'internal_link_candidates' => [], 'warnings' => ['DICTIONARY_PLANNING_UNAVAILABLE'], 'blocking' => false];
         }
+        $dictionaryPlan['structured_interpretation'] = $structuredPacket;
         foreach ((array) ($dictionaryPlan['warnings'] ?? []) as $warning) if (is_string($warning) && trim($warning) !== '') $warnings[] = $warning;
         $timings['planning_ms'] = $this->elapsed($started);
 

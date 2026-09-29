@@ -37,6 +37,9 @@ final readonly class UniversalInputEnvelope
         $value = [
             'owner_or_source_type' => $owner !== '' ? strtolower($owner) : 'generic',
             'source_identity' => is_array($input['source_identity'] ?? null) ? $input['source_identity'] : [],
+            'raw_input_reference' => is_scalar($input['raw_input_reference'] ?? null) ? (string) $input['raw_input_reference'] : null,
+            'locale' => trim((string) ($input['locale'] ?? 'vi-VN')) ?: 'vi-VN',
+            'lineage' => is_array($input['lineage'] ?? null) ? $input['lineage'] : [],
             'title' => $title,
             'body' => $body,
             'raw_text' => $body,
@@ -45,7 +48,7 @@ final readonly class UniversalInputEnvelope
             'observations' => $observations,
             'source_metadata' => is_array($input['source_metadata'] ?? null) ? $input['source_metadata'] : (is_array($input['metadata'] ?? null) ? $input['metadata'] : []),
             'metadata' => is_array($input['metadata'] ?? null) ? $input['metadata'] : [],
-            'relations' => self::records($input['relations'] ?? []),
+            'relations' => self::records($input['relations'] ?? $input['relation_hints'] ?? []),
             'existing_knowledge' => self::records($input['existing_knowledge'] ?? []),
             'user_hints' => self::records($input['user_hints'] ?? []),
             'requested_intent' => trim((string) ($input['requested_intent'] ?? $input['content_intent'] ?? '')),

@@ -1,5 +1,26 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-30 — Universal Structured Semantic Intake (LOCAL / NO MUTATION)
+
+IMPLEMENTED_SLICE: Added the ephemeral `StructuredInterpretationPacket` and
+shared `StructuredSemanticInterpreter` application boundary. It reuses the
+existing Dictionary detector and preserves lexical structural/configuration,
+identifier, proper-name, ambiguity and unknown-term behavior. The compatible
+Capture `TextInputInterpreter`, Dictionary planning, shared enrichment and
+Article research seams now consume or expose the shared packet. Relation
+planning remains candidate-only; subject/Knowledge/Graph/Governance ownership
+was not changed. `DerivedLineageGuard` blocks derived editorial prose from
+independent corroboration.
+
+VALIDATION: New synthetic structured-intake tests pass. Focused Dictionary,
+semantic, Capture, enrichment and Article suites pass. Full Unit under
+`memory_limit=512M` reaches 2,801 tests / 16,558 assertions with the two known
+pre-existing KnowledgeWriterPreview failures; default 128M remains blocked by
+the pre-existing TrustedProvidedFileMaterializer memory test. Changed PHP
+files lint, diff-check and secret review are performed at the final checkpoint.
+
+STATUS: `UNIVERSAL_STRUCTURED_INTAKE_LOCAL_READY / IMPLEMENTATION_PARTIAL / NO_MUTATION / UNCOMMITTED`
+
 # Checkpoint — 2026-09-29 — Dictionary Admin menu registration idempotency (LOCAL / NO MUTATION)
 
 ROOT_CAUSE_CONFIRMED: `nhk-core.php` called `Plugin::boot(__FILE__)`, whose

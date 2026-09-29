@@ -9,6 +9,7 @@ use NHK\Core\Application\Knowledge\{KnowledgeEnrichmentPlanner, KnowledgeEnrichm
 final class SharedEnrichmentBoundary
 {
     private UniversalEnrichmentCore $core;
+    private StructuredSemanticInterpreter $interpreter;
 
     /** @param callable(array<string,mixed>):array<string,mixed>|null $relations */
     public function __construct(
@@ -19,13 +20,14 @@ final class SharedEnrichmentBoundary
         mixed $relations = null,
         ?SemanticNeedDecomposer $decomposer = null,
     ) {
+        $this->interpreter = new StructuredSemanticInterpreter();
         $this->core = new UniversalEnrichmentCore(
             $retrieval,
             $selector,
             $knowledge,
             $proposalFactory,
             $relations,
-            $decomposer ?? new SemanticNeedDecomposer(new TextInputInterpreter(), new SemanticNeedVocabulary()),
+            $decomposer ?? new SemanticNeedDecomposer(new TextInputInterpreter($this->interpreter), new SemanticNeedVocabulary()),
         );
     }
 
@@ -56,6 +58,7 @@ final class SharedEnrichmentBoundary
         }
         $pack = $this->core->enrich(UniversalInputEnvelope::fromArray($request), $request);
         $result = $pack->toArray();
+        $result['interpretation'] = $this->interpreter->interpret(UniversalInputEnvelope::fromArray($request))->toArray();
         $result['profile'] = $profile;
         return $result;
     }

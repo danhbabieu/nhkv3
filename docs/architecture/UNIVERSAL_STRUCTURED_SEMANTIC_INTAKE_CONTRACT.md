@@ -269,11 +269,14 @@ valid unknown lexical observation or prevent a private Dictionary candidate.
 
 ## 13. Status and future acceptance
 
-This contract is `LAW APPROVED / DOCUMENTED`; it is not a claim that a complete
-universal packet/interpreter runtime exists. Dictionary is an early structured
-lexical implementation slice. Capture and Living Knowledge already implement
-parts of the shared semantic stages. Runtime adoption must be incremental and
-must retain existing owner boundaries.
+This contract is `LAW APPROVED / IMPLEMENTATION PARTIAL`. The first runtime
+slice now provides an ephemeral `StructuredInterpretationPacket` through the
+shared `StructuredSemanticInterpreter`; Dictionary planning, the legacy Capture
+adapter, shared editorial enrichment and Article research consume the same
+Dictionary-backed lexical semantics. Capture, Knowledge, Graph, Video and
+Media remain on their existing owner boundaries, and the packet remains
+planning-only. Full read-only corpus acceptance and every domain adapter are
+still incremental work; this status must not be read as complete acceptance.
 
 Future implementation acceptance must cover, with synthetic/unseen input:
 
@@ -293,3 +296,25 @@ This contract changes no existing canonical data, schema, migration, URL,
 identity, ownership, Graph predicate, endpoint, MCP operation or runtime
 behavior. It creates no backfill, mutation, deployment or parallel pipeline.
 
+## 15. Implementation checkpoint — 2026-09-30
+
+Implemented locally without schema or data mutation:
+
+- `StructuredSemanticInterpreter` and ephemeral `StructuredInterpretationPacket`
+  preserve source context, lineage, locale, lexical spans, unresolved/
+  ambiguous terms, planning candidates and bounded diagnostics.
+- `DictionaryTermDetector` remains the lexical owner and is invoked through
+  the shared interpreter by `DictionaryPlanningService` and the compatible
+  `TextInputInterpreter` Capture seam.
+- `SharedEnrichmentBoundary` and `ArticleResearchPreflight` expose the same
+  packet for downstream read/planning consumers; relation output remains
+  candidate-only and is not applied.
+- `DerivedLineageGuard` rejects generated/derived prose as independent
+  corroboration before Knowledge proposal planning.
+- Synthetic tests cover structural units, identifiers, ambiguity, unknown
+  lexical candidates, relation registry gaps, lineage and multi-consumer
+  lexical parity.
+
+The 77 Article / 1,170 Knowledge read-only corpus and live runtime bootstrap
+remain `PARTIAL`/`ENVIRONMENT_BLOCKED` in this workspace; no fixture-specific
+production rule was added.

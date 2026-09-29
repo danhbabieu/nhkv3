@@ -1,0 +1,96 @@
+<?php
+declare(strict_types=1);
+
+namespace NHK\Tests\Unit;
+
+use NHK\Core\Application\Semantic\{DerivedLineageGuard, StructuredSemanticInterpreter, TextInputInterpreter, UniversalInputEnvelope};
+use PHPUnit\Framework\TestCase;
+
+final class StructuredSemanticInterpreterTest extends TestCase
+{
+    public function test_packet_reuses_dictionary_lexical_semantics_and_preserves_context(): void
+    {
+        $packet = (new StructuredSemanticInterpreter())->interpret(UniversalInputEnvelope::fromArray([
+            'input_type' => 'TRANSCRIPT',
+            'source_identity' => ['source_id' => 'video-1'],
+            'raw_input_reference' => 'capture:1',
+            'locale' => 'vi-VN',
+            'text' => 'Cấu hình thử nghiệm có 17 alpha 19 beta và Ref 81.12.',
+            'metadata' => [
+                'lexical_hints' => [
+                    ['kind' => 'STRUCTURAL_UNIT', 'term' => 'alpha'],
+                    ['kind' => 'STRUCTURAL_UNIT', 'term' => 'beta'],
+                ],
+            ],
+        ]));
+
+        $value = $packet->toArray();
+        self::assertSame('transcript', $value['source_context']['source_kind']);
+        self::assertSame('vi-VN', $value['locale']);
+        self::assertContains('17 alpha 19 beta', array_column($value['configuration_spans'], 'normalized_term'));
+        self::assertContains('ref 81.12', array_column($value['identifier_spans'], 'normalized_term'));
+        self::assertNotContains('19 beta', array_column($value['lexical_spans'], 'normalized_term'));
+        self::assertNotEmpty($value['diagnostics']);
+    }
+
+    public function test_ambiguity_fails_closed_and_unknown_lexical_term_survives(): void
+    {
+        $packet = (new StructuredSemanticInterpreter())->interpret([
+            'input_type' => 'KNOWLEDGE_TEXT',
+            'text' => '“Alpha-Beta” được ghi nhận.',
+            'subject_resolution' => [
+                'status' => 'ambiguous',
+                'candidates' => [
+                    ['id' => 'one', 'type' => 'variant'],
+                    ['id' => 'two', 'type' => 'variant'],
+                ],
+            ],
+        ]);
+
+        $value = $packet->toArray();
+        self::assertSame('AMBIGUOUS', $value['status']);
+        self::assertNotEmpty($value['ambiguous_terms']);
+        self::assertContains('alpha-beta', array_column($value['unresolved_terms'], 'normalized_term'));
+        self::assertSame([], $value['relation_candidates']);
+    }
+
+    public function test_explicit_relation_hints_are_planned_only_and_unregistered_predicates_fail_closed(): void
+    {
+        $packet = (new StructuredSemanticInterpreter())->interpret([
+            'input_type' => 'HUMAN_HINT',
+            'text' => 'Alpha và Beta.',
+            'relation_hints' => [
+                ['source_id' => 'a', 'target_id' => 'b', 'predicate' => 'invented_predicate'],
+            ],
+        ]);
+
+        $value = $packet->toArray();
+        self::assertSame([], $value['relation_candidates']);
+        self::assertContains('RELATION_PREDICATE_UNSUPPORTED', $value['diagnostics']);
+    }
+
+    public function test_derived_lineage_is_not_independent_corroboration(): void
+    {
+        $guard = new DerivedLineageGuard();
+
+        self::assertFalse($guard->isIndependent([
+            'source_kind' => 'ARTICLE',
+            'lineage' => ['parent_claim_ids' => ['claim-a'], 'source_family' => 'claim-a'],
+        ]));
+        self::assertTrue($guard->isIndependent([
+            'source_kind' => 'CATALOG',
+            'lineage' => ['source_family' => 'catalog:42'],
+        ]));
+    }
+
+    public function test_legacy_capture_adapter_and_transcript_media_inputs_share_the_same_lexical_packet(): void
+    {
+        $text = 'Cấu hình thử nghiệm có 17 alpha 19 beta.';
+        $direct = (new StructuredSemanticInterpreter())->interpret(['input_type' => 'VIDEO_TEXT', 'text' => $text, 'metadata' => ['lexical_hints' => [['kind' => 'STRUCTURAL_UNIT', 'term' => 'alpha'], ['kind' => 'STRUCTURAL_UNIT', 'term' => 'beta']]]])->toArray();
+        $legacy = (new TextInputInterpreter())->interpret($text, [], [], ['source_kind' => 'TRANSCRIPT', 'lexical_hints' => [['kind' => 'STRUCTURAL_UNIT', 'term' => 'alpha'], ['kind' => 'STRUCTURAL_UNIT', 'term' => 'beta']]]);
+
+        self::assertSame(array_column($direct['configuration_spans'], 'normalized_term'), array_column($legacy['structured_interpretation_packet']['configuration_spans'], 'normalized_term'));
+        self::assertSame('video_text', $direct['source_context']['source_kind']);
+        self::assertSame('transcript', $legacy['structured_interpretation_packet']['source_context']['source_kind']);
+    }
+}

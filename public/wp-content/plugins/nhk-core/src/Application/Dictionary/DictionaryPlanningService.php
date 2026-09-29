@@ -6,6 +6,7 @@ namespace NHK\Core\Application\Dictionary;
 use NHK\Core\Contracts\Dictionary\{DictionaryCandidateRepository, DictionaryMentionRepository};
 use NHK\Core\Domain\Dictionary\{DictionaryCandidate, DictionaryCandidateState, DictionaryMention, DictionaryResolution};
 use NHK\Core\Shared\Uuid\UuidCodec;
+use NHK\Core\Application\Semantic\{StructuredSemanticInterpreter, UniversalInputEnvelope};
 
 final class DictionaryPlanningService
 {
@@ -16,7 +17,10 @@ final class DictionaryPlanningService
         private DictionaryMentionRepository $mentions,
         private DictionaryLinkPlanner $links,
         private $idGenerator = null,
-    ) {}
+        ?StructuredSemanticInterpreter $interpreter = null,
+    ) { $this->interpreter = $interpreter ?? new StructuredSemanticInterpreter($detector); }
+
+    private StructuredSemanticInterpreter $interpreter;
 
     public function preview(string $text, string $sourceKind, string $sourceId, array $context = [], array $hints = [], array $approvedLabels = []): array
     {
@@ -39,7 +43,13 @@ final class DictionaryPlanningService
         $lexicalContext = $this->lexicalContext($context);
         $contextHash = $this->hash($lexicalContext);
 
-        foreach ($this->detector->detect($text, $approvedLabels, $hints) as $observation) {
+        $packet = $this->interpreter->interpret(UniversalInputEnvelope::fromArray([
+            'input_type' => $sourceKind,
+            'source_identity' => ['source_id' => $sourceId],
+            'text' => $text,
+            'metadata' => ['approved_labels' => $approvedLabels, 'lexical_hints' => $hints] + $context,
+        ]))->toArray();
+        foreach ((array) ($packet['lexical_spans'] ?? []) as $observation) {
             $resolution = $this->resolver->resolve((string) $observation['term'], $lexicalContext);
             $conceptId = $resolution->conceptId;
             $mentionReplay = false;
