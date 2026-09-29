@@ -30,7 +30,8 @@ final class DictionaryTermDetectorTest extends TestCase
         self::assertContains('mặt số lớn', $terms('Mặt số lớn mà chúng ta thường thấy trên đồng hồ.'));
         self::assertNotContains('mặt số lớn mà chúng', $terms('Mặt số lớn mà chúng ta thường thấy trên đồng hồ.'));
         self::assertContains('mặt số', $terms('Mặt số như thế nào và nằm ở đâu?'));
-        self::assertContains('ngắt chuông đêm', $terms('Thiết bị có ngắt chuông đêm tự động và bộ thoát.'));
+        self::assertContains('ngắt chuông đêm tự động', $terms('Thiết bị có ngắt chuông đêm tự động và bộ thoát.'));
+        self::assertNotContains('ngắt chuông đêm tự', $terms('Thiết bị có ngắt chuông đêm tự động và bộ thoát.'));
         self::assertContains('bộ thoát', $terms('Thiết bị có ngắt chuông đêm tự động và bộ thoát.'));
     }
 

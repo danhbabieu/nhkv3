@@ -15,6 +15,7 @@ final class DictionaryLexicalQualityGate
         'thế', 'nào', 'nằm', 'ở', 'trở', 'nếu', 'vì', 'nên', 'khiến', 'tại', 'bởi',
         'cùng', 'tự', 'thường', 'phổ', 'biến', 'gặp', 'chúng', 'ta', 'họ', 'nó',
     ];
+    private const MODIFIER_PREFIX_WORDS = ['tự'];
 
     public function filter(string $phrase): ?string
     {
@@ -24,6 +25,7 @@ final class DictionaryLexicalQualityGate
 
         foreach ($parts as $index => $part) {
             $word = $this->lower((string) preg_replace('/[^\p{L}\p{N}\-]/u', '', $part));
+            if ($word !== '' && in_array($word, self::MODIFIER_PREFIX_WORDS, true) && isset($parts[$index + 1])) continue;
             if ($word !== '' && in_array($word, self::BOUNDARY_WORDS, true)) {
                 $parts = array_slice($parts, 0, $index);
                 break;

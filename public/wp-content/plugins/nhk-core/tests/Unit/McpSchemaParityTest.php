@@ -58,6 +58,23 @@ final class McpSchemaParityTest extends TestCase
         self::assertSame($hashes['nhk.capture.ingest'], McpToolCatalog::schemaHash('nhk.capture.ingest'));
     }
 
+    public function testDictionaryCandidateGetExposesPaginationAcrossCatalogAbilityAndConnector(): void
+    {
+        $tool = array_values(array_filter(McpToolCatalog::tools(), static fn (array $item): bool => $item['name'] === 'nhk.dictionary.candidate.get'))[0];
+        $properties = array_keys($tool['inputSchema']['properties']);
+        self::assertSame(['candidate_id', 'limit', 'offset'], $properties);
+        self::assertSame(['candidate_id'], $tool['inputSchema']['required']);
+
+        $ability = McpAbilityRegistration::abilityNameForTool('nhk.dictionary.candidate.get');
+        self::assertSame('nhk-v3/dictionary-candidate-get', $ability);
+        self::assertSame($tool['inputSchema'], McpAbilityRegistration::inputSchemaForTool('nhk.dictionary.candidate.get'));
+
+        $connectorName = McpAbilityRegistration::connectorToolNameForAbility($ability);
+        $projected = EasyMcpNativeFileCompatibilityAdapter::projectTools([['name' => $connectorName, 'inputSchema' => ['type' => 'object', 'properties' => ['candidate_id' => ['type' => 'string']]]]]);
+        $schema = array_values(array_filter($projected, static fn (array $item): bool => $item['name'] === $connectorName))[0]['inputSchema'];
+        self::assertSame(['candidate_id', 'limit', 'offset'], array_keys($schema['properties']));
+    }
+
     /** @param array<string,mixed> $expected @param array<string,mixed> $actual @param list<string> $ignored */
     private static function assertSchemaParity(array $expected, array $actual, string $path, array $ignored): void
     {

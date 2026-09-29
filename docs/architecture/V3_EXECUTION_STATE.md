@@ -20609,3 +20609,30 @@ Full PHP lint, `git diff --check` and secret scan pass. No code or data was
 changed by verification; this checkpoint only records final evidence.
 
 STATUS: `DICTIONARY_ISSUE_21_VERIFIED / NO_NEW_REGRESSION / WORKTREE_PENDING_DOC_COMMIT / NO_PUSH / NO_DEPLOY`.
+
+# Checkpoint — 2026-09-29 — Issue #21 live follow-up fixes
+
+REPLAY_IDEMPOTENCY: Planner now uses Mention upsert read-back identity to
+distinguish a new lexical observation from an exact source/fingerprint replay.
+Replay no longer increments Candidate occurrences/revision; distinct source or
+changed lexical observations remain deterministic. Suppressed and ambiguous
+paths are covered without adding candidate-side provenance storage or a
+migration.
+
+PAGINATION_EXPOSURE: `nhk.dictionary.candidate.get` now has an explicit stable
+Ability mapping and parity coverage through catalog, Ability schema, Easy MCP
+projection and connector descriptor. `limit`/`offset`/`next_offset` remain one
+canonical tool contract.
+
+NIGHT_SHUTOFF_AUDIT: `tự động` is a valid lexical modifier. The prior result
+was `QUALITY_GATE_OVERTRIM`; the generic bounded detector window and modifier
+boundary now preserve the complete reusable phrase while rejecting a trailing
+fragment. No phrase-specific rule was added.
+
+VALIDATION: Focused Dictionary/MCP/Admin/idempotency slice passes 77 tests /
+2,939 assertions. Full PHPUnit with 512M reaches 2,923 tests / 16,527
+assertions with the same 23 baseline/environment failures: two pre-existing
+KnowledgeWriter failures and 21 integration failures requiring
+`NHK_WP_TEST_PATH` / `nhk_v3_test`. PHP lint, diff check and secret scan pass.
+
+STATUS: `DICTIONARY_ISSUE_21_FOLLOWUP_LOCAL_READY / NO_LIVE_MUTATION / NO_PUSH / NO_DEPLOY`.

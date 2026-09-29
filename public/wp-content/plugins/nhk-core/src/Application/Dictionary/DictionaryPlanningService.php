@@ -42,6 +42,7 @@ final class DictionaryPlanningService
         foreach ($this->detector->detect($text, $approvedLabels, $hints) as $observation) {
             $resolution = $this->resolver->resolve((string) $observation['term'], $lexicalContext);
             $conceptId = $resolution->conceptId;
+            $mentionReplay = false;
 
             if ($persist) {
                 $mention = new DictionaryMention(
@@ -56,7 +57,8 @@ final class DictionaryPlanningService
                     (string) $observation['strength'],
                     gmdate('Y-m-d H:i:s'),
                 );
-                $this->mentions->upsert($mention);
+                $storedMention = $this->mentions->upsert($mention);
+                $mentionReplay = $storedMention->mentionId !== $mention->mentionId;
             }
 
             if ($resolution->status === DictionaryResolution::RESOLVED) {
@@ -93,7 +95,7 @@ final class DictionaryPlanningService
                     'normalized_term' => $resolution->normalizedTerm,
                     'candidates' => $resolution->candidates,
                 ];
-                if ($persist) {
+                if ($persist && !$mentionReplay) {
                     $saved = $this->candidates->upsertObservation(new DictionaryCandidate(
                         $this->id(),
                         $resolution->normalizedTerm,
@@ -139,6 +141,18 @@ final class DictionaryPlanningService
                 gmdate('Y-m-d H:i:s'),
                 1,
             );
+            if ($persist && $mentionReplay) {
+                $candidateTerms[] = [
+                    'candidate_id' => null,
+                    'term' => $observation['term'],
+                    'normalized_term' => $resolution->normalizedTerm,
+                    'state' => DictionaryCandidateState::NEEDS_REVIEW,
+                    'occurrences' => null,
+                    'origin' => $observation['origin'],
+                    'replayed' => true,
+                ];
+                continue;
+            }
             $saved = $this->candidates->upsertObservation($candidate);
             $candidateTerms[] = [
                 'candidate_id' => $saved->candidateId,

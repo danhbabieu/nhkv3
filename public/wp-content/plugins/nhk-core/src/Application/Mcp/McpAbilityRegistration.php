@@ -331,6 +331,14 @@ final class McpAbilityRegistration
         'nhk.knowledge.get' => 'nhk-v3/knowledge-get',
         'nhk.source.get' => 'nhk-v3/source-get',
         'nhk.evidence.get' => 'nhk-v3/evidence-get',
+        'nhk.dictionary.search' => 'nhk-v3/dictionary-search',
+        'nhk.dictionary.resolve' => 'nhk-v3/dictionary-resolve',
+        'nhk.dictionary.concept.get' => 'nhk-v3/dictionary-concept-get',
+        'nhk.dictionary.candidate.list' => 'nhk-v3/dictionary-candidate-list',
+        'nhk.dictionary.candidate.get' => 'nhk-v3/dictionary-candidate-get',
+        'nhk.dictionary.mentions.list' => 'nhk-v3/dictionary-mentions-list',
+        'nhk.dictionary.backfill.dry_run' => 'nhk-v3/dictionary-backfill-dry-run',
+        'nhk.dictionary.profile' => 'nhk-v3/dictionary-profile',
     ];
 
     /** @var array<string,string> */
