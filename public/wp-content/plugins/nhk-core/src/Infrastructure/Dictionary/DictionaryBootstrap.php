@@ -11,11 +11,14 @@ use NHK\Core\Infrastructure\Migration\DictionaryMigration015;
 final class DictionaryBootstrap
 {
     private static ?DictionaryRuntime $runtime = null;
+    private static bool $booted = false;
 
     public static function boot(): void
     {
         global $wpdb;
         if (!isset($wpdb) || !is_object($wpdb)) return;
+        if (self::$booted) return;
+        self::$booted = true;
 
         update_option('nhk_core_migration_target', max((int) get_option('nhk_core_migration_target', 0), DictionaryMigration015::VERSION), false);
         if (defined('NHK_RUN_MIGRATIONS') && NHK_RUN_MIGRATIONS === true && !DictionaryMigration015::schemaReady($wpdb)) (new DictionaryMigration015())->up();

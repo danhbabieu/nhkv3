@@ -39,7 +39,6 @@ Plugin::boot(__FILE__);
 (new WordPressPublicSlugBridge())->register();
 AdminWorkbenchPage::register();
 AdminAssets::register(__FILE__);
-DictionaryBootstrap::boot();
 FrontendSemanticBootstrap::boot();
 EntityDossierBootstrap::boot();
 register_activation_hook(__FILE__, [Plugin::class, 'activate']);

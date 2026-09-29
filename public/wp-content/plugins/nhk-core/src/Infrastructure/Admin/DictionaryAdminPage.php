@@ -9,10 +9,13 @@ use NHK\Core\Domain\Dictionary\{DictionaryCandidateState, DictionaryConcept, Dic
 final class DictionaryAdminPage
 {
     private static ?DictionaryRuntime $runtime = null;
+    private static bool $registered = false;
 
     public static function register(DictionaryRuntime $runtime): void
     {
         self::$runtime = $runtime;
+        if (self::$registered) return;
+        self::$registered = true;
         add_action('admin_menu', static function (): void { add_submenu_page('nhk-v3', 'Từ điển', 'Từ điển', 'nhk_curate_dictionary', 'nhk-v3-dictionary', [self::class, 'render']); }, 20);
         add_action('admin_post_nhk_dictionary_decide', [self::class, 'decide']);
         add_action('admin_post_nhk_dictionary_draft', [self::class, 'draft']);

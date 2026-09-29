@@ -1,5 +1,27 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-29 — Dictionary Admin menu registration idempotency (LOCAL / NO MUTATION)
+
+ROOT_CAUSE_CONFIRMED: `nhk-core.php` called `Plugin::boot(__FILE__)`, whose
+`Plugin::boot()` already called `DictionaryBootstrap::boot()`, and then the
+entrypoint called `DictionaryBootstrap::boot()` again. Each bootstrap call
+registered both Dictionary admin page callbacks, so `admin_menu` added each
+slug twice.
+
+FIXED_BOUNDARY: `Plugin::boot()` is now the sole composition owner;
+`DictionaryBootstrap::boot()` is idempotent, and both Dictionary admin page
+registrars have static registration guards. Existing capability, slugs, routes,
+semantic/runtime/storage boundaries and other menus are unchanged.
+
+REGRESSION: Repeated bootstrap/registration plus `admin_menu` tests prove one
+`nhk-v3-dictionary`, one `nhk-v3-dictionary-backfill`, and an unaffected other
+submenu. Focused Admin/Dictionary tests and Contract tests pass. Full Unit
+passes under 512M with two pre-existing KnowledgeWriterPreview failures; the
+default 128M run is also blocked by the existing TrustedProvidedFileMaterializer
+memory test.
+
+STATUS: `DICTIONARY_ADMIN_MENU_IDEMPOTENCY_LOCAL_READY / NO_MUTATION / UNCOMMITTED`
+
 # Checkpoint — 2026-09-28 — Exact MediaUsage staging apply scope verification (LOCAL / NO MUTATION)
 
 ROOT_CAUSE_CONFIRMED: The exact replace scope was issued as

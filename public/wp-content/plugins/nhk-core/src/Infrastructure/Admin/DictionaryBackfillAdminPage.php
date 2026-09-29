@@ -8,10 +8,13 @@ use NHK\Core\Application\Dictionary\DictionaryRuntime;
 final class DictionaryBackfillAdminPage
 {
     private static ?DictionaryRuntime $runtime = null;
+    private static bool $registered = false;
 
     public static function register(DictionaryRuntime $runtime): void
     {
         self::$runtime = $runtime;
+        if (self::$registered) return;
+        self::$registered = true;
         add_action('admin_menu', static function (): void {
             add_submenu_page(
                 'nhk-v3',
