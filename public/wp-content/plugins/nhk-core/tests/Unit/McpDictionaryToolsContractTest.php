@@ -11,7 +11,7 @@ final class McpDictionaryToolsContractTest extends TestCase
     public function test_dictionary_tools_have_catalog_dispatch_and_strict_mutation_fields(): void
     {
         $tools = array_column(McpToolCatalog::tools(), null, 'name');
-        foreach (['nhk.dictionary.search', 'nhk.dictionary.concept.get', 'nhk.dictionary.candidate.list', 'nhk.dictionary.concept.create', 'nhk.dictionary.concept.update', 'nhk.dictionary.concept.lifecycle', 'nhk.dictionary.label.save', 'nhk.dictionary.candidate.review', 'nhk.dictionary.relation.handoff', 'nhk.dictionary.backfill.dry_run'] as $name) {
+        foreach (['nhk.dictionary.search', 'nhk.dictionary.resolve', 'nhk.dictionary.concept.get', 'nhk.dictionary.candidate.list', 'nhk.dictionary.candidate.get', 'nhk.dictionary.mentions.list', 'nhk.dictionary.concept.create', 'nhk.dictionary.concept.update', 'nhk.dictionary.concept.lifecycle', 'nhk.dictionary.label.save', 'nhk.dictionary.candidate.review', 'nhk.dictionary.relation.handoff', 'nhk.dictionary.backfill.dry_run', 'nhk.dictionary.profile'] as $name) {
             self::assertArrayHasKey($name, $tools);
             self::assertTrue(McpDispatchRegistry::hasHandler($name));
         }

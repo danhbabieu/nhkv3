@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Core\Infrastructure\Dictionary;
 
-use NHK\Core\Application\Dictionary\{DictionaryHtmlLinker, DictionaryRuntime};
+use NHK\Core\Application\Dictionary\{DictionaryHtmlLinker, DictionaryObservationRegistry, DictionaryRuntime};
 use NHK\Core\Infrastructure\Http\PublicDictionaryRoutes;
 
 final class DictionaryWordPressBridge
@@ -35,7 +35,7 @@ final class DictionaryWordPressBridge
     public function observe(string $sourceKind, string $sourceId, string $text, array $context = [], array $hints = []): array
     {
         if (!$this->runtime->available() || trim($text) === '' || trim($sourceId) === '') return ['status' => 'UNAVAILABLE', 'blocking' => false];
-        return $this->runtime->plan($text, $sourceKind, $sourceId, $context, $hints);
+        return DictionaryObservationRegistry::observe($sourceKind, $sourceId, $text, $context, $hints);
     }
 
     public function observePost(int $postId, \WP_Post $post, bool $update): void

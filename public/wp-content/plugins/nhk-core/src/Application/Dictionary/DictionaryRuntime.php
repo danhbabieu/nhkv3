@@ -201,6 +201,62 @@ final class DictionaryRuntime
     public function candidates(): WpdbDictionaryCandidateRepository { return $this->candidates; }
     public function mentions(): WpdbDictionaryMentionRepository { return $this->mentions; }
 
+    public function resolve(string $term, array $context = [], array $hints = []): array
+    {
+        return $this->preview($term, 'MCP_RESOLVE', '', $context, $hints);
+    }
+
+    public function candidate(string $candidateId): ?\NHK\Core\Domain\Dictionary\DictionaryCandidate
+    {
+        if (!$this->available()) return null;
+        return $this->candidates->findById($candidateId);
+    }
+
+    public function mentionsForSource(string $sourceKind, string $sourceId): array
+    {
+        if (!$this->available()) throw new \RuntimeException('DICTIONARY_STORAGE_UNAVAILABLE');
+        return $this->mentions->listBySource($sourceKind, $sourceId);
+    }
+
+    public function profile(?string $conceptId = null, ?string $slug = null): array
+    {
+        if (!$this->available()) return ['status' => 'unavailable', 'reason' => 'DICTIONARY_STORAGE_UNAVAILABLE'];
+        $prefix = $this->database->prefix;
+        $count = static function (object $database, string $table, string $where = '', array $args = []): int {
+            $sql = "SELECT COUNT(*) FROM {$table}" . ($where !== '' ? " WHERE {$where}" : '');
+            return (int) $database->get_var($database->prepare($sql, ...$args));
+        };
+        $statusCounts = [];
+        foreach ([DictionaryConcept::DRAFT, DictionaryConcept::APPROVED, DictionaryConcept::RETIRED] as $status) $statusCounts[$status] = $count($this->database, $prefix . 'nhk_dictionary_concepts', 'status=%s', [$status]);
+        $candidateCounts = [];
+        foreach ([\NHK\Core\Domain\Dictionary\DictionaryCandidateState::DETECTED, \NHK\Core\Domain\Dictionary\DictionaryCandidateState::NEEDS_REVIEW, \NHK\Core\Domain\Dictionary\DictionaryCandidateState::AMBIGUOUS, \NHK\Core\Domain\Dictionary\DictionaryCandidateState::PROPOSED_NEW, \NHK\Core\Domain\Dictionary\DictionaryCandidateState::DO_NOT_SUGGEST] as $state) $candidateCounts[$state] = $count($this->database, $prefix . 'nhk_dictionary_candidates', 'candidate_state=%s', [$state]);
+        $mentionRows = $this->database->get_results("SELECT source_kind,COUNT(*) AS total FROM {$prefix}nhk_dictionary_mentions GROUP BY source_kind", ARRAY_A) ?: [];
+        $mentionCounts = [];
+        foreach ($mentionRows as $row) $mentionCounts[(string) ($row['source_kind'] ?? '')] = (int) ($row['total'] ?? 0);
+        $hub = $this->publicQuery->hub(2000);
+        $publicItems = array_values(array_filter((array) ($hub['items'] ?? []), 'is_array'));
+        $preview = null;
+        $requestedConcept = trim((string) ($conceptId ?? ''));
+        if ($requestedConcept !== '') {
+            $concept = $this->concepts->findById($requestedConcept);
+            if ($concept === null) $preview = ['status' => 'not_found'];
+            else {
+                foreach ($publicItems as $item) if ((string) ($item['concept_id'] ?? '') === $requestedConcept) { $preview = ['status' => 'READY', 'item' => $item]; break; }
+                $preview ??= $this->publicQuery->detail((string) ($concept->context['public_slug'] ?? ''));
+            }
+        } elseif (trim((string) ($slug ?? '')) !== '') {
+            $preview = $this->publicQuery->detail((string) $slug);
+        }
+        return [
+            'status' => 'available',
+            'storage' => ['status' => 'READY', 'migration' => DictionaryMigration015::VERSION],
+            'readiness' => ['status' => 'READY', 'public_hub' => ($hub['status'] ?? '') === 'AVAILABLE', 'owner_revalidation' => true, 'backfill' => 'DRY_RUN_ONLY'],
+            'coverage' => ['concepts' => $statusCounts, 'candidates' => $candidateCounts, 'mentions_by_source' => $mentionCounts, 'public_items_returned' => count($publicItems), 'public_items_bounded' => true],
+            'public_preview' => $preview,
+            'public_hub_preview' => ['status' => $hub['status'] ?? 'UNAVAILABLE', 'canonical_url' => $hub['canonical_url'] ?? '/tu-dien/', 'items' => array_slice($publicItems, 0, 20)],
+        ];
+    }
+
     public function mutation(): DictionaryMutationService
     {
         $audit = new WpdbAuditSink($this->database);

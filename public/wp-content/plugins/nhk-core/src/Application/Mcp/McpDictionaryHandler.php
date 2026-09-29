@@ -33,6 +33,8 @@ final class McpDictionaryHandler
         return ['status' => 'available', 'concept' => $this->concept($concept), 'labels' => array_map($this->label(...), $this->runtime->concepts()->listLabels($conceptId, true))];
     }
 
+    public function resolve(string $term, array $context = [], array $hints = []): array { return $this->runtime->resolve($term, $context, $hints); }
+
     public function candidateList(?string $state = null, int $limit = 100): array
     {
         if (!$this->runtime->available()) return ['status' => 'unavailable', 'reason' => 'DICTIONARY_STORAGE_UNAVAILABLE'];
@@ -42,6 +44,22 @@ final class McpDictionaryHandler
         $items = array_values(array_filter($items, static fn (mixed $item): bool => $state === null || $item->state === $state));
         return ['status' => 'available', 'items' => array_map($this->candidate(...), $items), 'count' => count($items)];
     }
+
+    public function candidateDetail(string $candidateId): array
+    {
+        if (!$this->runtime->available()) return ['status' => 'unavailable', 'reason' => 'DICTIONARY_STORAGE_UNAVAILABLE'];
+        $candidate = $this->runtime->candidate($candidateId);
+        return $candidate === null ? ['status' => 'not_found', 'reason' => 'DICTIONARY_CANDIDATE_NOT_FOUND'] : ['status' => 'available', 'candidate' => $this->candidate($candidate)];
+    }
+
+    public function mentions(array $input): array
+    {
+        if (!$this->runtime->available()) return ['status' => 'unavailable', 'reason' => 'DICTIONARY_STORAGE_UNAVAILABLE'];
+        $items = $this->runtime->mentionsForSource((string) $input['source_kind'], (string) $input['source_id']);
+        return ['status' => 'available', 'source_kind' => strtoupper((string) $input['source_kind']), 'source_id' => (string) $input['source_id'], 'items' => array_map(static fn (object $mention): array => ['id' => $mention->mentionId, 'normalized_term' => $mention->normalizedTerm, 'concept_id' => $mention->conceptId, 'context' => $mention->context, 'strength' => $mention->strength, 'created_at' => $mention->createdAt], $items), 'count' => count($items)];
+    }
+
+    public function profile(array $input): array { return $this->runtime->profile(isset($input['concept_id']) ? (string) $input['concept_id'] : null, isset($input['slug']) ? (string) $input['slug'] : null); }
 
     public function createConcept(array $input): array { return $this->runtime->mutation()->createDraft((string) ($input['preferred_label'] ?? ''), (string) ($input['definition'] ?? ''), (array) ($input['context'] ?? []), (string) ($input['idempotency_key'] ?? '')); }
     public function updateConcept(array $input): array { return $this->runtime->mutation()->updateConcept((string) $input['concept_id'], (int) $input['expected_revision'], (string) $input['preferred_label'], (string) ($input['definition'] ?? ''), (array) ($input['context'] ?? []), (string) $input['idempotency_key']); }

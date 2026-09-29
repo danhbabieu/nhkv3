@@ -21,9 +21,16 @@ final class DictionaryBootstrap
         if (defined('NHK_RUN_MIGRATIONS') && NHK_RUN_MIGRATIONS === true && !DictionaryMigration015::schemaReady($wpdb)) (new DictionaryMigration015())->up();
 
         self::$runtime = new DictionaryRuntime($wpdb);
+        $harvester = self::$runtime->harvester();
         DictionaryObservationRegistry::register(
-            static fn (string $kind, string $id, string $text, array $context = [], array $hints = []): array => self::$runtime?->plan($text, $kind, $id, $context, $hints) ?? ['status' => 'UNAVAILABLE', 'blocking' => false],
-            static fn (string $kind, string $text, array $context = [], array $hints = []): array => self::$runtime?->preview($text, $kind, '', $context, $hints) ?? ['status' => 'UNAVAILABLE', 'blocking' => false],
+            static function (string $kind, string $id, string $text, array $context = [], array $hints = []) use ($harvester): array {
+                $result = $harvester->harvest([['source_kind' => $kind, 'source_id' => $id, 'text' => $text, 'context' => $context, 'hints' => $hints]], true);
+                return is_array($result['items'][0]['plan'] ?? null) ? $result['items'][0]['plan'] : ['status' => 'UNAVAILABLE', 'blocking' => false];
+            },
+            static function (string $kind, string $text, array $context = [], array $hints = []) use ($harvester): array {
+                $result = $harvester->harvest([['source_kind' => $kind, 'source_id' => 'preview', 'text' => $text, 'context' => $context, 'hints' => $hints]], false);
+                return is_array($result['items'][0]['plan'] ?? null) ? $result['items'][0]['plan'] : ['status' => 'UNAVAILABLE', 'blocking' => false];
+            },
         );
         (new DictionaryWordPressBridge(self::$runtime))->register();
         DictionaryAdminPage::register(self::$runtime);
