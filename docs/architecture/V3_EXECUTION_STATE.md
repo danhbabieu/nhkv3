@@ -20553,3 +20553,26 @@ Dictionary failure was reported. WordPress/MySQL integration remains
 unavailable here; live Dictionary dry-run is therefore `ENVIRONMENT_BLOCKED`.
 
 STATUS: `DICTIONARY_ISSUE_21_LOCAL_READY / BASELINE_AND_RUNTIME_GATES_DOCUMENTED / NO_LIVE_MUTATION`.
+
+# Checkpoint — 2026-09-29 — Dictionary @v52 acceptance follow-up
+
+AUDIT: The supplied @v52 report was traced against the local
+DictionaryObservationRegistry → DictionaryHarvester → DictionaryPlanningService
+→ DictionaryTermDetector → resolver/repositories path. Fragment terms are an
+implementation bug in the detector's arbitrary token window, not an ownership
+conflict. Added the generic locale-aware `DictionaryLexicalQualityGate` without
+phrase/domain special cases.
+
+PROVENANCE: Candidate MCP detail and Admin curator now read source mentions and
+bounded source contexts from the existing Mention owner. No migration or second
+provenance store was introduced. Historical all-zero unresolved Mention UUIDs
+are normalized to nullable semantics on read; no live cleanup was performed.
+
+VALIDATION: Dictionary focused slice after the fix passes 27 tests / 136
+assertions. Full PHPUnit after the fix reaches 2,918 tests / 16,490 assertions
+with the same 23 failures: two proven pre-existing KnowledgeWriter failures and
+21 environment-gated integration failures. Supplied live dry-run remains
+evidence-only; local WordPress/MySQL
+runtime is unavailable, so no backfill was executed and no data was mutated.
+
+STATUS: `DICTIONARY_ACCEPTANCE_FOLLOWUP_LOCAL_READY / LIVE_DATA_UNCHANGED / NO_PUSH / NO_DEPLOY`.

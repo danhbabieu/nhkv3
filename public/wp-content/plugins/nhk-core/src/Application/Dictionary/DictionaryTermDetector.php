@@ -5,11 +5,10 @@ namespace NHK\Core\Application\Dictionary;
 
 final class DictionaryTermDetector
 {
-    private const STOP_WORDS = ['và','hoặc','là','có','cho','với','của','được','trong','trên','dưới','này','đó','thì','khi','để','từ','một','những','các'];
-
-    public function __construct(private ?DictionaryTermNormalizer $normalizer = null)
+    public function __construct(private ?DictionaryTermNormalizer $normalizer = null, private ?DictionaryLexicalQualityGate $qualityGate = null)
     {
         $this->normalizer ??= new DictionaryTermNormalizer();
+        $this->qualityGate ??= new DictionaryLexicalQualityGate();
     }
 
     public function detect(string $text, array $approvedLabels = [], array $hints = []): array
@@ -47,15 +46,15 @@ final class DictionaryTermDetector
         foreach ($patterns as $pattern) {
             if (!preg_match_all($pattern, $text, $matches)) continue;
             foreach ($matches[1] as $value) {
-                $phrase = $this->trimStopWords((string) $value);
-                if ($phrase !== '') $this->add($out, $phrase, 'DOMAIN_PHRASE', 'NORMAL');
+                $phrase = $this->qualityGate->filter((string) $value);
+                if ($phrase !== null) $this->add($out, $phrase, 'DOMAIN_PHRASE', 'NORMAL');
             }
         }
 
         if (preg_match_all('/\bbản\s+nhạc\s+(' . $word . '(?:\s+' . $word . '){0,3})\b/iu', $text, $music)) {
             foreach ($music[1] as $value) {
-                $phrase = $this->trimStopWords((string) $value);
-                if ($phrase !== '') $this->add($out, $phrase, 'MUSIC_NAME', 'NORMAL');
+                $phrase = $this->qualityGate->filter((string) $value);
+                if ($phrase !== null) $this->add($out, $phrase, 'MUSIC_NAME', 'NORMAL');
             }
         }
 
@@ -82,28 +81,4 @@ final class DictionaryTermDetector
         return preg_match('/(?<![\p{L}\p{N}_])' . preg_quote($term, '/') . '(?![\p{L}\p{N}_])/iu', $text) === 1;
     }
 
-    private function trimStopWords(string $phrase): string
-    {
-        $parts = preg_split('/\s+/u', trim($phrase)) ?: [];
-        if (count($parts) > 1) {
-            foreach ($parts as $index => $part) {
-                if ($index === 0) continue;
-                if (in_array($this->lower((string) $part), self::STOP_WORDS, true)) {
-                    $parts = array_slice($parts, 0, $index);
-                    break;
-                }
-            }
-        }
-        while ($parts !== []) {
-            $last = $this->lower((string) end($parts));
-            if (!in_array($last, self::STOP_WORDS, true)) break;
-            array_pop($parts);
-        }
-        return trim(implode(' ', $parts));
-    }
-
-    private function lower(string $value): string
-    {
-        return function_exists('mb_strtolower') ? mb_strtolower($value, 'UTF-8') : strtolower($value);
-    }
 }

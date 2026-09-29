@@ -61,7 +61,11 @@ final class DictionaryAdminPage
         foreach ($items as $candidate) {
             $raw = implode(', ', array_map('strval', $candidate->rawForms));
             $context = (string) wp_json_encode($candidate->context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-            echo '<tr><td><strong>' . esc_html($raw ?: $candidate->normalizedTerm) . '</strong><br><code>' . esc_html($candidate->normalizedTerm) . '</code></td><td><small>' . esc_html($context) . '</small></td><td>' . esc_html((string) $candidate->occurrences) . '</td><td>Cần xác định: alias của mục đã có hay khái niệm độc lập.</td><td>';
+            $mentions = $runtime->mentionsForCandidate($candidate->candidateId);
+            $sources = array_map(static fn (object $mention): string => $mention->sourceKind . ':' . $mention->sourceId, $mentions);
+            $sources = array_values(array_unique($sources));
+            $sourceText = (string) wp_json_encode(array_slice($sources, 0, 12), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            echo '<tr><td><strong>' . esc_html($raw ?: $candidate->normalizedTerm) . '</strong><br><code>' . esc_html($candidate->normalizedTerm) . '</code></td><td><small>Candidate context: ' . esc_html($context) . '<br>Source context: ' . esc_html($sourceText ?: '[]') . '</small></td><td>' . esc_html((string) $candidate->occurrences) . ' / ' . esc_html((string) count($mentions)) . ' mention</td><td>Cần xác định: alias của mục đã có hay khái niệm độc lập.</td><td>';
             self::decisionForm($candidate->candidateId, $candidate->revision, DictionaryCandidateState::IGNORED, 'Bỏ qua');
             self::decisionForm($candidate->candidateId, $candidate->revision, DictionaryCandidateState::DO_NOT_SUGGEST, 'Không gợi ý lại');
             echo '<details><summary>Tạo mục nháp</summary><form method="post" action="' . esc_url(admin_url('admin-post.php')) . '">'; self::nonce();

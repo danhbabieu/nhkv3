@@ -49,7 +49,9 @@ final class McpDictionaryHandler
     {
         if (!$this->runtime->available()) return ['status' => 'unavailable', 'reason' => 'DICTIONARY_STORAGE_UNAVAILABLE'];
         $candidate = $this->runtime->candidate($candidateId);
-        return $candidate === null ? ['status' => 'not_found', 'reason' => 'DICTIONARY_CANDIDATE_NOT_FOUND'] : ['status' => 'available', 'candidate' => $this->candidate($candidate)];
+        if ($candidate === null) return ['status' => 'not_found', 'reason' => 'DICTIONARY_CANDIDATE_NOT_FOUND'];
+        $mentions = $this->runtime->mentionsForCandidate($candidateId);
+        return ['status' => 'available', 'candidate' => $this->candidate($candidate), 'provenance' => $this->provenance($mentions)];
     }
 
     public function mentions(array $input): array
@@ -98,4 +100,22 @@ final class McpDictionaryHandler
     private function concept(object $concept): array { return ['id' => $concept->conceptId, 'preferred_label' => $concept->preferredLabel, 'definition' => $concept->definition, 'status' => $concept->status, 'destination_type' => $concept->destinationType, 'destination_id' => $concept->destinationId, 'destination_url' => $concept->destinationUrl, 'context' => $concept->context, 'revision' => $concept->revision]; }
     private function label(object $label): array { return ['label' => $label->label, 'normalized_label' => $label->normalizedLabel, 'kind' => $label->kind, 'locale' => $label->locale, 'context' => $label->context, 'active' => $label->active]; }
     private function candidate(object $candidate): array { return ['id' => $candidate->candidateId, 'normalized_term' => $candidate->normalizedTerm, 'raw_forms' => $candidate->rawForms, 'state' => $candidate->state, 'context' => $candidate->context, 'suggestions' => $candidate->suggestions, 'occurrences' => $candidate->occurrences, 'revision' => $candidate->revision]; }
+    private function provenance(array $mentions): array
+    {
+        $items = array_map(static fn (object $mention): array => [
+            'id' => $mention->mentionId,
+            'source_kind' => $mention->sourceKind,
+            'source_id' => $mention->sourceId,
+            'concept_id' => $mention->conceptId,
+            'context' => $mention->context,
+            'strength' => $mention->strength,
+            'created_at' => $mention->createdAt,
+        ], $mentions);
+        $families = [];
+        foreach ($items as $item) {
+            $key = $item['source_kind'] . ':' . $item['source_id'];
+            $families[$key] = ($families[$key] ?? 0) + 1;
+        }
+        return ['mention_count' => count($items), 'source_count' => count($families), 'items' => $items];
+    }
 }

@@ -100,6 +100,13 @@ occurrence count, first/last seen timestamps, resolver suggestions, confidence
 signals and review decision. Confidence is advisory only and never substitutes
 for ownership/evidence rules.
 
+Detector windows must pass a lexical-quality boundary before they can become a
+candidate. The boundary is locale-aware and reusable: it cuts conjunction,
+pronoun, auxiliary, preposition, question and clause-continuation tails, and
+rejects an empty/non-reusable remainder. It must not contain a list of known
+Article phrases or domain-specific exceptions. Frequency only ranks review
+priority; it never upgrades a weak segmentation to lexical truth.
+
 `DO_NOT_SUGGEST` is durable suppression: the detector must stop recreating the
 same normalized candidate for equivalent context unless a human explicitly
 reopens it.
@@ -130,6 +137,17 @@ create canonical semantic identity.
 
 Detection must preserve `source_kind`, source identifier, locator/context and
 observation strength so reviewers can see why a candidate exists.
+
+Source replay is idempotent at the Mention fingerprint boundary. A repeated
+source identifier and equivalent lexical context must not create another
+occurrence. Derived/generated copies may be observed for diagnostics, but their
+lineage/source-family metadata must remain available to curator projections so
+one provenance family is not mistaken for independent lexical corroboration.
+Candidate detail and Admin review therefore project source mentions and their
+contexts from the Mention owner; the aggregate candidate row is not a second
+provenance store. A missing unresolved concept is represented as `NULL`; the
+all-zero UUID is treated as a legacy/null sentinel on read and is never a valid
+Dictionary owner.
 
 ## 4. Resolution order
 

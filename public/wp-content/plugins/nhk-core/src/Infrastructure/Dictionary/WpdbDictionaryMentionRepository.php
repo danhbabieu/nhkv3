@@ -45,6 +45,17 @@ final class WpdbDictionaryMentionRepository implements DictionaryMentionReposito
         return array_values(array_filter(array_map(fn (array $row): ?DictionaryMention => $this->hydrate($row), $rows)));
     }
 
+    /** Read projection for curator/MCP provenance; Mention remains the owner. */
+    public function listByCandidate(string $normalizedTerm, string $contextHash, int $limit = 500): array
+    {
+        $limit = max(1, min(2000, $limit));
+        $rows = $this->database->get_results($this->database->prepare(
+            "SELECT * FROM {$this->table} WHERE normalized_term=%s AND context_hash=%s ORDER BY id LIMIT %d",
+            trim($normalizedTerm), trim($contextHash), $limit,
+        ), ARRAY_A) ?: [];
+        return array_values(array_filter(array_map(fn (array $row): ?DictionaryMention => $this->hydrate($row), $rows)));
+    }
+
     private function findByFingerprint(string $fingerprint): ?DictionaryMention
     {
         $row = $this->database->get_row($this->database->prepare("SELECT * FROM {$this->table} WHERE fingerprint=%s LIMIT 1", $fingerprint), ARRAY_A);
@@ -58,6 +69,7 @@ final class WpdbDictionaryMentionRepository implements DictionaryMentionReposito
             $context = json_decode((string) ($row['context_json'] ?? '{}'), true, 512, JSON_THROW_ON_ERROR);
             if (!is_array($context)) $context = [];
             $concept = ($row['concept_uuid'] ?? null) !== null ? UuidCodec::fromBinary($row['concept_uuid']) : null;
+            if ($concept === '00000000-0000-0000-0000-000000000000') $concept = null;
             return new DictionaryMention(
                 UuidCodec::fromBinary($row['mention_uuid']),
                 (string) $row['fingerprint'],

@@ -21,4 +21,17 @@ final class DictionaryTermDetectorTest extends TestCase
         $items = (new DictionaryTermDetector())->detect('Chiếc máy đẹp, sạch và rất ấn tượng.');
         self::assertNotContains('máy đẹp', array_column($items, 'normalized_term'));
     }
+
+    public function test_quality_gate_cuts_clause_tails_but_keeps_reusable_lexical_phrase(): void
+    {
+        $detector = new DictionaryTermDetector();
+        $terms = static fn (string $text): array => array_column($detector->detect($text), 'normalized_term');
+
+        self::assertContains('mặt số lớn', $terms('Mặt số lớn mà chúng ta thường thấy trên đồng hồ.'));
+        self::assertNotContains('mặt số lớn mà chúng', $terms('Mặt số lớn mà chúng ta thường thấy trên đồng hồ.'));
+        self::assertContains('mặt số', $terms('Mặt số như thế nào và nằm ở đâu?'));
+        self::assertContains('ngắt chuông đêm', $terms('Thiết bị có ngắt chuông đêm tự động và bộ thoát.'));
+        self::assertContains('bộ thoát', $terms('Thiết bị có ngắt chuông đêm tự động và bộ thoát.'));
+    }
+
 }

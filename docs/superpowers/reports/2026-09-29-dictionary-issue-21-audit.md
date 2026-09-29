@@ -50,7 +50,42 @@ The two KnowledgeWriter failures were verified against the immediate pre-Issue
 same assertion before Issue #21 changes, so they are pre-existing and not a
 Dictionary regression.
 
-Final full PHPUnit invocation: 2,917 tests / 16,485 assertions, 23 failures,
+Final pre-follow-up full PHPUnit invocation: 2,917 tests / 16,485 assertions, 23 failures,
 19 warnings, 46 deprecations, 49 PHPUnit deprecations and 122 skips. The 23
 failures are exactly the two baseline KnowledgeWriter failures plus 21 guarded
 integration failures caused by the unavailable WordPress/MySQL test runtime.
+
+Post-follow-up full PHPUnit invocation: 2,918 tests / 16,490 assertions, 23
+failures, 19 warnings, 46 deprecations, 49 PHPUnit deprecations and 122 skips.
+The added Dictionary detector coverage passes; the two KnowledgeWriter failures
+and 21 environment-gated integration failures are unchanged.
+
+## Post-deploy acceptance audit — @v52 evidence
+
+The supplied @v52 report confirms the Dictionary MCP tools are callable,
+storage/readiness are `READY`, the public hub is available, dry-run is
+`DRY_RUN/no_write`, Westminster reuses the existing owner, and ambiguity fails
+closed. It also exposes a detector-quality defect: fixed-window patterns emitted
+clause fragments such as `mặt số lớn mà chúng` and `ngắt chuông đêm tự`.
+
+ROOT_CAUSE: `DictionaryTermDetector` used domain stem regexes with an arbitrary
+token window and a short stop-word trim. This is an implementation bug, not an
+ownership-contract gap.
+
+FIX: `DictionaryLexicalQualityGate` now applies a locale-aware reusable grammar
+boundary before resolver/candidate persistence. It contains no data-specific
+phrases; valid `bộ thoát` and reusable lexical bases remain observable, while
+clause tails do not become candidates. Frequency remains review priority only.
+
+PROVENANCE: candidate detail and Admin curator now project source mentions and
+contexts from the existing Mention owner. No second provenance store or
+migration was added. Same-source replay remains protected by the existing
+fingerprint; future derived-source adapters must carry source-family/lineage
+context when they represent projections rather than independent evidence.
+
+NULL_SEMANTICS: unresolved planner rows are nullable; historical all-zero UUID
+Mention values are normalized to `NULL` on read. No live data cleanup occurred.
+
+CLEANUP: do not delete or bulk-rewrite the 489 live candidates. They remain
+private curation data; cleanup must use governed review or a separately
+authorized migration packet.

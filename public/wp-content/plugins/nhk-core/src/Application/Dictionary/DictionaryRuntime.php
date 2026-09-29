@@ -218,6 +218,13 @@ final class DictionaryRuntime
         return $this->mentions->listBySource($sourceKind, $sourceId);
     }
 
+    public function mentionsForCandidate(string $candidateId): array
+    {
+        if (!$this->available()) throw new \RuntimeException('DICTIONARY_STORAGE_UNAVAILABLE');
+        $candidate = $this->candidates->findById($candidateId);
+        return $candidate === null ? [] : $this->mentions->listByCandidate($candidate->normalizedTerm, $candidate->contextHash);
+    }
+
     public function profile(?string $conceptId = null, ?string $slug = null): array
     {
         if (!$this->available()) return ['status' => 'unavailable', 'reason' => 'DICTIONARY_STORAGE_UNAVAILABLE'];
