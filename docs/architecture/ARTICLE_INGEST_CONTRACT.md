@@ -47,6 +47,12 @@ continuations. They require `nhk_internal_content_operations` at the MCP/Admin
 surface; without it they fail closed with `DIRECT_WRITE_BLOCKED` and
 `USE_CANONICAL_CAPTURE_FLOW`.
 
+The shared interpretation boundary for Article text, transcript, Media context
+and human hints is governed by
+`UNIVERSAL_STRUCTURED_SEMANTIC_INTAKE_CONTRACT.md`. Article Ingest consumes its
+ephemeral planning result; it does not persist a second Article semantic owner
+or treat interpretation output as Knowledge/Evidence.
+
 ## Required stage order
 
 1. Resolve all semantic references through the runtime registries. Subject

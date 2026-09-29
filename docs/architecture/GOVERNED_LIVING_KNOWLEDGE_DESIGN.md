@@ -30,6 +30,12 @@ No new Graph predicate is added by this design.
 
 ## Living Knowledge behavior
 
+Living Knowledge consumes the shared
+`UNIVERSAL_STRUCTURED_SEMANTIC_INTAKE_CONTRACT.md` planning boundary. Structured
+interpretation separates language, semantic structure and trust/scope signals;
+it does not replace canonical subject resolution, evidence validation or the
+existing reuse-before-create lifecycle.
+
 Semantic meaning is never silently rewritten in an existing claim. Editorial
 typos that do not change meaning may use the existing correction contract;
 otherwise the system conservatively classifies structured input as one of:

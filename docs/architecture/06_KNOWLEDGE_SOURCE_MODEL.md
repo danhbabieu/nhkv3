@@ -43,6 +43,13 @@ remains a cutover gate.
 
 ## Current enrichment and reuse boundary — 2026-09-04
 
+Knowledge interpretation follows the shared
+`UNIVERSAL_STRUCTURED_SEMANTIC_INTAKE_CONTRACT.md` planning boundary: atomize
+subject, designation, proposition, provenance and scope signals, resolve and
+reuse existing canonical Knowledge before proposing a delta, and retain
+raw/derived lineage. The shared packet is planning-only; Knowledge remains the
+owner of atomic claims and Source/Evidence remains the owner of support.
+
 Knowledge remains atomic and canonical. Article body text, Video transcript,
 Video editorial copy, Media alt/caption, OCR output and generated AI prose are
 not themselves Knowledge or Evidence. They may only act as bounded input to a

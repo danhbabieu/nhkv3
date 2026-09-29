@@ -12,6 +12,13 @@
 
 ## 1. Purpose
 
+Dictionary detection participates in the shared ephemeral interpretation
+boundary governed by
+`UNIVERSAL_STRUCTURED_SEMANTIC_INTAKE_CONTRACT.md`. Its lexical-quality,
+longest-span, structural-unit, identifier, proper-name, overlap, numeric and
+ambiguity rules are shared planning law; Dictionary remains lexical curation
+and does not become semantic identity, Knowledge, Evidence or Graph truth.
+
 The Dictionary capability detects domain terms while NHK creates, researches,
 updates or ingests Article, Knowledge, Media/Image and Video content; resolves
 those terms to already-owned canonical public destinations whenever possible;

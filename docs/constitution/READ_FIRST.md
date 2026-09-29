@@ -52,6 +52,13 @@ the operation:
 | MCP / Admin | current contract: `docs/mcp/MCP_V3_CONTENT_OPERATIONS.md`, `docs/mcp/NHK_V3_CONTENT_OPERATIONS_CONTROL_PLANE.md`; all MCP ingest also follows Constitution §20.1 bounded post-ingest reconciliation and completion gate; current tool/Ability availability must be checked against executable catalog/registration, fresh target runtime discovery and the actual client/connector surface. `docs/mcp/MCP_V3_ABILITY_EXPOSURE.md` is historical/superseded evidence only |
 | Storage / schema / execution | current boundaries from the relevant domain contracts plus `docs/architecture/CURRENT_DOCUMENTATION_STATUS_INDEX.md`; `docs/architecture/21_P5_CANONICAL_DOMAIN_FOUNDATION.md`, `docs/architecture/22_P6_MEDIA_VIDEO_FOUNDATION.md`, `docs/architecture/V3_EXECUTION_STATE.md` and `docs/architecture/V2_V3_PARITY_MATRIX.md` contain implementation/history evidence and must be interpreted by date/context |
 
+For any linguistic interpretation, enrichment or editorial synthesis crossing
+Article, Knowledge, Dictionary, Media, Video, transcript or human-hint input,
+also read the shared planning law
+`docs/architecture/UNIVERSAL_STRUCTURED_SEMANTIC_INTAKE_CONTRACT.md`. It is
+one subordinate contract for the ephemeral interpretation boundary, not a new
+owner or runtime pipeline.
+
 For Media upload specifically, read the Media model, P6 foundation, Admin Media
 guidance and the Media section of the current MCP Content Operations contract
 together. The current file flow is `nhk.media.upload-batch` multipart → native

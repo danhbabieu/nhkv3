@@ -41,6 +41,7 @@ final class McpDocumentationRegistry
         'video-seo' => ['path' => 'docs/seo/VIDEO_SEO_PROJECTION_CONTRACT.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'video'],
         'video-workflow' => ['path' => 'docs/mcp/MCP_V3_VIDEO_WORKFLOW.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'video'],
         'knowledge' => ['path' => 'docs/architecture/06_KNOWLEDGE_SOURCE_MODEL.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'knowledge'],
+        'universal-structured-semantic-intake' => ['path' => 'docs/architecture/UNIVERSAL_STRUCTURED_SEMANTIC_INTAKE_CONTRACT.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'knowledge'],
         'dictionary-lexical-knowledge' => ['path' => 'docs/architecture/DICTIONARY_LEXICAL_KNOWLEDGE_CONTRACT.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'knowledge'],
         'living-knowledge' => ['path' => 'docs/architecture/GOVERNED_LIVING_KNOWLEDGE_DESIGN.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'knowledge'],
         'collector-profile' => ['path' => 'docs/architecture/COLLECTOR_PROFILE_CONTRACT.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'knowledge'],

@@ -1887,6 +1887,60 @@ bootstrap checkpoint; when the deployed manifest changes, the mutation fails
 closed with `DOCUMENTATION_CHECKPOINT_STALE` until the operator bootstraps
 again.
 
+## Amendment record — 2026-09-30 — Universal Structured Semantic Intake & Synthesis Law
+
+**WHY:** NHK V3 receives linguistic input from Articles, Knowledge text,
+Video metadata/transcripts, Media context, spoken-language transcripts and
+human hints. Lexical detection, semantic resolution, trust evaluation and
+editorial synthesis must share one bounded planning law without creating a
+second semantic store or an AI-owned truth boundary.
+
+**WHAT LAW CHANGES:** Every unstructured or semi-structured linguistic input
+must pass through a structured, read/planning-only interpretation boundary
+before semantic identity resolution, enrichment, delta proposal or editorial
+synthesis. The canonical conceptual sequence is:
+
+`RAW INPUT → INTERPRET → STRUCTURED SPANS/CANDIDATES → RESOLVE → REUSE → EVALUATE → DELTA PLANNING → GOVERNANCE IF MUTATION → SYNTHESIS/PUBLIC PROJECTION IF READ PATH`.
+
+The interpretation result is an ephemeral planning representation. It is not a
+canonical identity, Authority type, Graph endpoint, Knowledge record,
+Dictionary owner, Source, Evidence or Article semantic owner. It never stores
+raw Article body as Knowledge and never authorizes a write. `nhk.capture.ingest`
+remains the only normal entry point for a new submission; this law does not
+create a parallel intake pipeline.
+
+The following distinctions are constitutional invariants:
+
+`DETECTED ≠ TRUE`; `RESOLVED ≠ RELATED`; `RELATED ≠ FACT`; `FACT ≠ UNIVERSAL`;
+`MENTION ≠ EVIDENCE`; `GENERATED PROSE ≠ KNOWLEDGE`; `GENERATED PROSE ≠ EVIDENCE`;
+`LEXICAL MATCH ≠ SEMANTIC IDENTITY`; `GRAPH REACHABILITY ≠ APPLICABILITY`;
+`FREQUENCY ≠ AUTHORITY`; `CONFIDENCE ≠ APPROVAL`; `UNKNOWN ≠ FALSE`.
+
+Ambiguous identity, unsupported scope, insufficient provenance/evidence and
+unresolved owner selection fail closed. Narrow scope must not silently widen.
+Search and canonical reuse precede any new candidate or delta proposal.
+`RAW TEXT → DIRECT SEMANTIC WRITE` and
+`GENERATED TEXT → AUTOMATIC KNOWLEDGE` are forbidden. Transcript/ASR
+confidence, OCR, captions, generated copy and lexical frequency are signals
+only; source and derived lineage must remain distinguishable so generated or
+derived output cannot inflate corroboration or create a feedback loop.
+
+This amendment consolidates and is implemented through the existing Universal
+Capture, Article Ingest, Knowledge/Source/Evidence, Dictionary, Graph,
+Governance, Media and Video contracts. Those contracts retain their owners,
+registered vocabularies, scope rules and mutation gates.
+
+**COMPATIBILITY AND STATUS:** Existing canonical data, URLs, identities,
+ownership and runtime behavior are unchanged. This amendment authorizes no
+schema, migration, backfill, mutation, deployment, new predicate, endpoint,
+entity type or pipeline. The shared interpretation contract is
+`LAW APPROVED / DOCUMENTED`; that status must not be read as proof that a full
+universal packet/interpreter runtime already exists. Dictionary and the current
+Capture/Living Knowledge stages are implementation slices that may adopt the
+shared contract incrementally.
+
+**DECISION OWNER / DATE:** NHK V3 architecture approval, 2026-09-30.
+
 ### 20.0.2 Canonical submission entry point
 
 Runtime phải expose đúng một entry point cho submission mới:

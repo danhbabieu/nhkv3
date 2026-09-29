@@ -45,6 +45,21 @@ closed as `DOCUMENTATION_CHECKPOINT_STALE`. Code-side discovery is covered;
 target-runtime connector discovery/read-back remains an environment gate until
 freshly verified.
 
+## 0.0.2 Universal structured semantic intake law — 2026-09-30
+
+`UNIVERSAL_STRUCTURED_SEMANTIC_INTAKE_CONTRACT.md` is the current subordinate
+contract for the shared interpretation boundary across Article, Knowledge,
+Dictionary, Media, Video, transcript and human-hint input. It defines the
+ephemeral `StructuredInterpretationPacket` concept and the shared
+interpret → resolve → reuse → evaluate → delta-planning → Governance/synthesis
+sequence without creating a semantic owner, storage boundary or parallel
+pipeline.
+
+Status is **LAW APPROVED / DOCUMENTED**, not FULL RUNTIME IMPLEMENTED.
+Dictionary, Capture and Living Knowledge contain implementation slices of these
+stages, but the repository does not claim a complete universal packet or
+interpreter runtime until executable coverage and contract tests prove it.
+
 ## 0.1 Governed Conversational Authority — 2026-09-11
 
 The current Capture boundary now has typed purposes `EDITORIAL`, `AUTHORITY`

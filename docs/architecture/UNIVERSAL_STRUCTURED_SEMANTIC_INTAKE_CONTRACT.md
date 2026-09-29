@@ -1,0 +1,295 @@
+# NHK V3 Universal Structured Semantic Intake & Synthesis Contract
+
+> **APPROVED SUBORDINATE CONTRACT — 2026-09-30.** This contract is
+> subordinate to `docs/constitution/NHK_V3_CONSTITUTION.md`. If any wording
+> conflicts with the Constitution, the Constitution controls.
+
+## 1. Purpose and scope
+
+This contract defines the shared planning law for interpreting linguistic input
+before NHK V3 resolves canonical identity, enriches existing semantic truth,
+plans a Dictionary/Knowledge/Relation delta or synthesizes editorial output.
+It applies to Article text, Knowledge text, Video title/description/transcript,
+Media caption/alt/OCR/context, spoken-language transcripts and human hints.
+
+The canonical conceptual sequence is:
+
+```text
+RAW INPUT
+  → INTERPRET
+  → STRUCTURED SPANS / CANDIDATES
+  → RESOLVE
+  → REUSE
+  → EVALUATE SCOPE, PROVENANCE, EVIDENCE AND APPLICABILITY
+  → DELTA PLANNING
+  → GOVERNANCE IF MUTATION
+  → SYNTHESIS / PUBLIC PROJECTION IF READ PATH
+```
+
+This is an application/planning boundary. It does not replace the owning
+contracts for Authority, Graph, Knowledge, Source/Evidence, Dictionary, Media,
+Video, Article, Capture, Content Intent or Governance.
+
+`nhk.capture.ingest` remains the only normal entry point for a new submission.
+Direct domain writers remain guarded internal/admin lifecycle boundaries under
+the Constitution and their owning contracts.
+
+## 2. Ownership and non-persistence
+
+The shared result is an ephemeral/read-planning DTO contract, referred to here
+as a `StructuredInterpretationPacket`. The name is conceptual until an approved
+runtime implementation exists; it does not authorize a new runtime type.
+
+The packet may contain, as applicable:
+
+- source context, raw-input reference/lineage, locale and Content Intent context;
+- provenance, evidence, uncertainty, scope, subject and editorial signals;
+- lexical, proper-name, identifier, configuration and technical-term spans;
+- resolved references, unresolved terms and ambiguous terms;
+- attribute, relation and claim candidates;
+- reuse matches and diagnostics;
+- Dictionary, Knowledge and Relation delta candidates.
+
+The packet is not a database entity, canonical semantic identity, Authority
+type, Graph endpoint, Source, Evidence, Knowledge record, Dictionary owner or
+Article semantic owner. It does not persist raw Article body as Knowledge,
+create a parallel semantic store or authorize a write.
+
+## 3. Three interpretation layers
+
+### 3.1 Language layer
+
+This layer records what wording is observed: aliases, colloquial terms,
+technical terms, names, shorthand, phonetic forms and normalized lookup forms.
+Dictionary and other lexical capabilities operate here.
+
+### 3.2 Semantic-structure layer
+
+This layer proposes or resolves subjects, designations, attributes,
+configurations, claims and relations through existing Authority, Knowledge and
+Graph boundaries. A lexical match is not semantic identity. A resolved subject
+is not automatically related to another subject, and a relation candidate is
+not a fact.
+
+### 3.3 Trust-and-scope layer
+
+This layer preserves source kind, source identifier, raw/derived lineage,
+observation class, provenance, evidence status, applicability, scope and
+uncertainty. Layer A cannot decide Layer C. Frequency and model confidence are
+signals, not authority or approval.
+
+## 4. Constitutional interpretation invariants
+
+The packet and every consumer must preserve these distinctions:
+
+```text
+DETECTED ≠ TRUE
+RESOLVED ≠ RELATED
+RELATED ≠ FACT
+FACT ≠ UNIVERSAL
+MENTION ≠ EVIDENCE
+GENERATED PROSE ≠ KNOWLEDGE
+GENERATED PROSE ≠ EVIDENCE
+LEXICAL MATCH ≠ SEMANTIC IDENTITY
+GRAPH REACHABILITY ≠ APPLICABILITY
+FREQUENCY ≠ AUTHORITY
+CONFIDENCE ≠ APPROVAL
+UNKNOWN ≠ FALSE
+```
+
+`AMBIGUOUS` identity, owner, scope, predicate or applicability fails closed.
+`UNKNOWN` may remain a valid private lexical candidate; it is not silently
+discarded or treated as false. Narrow scope must not silently widen. Search and
+canonical reuse precede any create/propose decision.
+
+## 5. Shared lexical and structural interpretation law
+
+The shared lexical boundary is locale-aware and reusable across Article,
+Knowledge, Media, Video, transcript and human-input planning.
+
+1. Prefer the longest reusable span with valid syntax and lexical reason.
+2. Stop at conjunction, preposition, pronoun, auxiliary, question, clause
+   continuation or other editorial tail; do not consume prose merely to make a
+   longer candidate.
+3. `NUMBER + WORD` is not sufficient for a structural configuration. Each
+   `UNIT` position needs independent lexical/structural eligibility from an
+   approved/hinted lexical capability, an existing generic detector reason or
+   another governed structural-unit boundary. Arbitrary following words are
+   not units.
+4. A composite configuration is emitted only when every unit position is
+   eligible. An invalid position fails closed or leaves only independently
+   justified lexical spans; it must not create an interior fragment merely
+   because a larger composite was attempted.
+5. `/`, `-` and `.` do not independently create an identifier. Identifier
+   eligibility requires sufficiently strong code/reference morphology or
+   bounded contextual identity evidence, such as a digit-bearing reference
+   segment, alphanumeric code morphology, registered technical prefix or
+   approved/hinted identifier context.
+6. A hyphenated proper-name beginning must retain a valid continuation when
+   syntax/context supports one; a weaker first-token fragment is not emitted
+   solely because it is easier to match.
+7. A weaker interior span is suppressed when it exists only inside a stronger
+   selected span. An atomic term remains valid when an independent detector
+   reason exists.
+8. Numeric-only designations are not rejected categorically. A numeric token
+   may be a model, calibre, collector alias, variant shorthand or reference,
+   but requires an independent context, hint or approved lexical reason.
+9. If multiple canonical owners remain viable for one span, the result is
+   `AMBIGUOUS`; it is not auto-linked or auto-attached.
+
+Production/runtime corpus examples are regression observations only. They are
+not implementation vocabulary, hard-coded production rules or authorization.
+Synthetic and unseen fixtures are required to demonstrate generic behavior.
+
+## 6. Spoken-language and transcript input
+
+Transcript and ASR input may contain missing subjects, shorthand, aliases,
+repetition, broken clauses, self-correction, incomplete spoken numbers,
+community terminology and transcription errors. The interpreter must:
+
+- preserve raw source lineage and the distinction between transcript and later
+  derived/editorial text;
+- retain uncertainty and ambiguity instead of silently correcting identity;
+- treat ASR/transcript confidence as an observation signal, not semantic
+  confidence or Evidence;
+- allow a human correction to provide a stronger lexical hint without
+  bypassing canonical resolution, scope, provenance, evidence or Governance;
+- keep transcript-derived Knowledge/relation output planning-only until the
+  owning governed lifecycle validates it.
+
+Transcript text is not automatically a Source, Evidence, canonical claim or
+relation.
+
+## 7. Reuse-first enrichment order
+
+After interpretation, enrichment follows this conceptual order:
+
+```text
+resolve subject
+  → Dictionary lookup
+  → canonical search
+  → bounded Graph neighborhood
+  → Knowledge search
+  → exact/reuse analysis
+  → Source/Evidence validation
+  → determine actual gap
+```
+
+Graph reachability discovers candidates only. It does not authorize claim reuse,
+relation applicability or scope widening. Existing canonical IDs and revisions,
+original subject/scope, provenance, evidence and relevance must be retained for
+every reused Knowledge item.
+
+The packet may classify planning outcomes as `NO_CHANGE`, `REUSE_EXISTING`, a
+Dictionary/Knowledge/Relation candidate, an evidence-addition candidate,
+`AMBIGUOUS`, `EDITORIAL_ONLY`, `NOISE` or `UNRESOLVED`. These are semantic
+planning classes, not a license to create storage enums or runtime vocabulary.
+
+## 8. Knowledge enrichment
+
+Input sentences are atomized into subject/designation, attribute or component,
+factual proposition, provenance signal and scope signal. A complete sentence
+is not automatically one Knowledge claim.
+
+If equivalent applicable Knowledge exists, reuse it or plan valid evidence or
+qualification enrichment before proposing a new claim. Repeated wording,
+similarity, lexical frequency or generated prose does not create a duplicate
+claim. User statements, specimen observations, transcript observations and
+system inference retain their bounded provenance and scope. A narrow
+observation must not silently become a Model, Brand or universal fact.
+
+Durable Knowledge, Source or Evidence mutation remains:
+
+`Proposal → Human Approval → Eligibility → Controlled Apply → repository → audit → read-back`.
+
+## 9. Dictionary enrichment
+
+Dictionary can consume Article, Knowledge, Video, Media, transcript and human
+input to propose preferred, alternate, colloquial, technical, phonetic or
+contextual labels and lexical concepts. It remains lexical curation only.
+
+Automatic detection creates a private candidate or planning result; it does not
+approve a concept, prove identity, establish factual truth, prove a relation or
+become Evidence. Existing canonical owners are preferred for resolution. A
+Dictionary definition does not copy or replace the owner's semantic truth.
+Approval and any durable curation action remain human/governed under the
+Dictionary contract.
+
+## 10. Relation discovery
+
+A relation candidate requires resolved source and target identities, a
+registered predicate, valid direction, valid scope and sufficient
+provenance/evidence under the owning contract. Co-occurrence, lexical
+proximity, appearing in one sentence, same transcript segment or Graph
+reachability alone is not a relation or evidence.
+
+Relation mutation remains governed and read back. The packet cannot invent an
+endpoint, predicate, relation type, direction or semantic owner.
+
+## 11. Synthesis and public projection
+
+Self-writing follows:
+
+```text
+EDITORIAL INTENT
+  → interpret topic
+  → resolve canonical subjects
+  → Dictionary language expansion
+  → bounded Graph discovery
+  → retrieve Knowledge
+  → validate subject, scope, provenance and evidence
+  → determine reader coverage
+  → select applicable Claims
+  → synthesize
+  → compliance
+  → public projection
+```
+
+The writer must not write from Graph reachability alone, dump every related
+claim, use an unreviewed lexical/semantic candidate as fact, broaden a
+specimen observation, or copy raw Knowledge payload into a second store.
+Existing Article contracts govern body-free Claim ID/revision traces.
+
+Generated Article prose, summaries, SEO descriptions and other derived copies
+remain editorial/read-model output. They are not automatic Knowledge or
+Evidence. When derived output is scanned lexically, its lineage/source family
+must remain visible so it cannot be counted as independent corroboration,
+inflate frequency or feed a self-training loop.
+
+## 12. Fail-closed and read/write boundaries
+
+Interpretation, search, resolution, bounded Graph discovery, Knowledge
+retrieval and synthesis may run on the read path. Dictionary approval,
+Knowledge create/update, Evidence, Relation and Authority change remain write
+path operations requiring their existing Governance boundaries.
+
+If interpretation is incomplete, return `AMBIGUOUS`, `UNRESOLVED` or
+`REVIEW_REQUIRED` as appropriate. Fail-closed semantic identity does not erase a
+valid unknown lexical observation or prevent a private Dictionary candidate.
+
+## 13. Status and future acceptance
+
+This contract is `LAW APPROVED / DOCUMENTED`; it is not a claim that a complete
+universal packet/interpreter runtime exists. Dictionary is an early structured
+lexical implementation slice. Capture and Living Knowledge already implement
+parts of the shared semantic stages. Runtime adoption must be incremental and
+must retain existing owner boundaries.
+
+Future implementation acceptance must cover, with synthetic/unseen input:
+
+- lexical span length and grammar boundaries, proper names, identifiers,
+  structural configurations, contextual numeric aliases and ambiguity;
+- subject resolution, claim atomization, scope preservation, relation-candidate
+  validation, reuse and duplicate suppression;
+- user observation versus universal fact, transcript versus Evidence and
+  generated prose versus Evidence, including derived-lineage contamination;
+- synthesis limited to applicable Knowledge, bounded Graph discovery,
+  unresolved candidates not becoming facts and generated Articles not feeding
+  canonical Knowledge automatically.
+
+## 14. Compatibility
+
+This contract changes no existing canonical data, schema, migration, URL,
+identity, ownership, Graph predicate, endpoint, MCP operation or runtime
+behavior. It creates no backfill, mutation, deployment or parallel pipeline.
+
