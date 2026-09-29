@@ -65,6 +65,7 @@ final class DictionaryPublicQueryTest extends TestCase
             public function createConcept(DictionaryConcept $concept): DictionaryConcept { return $concept; }
             public function updateConcept(DictionaryConcept $concept, int $expectedRevision): DictionaryConcept { return $concept; }
             public function addLabel(DictionaryLabel $label): DictionaryLabel { return $label; }
+            public function saveLabel(DictionaryLabel $label, string $previousNormalizedLabel, int $expectedConceptRevision): DictionaryLabel { return $label; }
         };
     }
 }

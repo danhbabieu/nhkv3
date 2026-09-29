@@ -149,6 +149,21 @@ final class WpdbDictionaryConceptRepository implements DictionaryConceptReposito
         return $label;
     }
 
+    public function saveLabel(DictionaryLabel $label, string $previousNormalizedLabel, int $expectedConceptRevision): DictionaryLabel
+    {
+        $concept = $this->findById($label->conceptId);
+        if ($concept === null || $concept->revision !== $expectedConceptRevision) throw new \RuntimeException('DICTIONARY_CONCEPT_REVISION_CONFLICT');
+        $hash = $this->contextHash($label->context);
+        $ok = $this->database->query($this->database->prepare(
+            "UPDATE {$this->labels} l INNER JOIN {$this->concepts} c ON c.concept_uuid=l.concept_uuid SET l.label_text=%s,l.normalized_label=%s,l.label_kind=%s,l.locale=%s,l.context_hash=%s,l.context_json=%s,l.state=%d,l.updated_at=%s,c.revision=c.revision+1,c.updated_at=%s WHERE l.concept_uuid=%s AND l.normalized_label=%s AND l.context_hash=%s AND c.revision=%d",
+            $label->label, $label->normalizedLabel, $label->kind, $label->locale, $hash,
+            wp_json_encode($label->context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), $label->active ? 1 : 0,
+            gmdate('Y-m-d H:i:s.u'), gmdate('Y-m-d H:i:s.u'), UuidCodec::toBinary($label->conceptId), $previousNormalizedLabel, $hash, $expectedConceptRevision,
+        ));
+        if ($ok !== 1) throw new \RuntimeException('DICTIONARY_LABEL_REVISION_CONFLICT');
+        return $this->hydrateLabel(['label_text' => $label->label, 'normalized_label' => $label->normalizedLabel, 'label_kind' => $label->kind, 'locale' => $label->locale, 'context_json' => wp_json_encode($label->context), 'state' => $label->active ? 1 : 0], $label->conceptId) ?? $label;
+    }
+
     private function hydrateConcept(?array $row): ?DictionaryConcept
     {
         if ($row === null) return null;

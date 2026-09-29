@@ -49,6 +49,7 @@ final class DictionaryCurationServiceTest extends TestCase
             public function createConcept(DictionaryConcept $concept): DictionaryConcept { return $concept; }
             public function updateConcept(DictionaryConcept $concept, int $expectedRevision): DictionaryConcept { $this->concept = new DictionaryConcept($concept->conceptId, $concept->preferredLabel, $concept->definition, $concept->status, $concept->destinationType, $concept->destinationId, $concept->destinationUrl, $concept->context, $concept->revision + 1); return $this->concept; }
             public function addLabel(DictionaryLabel $label): DictionaryLabel { return $label; }
+            public function saveLabel(DictionaryLabel $label, string $previousNormalizedLabel, int $expectedConceptRevision): DictionaryLabel { return $label; }
         };
         $ownerCandidate = new DictionaryCandidate('owner-candidate', 'mặt nằm', hash('sha256', '{}'), ['Mặt nằm'], DictionaryCandidateState::NEEDS_REVIEW, [], [], 1, 'a', 'b', 1);
         [$candidateRepo] = $this->repositories($ownerCandidate);
@@ -86,6 +87,7 @@ final class DictionaryCurationServiceTest extends TestCase
             public function createConcept(DictionaryConcept $concept): DictionaryConcept { return $this->concept = $concept; }
             public function updateConcept(DictionaryConcept $concept, int $expectedRevision): DictionaryConcept { return $this->concept = $concept; }
             public function addLabel(DictionaryLabel $label): DictionaryLabel { $this->labels[] = $label; return $label; }
+            public function saveLabel(DictionaryLabel $label, string $previousNormalizedLabel, int $expectedConceptRevision): DictionaryLabel { $this->labels[] = $label; return $label; }
         };
         return [$candidateRepo, $conceptRepo];
     }

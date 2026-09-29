@@ -14,4 +14,5 @@ interface DictionaryConceptRepository
     public function createConcept(DictionaryConcept $concept): DictionaryConcept;
     public function updateConcept(DictionaryConcept $concept, int $expectedRevision): DictionaryConcept;
     public function addLabel(DictionaryLabel $label): DictionaryLabel;
+    public function saveLabel(DictionaryLabel $label, string $previousNormalizedLabel, int $expectedConceptRevision): DictionaryLabel;
 }
