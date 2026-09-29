@@ -218,11 +218,11 @@ final class DictionaryRuntime
         return $this->mentions->listBySource($sourceKind, $sourceId);
     }
 
-    public function mentionsForCandidate(string $candidateId): array
+    public function mentionsForCandidate(string $candidateId, int $limit = 100, int $offset = 0): array
     {
         if (!$this->available()) throw new \RuntimeException('DICTIONARY_STORAGE_UNAVAILABLE');
         $candidate = $this->candidates->findById($candidateId);
-        return $candidate === null ? [] : $this->mentions->listByCandidate($candidate->normalizedTerm, $candidate->contextHash);
+        return $candidate === null ? [] : $this->mentions->listByCandidate($candidate->normalizedTerm, $candidate->contextHash, max(1, min(100, $limit)) + 1, $offset);
     }
 
     public function profile(?string $conceptId = null, ?string $slug = null): array

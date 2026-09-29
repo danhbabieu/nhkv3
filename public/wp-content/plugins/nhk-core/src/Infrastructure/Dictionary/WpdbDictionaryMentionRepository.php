@@ -46,12 +46,13 @@ final class WpdbDictionaryMentionRepository implements DictionaryMentionReposito
     }
 
     /** Read projection for curator/MCP provenance; Mention remains the owner. */
-    public function listByCandidate(string $normalizedTerm, string $contextHash, int $limit = 500): array
+    public function listByCandidate(string $normalizedTerm, string $contextHash, int $limit = 100, int $offset = 0): array
     {
-        $limit = max(1, min(2000, $limit));
+        $limit = max(1, min(101, $limit));
+        $offset = max(0, min(100000, $offset));
         $rows = $this->database->get_results($this->database->prepare(
-            "SELECT * FROM {$this->table} WHERE normalized_term=%s AND context_hash=%s ORDER BY id LIMIT %d",
-            trim($normalizedTerm), trim($contextHash), $limit,
+            "SELECT * FROM {$this->table} WHERE normalized_term=%s AND context_hash=%s ORDER BY id LIMIT %d OFFSET %d",
+            trim($normalizedTerm), trim($contextHash), $limit, $offset,
         ), ARRAY_A) ?: [];
         return array_values(array_filter(array_map(fn (array $row): ?DictionaryMention => $this->hydrate($row), $rows)));
     }

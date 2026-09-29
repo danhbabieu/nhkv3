@@ -20576,3 +20576,22 @@ evidence-only; local WordPress/MySQL
 runtime is unavailable, so no backfill was executed and no data was mutated.
 
 STATUS: `DICTIONARY_ACCEPTANCE_FOLLOWUP_LOCAL_READY / LIVE_DATA_UNCHANGED / NO_PUSH / NO_DEPLOY`.
+
+# Checkpoint — 2026-09-29 — Dictionary reverse provenance and UUID semantics
+
+REVERSE_PROVENANCE: `nhk.dictionary.candidate.get` now projects bounded
+Mention-owned source evidence with `source_kind`, `source_id`, allowlisted
+context, `strength`, `created_at`, source counts and `next_offset`. The MCP
+schema accepts bounded `limit`/`offset`; projection is read-only and does not
+copy provenance into the Candidate row. Admin continues to read the same
+Mention projection.
+
+ZERO_UUID_SEMANTICS: Migration 015 declares `concept_uuid BINARY(16) NULL` and
+does not define all-zero UUID as a deliberate storage sentinel. The planner's
+current unresolved meaning is `NULL`; repository hydration now maps historical
+all-zero values to `NULL`, preventing false Concept joins/linking/relation
+interpretation. No live reconciliation or migration is required for this
+defensive read-boundary fix.
+
+VALIDATION: provenance/UUID/MCP focused slice passes 31 tests / 156 assertions
+(one PHPUnit deprecation). PHP lint and `git diff --check` pass.

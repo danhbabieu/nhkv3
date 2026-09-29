@@ -45,20 +45,23 @@ final class McpDictionaryHandler
         return ['status' => 'available', 'items' => array_map($this->candidate(...), $items), 'count' => count($items)];
     }
 
-    public function candidateDetail(string $candidateId): array
+    public function candidateDetail(string $candidateId, int $limit = 50, int $offset = 0): array
     {
         if (!$this->runtime->available()) return ['status' => 'unavailable', 'reason' => 'DICTIONARY_STORAGE_UNAVAILABLE'];
         $candidate = $this->runtime->candidate($candidateId);
         if ($candidate === null) return ['status' => 'not_found', 'reason' => 'DICTIONARY_CANDIDATE_NOT_FOUND'];
-        $mentions = $this->runtime->mentionsForCandidate($candidateId);
-        return ['status' => 'available', 'candidate' => $this->candidate($candidate), 'provenance' => $this->provenance($mentions)];
+        $limit = max(1, min(100, $limit)); $offset = max(0, $offset);
+        $mentions = $this->runtime->mentionsForCandidate($candidateId, $limit, $offset);
+        $hasMore = count($mentions) > $limit;
+        if ($hasMore) $mentions = array_slice($mentions, 0, $limit);
+        return ['status' => 'available', 'candidate' => $this->candidate($candidate), 'provenance' => $this->provenance($mentions, count($mentions), $hasMore ? $offset + $limit : null)];
     }
 
     public function mentions(array $input): array
     {
         if (!$this->runtime->available()) return ['status' => 'unavailable', 'reason' => 'DICTIONARY_STORAGE_UNAVAILABLE'];
         $items = $this->runtime->mentionsForSource((string) $input['source_kind'], (string) $input['source_id']);
-        return ['status' => 'available', 'source_kind' => strtoupper((string) $input['source_kind']), 'source_id' => (string) $input['source_id'], 'items' => array_map(static fn (object $mention): array => ['id' => $mention->mentionId, 'normalized_term' => $mention->normalizedTerm, 'concept_id' => $mention->conceptId, 'context' => $mention->context, 'strength' => $mention->strength, 'created_at' => $mention->createdAt], $items), 'count' => count($items)];
+        return ['status' => 'available', 'source_kind' => strtoupper((string) $input['source_kind']), 'source_id' => (string) $input['source_id'], 'items' => array_map(fn (object $mention): array => ['id' => $mention->mentionId, 'normalized_term' => $mention->normalizedTerm, 'concept_id' => $mention->conceptId, 'context' => $this->boundedContext($mention->context), 'strength' => $mention->strength, 'created_at' => $mention->createdAt], $items), 'count' => count($items)];
     }
 
     public function profile(array $input): array { return $this->runtime->profile(isset($input['concept_id']) ? (string) $input['concept_id'] : null, isset($input['slug']) ? (string) $input['slug'] : null); }
@@ -100,14 +103,14 @@ final class McpDictionaryHandler
     private function concept(object $concept): array { return ['id' => $concept->conceptId, 'preferred_label' => $concept->preferredLabel, 'definition' => $concept->definition, 'status' => $concept->status, 'destination_type' => $concept->destinationType, 'destination_id' => $concept->destinationId, 'destination_url' => $concept->destinationUrl, 'context' => $concept->context, 'revision' => $concept->revision]; }
     private function label(object $label): array { return ['label' => $label->label, 'normalized_label' => $label->normalizedLabel, 'kind' => $label->kind, 'locale' => $label->locale, 'context' => $label->context, 'active' => $label->active]; }
     private function candidate(object $candidate): array { return ['id' => $candidate->candidateId, 'normalized_term' => $candidate->normalizedTerm, 'raw_forms' => $candidate->rawForms, 'state' => $candidate->state, 'context' => $candidate->context, 'suggestions' => $candidate->suggestions, 'occurrences' => $candidate->occurrences, 'revision' => $candidate->revision]; }
-    private function provenance(array $mentions): array
+    private function provenance(array $mentions, int $count, ?int $nextOffset): array
     {
-        $items = array_map(static fn (object $mention): array => [
+        $items = array_map(fn (object $mention): array => [
             'id' => $mention->mentionId,
             'source_kind' => $mention->sourceKind,
             'source_id' => $mention->sourceId,
             'concept_id' => $mention->conceptId,
-            'context' => $mention->context,
+            'context' => $this->boundedContext($mention->context),
             'strength' => $mention->strength,
             'created_at' => $mention->createdAt,
         ], $mentions);
@@ -116,6 +119,14 @@ final class McpDictionaryHandler
             $key = $item['source_kind'] . ':' . $item['source_id'];
             $families[$key] = ($families[$key] ?? 0) + 1;
         }
-        return ['mention_count' => count($items), 'source_count' => count($families), 'items' => $items];
+        return ['mention_count' => $count, 'source_count' => count($families), 'items' => $items, 'next_offset' => $nextOffset];
+    }
+
+    private function boundedContext(array $context): array
+    {
+        $allowed = ['locale', 'domain', 'usage_scope', 'region', 'community', 'scope', 'term_type', 'subject', 'source_revision', 'source_family', 'lineage', 'locator', 'post_id', 'claim_type', 'attachment_id', 'platform', 'external_video_id', 'weak_sources'];
+        $bounded = [];
+        foreach ($allowed as $key) if (array_key_exists($key, $context)) $bounded[$key] = $context[$key];
+        return $bounded;
     }
 }

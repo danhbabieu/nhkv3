@@ -89,3 +89,10 @@ Mention values are normalized to `NULL` on read. No live data cleanup occurred.
 CLEANUP: do not delete or bulk-rewrite the 489 live candidates. They remain
 private curation data; cleanup must use governed review or a separately
 authorized migration packet.
+
+FOLLOW-UP: Candidate provenance is now bounded and paginated (`limit`, `offset`,
+`next_offset`) from Mention storage, with an allowlisted context projection that
+excludes raw content. Migration 015 permits nullable `concept_uuid`; because it
+does not define the all-zero UUID sentinel and the planner uses `NULL`, the
+repository treats historical zero UUIDs as legacy/null. No migration or live
+rewrite is required.

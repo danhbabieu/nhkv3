@@ -209,7 +209,7 @@ final class McpTransport
             'nhk.dictionary.resolve' => $this->dictionary?->resolve((string) ($arguments['term'] ?? ''), (array) ($arguments['context'] ?? []), (array) ($arguments['hints'] ?? [])) ?? throw new \RuntimeException('DICTIONARY_HANDLER_UNAVAILABLE'),
             'nhk.dictionary.concept.get' => $this->dictionary?->conceptGet((string) ($arguments['concept_id'] ?? '')) ?? throw new \RuntimeException('DICTIONARY_HANDLER_UNAVAILABLE'),
             'nhk.dictionary.candidate.list' => $this->dictionary?->candidateList(isset($arguments['state']) ? (string) $arguments['state'] : null, (int) ($arguments['limit'] ?? 100)) ?? throw new \RuntimeException('DICTIONARY_HANDLER_UNAVAILABLE'),
-            'nhk.dictionary.candidate.get' => $this->dictionary?->candidateDetail((string) ($arguments['candidate_id'] ?? '')) ?? throw new \RuntimeException('DICTIONARY_HANDLER_UNAVAILABLE'),
+            'nhk.dictionary.candidate.get' => $this->dictionary?->candidateDetail((string) ($arguments['candidate_id'] ?? ''), (int) ($arguments['limit'] ?? 50), (int) ($arguments['offset'] ?? 0)) ?? throw new \RuntimeException('DICTIONARY_HANDLER_UNAVAILABLE'),
             'nhk.dictionary.mentions.list' => $this->dictionary?->mentions($arguments) ?? throw new \RuntimeException('DICTIONARY_HANDLER_UNAVAILABLE'),
             'nhk.dictionary.concept.create' => $this->dictionary?->createConcept($arguments) ?? throw new \RuntimeException('DICTIONARY_HANDLER_UNAVAILABLE'),
             'nhk.dictionary.concept.update' => $this->dictionary?->updateConcept($arguments) ?? throw new \RuntimeException('DICTIONARY_HANDLER_UNAVAILABLE'),
