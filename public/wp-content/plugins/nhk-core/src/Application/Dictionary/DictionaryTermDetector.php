@@ -15,11 +15,13 @@ final class DictionaryTermDetector
     {
         if (trim($text) === '') return [];
         $out = [];
+        $hintLabels = $this->hintLabels($hints);
+        $lexicalLabels = array_merge($approvedLabels, $hintLabels);
 
         foreach ($this->longestPresentLabels($text, $approvedLabels) as $label) {
             $this->addIfPresent($out, $text, $label, 'KNOWN_LABEL', 'STRONG');
         }
-        foreach ($hints as $hint) $this->addIfPresent($out, $text, (string) $hint, 'HINT', 'NORMAL');
+        foreach ($hintLabels as $hint) $this->addIfPresent($out, $text, $hint, 'HINT', 'NORMAL');
 
         foreach ($this->identifierSpans($text) as $span) {
             $this->add($out, $span, 'IDENTIFIER_SPAN', 'STRONG');
@@ -30,46 +32,29 @@ final class DictionaryTermDetector
 
         if (preg_match_all('/[“"\']([^“”"\']{2,80})[”"\']/u', $text, $quoted)) {
             foreach ($quoted[1] as $value) {
-                $phrase = $this->qualityGate->filter((string) $value, array_merge($approvedLabels, $hints));
+                $phrase = $this->qualityGate->filter((string) $value, $lexicalLabels);
                 if ($phrase !== null) $this->add($out, $phrase, 'QUOTED_PHRASE', 'NORMAL');
             }
         }
-        if (preg_match_all('/\b[\p{L}]{1,12}[-\/]?\d{1,4}(?:[-\/]\d{1,4})*\b/u', $text, $models)) {
+        if (preg_match_all('/\b[\p{Lu}][\p{L}]{0,11}[-\/]?\d{1,4}(?:[-\/]\d{1,4})*\b/u', $text, $models)) {
             foreach ($models[0] as $value) $this->add($out, (string) $value, 'TECHNICAL_PATTERN', 'WEAK');
         }
         if (preg_match_all('/(?<![\p{L}\p{N}])([\p{L}]{2,}(?:-[\p{L}\p{N}]+)+)(?![\p{L}\p{N}])/u', $text, $hyphenated)) {
             foreach ($hyphenated[1] as $value) $this->add($out, (string) $value, 'HYPHENATED_NAME', 'WEAK');
         }
+        $eligibleUnits = $this->eligibleStructuralUnits($text, $approvedLabels, $hints, $lexicalLabels);
         if (preg_match_all('/\b(\d{1,3}\s+[\p{L}][\p{L}-]*(?:\s+\d{1,3}\s+[\p{L}][\p{L}-]*){0,2})\b/iu', $text, $configurations)) {
             foreach ($configurations[1] as $value) {
-                $phrase = $this->qualityGate->filter((string) $value, array_merge($approvedLabels, $hints));
-                if ($phrase !== null) $this->add($out, $phrase, 'STRUCTURAL_CONFIGURATION', 'NORMAL');
+                $phrase = $this->qualityGate->filter((string) $value, $lexicalLabels);
+                if ($phrase !== null && $this->isEligibleStructuralConfiguration($phrase, $eligibleUnits)) {
+                    $this->add($out, $phrase, 'STRUCTURAL_CONFIGURATION', 'NORMAL');
+                }
             }
         }
 
         $word = '[\p{L}\p{N}][\p{L}\p{N}\-]*';
-        $patterns = [
-            '/\b(côn(?:\s+' . $word . '){0,3})\b/iu',
-            '/\b(ngắt\s+chuông(?:\s+' . $word . '){0,3})\b/iu',
-            '/\b(điểm\s+(?:giờ|chuông)(?:\s+' . $word . '){0,3})\b/iu',
-            '/\b(quả\s+lắc(?:\s+' . $word . '){0,3})\b/iu',
-            '/\b(dây\s+tóc(?:\s+' . $word . '){0,3})\b/iu',
-            '/\b(khóa\s+ngựa(?:\s+' . $word . '){0,3})\b/iu',
-            '/\b(bánh\s+thoát(?:\s+' . $word . '){0,3})\b/iu',
-            '/\b(bộ\s+thoát(?:\s+' . $word . '){0,3})\b/iu',
-            '/\b(hộp\s+cộng\s+hưởng(?:\s+' . $word . '){0,3})\b/iu',
-            '/\b(mặt\s+số(?:\s+' . $word . '){1,3})\b/iu',
-            '/\b(gông(?:\s+' . $word . '){1,3})\b/iu',
-            '/\b(búa(?:\s+' . $word . '){1,2})\b/iu',
-            '/\b(cọc(?:\s+' . $word . '){1,2})\b/iu',
-            '/\b(vách(?:\s+' . $word . '){1,3})\b/iu',
-        ];
-        foreach ($patterns as $pattern) {
-            if (!preg_match_all($pattern, $text, $matches)) continue;
-            foreach ($matches[1] as $value) {
-                $phrase = $this->qualityGate->filter((string) $value, array_merge($approvedLabels, $hints));
-                if ($phrase !== null) $this->add($out, $phrase, 'DOMAIN_PHRASE', 'NORMAL');
-            }
+        foreach ($this->domainPhraseSpans($text, $lexicalLabels) as $phrase) {
+            $this->add($out, $phrase, 'DOMAIN_PHRASE', 'NORMAL');
         }
 
         if (preg_match_all('/\bbản\s+nhạc\s+(' . $word . '(?:\s+' . $word . '){0,3})\b/iu', $text, $music)) {
@@ -79,7 +64,7 @@ final class DictionaryTermDetector
                     $this->add($out, $knownName, 'MUSIC_NAME', 'STRONG');
                     continue;
                 }
-                $phrase = $this->qualityGate->filter((string) $value, array_merge($approvedLabels, $hints));
+                $phrase = $this->qualityGate->filter((string) $value, $lexicalLabels);
                 if ($phrase !== null) $this->add($out, $phrase, 'MUSIC_NAME', 'NORMAL');
             }
         }
@@ -159,12 +144,96 @@ final class DictionaryTermDetector
     {
         $spans = [];
         $patterns = [
-            '/(?<![\p{L}\p{N}_])([\p{L}][\p{L}\p{N}-]*\s+\d[\p{L}\p{N}]*(?:[\/.][\p{L}\p{N}.-]+)+)(?![\p{L}\p{N}_])/u',
-            '/(?<![\p{L}\p{N}_])([\p{L}][\p{L}\p{N}-]*(?:[\/.][\p{L}\p{N}.-]+)+)(?![\p{L}\p{N}_])/u',
+            '/(?<![\p{L}\p{N}_])([\p{Lu}][\p{L}\p{N}-]*\s+\d[\p{L}\p{N}]*(?:[\/.][\p{L}\p{N}.-]+)+)(?![\p{L}\p{N}_])/u',
+            '/(?<![\p{L}\p{N}_])([\p{Lu}][\p{L}\p{N}-]*(?:[\/.][\p{L}\p{N}.-]+)+)(?![\p{L}\p{N}_])/u',
         ];
         foreach ($patterns as $pattern) {
             if (!preg_match_all($pattern, $text, $matches)) continue;
             foreach ($matches[1] as $value) $spans[$this->normalizer->normalize((string) $value)] = trim((string) $value);
+        }
+        return array_values($spans);
+    }
+
+    private function hintLabels(array $hints): array
+    {
+        $labels = [];
+        foreach ($hints as $hint) {
+            if (is_string($hint) || is_numeric($hint)) {
+                $label = trim((string) $hint);
+                if ($label !== '') $labels[] = $label;
+                continue;
+            }
+        }
+        return array_values(array_unique($labels));
+    }
+
+    private function structuralHintLabels(array $hints): array
+    {
+        $labels = [];
+        foreach ($hints as $hint) {
+            if (!is_array($hint) || ($hint['kind'] ?? '') !== 'STRUCTURAL_UNIT') continue;
+            $label = trim((string) ($hint['term'] ?? ''));
+            if ($label !== '') $labels[] = $label;
+        }
+        return array_values(array_unique($labels));
+    }
+
+    private function eligibleStructuralUnits(string $text, array $approvedLabels, array $hints, array $lexicalLabels): array
+    {
+        $units = [];
+        foreach (array_merge($approvedLabels, $this->structuralHintLabels($hints)) as $label) {
+            $parts = preg_split('/\s+/u', trim((string) $label)) ?: [];
+            if (count($parts) === 1 && preg_match('/^[\p{L}][\p{L}-]*$/u', (string) $parts[0])) {
+                $units[$this->normalizer->normalize((string) $parts[0])] = true;
+            }
+        }
+        foreach ($this->domainPhraseSpans($text, $lexicalLabels) as $phrase) {
+            $parts = preg_split('/\s+/u', trim($phrase)) ?: [];
+            if (count($parts) === 1 || (isset($parts[1]) && preg_match('/^\d+$/u', (string) $parts[1]))) {
+                $units[$this->normalizer->normalize((string) $parts[0])] = true;
+            }
+        }
+        return $units;
+    }
+
+    private function isEligibleStructuralConfiguration(string $phrase, array $eligibleUnits): bool
+    {
+        $parts = preg_split('/\s+/u', trim($phrase)) ?: [];
+        if (count($parts) < 2 || count($parts) % 2 !== 0) return false;
+        for ($index = 0; $index < count($parts); $index += 2) {
+            if (!preg_match('/^\d{1,3}$/u', (string) $parts[$index])) return false;
+            $unit = $this->normalizer->normalize((string) $parts[$index + 1]);
+            if (!isset($eligibleUnits[$unit])) return false;
+        }
+        return true;
+    }
+
+    private function domainPhraseSpans(string $text, array $lexicalLabels): array
+    {
+        $word = '[\p{L}\p{N}][\p{L}\p{N}\-]*';
+        $patterns = [
+            '/\b(côn(?:\s+' . $word . '){0,3})\b/iu',
+            '/\b(ngắt\s+chuông(?:\s+' . $word . '){0,3})\b/iu',
+            '/\b(điểm\s+(?:giờ|chuông)(?:\s+' . $word . '){0,3})\b/iu',
+            '/\b(quả\s+lắc(?:\s+' . $word . '){0,3})\b/iu',
+            '/\b(dây\s+tóc(?:\s+' . $word . '){0,3})\b/iu',
+            '/\b(khóa\s+ngựa(?:\s+' . $word . '){0,3})\b/iu',
+            '/\b(bánh\s+thoát(?:\s+' . $word . '){0,3})\b/iu',
+            '/\b(bộ\s+thoát(?:\s+' . $word . '){0,3})\b/iu',
+            '/\b(hộp\s+cộng\s+hưởng(?:\s+' . $word . '){0,3})\b/iu',
+            '/\b(mặt\s+số(?:\s+' . $word . '){1,3})\b/iu',
+            '/\b(gông(?:\s+' . $word . '){1,3})\b/iu',
+            '/\b(búa(?:\s+' . $word . '){1,2})\b/iu',
+            '/\b(cọc(?:\s+' . $word . '){1,2})\b/iu',
+            '/\b(vách(?:\s+' . $word . '){1,3})\b/iu',
+        ];
+        $spans = [];
+        foreach ($patterns as $pattern) {
+            if (!preg_match_all($pattern, $text, $matches)) continue;
+            foreach ($matches[1] as $value) {
+                $phrase = $this->qualityGate->filter((string) $value, $lexicalLabels);
+                if ($phrase !== null) $spans[$this->normalizer->normalize($phrase)] = $phrase;
+            }
         }
         return array_values($spans);
     }

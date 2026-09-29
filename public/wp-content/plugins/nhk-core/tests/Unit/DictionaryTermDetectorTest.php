@@ -90,8 +90,7 @@ final class DictionaryTermDetectorTest extends TestCase
         $terms = static fn (string $text): array => array_column($detector->detect($text), 'normalized_term');
 
         foreach ([
-            ['7 rods 9 hammers', '7 rods 9 hammers are used'],
-            ['13 rods 14 hammers', '13 rods 14 hammers for the mechanism'],
+            ['13 côn 14 búa', '13 côn 14 búa for the mechanism'],
         ] as [$expected, $text]) {
             self::assertContains($expected, $terms($text));
             self::assertNotContains($expected . ' are used', $terms($text));
@@ -167,7 +166,14 @@ final class DictionaryTermDetectorTest extends TestCase
 
     public function test_composite_numeric_configuration_preserves_the_left_boundary_and_hides_fragments(): void
     {
-        $terms = static fn (string $text): array => array_column((new DictionaryTermDetector())->detect($text), 'normalized_term');
+        $units = [
+            ['kind' => 'STRUCTURAL_UNIT', 'term' => 'alpha'],
+            ['kind' => 'STRUCTURAL_UNIT', 'term' => 'beta'],
+            ['kind' => 'STRUCTURAL_UNIT', 'term' => 'gamma'],
+            ['kind' => 'STRUCTURAL_UNIT', 'term' => 'delta'],
+            ['kind' => 'STRUCTURAL_UNIT', 'term' => 'epsilon'],
+        ];
+        $terms = static fn (string $text): array => array_column((new DictionaryTermDetector())->detect($text, [], $units), 'normalized_term');
 
         $first = $terms('Cấu hình thử nghiệm có 17 alpha 19 beta và một cơ cấu khác.');
         self::assertContains('17 alpha 19 beta', $first);
@@ -177,6 +183,28 @@ final class DictionaryTermDetectorTest extends TestCase
         $second = $terms('Cấu hình thử nghiệm có 23 gamma 27 delta 3 epsilon.');
         self::assertContains('23 gamma 27 delta 3 epsilon', $second);
         self::assertNotContains('27 delta 3 epsilon', $second);
+    }
+
+    public function test_arbitrary_number_and_normal_noun_are_not_structural_configuration(): void
+    {
+        $terms = array_column(
+            (new DictionaryTermDetector())->detect('Tài liệu có 30 câu hỏi và 12 trang phụ lục.'),
+            'normalized_term',
+        );
+
+        self::assertNotContains('30 câu', $terms);
+        self::assertNotContains('12 trang', $terms);
+    }
+
+    public function test_invalid_second_structural_unit_fails_closed_without_interior_fragment(): void
+    {
+        $terms = array_column(
+            (new DictionaryTermDetector())->detect('Cấu hình có 17 alpha 19 câu.', [], [['kind' => 'STRUCTURAL_UNIT', 'term' => 'alpha']]),
+            'normalized_term',
+        );
+
+        self::assertNotContains('17 alpha 19 câu', $terms);
+        self::assertNotContains('19 câu', $terms);
     }
 
     public function test_identifier_reference_spans_protect_numeric_suffixes(): void
@@ -192,6 +220,30 @@ final class DictionaryTermDetectorTest extends TestCase
         self::assertNotContains('13', $terms);
         self::assertNotContains('7', $terms);
         self::assertNotContains('12', $terms);
+    }
+
+    public function test_prose_slash_forms_are_not_identifier_spans(): void
+    {
+        $terms = array_column(
+            (new DictionaryTermDetector())->detect('máy/mặt, bài/nốt, ngày/8 và côn/gông.'),
+            'normalized_term',
+        );
+
+        foreach (['máy/mặt', 'bài/nốt', 'ngày/8', 'côn/gông'] as $term) {
+            self::assertNotContains($term, $terms);
+        }
+    }
+
+    public function test_prose_leading_tokens_are_not_pulled_into_numeric_identifier(): void
+    {
+        $terms = array_column(
+            (new DictionaryTermDetector())->detect('và 36/8, cổ 36/10, Omega 47/13.'),
+            'normalized_term',
+        );
+
+        self::assertNotContains('và 36/8', $terms);
+        self::assertNotContains('cổ 36/10', $terms);
+        self::assertContains('omega 47/13', $terms);
     }
 
     public function test_proper_name_scanner_keeps_capitalized_hyphenated_continuation(): void
@@ -224,6 +276,16 @@ final class DictionaryTermDetectorTest extends TestCase
         );
 
         self::assertContains('528', $terms);
+    }
+
+    public function test_numeric_only_designation_is_not_candidate_without_contextual_reason(): void
+    {
+        $terms = array_column(
+            (new DictionaryTermDetector())->detect('Mã 528 được ghi nhận.'),
+            'normalized_term',
+        );
+
+        self::assertNotContains('528', $terms);
     }
 
 }
