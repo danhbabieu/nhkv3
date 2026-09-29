@@ -28,7 +28,9 @@ final class DictionaryLexicalQualityGate
         $parts = array_values(array_filter($parts, static fn (string $part): bool => $part !== ''));
         if ($parts === []) return null;
 
-        $phrase = $this->trimAtKnownLabelBoundary($parts, $knownLabels);
+        $phrase = $this->isNumericConfiguration($parts)
+            ? implode(' ', $parts)
+            : $this->trimAtKnownLabelBoundary($parts, $knownLabels);
         $parts = preg_split('/\s+/u', trim($phrase)) ?: [];
         $parts = array_values(array_filter($parts, static fn (string $part): bool => $part !== ''));
         if ($parts === []) return null;
@@ -88,6 +90,16 @@ final class DictionaryLexicalQualityGate
     private function word(string $part): string
     {
         return $this->lower((string) preg_replace('/[^\p{L}\p{N}\-]/u', '', $part));
+    }
+
+    private function isNumericConfiguration(array $parts): bool
+    {
+        if (count($parts) < 2 || count($parts) % 2 !== 0) return false;
+        for ($index = 0; $index < count($parts); $index += 2) {
+            if (!preg_match('/^\d{1,3}$/u', $this->word((string) $parts[$index]))) return false;
+            if (!preg_match('/^[\p{L}][\p{L}-]*$/u', $this->word((string) $parts[$index + 1]))) return false;
+        }
+        return true;
     }
 
     private function lower(string $value): string

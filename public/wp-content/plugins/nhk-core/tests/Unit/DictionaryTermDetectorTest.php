@@ -165,4 +165,65 @@ final class DictionaryTermDetectorTest extends TestCase
         self::assertContains('côn đồng bạch', $terms('côn đồng bạch hiệu'));
     }
 
+    public function test_composite_numeric_configuration_preserves_the_left_boundary_and_hides_fragments(): void
+    {
+        $terms = static fn (string $text): array => array_column((new DictionaryTermDetector())->detect($text), 'normalized_term');
+
+        $first = $terms('Cấu hình thử nghiệm có 17 alpha 19 beta và một cơ cấu khác.');
+        self::assertContains('17 alpha 19 beta', $first);
+        self::assertNotContains('19 beta', $first);
+        self::assertNotContains('beta', $first);
+
+        $second = $terms('Cấu hình thử nghiệm có 23 gamma 27 delta 3 epsilon.');
+        self::assertContains('23 gamma 27 delta 3 epsilon', $second);
+        self::assertNotContains('27 delta 3 epsilon', $second);
+    }
+
+    public function test_identifier_reference_spans_protect_numeric_suffixes(): void
+    {
+        $terms = array_column(
+            (new DictionaryTermDetector())->detect('Omega 47/13, ZX-42/7 và Ref 81.12 được ghi nhận.'),
+            'normalized_term',
+        );
+
+        self::assertContains('omega 47/13', $terms);
+        self::assertContains('zx-42/7', $terms);
+        self::assertContains('ref 81.12', $terms);
+        self::assertNotContains('13', $terms);
+        self::assertNotContains('7', $terms);
+        self::assertNotContains('12', $terms);
+    }
+
+    public function test_proper_name_scanner_keeps_capitalized_hyphenated_continuation(): void
+    {
+        $terms = array_column(
+            (new DictionaryTermDetector())->detect('Anne-Marie Dupont và Jean-Paul Van Buren được nhắc đến.'),
+            'normalized_term',
+        );
+
+        self::assertContains('anne-marie dupont', $terms);
+        self::assertContains('jean-paul van buren', $terms);
+        self::assertNotContains('anne-marie', $terms);
+        self::assertNotContains('jean-paul', $terms);
+    }
+
+    public function test_atomic_term_is_kept_independently_but_not_as_a_configuration_fragment(): void
+    {
+        $detector = new DictionaryTermDetector();
+        self::assertContains('búa', array_column($detector->detect('Búa được kiểm tra độc lập.'), 'normalized_term'));
+
+        $composite = array_column($detector->detect('17 alpha 19 beta.'), 'normalized_term');
+        self::assertNotContains('beta', $composite);
+    }
+
+    public function test_contextual_numeric_alias_is_preserved_when_explicitly_signaled(): void
+    {
+        $terms = array_column(
+            (new DictionaryTermDetector())->detect('Mã collector 528 được ghi nhận.', ['528']),
+            'normalized_term',
+        );
+
+        self::assertContains('528', $terms);
+    }
+
 }
