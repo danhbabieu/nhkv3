@@ -13,6 +13,8 @@ use NHK\Core\Infrastructure\Knowledge\WpdbKnowledgeRepository;
 use NHK\Core\Infrastructure\Media\{WpdbMediaAssetRepository, WpdbMediaRepository, WpdbMediaUsageRepository};
 use NHK\Core\Infrastructure\Migration\DictionaryMigration015;
 use NHK\Core\Infrastructure\Video\WpdbVideoRepository;
+use NHK\Core\Infrastructure\Governance\WpdbAuditSink;
+use NHK\Core\Domain\Graph\PredicateRegistry;
 
 final class DictionaryRuntime
 {
@@ -198,6 +200,45 @@ final class DictionaryRuntime
     public function concepts(): WpdbDictionaryConceptRepository { return $this->concepts; }
     public function candidates(): WpdbDictionaryCandidateRepository { return $this->candidates; }
     public function mentions(): WpdbDictionaryMentionRepository { return $this->mentions; }
+
+    public function mutation(): DictionaryMutationService
+    {
+        $audit = new WpdbAuditSink($this->database);
+        return new DictionaryMutationService(
+            $this->concepts,
+            null,
+            function (string $key, string $fingerprint): ?array {
+                $row = $this->database->get_row($this->database->prepare('SELECT context_json FROM ' . $this->database->prefix . 'nhk_audit_events WHERE event_type=%s AND object_type=%s AND object_key=%s ORDER BY id DESC LIMIT 1', 'DictionaryMutation', 'dictionary', $key), ARRAY_A);
+                if (!is_array($row)) return null;
+                $context = json_decode((string) ($row['context_json'] ?? ''), true);
+                if (!is_array($context) || (string) ($context['fingerprint'] ?? '') !== $fingerprint) return ['fingerprint' => (string) ($context['fingerprint'] ?? ''), 'result' => (array) ($context['result'] ?? [])];
+                return ['fingerprint' => $fingerprint, 'result' => (array) ($context['result'] ?? [])];
+            },
+            function (string $key, string $fingerprint, array $result) use ($audit): void {
+                $audit->recordEvent('DictionaryMutation', 'dictionary', $key, function_exists('get_current_user_id') ? (int) get_current_user_id() : null, ['fingerprint' => $fingerprint, 'result' => $result]);
+            },
+        );
+    }
+
+    public function harvester(): DictionaryHarvester { return new DictionaryHarvester($this->planning); }
+
+    public function relationHandoff(): DictionaryRelationHandoff
+    {
+        return new DictionaryRelationHandoff(
+            function (string $type, string $id): ?array {
+                if ($this->types->has($type)) { $entity = $this->authority->findByCanonicalId($id); return $entity instanceof AuthorityEntity && $entity->entityType === $type && $entity->active() ? ['id' => $entity->canonicalId, 'revision' => $entity->revision] : null; }
+                if ($type === 'knowledge') { $claim = $this->knowledge->findByCanonicalId($id); return $claim !== null && $claim->active ? ['id' => $claim->canonicalId, 'revision' => $claim->revision] : null; }
+                return null;
+            },
+            static function (string $sourceType, string $predicate, string $targetType): bool {
+                try {
+                    return (new PredicateRegistry())->get($predicate)->allows($sourceType, $targetType);
+                } catch (\Throwable) {
+                    return false;
+                }
+            },
+        );
+    }
 
     public function detectionLabels(): array
     {

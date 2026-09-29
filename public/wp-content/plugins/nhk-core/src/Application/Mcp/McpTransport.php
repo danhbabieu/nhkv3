@@ -56,6 +56,7 @@ final class McpTransport
         private ?KnowledgeWriterPreviewService $knowledgeWriterPreview = null,
         private ?MediaTargetNormalizer $mediaTargetNormalizer = null,
         private ?\NHK\Core\Application\Media\MediaEnrichmentIntentCompiler $mediaIntentCompiler = null,
+        private ?McpDictionaryHandler $dictionary = null,
     ) {}
 
     /** @return array{status:int,body:?array} */
@@ -174,6 +175,7 @@ final class McpTransport
             'nhk.proposal.apply' => 'nhk_apply_proposals',
             'nhk.relation.backfill.apply' => 'nhk_apply_proposals',
             'nhk.public-url.audit', 'nhk.public-url.reproject' => 'nhk_manage_public_urls',
+            'nhk.dictionary.concept.create', 'nhk.dictionary.concept.update', 'nhk.dictionary.concept.lifecycle', 'nhk.dictionary.label.save', 'nhk.dictionary.candidate.review', 'nhk.dictionary.relation.handoff' => 'nhk_curate_dictionary',
             default => null,
         };
         if ($capability !== null && (!$this->can || !(bool) ($this->can)($capability))) throw new McpPermissionDenied($capability);
@@ -203,6 +205,16 @@ final class McpTransport
             'nhk.relation.backfill.dry_run' => $this->read->relationBackfillDryRun((array) ($arguments['records'] ?? [])),
             'nhk.relation.backfill.apply' => $this->governance->relationBatchApply((array) ($arguments['candidates'] ?? []), (bool) ($arguments['approval_confirmed'] ?? false)),
             'nhk.semantic.resolve' => $this->read->semanticResolve((array) ($arguments['context'] ?? [])),
+            'nhk.dictionary.search' => $this->dictionary?->search((string) ($arguments['q'] ?? ''), (int) ($arguments['limit'] ?? 50)) ?? throw new \RuntimeException('DICTIONARY_HANDLER_UNAVAILABLE'),
+            'nhk.dictionary.concept.get' => $this->dictionary?->conceptGet((string) ($arguments['concept_id'] ?? '')) ?? throw new \RuntimeException('DICTIONARY_HANDLER_UNAVAILABLE'),
+            'nhk.dictionary.candidate.list' => $this->dictionary?->candidateList(isset($arguments['state']) ? (string) $arguments['state'] : null, (int) ($arguments['limit'] ?? 100)) ?? throw new \RuntimeException('DICTIONARY_HANDLER_UNAVAILABLE'),
+            'nhk.dictionary.concept.create' => $this->dictionary?->createConcept($arguments) ?? throw new \RuntimeException('DICTIONARY_HANDLER_UNAVAILABLE'),
+            'nhk.dictionary.concept.update' => $this->dictionary?->updateConcept($arguments) ?? throw new \RuntimeException('DICTIONARY_HANDLER_UNAVAILABLE'),
+            'nhk.dictionary.concept.lifecycle' => $this->dictionary?->lifecycle($arguments) ?? throw new \RuntimeException('DICTIONARY_HANDLER_UNAVAILABLE'),
+            'nhk.dictionary.label.save' => $this->dictionary?->saveLabel($arguments) ?? throw new \RuntimeException('DICTIONARY_HANDLER_UNAVAILABLE'),
+            'nhk.dictionary.candidate.review' => $this->dictionary?->review($arguments) ?? throw new \RuntimeException('DICTIONARY_HANDLER_UNAVAILABLE'),
+            'nhk.dictionary.relation.handoff' => $this->dictionary?->handoff($arguments) ?? throw new \RuntimeException('DICTIONARY_HANDLER_UNAVAILABLE'),
+            'nhk.dictionary.backfill.dry_run' => $this->dictionary?->backfillDryRun((array) ($arguments['sources'] ?? [])) ?? throw new \RuntimeException('DICTIONARY_HANDLER_UNAVAILABLE'),
             'nhk.capture.get' => $this->read->captureGet((string) ($arguments['id'] ?? '')),
             'nhk.entity.neighborhood' => $this->read->entityNeighborhood((string) ($arguments['type'] ?? ''), (string) ($arguments['id'] ?? ''), (string) ($arguments['profile'] ?? ''), (int) ($arguments['max_hops'] ?? 2), (int) ($arguments['limit'] ?? 50)),
             'nhk.article.preflight' => $this->article?->preflight($arguments) ?? throw new \RuntimeException('ARTICLE_INGEST_HANDLER_UNAVAILABLE'),

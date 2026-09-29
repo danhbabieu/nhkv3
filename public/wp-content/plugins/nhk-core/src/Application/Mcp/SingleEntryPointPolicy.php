@@ -49,6 +49,12 @@ final class SingleEntryPointPolicy
         'nhk.proposal.reject',
         'nhk.proposal.apply',
         'nhk.relation.backfill.apply',
+        'nhk.dictionary.concept.create',
+        'nhk.dictionary.concept.update',
+        'nhk.dictionary.concept.lifecycle',
+        'nhk.dictionary.label.save',
+        'nhk.dictionary.candidate.review',
+        'nhk.dictionary.relation.handoff',
     ];
 
     /** Lifecycle continuation for an existing Capture-owned Article draft. */

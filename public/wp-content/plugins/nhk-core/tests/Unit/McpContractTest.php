@@ -50,6 +50,16 @@ final class McpContractTest extends TestCase
             'nhk.documentation.list',
             'nhk.docs.bootstrap',
             'nhk.docs.get',
+            'nhk.dictionary.search',
+            'nhk.dictionary.concept.get',
+            'nhk.dictionary.candidate.list',
+            'nhk.dictionary.concept.create',
+            'nhk.dictionary.concept.update',
+            'nhk.dictionary.concept.lifecycle',
+            'nhk.dictionary.label.save',
+            'nhk.dictionary.candidate.review',
+            'nhk.dictionary.relation.handoff',
+            'nhk.dictionary.backfill.dry_run',
             'nhk.search',
             'nhk.canonical.inventory',
             'nhk.graph.inventory',
@@ -482,6 +492,10 @@ final class McpContractTest extends TestCase
             'nhk-v3/knowledge-get',
             'nhk-v3/source-get',
             'nhk-v3/evidence-get',
+            'nhk-v3/dictionary-search',
+            'nhk-v3/dictionary-concept-get',
+            'nhk-v3/dictionary-candidate-list',
+            'nhk-v3/dictionary-backfill-dry-run',
             'nhk-v3/knowledge-writer-preview',
         ], McpAbilityRegistration::readAbilityNames());
         self::assertSame('nhk-v3/entity-get', McpAbilityRegistration::abilityNameForTool('nhk.entity.get'));
@@ -526,6 +540,12 @@ final class McpContractTest extends TestCase
             'nhk-v3/proposal-reject',
             'nhk-v3/proposal-apply',
             'nhk-v3/relation-backfill-apply',
+            'nhk-v3/dictionary-concept-create',
+            'nhk-v3/dictionary-concept-update',
+            'nhk-v3/dictionary-concept-lifecycle',
+            'nhk-v3/dictionary-label-save',
+            'nhk-v3/dictionary-candidate-review',
+            'nhk-v3/dictionary-relation-handoff',
         ], McpAbilityRegistration::governedAbilityNames());
         self::assertSame('nhk-v3/article-preflight', McpAbilityRegistration::abilityNameForTool('nhk.article.preflight'));
         self::assertSame('nhk-v3/article-ingest', McpAbilityRegistration::abilityNameForTool('nhk.article.ingest'));

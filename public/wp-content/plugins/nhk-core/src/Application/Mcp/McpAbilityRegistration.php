@@ -47,6 +47,12 @@ final class McpAbilityRegistration
         'nhk-v3/source-ingest',
         'nhk-v3/evidence-ingest',
         'nhk-v3/proposal-create',
+        'nhk-v3/dictionary-concept-create',
+        'nhk-v3/dictionary-concept-update',
+        'nhk-v3/dictionary-concept-lifecycle',
+        'nhk-v3/dictionary-label-save',
+        'nhk-v3/dictionary-candidate-review',
+        'nhk-v3/dictionary-relation-handoff',
         self::MCP_APP_DIAGNOSTICS_ABILITY,
     ];
 
@@ -369,6 +375,12 @@ final class McpAbilityRegistration
         'nhk.proposal.reject' => 'nhk-v3/proposal-reject',
         'nhk.proposal.apply' => 'nhk-v3/proposal-apply',
         'nhk.relation.backfill.apply' => 'nhk-v3/relation-backfill-apply',
+        'nhk.dictionary.concept.create' => 'nhk-v3/dictionary-concept-create',
+        'nhk.dictionary.concept.update' => 'nhk-v3/dictionary-concept-update',
+        'nhk.dictionary.concept.lifecycle' => 'nhk-v3/dictionary-concept-lifecycle',
+        'nhk.dictionary.label.save' => 'nhk-v3/dictionary-label-save',
+        'nhk.dictionary.candidate.review' => 'nhk-v3/dictionary-candidate-review',
+        'nhk.dictionary.relation.handoff' => 'nhk-v3/dictionary-relation-handoff',
     ];
 
     /**

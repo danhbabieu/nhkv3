@@ -18,6 +18,8 @@ final class DictionaryAdminPage
         add_action('admin_post_nhk_dictionary_draft', [self::class, 'draft']);
         add_action('admin_post_nhk_dictionary_attach', [self::class, 'attach']);
         add_action('admin_post_nhk_dictionary_approve', [self::class, 'approve']);
+        add_action('admin_post_nhk_dictionary_edit', [self::class, 'edit']);
+        add_action('admin_post_nhk_dictionary_lifecycle', [self::class, 'lifecycle']);
     }
 
     public static function render(): void
@@ -28,6 +30,7 @@ final class DictionaryAdminPage
         if (!$runtime || !$runtime->available()) { echo '<div class="notice notice-warning"><p>Dictionary storage chưa sẵn sàng. Không hiển thị kết quả rỗng giả.</p></div></div>'; return; }
         echo '<p>Candidate tự động chỉ là gợi ý; không tự tạo Knowledge, Evidence hay Graph relation.</p>';
         self::renderDrafts($runtime);
+        self::renderManagedConcepts($runtime);
         self::renderCandidates($runtime);
         echo '</div>';
     }
@@ -70,6 +73,27 @@ final class DictionaryAdminPage
         echo '</tbody></table>';
     }
 
+    private static function renderManagedConcepts(DictionaryRuntime $runtime): void
+    {
+        $items = array_merge(
+            $runtime->concepts()->listByStatus(DictionaryConcept::APPROVED, 200),
+            $runtime->concepts()->listByStatus(DictionaryConcept::RETIRED, 200),
+        );
+        echo '<h2>Mục từ đã quản lý</h2>';
+        if ($items === []) { echo '<p>Chưa có mục từ đã duyệt hoặc đã retire.</p>'; return; }
+        echo '<table class="widefat striped"><thead><tr><th>Mục từ</th><th>Trạng thái</th><th>Revision</th><th>Thao tác</th></tr></thead><tbody>';
+        foreach ($items as $concept) {
+            echo '<tr><td><strong>' . esc_html($concept->preferredLabel) . '</strong><br><code>' . esc_html($concept->conceptId) . '</code></td><td>' . esc_html($concept->status) . '</td><td>' . esc_html((string) $concept->revision) . '</td><td>';
+            echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '">'; self::nonce();
+            echo '<input type="hidden" name="action" value="nhk_dictionary_edit"><input type="hidden" name="concept_id" value="' . esc_attr($concept->conceptId) . '"><input type="hidden" name="revision" value="' . esc_attr((string) $concept->revision) . '"><p><input name="preferred_label" value="' . esc_attr($concept->preferredLabel) . '" required><input name="definition" value="' . esc_attr($concept->definition) . '"></p><button class="button">Lưu lexical</button></form> ';
+            $next = $concept->status === DictionaryConcept::RETIRED ? DictionaryConcept::APPROVED : DictionaryConcept::RETIRED;
+            echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" style="display:inline">'; self::nonce();
+            echo '<input type="hidden" name="action" value="nhk_dictionary_lifecycle"><input type="hidden" name="concept_id" value="' . esc_attr($concept->conceptId) . '"><input type="hidden" name="revision" value="' . esc_attr((string) $concept->revision) . '"><input type="hidden" name="status" value="' . esc_attr($next) . '"><button class="button">' . esc_html($next === DictionaryConcept::RETIRED ? 'Retire' : 'Reactivate') . '</button></form>';
+            echo '</td></tr>';
+        }
+        echo '</tbody></table>';
+    }
+
     public static function decide(): void
     {
         self::authorize(); self::verifyNonce();
@@ -99,6 +123,33 @@ final class DictionaryAdminPage
         $current = $runtime->concepts()->findById($conceptId); if (!$current) wp_die('Dictionary concept not found.');
         $slug = sanitize_title((string) ($_POST['public_slug'] ?? ($current->context['public_slug'] ?? '')));
         $runtime->curation()->approveConcept($conceptId, self::revision(), self::nullable('destination_type'), self::nullable('destination_id'), self::nullable('destination_url'), ['public_slug' => $slug]);
+        $runtime->invalidateLabelCache(); self::redirect();
+    }
+
+    public static function edit(): void
+    {
+        self::authorize(); self::verifyNonce();
+        $runtime = self::$runtime; if (!$runtime) wp_die('Dictionary runtime unavailable.');
+        $conceptId = sanitize_text_field((string) ($_POST['concept_id'] ?? ''));
+        $revision = self::revision();
+        $runtime->mutation()->updateConcept(
+            $conceptId,
+            $revision,
+            sanitize_text_field((string) ($_POST['preferred_label'] ?? '')),
+            sanitize_textarea_field((string) ($_POST['definition'] ?? '')),
+            [],
+            'dictionary-admin-edit:' . $conceptId . ':' . $revision,
+        );
+        $runtime->invalidateLabelCache(); self::redirect();
+    }
+
+    public static function lifecycle(): void
+    {
+        self::authorize(); self::verifyNonce();
+        $runtime = self::$runtime; if (!$runtime) wp_die('Dictionary runtime unavailable.');
+        $conceptId = sanitize_text_field((string) ($_POST['concept_id'] ?? ''));
+        $revision = self::revision();
+        $runtime->mutation()->setConceptStatus($conceptId, $revision, strtoupper(sanitize_key((string) ($_POST['status'] ?? ''))), 'dictionary-admin-lifecycle:' . $conceptId . ':' . $revision . ':' . sanitize_key((string) ($_POST['status'] ?? '')));
         $runtime->invalidateLabelCache(); self::redirect();
     }
 
