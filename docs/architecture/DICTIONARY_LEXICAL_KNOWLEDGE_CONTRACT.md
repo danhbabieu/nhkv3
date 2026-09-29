@@ -1,6 +1,6 @@
 # NHK V3 Dictionary Lexical Knowledge Contract
 
-> **APPROVED SUBORDINATE CONTRACT — updated 2026-09-06.**
+> **APPROVED SUBORDINATE CONTRACT — updated 2026-09-29.**
 > This contract is subordinate to `docs/constitution/NHK_V3_CONSTITUTION.md`.
 > It introduces a bounded lexical/curation layer. It does **not** create a new
 > Authority entity type, Graph predicate, semantic evidence source, Article body
@@ -515,6 +515,29 @@ were an approved term.
 When no eligible public term exists, the component should be omitted or report
 an unavailable/no-match state appropriate to the host surface; it must not fill
 space with invented lexical content.
+
+### 20.1 Issue #21 executable reconciliation
+
+The canonical runtime path is now explicit: Article research/Capture preview,
+Knowledge writes, Media attachment observations and Video writes all enter
+`DictionaryObservationRegistry`; the registry delegates to the existing
+`DictionaryHarvester`, which delegates to `DictionaryPlanningService`. The
+harvester persists only Dictionary mentions/candidates on an observation path
+and never writes semantic truth. Dry-run uses the same harvester with
+`persist=false`.
+
+The executable MCP read surface includes approved search, lexical resolve,
+Concept detail/labels, candidate queue/detail, mention/source context and a
+bounded live profile containing storage/readiness/coverage/public preview.
+Curated writes remain the dedicated revision/idempotency/audit boundary. Admin
+uses the same mutation service. Relation handoff validates existing owner and
+predicate registries then returns a Governance-ready review packet; it never
+writes Graph.
+
+The owner-backed projection is read-only and revalidated at the owner boundary:
+Dictionary lexical entry → canonical owner → existing Graph/Knowledge/Media or
+Video read projections → coverage/readiness. No factual claim is copied into
+Dictionary and no Dictionary row is treated as an Authority or Graph endpoint.
 
 ## 20. Acceptance criteria
 

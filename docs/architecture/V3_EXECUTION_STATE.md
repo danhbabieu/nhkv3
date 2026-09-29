@@ -20543,13 +20543,13 @@ canonical storage; existing audit storage records Dictionary mutation receipts.
 No curated Dictionary data, staging data, production data, V2 data or Graph
 edge was mutated.
 
-VALIDATION: Final focused Dictionary/MCP/Admin/contract slice passes 63 tests /
-819 assertions. Changed PHP files lint clean, `git diff --check` passes and the
-secret-pattern scan is clean. Full suite under 512M reached 2,916 tests /
-16,340 assertions with 26 failures: two pre-existing KnowledgeWriter
-assertions and 24 environment-gated integration/runtime tests requiring
-`NHK_WP_TEST_PATH`/`nhk_v3_test`; the default 128M invocation also hits the
-pre-existing large-file materializer memory test. No Dictionary failure was
-reported. WordPress/MySQL integration remains unavailable here.
+VALIDATION: Final focused Dictionary/MCP/Admin/frontend slice passes 131 tests /
+1,167 assertions. Changed PHP files lint clean, `git diff --check` passes and
+the secret-pattern scan is clean. Final full suite under 512M reached 2,917
+tests / 16,485 assertions with 23 failures: two pre-existing KnowledgeWriter
+assertions proven against baseline `6c57edf6`, plus 21 environment-gated
+integration/runtime failures requiring `NHK_WP_TEST_PATH`/`nhk_v3_test`. No
+Dictionary failure was reported. WordPress/MySQL integration remains
+unavailable here; live Dictionary dry-run is therefore `ENVIRONMENT_BLOCKED`.
 
 STATUS: `DICTIONARY_ISSUE_21_LOCAL_READY / BASELINE_AND_RUNTIME_GATES_DOCUMENTED / NO_LIVE_MUTATION`.
