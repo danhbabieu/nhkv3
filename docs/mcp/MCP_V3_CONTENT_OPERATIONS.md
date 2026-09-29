@@ -566,6 +566,13 @@ availability; local HTTP wire smoke remains an environment check.
 | `nhk.knowledge.writer.preview` | Universal Enrichment + Editorial Intelligence read preview | READ | No | N/A | Bounded semantic read only | READY through `/nhk/v1/mcp` and the generic Easy MCP Ability projection |
 | `nhk.source.get` | Source + public evidence | READ | No | N/A | No raw edge | READY for active/public chain |
 | `nhk.evidence.get` | Evidence + public endpoints | READ | No | N/A | No raw edge | READY for active/public chain |
+| `nhk.dictionary.search` / `nhk.dictionary.concept.get` | Dictionary approved lexical truth | READ | No | N/A | No raw edge | READY in executable catalog; unavailable is explicit when storage is not ready |
+| `nhk.dictionary.candidate.list` | Private Dictionary review queue | READ | No | N/A | No raw edge | READY; candidates are never public truth |
+| `nhk.dictionary.concept.create` / `nhk.dictionary.concept.update` / `nhk.dictionary.concept.lifecycle` | Dictionary Concept lexical curation | WRITE / INTERNAL | Yes | Expected concept revision + idempotency + audit/read-back | No Graph write | READY through `nhk_curate_dictionary` + `nhk_internal_content_operations`; lifecycle retires/reactivates, never hard-deletes |
+| `nhk.dictionary.label.save` | Dictionary Label lexical curation | WRITE / INTERNAL | Yes | Expected concept revision + idempotency + audit/read-back | No Graph write | READY through governed Dictionary boundary |
+| `nhk.dictionary.candidate.review` | Candidate review/attach/create-draft | WRITE / INTERNAL | Yes | Expected candidate revision + idempotency | No semantic owner creation | READY; attach reuses existing Concept/owner and remains curator-controlled |
+| `nhk.dictionary.relation.handoff` | Dictionary relation intent packet | READ / INTERNAL | Existing Governance apply required | Idempotency packet; owner revisions | Never writes Graph directly | READY as `REVIEW_REQUIRED` handoff; Graph predicate/edge remains in existing Governance registry/lifecycle |
+| `nhk.dictionary.backfill.dry_run` | Bounded lexical observation scan | READ | No | N/A | No raw edge | READY read-only; no bulk backfill/apply is implied |
 | `nhk.knowledge.ingest` | Knowledge claim | WRITE | Yes | Apply/revision governed | No edge by ingest | READY |
 | `nhk.source.ingest` | Source | WRITE | Yes | Apply/revision governed | No edge by ingest | READY |
 | `nhk.evidence.ingest` | Evidence | WRITE | Yes | Apply/revision governed | Claim/Source boundary | READY |
@@ -583,6 +590,12 @@ operations present in `McpToolCatalog`; the exact live catalog must still be
 confirmed through a fresh tool discovery/wire smoke before relying on a count.
 Article ingest is capability-gated by `nhk_ingest_articles`, while Article
 preflight is read-gated.
+
+Dictionary is deliberately a lexical owner only. Factual claims belong to
+Knowledge, canonical identity belongs to Authority, and semantic relations
+belong to Graph through the existing Governance proposal/approval/apply path.
+The Dictionary handoff tool emits a validated source/target/predicate packet;
+it does not persist a Graph edge or invent a predicate.
 
 ## 3. Use-case capability matrix
 

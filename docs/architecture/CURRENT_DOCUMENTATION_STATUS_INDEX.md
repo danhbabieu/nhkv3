@@ -486,12 +486,11 @@ or editorial publication is part of this discovery checkpoint.
   equivalent type-specific completeness recipes for Model, Movement, Variant
   and the remaining Entity types must be added deliberately rather than by
   increasing the generic graph traversal bound;
-- Dictionary migration 015/runtime activation, initial curated data, dry-run
-  legacy backfill and target-environment public-route/read-back are not proven
-  until executed in the target WordPress runtime; code presence alone is not
-  live acceptance;
-- dedicated Dictionary MCP tools are not current capability truth unless they
-  are added to the executable catalog and confirmed by fresh runtime discovery;
+- Dictionary migration 015 remains the canonical storage and the runtime now
+  activates its existing repositories, harvester, Admin curator and executable
+  MCP catalog; target-environment migration/public-route/read-back acceptance,
+  initial curated data and any legacy dry-run remain runtime-gated and have not
+  been claimed here;
 - dedicated Product–Specimen canonical relation;
 - approved Classification membership predicate (`classified_as`) and governed Graph relation apply; read-only Graph inventory/relation dry-run capability is implemented;
 - Collector facet registry and `collector_facet_update` governed maintenance path are implemented code-side; the CLI dry-run is read-only and target-runtime data/apply/read-back remain separately environment-gated;

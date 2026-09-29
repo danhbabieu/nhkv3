@@ -20517,3 +20517,37 @@ available in this checkpoint. No staging, production, migration, seed, or
 semantic data mutation was performed.
 
 STATUS: `ARTICLE_FEATURED_MEDIA_GOVERNED_LOCAL_READY / BASELINE_FAILURE_DOCUMENTED / NO_LIVE_MUTATION / UNCOMMITTED`.
+
+# Checkpoint — 2026-09-29 — Dictionary Issue #21 lexical owner vertical slice (LOCAL / INTEGRATION PENDING)
+
+IMPLEMENTATION: Reused Dictionary migration 015 and the existing
+Concept/Label/Candidate/Mention repositories. Added the governed lexical
+mutation boundary with optimistic revisions, idempotency receipts and audit;
+added the harvester as a planning/persistence adapter over the existing
+Dictionary planner; added a validated relation handoff packet that delegates
+predicate/owner validation to the existing registries and emits `REVIEW_REQUIRED`
+without writing Graph. Dictionary MCP search/get/candidate queue, lexical CRUD,
+lifecycle retire/reactivate, candidate review, relation handoff and bounded
+backfill dry-run are present in the executable catalog, dispatch and Ability
+projection. Runtime bootstrap now activates Dictionary once and Admin curator
+supports lexical edit plus retire/reactivate; no hard-delete action exists.
+
+OWNERSHIP: Dictionary owns lexical truth only. Knowledge remains factual truth,
+Authority remains identity truth, and Graph/Governance remains the sole semantic
+relation owner. The handoff carries canonical IDs/revisions, registered
+predicate and provenance for the existing Governance lifecycle; it is not a
+parallel Graph writer or predicate registry.
+
+STORAGE: No new Dictionary migration was introduced. Migration 015 remains the
+canonical storage; existing audit storage records Dictionary mutation receipts.
+No curated Dictionary data, staging data, production data, V2 data or Graph
+edge was mutated.
+
+VALIDATION: Focused Dictionary/MCP/Admin slice passes 18 tests / 97 assertions;
+the broader pre-existing Dictionary mutation/harvester/relation slice passes 7
+tests / 43 assertions. Changed PHP files lint clean and `git diff --check`
+passes. Full unit/integration verification and secret review remain final
+checkpoint work; WordPress/MySQL integration is expected to remain gated by the
+environment unless the required test runtime is available.
+
+STATUS: `DICTIONARY_ISSUE_21_LOCAL_VERTICAL_SLICE / NO_LIVE_MUTATION / FINAL_VERIFICATION_PENDING`.
