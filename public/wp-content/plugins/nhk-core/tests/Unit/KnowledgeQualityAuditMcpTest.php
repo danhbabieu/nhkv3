@@ -5,13 +5,21 @@ namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Knowledge\KnowledgeQualityAuditCoordinator;
 use NHK\Core\Application\Knowledge\KnowledgeQualityAuditor;
+use NHK\Core\Application\Governance\GovernanceService;
 use NHK\Core\Application\Mcp\KnowledgeQualityAuditHandler;
 use NHK\Core\Application\Mcp\McpAbilityRegistration;
 use NHK\Core\Application\Mcp\McpCapabilityManifest;
 use NHK\Core\Application\Mcp\McpDispatchRegistry;
+use NHK\Core\Application\Mcp\McpGovernanceHandler;
+use NHK\Core\Application\Mcp\McpReadHandler;
+use NHK\Core\Application\Mcp\McpTransport;
 use NHK\Core\Application\Mcp\McpToolCatalog;
 use NHK\Core\Application\Semantic\StructuredSemanticInterpreter;
+use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgePageReader, KnowledgeRepository, SourceRepository};
+use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository, MediaUsageRepository};
+use NHK\Core\Contracts\Video\VideoRepository;
+use NHK\Core\Domain\Authority\EntityTypeRegistry;
 use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim, Source};
 use NHK\Core\Shared\Uuid\UuidCodec;
 use PHPUnit\Framework\TestCase;
@@ -98,6 +106,53 @@ final class KnowledgeQualityAuditMcpTest extends TestCase
         self::assertContains('nhk-v3/knowledge-quality-audit', McpAbilityRegistration::capabilityGatedReadAbilityNames());
         self::assertContains('nhk-v3/knowledge-quality-audit', McpAbilityRegistration::explicitInternalAdminAbilityAllowlist());
         self::assertContains('nhk.knowledge.quality-audit', McpCapabilityManifest::all()['knowledge']['reads']);
+    }
+
+    public function test_quality_audit_has_an_explicit_read_only_easy_mcp_opt_in(): void
+    {
+        self::assertSame(['nhk-v3/knowledge-quality-audit'], McpAbilityRegistration::explicitInternalAdminReadOnlyAbilityAllowlist());
+    }
+
+    public function test_selected_internal_ability_discovers_and_invokes_audit_without_writes(): void
+    {
+        $repository = new QualityAuditMcpClaims($this->claims(1));
+        $transport = $this->transport(
+            static fn (string $capability): bool => in_array($capability, ['read', 'nhk_internal_content_operations', 'nhk_view_governance'], true),
+            $this->handler($repository),
+        );
+        $response = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/call', 'params' => ['name' => 'nhk.knowledge.quality-audit', 'arguments' => ['limit' => 1]]]);
+
+        self::assertSame(200, $response['status']);
+        self::assertSame('AVAILABLE', $response['body']['result']['structuredContent']['status']);
+        self::assertTrue($response['body']['result']['structuredContent']['read_only']);
+        self::assertFalse($response['body']['result']['structuredContent']['mutated']);
+        self::assertSame(0, $repository->writes);
+        self::assertContains('nhk-v3/knowledge-quality-audit', McpAbilityRegistration::ensureEasyMcpEnabledAbilities(['wp_ability_nhk_v3_knowledge_quality_audit']));
+        self::assertNotContains('nhk-v3/knowledge-quality-audit', McpAbilityRegistration::operatorEnabledAbilityAllowlist());
+    }
+
+    public function test_non_capable_actor_is_forbidden_before_audit_invocation(): void
+    {
+        $repository = new QualityAuditMcpClaims($this->claims(1));
+        $transport = $this->transport(
+            static fn (string $capability): bool => false,
+            $this->handler($repository),
+        );
+        $response = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/call', 'params' => ['name' => 'nhk.knowledge.quality-audit', 'arguments' => []]]);
+
+        self::assertTrue($response['body']['result']['isError']);
+        self::assertSame('DIRECT_WRITE_BLOCKED', $response['body']['result']['structuredContent']['error']['code']);
+        self::assertSame(0, $repository->writes);
+    }
+
+    private function transport(callable $can, KnowledgeQualityAuditHandler $handler): McpTransport
+    {
+        $read = new McpReadHandler(
+            $this->createMock(AuthorityRepository::class), new EntityTypeRegistry(),
+            $this->createMock(MediaRepository::class), $this->createMock(MediaAssetRepository::class), $this->createMock(MediaUsageRepository::class),
+            $this->createMock(VideoRepository::class), $this->createMock(KnowledgeRepository::class), $this->createMock(EvidenceRepository::class),
+        );
+        return new McpTransport($read, new McpGovernanceHandler(new GovernanceService(new \NHK\Tests\Support\InMemoryProposalRepository())), $can, knowledgeQualityAudit: $handler);
     }
 
     /** @return array{ids:list<string>,page_sizes:list<int>} */

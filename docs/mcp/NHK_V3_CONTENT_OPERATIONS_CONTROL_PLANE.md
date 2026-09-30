@@ -135,7 +135,10 @@ capability-gated by the existing governance/internal boundary. Its repair
 candidates are planning-only; no audit call can mutate Knowledge, Source,
 Evidence or Graph. If the canonical repository/runtime is unavailable, the
 operation reports `KNOWLEDGE_QUALITY_AUDIT_UNAVAILABLE` instead of claiming an
-empty or complete corpus.
+empty or complete corpus. The connector exposure is an explicit read-only
+internal/admin Ability opt-in (`nhk-v3/knowledge-quality-audit`), not a public
+operator allowlist entry; non-capable actors remain forbidden at the canonical
+transport boundary.
 
 ### Scoped Public URL lifecycle — 2026-09-14
 

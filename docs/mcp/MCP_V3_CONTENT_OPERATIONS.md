@@ -135,6 +135,10 @@ claim/source/evidence text, never creates a repair operation, and never writes
 Knowledge, Source, Evidence, Authority, Graph or Governance state. Missing or
 unavailable WordPress/MySQL runtime remains an explicit unavailable result; it
 must not be represented as an empty corpus.
+Its Easy MCP Ability is an explicit read-only internal/admin opt-in
+(`nhk-v3/knowledge-quality-audit`); it is not added to the public/operator
+allowlist, and invocation still requires `nhk_internal_content_operations` plus
+the existing governance-read capability.
 
 ### Runtime semantic-write policy — 2026-09-13
 

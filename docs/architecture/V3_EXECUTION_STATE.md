@@ -1,5 +1,20 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-30 — Quality audit Easy MCP explicit read-only exposure
+
+EXPOSURE: Split `nhk-v3/knowledge-quality-audit` into the explicit
+internal/admin read-only Easy MCP opt-in seam. The Ability remains outside the
+operator allowlist, retains `internal_admin_only`, and requires
+`nhk_internal_content_operations` plus the existing governance-read capability.
+No mutation capability or public writer surface was added.
+
+VALIDATION: Focused Quality Audit/MCP exposure tests pass 7 tests / 36
+assertions, including selected-Ability discovery, canonical transport
+invocation, public/non-capable rejection, dispatch/catalog parity and zero
+writes. No schema, migration, semantic data or live runtime state changed.
+
+STATUS: `QUALITY_AUDIT_EASY_MCP_READONLY_OPT_IN / NO_PUBLIC_EXPOSURE / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-30 — Knowledge quality audit operator surface
 
 IMPLEMENTATION: Added the canonical internal/admin read-only

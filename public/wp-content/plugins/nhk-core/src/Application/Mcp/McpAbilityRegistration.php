@@ -53,8 +53,12 @@ final class McpAbilityRegistration
         'nhk-v3/dictionary-label-save',
         'nhk-v3/dictionary-candidate-review',
         'nhk-v3/dictionary-relation-handoff',
-        'nhk-v3/knowledge-quality-audit',
         self::MCP_APP_DIAGNOSTICS_ABILITY,
+    ];
+
+    /** @var list<string> Explicit internal/admin read-only connector opt-ins. */
+    private const EASY_MCP_EXPLICIT_INTERNAL_READ_ONLY_ABILITIES = [
+        'nhk-v3/knowledge-quality-audit',
     ];
 
     public static function bootstrapRegistry(): void
@@ -81,7 +85,14 @@ final class McpAbilityRegistration
     /** @return list<string> */
     public static function explicitInternalAdminAbilityAllowlist(): array
     {
-        return self::EASY_MCP_EXPLICIT_INTERNAL_ABILITIES;
+        $base = array_values(array_diff(self::EASY_MCP_EXPLICIT_INTERNAL_ABILITIES, [self::MCP_APP_DIAGNOSTICS_ABILITY]));
+        return array_values(array_unique(array_merge($base, self::EASY_MCP_EXPLICIT_INTERNAL_READ_ONLY_ABILITIES, [self::MCP_APP_DIAGNOSTICS_ABILITY])));
+    }
+
+    /** @return list<string> */
+    public static function explicitInternalAdminReadOnlyAbilityAllowlist(): array
+    {
+        return self::EASY_MCP_EXPLICIT_INTERNAL_READ_ONLY_ABILITIES;
     }
 
     /** @return list<string> */
