@@ -1,5 +1,27 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-30 — Dictionary Seed Audit Ability duplicate registration (LOCAL / NO MUTATION)
+
+ROOT_CAUSE_CONFIRMED: `nhk.dictionary.seed-audit` was mapped in both the
+general `READ_TOOL_MAP` and the capability-gated read map. The WordPress
+Ability bootstrap therefore called `wp_register_ability()` twice for the same
+native Ability ID and emitted the WordPress 6.9 duplicate-registration Notice.
+
+FIXED_BOUNDARY: The Dictionary Seed Audit Ability remains exclusively in the
+internal/admin capability-gated registry. The overlapping general-read mapping
+was removed; no transport, capability, handler, semantic owner or public
+exposure was changed.
+
+REGRESSION: Added a contract test asserting the read registries are disjoint
+and that Dictionary Seed Audit is capability-gated only. Focused MCP/Ability
+tests pass 30 tests / 121 assertions. Full Unit passes under 512M with 2,829
+tests / 16,809 assertions and the two known pre-existing KnowledgeWriterPreview
+failures; the default 128M run remains blocked by the known
+TrustedProvidedFileMaterializer memory test. PHP lint and diff-check pass.
+No schema, semantic data, staging or production mutation occurred.
+
+STATUS: `ABILITY_REGISTRATION_IDEMPOTENCY_LOCAL_READY / NO_MUTATION / DEPLOYMENT_NOT_PERFORMED`.
+
 # Checkpoint — 2026-09-30 — Dictionary semantic enrichment Native slice (LOCAL / NO MUTATION)
 
 IMPLEMENTED: Extended the ephemeral shared input/packet with source metadata,

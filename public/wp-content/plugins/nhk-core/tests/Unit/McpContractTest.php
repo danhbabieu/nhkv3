@@ -506,7 +506,6 @@ final class McpContractTest extends TestCase
             'nhk-v3/dictionary-mentions-list',
             'nhk-v3/dictionary-backfill-dry-run',
             'nhk-v3/dictionary-profile',
-            'nhk-v3/dictionary-seed-audit',
             'nhk-v3/knowledge-writer-preview',
         ], McpAbilityRegistration::readAbilityNames());
         self::assertSame('nhk-v3/entity-get', McpAbilityRegistration::abilityNameForTool('nhk.entity.get'));
@@ -561,6 +560,16 @@ final class McpContractTest extends TestCase
         self::assertSame('nhk-v3/article-preflight', McpAbilityRegistration::abilityNameForTool('nhk.article.preflight'));
         self::assertSame('nhk-v3/article-ingest', McpAbilityRegistration::abilityNameForTool('nhk.article.ingest'));
         self::assertCount(count(McpToolCatalog::tools()) - count(McpAbilityRegistration::explicitExclusionReasons()) + 1, McpAbilityRegistration::abilityNames());
+    }
+
+    public function test_ability_registration_maps_are_disjoint_to_prevent_duplicate_wordpress_registration(): void
+    {
+        self::assertSame([], array_values(array_intersect(
+            McpAbilityRegistration::readAbilityNames(),
+            McpAbilityRegistration::capabilityGatedReadAbilityNames(),
+        )));
+        self::assertNotContains('nhk-v3/dictionary-seed-audit', McpAbilityRegistration::readAbilityNames());
+        self::assertContains('nhk-v3/dictionary-seed-audit', McpAbilityRegistration::capabilityGatedReadAbilityNames());
     }
 
     public function test_every_catalog_tool_is_registered_or_has_an_explicit_exclusion_reason(): void

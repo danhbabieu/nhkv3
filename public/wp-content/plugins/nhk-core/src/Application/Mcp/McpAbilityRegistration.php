@@ -352,7 +352,6 @@ final class McpAbilityRegistration
         'nhk.dictionary.mentions.list' => 'nhk-v3/dictionary-mentions-list',
         'nhk.dictionary.backfill.dry_run' => 'nhk-v3/dictionary-backfill-dry-run',
         'nhk.dictionary.profile' => 'nhk-v3/dictionary-profile',
-        'nhk.dictionary.seed-audit' => 'nhk-v3/dictionary-seed-audit',
     ];
 
     /** @var array<string,string> */
