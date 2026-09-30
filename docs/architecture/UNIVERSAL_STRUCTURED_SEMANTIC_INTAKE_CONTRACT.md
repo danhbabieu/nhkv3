@@ -536,3 +536,11 @@ evidence, preserves unknown lexical terms, blocks derived prose from
 independent corroboration and reports unavailable runtime distinctly from
 empty data. The MCP `nhk.dictionary.seed-audit` adapter is internal/admin-only
 and privacy-safe; it cannot approve or mutate any owner.
+
+The same adapter provides a server-side bounded corpus mode for `KNOWLEDGE`,
+`ARTICLE` and, when both readers are available, `ALL`. Canonical source text
+is consumed only inside the process; opaque deterministic cursors page source
+IDs and the serialized result contains lexical planning data only. The legacy
+Dictionary candidate queue may be compared after current interpretation for
+planning-only cleanup/review, but it never changes the current packet or Seed
+v1 result.

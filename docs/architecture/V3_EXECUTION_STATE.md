@@ -1,5 +1,28 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-30 — Dictionary Seed v1 bounded corpus audit (LOCAL / NO MUTATION)
+
+IMPLEMENTED: Extended the existing internal/admin-only
+`nhk.dictionary.seed-audit` operation with bounded server-side corpus mode for
+`KNOWLEDGE`, `ARTICLE` and `ALL`. Canonical Knowledge claims are read through
+the stable-key page reader; native Articles use a bounded `wp_posts` ID cursor
+and canonical editorial read-back. Each source is interpreted internally by
+`StructuredSemanticInterpreter`, planned by `DictionarySeedPlanner`, and
+aggregated by normalized lexical seed with source/family counts and existing
+reuse/alias/new/ambiguity/editorial/noise actions.
+
+PRIVACY: Claim/article bodies, private evidence/source text and raw forms never
+cross MCP. The legacy candidate queue is comparison-only after current
+interpretation and cannot alter the current result. The operation always
+returns `read_only=true`, `mutated=false`; no Dictionary, Knowledge, Evidence,
+Graph, Authority or Article record is written.
+
+VALIDATION: Focused corpus/MCP/planner tests pass 18 tests / 94 assertions;
+full live 1,170 Knowledge / 77 Article verification remains runtime-gated and
+was not claimed in this local checkpoint.
+
+STATUS: `DICTIONARY_SEED_V1_BOUNDED_CORPUS_LOCAL_READY / NO_MUTATION / NO_DEPLOYMENT`.
+
 # Checkpoint — 2026-09-30 — Dictionary canonical Authority reuse wiring (LOCAL / NO MUTATION)
 
 ROOT_CAUSE_CONFIRMED: `DictionaryRuntime` supplied a bespoke exact-form scan to

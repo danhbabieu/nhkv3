@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Mcp;
 
 use NHK\Core\Application\Dictionary\DictionarySeedPlanner;
+use NHK\Core\Application\Dictionary\DictionarySeedCorpusAuditCoordinator;
 use NHK\Core\Application\Semantic\StructuredSemanticInterpreter;
 
 /** MCP adapter for bounded, privacy-safe Dictionary Seed v1 planning. */
@@ -11,7 +12,7 @@ final class DictionarySeedAuditHandler
 {
     private const CLASSIFICATIONS = ['RESOLVED_EXISTING', 'ALIAS_TO_EXISTING', 'PROPER_NAME', 'IDENTIFIER', 'CONFIGURATION', 'TECHNICAL_TERM', 'COLLOQUIAL_TERM', 'PHONETIC_ASR_FORM', 'AMBIGUOUS', 'NEW_LEXICAL_CANDIDATE', 'EDITORIAL_ONLY', 'NOISE', 'SUPPRESSED'];
 
-    public function __construct(private DictionarySeedPlanner $planner, private ?StructuredSemanticInterpreter $interpreter = null)
+    public function __construct(private DictionarySeedPlanner $planner, private ?StructuredSemanticInterpreter $interpreter = null, private ?DictionarySeedCorpusAuditCoordinator $corpus = null)
     {
         $this->interpreter ??= new StructuredSemanticInterpreter();
     }
@@ -19,6 +20,7 @@ final class DictionarySeedAuditHandler
     /** @return array<string,mixed> */
     public function audit(array $input): array
     {
+        if (array_key_exists('source_scope', $input)) return $this->auditCorpus($input);
         $text = trim((string) ($input['text'] ?? ''));
         if ($text === '' || strlen($text) > 12000) throw new \InvalidArgumentException('DICTIONARY_SEED_AUDIT_TEXT_INVALID');
         $limit = $input['limit'] ?? 50;
@@ -66,5 +68,24 @@ final class DictionarySeedAuditHandler
         foreach ($items as $item) $counts[$item['classification']] = ($counts[$item['classification']] ?? 0) + 1;
         ksort($counts);
         return ['status' => 'AVAILABLE', 'read_only' => true, 'mutated' => false, 'total' => $total, 'items' => $safe, 'aggregate' => ['total' => $total, 'counts_by_classification' => $counts], 'next_offset' => $offset + count($page) < $total ? $offset + count($page) : null, 'has_more' => $offset + count($page) < $total, 'diagnostics' => ['bounded_limit' => $limit, 'offset' => $offset, 'source_kind' => (string) ($input['source_kind'] ?? 'generic')]];
+    }
+
+    /** @return array<string,mixed> */
+    private function auditCorpus(array $input): array
+    {
+        if ($this->corpus === null) throw new \RuntimeException('DICTIONARY_SEED_CORPUS_UNAVAILABLE');
+        $scope = (string) ($input['source_scope'] ?? '');
+        $cursor = $input['cursor'] ?? null;
+        $limit = $input['limit'] ?? 50;
+        if (!is_string($scope) || $scope === '') throw new \InvalidArgumentException('DICTIONARY_SEED_CORPUS_SCOPE_INVALID');
+        if ($cursor !== null && !is_string($cursor)) throw new \InvalidArgumentException('DICTIONARY_SEED_CORPUS_CURSOR_INVALID');
+        if (!is_int($limit) || $limit < 1 || $limit > 100) throw new \InvalidArgumentException('DICTIONARY_SEED_CORPUS_LIMIT_INVALID');
+        try {
+            return $this->corpus->audit($scope, $cursor, $limit);
+        } catch (\InvalidArgumentException $exception) {
+            throw $exception;
+        } catch (\Throwable) {
+            return ['status' => 'UNAVAILABLE', 'read_only' => true, 'mutated' => false, 'source_scope' => strtoupper($scope), 'sources_scanned' => 0, 'lexical_observations' => 0, 'unique_normalized_terms' => 0, 'items' => [], 'aggregate' => [], 'legacy_candidate_comparison' => ['legacy_only' => [], 'current_also_legacy' => [], 'current_only' => []], 'next_cursor' => null, 'has_more' => false, 'diagnostics' => ['DICTIONARY_SEED_CORPUS_UNAVAILABLE']];
+        }
     }
 }

@@ -374,6 +374,17 @@ final class Plugin {
                 $claims,
             );
             add_filter('nhk_v3_knowledge_quality_audit_coordinator', static fn (mixed $current): mixed => $current ?? $knowledgeQualityAudit, 10, 1);
+            $dictionaryRuntime = DictionaryBootstrap::runtime();
+            $dictionarySeedAuditHandler = null;
+            if ($dictionaryRuntime !== null) {
+                $dictionaryCorpus = new \NHK\Core\Application\Dictionary\DictionarySeedCorpusAuditCoordinator(
+                    ['KNOWLEDGE' => new \NHK\Core\Application\Dictionary\KnowledgeDictionaryCorpusReader($claims), 'ARTICLE' => new \NHK\Core\Infrastructure\Article\WpArticleDictionaryCorpusReader($wpdb)],
+                    new \NHK\Core\Application\Semantic\StructuredSemanticInterpreter(),
+                    $dictionaryRuntime->seedPlanner(),
+                    $dictionaryRuntime->candidateRepository(),
+                );
+                $dictionarySeedAuditHandler = new \NHK\Core\Application\Mcp\DictionarySeedAuditHandler($dictionaryRuntime->seedPlanner(), corpus: $dictionaryCorpus);
+            }
             $collectorBranchReader = static function (string $classificationId) use ($authority, $claims, $graphService): array {
                 $classification = $authority->findByCanonicalId($classificationId);
                 if (!$classification instanceof \NHK\Core\Domain\Authority\AuthorityEntity || $classification->entityType !== 'classification' || !$classification->active()) return ['status' => 'unavailable', 'reason' => 'CLASSIFICATION_NOT_AVAILABLE'];
@@ -1976,7 +1987,7 @@ final class Plugin {
                 new EditorialQualityGate(),
             );
             $knowledgeQualityAuditHandler = new \NHK\Core\Application\Mcp\KnowledgeQualityAuditHandler($knowledgeQualityAudit);
-            (new McpApi(new McpTransport($mcpRead, $mcpGovernance, static fn (string $capability): bool => current_user_can($capability), static fn (string $value): bool => in_array($value, $allowedOrigins, true), $articleHandler, $videoIntake, $wordpressAttachments, $categoryGateway, $draftGateway, new CanonicalDependencyValidator($claims, $sources, $evidence), $publicUrlMaintenance, $mediaBatchUpload, $documentation, $capture, $captureContinuation, $authorityCapture, static function (): bool { return (new MigrationStatus())->runtimeSchemaReady(); }, $imageIngest, semanticWritePolicy: $semanticWritePolicy, mediaBinding: $mediaBindingService, videoSourceRefresh: $videoSourceRefresh, knowledgeRepairPreview: $knowledgeRepairPreview, videoFrontendReconciliation: $videoFrontendReconciliation, knowledgeWriterPreview: $knowledgeWriterPreview, knowledgeQualityAudit: $knowledgeQualityAuditHandler, dictionarySeedAudit: DictionaryBootstrap::runtime() !== null ? new \NHK\Core\Application\Mcp\DictionarySeedAuditHandler(DictionaryBootstrap::runtime()->seedPlanner()) : null, mediaTargetNormalizer: new \NHK\Core\Application\Media\MediaTargetNormalizer($endpoints, $types, $authority), mediaIntentCompiler: new MediaEnrichmentIntentCompiler($mediaBindingService, $usages, new MediaTargetNormalizer($endpoints, $types, $authority), new WordPressMediaTargetUrlResolver($publicRoutes, historicRoutes: new HistoricPublicRouteService($publicIdentityRepository))), dictionary: DictionaryBootstrap::runtime() !== null ? new McpDictionaryHandler(DictionaryBootstrap::runtime()) : null), $recoveryBinding))->register();
+            (new McpApi(new McpTransport($mcpRead, $mcpGovernance, static fn (string $capability): bool => current_user_can($capability), static fn (string $value): bool => in_array($value, $allowedOrigins, true), $articleHandler, $videoIntake, $wordpressAttachments, $categoryGateway, $draftGateway, new CanonicalDependencyValidator($claims, $sources, $evidence), $publicUrlMaintenance, $mediaBatchUpload, $documentation, $capture, $captureContinuation, $authorityCapture, static function (): bool { return (new MigrationStatus())->runtimeSchemaReady(); }, $imageIngest, semanticWritePolicy: $semanticWritePolicy, mediaBinding: $mediaBindingService, videoSourceRefresh: $videoSourceRefresh, knowledgeRepairPreview: $knowledgeRepairPreview, videoFrontendReconciliation: $videoFrontendReconciliation, knowledgeWriterPreview: $knowledgeWriterPreview, knowledgeQualityAudit: $knowledgeQualityAuditHandler, dictionarySeedAudit: $dictionarySeedAuditHandler, mediaTargetNormalizer: new \NHK\Core\Application\Media\MediaTargetNormalizer($endpoints, $types, $authority), mediaIntentCompiler: new MediaEnrichmentIntentCompiler($mediaBindingService, $usages, new MediaTargetNormalizer($endpoints, $types, $authority), new WordPressMediaTargetUrlResolver($publicRoutes, historicRoutes: new HistoricPublicRouteService($publicIdentityRepository))), dictionary: $dictionaryRuntime !== null ? new McpDictionaryHandler($dictionaryRuntime) : null), $recoveryBinding))->register();
             do_action('nhk_mcp_register_tools', McpToolCatalog::tools(), $mcpRead, $mcpGovernance);
         });
         add_action('admin_menu', [AdminPage::class, 'register']);

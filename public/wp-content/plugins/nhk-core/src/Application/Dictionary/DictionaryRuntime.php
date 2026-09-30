@@ -203,6 +203,7 @@ final class DictionaryRuntime
     public function candidates(): WpdbDictionaryCandidateRepository { return $this->candidates; }
     public function mentions(): WpdbDictionaryMentionRepository { return $this->mentions; }
     public function seedPlanner(): DictionarySeedPlanner { return $this->seedPlanner; }
+    public function candidateRepository(): WpdbDictionaryCandidateRepository { return $this->candidates; }
 
     public function resolve(string $term, array $context = [], array $hints = []): array
     {

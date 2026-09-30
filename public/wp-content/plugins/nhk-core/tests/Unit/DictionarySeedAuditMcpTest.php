@@ -3,7 +3,8 @@ declare(strict_types=1);
 
 namespace NHKTests\Unit;
 
-use NHK\Core\Application\Dictionary\{DictionaryResolver, DictionarySeedPlanner};
+use NHK\Core\Application\Dictionary\{DictionaryCorpusSourceReader, DictionaryResolver, DictionarySeedCorpusAuditCoordinator, DictionarySeedPlanner};
+use NHK\Core\Application\Semantic\StructuredSemanticInterpreter;
 use NHK\Core\Application\Governance\GovernanceService;
 use NHK\Core\Application\Mcp\{DictionarySeedAuditHandler, McpAbilityRegistration, McpCapabilityManifest, McpDispatchRegistry, McpGovernanceHandler, McpReadHandler, McpToolCatalog, McpTransport};
 use NHK\Core\Domain\Authority\EntityTypeRegistry;
@@ -52,6 +53,23 @@ final class DictionarySeedAuditMcpTest extends TestCase
         self::assertSame('wp_ability_nhk_v3_dictionary_seed_audit', McpAbilityRegistration::connectorToolNameForAbility('nhk-v3/dictionary-seed-audit'));
         self::assertSame('nhk.dictionary.seed-audit', McpAbilityRegistration::toolNameForConnectorTool('wp_ability_nhk_v3_dictionary_seed_audit'));
         self::assertContains('nhk.dictionary.seed-audit', array_column(McpToolCatalog::tools(), 'name'));
+        self::assertArrayHasKey('source_scope', $tool['inputSchema']['properties']);
+        self::assertNotContains('text', $tool['inputSchema']['required'] ?? []);
+    }
+
+    public function test_corpus_scope_uses_the_same_internal_tool_and_returns_bounded_aggregate(): void
+    {
+        $reader = new class implements DictionaryCorpusSourceReader {
+            public function page(?string $after, int $limit): array { return ['items' => [['source_id' => 'knowledge:1', 'source_family' => 'family:1', 'source_kind' => 'KNOWLEDGE', 'raw_text' => 'Corpus Term', 'context' => ['lexical_hints' => ['Corpus Term']]]], 'has_more' => false]; }
+        };
+        $resolver = new DictionaryResolver(static fn (): array => [], static fn (): array => [], static fn (): array => [], static fn (): array => [], static fn (): bool => false);
+        $handler = new DictionarySeedAuditHandler(new DictionarySeedPlanner($resolver), corpus: new DictionarySeedCorpusAuditCoordinator(['KNOWLEDGE' => $reader], new StructuredSemanticInterpreter(), new DictionarySeedPlanner($resolver)));
+        $result = $handler->audit(['source_scope' => 'KNOWLEDGE', 'limit' => 10]);
+        self::assertSame('AVAILABLE', $result['status']);
+        self::assertSame(1, $result['sources_scanned']);
+        self::assertSame(1, $result['unique_normalized_terms']);
+        self::assertTrue($result['read_only']);
+        self::assertFalse($result['mutated']);
     }
 
     public function test_tools_list_discovers_the_internal_read_only_operation(): void

@@ -632,6 +632,27 @@ The capability is not READY until tests and runtime read-back demonstrate:
 
 ## 20.2 Dictionary Seed v1 read-only planner
 
+### 20.2.1 Bounded canonical corpus audit
+
+The existing `nhk.dictionary.seed-audit` read operation also accepts a
+bounded `source_scope` of `KNOWLEDGE`, `ARTICLE` or `ALL`, plus an opaque
+deterministic cursor and a maximum page size of 100. The server reads
+canonical source text internally, preserves source identity/family and raw or
+derived lineage in the ephemeral packet, then interprets with the shared
+`StructuredSemanticInterpreter` and aggregates through `DictionarySeedPlanner`.
+Private claim/article text, raw forms and source bodies are never serialized to
+MCP. The result is planning-only and always declares `read_only=true` and
+`mutated=false`.
+
+The aggregate is keyed by normalized lexical seed and reports occurrences,
+distinct source/family counts, resolution, ambiguity, destination IDs and one
+of the existing actions `REUSE_EXISTING`, `ADD_ALIAS_CANDIDATE`,
+`NEW_CONCEPT_CANDIDATE`, `REVIEW_AMBIGUITY`, `SUPPRESS_EDITORIAL` or
+`SUPPRESS_NOISE`. The legacy Dictionary candidate queue is read only for a
+bounded comparison map; it is not an interpretation input or Seed v1 source of
+truth. No candidate, concept, label, Knowledge, Evidence, Graph or Authority
+record is changed.
+
 The shared `StructuredInterpretationPacket` is the Dictionary planning input.
 `DictionarySeedPlanner` applies `SEARCH FIRST → RESOLVE → REUSE → CANDIDATE
 ONLY IF UNRESOLVED` over semantic query seeds and does not run a second parser.
