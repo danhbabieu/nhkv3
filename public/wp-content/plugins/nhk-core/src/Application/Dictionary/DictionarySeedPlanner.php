@@ -1,0 +1,84 @@
+<?php
+declare(strict_types=1);
+
+namespace NHK\Core\Application\Dictionary;
+
+use NHK\Core\Application\Semantic\StructuredInterpretationPacket;
+use NHK\Core\Domain\Dictionary\DictionaryResolution;
+
+/** Read-only Dictionary planning over the shared structured packet. */
+final class DictionarySeedPlanner
+{
+    public function __construct(private DictionaryResolver $resolver) {}
+
+    /** @param StructuredInterpretationPacket|array<string,mixed> $packet @param array<string,mixed> $options @return array<string,mixed> */
+    public function plan(StructuredInterpretationPacket|array $packet, array $options = []): array
+    {
+        $value = $packet instanceof StructuredInterpretationPacket ? $packet->toArray() : $packet;
+        $sourceContext = is_array($value['source_context'] ?? null) ? $value['source_context'] : [];
+        $sourceFamily = trim((string) ($options['source_family'] ?? $sourceContext['source_identifier'] ?? $sourceContext['source_kind'] ?? 'unknown')) ?: 'unknown';
+        $context = is_array($options['context'] ?? null) ? $options['context'] : [];
+        $items = [];
+
+        foreach ((array) ($value['semantic_query_seeds'] ?? []) as $seed) {
+            if (!is_array($seed)) continue;
+            $normalized = trim((string) ($seed['normalized_form'] ?? ''));
+            if ($normalized === '') continue;
+            $category = strtoupper(trim((string) ($seed['category'] ?? 'LEXICAL_OBSERVATION')));
+            if (!isset($items[$normalized])) {
+                $items[$normalized] = [
+                    'normalized_form' => $normalized,
+                    'category' => $category,
+                    'locale' => (string) ($seed['locale'] ?? $value['locale'] ?? 'vi-VN'),
+                    'raw_forms' => [],
+                    'source_families' => [],
+                    'occurrences' => 0,
+                    'classification' => null,
+                    'resolution' => [],
+                    'diagnostics' => [],
+                ];
+                $items[$normalized]['resolution'] = ['status' => 'UNRESOLVED', 'concept_id' => null, 'destination_ids' => []];
+            }
+            $raw = trim((string) ($seed['raw_span'] ?? $normalized));
+            if ($raw !== '' && !in_array($raw, $items[$normalized]['raw_forms'], true)) $items[$normalized]['raw_forms'][] = $raw;
+            if (!in_array($sourceFamily, $items[$normalized]['source_families'], true)) $items[$normalized]['source_families'][] = $sourceFamily;
+            $items[$normalized]['occurrences']++;
+            if ((array) ($seed['diagnostics'] ?? []) !== []) $items[$normalized]['diagnostics'] = array_values(array_unique(array_merge($items[$normalized]['diagnostics'], array_map('strval', (array) $seed['diagnostics']))));
+        }
+
+        foreach ($items as &$item) {
+            if ($item['category'] === 'EDITORIAL_SIGNAL') {
+                $item['classification'] = 'EDITORIAL_ONLY';
+                continue;
+            }
+            if ($item['category'] === 'NOISE') {
+                $item['classification'] = 'NOISE';
+                continue;
+            }
+            $resolution = $this->resolver->resolve((string) ($item['raw_forms'][0] ?? $item['normalized_form']), $context + ['locale' => $item['locale']]);
+            $item['resolution'] = [
+                'status' => $resolution->status,
+                'concept_id' => $resolution->status === DictionaryResolution::RESOLVED ? $resolution->conceptId : null,
+                'preferred_label' => $resolution->status === DictionaryResolution::RESOLVED ? $resolution->preferredLabel : null,
+                'destination_type' => $resolution->status === DictionaryResolution::RESOLVED ? $resolution->destinationType : null,
+                'destination_id' => $resolution->status === DictionaryResolution::RESOLVED ? $resolution->destinationId : null,
+                'destination_ids' => $resolution->status === DictionaryResolution::RESOLVED && $resolution->destinationId !== null ? [$resolution->destinationId] : [],
+            ];
+            $item['classification'] = match ($resolution->status) {
+                DictionaryResolution::RESOLVED => 'RESOLVED_EXISTING',
+                DictionaryResolution::AMBIGUOUS => 'AMBIGUOUS',
+                DictionaryResolution::SUPPRESSED => 'SUPPRESSED',
+                default => 'NEW_LEXICAL_CANDIDATE',
+            };
+            if ($resolution->status === DictionaryResolution::AMBIGUOUS) $item['diagnostics'][] = 'AMBIGUOUS_CANONICAL_OWNER';
+            $item['diagnostics'] = array_values(array_unique($item['diagnostics']));
+        }
+        unset($item);
+
+        $rows = array_values($items);
+        $aggregate = ['total' => count($rows), 'counts_by_classification' => []];
+        foreach ($rows as $row) $aggregate['counts_by_classification'][$row['classification']] = ($aggregate['counts_by_classification'][$row['classification']] ?? 0) + 1;
+        ksort($aggregate['counts_by_classification']);
+        return ['status' => 'READ_ONLY_PLAN', 'read_only' => true, 'mutated' => false, 'items' => $rows, 'aggregate' => $aggregate, 'diagnostics' => ['deduplication' => 'normalized_form', 'source_family' => $sourceFamily]];
+    }
+}
