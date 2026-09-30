@@ -15,6 +15,7 @@ use NHK\Core\Infrastructure\Migration\DictionaryMigration015;
 use NHK\Core\Infrastructure\Video\WpdbVideoRepository;
 use NHK\Core\Infrastructure\Governance\WpdbAuditSink;
 use NHK\Core\Domain\Graph\PredicateRegistry;
+use NHK\Core\Application\Semantic\CanonicalAuthoritySubjectResolver;
 
 final class DictionaryRuntime
 {
@@ -45,25 +46,24 @@ final class DictionaryRuntime
         $this->routes = new PublicRouteResolver($this->authority, $this->types);
 
         $contextHash = fn (array $context): string => $this->contextHash($context);
+        $canonicalAuthorityResolver = new CanonicalAuthoritySubjectResolver($this->authority, $this->types);
         $resolver = new DictionaryResolver(
             approvedLabelLookup: fn (string $term, array $context): array => $this->approvedLabelRows($term, $context),
-            entityLookup: function (string $term, array $context): array {
+            entityLookup: function (string $term, array $context) use ($canonicalAuthorityResolver): array {
                 $out = [];
-                foreach ($this->types->all() as $definition) {
-                    foreach ($this->authority->listByType($definition->type) as $entity) {
-                        if (!$entity instanceof AuthorityEntity || !$entity->active()) continue;
-                        foreach ($this->entityForms($entity) as $form) {
-                            if ($this->normalizer->normalize($form) !== $term) continue;
-                            $url = $this->routes->path($entity);
-                            $out[$entity->canonicalId] = [
-                                'preferred_label' => $entity->canonicalName,
-                                'destination_type' => $entity->entityType,
-                                'destination_id' => $entity->canonicalId,
-                                'destination_url' => $url,
-                            ];
-                            break;
-                        }
-                    }
+                foreach ($canonicalAuthorityResolver->resolve($term) as $match) {
+                    $id = trim((string) ($match['id'] ?? ''));
+                    $type = trim((string) ($match['type'] ?? ''));
+                    if ($id === '' || $type === '') continue;
+                    $entity = $this->authority->findByCanonicalId($id);
+                    if (!$entity instanceof AuthorityEntity || !$entity->active() || $entity->entityType !== $type) continue;
+                    $out[$id] = [
+                        'preferred_label' => $entity->canonicalName,
+                        'destination_type' => $entity->entityType,
+                        'destination_id' => $entity->canonicalId,
+                        'destination_url' => $this->routes->path($entity),
+                        'match' => (string) ($match['match'] ?? ''),
+                    ];
                 }
                 return array_values($out);
             },

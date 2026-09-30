@@ -53,14 +53,17 @@ final class DictionaryResolver
 
     private function fromRow(string $term, string $normalized, array $row, array $context): DictionaryResolution
     {
+        $destinationType = trim((string) ($row['destination_type'] ?? $row['type'] ?? ''));
+        $destinationId = trim((string) ($row['destination_id'] ?? $row['id'] ?? ''));
+        $preferredLabel = trim((string) ($row['preferred_label'] ?? $row['name'] ?? ''));
         return new DictionaryResolution(
             DictionaryResolution::RESOLVED,
             $term,
             $normalized,
             isset($row['concept_id']) ? (string) $row['concept_id'] : null,
-            isset($row['preferred_label']) ? (string) $row['preferred_label'] : null,
-            isset($row['destination_type']) ? (string) $row['destination_type'] : null,
-            isset($row['destination_id']) ? (string) $row['destination_id'] : null,
+            $preferredLabel !== '' ? $preferredLabel : null,
+            $destinationType !== '' ? $destinationType : null,
+            $destinationId !== '' ? $destinationId : null,
             isset($row['destination_url']) ? (string) $row['destination_url'] : null,
             [$row],
             $context,

@@ -1,5 +1,33 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-30 — Dictionary canonical Authority reuse wiring (LOCAL / NO MUTATION)
+
+ROOT_CAUSE_CONFIRMED: `DictionaryRuntime` supplied a bespoke exact-form scan to
+`DictionaryResolver`, so a lexical seed such as `odo 36/10` could not reach the
+existing canonical Authority subject resolver. The planner therefore fell
+through to `UNKNOWN` / `NEW_LEXICAL_CANDIDATE` even when the Authority owner was
+already discoverable and canonical.
+
+FIXED_BOUNDARY: Dictionary now reuses `CanonicalAuthoritySubjectResolver` for
+Authority discovery and canonical name/alias/context confirmation, then
+revalidates the returned UUID/type through the Authority repository before
+building a Dictionary destination. Bounded generic identifier suffix,
+canonical-prefix and transliteration/phonetic forms remain reuse/alias plans;
+fuzzy/search-only rows are not identity proof and multiple owners remain
+ambiguous. No parallel resolver, Odo-specific rule, Dictionary apply, alias
+approval, Authority update, schema change or data mutation was added.
+
+VALIDATION: Synthetic acceptance covers exact canonical display name, approved
+alias, unique short wording, ambiguous short wording, unknown wording,
+search-only non-proof and generic `ÔĐô` phonetic alias planning. Focused
+Dictionary/Authority suites pass 148 tests / 616 assertions; MCP/contract
+suite passes 48 tests / 783 assertions. Full Unit has 2,839 tests with 3
+existing unrelated failures in KnowledgeQualityAudit/KnowledgeWriterPreview;
+the changed Authority semantic-core regression passes. Live target read-back
+was not performed and no staging/production data was touched.
+
+STATUS: `DICTIONARY_CANONICAL_REUSE_WIRING_LOCAL_READY / NO_LIVE_MUTATION / DEPLOYMENT_NOT_PERFORMED`.
+
 # Checkpoint — 2026-09-30 — Dictionary Seed Audit Ability duplicate registration (LOCAL / NO MUTATION)
 
 ROOT_CAUSE_CONFIRMED: `nhk.dictionary.seed-audit` was mapped in both the

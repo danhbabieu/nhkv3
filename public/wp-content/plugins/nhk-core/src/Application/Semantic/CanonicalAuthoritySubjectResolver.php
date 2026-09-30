@@ -115,14 +115,20 @@ final class CanonicalAuthoritySubjectResolver
         if ($this->normalize($entity->canonicalName) === $needle) return 'exact_canonical_name';
         if ($this->hasAlias($entity, $needle)) return 'exact_alias';
 
-        // A qualified reference such as "36/8" may match the canonical
-        // Variant name "Đồng hồ Odo 36/8". This remains an identity match,
-        // not generic fuzzy text search, so a parent Model cannot win it.
-        if ($entity->entityType === 'variant') {
-            $reference = $this->normalize((string) ($entity->payload['reference'] ?? ''));
-            if ($reference !== '' && $reference === $needle) return 'exact_variant_reference';
-            if (str_contains($needle, '/') && str_ends_with($this->normalize($entity->canonicalName), $needle)) return 'exact_variant_name_reference';
+        // A bounded identifier suffix may identify a canonical owner only
+        // after the canonical record/name boundary confirms it. This is
+        // discovery-safe: generic fuzzy search is not promoted to identity,
+        // and multiple suffix owners remain ambiguous to the caller.
+        $canonicalName = $this->normalize($entity->canonicalName);
+        $reference = $this->normalize((string) ($entity->payload['reference'] ?? ''));
+        if ($reference !== '' && $reference === $needle) return $entity->entityType === 'variant' ? 'exact_variant_reference' : 'exact_identifier_reference';
+        if ($this->isBoundedIdentifier($needle) && $this->matchesIdentifierSuffix($canonicalName, $needle)) {
+            return $entity->entityType === 'variant' && str_contains($needle, '/') ? 'exact_variant_name_reference' : 'exact_identifier_suffix';
         }
+        if ($this->matchesCanonicalPrefixWithIdentifier($canonicalName, $needle)) return 'exact_canonical_prefix';
+        $phoneticNeedle = $this->phoneticNormalize($needle);
+        $phoneticName = $this->phoneticNormalize($canonicalName);
+        if ($phoneticNeedle !== $needle && $this->isBoundedIdentifier($phoneticNeedle) && $this->matchesIdentifierSuffix($phoneticName, $phoneticNeedle)) return 'phonetic_identifier_suffix';
 
         return null;
     }
@@ -147,7 +153,7 @@ final class CanonicalAuthoritySubjectResolver
                 'uuid_exact' => 'EXACT_CANONICAL_IDENTITY',
                 'stable_key_exact' => 'EXACT_STABLE_KEY',
                 'exact_canonical_name' => 'EXACT_CANONICAL_NAME',
-                'exact_alias', 'exact_variant_reference', 'exact_variant_name_reference' => 'EXACT_NORMALIZED_NAME_OR_ALIAS',
+                'exact_alias', 'exact_identifier_reference', 'exact_identifier_suffix', 'exact_variant_reference', 'exact_variant_name_reference', 'exact_canonical_prefix', 'phonetic_identifier_suffix' => 'EXACT_NORMALIZED_NAME_OR_ALIAS',
                 'composite_exact_identity' => 'EXACT_COMPOSITE_IDENTITY',
                 'composite_expanded_match' => 'PARTIAL_OR_EXPANDED_MATCH',
                 default => 'STRUCTURAL_COMPATIBLE_CONTEXT',
@@ -166,5 +172,44 @@ final class CanonicalAuthoritySubjectResolver
         $value = preg_replace('/\s*\/\s*/u', '/', $value) ?? $value;
         $value = preg_replace('/\s+/u', ' ', $value) ?? $value;
         return function_exists('mb_strtolower') ? mb_strtolower($value) : strtolower($value);
+    }
+
+    private function isBoundedIdentifier(string $value): bool
+    {
+        return preg_match('/\d/u', $value) === 1 && preg_match('/^[\p{L}\p{N}][\p{L}\p{N} .\/-]*$/u', $value) === 1;
+    }
+
+    private function matchesIdentifierSuffix(string $canonicalName, string $needle): bool
+    {
+        $nameTokens = preg_split('/\s+/u', $canonicalName, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $needleTokens = preg_split('/\s+/u', $needle, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        if ($nameTokens === [] || $needleTokens === [] || end($nameTokens) !== end($needleTokens)) return false;
+        $cursor = 0;
+        foreach ($needleTokens as $needleToken) {
+            $found = false;
+            while ($cursor < count($nameTokens)) {
+                if ($nameTokens[$cursor] === $needleToken) { $found = true; $cursor++; break; }
+                $cursor++;
+            }
+            if (!$found) return false;
+        }
+        return true;
+    }
+
+    private function phoneticNormalize(string $value): string
+    {
+        if (function_exists('transliterator_transliterate')) {
+            $value = (string) transliterator_transliterate('Any-Latin; Latin-ASCII', $value);
+        } elseif (function_exists('iconv')) {
+            $value = (string) (iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $value) ?: $value);
+        }
+        return $this->normalize($value);
+    }
+
+    private function matchesCanonicalPrefixWithIdentifier(string $canonicalName, string $needle): bool
+    {
+        if ($needle === '' || !str_starts_with($canonicalName, $needle . ' ')) return false;
+        $remainder = trim(substr($canonicalName, strlen($needle)));
+        return $this->isBoundedIdentifier($remainder);
     }
 }
