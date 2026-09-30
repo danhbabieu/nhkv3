@@ -41,16 +41,29 @@ final class DictionarySeedCorpusAuditCoordinator
             catch (\Throwable $error) { $diagnostics[] = ['code' => 'CORPUS_SOURCE_PAGE_FAILED', 'source_scope' => $sourceScope, 'error' => get_class($error)]; continue; }
             foreach ((array) ($page['diagnostics'] ?? []) as $diagnostic) if (is_array($diagnostic)) $diagnostics[] = $diagnostic + ['source_scope' => $sourceScope];
             $seenSources = [];
-            foreach ((array) ($page['items'] ?? []) as $source) {
-                if (!is_array($source)) continue;
+            foreach ((array) ($page['items'] ?? []) as $rowIndex => $source) {
+                if (!is_array($source)) {
+                    $diagnostics[] = ['code' => 'CORPUS_SOURCE_SHAPE_INVALID', 'source_scope' => $sourceScope, 'source_id' => $sourceScope . ':row:' . (string) $rowIndex];
+                    $sourcesScanned++;
+                    continue;
+                }
                 $sourceId = trim((string) ($source['source_id'] ?? ''));
+                if ($sourceId === '') {
+                    $sourceId = $sourceScope . ':row:' . (string) $rowIndex;
+                    $diagnostics[] = ['code' => 'CORPUS_SOURCE_ID_MISSING', 'source_scope' => $sourceScope, 'source_id' => $sourceId];
+                }
                 $text = trim((string) ($source['raw_text'] ?? ''));
-                if ($sourceId === '' || isset($seenSources[$sourceId])) continue;
+                if (isset($seenSources[$sourceId])) continue;
                 $seenSources[$sourceId] = true;
                 $sourcesScanned++;
                 if (isset($source['source_error'])) $diagnostics[] = ['code' => (string) $source['source_error'], 'source_scope' => $sourceScope, 'source_id' => $sourceId];
                 $family = trim((string) ($source['source_family'] ?? $sourceId)) ?: $sourceId;
                 $context = is_array($source['context'] ?? null) ? $source['context'] : [];
+                if (preg_match('//u', $text) !== 1) {
+                    $diagnostics[] = ['code' => 'CORPUS_SOURCE_TEXT_ENCODING_INVALID', 'source_scope' => $sourceScope, 'source_id' => $sourceId];
+                    $next = $sourceId;
+                    continue;
+                }
                 try { $packet = $this->interpreter->interpret([
                     'raw_text' => $text,
                     'source_kind' => $sourceScope,
@@ -60,7 +73,13 @@ final class DictionarySeedCorpusAuditCoordinator
                     'metadata' => $context,
                     'locale' => (string) ($source['locale'] ?? 'vi-VN'),
                 ]); } catch (\Throwable $error) { $diagnostics[] = ['code' => 'CORPUS_SOURCE_INTERPRETATION_FAILED', 'source_scope' => $sourceScope, 'source_id' => $sourceId, 'error' => get_class($error)]; continue; }
-                $plan = $this->planner->plan($packet, ['source_family' => $family, 'context' => $context]);
+                try {
+                    $plan = $this->planner->plan($packet, ['source_family' => $family, 'context' => $context]);
+                } catch (\Throwable $error) {
+                    $diagnostics[] = ['code' => 'CORPUS_SOURCE_PLANNING_FAILED', 'source_scope' => $sourceScope, 'source_id' => $sourceId, 'error' => get_class($error)];
+                    $next = $sourceId;
+                    continue;
+                }
                 foreach ((array) ($plan['items'] ?? []) as $row) {
                     if (!is_array($row)) continue;
                     $lexicalObservations += (int) ($row['occurrences'] ?? 0);

@@ -44,21 +44,27 @@ final class WpdbKnowledgeRepository implements KnowledgeRepository, KnowledgePag
         $where = $includeRetired ? '1=1' : 'state=1';
         $cursor = trim((string) ($afterStableKey ?? ''));
         $items = [];
-        do {
-            $args = [];
-            $pageWhere = $where;
-            if ($cursor !== '') { $pageWhere .= ' AND stable_key > %s'; $args[] = $cursor; }
-            $args[] = $limit + 1;
-            $rows = $this->database->get_results($this->database->prepare("SELECT * FROM {$this->table} WHERE {$pageWhere} ORDER BY stable_key ASC LIMIT %d", ...$args), ARRAY_A) ?: [];
-            foreach ($rows as $row) {
-                $cursor = (string) ($row['stable_key'] ?? $cursor);
-                $claim = $this->hydrate($row);
-                if ($claim !== null) $items[] = $claim;
-                if (count($items) >= $limit + 1) break;
+        $diagnostics = [];
+        $args = [];
+        $pageWhere = $where;
+        if ($cursor !== '') { $pageWhere .= ' AND stable_key > %s'; $args[] = $cursor; }
+        $args[] = $limit + 1;
+        $rows = $this->database->get_results($this->database->prepare("SELECT * FROM {$this->table} WHERE {$pageWhere} ORDER BY stable_key ASC LIMIT %d", ...$args), ARRAY_A) ?: [];
+        $pageRows = array_slice($rows, 0, $limit);
+        foreach ($pageRows as $row) {
+            $claim = $this->hydrate($row);
+            if ($claim !== null) {
+                $items[] = $claim;
+                continue;
             }
-        } while (count($items) < $limit + 1 && count($rows) > 0);
-        $hasMore = count($items) > $limit;
-        return ['items' => array_slice($items, 0, $limit), 'has_more' => $hasMore];
+            $diagnostic = ['code' => 'KNOWLEDGE_SOURCE_HYDRATION_FAILED', 'source_id' => trim((string) ($row['stable_key'] ?? ''))];
+            try { $diagnostic['canonical_uuid'] = UuidCodec::fromBinary((string) ($row['canonical_uuid'] ?? '')); } catch (\Throwable) {}
+            if ($diagnostic['source_id'] === '') $diagnostic['source_id'] = 'knowledge:row:' . (string) ($row['id'] ?? 'unknown');
+            $diagnostics[] = $diagnostic;
+        }
+        $nextCursor = $pageRows !== [] ? trim((string) ($pageRows[count($pageRows) - 1]['stable_key'] ?? '')) : null;
+        $hasMore = count($rows) > $limit;
+        return ['items' => $items, 'has_more' => $hasMore, 'next_cursor' => $nextCursor, 'diagnostics' => $diagnostics];
     }
     public function latestFeedCandidates(int $limit): array { $limit = max(1, min(100, $limit)); $rows = $this->database->get_results($this->database->prepare("SELECT * FROM {$this->table} WHERE state=1 ORDER BY created_at DESC, id DESC LIMIT %d", $limit), ARRAY_A); return array_values(array_filter(array_map(fn (array $row): ?KnowledgeClaim => $this->hydrate($row), $rows ?: []), static fn (?KnowledgeClaim $claim): bool => $claim !== null)); }
     private function hydrate(?array $row): ?KnowledgeClaim { if (!$row) return null; try { $provenance = json_decode((string) ($row['provenance_json'] ?? ''), true, 512, JSON_THROW_ON_ERROR); if (!is_array($provenance) || preg_match('/^[01]$/', (string) ($row['state'] ?? '')) !== 1) return null; return new KnowledgeClaim(UuidCodec::fromBinary($row['canonical_uuid']), (string) $row['stable_key'], (string) $row['claim_text'], (string) $row['claim_type'], $provenance, (int) $row['state'] === 1, (int) $row['revision'], $row['created_at'] ?? null, $row['updated_at'] ?? null); } catch (\Throwable) { return null; } }

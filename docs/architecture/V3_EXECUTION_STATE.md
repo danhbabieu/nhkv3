@@ -1,5 +1,35 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-01 — Generic corpus audit fault isolation (LOCAL / NO MUTATION)
+
+ROOT_CAUSES_FIXED: Knowledge paging previously used hydrated-row count as the
+page boundary, discarded hydration failures and exposed no raw stable-key
+cursor. The reader now advances by canonical raw stable-key rows, emits
+bounded hydration diagnostics (including canonical UUID when available), and
+the corpus adapter counts those rows as source attempts, including empty/no
+lexical sources. Generic corpus planning failures and invalid source encoding
+are also isolated to one source with privacy-safe diagnostics; cursor progress
+continues deterministically.
+
+ARTICLE_19_EVIDENCE: The live canonical post read-back is publish ID 19 with
+10,281 content characters. The deployed direct text path rejects this valid
+UTF-8 article at its byte-bound `strlen` check (`DICTIONARY_SEED_AUDIT_TEXT_INVALID`);
+the deployed corpus path then terminates at cursor 18 with an internal error.
+The local generic corpus regression reproduces the relevant failure boundary
+as a resolver/planner exception and now continues to the next source. No
+article body or private text is serialized in diagnostics.
+
+REGRESSION: Focused corpus/Knowledge-page/Article-reader tests pass locally;
+live read-back used the current deployed build only and remains pre-fix:
+ARTICLE reaches ID 19 then internal error, KNOWLEDGE returns internal error.
+No deployment was performed.
+
+NO_DATA_MUTATION: `read_only=true`, `mutated=false`; no Dictionary, Knowledge,
+Source, Evidence, Graph, Authority or Article write, migration, seed, backfill,
+staging or production operation was performed.
+
+STATUS: `DICTIONARY_SEED_CORPUS_FAULT_ISOLATION_LOCAL_READY / NO_MUTATION / DEPLOYMENT_NOT_PERFORMED`.
+
 # Checkpoint — 2026-09-30 — Dictionary Seed bounded reader/detector hardening (LOCAL / NO MUTATION)
 
 IMPLEMENTED: Generic lexical suppression now classifies directive/attribution

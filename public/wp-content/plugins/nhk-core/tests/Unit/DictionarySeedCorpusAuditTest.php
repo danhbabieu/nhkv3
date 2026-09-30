@@ -106,6 +106,48 @@ final class DictionarySeedCorpusAuditTest extends TestCase
         self::assertSame(1, $result['aggregate']['suppressed_noise']);
     }
 
+    public function test_planner_failure_is_bounded_to_one_source_and_cursor_continues(): void
+    {
+        $reader = new FakeDictionaryCorpusReader([
+            ['source_id' => 'article:19', 'source_family' => 'article:19', 'source_kind' => 'ARTICLE', 'raw_text' => 'Broken Term', 'context' => []],
+            ['source_id' => 'article:20', 'source_family' => 'article:20', 'source_kind' => 'ARTICLE', 'raw_text' => 'Valid Term', 'context' => []],
+        ]);
+        $resolver = new DictionaryResolver(
+            static fn (): array => [],
+            static function (string $term): array {
+                if (mb_strtolower($term) === 'broken term') throw new \RuntimeException('resolver failed');
+                return [];
+            },
+            static fn (): array => [],
+            static fn (): array => [],
+            static fn (): bool => false,
+        );
+        $coordinator = new DictionarySeedCorpusAuditCoordinator(['ARTICLE' => $reader], new StructuredSemanticInterpreter(), new DictionarySeedPlanner($resolver));
+
+        $result = $coordinator->audit('ARTICLE', null, 10);
+
+        self::assertSame(2, $result['sources_scanned']);
+        self::assertSame('CORPUS_SOURCE_PLANNING_FAILED', $result['diagnostics']['source_diagnostics'][0]['code']);
+        self::assertSame('article:19', $result['diagnostics']['source_diagnostics'][0]['source_id']);
+        self::assertSame('valid term', $result['items'][0]['normalized_form']);
+        self::assertFalse($result['mutated']);
+    }
+
+    public function test_article_source_with_roughly_ten_thousand_characters_does_not_kill_audit(): void
+    {
+        $reader = new FakeDictionaryCorpusReader([
+            ['source_id' => 'article:19', 'source_family' => 'article:19', 'source_kind' => 'ARTICLE', 'raw_text' => str_repeat('Odo 36/10 và ÔĐô 36/10. ', 430), 'context' => []],
+            ['source_id' => 'article:20', 'source_family' => 'article:20', 'source_kind' => 'ARTICLE', 'raw_text' => 'Valid Term', 'context' => []],
+        ]);
+        $coordinator = $this->coordinator(['ARTICLE' => $reader], static fn (): array => []);
+
+        $result = $coordinator->audit('ARTICLE', null, 2);
+
+        self::assertSame(2, $result['sources_scanned']);
+        self::assertSame('AVAILABLE', $result['status']);
+        self::assertFalse($result['mutated']);
+    }
+
     /** @param array<string,DictionaryCorpusSourceReader> $readers @param callable(string):array $entityLookup */
     private function coordinator(array $readers, callable $entityLookup, ?DictionaryCandidateRepository $queue = null): DictionarySeedCorpusAuditCoordinator
     {

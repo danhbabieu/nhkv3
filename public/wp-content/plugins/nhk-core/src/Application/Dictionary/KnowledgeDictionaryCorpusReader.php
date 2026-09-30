@@ -26,6 +26,13 @@ final class KnowledgeDictionaryCorpusReader implements DictionaryCorpusSourceRea
             $family = trim((string) ($metadata['source_family'] ?? $metadata['source_id'] ?? '')) ?: 'knowledge:' . $claim->stableKey;
             $items[] = ['source_id' => $claim->stableKey, 'source_family' => $family, 'source_kind' => 'KNOWLEDGE', 'raw_text' => $claim->claimText, 'raw_or_derived' => strtoupper((string) ($metadata['raw_or_derived'] ?? 'RAW')), 'lineage' => is_array($metadata['lineage'] ?? null) ? $metadata['lineage'] : [], 'context' => $metadata, 'locale' => (string) ($metadata['locale'] ?? 'vi-VN')];
         }
-        return ['items' => $items, 'has_more' => (bool) ($page['has_more'] ?? false)];
+        foreach ((array) ($page['diagnostics'] ?? []) as $diagnostic) {
+            if (!is_array($diagnostic)) continue;
+            $sourceId = trim((string) ($diagnostic['source_id'] ?? ''));
+            if ($sourceId === '') continue;
+            $items[] = ['source_id' => $sourceId, 'source_family' => 'knowledge:' . $sourceId, 'source_kind' => 'KNOWLEDGE', 'raw_text' => '', 'source_error' => (string) ($diagnostic['code'] ?? 'KNOWLEDGE_SOURCE_UNAVAILABLE'), 'context' => ['canonical_uuid' => (string) ($diagnostic['canonical_uuid'] ?? '')]];
+        }
+        usort($items, static fn (array $left, array $right): int => strcmp((string) $left['source_id'], (string) $right['source_id']));
+        return ['items' => $items, 'has_more' => (bool) ($page['has_more'] ?? false), 'next_cursor' => isset($page['next_cursor']) ? (string) $page['next_cursor'] : null, 'diagnostics' => []];
     }
 }
