@@ -369,6 +369,11 @@ final class Plugin {
             $sharedAttachmentBridge = $attachmentBridge;
             $mediaEnrichmentExactReadback = new MediaEnrichmentExactReadbackService($usages, $attachmentBridge, [$entityMediaProjection, 'representativeForEntity']);
             $knowledgeService = new KnowledgeService($claims, $sources, $evidence);
+            $knowledgeQualityAudit = new \NHK\Core\Application\Knowledge\KnowledgeQualityAuditCoordinator(
+                new \NHK\Core\Application\Knowledge\KnowledgeQualityAuditor($claims, $evidence, $sources, new \NHK\Core\Application\Semantic\StructuredSemanticInterpreter()),
+                $claims,
+            );
+            add_filter('nhk_v3_knowledge_quality_audit_coordinator', static fn (mixed $current): mixed => $current ?? $knowledgeQualityAudit, 10, 1);
             $collectorBranchReader = static function (string $classificationId) use ($authority, $claims, $graphService): array {
                 $classification = $authority->findByCanonicalId($classificationId);
                 if (!$classification instanceof \NHK\Core\Domain\Authority\AuthorityEntity || $classification->entityType !== 'classification' || !$classification->active()) return ['status' => 'unavailable', 'reason' => 'CLASSIFICATION_NOT_AVAILABLE'];

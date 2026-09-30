@@ -1,5 +1,33 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-30 — Knowledge Quality Audit & Normalization Planner (LOCAL / READ-ONLY)
+
+IMPLEMENTED_SLICE: Added the ephemeral `KnowledgeQualityAuditResult`,
+`KnowledgeQualityAuditor` and bounded `KnowledgeQualityAuditCoordinator`. The
+auditor reads canonical Knowledge, Evidence and Source repositories, invokes
+the shared `StructuredSemanticInterpreter`, preserves subject/scope/
+provenance/evidence assessments, detects deterministic duplicate/reuse,
+process/derived/editorial contamination, atomization, Dictionary and
+registered-relation candidates, and emits planning-only repair actions plus
+facet/readiness summaries. It performs no Knowledge, Evidence, Source or Graph
+mutation and default serialization redacts claim text/lexical payload.
+
+The Knowledge repository now exposes an optional stable-key page reader so a
+corpus audit can remain bounded when the runtime adapter supports it; legacy
+repositories retain a deterministic list fallback. The composition root wires
+the planner through the internal `nhk_v3_knowledge_quality_audit_coordinator`
+filter without adding a public writer or mutation Ability.
+
+VALIDATION: Five focused audit tests pass (22 assertions); changed PHP files
+lint and `git diff --check` pass. Full PHPUnit with `memory_limit=512M` runs
+2,956 tests / 16,651 assertions and retains the known two KnowledgeWriterPreview
+failures plus environment-gated integration errors because the exact WordPress
+test bootstrap was not supplied. The default 128M run remains blocked by the
+known TrustedProvidedFileMaterializer memory test. No 1,170-record live scan was
+claimed or performed without the canonical WP runtime.
+
+STATUS: `KNOWLEDGE_QUALITY_AUDIT_LOCAL_READY / IMPLEMENTATION_PARTIAL / NO_MUTATION / COMMITTED`
+
 # Checkpoint — 2026-09-30 — Universal Structured Semantic Intake (LOCAL / NO MUTATION)
 
 IMPLEMENTED_SLICE: Added the ephemeral `StructuredInterpretationPacket` and

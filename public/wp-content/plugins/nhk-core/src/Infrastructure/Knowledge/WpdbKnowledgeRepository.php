@@ -3,12 +3,12 @@ declare(strict_types=1);
 
 namespace NHK\Core\Infrastructure\Knowledge;
 
-use NHK\Core\Contracts\Knowledge\KnowledgeRepository;
+use NHK\Core\Contracts\Knowledge\{KnowledgePageReader, KnowledgeRepository};
 use NHK\Core\Contracts\Home\BoundedLatestFeedReader;
 use NHK\Core\Domain\Knowledge\{KnowledgeClaim, KnowledgeException};
 use NHK\Core\Shared\Uuid\UuidCodec;
 
-final class WpdbKnowledgeRepository implements KnowledgeRepository, BoundedLatestFeedReader
+final class WpdbKnowledgeRepository implements KnowledgeRepository, KnowledgePageReader, BoundedLatestFeedReader
 {
     private string $table;
     public function __construct(private object $database) { $this->table = $database->prefix . 'nhk_knowledge_claims'; }
@@ -38,6 +38,18 @@ final class WpdbKnowledgeRepository implements KnowledgeRepository, BoundedLates
         return $this->findByCanonicalId($claim->canonicalId) ?? $claim;
     }
     public function list(bool $includeRetired = false): array { $rows = $this->database->get_results("SELECT * FROM {$this->table}" . ($includeRetired ? '' : ' WHERE state=1') . ' ORDER BY id', ARRAY_A); return array_values(array_filter(array_map(fn (array $row): ?KnowledgeClaim => $this->hydrate($row), $rows ?: []), static fn (?KnowledgeClaim $claim): bool => $claim !== null)); }
+    public function page(bool $includeRetired, ?string $afterStableKey, int $limit): array
+    {
+        $limit = max(1, min(200, $limit));
+        $where = $includeRetired ? '1=1' : 'state=1';
+        $args = [];
+        if ($afterStableKey !== null && trim($afterStableKey) !== '') { $where .= ' AND stable_key > %s'; $args[] = $afterStableKey; }
+        $args[] = $limit + 1;
+        $rows = $this->database->get_results($this->database->prepare("SELECT * FROM {$this->table} WHERE {$where} ORDER BY stable_key ASC LIMIT %d", ...$args), ARRAY_A);
+        $items = array_values(array_filter(array_map(fn (array $row): ?KnowledgeClaim => $this->hydrate($row), $rows ?: []), static fn (?KnowledgeClaim $claim): bool => $claim !== null));
+        $hasMore = count($items) > $limit;
+        return ['items' => array_slice($items, 0, $limit), 'has_more' => $hasMore];
+    }
     public function latestFeedCandidates(int $limit): array { $limit = max(1, min(100, $limit)); $rows = $this->database->get_results($this->database->prepare("SELECT * FROM {$this->table} WHERE state=1 ORDER BY created_at DESC, id DESC LIMIT %d", $limit), ARRAY_A); return array_values(array_filter(array_map(fn (array $row): ?KnowledgeClaim => $this->hydrate($row), $rows ?: []), static fn (?KnowledgeClaim $claim): bool => $claim !== null)); }
     private function hydrate(?array $row): ?KnowledgeClaim { if (!$row) return null; try { $provenance = json_decode((string) ($row['provenance_json'] ?? ''), true, 512, JSON_THROW_ON_ERROR); if (!is_array($provenance) || preg_match('/^[01]$/', (string) ($row['state'] ?? '')) !== 1) return null; return new KnowledgeClaim(UuidCodec::fromBinary($row['canonical_uuid']), (string) $row['stable_key'], (string) $row['claim_text'], (string) $row['claim_type'], $provenance, (int) $row['state'] === 1, (int) $row['revision'], $row['created_at'] ?? null, $row['updated_at'] ?? null); } catch (\Throwable) { return null; } }
 
