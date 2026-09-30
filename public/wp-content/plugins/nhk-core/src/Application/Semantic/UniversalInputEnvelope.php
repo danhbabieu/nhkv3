@@ -19,7 +19,7 @@ final readonly class UniversalInputEnvelope
     /** @param array<string,mixed> $input */
     public static function fromArray(array $input): self
     {
-        $owner = trim((string) ($input['owner_or_source_type'] ?? $input['input_type'] ?? 'generic'));
+        $owner = trim((string) ($input['source_kind'] ?? $input['owner_or_source_type'] ?? $input['input_type'] ?? 'generic'));
         $body = self::scalarString($input['body'] ?? $input['text'] ?? $input['raw_text'] ?? $input['raw_input'] ?? '');
         $subjectResolution = is_array($input['subject_resolution'] ?? null) ? $input['subject_resolution'] : [];
         $observations = self::normalizeRecords($input['observations'] ?? [], 'MACHINE_DERIVED');
@@ -34,9 +34,22 @@ final readonly class UniversalInputEnvelope
             $diagnostics[] = 'INPUT_CONTENT_UNAVAILABLE';
         }
 
+        $sourceIdentity = is_array($input['source_identity'] ?? null) ? $input['source_identity'] : [];
+        if (!array_key_exists('source_id', $sourceIdentity) && is_scalar($input['source_identifier'] ?? null)) {
+            $sourceIdentity['source_id'] = (string) $input['source_identifier'];
+        }
+        $metadata = is_array($input['metadata'] ?? null) ? $input['metadata'] : [];
+        if (array_key_exists('hints', $input) && !array_key_exists('lexical_hints', $metadata)) {
+            $metadata['lexical_hints'] = is_array($input['hints']) ? $input['hints'] : [];
+        }
+        foreach (['content_intent_context', 'canonical_target_hint', 'provenance_context', 'observation_strength', 'raw_or_derived'] as $key) {
+            if (array_key_exists($key, $input) && !array_key_exists($key, $metadata)) $metadata[$key] = $input[$key];
+        }
+
         $value = [
             'owner_or_source_type' => $owner !== '' ? strtolower($owner) : 'generic',
-            'source_identity' => is_array($input['source_identity'] ?? null) ? $input['source_identity'] : [],
+            'source_identity' => $sourceIdentity,
+            'source_kind' => $owner !== '' ? strtolower($owner) : 'generic',
             'raw_input_reference' => is_scalar($input['raw_input_reference'] ?? null) ? (string) $input['raw_input_reference'] : null,
             'locale' => trim((string) ($input['locale'] ?? 'vi-VN')) ?: 'vi-VN',
             'lineage' => is_array($input['lineage'] ?? null) ? $input['lineage'] : [],
@@ -46,8 +59,8 @@ final readonly class UniversalInputEnvelope
             'subject_resolution' => $subjectResolution,
             'subject_hints' => self::strings($input['subject_hints'] ?? []),
             'observations' => $observations,
-            'source_metadata' => is_array($input['source_metadata'] ?? null) ? $input['source_metadata'] : (is_array($input['metadata'] ?? null) ? $input['metadata'] : []),
-            'metadata' => is_array($input['metadata'] ?? null) ? $input['metadata'] : [],
+            'source_metadata' => is_array($input['source_metadata'] ?? null) ? $input['source_metadata'] : $metadata,
+            'metadata' => $metadata,
             'relations' => self::records($input['relations'] ?? $input['relation_hints'] ?? []),
             'existing_knowledge' => self::records($input['existing_knowledge'] ?? []),
             'user_hints' => self::records($input['user_hints'] ?? []),
@@ -57,6 +70,11 @@ final readonly class UniversalInputEnvelope
             'semantic_context' => is_array($input['semantic_context'] ?? null) ? $input['semantic_context'] : [],
             'provenance' => is_array($input['provenance'] ?? null) ? $input['provenance'] : [],
             'confidence' => max(0.0, min(1.0, $confidence)),
+            'raw_or_derived' => strtoupper(trim((string) ($input['raw_or_derived'] ?? $metadata['raw_or_derived'] ?? 'RAW'))) ?: 'RAW',
+            'content_intent_context' => is_array($input['content_intent_context'] ?? null) ? $input['content_intent_context'] : (is_array($metadata['content_intent_context'] ?? null) ? $metadata['content_intent_context'] : []),
+            'canonical_target_hint' => is_array($input['canonical_target_hint'] ?? null) ? $input['canonical_target_hint'] : (is_array($metadata['canonical_target_hint'] ?? null) ? $metadata['canonical_target_hint'] : []),
+            'provenance_context' => is_array($input['provenance_context'] ?? null) ? $input['provenance_context'] : (is_array($metadata['provenance_context'] ?? null) ? $metadata['provenance_context'] : []),
+            'observation_strength' => strtoupper(trim((string) ($input['observation_strength'] ?? $metadata['observation_strength'] ?? 'NORMAL'))) ?: 'NORMAL',
             'constraints' => is_array($input['constraints'] ?? null) ? $input['constraints'] : [],
             'target_surface' => trim((string) ($input['target_surface'] ?? 'generic')) ?: 'generic',
             'components' => $components,

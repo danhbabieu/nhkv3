@@ -43,6 +43,7 @@ final readonly class StructuredInterpretationPacket
             'dictionary_delta_candidates' => [],
             'knowledge_delta_candidates' => [],
             'relation_delta_candidates' => [],
+            'semantic_query_seeds' => [],
             'diagnostics' => [],
             'outcomes' => [],
         ];

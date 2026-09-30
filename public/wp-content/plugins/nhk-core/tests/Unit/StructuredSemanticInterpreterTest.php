@@ -93,4 +93,30 @@ final class StructuredSemanticInterpreterTest extends TestCase
         self::assertSame('video_text', $direct['source_context']['source_kind']);
         self::assertSame('transcript', $legacy['structured_interpretation_packet']['source_context']['source_kind']);
     }
+
+    public function test_input_contract_preserves_lineage_intent_target_provenance_and_observation_strength(): void
+    {
+        $packet = (new StructuredSemanticInterpreter())->interpret([
+            'text' => 'Unknown valid term được quan sát.',
+            'locale' => 'vi-VN',
+            'source_kind' => 'human_chat',
+            'source_identifier' => 'chat:42',
+            'raw_input_reference' => 'capture:42',
+            'raw_or_derived' => 'RAW',
+            'content_intent_context' => ['intent' => 'KNOWLEDGE_DELTA'],
+            'canonical_target_hint' => ['type' => 'model', 'id' => 'model-1'],
+            'provenance_context' => ['source_class' => 'EXPLICIT_USER_KNOWLEDGE'],
+            'observation_strength' => 'NORMAL',
+            'hints' => ['Unknown valid term'],
+        ])->toArray();
+
+        self::assertSame('human_chat', $packet['source_context']['source_kind']);
+        self::assertSame('chat:42', $packet['source_context']['source_identifier']);
+        self::assertSame('RAW', $packet['source_context']['raw_or_derived']);
+        self::assertSame(['intent' => 'KNOWLEDGE_DELTA'], $packet['source_context']['content_intent_context']);
+        self::assertSame(['type' => 'model', 'id' => 'model-1'], $packet['source_context']['canonical_target_hint']);
+        self::assertSame(['source_class' => 'EXPLICIT_USER_KNOWLEDGE'], $packet['source_context']['provenance_context']);
+        self::assertSame('NORMAL', $packet['source_context']['observation_strength']);
+        self::assertSame('unknown valid term', $packet['semantic_query_seeds'][0]['normalized_form']);
+    }
 }

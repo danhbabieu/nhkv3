@@ -49,11 +49,16 @@ final class StructuredSemanticInterpreter
         return StructuredInterpretationPacket::fromArray([
             'status' => $status,
             'source_context' => [
-                'source_kind' => strtolower((string) ($value['owner_or_source_type'] ?? 'generic')),
+                'source_kind' => strtolower((string) ($value['source_kind'] ?? $value['owner_or_source_type'] ?? 'generic')),
                 'source_identity' => (array) ($value['source_identity'] ?? []),
-                'raw_or_derived' => $this->rawOrDerived($value),
+                'source_identifier' => (string) (($value['source_identity']['source_id'] ?? '') ?: ($value['source_identity']['id'] ?? '')),
+                'raw_or_derived' => $value['raw_or_derived'] ?? $this->rawOrDerived($value),
                 'lineage' => (array) ($value['lineage'] ?? $metadata['lineage'] ?? []),
                 'content_intent' => (string) ($value['content_intent'] ?? ''),
+                'content_intent_context' => (array) ($value['content_intent_context'] ?? []),
+                'canonical_target_hint' => (array) ($value['canonical_target_hint'] ?? []),
+                'provenance_context' => (array) ($value['provenance_context'] ?? []),
+                'observation_strength' => (string) ($value['observation_strength'] ?? 'NORMAL'),
             ],
             'raw_input_reference' => $value['raw_input_reference'] ?? ($value['source_identity']['raw_input_reference'] ?? null),
             'locale' => (string) ($value['locale'] ?? $metadata['locale'] ?? 'vi-VN'),
@@ -78,6 +83,7 @@ final class StructuredSemanticInterpreter
             'dictionary_delta_candidates' => $this->dictionaryCandidates($lexical, $unresolved),
             'knowledge_delta_candidates' => $this->knowledgeCandidates($claims),
             'relation_delta_candidates' => $relations,
+            'semantic_query_seeds' => $this->querySeeds($lexical, $value, $ambiguous),
             'diagnostics' => $diagnostics,
             'outcomes' => $this->outcomes($lexical, $claims, $relations, $ambiguous, $unresolved),
         ]);
@@ -173,7 +179,7 @@ final class StructuredSemanticInterpreter
     /** @param array<string,mixed> $value @param list<array<string,mixed>> $ambiguous @return list<string> */
     private function uncertaintySignals(array $value, array $ambiguous): array { return array_values(array_unique(array_merge($this->strings($value['uncertainty_signals'] ?? []), $ambiguous !== [] ? ['AMBIGUOUS'] : []))); }
     /** @param array<string,mixed> $value @return list<array<string,mixed>> */
-    private function editorialSignals(array $value): array { return array_values(array_filter((array) ($value['editorial_signals'] ?? $value['metadata']['editorial_only'] ?? []), 'is_array')); }
+    private function editorialSignals(array $value): array { return array_values(array_filter((array) ($value['editorial_signals'] ?? $value['metadata']['editorial_signals'] ?? $value['metadata']['editorial_only'] ?? []), 'is_array')); }
     /** @param array<string,mixed> $value @param list<array<string,mixed>> $claims @return list<array<string,mixed>> */
     private function reuseMatches(array $value, array $claims): array { return array_values(array_filter((array) ($value['existing_knowledge'] ?? []), static fn (mixed $item): bool => is_array($item) && trim((string) ($item['claim_id'] ?? $item['id'] ?? '')) !== '')); }
     /** @param list<array<string,mixed>> $lexical @param list<array<string,mixed>> $unresolved @return list<array<string,mixed>> */
@@ -188,4 +194,41 @@ final class StructuredSemanticInterpreter
     private function normalize(string $value): string { return function_exists('mb_strtolower') ? mb_strtolower(trim($value)) : strtolower(trim($value)); }
     /** @param array<string,mixed> $value @param list<array<string,mixed>> $claims @return list<array<string,mixed>> */
     private function attributeCandidates(array $value, array $lexical): array { return array_values(array_filter($lexical, static fn (array $span): bool => in_array($span['origin'], ['DOMAIN_PHRASE', 'STRUCTURAL_CONFIGURATION'], true))); }
+
+    /** @param list<array<string,mixed>> $lexical @param list<array<string,mixed>> $ambiguous @return list<array<string,mixed>> */
+    private function querySeeds(array $lexical, array $value, array $ambiguous): array
+    {
+        $ambiguousTerms = array_fill_keys(array_column($ambiguous, 'normalized_term'), true);
+        $locale = (string) ($value['locale'] ?? 'vi-VN');
+        $context = is_array($value['semantic_context'] ?? null) ? $value['semantic_context'] : [];
+        $facet = (string) ($context['facet'] ?? '');
+        $seeds = [];
+        foreach ($lexical as $span) {
+            $normalized = (string) ($span['normalized_term'] ?? '');
+            if ($normalized === '') continue;
+            $seeds[] = [
+                'raw_span' => (string) ($span['term'] ?? ''),
+                'normalized_form' => $normalized,
+                'category' => $this->queryCategory((string) ($span['origin'] ?? 'UNKNOWN')),
+                'locale' => $locale,
+                'context' => $context,
+                'canonical_reference' => null,
+                'facet_hint' => $facet !== '' ? $facet : null,
+                'ambiguity' => isset($ambiguousTerms[$normalized]) ? 'AMBIGUOUS' : 'UNRESOLVED',
+                'diagnostics' => isset($ambiguousTerms[$normalized]) ? ['AMBIGUOUS_CANONICAL_OWNER'] : [],
+            ];
+        }
+        return $seeds;
+    }
+
+    private function queryCategory(string $origin): string
+    {
+        return match ($origin) {
+            'PROPER_NAME_SPAN' => 'PROPER_NAME',
+            'IDENTIFIER_SPAN', 'TECHNICAL_PATTERN' => 'IDENTIFIER',
+            'STRUCTURAL_CONFIGURATION' => 'CONFIGURATION',
+            'DOMAIN_PHRASE', 'QUOTED_PHRASE', 'MUSIC_NAME' => 'LEXICAL_TERM',
+            default => 'LEXICAL_OBSERVATION',
+        };
+    }
 }
