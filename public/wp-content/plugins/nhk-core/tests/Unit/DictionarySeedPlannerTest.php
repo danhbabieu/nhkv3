@@ -34,7 +34,7 @@ final class DictionarySeedPlannerTest extends TestCase
         self::assertSame('RESOLVED_EXISTING', $result['items'][0]['classification']);
         self::assertSame(['Existing Label'], $result['items'][0]['raw_forms']);
         self::assertSame(['article:1'], $result['items'][0]['source_families']);
-        self::assertSame('RESOLVED_EXISTING', $result['items'][1]['classification']);
+        self::assertSame('ALIAS_TO_EXISTING', $result['items'][1]['classification']);
         self::assertSame('concept-1', $result['items'][1]['resolution']['concept_id']);
     }
 

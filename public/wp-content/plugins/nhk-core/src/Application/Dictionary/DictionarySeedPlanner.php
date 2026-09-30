@@ -65,7 +65,7 @@ final class DictionarySeedPlanner
                 'destination_ids' => $resolution->status === DictionaryResolution::RESOLVED && $resolution->destinationId !== null ? [$resolution->destinationId] : [],
             ];
             $item['classification'] = match ($resolution->status) {
-                DictionaryResolution::RESOLVED => 'RESOLVED_EXISTING',
+                DictionaryResolution::RESOLVED => $this->normalize((string) ($resolution->preferredLabel ?? '')) !== '' && $this->normalize((string) ($resolution->preferredLabel ?? '')) !== $item['normalized_form'] ? 'ALIAS_TO_EXISTING' : 'RESOLVED_EXISTING',
                 DictionaryResolution::AMBIGUOUS => 'AMBIGUOUS',
                 DictionaryResolution::SUPPRESSED => 'SUPPRESSED',
                 default => 'NEW_LEXICAL_CANDIDATE',
@@ -80,5 +80,11 @@ final class DictionarySeedPlanner
         foreach ($rows as $row) $aggregate['counts_by_classification'][$row['classification']] = ($aggregate['counts_by_classification'][$row['classification']] ?? 0) + 1;
         ksort($aggregate['counts_by_classification']);
         return ['status' => 'READ_ONLY_PLAN', 'read_only' => true, 'mutated' => false, 'items' => $rows, 'aggregate' => $aggregate, 'diagnostics' => ['deduplication' => 'normalized_form', 'source_family' => $sourceFamily]];
+    }
+
+    private function normalize(string $value): string
+    {
+        $value = function_exists('mb_strtolower') ? mb_strtolower($value, 'UTF-8') : strtolower($value);
+        return preg_replace('/\s+/u', ' ', trim($value)) ?? trim($value);
     }
 }
