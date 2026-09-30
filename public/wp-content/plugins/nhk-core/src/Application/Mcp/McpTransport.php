@@ -59,6 +59,7 @@ final class McpTransport
         private ?MediaTargetNormalizer $mediaTargetNormalizer = null,
         private ?\NHK\Core\Application\Media\MediaEnrichmentIntentCompiler $mediaIntentCompiler = null,
         private ?McpDictionaryHandler $dictionary = null,
+        private ?DictionarySeedAuditHandler $dictionarySeedAudit = null,
     ) {}
 
     /** @return array{status:int,body:?array} */
@@ -160,6 +161,7 @@ final class McpTransport
             'nhk.documentation.bootstrap', 'nhk.documentation.get', 'nhk.documentation.list', 'nhk.docs.bootstrap', 'nhk.docs.get' => 'read',
             'nhk.article.preflight', 'nhk.relationship.registry', 'nhk.relationship.list', 'nhk.relationship.get', 'nhk.relationship.preview', 'nhk.knowledge.writer.preview' => 'read',
             'nhk.knowledge.quality-audit' => 'nhk_view_governance',
+            'nhk.dictionary.seed-audit' => 'nhk_view_governance',
             'nhk.article.ingest' => 'nhk_ingest_articles',
             'nhk.capture.ingest' => 'nhk_ingest_articles',
             'nhk.category.create', 'nhk.category.update', 'nhk.category.assign', 'nhk.category.unassign', 'nhk.category.delete', 'nhk.article.draft.create', 'nhk.article.draft.update', 'nhk.article.publish', 'nhk.article.publish.review', 'nhk.article.publish.approve', 'nhk.article.trash', 'nhk.article.restore' => 'nhk_ingest_articles',
@@ -193,6 +195,7 @@ final class McpTransport
         $result = match ($dispatch) {
             'nhk.knowledge.writer.preview' => $this->knowledgeWriterPreview?->preview($arguments) ?? throw new \RuntimeException('KNOWLEDGE_WRITER_PREVIEW_UNAVAILABLE'),
             'nhk.knowledge.quality-audit' => $this->knowledgeQualityAudit?->audit($arguments) ?? throw new \RuntimeException('KNOWLEDGE_QUALITY_AUDIT_UNAVAILABLE'),
+            'nhk.dictionary.seed-audit' => $this->dictionarySeedAudit?->audit($arguments) ?? throw new \RuntimeException('DICTIONARY_SEED_AUDIT_UNAVAILABLE'),
             'nhk.documentation.bootstrap', 'nhk.docs.bootstrap' => ($this->documentation ?? new McpDocumentationRegistry())->bootstrap(),
             'nhk.documentation.get' => ($this->documentation ?? new McpDocumentationRegistry())->get((string) ($arguments['path'] ?? ''), isset($arguments['start_line']) ? (int) $arguments['start_line'] : null, isset($arguments['line_count']) ? (int) $arguments['line_count'] : null),
             'nhk.documentation.list' => ($this->documentation ?? new McpDocumentationRegistry())->list(isset($arguments['status']) ? (string) $arguments['status'] : null, isset($arguments['domain']) ? (string) $arguments['domain'] : null, isset($arguments['path_prefix']) ? (string) $arguments['path_prefix'] : null),

@@ -27,6 +27,7 @@ final class DictionaryRuntime
     private WpdbDictionaryCandidateRepository $candidates;
     private WpdbDictionaryMentionRepository $mentions;
     private DictionaryPlanningService $planning;
+    private DictionarySeedPlanner $seedPlanner;
     private DictionaryCurationService $curation;
     private DictionaryPublicQuery $publicQuery;
     private ?array $detectionLabels = null;
@@ -96,6 +97,7 @@ final class DictionaryRuntime
         );
 
         $this->planning = new DictionaryPlanningService(new DictionaryTermDetector($this->normalizer), $resolver, $this->candidates, $this->mentions, new DictionaryLinkPlanner());
+        $this->seedPlanner = new DictionarySeedPlanner($resolver);
         $this->curation = new DictionaryCurationService(
             $this->candidates,
             $this->concepts,
@@ -200,6 +202,7 @@ final class DictionaryRuntime
     public function concepts(): WpdbDictionaryConceptRepository { return $this->concepts; }
     public function candidates(): WpdbDictionaryCandidateRepository { return $this->candidates; }
     public function mentions(): WpdbDictionaryMentionRepository { return $this->mentions; }
+    public function seedPlanner(): DictionarySeedPlanner { return $this->seedPlanner; }
 
     public function resolve(string $term, array $context = [], array $hints = []): array
     {

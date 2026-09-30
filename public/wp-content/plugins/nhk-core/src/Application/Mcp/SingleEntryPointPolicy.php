@@ -41,6 +41,7 @@ final class SingleEntryPointPolicy
         'nhk.video.frontend.reconcile',
         'nhk.knowledge.ingest',
         'nhk.knowledge.quality-audit',
+        'nhk.dictionary.seed-audit',
         'nhk.source.ingest',
         'nhk.evidence.ingest',
         'nhk.public-url.reproject',

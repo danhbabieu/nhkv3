@@ -76,6 +76,18 @@ final class McpToolCatalog
                 'include_items' => ['type' => 'boolean'],
                 'include_repair_candidates' => ['type' => 'boolean'],
             ], []),
+            self::tool('nhk.dictionary.seed-audit', 'Read-only bounded Dictionary Seed v1 audit over shared structured semantic interpretation; returns privacy-safe lexical planning output and never approves or mutates a semantic owner.', [
+                'text' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 12000],
+                'source_kind' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 64],
+                'source_id' => ['type' => 'string', 'maxLength' => 191],
+                'source_family' => ['type' => 'string', 'maxLength' => 191],
+                'locale' => ['type' => 'string', 'maxLength' => 32],
+                'hints' => ['type' => 'array', 'maxItems' => 50],
+                'context' => ['type' => 'object'],
+                'classification_filters' => ['type' => 'array', 'maxItems' => 10, 'items' => ['type' => 'string']],
+                'limit' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 100],
+                'offset' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 10000],
+            ], ['text']),
             self::tool('nhk.article.ingest', 'Resume governed reconciliation or a bounded update of an existing Article using the same idempotency key.', self::articleProperties(true), ['idempotency_key', 'intent'], true),
             self::tool('nhk.capture.ingest', 'Capture new editorial input or continue one existing Capture; classify intent before creating an Article, preserve canonical owners, reconcile typed MediaUsage bindings even without an Article, resolve bounded semantic context when required and return the current read-back.', [
                 'idempotency_key' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 191],

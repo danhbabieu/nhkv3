@@ -78,6 +78,7 @@ final class McpContractTest extends TestCase
             'nhk.article.preflight',
             'nhk.knowledge.writer.preview',
             'nhk.knowledge.quality-audit',
+            'nhk.dictionary.seed-audit',
             'nhk.article.ingest',
             'nhk.capture.ingest',
             'nhk.capture.get',
@@ -505,6 +506,7 @@ final class McpContractTest extends TestCase
             'nhk-v3/dictionary-mentions-list',
             'nhk-v3/dictionary-backfill-dry-run',
             'nhk-v3/dictionary-profile',
+            'nhk-v3/dictionary-seed-audit',
             'nhk-v3/knowledge-writer-preview',
         ], McpAbilityRegistration::readAbilityNames());
         self::assertSame('nhk-v3/entity-get', McpAbilityRegistration::abilityNameForTool('nhk.entity.get'));

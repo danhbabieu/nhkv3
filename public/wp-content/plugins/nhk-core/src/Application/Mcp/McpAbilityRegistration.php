@@ -59,6 +59,7 @@ final class McpAbilityRegistration
     /** @var list<string> Explicit internal/admin read-only connector opt-ins. */
     private const EASY_MCP_EXPLICIT_INTERNAL_READ_ONLY_ABILITIES = [
         'nhk-v3/knowledge-quality-audit',
+        'nhk-v3/dictionary-seed-audit',
     ];
 
     public static function bootstrapRegistry(): void
@@ -351,6 +352,7 @@ final class McpAbilityRegistration
         'nhk.dictionary.mentions.list' => 'nhk-v3/dictionary-mentions-list',
         'nhk.dictionary.backfill.dry_run' => 'nhk-v3/dictionary-backfill-dry-run',
         'nhk.dictionary.profile' => 'nhk-v3/dictionary-profile',
+        'nhk.dictionary.seed-audit' => 'nhk-v3/dictionary-seed-audit',
     ];
 
     /** @var array<string,string> */
@@ -359,6 +361,7 @@ final class McpAbilityRegistration
         'nhk.proposal.review' => 'nhk-v3/proposal-review',
         'nhk.public-url.audit' => 'nhk-v3/public-url-audit',
         'nhk.knowledge.quality-audit' => 'nhk-v3/knowledge-quality-audit',
+        'nhk.dictionary.seed-audit' => 'nhk-v3/dictionary-seed-audit',
     ];
 
     /** @var array<string,string> */
@@ -791,6 +794,7 @@ final class McpAbilityRegistration
             'nhk.proposal.approve', 'nhk.proposal.reject' => 'nhk_approve_proposals',
             'nhk.proposal.eligibility' => 'nhk_view_governance',
             'nhk.knowledge.quality-audit' => 'nhk_view_governance',
+            'nhk.dictionary.seed-audit' => 'nhk_view_governance',
             'nhk.proposal.apply' => 'nhk_apply_proposals',
             'nhk.relation.backfill.apply' => 'nhk_apply_proposals',
             'nhk.public-url.audit', 'nhk.public-url.reproject' => 'nhk_manage_public_urls',
