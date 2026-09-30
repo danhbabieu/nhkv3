@@ -30,6 +30,15 @@ final class StructuredSemanticInterpreter
         $hints = is_array($metadata['lexical_hints'] ?? null) ? $metadata['lexical_hints'] : (array) ($value['user_hints'] ?? []);
         $spans = $this->detector->detect($text, $approved, $hints);
         $lexical = array_values(array_map(fn (array $span): array => $this->span($span), $spans));
+        $detectorEditorial = $this->detector->editorialSignals($text);
+        $detectorNoise = $this->detector->noiseSignals($text);
+        foreach (array_merge(array_filter($detectorEditorial, static fn (array $signal): bool => preg_match('/(?:hãy|đừng|chỉ\s+cần|cảm\s+thấy|bắt\s+nguồn|ghi\s+nhận)/iu', (string) ($signal['term'] ?? '')) === 1), $detectorNoise) as $signal) {
+            $normalized = (string) ($signal['normalized_term'] ?? '');
+            $found = false;
+            foreach ($lexical as &$span) if ($span['normalized_term'] === $normalized) { $span['origin'] = (string) ($signal['origin'] ?? $span['origin']); $found = true; break; }
+            unset($span);
+            if (!$found) $lexical[] = $this->span($signal);
+        }
         $declaredEditorial = $this->editorialSignals($value);
         $declaredEditorialTerms = array_fill_keys(array_map(fn (array $signal): string => $this->normalize((string) ($signal['term'] ?? '')), $declaredEditorial), true);
         $lexical = array_values(array_filter($lexical, static fn (array $span): bool => !isset($declaredEditorialTerms[$span['normalized_term']])));
@@ -43,7 +52,7 @@ final class StructuredSemanticInterpreter
         $resolved = $this->resolvedReferences($value);
         $claims = $this->claimCandidates($value, $text);
         $relations = $this->relationCandidates($value);
-        $editorialSignals = array_values(array_filter(array_merge($this->detectorEditorialSignals($text), $declaredEditorial), 'is_array'));
+        $editorialSignals = array_values(array_filter(array_merge($detectorEditorial, $declaredEditorial), 'is_array'));
         $diagnostics = array_values(array_unique(array_merge(
             (array) ($value['diagnostics'] ?? []),
             $this->diagnostics($value, $lexical, $ambiguous, $relations),
@@ -239,6 +248,8 @@ final class StructuredSemanticInterpreter
             'PROPER_NAME_SPAN' => 'PROPER_NAME',
             'IDENTIFIER_SPAN', 'TECHNICAL_PATTERN' => 'IDENTIFIER',
             'STRUCTURAL_CONFIGURATION' => 'CONFIGURATION',
+            'EDITORIAL_SIGNAL' => 'EDITORIAL_SIGNAL',
+            'NOISE' => 'NOISE',
             'DOMAIN_PHRASE', 'QUOTED_PHRASE', 'MUSIC_NAME' => 'LEXICAL_TERM',
             default => 'LEXICAL_OBSERVATION',
         };

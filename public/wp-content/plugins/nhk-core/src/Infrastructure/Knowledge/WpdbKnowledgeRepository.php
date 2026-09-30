@@ -42,11 +42,21 @@ final class WpdbKnowledgeRepository implements KnowledgeRepository, KnowledgePag
     {
         $limit = max(1, min(200, $limit));
         $where = $includeRetired ? '1=1' : 'state=1';
-        $args = [];
-        if ($afterStableKey !== null && trim($afterStableKey) !== '') { $where .= ' AND stable_key > %s'; $args[] = $afterStableKey; }
-        $args[] = $limit + 1;
-        $rows = $this->database->get_results($this->database->prepare("SELECT * FROM {$this->table} WHERE {$where} ORDER BY stable_key ASC LIMIT %d", ...$args), ARRAY_A);
-        $items = array_values(array_filter(array_map(fn (array $row): ?KnowledgeClaim => $this->hydrate($row), $rows ?: []), static fn (?KnowledgeClaim $claim): bool => $claim !== null));
+        $cursor = trim((string) ($afterStableKey ?? ''));
+        $items = [];
+        do {
+            $args = [];
+            $pageWhere = $where;
+            if ($cursor !== '') { $pageWhere .= ' AND stable_key > %s'; $args[] = $cursor; }
+            $args[] = $limit + 1;
+            $rows = $this->database->get_results($this->database->prepare("SELECT * FROM {$this->table} WHERE {$pageWhere} ORDER BY stable_key ASC LIMIT %d", ...$args), ARRAY_A) ?: [];
+            foreach ($rows as $row) {
+                $cursor = (string) ($row['stable_key'] ?? $cursor);
+                $claim = $this->hydrate($row);
+                if ($claim !== null) $items[] = $claim;
+                if (count($items) >= $limit + 1) break;
+            }
+        } while (count($items) < $limit + 1 && count($rows) > 0);
         $hasMore = count($items) > $limit;
         return ['items' => array_slice($items, 0, $limit), 'has_more' => $hasMore];
     }

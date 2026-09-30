@@ -33,21 +33,25 @@ final class DictionarySeedCorpusAuditCoordinator
         $lexicalObservations = 0;
         $next = null;
         $hasMore = false;
+        $diagnostics = [];
         foreach ($selected as $sourceScope) {
             $reader = $this->readers[$sourceScope] ?? null;
             if (!$reader instanceof DictionaryCorpusSourceReader) continue;
-            $page = $reader->page($state['after'][$sourceScope] ?? null, $limit);
+            try { $page = $reader->page($state['after'][$sourceScope] ?? null, $limit); }
+            catch (\Throwable $error) { $diagnostics[] = ['code' => 'CORPUS_SOURCE_PAGE_FAILED', 'source_scope' => $sourceScope, 'error' => get_class($error)]; continue; }
+            foreach ((array) ($page['diagnostics'] ?? []) as $diagnostic) if (is_array($diagnostic)) $diagnostics[] = $diagnostic + ['source_scope' => $sourceScope];
             $seenSources = [];
             foreach ((array) ($page['items'] ?? []) as $source) {
                 if (!is_array($source)) continue;
                 $sourceId = trim((string) ($source['source_id'] ?? ''));
                 $text = trim((string) ($source['raw_text'] ?? ''));
-                if ($sourceId === '' || $text === '' || isset($seenSources[$sourceId])) continue;
+                if ($sourceId === '' || isset($seenSources[$sourceId])) continue;
                 $seenSources[$sourceId] = true;
                 $sourcesScanned++;
+                if (isset($source['source_error'])) $diagnostics[] = ['code' => (string) $source['source_error'], 'source_scope' => $sourceScope, 'source_id' => $sourceId];
                 $family = trim((string) ($source['source_family'] ?? $sourceId)) ?: $sourceId;
                 $context = is_array($source['context'] ?? null) ? $source['context'] : [];
-                $packet = $this->interpreter->interpret([
+                try { $packet = $this->interpreter->interpret([
                     'raw_text' => $text,
                     'source_kind' => $sourceScope,
                     'source_identity' => ['source_id' => $sourceId, 'source_family' => $family],
@@ -55,7 +59,7 @@ final class DictionarySeedCorpusAuditCoordinator
                     'raw_or_derived' => (string) ($source['raw_or_derived'] ?? 'RAW'),
                     'metadata' => $context,
                     'locale' => (string) ($source['locale'] ?? 'vi-VN'),
-                ]);
+                ]); } catch (\Throwable $error) { $diagnostics[] = ['code' => 'CORPUS_SOURCE_INTERPRETATION_FAILED', 'source_scope' => $sourceScope, 'source_id' => $sourceId, 'error' => get_class($error)]; continue; }
                 $plan = $this->planner->plan($packet, ['source_family' => $family, 'context' => $context]);
                 foreach ((array) ($plan['items'] ?? []) as $row) {
                     if (!is_array($row)) continue;
@@ -87,7 +91,7 @@ final class DictionarySeedCorpusAuditCoordinator
             'lexical_observations' => $lexicalObservations, 'unique_normalized_terms' => count($rows),
             'items' => array_map([$this, 'safeRow'], $rows), 'aggregate' => $aggregate,
             'legacy_candidate_comparison' => $comparison, 'next_cursor' => $cursorOut, 'has_more' => $cursorOut !== null,
-            'diagnostics' => ['bounded_limit' => $limit, 'ordering' => 'source_id_ascending', 'legacy_queue' => 'comparison_only'],
+            'diagnostics' => ['bounded_limit' => $limit, 'ordering' => 'source_id_ascending', 'legacy_queue' => 'comparison_only', 'source_diagnostics' => $diagnostics],
         ];
     }
 

@@ -90,6 +90,25 @@ final class DictionaryTermDetector
             $normalized = $this->normalizer->normalize($term);
             if ($normalized !== '') $signals[$normalized] = ['term' => $term, 'normalized_term' => $normalized, 'origin' => 'EDITORIAL_SIGNAL', 'strength' => 'NORMAL'];
         }
+        $patterns = [
+            '/\b(?:hãy\s+\p{L}+|đừng\s+vội\s+\p{L}+|chỉ\s+cần\s+\p{L}+|cảm\s+thấy)\b/iu',
+            '/\b(?:\p{Lu}[\p{L}-]+\s+){1,3}(?:bắt\s+nguồn|ghi\s+nhận|được\s+ghi\s+nhận)\b/u',
+        ];
+        foreach ($patterns as $pattern) if (preg_match_all($pattern, $text, $matches)) foreach ($matches[0] as $term) {
+            $normalized = $this->normalizer->normalize((string) $term);
+            if ($normalized !== '') $signals[$normalized] = ['term' => trim((string) $term), 'normalized_term' => $normalized, 'origin' => 'EDITORIAL_SIGNAL', 'strength' => 'NORMAL'];
+        }
+        return array_values($signals);
+    }
+
+    public function noiseSignals(string $text): array
+    {
+        $signals = [];
+        if (preg_match_all('/\b(?:[\p{L}]+\s+){0,3}(?:mang\s+đồng\s+thời|hoàn\s+toàn)\s+[\p{L}]+(?:\s+[\p{L}]+){0,2}\b/iu', $text, $matches)) foreach ($matches[0] as $term) {
+            $term = trim((string) preg_replace('/^(?:và|nhưng|mà|có|là)\s+/iu', '', (string) $term));
+            $normalized = $this->normalizer->normalize($term);
+            if ($normalized !== '') $signals[$normalized] = ['term' => $term, 'normalized_term' => $normalized, 'origin' => 'NOISE', 'strength' => 'NORMAL'];
+        }
         return array_values($signals);
     }
 
@@ -285,11 +304,20 @@ final class DictionaryTermDetector
         while (count($tokens) > 1 && in_array(mb_strtolower((string) $tokens[0], 'UTF-8'), ['the', 'a', 'an', 'chiếc', 'một', 'mẫu', 'con'], true)) array_shift($tokens);
         if (count($tokens) < 2) return;
         $value = implode(' ', $tokens);
+        if ($this->isEditorialOrNoisePhrase($value)) return;
         $spans[$this->normalizer->normalize($value)] = $value;
         if (count($tokens) === 2 && in_array(mb_strtolower((string) $tokens[0], 'UTF-8'), ['bộ', 'cụm', 'hệ', 'van'], true) && mb_strlen((string) $tokens[1], 'UTF-8') <= 4) {
             $atomic = (string) $tokens[1];
             $spans[$this->normalizer->normalize($atomic)] = $atomic;
         }
+    }
+
+    private function isEditorialOrNoisePhrase(string $value): bool
+    {
+        $normalized = $this->normalizer->normalize($value);
+        return preg_match('/^(?:hãy\s+|đừng\s+vội\s+|chỉ\s+cần\s+|cảm\s+thấy\b)/u', $normalized) === 1
+            || preg_match('/\b(?:mang\s+đồng\s+thời|hoàn\s+toàn)\b/u', $normalized)
+            || preg_match('/^(?:[\p{Lu}][\p{L}-]+\s+){1,3}(?:bắt\s+nguồn|ghi\s+nhận|được\s+ghi\s+nhận)$/u', $value) === 1;
     }
 
     /** @return list<string> */

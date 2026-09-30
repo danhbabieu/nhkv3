@@ -77,6 +77,35 @@ final class DictionarySeedCorpusAuditTest extends TestCase
         self::assertFalse($result['mutated']);
     }
 
+    public function test_source_without_lexical_term_is_still_counted_and_cursor_is_deterministic(): void
+    {
+        $reader = new FakeDictionaryCorpusReader([
+            ['source_id' => 'knowledge:1', 'source_family' => 'source:a', 'source_kind' => 'KNOWLEDGE', 'raw_text' => '', 'context' => []],
+            ['source_id' => 'knowledge:2', 'source_family' => 'source:a', 'source_kind' => 'KNOWLEDGE', 'raw_text' => 'Valid Term', 'context' => ['lexical_hints' => ['Valid Term']]],
+        ]);
+        $coordinator = $this->coordinator(['KNOWLEDGE' => $reader], static fn (): array => []);
+
+        $result = $coordinator->audit('KNOWLEDGE', null, 10);
+
+        self::assertSame(2, $result['sources_scanned']);
+        self::assertSame(1, $result['lexical_observations']);
+        self::assertSame('valid term', $result['items'][0]['normalized_form']);
+    }
+
+    public function test_editorial_and_noise_signals_are_suppressed_in_seed_plan(): void
+    {
+        $reader = new FakeDictionaryCorpusReader([
+            ['source_id' => 'knowledge:1', 'source_family' => 'source:a', 'source_kind' => 'KNOWLEDGE', 'raw_text' => 'Hãy hỏi và bộ máy hoàn toàn nguyên bản.', 'context' => []],
+        ]);
+        $result = $this->coordinator(['KNOWLEDGE' => $reader], static fn (): array => [])->audit('KNOWLEDGE', null, 10);
+        $classifications = array_column($result['items'], 'classification', 'normalized_form');
+
+        self::assertSame('EDITORIAL_ONLY', $classifications['hãy hỏi']);
+        self::assertSame('NOISE', $classifications['bộ máy hoàn toàn nguyên bản']);
+        self::assertSame(1, $result['aggregate']['suppressed_editorial']);
+        self::assertSame(1, $result['aggregate']['suppressed_noise']);
+    }
+
     /** @param array<string,DictionaryCorpusSourceReader> $readers @param callable(string):array $entityLookup */
     private function coordinator(array $readers, callable $entityLookup, ?DictionaryCandidateRepository $queue = null): DictionarySeedCorpusAuditCoordinator
     {

@@ -318,4 +318,19 @@ final class DictionaryTermDetectorTest extends TestCase
         self::assertNotContains('528', $terms);
     }
 
+    public function test_editorial_process_phrases_are_not_lexical_candidates_but_terms_and_identifiers_survive(): void
+    {
+        $detector = new DictionaryTermDetector();
+        $terms = array_column($detector->detect(
+            'Hãy hỏi, cảm thấy, chỉ cần nhớ và đừng vội hỏi. Anton Schneider bắt nguồn; Deutsches Uhrenmuseum ghi nhận. Hiện vật mang đồng thời nhiều đặc điểm; bộ máy hoàn toàn nguyên bản. 8 côn 8 búa, 10 côn 11 búa, bộ thoát, mặt số, Odo 36/10.'
+        ), 'normalized_term');
+
+        foreach (['hãy hỏi', 'cảm thấy', 'chỉ cần nhớ', 'đừng vội hỏi', 'anton schneider bắt nguồn', 'deutsches uhrenmuseum ghi nhận', 'hiện vật mang đồng thời nhiều', 'bộ máy hoàn toàn nguyên bản'] as $noise) {
+            self::assertNotContains($noise, $terms);
+        }
+        foreach (['8 côn 8 búa', '10 côn 11 búa', 'bộ thoát', 'mặt số', 'odo 36/10'] as $term) {
+            self::assertContains($term, $terms);
+        }
+    }
+
 }

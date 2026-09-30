@@ -1,5 +1,38 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-30 — Dictionary Seed bounded reader/detector hardening (LOCAL / NO MUTATION)
+
+IMPLEMENTED: Generic lexical suppression now classifies directive/attribution
+process phrases as `SUPPRESS_EDITORIAL` and generic absolute/cumulative prose as
+`SUPPRESS_NOISE`, while preserving structural configurations, identifiers,
+proper names and valid domain terms. Structured interpretation carries these
+suppression origins into the read-only seed planner.
+
+ROOT_CAUSES_FIXED: Knowledge corpus coordination previously discarded sources
+whose text had no lexical term, so valid no-term records were absent from
+`sources_scanned`; the native Knowledge page reader also could terminate early
+when hydrated rows were invalid inside a SQL page. Article scanning included
+private posts, admitted the WordPress sample `Hello World`, skipped empty
+eligible Articles, and allowed one state-read failure to disappear without a
+source diagnostic. Article reads now cover canonical publish/draft scope,
+retain empty/error source attempts, report bounded diagnostics, and tolerate
+large/bad source reads without dropping the page.
+
+VALIDATION: Focused detector/corpus/interpreter/Article reader tests pass 41
+tests / 160 assertions. Dictionary resolver/planner/reuse/ambiguity regression
+passes 27 tests / 100 assertions. Contract suite passes 6 tests / 48
+assertions. Full Unit under 512M reaches 2,848 tests / 16,904 assertions with
+three existing KnowledgeQuality/KnowledgeWriterPreview failures; default 128M
+also remains blocked by the existing TrustedProvidedFileMaterializer memory
+test. PHP lint, diff-check and secret scan pass. The canonical runtime was not
+available for live 1,170 Knowledge / 77 Article read-back.
+
+NO_DATA_MUTATION: `read_only=true`, `mutated=false` paths remain unchanged;
+no Dictionary, Knowledge, Source, Evidence, Graph, Authority or Article write,
+migration, seed, backfill, staging or production operation was performed.
+
+STATUS: `DICTIONARY_SEED_READER_DETECTOR_HARDENED_LOCAL_READY / NO_MUTATION / DEPLOYMENT_NOT_PERFORMED`.
+
 # Checkpoint — 2026-09-30 — Dictionary Seed v1 bounded corpus audit (LOCAL / NO MUTATION)
 
 IMPLEMENTED: Extended the existing internal/admin-only
