@@ -66,6 +66,7 @@ final class McpPublicUrlMaintenanceContractTest extends TestCase
             'nhk-v3/dictionary-candidate-review',
             'nhk-v3/dictionary-relation-handoff',
             'nhk-v3/knowledge-quality-audit',
+            'nhk-v3/dictionary-seed-audit',
             'nhk-v3/mcp-app-diagnostics',
         ], McpAbilityRegistration::explicitInternalAdminAbilityAllowlist());
         self::assertNotContains($ability, McpAbilityRegistration::ensureEasyMcpEnabledAbilities([]));

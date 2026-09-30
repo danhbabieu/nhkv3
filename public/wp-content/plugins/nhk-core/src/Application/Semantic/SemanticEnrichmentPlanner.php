@@ -33,7 +33,7 @@ final class SemanticEnrichmentPlanner
 
         $owners = [];
         foreach ($dictionary['items'] as $seed) {
-            if (($seed['classification'] ?? '') !== 'RESOLVED_EXISTING' || !is_callable($this->ownerResolver)) continue;
+            if (!in_array(($seed['classification'] ?? ''), ['RESOLVED_EXISTING', 'ALIAS_TO_EXISTING'], true) || !is_callable($this->ownerResolver)) continue;
             try {
                 foreach ((array) (($this->ownerResolver)($seed) ?? []) as $owner) if (is_array($owner)) $owners[] = $owner + ['seed' => $seed['normalized_form']];
             } catch (\Throwable $error) {

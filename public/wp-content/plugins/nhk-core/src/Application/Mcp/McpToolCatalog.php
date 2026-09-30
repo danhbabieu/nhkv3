@@ -82,7 +82,7 @@ final class McpToolCatalog
                 'source_id' => ['type' => 'string', 'maxLength' => 191],
                 'source_family' => ['type' => 'string', 'maxLength' => 191],
                 'locale' => ['type' => 'string', 'maxLength' => 32],
-                'hints' => ['type' => 'array', 'maxItems' => 50],
+                'hints' => ['type' => 'array', 'maxItems' => 50, 'items' => ['type' => 'object']],
                 'context' => ['type' => 'object'],
                 'classification_filters' => ['type' => 'array', 'maxItems' => 10, 'items' => ['type' => 'string']],
                 'limit' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 100],

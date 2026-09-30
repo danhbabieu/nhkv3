@@ -12,7 +12,7 @@ final class SemanticEnrichmentPlannerTest extends TestCase
     public function test_read_only_enrichment_resolves_dictionary_discovers_graph_and_keeps_only_applicable_claims(): void
     {
         $dictionary = new DictionarySeedPlanner(new DictionaryResolver(
-            static fn (): array => [['concept_id' => 'concept-1', 'destination_type' => 'model', 'destination_id' => 'model-1']],
+            static fn (): array => [['concept_id' => 'concept-1', 'preferred_label' => 'Canonical Label', 'destination_type' => 'model', 'destination_id' => 'model-1']],
             static fn (): array => [], static fn (): array => [], static fn (): array => [], static fn (): bool => false,
         ));
         $planner = new SemanticEnrichmentPlanner(
@@ -37,6 +37,7 @@ final class SemanticEnrichmentPlannerTest extends TestCase
         self::assertFalse($result['mutated']);
         self::assertSame('AVAILABLE', $result['status']);
         self::assertCount(1, $result['dictionary']['items']);
+        self::assertSame('ALIAS_TO_EXISTING', $result['dictionary']['items'][0]['classification']);
         self::assertCount(1, $result['owners']);
         self::assertCount(1, $result['graph_candidates']);
         self::assertSame(['claim-valid'], array_column($result['knowledge']['applicable'], 'claim_id'));
