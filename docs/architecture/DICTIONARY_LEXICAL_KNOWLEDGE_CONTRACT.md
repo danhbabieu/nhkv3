@@ -145,6 +145,26 @@ create canonical semantic identity.
 Detection must preserve `source_kind`, source identifier, locator/context and
 observation strength so reviewers can see why a candidate exists.
 
+### Adapter-specific lexical/query seeds
+
+Every source adapter supplies only lexical/query seeds to Dictionary. The
+shared packet preserves the adapter's signal kind and lineage; Dictionary does
+not re-parse source formats or become a semantic parser.
+
+| Adapter | Permitted seeds | Required lexical/trust handling |
+| --- | --- | --- |
+| Human/Chat | `USER_TEXT`, explicit user hint | Preserve exact wording and user lineage; resolve context without treating the assertion as Evidence. |
+| Image/Media | `CAPTION`, `ALT_TEXT`, `FILENAME`, `OCR`, `VISUAL_OBSERVATION`, `MODEL_RECOGNITION`, plus bounded `USER_TEXT` | Keep field/extractor/confidence lineage. OCR, filename, recognition, MediaUsage and `depicts` remain lexical/observation signals, not Evidence or canonical identity. |
+| Article/News | segmented `SOURCE_TEXT`, quotes, terminology/query seeds, and bounded editorial context | Keep source identity, locator, quote/opinion/editorial classification and derived lineage; do not index a whole Article as Knowledge or corroboration. |
+| Video | title, description, tags, transcript segments and timestamped observations | Keep timestamp/segment and ASR lineage; spoken wording is not automatically canonical terminology, Knowledge, Evidence or an alias/relation. |
+| Knowledge | canonical claim/subject/facet terminology already read from the owner | Reuse canonical IDs/revisions and provenance; Dictionary does not replace the Knowledge owner or infer new facts. |
+
+For every seed, Dictionary records source kind, source identifier, field or
+locator, derivation parent, confidence/uncertainty and provenance family. An
+explicit canonical target is a disambiguation context only. It constrains
+resolution and must not cause the detector to broaden to unrelated
+Brand/Model/Variant candidates.
+
 Source replay is idempotent at the Mention fingerprint boundary. A repeated
 source identifier and equivalent lexical context must not create another
 occurrence. Derived/generated copies may be observed for diagnostics, but their
@@ -318,6 +338,13 @@ description or transcript is an alias/relation of that target.
 
 Dictionary candidates created from Video remain planning/curation objects and
 never bypass Video Governance, Knowledge Governance or relation evidence rules.
+
+Video transcript segments, ASR alternatives and timestamped observations are
+distinct lexical inputs. A transcript correction may produce a new query seed
+with recoverable lineage; it does not rewrite the source transcript or create
+an alias automatically. A target hint narrows lookup only and never makes
+every matching word in the transcript a label, relation or fact about that
+target.
 
 ## 12. Auto-link projection
 
@@ -602,3 +629,30 @@ The capability is not READY until tests and runtime read-back demonstrate:
 22. no Dictionary operation implicitly creates Authority, Knowledge, Source,
     Evidence or Graph truth;
 23. runtime failure is surfaced as unavailable, never an empty success.
+
+## 20.2 Dictionary Seed v1 read-only planner
+
+The shared `StructuredInterpretationPacket` is the Dictionary planning input.
+`DictionarySeedPlanner` applies `SEARCH FIRST → RESOLVE → REUSE → CANDIDATE
+ONLY IF UNRESOLVED` over semantic query seeds and does not run a second parser.
+It preserves normalized deduplication, raw observed forms, source-family
+lineage and occurrence counts without treating frequency as authority.
+
+The planner reports existing reuse/aliases, proper names, identifiers,
+configurations, technical/colloquial/phonetic observations, ambiguity,
+unresolved candidates, editorial/noise and suppression using existing runtime
+vocabulary. It is ephemeral and read-only: it never approves, attaches,
+creates a concept/label, writes Knowledge/Evidence or writes Graph.
+
+The internal/admin-only `nhk.dictionary.seed-audit` operation exposes bounded,
+privacy-safe pagination/filtering and aggregate counts with explicit
+`read_only=true`, `mutated=false` and unavailable handling. It is not in the
+public operator allowlist.
+
+All future source adapters enter Dictionary through the same
+`StructuredInterpretationPacket`: physical ingest → source adapter → Shared
+Semantic Core → Dictionary resolution → canonical semantic retrieval →
+Knowledge reuse → relation discovery → enrichment → Writer/read-back. A
+Dictionary match remains lexical discovery only; it is never semantic identity,
+Evidence, Knowledge or a Graph relation, and Graph reachability never proves
+applicability.

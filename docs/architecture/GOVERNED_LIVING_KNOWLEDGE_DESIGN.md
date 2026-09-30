@@ -108,6 +108,90 @@ it never emits fabricated prose or turns unavailable into empty.
 
 ## Article, Video, Media and Dictionary boundaries
 
+All future source paths inherit one adapter boundary and one shared semantic
+core:
+
+```text
+physical ingest
+→ source adapter
+→ Shared Semantic Core
+→ Dictionary resolution
+→ canonical semantic retrieval
+→ Knowledge reuse
+→ relation discovery
+→ enrichment
+→ Writer/read-back
+```
+
+Natural Chat, Image/Media, Article/News, Video and Legacy Knowledge adapters
+only extract source-specific signals and attach provenance/lineage. They do
+not implement separate semantic parsers. `OCR ≠ Evidence`, `recognition ≠
+canonical identity`, `transcript ≠ Knowledge`, `transcript ≠ Evidence
+automatically`, `generated prose ≠ Knowledge`, `generated prose ≠ Evidence`,
+`Dictionary match ≠ semantic identity`, and `Graph reachability ≠
+applicability`.
+
+### Future adapter handoff contracts
+
+Image/Media, Article/News and Video are future source adapters, not additional
+semantic owners. They must extract source-specific signals, attach metadata
+and provenance/lineage, preserve any validated canonical-target hint, and hand
+the result to the shared `StructuredSemanticInterpreter`. The handoff remains
+ephemeral until the owning governed lifecycle accepts a proposal.
+
+Image/Media handoff follows:
+
+```text
+uploaded image → physical Media ingest → Media identity/read-back
+→ permitted metadata → caption/alt/filename → OCR/visual observation/
+model recognition when available → Shared Semantic Core
+→ StructuredInterpretationPacket → Dictionary → Authority → Knowledge retrieval
+→ relation/claim candidates → enrichment/editorial planning
+```
+
+`USER_TEXT`, `CAPTION`, `ALT_TEXT`, `FILENAME`, `OCR`,
+`VISUAL_OBSERVATION` and `MODEL_RECOGNITION` remain distinct lineage-bearing
+signals. OCR and filename are not Evidence; recognition is not canonical
+identity; `MediaUsage`/`depicts` is not factual proof; and a specimen
+observation cannot become a Model/Variant fact by scope widening. An upstream
+canonical target is context only and cannot expand the candidate set to other
+Brand/Model/Variant owners.
+
+Article/News handoff follows:
+
+```text
+Article/news/research text → Source context → text segmentation
+→ Shared Semantic Core → terminology/query seeds → subject resolution
+→ canonical Knowledge search → claim extraction → duplicate/reuse analysis
+→ qualification/contradiction analysis → Source/Evidence candidate planning
+→ governed Knowledge/Graph planning → editorial synthesis
+```
+
+The adapter distinguishes `SOURCE_TEXT`, `FACTUAL_CLAIM`,
+`EDITORIAL_LANGUAGE`, `QUOTE`, `AUTHOR_OPINION` and `GENERATED_SUMMARY`.
+The complete article body is not Knowledge. NHK-generated article prose or a
+generated summary is not a new Source, Evidence or independent corroboration;
+all restatements of one source remain one provenance family.
+
+Video handoff follows:
+
+```text
+Video identity → title → description → tags → transcript
+→ timestamped observations → Shared Semantic Core
+→ Dictionary/query seeds → subject resolution → Knowledge retrieval
+→ observation/claim/relation candidates → enrichment plan → Writer/output
+```
+
+Transcript text is not Knowledge or Evidence automatically, and spoken wording
+is not canonical terminology. ASR errors remain recoverable through raw text,
+confidence, correction lineage and timestamp/segment context. An explicit
+canonical Video target narrows context but does not turn every transcript term
+into an alias or relation of that target.
+
+All three adapters consume the same Core and downstream Dictionary, Retrieval,
+Knowledge, Relation and Writer consumers. The Core does not depend on adapter
+classes, and adapters may not invent semantic vocabulary or bypass Governance.
+
 Knowledge changes affecting an Article create an enrichment/update suggestion
 packet only. They never write an Article body or bypass the Article workflow.
 Video `user_hint` and bounded factual observations extracted from an authorized

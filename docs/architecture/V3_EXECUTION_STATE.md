@@ -1,5 +1,58 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-30 — Dictionary semantic enrichment Native slice (LOCAL / NO MUTATION)
+
+IMPLEMENTED: Extended the ephemeral shared input/packet with source metadata,
+lineage, content-intent/target/provenance context, observation strength and
+bounded `semantic_query_seeds`; added source-kind parity tests. Added the
+read-only `DictionarySeedPlanner`, external `SemanticEnrichmentPlanner`, and
+internal/admin-only `nhk.dictionary.seed-audit` MCP/Ability surface.
+
+BOUNDARIES: Dictionary remains the first consumer; semantic retrieval remains
+outside the shared core. Ambiguity, wrong scope, missing evidence and derived
+prose fail closed. No Dictionary approval, Knowledge/Evidence/Graph mutation,
+schema change, migration, backfill, staging or production write occurred.
+
+VALIDATION: Focused core/detector 33 tests / 119 assertions, compatibility 31 /
+122, Dictionary 23 / 99, enrichment 49 / 199 and MCP/contract 55 / 813 pass;
+PHP lint and `git diff --check` pass. PHPUnit emits existing deprecations.
+The 77 Article / 1,170 Knowledge live corpus remains `ENVIRONMENT_BLOCKED` and
+was not claimed or scanned.
+
+STATUS: `DICTIONARY_SEED_V1_LOCAL_READY / SEMANTIC_ENRICHMENT_LOCAL_READY / MCP_READ_ONLY_INTERNAL_ADMIN_ONLY / NO_LIVE_MUTATION`.
+
+RUNTIME CLOSURE:
+
+```text
+Shared semantic core = IMPLEMENTED
+Semantic query seeds = IMPLEMENTED
+Dictionary Seed Planner = IMPLEMENTED
+Semantic Enrichment Planner = IMPLEMENTED
+Dictionary seed audit runtime = IMPLEMENTED/EXPOSED
+
+Chat adapter = SEAM READY / NOT CONNECTED
+Image/Media adapter = SEAM READY / NOT CONNECTED
+Article/News adapter = SEAM READY / NOT CONNECTED
+Video adapter = SEAM READY / NOT CONNECTED
+```
+
+The Easy MCP normalized connector name is
+`mcp__v53__wp_ability_nhk_v3_dictionary_seed_audit`; the native Ability ID is
+`nhk-v3/dictionary-seed-audit`. It remains an explicit internal/admin
+read-only opt-in and is excluded from the anonymous/operator allowlist.
+
+# Checkpoint — 2026-09-30 — Future source adapter contract seams (LOCAL / NO MUTATION)
+
+DOCUMENTATION: Closed the inheritance seams for future Image/Media,
+Article/News and Video adapters in the Universal Structured Semantic Intake,
+Dictionary Lexical Knowledge and Governed Living Knowledge contracts. Each
+adapter is source-specific extraction plus metadata, provenance/lineage and
+canonical-target hints into the existing Shared Semantic Core and ephemeral
+`StructuredInterpretationPacket`; no adapter-specific semantic parser, owner,
+relation or writer was added.
+
+STATUS: `SHARED_CORE_IMPLEMENTED / DICTIONARY_CONSUMER_IMPLEMENTED / IMAGE_MEDIA_ADAPTER_PLANNED_NOT_CONNECTED / ARTICLE_NEWS_ADAPTER_PLANNED_NOT_CONNECTED / VIDEO_ADAPTER_PLANNED_NOT_CONNECTED / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-30 — Quality audit Easy MCP explicit read-only exposure
 
 EXPOSURE: Split `nhk-v3/knowledge-quality-audit` into the explicit

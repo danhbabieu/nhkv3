@@ -46,6 +46,20 @@ final class DictionarySeedAuditMcpTest extends TestCase
         self::assertSame('nhk-v3/dictionary-seed-audit', McpAbilityRegistration::abilityNameForTool('nhk.dictionary.seed-audit'));
         self::assertContains('nhk-v3/dictionary-seed-audit', McpAbilityRegistration::explicitInternalAdminReadOnlyAbilityAllowlist());
         self::assertContains('nhk.dictionary.seed-audit', McpCapabilityManifest::all()['dictionary']['reads']);
+        self::assertSame('wp_ability_nhk_v3_dictionary_seed_audit', McpAbilityRegistration::connectorToolNameForAbility('nhk-v3/dictionary-seed-audit'));
+        self::assertSame('nhk.dictionary.seed-audit', McpAbilityRegistration::toolNameForConnectorTool('wp_ability_nhk_v3_dictionary_seed_audit'));
+        self::assertContains('nhk.dictionary.seed-audit', array_column(McpToolCatalog::tools(), 'name'));
+    }
+
+    public function test_tools_list_discovers_the_internal_read_only_operation(): void
+    {
+        $response = $this->transport(static fn (string $capability): bool => $capability === 'nhk_view_governance')
+            ->dispatch(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/list', 'params' => []]);
+        $tools = $response['body']['result']['tools'] ?? [];
+        $names = array_column($tools, 'name');
+
+        self::assertSame(200, $response['status']);
+        self::assertContains('nhk.dictionary.seed-audit', $names);
     }
 
     public function test_transport_forbids_non_capable_actor_before_handler(): void

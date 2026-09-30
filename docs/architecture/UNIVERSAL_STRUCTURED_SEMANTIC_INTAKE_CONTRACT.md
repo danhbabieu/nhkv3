@@ -55,6 +55,202 @@ type, Graph endpoint, Source, Evidence, Knowledge record, Dictionary owner or
 Article semantic owner. It does not persist raw Article body as Knowledge,
 create a parallel semantic store or authorize a write.
 
+## Source Adapter Contracts
+
+The inheritance law is one shared semantic path:
+
+```text
+Natural Chat ─────┐
+Image / Media ────┤
+Article / News ───┤
+Video ────────────┤
+Legacy Knowledge ─┤
+                  ▼
+      Shared Semantic Core
+                  ▼
+ StructuredInterpretationPacket
+                  ▼
+ Dictionary / Retrieval
+ Knowledge / Relation
+ Writer / Search
+```
+
+Future physical ingest, image/media, article/news and video flows add only an
+outer source adapter:
+
+```text
+physical ingest
+→ source adapter
+→ Shared Semantic Core
+→ Dictionary resolution
+→ canonical semantic retrieval
+→ Knowledge reuse
+→ relation discovery
+→ enrichment
+→ Writer/read-back
+```
+
+No Image, Video or Article adapter may create a second semantic parser. The
+same trust boundaries remain in force: `OCR ≠ Evidence`, `recognition ≠
+canonical identity`, `transcript ≠ Knowledge`, `transcript ≠ Evidence
+automatically`, `generated prose ≠ Knowledge`, `generated prose ≠ Evidence`,
+`Dictionary match ≠ semantic identity`, and `Graph reachability ≠
+applicability`.
+
+The source adapter law is deliberately source-agnostic after extraction:
+
+```text
+IMAGE / MEDIA   ─────┐
+ARTICLE / NEWS  ─────┤
+VIDEO           ─────┤
+HUMAN / CHAT    ─────┤
+KNOWLEDGE       ─────┤
+                    ▼
+           SHARED SEMANTIC CORE
+                    ▼
+      StructuredInterpretationPacket
+                    ▼
+ Dictionary / Retrieval / Knowledge
+ Relation / Editorial Writer / Search
+```
+
+`IMAGE`, `ARTICLE`, `NEWS`, `VIDEO`, `CHAT` and `KNOWLEDGE` must not grow
+separate semantic parsers. Each adapter is limited to source-specific
+extraction, source metadata, provenance/lineage and validated canonical-target
+hints. It then calls the shared interpreter. The Core has no dependency on an
+adapter and downstream consumers must consume the same packet shape and trust
+invariants. Adding a future adapter therefore means `build adapter → plug into
+Core`, not changing Core, Dictionary, Knowledge or Writer semantics.
+
+### Human / Chat adapter
+
+Human text and Chat input provide `USER_TEXT`, optional user hints, source
+context and explicit intent/target hints. The adapter preserves the exact
+request and its lineage, but the user's wording is still interpreted through
+the same lexical, subject, scope, provenance and Governance boundaries. A user
+assertion is not Evidence merely because it is explicit; it is a bounded
+observation/provenance signal for planning.
+
+### Image / Media adapter (planned seam)
+
+The future Media adapter must expose this ordered, read-back-oriented pipeline:
+
+```text
+uploaded image
+  → physical Media ingest
+  → Media identity/read-back
+  → permitted metadata
+  → caption / alt / filename
+  → OCR if available
+  → visual recognition/observation if available
+  → Shared Semantic Core
+  → StructuredInterpretationPacket
+  → Dictionary resolution
+  → Authority resolution
+  → Knowledge retrieval
+  → relation/claim candidates
+  → enrichment/editorial planning
+```
+
+The adapter must retain signal kind and lineage for each input. The permitted
+signal kinds are `USER_TEXT`, `CAPTION`, `ALT_TEXT`, `FILENAME`, `OCR`,
+`VISUAL_OBSERVATION` and `MODEL_RECOGNITION`. Each signal carries its source
+locator/field, extraction method, timestamp or request context when available,
+confidence/uncertainty and parent lineage. Confidence ranks a candidate; it
+never promotes it to identity, fact or Evidence.
+
+The following trust boundaries are mandatory:
+
+```text
+OCR ≠ Evidence
+filename ≠ Evidence
+recognition ≠ canonical identity
+MediaUsage/depicts ≠ factual proof
+specimen observation ≠ model/variant fact
+```
+
+Media identity belongs to Media/MediaAsset and usage belongs to MediaUsage;
+neither is replaced by an interpretation packet. If upstream supplies an
+already canonical target, the adapter passes that target as context, including
+its UUID/stable key and revision where available. It must not expand that
+context to another Brand, Model or Variant merely because a caption, filename,
+OCR or recognition result matches a broader or neighboring term.
+
+### Article / News adapter (planned seam)
+
+The future Article/News adapter must keep editorial ownership in native
+WordPress posts and expose this planning sequence:
+
+```text
+Article / news / research text
+  → Source context
+  → text segmentation
+  → Shared Semantic Core
+  → terminology/query seeds
+  → subject resolution
+  → canonical Knowledge search
+  → claim extraction
+  → duplicate/reuse analysis
+  → qualification/contradiction analysis
+  → Source/Evidence candidate planning
+  → governed Knowledge/Graph planning
+  → editorial synthesis
+```
+
+It must distinguish `SOURCE_TEXT`, `FACTUAL_CLAIM`, `EDITORIAL_LANGUAGE`,
+`QUOTE`, `AUTHOR_OPINION` and `GENERATED_SUMMARY`. A whole article, research
+note or news story is not Knowledge. Generated summary or an NHK-authored
+Article body is:
+
+```text
+GENERATED SUMMARY / NHK ARTICLE BODY ≠ Source mới
+GENERATED SUMMARY / NHK ARTICLE BODY ≠ Evidence mới
+GENERATED SUMMARY / NHK ARTICLE BODY ≠ independent corroboration
+```
+
+Rephrasing one source in multiple places remains one provenance family. The
+adapter must carry source identity, publication/locator context, quote and
+derivation lineage so duplicate/reuse and corroboration checks cannot count
+editorial rewrites as independent support.
+
+### Video adapter (planned seam)
+
+The future Video adapter must expose:
+
+```text
+Video identity
+  → title
+  → description
+  → tags
+  → transcript
+  → timestamped observations if available
+  → Shared Semantic Core
+  → Dictionary/query seeds
+  → subject resolution
+  → Knowledge retrieval
+  → observation/claim/relation candidates
+  → enrichment plan
+  → Writer/output
+```
+
+`transcript ≠ Knowledge`, `transcript ≠ Evidence` automatically and spoken
+wording is not canonical terminology. ASR errors remain recoverable: raw
+transcript, ASR confidence, correction lineage and segment/timestamp context
+must remain available. Every visual/audio observation carries its timestamp,
+segment and source context. If Video has an explicit canonical semantic target,
+the target is context only; words in the transcript are not automatically
+aliases or relations of that target, and the adapter must not broaden the
+target to another subject without an independently resolved and governed path.
+
+### Shared handoff law
+
+After any adapter reaches the Core, the only shared consumers are Dictionary,
+Semantic Retrieval, Knowledge planner, Relation planner, Editorial Writer and
+Search/Projection. Core output remains ephemeral and planning-only until the
+existing owner/Governance boundary accepts a mutation. No adapter may add an
+entity type, endpoint type, predicate, relation type, canonical field,
+Knowledge profile, alias or Evidence rule to make its source easier to parse.
+
 ## 3. Three interpretation layers
 
 ### 3.1 Language layer
@@ -318,3 +514,25 @@ Implemented locally without schema or data mutation:
 The 77 Article / 1,170 Knowledge read-only corpus and live runtime bootstrap
 remain `PARTIAL`/`ENVIRONMENT_BLOCKED` in this workspace; no fixture-specific
 production rule was added.
+
+## 16. Dictionary Seed v1 and external enrichment implementation checkpoint
+
+The local implementation now exposes `semantic_query_seeds` on the ephemeral
+packet. Each seed carries the raw span, normalized form, generic category,
+locale, bounded context, optional canonical reference/facet hint, ambiguity
+state and advisory diagnostics. Seeds remain lookup hints and never become
+Knowledge, Evidence, Entity or Graph relations.
+
+`DictionarySeedPlanner` is the first read-only consumer. It deduplicates by
+normalized form plus bounded context, preserves raw forms/source-family
+lineage, resolves through the existing Dictionary owner, and reports
+resolved-existing, ambiguous, suppressed, editorial/noise and unresolved
+candidate outcomes without approval or persistence.
+
+`SemanticEnrichmentPlanner` is an external read-only seam that composes
+Dictionary resolution, canonical-owner resolution, bounded Graph discovery
+and Knowledge applicability checks. It rejects wrong scope and missing
+evidence, preserves unknown lexical terms, blocks derived prose from
+independent corroboration and reports unavailable runtime distinctly from
+empty data. The MCP `nhk.dictionary.seed-audit` adapter is internal/admin-only
+and privacy-safe; it cannot approve or mutate any owner.
