@@ -126,6 +126,16 @@ Graph, Media, Video, Proposal, Governance, Public Identity, SEO or publication
 state. It is intentionally not registered as a generic WordPress Ability; MCP
 catalog/dispatch availability and connector exposure remain separate facts.
 
+`nhk.knowledge.quality-audit` is the internal/admin, capability-gated read
+surface for the existing `KnowledgeQualityAuditCoordinator` and
+`KnowledgeQualityAuditor`. It accepts a bounded stable-key cursor and optional
+finding, subject, scope and readiness filters, and returns deterministic
+aggregate counts plus privacy-safe per-claim planning output. It never exposes
+claim/source/evidence text, never creates a repair operation, and never writes
+Knowledge, Source, Evidence, Authority, Graph or Governance state. Missing or
+unavailable WordPress/MySQL runtime remains an explicit unavailable result; it
+must not be represented as an empty corpus.
+
 ### Runtime semantic-write policy — 2026-09-13
 
 The deployed runtime resolves semantic mutation policy from
@@ -564,6 +574,7 @@ availability; local HTTP wire smoke remains an environment check.
 | `nhk.video.frontend.reconcile` | Existing canonical Video → frontend read-back | WRITE / INTERNAL lifecycle check | Yes | No owner, identity, editorial or SEO write; exact owner-bound read-back only | `MediaVideoPageQuery` detail/archive + `HomeSemanticQuery` homepage source | READY only when projection, route and required listing read-backs pass; otherwise `REVIEW_REQUIRED` |
 | `nhk.knowledge.get` | Knowledge + public evidence | READ | No | N/A | No raw edge | READY for active/public chain |
 | `nhk.knowledge.writer.preview` | Universal Enrichment + Editorial Intelligence read preview | READ | No | N/A | Bounded semantic read only | READY through `/nhk/v1/mcp` and the generic Easy MCP Ability projection |
+| `nhk.knowledge.quality-audit` | Canonical Knowledge quality audit and repair planning preview | READ / INTERNAL | No | Stable-key cursor | No writes; planning-only candidates | READY in catalog/Ability contract; full-corpus result remains runtime-gated |
 | `nhk.source.get` | Source + public evidence | READ | No | N/A | No raw edge | READY for active/public chain |
 | `nhk.evidence.get` | Evidence + public endpoints | READ | No | N/A | No raw edge | READY for active/public chain |
 | `nhk.dictionary.search` / `nhk.dictionary.concept.get` | Dictionary approved lexical truth | READ | No | N/A | No raw edge | READY in executable catalog; unavailable is explicit when storage is not ready |

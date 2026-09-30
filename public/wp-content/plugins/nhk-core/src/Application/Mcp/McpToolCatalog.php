@@ -66,6 +66,16 @@ final class McpToolCatalog
                     'max_chars' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 4000],
                 ], 'additionalProperties' => false],
             ], ['instruction']),
+            self::tool('nhk.knowledge.quality-audit', 'Read-only bounded Knowledge quality audit over canonical claims. Returns privacy-safe findings, aggregate counts, deterministic cursors and planning-only repair candidates; it never mutates Knowledge, Evidence, Source or any semantic owner.', [
+                'cursor' => ['type' => 'string', 'maxLength' => 191],
+                'limit' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 100],
+                'finding_filters' => ['type' => 'array', 'maxItems' => 10, 'items' => ['type' => 'string', 'enum' => ['KEEP_CANONICAL', 'DUPLICATE_OR_REUSE', 'PROCESS_CONTAMINATION', 'EDITORIAL_FRAGMENT', 'SCOPE_PROBLEM', 'PROVENANCE_GAP', 'EVIDENCE_GAP', 'ATOMIZATION_NEEDED', 'SUBJECT_UNRESOLVED', 'SUBJECT_AMBIGUOUS', 'DICTIONARY_CANDIDATE', 'RELATION_CANDIDATE', 'CONTRADICTION_REVIEW', 'QUALIFICATION_REVIEW', 'DERIVED_CONTENT_CONTAMINATION', 'INTERNAL_WORKFLOW_KNOWLEDGE', 'UNRESOLVED']]],
+                'subject_id' => self::uuidField(true),
+                'scope' => ['type' => 'string', 'enum' => ['entity', 'brand', 'model', 'variant', 'movement', 'specimen', 'specimen_observation', 'observation', 'editorial_experience', 'hypothesis', 'unresolved']],
+                'readiness' => ['type' => 'string', 'enum' => ['READY', 'PARTIAL', 'BLOCKED']],
+                'include_items' => ['type' => 'boolean'],
+                'include_repair_candidates' => ['type' => 'boolean'],
+            ], []),
             self::tool('nhk.article.ingest', 'Resume governed reconciliation or a bounded update of an existing Article using the same idempotency key.', self::articleProperties(true), ['idempotency_key', 'intent'], true),
             self::tool('nhk.capture.ingest', 'Capture new editorial input or continue one existing Capture; classify intent before creating an Article, preserve canonical owners, reconcile typed MediaUsage bindings even without an Article, resolve bounded semantic context when required and return the current read-back.', [
                 'idempotency_key' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 191],

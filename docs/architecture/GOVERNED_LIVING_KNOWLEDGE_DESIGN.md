@@ -219,6 +219,16 @@ external-reference owner and governed proposal/apply boundary; reusing the
 semantic core does not authorize duplicate Video identity, duplicate Article
 creation or a convenience relation to imitate missing orchestration.
 
+### Knowledge quality audit operator surface — 2026-09-30
+
+The existing deterministic quality auditor is exposed through
+`nhk.knowledge.quality-audit` only as an internal/admin, read-only Ability/MCP
+operation. The adapter adds bounded stable-key pagination and filters but does
+not add a Knowledge owner, finding vocabulary, repair writer or mutation path.
+Per-record output is privacy-safe and repair candidates remain planning-only;
+applying any candidate still requires the already registered Capture/Governance
+lifecycle. Runtime unavailability is explicit and fail-closed.
+
 ## Governed apply boundary
 
 The effective operation vocabulary is read from the current runtime catalog

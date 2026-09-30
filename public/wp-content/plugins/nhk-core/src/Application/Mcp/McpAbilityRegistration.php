@@ -53,6 +53,7 @@ final class McpAbilityRegistration
         'nhk-v3/dictionary-label-save',
         'nhk-v3/dictionary-candidate-review',
         'nhk-v3/dictionary-relation-handoff',
+        'nhk-v3/knowledge-quality-audit',
         self::MCP_APP_DIAGNOSTICS_ABILITY,
     ];
 
@@ -346,6 +347,7 @@ final class McpAbilityRegistration
         'nhk.proposal.eligibility' => 'nhk-v3/proposal-eligibility',
         'nhk.proposal.review' => 'nhk-v3/proposal-review',
         'nhk.public-url.audit' => 'nhk-v3/public-url-audit',
+        'nhk.knowledge.quality-audit' => 'nhk-v3/knowledge-quality-audit',
     ];
 
     /** @var array<string,string> */
@@ -777,6 +779,7 @@ final class McpAbilityRegistration
             'nhk.proposal.submit' => 'nhk_submit_proposals',
             'nhk.proposal.approve', 'nhk.proposal.reject' => 'nhk_approve_proposals',
             'nhk.proposal.eligibility' => 'nhk_view_governance',
+            'nhk.knowledge.quality-audit' => 'nhk_view_governance',
             'nhk.proposal.apply' => 'nhk_apply_proposals',
             'nhk.relation.backfill.apply' => 'nhk_apply_proposals',
             'nhk.public-url.audit', 'nhk.public-url.reproject' => 'nhk_manage_public_urls',

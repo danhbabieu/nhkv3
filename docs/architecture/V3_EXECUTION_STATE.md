@@ -1,5 +1,27 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-30 — Knowledge quality audit operator surface
+
+IMPLEMENTATION: Added the canonical internal/admin read-only
+`nhk.knowledge.quality-audit` MCP/Ability surface over the existing
+`KnowledgeQualityAuditCoordinator` and `KnowledgeQualityAuditor`. The adapter
+uses bounded stable-key pagination, deterministic finding/subject/scope/readiness
+filters, privacy-safe per-record serialization, aggregate counts and explicit
+unavailable handling. Repair candidates remain planning-only and no semantic
+owner or mutation path was introduced.
+
+DISCOVERY: Catalog, dispatch registry, SingleEntryPointPolicy, transport,
+WordPress Ability registration and Easy MCP internal/admin allowlist are wired
+to the same operation. The operation requires the existing governance/internal
+capability boundary and is not added to the public operator read allowlist.
+
+VALIDATION: Focused Knowledge audit/MCP slice passes 9 tests / 46 assertions.
+Full-corpus live verification is `ENVIRONMENT_BLOCKED` until the canonical
+WordPress/MySQL runtime is available; the adapter reports unavailable rather
+than treating unavailable storage as an empty corpus. No data was written.
+
+STATUS: `KNOWLEDGE_QUALITY_AUDIT_LOCAL_READY / RUNTIME_FULL_CORPUS_GATED / NO_LIVE_MUTATION`.
+
 # Checkpoint — 2026-09-30 — Knowledge Quality Audit & Normalization Planner (LOCAL / READ-ONLY)
 
 IMPLEMENTED_SLICE: Added the ephemeral `KnowledgeQualityAuditResult`,

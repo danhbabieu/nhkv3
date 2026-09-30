@@ -77,6 +77,7 @@ final class McpContractTest extends TestCase
             'nhk.entity.neighborhood',
             'nhk.article.preflight',
             'nhk.knowledge.writer.preview',
+            'nhk.knowledge.quality-audit',
             'nhk.article.ingest',
             'nhk.capture.ingest',
             'nhk.capture.get',

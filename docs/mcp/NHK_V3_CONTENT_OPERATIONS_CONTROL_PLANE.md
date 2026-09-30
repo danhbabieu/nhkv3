@@ -127,6 +127,16 @@ verification. Existing records remain readable and maintainable through their
 owner/lifecycle boundaries; this inventory changes the creation route, not
 canonical identity or historical data.
 
+The internal/admin `nhk.knowledge.quality-audit` Ability is a read-only
+operator projection of the existing Knowledge quality auditor. It is bounded by
+`limit`/stable-key cursor, supports finding/subject/scope/readiness filters,
+returns privacy-safe item snapshots and deterministic aggregates, and is
+capability-gated by the existing governance/internal boundary. Its repair
+candidates are planning-only; no audit call can mutate Knowledge, Source,
+Evidence or Graph. If the canonical repository/runtime is unavailable, the
+operation reports `KNOWLEDGE_QUALITY_AUDIT_UNAVAILABLE` instead of claiming an
+empty or complete corpus.
+
 ### Scoped Public URL lifecycle — 2026-09-14
 
 The canonical URL maintenance sequence is:

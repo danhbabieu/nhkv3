@@ -50,6 +50,15 @@ final readonly class KnowledgeQualityAuditResult
             'diagnostics' => $this->diagnostics,
         ];
         if (!$includePrivate) {
+            $subject = $result['subject_resolution'];
+            $result['subject_resolution'] = [
+                'status' => $subject['status'] ?? 'unresolved',
+                'canonical_subject_id' => $subject['canonical_subject_id'] ?? '',
+                'entity_type' => $subject['entity_type'] ?? '',
+                'candidate_count' => count((array) ($subject['candidates'] ?? [])),
+                'facet' => $subject['facet'] ?? '',
+                'scope' => $subject['scope'] ?? '',
+            ];
             $structured = $result['structured_interpretation'];
             $result['structured_interpretation'] = [
                 'status' => $structured['status'] ?? 'UNRESOLVED',
@@ -71,6 +80,14 @@ final readonly class KnowledgeQualityAuditResult
                 'outcomes' => $structured['outcomes'] ?? [],
             ];
             $result['evidence_assessment']['private_evidence_count'] = $result['evidence_assessment']['private_evidence_count'] ?? 0;
+            $result['dictionary_candidates'] = array_fill(0, count($result['dictionary_candidates']), ['planning_only' => true]);
+            $result['relation_candidates'] = array_map(static fn (array $candidate): array => [
+                'source_id' => (string) ($candidate['source_id'] ?? ''),
+                'target_id' => (string) ($candidate['target_id'] ?? ''),
+                'predicate' => (string) ($candidate['predicate'] ?? ''),
+                'scope' => (string) ($candidate['scope'] ?? ''),
+                'planning_only' => true,
+            ], array_values(array_filter($result['relation_candidates'], 'is_array')));
         }
         return $result;
     }

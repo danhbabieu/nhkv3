@@ -48,6 +48,7 @@ final class McpDispatchRegistry
         'nhk.entity.neighborhood' => 'nhk.entity.neighborhood',
         'nhk.article.preflight' => 'nhk.article.preflight',
         'nhk.knowledge.writer.preview' => 'nhk.knowledge.writer.preview',
+        'nhk.knowledge.quality-audit' => 'nhk.knowledge.quality-audit',
         'nhk.article.ingest' => 'nhk.article.ingest',
         'nhk.capture.ingest' => 'nhk.capture.ingest',
         'nhk.capture.get' => 'nhk.capture.get',
