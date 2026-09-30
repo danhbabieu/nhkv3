@@ -8,6 +8,18 @@ use PHPUnit\Framework\TestCase;
 
 final class StructuredSemanticInterpreterTest extends TestCase
 {
+    public function test_editorial_signals_do_not_become_dictionary_candidates(): void
+    {
+        $value = (new StructuredSemanticInterpreter())->interpret([
+            'text' => 'bộ truyền động cũng khá đặc biệt',
+            'source_kind' => 'human_chat',
+        ])->toArray();
+
+        self::assertContains('bộ truyền động', array_column($value['lexical_spans'], 'normalized_term'));
+        self::assertNotContains('khá đặc biệt', array_column($value['semantic_query_seeds'], 'normalized_form'));
+        self::assertSame(['khá đặc biệt'], array_column($value['editorial_signals'], 'term'));
+    }
+
     public function test_packet_reuses_dictionary_lexical_semantics_and_preserves_context(): void
     {
         $packet = (new StructuredSemanticInterpreter())->interpret(UniversalInputEnvelope::fromArray([

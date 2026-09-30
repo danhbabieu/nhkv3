@@ -15,12 +15,25 @@ final class DictionaryLexicalQualityGate
         'thế', 'nào', 'nằm', 'ở', 'trở', 'nếu', 'vì', 'nên', 'khiến', 'tại', 'bởi',
         'cùng', 'tự', 'thường', 'phổ', 'biến', 'gặp', 'chúng', 'ta', 'họ', 'nó',
         'không', 'đến', 'dùng', 'hiệu', 'hai', 'phần', 'sử', 'theo', 'sau', 'trước', 'vào',
-        'from', 'with', 'for', 'and', 'or', 'to', 'of', 'in', 'on', 'are', 'is', 'used',
+        'cũng', 'khá', 'rất', 'nghe', 'nhìn', 'đặc', 'biệt', 'êm', 'đẹp', 'hay', 'thay', 'cực', 'kỳ',
+        'ấn', 'tượng', 'hiếm', 'lực', 'also', 'quite', 'unusual', 'very', 'sounds',
+        'beautiful', 'nice', 'impressive', 'rare', 'this', 'that', 'these', 'those',
+        'from', 'with', 'for', 'and', 'or', 'to', 'of', 'in', 'on', 'are', 'is', 'was', 'were', 'used',
     ];
     private const BOUNDARY_PHRASES = [
         'thay vì', 'mặc dù', 'bởi vì', 'cho nên', 'vì vậy', 'do đó', 'để mà',
     ];
     private const MODIFIER_PREFIX_WORDS = ['tự'];
+
+    public function isBoundaryWord(string $word): bool
+    {
+        return in_array($this->word($word), self::BOUNDARY_WORDS, true);
+    }
+
+    public function isModifierWord(string $word): bool
+    {
+        return in_array($this->word($word), self::MODIFIER_PREFIX_WORDS, true);
+    }
 
     public function filter(string $phrase, array $knownLabels = []): ?string
     {

@@ -8,6 +8,36 @@ use PHPUnit\Framework\TestCase;
 
 final class DictionaryTermDetectorTest extends TestCase
 {
+    public function test_generic_noun_phrases_stop_before_editorial_continuations(): void
+    {
+        $detector = new DictionaryTermDetector();
+        $terms = static fn (string $text): array => array_column($detector->detect($text), 'normalized_term');
+
+        self::assertContains('pressure valve', $terms('The pressure valve is also quite unusual.'));
+        self::assertContains('bộ truyền động', $terms('bộ truyền động cũng khá đặc biệt'));
+        self::assertContains('van áp suất', $terms('van áp suất thì cũng khá lớn'));
+        self::assertContains('hệ thống làm mát', $terms('hệ thống làm mát nghe rất êm'));
+        self::assertContains('cụm bánh răng', $terms('cụm bánh răng này nhìn khá đặc biệt'));
+        self::assertNotContains('truyền động cũng khá đặc', $terms('bộ truyền động cũng khá đặc biệt'));
+    }
+
+    public function test_editorial_tail_is_reported_separately_from_lexical_spans(): void
+    {
+        $detector = new DictionaryTermDetector();
+
+        $signals = $detector->editorialSignals('bộ truyền động cũng khá đặc biệt');
+
+        self::assertSame(['khá đặc biệt'], array_column($signals, 'term'));
+        self::assertSame('EDITORIAL_SIGNAL', $signals[0]['origin']);
+    }
+
+    public function test_editorial_only_text_has_no_lexical_candidate(): void
+    {
+        $terms = array_column((new DictionaryTermDetector())->detect('rất đẹp và cực kỳ hiếm'), 'normalized_term');
+
+        self::assertSame([], $terms);
+    }
+
     public function test_detects_clock_domain_phrases_without_requiring_existing_dictionary_entry(): void
     {
         $items = (new DictionaryTermDetector())->detect('Chiếc đồng hồ dùng côn lòng máng trắng và có cơ chế ngắt chuông đêm.');

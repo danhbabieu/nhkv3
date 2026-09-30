@@ -33,6 +33,9 @@ final class DictionarySeedAuditMcpTest extends TestCase
         self::assertSame(1, $response['total']);
         self::assertStringNotContainsString('Private phrase Alpha', $serialized);
         self::assertSame('NEW_LEXICAL_CANDIDATE', $response['items'][0]['classification']);
+        self::assertArrayHasKey('raw_form', $response['items'][0]);
+        self::assertArrayHasKey('resolution_status', $response['items'][0]);
+        self::assertArrayHasKey('suggested_action', $response['items'][0]);
     }
 
     public function test_catalog_dispatch_and_ability_parity_is_internal_read_only(): void

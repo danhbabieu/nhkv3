@@ -30,6 +30,9 @@ final class StructuredSemanticInterpreter
         $hints = is_array($metadata['lexical_hints'] ?? null) ? $metadata['lexical_hints'] : (array) ($value['user_hints'] ?? []);
         $spans = $this->detector->detect($text, $approved, $hints);
         $lexical = array_values(array_map(fn (array $span): array => $this->span($span), $spans));
+        $declaredEditorial = $this->editorialSignals($value);
+        $declaredEditorialTerms = array_fill_keys(array_map(fn (array $signal): string => $this->normalize((string) ($signal['term'] ?? '')), $declaredEditorial), true);
+        $lexical = array_values(array_filter($lexical, static fn (array $span): bool => !isset($declaredEditorialTerms[$span['normalized_term']])));
         $proper = array_values(array_filter($lexical, static fn (array $span): bool => $span['origin'] === 'PROPER_NAME_SPAN'));
         $identifiers = array_values(array_filter($lexical, static fn (array $span): bool => in_array($span['origin'], ['IDENTIFIER_SPAN', 'TECHNICAL_PATTERN'], true)));
         $configuration = array_values(array_filter($lexical, static fn (array $span): bool => $span['origin'] === 'STRUCTURAL_CONFIGURATION'));
@@ -40,6 +43,7 @@ final class StructuredSemanticInterpreter
         $resolved = $this->resolvedReferences($value);
         $claims = $this->claimCandidates($value, $text);
         $relations = $this->relationCandidates($value);
+        $editorialSignals = array_values(array_filter(array_merge($this->detectorEditorialSignals($text), $declaredEditorial), 'is_array'));
         $diagnostics = array_values(array_unique(array_merge(
             (array) ($value['diagnostics'] ?? []),
             $this->diagnostics($value, $lexical, $ambiguous, $relations),
@@ -78,7 +82,7 @@ final class StructuredSemanticInterpreter
             'provenance_signals' => $this->provenanceSignals($value, $claims),
             'evidence_signals' => $this->evidenceSignals($value),
             'uncertainty_signals' => $this->uncertaintySignals($value, $ambiguous),
-            'editorial_signals' => $this->editorialSignals($value),
+            'editorial_signals' => $editorialSignals,
             'reuse_matches' => $this->reuseMatches($value, $claims),
             'dictionary_delta_candidates' => $this->dictionaryCandidates($lexical, $unresolved),
             'knowledge_delta_candidates' => $this->knowledgeCandidates($claims),
@@ -180,6 +184,8 @@ final class StructuredSemanticInterpreter
     private function uncertaintySignals(array $value, array $ambiguous): array { return array_values(array_unique(array_merge($this->strings($value['uncertainty_signals'] ?? []), $ambiguous !== [] ? ['AMBIGUOUS'] : []))); }
     /** @param array<string,mixed> $value @return list<array<string,mixed>> */
     private function editorialSignals(array $value): array { return array_values(array_filter((array) ($value['editorial_signals'] ?? $value['metadata']['editorial_signals'] ?? $value['metadata']['editorial_only'] ?? []), 'is_array')); }
+    /** @return list<array<string,mixed>> */
+    private function detectorEditorialSignals(string $text): array { return $this->detector?->editorialSignals($text) ?? []; }
     /** @param array<string,mixed> $value @param list<array<string,mixed>> $claims @return list<array<string,mixed>> */
     private function reuseMatches(array $value, array $claims): array { return array_values(array_filter((array) ($value['existing_knowledge'] ?? []), static fn (mixed $item): bool => is_array($item) && trim((string) ($item['claim_id'] ?? $item['id'] ?? '')) !== '')); }
     /** @param list<array<string,mixed>> $lexical @param list<array<string,mixed>> $unresolved @return list<array<string,mixed>> */
@@ -203,6 +209,12 @@ final class StructuredSemanticInterpreter
         $context = is_array($value['semantic_context'] ?? null) ? $value['semantic_context'] : [];
         $facet = (string) ($context['facet'] ?? '');
         $seeds = [];
+        usort($lexical, static function (array $left, array $right) use ($value): int {
+            $text = (string) ($value['raw_text'] ?? $value['body'] ?? '');
+            $leftPosition = mb_stripos($text, (string) ($left['term'] ?? ''));
+            $rightPosition = mb_stripos($text, (string) ($right['term'] ?? ''));
+            return ($leftPosition === false ? PHP_INT_MAX : $leftPosition) <=> ($rightPosition === false ? PHP_INT_MAX : $rightPosition);
+        });
         foreach ($lexical as $span) {
             $normalized = (string) ($span['normalized_term'] ?? '');
             if ($normalized === '') continue;

@@ -49,7 +49,7 @@ final class DictionaryPlanningService
             'text' => $text,
             'metadata' => ['approved_labels' => $approvedLabels, 'lexical_hints' => $hints] + $context,
         ]))->toArray();
-        foreach ((array) ($packet['lexical_spans'] ?? []) as $observation) {
+        foreach ($this->legacyPlanningObservations((array) ($packet['lexical_spans'] ?? []), $hints, $approvedLabels) as $observation) {
             $resolution = $this->resolver->resolve((string) $observation['term'], $lexicalContext);
             $conceptId = $resolution->conceptId;
             $mentionReplay = false;
@@ -184,6 +184,25 @@ final class DictionaryPlanningService
             'warnings' => array_values(array_unique($warnings)),
             'blocking' => false,
         ];
+    }
+
+    /** Keep the legacy mutation-compatible planner bounded to explicit lexical context. */
+    private function legacyPlanningObservations(array $observations, array $hints, array $approvedLabels): array
+    {
+        $labels = array_values(array_filter(array_map(fn (mixed $value): string => $this->normalize((string) $value), array_merge($hints, $approvedLabels))));
+        if ($labels === []) return $observations;
+        return array_values(array_filter($observations, static function (mixed $observation) use ($labels): bool {
+            if (!is_array($observation) || ($observation['origin'] ?? '') !== 'DOMAIN_PHRASE') return true;
+            $term = (string) ($observation['normalized_term'] ?? '');
+            foreach ($labels as $label) if ($term === $label || str_contains($term, $label) || str_contains($label, $term)) return true;
+            return false;
+        }));
+    }
+
+    private function normalize(string $value): string
+    {
+        $value = function_exists('mb_strtolower') ? mb_strtolower(trim($value), 'UTF-8') : strtolower(trim($value));
+        return preg_replace('/\s+/u', ' ', $value) ?? $value;
     }
 
     private function id(): string

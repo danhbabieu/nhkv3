@@ -20819,3 +20819,32 @@ KnowledgeWriter failures and 21 integration failures requiring
 `NHK_WP_TEST_PATH` / `nhk_v3_test`. PHP lint, diff check and secret scan pass.
 
 STATUS: `DICTIONARY_ISSUE_21_FOLLOWUP_LOCAL_READY / NO_LIVE_MUTATION / NO_PUSH / NO_DEPLOY`.
+
+# Checkpoint — 2026-09-30 — Generic lexical boundary and canonical reuse planning
+
+IMPLEMENTATION: Replaced the remaining domain-specific Dictionary detector
+phrase patterns with a shared bounded lexical segmentation path. Generic noun
+phrases now stop at conjunction/discourse/auxiliary/editorial continuations;
+identifier and structural configuration detection remain independent. Editorial
+tails are emitted as ephemeral editorial signals and are excluded from
+Dictionary query seeds. Human chat, Article, Video transcript and Media
+caption inputs continue to use the same interpreter/query-seed path.
+
+RESOLUTION: Dictionary Seed planning now exposes resolution status, ambiguity
+count, canonical destination type/id, Dictionary concept id and suggested
+reuse/alias/new/review/suppression action. Canonical lookup still runs before
+unknown candidate classification; the planner and MCP audit remain read-only,
+privacy-safe and mutation-free. Legacy mutation-compatible planning filters
+generic inferred spans to its explicit lexical context without changing
+candidate persistence boundaries.
+
+VALIDATION: Dictionary/Semantic focused suite passes 331 tests / 1,380
+assertions, with one PHPUnit deprecation. Changed PHP files pass lint and
+`git diff --check`. Secret-pattern review is clean. No migration, seed,
+backfill, staging, production or semantic data mutation was performed.
+
+RUNTIME_GATES: The supplied live @v54 evidence remains read-only historical
+input; no live replay was run from this workspace. Canonical WordPress/MySQL
+runtime verification remains environment-gated and is not claimed.
+
+STATUS: `DICTIONARY_GENERIC_SEGMENTATION_CANONICAL_REUSE_LOCAL_READY / NO_LIVE_MUTATION / NO_PUSH / NO_DEPLOY`.

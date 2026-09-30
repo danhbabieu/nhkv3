@@ -46,13 +46,20 @@ final class DictionarySeedAuditHandler
         $total = count($items);
         $page = array_slice($items, $offset, $limit);
         $safe = array_map(static fn (array $item): array => [
+            'raw_form' => null,
             'normalized_form' => $item['normalized_form'],
             'category' => $item['category'],
             'classification' => $item['classification'],
+            'resolved_destination_type' => $item['resolved_destination_type'] ?? null,
+            'resolved_destination_id' => $item['resolved_destination_id'] ?? null,
+            'resolved_dictionary_concept_id' => $item['resolved_dictionary_concept_id'] ?? null,
+            'resolution_status' => $item['resolution_status'] ?? 'UNRESOLVED',
+            'ambiguity_count' => $item['ambiguity_count'] ?? 0,
             'locale' => $item['locale'],
             'occurrences' => $item['occurrences'],
             'raw_form_count' => count($item['raw_forms']),
             'source_family_count' => count($item['source_families']),
+            'suggested_action' => $item['suggested_action'] ?? null,
             'diagnostics' => $item['diagnostics'],
         ], $page);
         $counts = [];

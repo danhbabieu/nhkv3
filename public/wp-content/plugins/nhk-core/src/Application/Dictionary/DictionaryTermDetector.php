@@ -51,25 +51,46 @@ final class DictionaryTermDetector
                 }
             }
         }
+        foreach ($approvedLabels as $label) {
+            $label = trim((string) $label);
+            if ($label === '' || !preg_match('/(?<![\p{L}\p{N}])' . preg_quote($label, '/') . '\s+\d{1,3}\s+([\p{L}][\p{L}-]*)(?![\p{L}\p{N}])/iu', $text, $match)) continue;
+            if (!$this->qualityGate->isBoundaryWord((string) ($match[1] ?? ''))) $this->add($out, (string) $match[0], 'STRUCTURAL_CONFIGURATION', 'NORMAL');
+            if (preg_match('/(?<![\p{L}\p{N}])' . preg_quote($label, '/') . '\s+\d{1,3}(?![\p{L}\p{N}])/iu', $text, $numberMatch)) $this->add($out, (string) $numberMatch[0], 'IDENTIFIER_SPAN', 'NORMAL');
+        }
 
-        $word = '[\p{L}\p{N}][\p{L}\p{N}\-]*';
-        foreach ($this->domainPhraseSpans($text, $lexicalLabels) as $phrase) {
+        foreach ($this->genericPhraseSpans($text, $lexicalLabels) as $phrase) {
             $this->add($out, $phrase, 'DOMAIN_PHRASE', 'NORMAL');
         }
 
-        if (preg_match_all('/\bbản\s+nhạc\s+(' . $word . '(?:\s+' . $word . '){0,3})\b/iu', $text, $music)) {
-            foreach ($music[1] as $value) {
-                $knownName = $this->knownLabelInWindow((string) $value, $approvedLabels);
-                if ($knownName !== null) {
-                    $this->add($out, $knownName, 'MUSIC_NAME', 'STRONG');
-                    continue;
-                }
-                $phrase = $this->qualityGate->filter((string) $value, $lexicalLabels);
-                if ($phrase !== null) $this->add($out, $phrase, 'MUSIC_NAME', 'NORMAL');
-            }
-        }
-
         return array_values($this->removeWeakerSubspans($out));
+    }
+
+    /** @return list<array{term:string,normalized_term:string,origin:string,strength:string}> */
+    public function editorialSignals(string $text): array
+    {
+        $signals = [];
+        foreach (preg_split('/[.!?;,:\n“”"\']+/u', $text) ?: [] as $clause) {
+            $tokens = $this->tokens($clause);
+            if ($tokens === []) continue;
+            $boundary = null;
+            foreach ($tokens as $index => $token) {
+                if ($this->qualityGate->isBoundaryWord($token)) {
+                    $boundary = $index;
+                    break;
+                }
+            }
+            if ($boundary === null) continue;
+            $prefix = array_slice($tokens, 0, $boundary);
+            while ($prefix !== [] && in_array(mb_strtolower((string) $prefix[0], 'UTF-8'), ['con', 'chiếc', 'một', 'mẫu', 'the', 'a', 'an'], true)) array_shift($prefix);
+            if (count($prefix) < 2) continue;
+            $tail = array_slice($tokens, $boundary);
+            while ($tail !== [] && in_array(mb_strtolower((string) $tail[0], 'UTF-8'), ['mà', 'và', 'cũng', 'thì', 'nghe', 'nhìn'], true)) array_shift($tail);
+            if ($tail === []) continue;
+            $term = trim(implode(' ', $tail));
+            $normalized = $this->normalizer->normalize($term);
+            if ($normalized !== '') $signals[$normalized] = ['term' => $term, 'normalized_term' => $normalized, 'origin' => 'EDITORIAL_SIGNAL', 'strength' => 'NORMAL'];
+        }
+        return array_values($signals);
     }
 
     private function addIfPresent(array &$out, string $text, string $term, string $origin, string $strength): void
@@ -187,10 +208,22 @@ final class DictionaryTermDetector
                 $units[$this->normalizer->normalize((string) $parts[0])] = true;
             }
         }
-        foreach ($this->domainPhraseSpans($text, $lexicalLabels) as $phrase) {
+        foreach ($this->genericPhraseSpans($text, $lexicalLabels) as $phrase) {
             $parts = preg_split('/\s+/u', trim($phrase)) ?: [];
             if (count($parts) === 1 || (isset($parts[1]) && preg_match('/^\d+$/u', (string) $parts[1]))) {
                 $units[$this->normalizer->normalize((string) $parts[0])] = true;
+            }
+        }
+        if (preg_match_all('/(?<![\p{L}\p{N}])\d{1,3}\s+([\p{L}][\p{L}-]*)(?=\s+\d{1,3}\s+[\p{L}])/u', $text, $matches)) {
+            foreach ($matches[1] as $unit) {
+                $normalized = $this->normalizer->normalize((string) $unit);
+                if ($normalized !== '' && !in_array($normalized, ['câu', 'trang', 'mục', 'phần'], true) && !$this->qualityGate->isBoundaryWord($normalized)) $units[$normalized] = true;
+            }
+            if (preg_match_all('/(?<![\p{L}\p{N}])\d{1,3}\s+[\p{L}][\p{L}-]*\s+\d{1,3}\s+([\p{L}][\p{L}-]*)/u', $text, $tailMatches)) {
+                foreach ($tailMatches[1] as $unit) {
+                    $normalized = $this->normalizer->normalize((string) $unit);
+                    if ($normalized !== '' && !in_array($normalized, ['câu', 'trang', 'mục', 'phần'], true) && !$this->qualityGate->isBoundaryWord($normalized)) $units[$normalized] = true;
+                }
             }
         }
         return $units;
@@ -208,34 +241,69 @@ final class DictionaryTermDetector
         return true;
     }
 
-    private function domainPhraseSpans(string $text, array $lexicalLabels): array
+    private function genericPhraseSpans(string $text, array $lexicalLabels): array
     {
-        $word = '[\p{L}\p{N}][\p{L}\p{N}\-]*';
-        $patterns = [
-            '/\b(côn(?:\s+' . $word . '){0,3})\b/iu',
-            '/\b(ngắt\s+chuông(?:\s+' . $word . '){0,3})\b/iu',
-            '/\b(điểm\s+(?:giờ|chuông)(?:\s+' . $word . '){0,3})\b/iu',
-            '/\b(quả\s+lắc(?:\s+' . $word . '){0,3})\b/iu',
-            '/\b(dây\s+tóc(?:\s+' . $word . '){0,3})\b/iu',
-            '/\b(khóa\s+ngựa(?:\s+' . $word . '){0,3})\b/iu',
-            '/\b(bánh\s+thoát(?:\s+' . $word . '){0,3})\b/iu',
-            '/\b(bộ\s+thoát(?:\s+' . $word . '){0,3})\b/iu',
-            '/\b(hộp\s+cộng\s+hưởng(?:\s+' . $word . '){0,3})\b/iu',
-            '/\b(mặt\s+số(?:\s+' . $word . '){1,3})\b/iu',
-            '/\b(gông(?:\s+' . $word . '){1,3})\b/iu',
-            '/\b(búa(?:\s+' . $word . '){1,2})\b/iu',
-            '/\b(cọc(?:\s+' . $word . '){1,2})\b/iu',
-            '/\b(vách(?:\s+' . $word . '){1,3})\b/iu',
-        ];
         $spans = [];
-        foreach ($patterns as $pattern) {
-            if (!preg_match_all($pattern, $text, $matches)) continue;
-            foreach ($matches[1] as $value) {
-                $phrase = $this->qualityGate->filter((string) $value, $lexicalLabels);
-                if ($phrase !== null) $spans[$this->normalizer->normalize($phrase)] = $phrase;
+        foreach (preg_split('/[.!?;,:\n“”"\']+/u', $text) ?: [] as $clause) {
+            $current = [];
+            $flush = function () use (&$spans, &$current, $lexicalLabels): void {
+                if ($current === []) return;
+                $bounded = $this->qualityGate->filter(implode(' ', $current), $lexicalLabels);
+                if ($bounded !== null) $this->appendGenericSpan($spans, $this->tokens($bounded));
+                $current = [];
+            };
+            foreach ($this->tokens(trim($clause, " \t,()[]{}\"'")) as $token) {
+                if (preg_match('/\d/u', $token)) {
+                    $flush();
+                    continue;
+                }
+                if ($this->qualityGate->isBoundaryWord($token) && !$this->qualityGate->isModifierWord($token)) {
+                    $flush();
+                    continue;
+                }
+                $current[] = $token;
             }
+            $flush();
         }
         return array_values($spans);
+    }
+
+    /** @param array<string,string> $spans @param list<string> $tokens */
+    private function appendGenericSpan(array &$spans, array $tokens): void
+    {
+        if ($tokens === []) return;
+        if (count($tokens) === 1 && preg_match('/^\p{Lu}/u', (string) $tokens[0]) && !in_array(mb_strtolower((string) $tokens[0], 'UTF-8'), ['con', 'chiếc', 'một', 'mẫu'], true)) {
+            $normalized = $this->normalizer->normalize((string) $tokens[0]);
+            if ($normalized !== '' && !$this->qualityGate->isBoundaryWord((string) $tokens[0])) $spans[$normalized] = (string) $tokens[0];
+            return;
+        }
+        if (count($tokens) > 6 || $this->containsNumber($tokens)) return;
+        if (count($tokens) > 2 && in_array(mb_strtolower((string) $tokens[0], 'UTF-8') . ' ' . mb_strtolower((string) $tokens[1], 'UTF-8'), ['cơ chế', 'tình trạng', 'mô tả', 'cách gọi'], true)) {
+            $tokens = array_slice($tokens, 2);
+        }
+        if (count($tokens) > 1 && in_array(mb_strtolower((string) $tokens[0], 'UTF-8'), ['bản'], true)) array_shift($tokens);
+        while (count($tokens) > 1 && in_array(mb_strtolower((string) $tokens[0], 'UTF-8'), ['the', 'a', 'an', 'chiếc', 'một', 'mẫu', 'con'], true)) array_shift($tokens);
+        if (count($tokens) < 2) return;
+        $value = implode(' ', $tokens);
+        $spans[$this->normalizer->normalize($value)] = $value;
+        if (count($tokens) === 2 && in_array(mb_strtolower((string) $tokens[0], 'UTF-8'), ['bộ', 'cụm', 'hệ', 'van'], true) && mb_strlen((string) $tokens[1], 'UTF-8') <= 4) {
+            $atomic = (string) $tokens[1];
+            $spans[$this->normalizer->normalize($atomic)] = $atomic;
+        }
+    }
+
+    /** @return list<string> */
+    private function tokens(string $text): array
+    {
+        preg_match_all('/[\p{L}\p{N}][\p{L}\p{N}\-\/.]*/u', $text, $matches);
+        return array_values(array_map('strval', $matches[0] ?? []));
+    }
+
+    /** @param list<string> $tokens */
+    private function containsNumber(array $tokens): bool
+    {
+        foreach ($tokens as $token) if (preg_match('/\d/u', $token)) return true;
+        return false;
     }
 
     private function properNameSpans(string $text): array
@@ -254,8 +322,11 @@ final class DictionaryTermDetector
 
         foreach ($items as $normalized => $item) {
             if (in_array($item['origin'] ?? '', ['KNOWN_LABEL', 'HINT', 'MUSIC_NAME'], true)) continue;
+            $candidateParts = preg_split('/\s+/u', trim((string) $normalized)) ?: [];
             foreach ($containers as $strong) {
                 if ((string) $normalized === $strong) continue;
+                $strongParts = preg_split('/\s+/u', trim($strong)) ?: [];
+                if (count($candidateParts) === 1 && count($strongParts) === 2 && in_array($strongParts[0], ['bộ', 'cụm', 'hệ', 'van'], true) && mb_strlen((string) $candidateParts[0], 'UTF-8') <= 4) continue;
                 if ($this->isTokenSubspan((string) $normalized, $strong) || $this->isIdentifierFragment((string) $normalized, $strong)) {
                     unset($items[$normalized]);
                     break;

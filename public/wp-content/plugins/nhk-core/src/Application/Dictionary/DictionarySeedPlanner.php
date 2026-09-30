@@ -35,6 +35,12 @@ final class DictionarySeedPlanner
                     'occurrences' => 0,
                     'classification' => null,
                     'resolution' => [],
+                    'resolution_status' => 'UNRESOLVED',
+                    'resolved_destination_type' => null,
+                    'resolved_destination_id' => null,
+                    'resolved_dictionary_concept_id' => null,
+                    'ambiguity_count' => 0,
+                    'suggested_action' => null,
                     'diagnostics' => [],
                 ];
                 $items[$normalized]['resolution'] = ['status' => 'UNRESOLVED', 'concept_id' => null, 'destination_ids' => []];
@@ -49,10 +55,12 @@ final class DictionarySeedPlanner
         foreach ($items as &$item) {
             if ($item['category'] === 'EDITORIAL_SIGNAL') {
                 $item['classification'] = 'EDITORIAL_ONLY';
+                $item['suggested_action'] = 'SUPPRESS_EDITORIAL';
                 continue;
             }
             if ($item['category'] === 'NOISE') {
                 $item['classification'] = 'NOISE';
+                $item['suggested_action'] = 'SUPPRESS_NOISE';
                 continue;
             }
             $resolution = $this->resolver->resolve((string) ($item['raw_forms'][0] ?? $item['normalized_form']), $context + ['locale' => $item['locale']]);
@@ -64,11 +72,23 @@ final class DictionarySeedPlanner
                 'destination_id' => $resolution->status === DictionaryResolution::RESOLVED ? $resolution->destinationId : null,
                 'destination_ids' => $resolution->status === DictionaryResolution::RESOLVED && $resolution->destinationId !== null ? [$resolution->destinationId] : [],
             ];
+            $item['resolution_status'] = $resolution->status;
+            $item['resolved_destination_type'] = $resolution->destinationType;
+            $item['resolved_destination_id'] = $resolution->destinationId;
+            $item['resolved_dictionary_concept_id'] = $resolution->conceptId;
+            $item['ambiguity_count'] = count($resolution->candidates);
             $item['classification'] = match ($resolution->status) {
                 DictionaryResolution::RESOLVED => $this->normalize((string) ($resolution->preferredLabel ?? '')) !== '' && $this->normalize((string) ($resolution->preferredLabel ?? '')) !== $item['normalized_form'] ? 'ALIAS_TO_EXISTING' : 'RESOLVED_EXISTING',
                 DictionaryResolution::AMBIGUOUS => 'AMBIGUOUS',
                 DictionaryResolution::SUPPRESSED => 'SUPPRESSED',
                 default => 'NEW_LEXICAL_CANDIDATE',
+            };
+            $item['suggested_action'] = match ($item['classification']) {
+                'RESOLVED_EXISTING' => 'REUSE_EXISTING',
+                'ALIAS_TO_EXISTING' => 'ADD_ALIAS_CANDIDATE',
+                'AMBIGUOUS' => 'REVIEW_AMBIGUITY',
+                'SUPPRESSED' => 'SUPPRESS_NOISE',
+                default => 'NEW_CONCEPT_CANDIDATE',
             };
             if ($resolution->status === DictionaryResolution::AMBIGUOUS) $item['diagnostics'][] = 'AMBIGUOUS_CANONICAL_OWNER';
             $item['diagnostics'] = array_values(array_unique($item['diagnostics']));

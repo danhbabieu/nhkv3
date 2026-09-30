@@ -81,4 +81,37 @@ final class DictionarySeedPlannerTest extends TestCase
         self::assertFalse($result['mutated']);
         self::assertSame(3, $result['aggregate']['total']);
     }
+
+    public function test_seed_plan_exposes_canonical_reuse_and_action_without_creating_a_concept(): void
+    {
+        $resolver = new DictionaryResolver(
+            static fn (): array => [],
+            static fn (): array => [[
+                'preferred_label' => 'ÔĐô 36/10',
+                'destination_type' => 'variant',
+                'destination_id' => 'variant-1',
+            ]],
+            static fn (): array => [],
+            static fn (): array => [],
+            static fn (): bool => false,
+        );
+
+        $result = (new DictionarySeedPlanner($resolver))->plan([
+            'semantic_query_seeds' => [[
+                'raw_span' => 'ÔĐô 36/10',
+                'normalized_form' => 'ôđô 36/10',
+                'category' => 'IDENTIFIER',
+                'locale' => 'vi-VN',
+            ]],
+        ]);
+
+        $item = $result['items'][0];
+        self::assertSame('RESOLVED_EXISTING', $item['classification']);
+        self::assertSame('RESOLVED', $item['resolution_status']);
+        self::assertSame('variant', $item['resolved_destination_type']);
+        self::assertSame('variant-1', $item['resolved_destination_id']);
+        self::assertSame('REUSE_EXISTING', $item['suggested_action']);
+        self::assertNull($item['resolved_dictionary_concept_id']);
+        self::assertFalse($result['mutated']);
+    }
 }
