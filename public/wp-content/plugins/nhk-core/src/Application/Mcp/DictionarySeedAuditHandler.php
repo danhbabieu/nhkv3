@@ -22,7 +22,7 @@ final class DictionarySeedAuditHandler
     {
         if (array_key_exists('source_scope', $input)) return $this->auditCorpus($input);
         $text = trim((string) ($input['text'] ?? ''));
-        if ($text === '' || strlen($text) > 12000) throw new \InvalidArgumentException('DICTIONARY_SEED_AUDIT_TEXT_INVALID');
+        if ($text === '' || (function_exists('mb_strlen') ? mb_strlen($text, 'UTF-8') : strlen($text)) > 12000) throw new \InvalidArgumentException('DICTIONARY_SEED_AUDIT_TEXT_INVALID');
         $limit = $input['limit'] ?? 50;
         if (!is_int($limit) || $limit < 1 || $limit > 100) throw new \InvalidArgumentException('DICTIONARY_SEED_AUDIT_LIMIT_INVALID');
         $offset = $input['offset'] ?? 0;

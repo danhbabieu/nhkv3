@@ -1,5 +1,30 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-01 — Article corpus audit fault closure (LOCAL / NO MUTATION)
+
+ROOT_CAUSE_CONFIRMED: Dictionary Seed direct text validation used PHP `strlen`,
+so a valid UTF-8 Article could exceed the 12,000-byte check while remaining
+within the 12,000-character contract. The corpus result also passed resolver
+destination fields through final MCP JSON serialization without a UTF-8
+fail-closed boundary; one malformed resolver field could turn a source-local
+problem into an Ability-level internal error.
+
+FIXED_BOUNDARY: Text bounds now use UTF-8 character length. Corpus diagnostics
+are capped at 50 entries, source processing retains count/cursor progress when
+interpretation or planning fails, and reader-safe serialization drops malformed
+resolver strings rather than exposing raw/private data or throwing. No Article,
+Dictionary, Knowledge, Source, Evidence, Graph or Authority writer is called.
+
+REGRESSION: Targeted Dictionary corpus/MCP/Article-reader suite passes 18 tests
+and 95 assertions, including valid Article 18, faulty Article 19, the cursor
+after Article 19, bounded diagnostics, UTF-8 bounds, read-only flags and
+malformed resolver output. No live deployment was performed.
+
+NO_DATA_MUTATION: `read_only=true`, `mutated=false`; no data, schema, migration,
+seed, backfill, staging or production state was changed.
+
+STATUS: `DICTIONARY_SEED_ARTICLE_FAULT_CLOSED_LOCAL_READY / NO_MUTATION / DEPLOYMENT_NOT_PERFORMED`.
+
 # Checkpoint — 2026-10-01 — Generic corpus audit fault isolation (LOCAL / NO MUTATION)
 
 ROOT_CAUSES_FIXED: Knowledge paging previously used hydrated-row count as the

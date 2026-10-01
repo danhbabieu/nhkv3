@@ -11,6 +11,7 @@ use NHK\Core\Domain\Dictionary\DictionaryCandidate;
 final class DictionarySeedCorpusAuditCoordinator
 {
     private const SCOPES = ['KNOWLEDGE', 'ARTICLE', 'ALL'];
+    private const MAX_SOURCE_DIAGNOSTICS = 50;
 
     /** @param array<string,DictionaryCorpusSourceReader> $readers */
     public function __construct(
@@ -38,29 +39,29 @@ final class DictionarySeedCorpusAuditCoordinator
             $reader = $this->readers[$sourceScope] ?? null;
             if (!$reader instanceof DictionaryCorpusSourceReader) continue;
             try { $page = $reader->page($state['after'][$sourceScope] ?? null, $limit); }
-            catch (\Throwable $error) { $diagnostics[] = ['code' => 'CORPUS_SOURCE_PAGE_FAILED', 'source_scope' => $sourceScope, 'error' => get_class($error)]; continue; }
-            foreach ((array) ($page['diagnostics'] ?? []) as $diagnostic) if (is_array($diagnostic)) $diagnostics[] = $diagnostic + ['source_scope' => $sourceScope];
+            catch (\Throwable $error) { $this->diagnostic($diagnostics, ['code' => 'CORPUS_SOURCE_PAGE_FAILED', 'source_scope' => $sourceScope, 'error' => get_class($error)]); continue; }
+            foreach ((array) ($page['diagnostics'] ?? []) as $diagnostic) if (is_array($diagnostic)) $this->diagnostic($diagnostics, $diagnostic + ['source_scope' => $sourceScope]);
             $seenSources = [];
             foreach ((array) ($page['items'] ?? []) as $rowIndex => $source) {
                 if (!is_array($source)) {
-                    $diagnostics[] = ['code' => 'CORPUS_SOURCE_SHAPE_INVALID', 'source_scope' => $sourceScope, 'source_id' => $sourceScope . ':row:' . (string) $rowIndex];
+                    $this->diagnostic($diagnostics, ['code' => 'CORPUS_SOURCE_SHAPE_INVALID', 'source_scope' => $sourceScope, 'source_id' => $sourceScope . ':row:' . (string) $rowIndex]);
                     $sourcesScanned++;
                     continue;
                 }
                 $sourceId = trim((string) ($source['source_id'] ?? ''));
                 if ($sourceId === '') {
                     $sourceId = $sourceScope . ':row:' . (string) $rowIndex;
-                    $diagnostics[] = ['code' => 'CORPUS_SOURCE_ID_MISSING', 'source_scope' => $sourceScope, 'source_id' => $sourceId];
+                    $this->diagnostic($diagnostics, ['code' => 'CORPUS_SOURCE_ID_MISSING', 'source_scope' => $sourceScope, 'source_id' => $sourceId]);
                 }
                 $text = trim((string) ($source['raw_text'] ?? ''));
                 if (isset($seenSources[$sourceId])) continue;
                 $seenSources[$sourceId] = true;
                 $sourcesScanned++;
-                if (isset($source['source_error'])) $diagnostics[] = ['code' => (string) $source['source_error'], 'source_scope' => $sourceScope, 'source_id' => $sourceId];
+                if (isset($source['source_error'])) $this->diagnostic($diagnostics, ['code' => (string) $source['source_error'], 'source_scope' => $sourceScope, 'source_id' => $sourceId]);
                 $family = trim((string) ($source['source_family'] ?? $sourceId)) ?: $sourceId;
                 $context = is_array($source['context'] ?? null) ? $source['context'] : [];
                 if (preg_match('//u', $text) !== 1) {
-                    $diagnostics[] = ['code' => 'CORPUS_SOURCE_TEXT_ENCODING_INVALID', 'source_scope' => $sourceScope, 'source_id' => $sourceId];
+                    $this->diagnostic($diagnostics, ['code' => 'CORPUS_SOURCE_TEXT_ENCODING_INVALID', 'source_scope' => $sourceScope, 'source_id' => $sourceId]);
                     $next = $sourceId;
                     continue;
                 }
@@ -72,11 +73,11 @@ final class DictionarySeedCorpusAuditCoordinator
                     'raw_or_derived' => (string) ($source['raw_or_derived'] ?? 'RAW'),
                     'metadata' => $context,
                     'locale' => (string) ($source['locale'] ?? 'vi-VN'),
-                ]); } catch (\Throwable $error) { $diagnostics[] = ['code' => 'CORPUS_SOURCE_INTERPRETATION_FAILED', 'source_scope' => $sourceScope, 'source_id' => $sourceId, 'error' => get_class($error)]; continue; }
+                ]); } catch (\Throwable $error) { $this->diagnostic($diagnostics, ['code' => 'CORPUS_SOURCE_INTERPRETATION_FAILED', 'source_scope' => $sourceScope, 'source_id' => $sourceId, 'error' => get_class($error)]); $next = $sourceId; continue; }
                 try {
                     $plan = $this->planner->plan($packet, ['source_family' => $family, 'context' => $context]);
                 } catch (\Throwable $error) {
-                    $diagnostics[] = ['code' => 'CORPUS_SOURCE_PLANNING_FAILED', 'source_scope' => $sourceScope, 'source_id' => $sourceId, 'error' => get_class($error)];
+                    $this->diagnostic($diagnostics, ['code' => 'CORPUS_SOURCE_PLANNING_FAILED', 'source_scope' => $sourceScope, 'source_id' => $sourceId, 'error' => get_class($error)]);
                     $next = $sourceId;
                     continue;
                 }
@@ -142,7 +143,25 @@ final class DictionarySeedCorpusAuditCoordinator
     /** @return array<string,mixed> */
     private function safeRow(array $row): array
     {
-        return ['normalized_form' => $row['normalized_form'], 'category' => $row['category'], 'classification' => $row['classification'], 'resolution_status' => $row['resolution_status'] ?? 'UNRESOLVED', 'resolved_destination_type' => $row['resolved_destination_type'] ?? null, 'resolved_destination_id' => $row['resolved_destination_id'] ?? null, 'resolved_dictionary_concept_id' => $row['resolved_dictionary_concept_id'] ?? null, 'occurrences' => $row['occurrences'], 'source_count' => count($row['source_ids'] ?? []), 'source_family_count' => count($row['source_families'] ?? []), 'ambiguity_count' => $row['ambiguity_count'] ?? 0, 'suggested_action' => $row['suggested_action'] ?? null, 'diagnostics' => $row['diagnostics'] ?? []];
+        return ['normalized_form' => $this->safeString($row['normalized_form'] ?? '', ''), 'category' => $this->safeString($row['category'] ?? '', 'LEXICAL_OBSERVATION'), 'classification' => $this->safeString($row['classification'] ?? '', 'NEW_LEXICAL_CANDIDATE'), 'resolution_status' => $this->safeString($row['resolution_status'] ?? 'UNRESOLVED', 'UNRESOLVED'), 'resolved_destination_type' => $this->safeNullableString($row['resolved_destination_type'] ?? null), 'resolved_destination_id' => $this->safeNullableString($row['resolved_destination_id'] ?? null), 'resolved_dictionary_concept_id' => $this->safeNullableString($row['resolved_dictionary_concept_id'] ?? null), 'occurrences' => (int) ($row['occurrences'] ?? 0), 'source_count' => count($row['source_ids'] ?? []), 'source_family_count' => count($row['source_families'] ?? []), 'ambiguity_count' => (int) ($row['ambiguity_count'] ?? 0), 'suggested_action' => $this->safeNullableString($row['suggested_action'] ?? null), 'diagnostics' => array_values(array_filter(array_map(fn (mixed $value): string => $this->safeString($value, ''), (array) ($row['diagnostics'] ?? [])), static fn (string $value): bool => $value !== ''))];
+    }
+
+    private function diagnostic(array &$diagnostics, array $diagnostic): void
+    {
+        if (count($diagnostics) < self::MAX_SOURCE_DIAGNOSTICS) $diagnostics[] = $diagnostic;
+    }
+
+    private function safeString(mixed $value, string $fallback): string
+    {
+        $value = is_scalar($value) ? (string) $value : $fallback;
+        return preg_match('//u', $value) === 1 ? $value : $fallback;
+    }
+
+    private function safeNullableString(mixed $value): ?string
+    {
+        if ($value === null) return null;
+        $safe = $this->safeString($value, '');
+        return $safe !== '' ? $safe : null;
     }
 
     /** @param list<array<string,mixed>> $rows @return array<string,mixed> */

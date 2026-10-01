@@ -39,6 +39,15 @@ final class DictionarySeedAuditMcpTest extends TestCase
         self::assertArrayHasKey('suggested_action', $response['items'][0]);
     }
 
+    public function test_handler_uses_character_bound_for_utf8_text(): void
+    {
+        $response = $this->handler()->audit(['text' => str_repeat('đ ', 5999) . 'đ', 'limit' => 1]);
+
+        self::assertSame('AVAILABLE', $response['status']);
+        self::assertTrue($response['read_only']);
+        self::assertFalse($response['mutated']);
+    }
+
     public function test_catalog_dispatch_and_ability_parity_is_internal_read_only(): void
     {
         $tool = array_values(array_filter(McpToolCatalog::tools(), static fn (array $tool): bool => $tool['name'] === 'nhk.dictionary.seed-audit'))[0] ?? null;

@@ -133,6 +133,38 @@ final class DictionarySeedCorpusAuditTest extends TestCase
         self::assertFalse($result['mutated']);
     }
 
+    public function test_article_cursor_continues_after_faulty_source_between_two_valid_articles(): void
+    {
+        $reader = new FakeDictionaryCorpusReader([
+            ['source_id' => '18', 'source_family' => 'article:18', 'source_kind' => 'ARTICLE', 'raw_text' => 'Valid Before', 'context' => []],
+            ['source_id' => '19', 'source_family' => 'article:19', 'source_kind' => 'ARTICLE', 'raw_text' => 'Broken Term', 'context' => []],
+            ['source_id' => '20', 'source_family' => 'article:20', 'source_kind' => 'ARTICLE', 'raw_text' => 'Valid After', 'context' => []],
+        ]);
+        $resolver = new DictionaryResolver(
+            static fn (): array => [],
+            static function (string $term): array {
+                if (mb_strtolower($term) === 'broken term') throw new \RuntimeException('resolver failed');
+                return [];
+            },
+            static fn (): array => [],
+            static fn (): array => [],
+            static fn (): bool => false,
+        );
+        $coordinator = new DictionarySeedCorpusAuditCoordinator(['ARTICLE' => $reader], new StructuredSemanticInterpreter(), new DictionarySeedPlanner($resolver));
+
+        $before = $coordinator->audit('ARTICLE', null, 1);
+        $fault = $coordinator->audit('ARTICLE', $before['next_cursor'], 1);
+        $after = $coordinator->audit('ARTICLE', $fault['next_cursor'], 1);
+
+        self::assertSame(1, $before['sources_scanned']);
+        self::assertSame('valid before', $before['items'][0]['normalized_form']);
+        self::assertSame('CORPUS_SOURCE_PLANNING_FAILED', $fault['diagnostics']['source_diagnostics'][0]['code']);
+        self::assertSame(1, $fault['sources_scanned']);
+        self::assertSame('valid after', $after['items'][0]['normalized_form']);
+        self::assertTrue($fault['read_only']);
+        self::assertFalse($fault['mutated']);
+    }
+
     public function test_article_source_with_roughly_ten_thousand_characters_does_not_kill_audit(): void
     {
         $reader = new FakeDictionaryCorpusReader([
@@ -145,6 +177,47 @@ final class DictionarySeedCorpusAuditTest extends TestCase
 
         self::assertSame(2, $result['sources_scanned']);
         self::assertSame('AVAILABLE', $result['status']);
+        self::assertFalse($result['mutated']);
+    }
+
+    public function test_invalid_resolver_output_cannot_break_serialization_or_cursor_progress(): void
+    {
+        $reader = new FakeDictionaryCorpusReader([
+            ['source_id' => 'article:bad', 'source_family' => 'article:bad', 'source_kind' => 'ARTICLE', 'raw_text' => 'Broken Term', 'context' => []],
+            ['source_id' => 'article:next', 'source_family' => 'article:next', 'source_kind' => 'ARTICLE', 'raw_text' => 'Valid Term', 'context' => []],
+        ]);
+        $resolver = new DictionaryResolver(
+            static fn (): array => [],
+            static fn (): array => [['preferred_label' => 'Valid Term', 'destination_type' => 'model', 'destination_id' => "\xB1"]],
+            static fn (): array => [],
+            static fn (): array => [],
+            static fn (): bool => false,
+        );
+        $coordinator = new DictionarySeedCorpusAuditCoordinator(['ARTICLE' => $reader], new StructuredSemanticInterpreter(), new DictionarySeedPlanner($resolver));
+
+        $result = $coordinator->audit('ARTICLE', null, 1);
+        $serialized = json_encode($result, JSON_THROW_ON_ERROR);
+
+        self::assertStringNotContainsString("\xB1", $serialized);
+        self::assertNotNull($result['next_cursor']);
+        $next = $coordinator->audit('ARTICLE', $result['next_cursor'], 1);
+        self::assertSame(1, $next['sources_scanned']);
+        self::assertSame('valid term', $next['items'][0]['normalized_form']);
+        self::assertTrue($next['read_only']);
+        self::assertFalse($next['mutated']);
+    }
+
+    public function test_source_diagnostics_are_bounded_without_dropping_source_count(): void
+    {
+        $rows = [];
+        for ($index = 1; $index <= 100; $index++) {
+            $rows[] = ['source_id' => 'article:' . $index, 'source_family' => 'article:' . $index, 'source_kind' => 'ARTICLE', 'raw_text' => '', 'source_error' => 'ARTICLE_SOURCE_UNAVAILABLE', 'context' => []];
+        }
+        $result = $this->coordinator(['ARTICLE' => new FakeDictionaryCorpusReader($rows)], static fn (): array => [])->audit('ARTICLE', null, 100);
+
+        self::assertSame(100, $result['sources_scanned']);
+        self::assertCount(50, $result['diagnostics']['source_diagnostics']);
+        self::assertTrue($result['read_only']);
         self::assertFalse($result['mutated']);
     }
 
