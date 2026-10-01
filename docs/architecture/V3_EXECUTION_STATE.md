@@ -1,5 +1,45 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-01 — Universal lexical acquisition holdout and provenance (LOCAL / NO MUTATION)
+
+ROOT_CAUSES_CONFIRMED: Noise/editorial signals could be reintroduced into the
+shared packet with the default `QUALIFIED` status. A direct adapter packet
+could also mark a seed `resolver_eligible=false` while the Dictionary planner
+still performed resolver work. Corpus audit serialization retained aggregate
+counts but omitted raw forms, source identities, derived lineage and the
+distinction between source-local occurrences and independent sources. Generic
+Vietnamese `về` and common English transcript boundaries were missing from the
+shared lexical boundary vocabulary.
+
+IMPLEMENTED: Noise/editorial spans retain explicit non-qualified evidence and
+remain visible only as bounded suppression audit rows; observation-only spans
+do not enter resolver work. The planner enforces explicit resolver eligibility.
+Corpus aggregation now preserves safe raw forms, source IDs/families, derived
+lineage and independent-source counts without serializing source bodies. Added
+an independent holdout covering technical/configuration, specialist history,
+advertising, dialogue/transcript, names, unknown quoted terms, weak single-word
+context, ambiguity limits and derived lineage. Incomplete gold dimensions are
+reported unavailable rather than estimated.
+
+REGRESSION: Targeted Dictionary/Semantic/corpus/holdout suite passes 70 tests
+and 410 assertions, with 40 existing PHPUnit deprecations. Article 18, 19 and
+41 sentinels, escape/compound/name/identifier/ambiguity behavior and cursor
+continuation remain green. PHP lint passes for all seven changed PHP files;
+`git diff --check` and changed-scope secret scan pass. No resolver budget was
+increased and no new semantic owner, predicate, writer or schema was added.
+
+OPEN_LIMITATIONS: Advertising/source-genre noun suppression and resolver
+ambiguity metrics lack sufficiently complete independent gold labels; the
+holdout records these as `UNAVAILABLE`. Full Article/Knowledge corpus runs
+were intentionally not performed. Runtime/staging read-back was not needed
+for this local read-only slice and no deployment was performed.
+
+NO_DATA_MUTATION: `read_only=true`, `mutated=false`; no Dictionary, Knowledge,
+Source, Evidence, Graph, Authority or Article write, schema change, migration,
+seed, backfill, staging, production operation or deployment was performed.
+
+STATUS: `UNIVERSAL_LEXICAL_ACQUISITION_LOCAL_READY / NO_MUTATION / DEPLOYMENT_NOT_PERFORMED`.
+
 # Checkpoint — 2026-10-01 — Generic lexical quality gate (LOCAL / NO MUTATION)
 
 IMPLEMENTED: The shared generic Dictionary lexical-quality gate now rejects
