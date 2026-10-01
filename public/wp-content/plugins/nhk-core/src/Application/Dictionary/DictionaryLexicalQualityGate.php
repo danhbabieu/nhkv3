@@ -24,6 +24,14 @@ final class DictionaryLexicalQualityGate
         'thay vì', 'mặc dù', 'bởi vì', 'cho nên', 'vì vậy', 'do đó', 'để mà',
     ];
     private const MODIFIER_PREFIX_WORDS = ['tự'];
+    private const LOW_VALUE_FRAGMENT_PATTERNS = [
+        '/^(?:đây|tương đối|thuộc tính)$/u',
+        '/^nhiều người(?:\s|$)/u',
+        '/\byêu thích\b/u',
+        '/^(?:giá trị|mức độ)(?:\s+\p{L}+){1,4}$/u',
+        '/^cần\s+(?:tách|phân|xác định|lưu ý)(?:\s+\p{L}+){1,4}$/u',
+        '/\b(?:luôn|không)\s+đồng nghĩa\b/u',
+    ];
 
     public function isBoundaryWord(string $word): bool
     {
@@ -71,7 +79,19 @@ final class DictionaryLexicalQualityGate
         }
 
         $result = trim(implode(' ', $parts));
+        if ($result !== '' && $this->isLowValueFragment($result, $knownLabels)) return null;
         return $result === '' ? null : $result;
+    }
+
+    private function isLowValueFragment(string $phrase, array $knownLabels): bool
+    {
+        $normalized = $this->lower(trim((string) preg_replace('/\s+/u', ' ', $phrase)));
+        foreach ($knownLabels as $label) {
+            $known = $this->lower(trim((string) preg_replace('/\s+/u', ' ', (string) $label)));
+            if ($known !== '' && $known === $normalized) return false;
+        }
+        foreach (self::LOW_VALUE_FRAGMENT_PATTERNS as $pattern) if (preg_match($pattern, $normalized) === 1) return true;
+        return false;
     }
 
     private function trimAtKnownLabelBoundary(array $parts, array $knownLabels): string

@@ -309,6 +309,36 @@ final class DictionarySeedCorpusAuditTest extends TestCase
         $coordinator->audit('ARTICLE', $first['next_cursor'], 1);
     }
 
+    public function test_article_19_generic_prose_is_filtered_before_resolver_without_affecting_article_18_or_41(): void
+    {
+        $reader = new FakeDictionaryCorpusReader([
+            ['source_id' => '18', 'source_family' => 'article:18', 'source_kind' => 'ARTICLE', 'raw_text' => 'Mặt số lớn.', 'context' => []],
+            ['source_id' => '19', 'source_family' => 'article:19', 'source_kind' => 'ARTICLE', 'raw_text' => 'Odo 36/10 là dòng được nhiều người yêu thích. Đây là một chiếc đồng hồ có giá trị sưu tầm cao và tương đối hiếm. Cần tách riêng độ hiếm và giá trị sưu tầm, vì hai thuộc tính không luôn đồng nghĩa.', 'context' => []],
+            ['source_id' => '41', 'source_family' => 'article:41', 'source_kind' => 'ARTICLE', 'raw_text' => 'Bộ thoát và Odo 36/10.', 'context' => []],
+        ]);
+        $resolverCalls = [];
+        $coordinator = $this->coordinator(['ARTICLE' => $reader], static function (string $term) use (&$resolverCalls): array {
+            $resolverCalls[] = $term;
+            return [];
+        });
+
+        $article18 = $coordinator->audit('ARTICLE', null, 1);
+        $article19 = $coordinator->audit('ARTICLE', $article18['next_cursor'], 1);
+        $article41 = $coordinator->audit('ARTICLE', $article19['next_cursor'], 1);
+
+        self::assertSame(['mặt số lớn'], array_column($article18['items'], 'normalized_form'));
+        self::assertSame(['odo 36/10', 'đồng hồ'], array_column($article19['items'], 'normalized_form'));
+        self::assertSame(['bộ thoát', 'odo 36/10'], array_column($article41['items'], 'normalized_form'));
+        self::assertCount(5, $resolverCalls);
+        foreach (['nhiều người yêu thích', 'đây', 'giá trị sưu tầm cao', 'tương đối', 'cần tách riêng độ', 'thuộc tính', 'luôn đồng nghĩa'] as $fragment) {
+            self::assertNotContains($fragment, $resolverCalls);
+        }
+        foreach ([$article18, $article19, $article41] as $result) {
+            self::assertTrue($result['read_only']);
+            self::assertFalse($result['mutated']);
+        }
+    }
+
     /** @param array<string,DictionaryCorpusSourceReader> $readers @param callable(string):array $entityLookup */
     private function coordinator(array $readers, callable $entityLookup, ?DictionaryCandidateRepository $queue = null): DictionarySeedCorpusAuditCoordinator
     {

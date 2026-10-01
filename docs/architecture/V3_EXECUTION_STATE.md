@@ -1,5 +1,29 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-01 — Generic lexical quality gate (LOCAL / NO MUTATION)
+
+IMPLEMENTED: The shared generic Dictionary lexical-quality gate now rejects
+generic prose/opinion/discourse fragments before Dictionary resolver lookup
+using reusable grammar patterns, while preserving explicit labels, proper
+names, identifiers, structural configurations and domain phrases. No
+Article-specific names or phrase allowlist was added; NEW_LEXICAL_CANDIDATE
+remains a review-only unresolved classification and is never treated as an
+approved concept.
+
+REGRESSION: Article-style fixture output reduced from 9 detected spans before
+the change to 2 valid seeds after the change (odo 36/10, đồng hồ).
+Article 18 (mặt số lớn) and Article 41 (bộ thoát, odo 36/10) remain
+unchanged. Resolver lookup receives only the retained seeds. Targeted
+Dictionary detector/interpreter/planner/corpus/MCP suite passes 67 tests and
+327 assertions. Local WordPress Article 19 read-back was unavailable because
+the local database connection is unavailable; no live post was re-scanned.
+
+NO_DATA_MUTATION: read_only=true, mutated=false; no Knowledge scan, seed,
+Dictionary write, Article write, schema change, migration, staging,
+production operation or deployment was performed.
+
+STATUS: DICTIONARY_GENERIC_LEXICAL_QUALITY_LOCAL_READY / NO_MUTATION / DEPLOYMENT_NOT_PERFORMED.
+
 # Checkpoint — 2026-10-01 — Article Dictionary Seed continuation (LOCAL / NO MUTATION)
 
 IMPLEMENTED: Article Dictionary Seed audit now carries an active same-Article

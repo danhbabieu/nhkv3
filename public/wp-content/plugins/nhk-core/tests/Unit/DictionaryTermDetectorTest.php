@@ -194,6 +194,19 @@ final class DictionaryTermDetectorTest extends TestCase
         self::assertContains('côn đồng bạch', $terms('côn đồng bạch hiệu'));
     }
 
+    public function test_generic_article_prose_fragments_are_rejected_before_dictionary_lookup(): void
+    {
+        $terms = array_column((new DictionaryTermDetector())->detect(
+            'Odo 36/10 là dòng được nhiều người yêu thích. Đây là một chiếc đồng hồ có giá trị sưu tầm cao và tương đối hiếm. Cần tách riêng độ hiếm và giá trị sưu tầm, vì hai thuộc tính không luôn đồng nghĩa.'
+        ), 'normalized_term');
+
+        self::assertContains('odo 36/10', $terms);
+        self::assertContains('đồng hồ', $terms);
+        foreach (['nhiều người yêu thích', 'đây', 'giá trị sưu tầm cao', 'tương đối', 'cần tách riêng độ', 'thuộc tính', 'luôn đồng nghĩa'] as $fragment) {
+            self::assertNotContains($fragment, $terms);
+        }
+    }
+
     public function test_composite_numeric_configuration_preserves_the_left_boundary_and_hides_fragments(): void
     {
         $units = [
