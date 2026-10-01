@@ -21212,3 +21212,39 @@ and `git diff --check` pass. No pagination, cursor, resolver, Knowledge or
 data mutation changed.
 
 STATUS: `DICTIONARY_COMPOUND_BOUNDARY_LOCAL_READY / NO_LIVE_MUTATION / NO_PUSH / NO_DEPLOY`.
+
+# Checkpoint — 2026-10-02 — Lexical evidence and corpus provenance closure
+
+LEXICAL_EVIDENCE: Dictionary generic spans no longer become resolver-eligible
+solely because they contain two or more words. Speech fragments and
+unproven stylistic continuations are rejected at the shared segmentation
+boundary; quoted technical constructions retain the full lexical span when a
+predicate word is part of the construction. Approved labels, proper names,
+identifiers and existing compound paths remain intact. No term-specific
+blacklist or hardcoded discovered phrase was added.
+
+PROVENANCE_AGGREGATION: Missing source identity or invalid RAW/DERIVED
+provenance is `UNCERTAIN` and is excluded from independent-source counts.
+Audit rows now retain an ephemeral source-observation packet containing source
+identity, family, raw forms, occurrences and lineage. Derived lineages are
+retained as a collection, so distinct parent lineages are not collapsed; the
+existing `canonical_origin_id` de-duplication remains the independent-origin
+boundary. RAW editorial/context lineage without a parent remains independent
+when identity and provenance are valid.
+
+CURSOR_METRICS: `observation_only_count` and independent-source metrics remain
+explicitly `AUDIT_PAGE` and were verified independently across two Article
+cursor pages. The coordinator remains read-only; no schema, persistence owner,
+migration, seed, deployment or data mutation was introduced.
+
+VALIDATION: RED tests first reproduced the six requested lexical/provenance
+defects. Targeted Dictionary/corpus/Semantic/holdout slice passes 160 tests /
+777 assertions (one deprecation). The direct lexical/provenance slice passes
+60 tests / 326 assertions. Full Unit with `memory_limit=512M` reaches 2,887
+tests / 17,197 assertions with 1 unrelated repository-fixture TypeError, 3
+unrelated Article/Knowledge failures, 19 warnings, 47 deprecations and 49
+PHPUnit deprecations; those out-of-scope failures were not changed. Full PHP
+lint and changed-file lint pass; `git diff --check` passes; review of added
+lines found no credential, token or private-key material.
+
+STATUS: `DICTIONARY_LEXICAL_PROVENANCE_LOCAL_READY / FULL_UNIT_BASELINE_GAPS / NO_LIVE_MUTATION / NO_PUSH / NO_DEPLOY`.

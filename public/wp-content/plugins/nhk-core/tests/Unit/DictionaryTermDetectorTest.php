@@ -38,6 +38,49 @@ final class DictionaryTermDetectorTest extends TestCase
         self::assertSame([], $terms);
     }
 
+    public function test_two_word_speech_fragment_is_observation_only_and_not_a_dictionary_candidate(): void
+    {
+        $items = (new DictionaryTermDetector())->detect('khách bảo');
+
+        self::assertSame([], $items);
+    }
+
+    public function test_quoted_technical_phrase_keeps_the_full_span_when_definition_uses_a_boundary_word(): void
+    {
+        $items = (new DictionaryTermDetector())->detect('“bộ dẫn hướng từ trở” là cụm kỹ thuật mới trong định nghĩa.');
+        $terms = array_column($items, 'normalized_term');
+
+        self::assertContains('bộ dẫn hướng từ trở', $terms);
+        self::assertNotContains('bộ dẫn hướng', $terms);
+        self::assertNotContains('bộ dẫn hướng từ', $terms);
+    }
+
+    public function test_unproven_two_word_style_fragments_are_not_qualified_or_resolver_eligible(): void
+    {
+        $detector = new DictionaryTermDetector();
+
+        foreach (['kỹ sư hơn', 'tài liệu chính thức gần'] as $text) {
+            self::assertSame([], $detector->detect($text));
+        }
+    }
+
+    public function test_explicit_evidence_and_valid_compounds_remain_qualified_while_unproven_single_word_is_not(): void
+    {
+        $detector = new DictionaryTermDetector();
+        $items = $detector->detect(
+            'Jean-Paul Van Buren dùng Odo 36/10; bộ dẫn hướng; bộ thoát; khách.',
+            ['bộ dẫn hướng'],
+        );
+        $byTerm = [];
+        foreach ($items as $item) $byTerm[$item['normalized_term']] = $item;
+
+        self::assertSame('QUALIFIED', $byTerm['jean-paul van buren']['evidence_status']);
+        self::assertSame('QUALIFIED', $byTerm['odo 36/10']['evidence_status']);
+        self::assertSame('QUALIFIED', $byTerm['bộ dẫn hướng']['evidence_status']);
+        self::assertSame('QUALIFIED', $byTerm['bộ thoát']['evidence_status']);
+        self::assertArrayNotHasKey('khách', $byTerm);
+    }
+
     public function test_detects_clock_domain_phrases_without_requiring_existing_dictionary_entry(): void
     {
         $items = (new DictionaryTermDetector())->detect('Chiếc đồng hồ dùng côn lòng máng trắng và có cơ chế ngắt chuông đêm.');

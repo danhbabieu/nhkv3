@@ -13,7 +13,7 @@ final class DictionaryLexicalQualityGate
         'mà', 'và', 'hoặc', 'là', 'có', 'cho', 'với', 'của', 'được', 'trong', 'trên', 'nhưng', 'về',
         'dưới', 'này', 'đó', 'thì', 'khi', 'để', 'từ', 'một', 'những', 'các', 'như',
         'thế', 'nào', 'nằm', 'ở', 'trở', 'nếu', 'vì', 'nên', 'khiến', 'tại', 'bởi',
-        'cùng', 'tự', 'thường', 'phổ', 'biến', 'gặp', 'chúng', 'ta', 'họ', 'nó', 'đây', 'điều', 'đầu', 'tiên', 'luôn', 'riêng', 'nghĩa', 'sự', 'chỉ', 'sẽ', 'ấy', 'đã', 'cả', 'rồi', 'vẫn', 'vậy', 'qua', 'còn', 'lại', 'dụng', 'việc', 'chữ', 'mới',
+        'cùng', 'tự', 'thường', 'phổ', 'biến', 'gặp', 'chúng', 'ta', 'họ', 'nó', 'đây', 'điều', 'đầu', 'tiên', 'luôn', 'riêng', 'nghĩa', 'sự', 'chỉ', 'sẽ', 'ấy', 'đã', 'cả', 'rồi', 'vẫn', 'vậy', 'qua', 'còn', 'lại', 'dụng', 'việc', 'chữ', 'mới', 'hơn', 'gần',
         'không', 'đến', 'dùng', 'hiệu', 'hai', 'phần', 'sử', 'theo', 'sau', 'trước', 'vào',
         'cũng', 'khá', 'rất', 'nghe', 'nhìn', 'đặc', 'biệt', 'êm', 'đẹp', 'hay', 'thay', 'cực', 'kỳ',
         'ấn', 'tượng', 'hiếm', 'lực', 'also', 'quite', 'unusual', 'very', 'sounds',
@@ -31,11 +31,11 @@ final class DictionaryLexicalQualityGate
         'bắt', 'chạy', 'chạm', 'đung', 'đưa', 'đứng', 'đọc', 'đặt', 'gặp',
         'ghi', 'giúp', 'giống', 'giải', 'giữ', 'hoạt', 'khảo', 'kể', 'khiến', 'lên', 'mở', 'nghĩ', 'phân', 'tách', 'tham', 'xác', 'lưu', 'chơi', 'thích', 'thấy', 'biết', 'yên',
         'nhận', 'nhìn', 'nói', 'quay', 'sống', 'suy', 'tạo', 'tiếp', 'tinh', 'xoay', 'sang', 'ra', 'đời', 'xuống',
-        'tồn', 'tránh', 'trở', 'xem', 'yêu', 'đánh', 'đi', 'đến', 'dùng',
+        'tồn', 'tránh', 'trở', 'xem', 'yêu', 'đánh', 'đi', 'đến', 'dùng', 'bảo',
         'dễ', 'hãy', 'đừng', 'phải', 'muốn',
     ];
     private const NON_LEXICAL_SINGLE_WORDS = [
-        'bác', 'bài', 'cả', 'các', 'câu', 'chẳng', 'chúng', 'đây', 'điều', 'độ', 'giá', 'họ', 'một', 'tên',
+        'bác', 'bài', 'cả', 'các', 'câu', 'chẳng', 'chúng', 'đây', 'điều', 'độ', 'giá', 'họ', 'khách', 'một', 'tên',
         'người', 'nó', 'những', 'sự', 'ta', 'thể', 'vậy', 'vì', 'với', 'cần',
         'mức', 'phần', 'trang', 'thuộc', 'tính', 'đồng', 'dòng', 'lặng', 'việc', 'bên', 'ông', 'gần', 'rằng', 'tưởng', 'chính', 'chiếc', 'dấu', 'rộng', 'ngay', 'xuyên', 'lâu', 'động', 'khu',
     ];
@@ -64,7 +64,7 @@ final class DictionaryLexicalQualityGate
 
     public function isWeakDiscourseBoundary(string $word): bool
     {
-        return in_array($this->word($word), ['ấy', 'đã', 'rồi', 'vẫn', 'còn', 'vậy', 'chính', 'lại', 'sẽ'], true);
+        return in_array($this->word($word), ['ấy', 'đã', 'rồi', 'vẫn', 'còn', 'vậy', 'chính', 'lại', 'sẽ', 'hơn', 'gần'], true);
     }
 
     public function isDiscourseStart(string $word): bool
@@ -138,11 +138,16 @@ final class DictionaryLexicalQualityGate
             $nextWord = isset($parts[$index + 1])
                 ? $this->word((string) $parts[$index + 1])
                 : '';
+            $previousWord = $index > 0 ? $this->word((string) $parts[$index - 1]) : '';
             if ($nextWord !== '' && in_array($word . ' ' . $nextWord, self::BOUNDARY_PHRASES, true)) {
                 $parts = array_slice($parts, 0, $index);
                 break;
             }
             if ($this->isCompoundLead($word, $nextWord)) continue;
+            if ($word === 'từ' && $nextWord === 'trở') continue;
+            // “từ trở” is a lexical technical construction; “trở” is only a
+            // clause predicate when it is not attached to that construction.
+            if ($word === 'trở' && $previousWord === 'từ') continue;
             if ($word === 'cần' && $this->isPredicateWord($nextWord)) {
                 $parts = array_slice($parts, 0, $index);
                 break;
@@ -164,6 +169,7 @@ final class DictionaryLexicalQualityGate
 
         while ($parts !== []) {
             $last = $this->word((string) end($parts));
+            if ($last === 'trở' && count($parts) > 1 && $this->word((string) $parts[count($parts) - 2]) === 'từ') break;
             if ($last === '' || !in_array($last, self::BOUNDARY_WORDS, true)) break;
             array_pop($parts);
         }

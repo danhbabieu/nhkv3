@@ -178,6 +178,8 @@ final class DictionarySeedCorpusAuditCoordinator
             $items[$key]['independent_source_ids'] = [];
             $items[$key]['independent_origin_ids'] = [];
             $items[$key]['derived_lineage'] = [];
+            $items[$key]['derived_lineages'] = [];
+            $items[$key]['source_observations'] = [];
             $items[$key]['ambiguity_count'] = 0;
             $items[$key]['diagnostics'] = [];
             $items[$key]['provenance_uncertain'] = false;
@@ -191,13 +193,24 @@ final class DictionarySeedCorpusAuditCoordinator
         if (!in_array($sourceId, $item['source_ids'], true)) $item['source_ids'][] = $sourceId;
         if (!in_array($family, $item['source_families'], true)) $item['source_families'][] = $family;
         $provenance = $this->provenance($source, $sourceId);
+        $observation = [
+            'source_id' => $sourceId,
+            'source_family' => $family,
+            'raw_forms' => array_values(array_filter(array_map(fn (mixed $value): string => $this->safeString($value, ''), (array) ($row['raw_forms'] ?? [])), static fn (string $value): bool => $value !== '')),
+            'occurrences' => (int) ($row['occurrences'] ?? 0),
+            'lineage' => $this->safeLineage(is_array($source['lineage'] ?? null) ? $source['lineage'] : []),
+        ];
+        $observationKey = $sourceId . "\0" . $family;
+        $observationKeys = array_map(static fn (array $value): string => (string) ($value['source_id'] ?? '') . "\0" . (string) ($value['source_family'] ?? ''), (array) ($item['source_observations'] ?? []));
+        if (!in_array($observationKey, $observationKeys, true)) $item['source_observations'][] = $observation;
         if ($provenance['uncertain']) {
             $item['provenance_uncertain'] = true;
             $item['diagnostics'][] = 'PROVENANCE_INDEPENDENCE_UNCERTAIN';
         }
         if ($provenance['derived']) {
             if ($item['derived_lineage'] === []) $item['derived_lineage'] = $provenance['lineage'];
-        } elseif (!in_array($provenance['origin_id'], $item['independent_origin_ids'], true)) {
+            if ($provenance['lineage'] !== [] && !in_array($provenance['lineage'], $item['derived_lineages'], true)) $item['derived_lineages'][] = $provenance['lineage'];
+        } elseif (!$provenance['uncertain'] && !in_array($provenance['origin_id'], $item['independent_origin_ids'], true)) {
             $item['independent_origin_ids'][] = $provenance['origin_id'];
             $item['independent_source_ids'][] = $sourceId;
         }
@@ -229,6 +242,17 @@ final class DictionarySeedCorpusAuditCoordinator
             'independent_source_count' => count($row['independent_source_ids'] ?? []),
             'independent_source_count_scope' => 'AUDIT_PAGE',
             'derived_lineage' => $this->safeLineage((array) ($row['derived_lineage'] ?? [])),
+            'derived_lineages' => array_values(array_map(fn (mixed $lineage): array => $this->safeLineage(is_array($lineage) ? $lineage : []), (array) ($row['derived_lineages'] ?? []))),
+            'source_observations' => array_values(array_map(function (mixed $observation): array {
+                if (!is_array($observation)) return [];
+                return [
+                    'source_id' => $this->safeString($observation['source_id'] ?? '', ''),
+                    'source_family' => $this->safeString($observation['source_family'] ?? '', ''),
+                    'raw_forms' => array_values(array_filter(array_map(fn (mixed $value): string => $this->safeString($value, ''), (array) ($observation['raw_forms'] ?? [])), static fn (string $value): bool => $value !== '')),
+                    'occurrences' => (int) ($observation['occurrences'] ?? 0),
+                    'lineage' => $this->safeLineage(is_array($observation['lineage'] ?? null) ? $observation['lineage'] : []),
+                ];
+            }, (array) ($row['source_observations'] ?? []))),
             'provenance_status' => !empty($row['provenance_uncertain']) ? 'UNCERTAIN' : (!empty($row['derived_lineage']) ? 'DERIVED_PRESENT' : 'KNOWN'),
             'ambiguity_count' => (int) ($row['ambiguity_count'] ?? 0),
             'suggested_action' => $this->safeNullableString($row['suggested_action'] ?? null),

@@ -123,6 +123,41 @@ final class DictionarySeedCorpusAuditTest extends TestCase
         self::assertContains('PROVENANCE_INDEPENDENCE_UNCERTAIN', $item['diagnostics']);
     }
 
+    public function test_missing_identity_or_invalid_provenance_is_uncertain_and_not_independent(): void
+    {
+        $reader = new FakeDictionaryCorpusReader([
+            ['source_family' => 'family:missing', 'source_kind' => 'KNOWLEDGE', 'raw_text' => 'Alpha', 'raw_or_derived' => 'RAW', 'context' => ['lexical_hints' => ['Alpha']]],
+            ['source_id' => 'source:invalid', 'source_family' => 'family:invalid', 'source_kind' => 'KNOWLEDGE', 'raw_text' => 'Alpha', 'raw_or_derived' => 'MAYBE', 'context' => ['lexical_hints' => ['Alpha']]],
+        ]);
+
+        $result = $this->coordinator(['KNOWLEDGE' => $reader], static fn (): array => [])->audit('KNOWLEDGE', null, 10);
+        $item = $result['items'][0];
+
+        self::assertSame('UNCERTAIN', $item['provenance_status']);
+        self::assertSame(0, $item['independent_source_count']);
+        self::assertContains('PROVENANCE_INDEPENDENCE_UNCERTAIN', $item['diagnostics']);
+    }
+
+    public function test_derived_observations_retain_each_parent_lineage_and_source_observation_packet(): void
+    {
+        $reader = new FakeDictionaryCorpusReader([
+            ['source_id' => 'derived:a', 'source_family' => 'family:a', 'source_kind' => 'KNOWLEDGE', 'raw_text' => 'Alpha', 'raw_or_derived' => 'DERIVED', 'lineage' => ['parent_source_id' => 'parent:a', 'source_family' => 'family:a'], 'context' => ['lexical_hints' => ['Alpha']]],
+            ['source_id' => 'derived:b', 'source_family' => 'family:b', 'source_kind' => 'KNOWLEDGE', 'raw_text' => 'ALPHA', 'raw_or_derived' => 'DERIVED', 'lineage' => ['parent_source_id' => 'parent:b', 'source_family' => 'family:b'], 'context' => ['lexical_hints' => ['ALPHA']]],
+        ]);
+
+        $result = $this->coordinator(['KNOWLEDGE' => $reader], static fn (): array => [])->audit('KNOWLEDGE', null, 10);
+        $item = $result['items'][0];
+
+        self::assertSame([
+            ['source_id' => 'derived:a', 'source_family' => 'family:a', 'raw_forms' => ['Alpha'], 'occurrences' => 1, 'lineage' => ['parent_source_id' => 'parent:a', 'source_family' => 'family:a']],
+            ['source_id' => 'derived:b', 'source_family' => 'family:b', 'raw_forms' => ['ALPHA'], 'occurrences' => 1, 'lineage' => ['parent_source_id' => 'parent:b', 'source_family' => 'family:b']],
+        ], $item['source_observations']);
+        self::assertSame([
+            ['parent_source_id' => 'parent:a', 'source_family' => 'family:a'],
+            ['parent_source_id' => 'parent:b', 'source_family' => 'family:b'],
+        ], $item['derived_lineages']);
+    }
+
     public function test_independent_source_count_is_explicitly_page_local_across_cursor_calls(): void
     {
         $reader = new FakeDictionaryCorpusReader([
@@ -152,6 +187,23 @@ final class DictionarySeedCorpusAuditTest extends TestCase
         self::assertSame(1, $result['aggregate']['observation_only_count']);
         self::assertSame([], $result['items']);
         self::assertStringNotContainsString('carillon', json_encode($result, JSON_THROW_ON_ERROR));
+    }
+
+    public function test_observation_only_count_is_page_local_across_multiple_article_cursor_pages(): void
+    {
+        $reader = new FakeDictionaryCorpusReader([
+            ['source_id' => 'article:holdout-1', 'source_family' => 'article:holdout-1', 'source_kind' => 'ARTICLE', 'raw_text' => 'carillon', 'context' => []],
+            ['source_id' => 'article:holdout-2', 'source_family' => 'article:holdout-2', 'source_kind' => 'ARTICLE', 'raw_text' => 'astrolabe', 'context' => []],
+        ]);
+        $coordinator = $this->coordinator(['ARTICLE' => $reader], static fn (): array => []);
+
+        $first = $coordinator->audit('ARTICLE', null, 1);
+        $second = $coordinator->audit('ARTICLE', $first['next_cursor'], 1);
+
+        self::assertSame(1, $first['aggregate']['observation_only_count']);
+        self::assertSame(1, $second['aggregate']['observation_only_count']);
+        self::assertSame('AUDIT_PAGE', $first['aggregate']['independent_source_count_scope']);
+        self::assertSame('AUDIT_PAGE', $second['aggregate']['independent_source_count_scope']);
     }
 
     public function test_ambiguity_fails_closed_and_private_source_text_is_not_serialized(): void

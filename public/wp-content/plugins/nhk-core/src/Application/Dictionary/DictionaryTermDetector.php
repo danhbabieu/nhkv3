@@ -341,6 +341,10 @@ final class DictionaryTermDetector
                         $current[] = $token;
                         continue;
                     }
+                    if ($this->qualityGate->isWeakDiscourseBoundary($token)) {
+                        $current = [];
+                        continue;
+                    }
                     $flush();
                     continue;
                 }
