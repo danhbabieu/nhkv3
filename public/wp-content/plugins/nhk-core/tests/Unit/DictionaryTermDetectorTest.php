@@ -304,6 +304,35 @@ final class DictionaryTermDetectorTest extends TestCase
         foreach (['trục điều tốc', 'màng đàn hồi', 'cơ cấu truyền cóc'] as $term) self::assertContains($term, $compound);
     }
 
+    public function test_generic_spans_stop_at_proper_names_and_discourse_boundaries(): void
+    {
+        $detector = new DictionaryTermDetector();
+        $terms = static fn (string $text): array => array_column($detector->detect($text), 'normalized_term');
+
+        $nameTerms = $terms('Jean-Léon Reutter chế tạo đồng hồ Atmos.');
+        self::assertContains('jean-léon reutter', $nameTerms);
+        self::assertNotContains('jean-léon reutter chế', $nameTerms);
+        self::assertNotContains('jean', $nameTerms);
+
+        $article18 = $terms('Các bác đem tra nhưng chưa hình dung, nhầm Carillon.');
+        foreach (['bác đem tra', 'chưa hình dung', 'nhầm carillon'] as $fragment) self::assertNotContains($fragment, $article18);
+        self::assertContains('carillon', $article18);
+
+        $article19 = $terms('Sao Atmos tới bước chuyển bầu khí năm.');
+        foreach (['sao atmos', 'tới bước chuyển bầu khí năm'] as $fragment) self::assertNotContains($fragment, $article19);
+        self::assertContains('atmos', $article19);
+
+        $article41 = $terms('Đồng thời nhận diện đồng hồ.');
+        self::assertNotContains('đồng thời', $article41);
+        self::assertNotContains('nhận diện đồng hồ', $article41);
+        self::assertContains('nhận diện', $article41);
+        self::assertContains('đồng hồ', $article41);
+
+        $newTerm = $terms('Cơ cấu truyền cóc mới chưa có trong Dictionary.');
+        self::assertContains('cơ cấu truyền cóc', $newTerm);
+        self::assertNotContains('cơ cấu truyền cóc mới', $newTerm);
+    }
+
     public function test_composite_numeric_configuration_preserves_the_left_boundary_and_hides_fragments(): void
     {
         $units = [

@@ -289,6 +289,8 @@ final class DictionaryTermDetector
         $spans = [];
         foreach (preg_split('/[.!?;,:\n“”"\']+/u', $text) ?: [] as $clause) {
             $current = [];
+            $suppressUntilCapital = false;
+            $skipToken = false;
             $flush = function () use (&$spans, &$current, $lexicalLabels): void {
                 if ($current === []) return;
                 $bounded = $this->qualityGate->filter(implode(' ', $current), $lexicalLabels);
@@ -298,6 +300,25 @@ final class DictionaryTermDetector
             $clauseTokens = $this->tokens(trim($clause, " \t,()[]{}\"'"));
             foreach ($clauseTokens as $index => $token) {
                 $nextToken = $clauseTokens[$index + 1] ?? '';
+                if ($skipToken) {
+                    $skipToken = false;
+                    continue;
+                }
+                if ($this->qualityGate->isBoundaryPhrase($token, $nextToken)) {
+                    $flush();
+                    $suppressUntilCapital = false;
+                    $skipToken = true;
+                    continue;
+                }
+                if ($suppressUntilCapital) {
+                    if (preg_match('/^\p{Lu}/u', $token) !== 1) continue;
+                    $suppressUntilCapital = false;
+                }
+                if ($this->qualityGate->isDiscourseStart($token)) {
+                    $flush();
+                    $suppressUntilCapital = true;
+                    continue;
+                }
                 if (preg_match('/\d/u', $token)) {
                     $flush();
                     continue;
@@ -322,6 +343,9 @@ final class DictionaryTermDetector
                     }
                     $flush();
                     continue;
+                }
+                if ($current !== [] && count($current) >= 2 && $this->qualityGate->isCompoundLead((string) $current[0], (string) $current[1]) && $this->qualityGate->isNonLexicalSingleWord($token)) {
+                    $flush();
                 }
                 if ($this->qualityGate->isBoundaryWord($token) && !$this->qualityGate->isModifierWord($token)) {
                     if ($this->qualityGate->isWeakDiscourseBoundary($token)) {
@@ -421,6 +445,11 @@ final class DictionaryTermDetector
             if (count($candidateParts) === 2 && $this->qualityGate->isCompoundLead((string) $candidateParts[0], (string) $candidateParts[1])) continue;
             foreach ($containers as $strong) {
                 if ((string) $normalized === $strong) continue;
+                $strongItem = $items[$strong] ?? null;
+                if (($item['origin'] ?? '') === 'DOMAIN_PHRASE' && is_array($strongItem) && in_array($strongItem['origin'] ?? '', ['KNOWN_LABEL', 'HINT', 'MUSIC_NAME', 'PROPER_NAME_SPAN', 'IDENTIFIER_SPAN', 'TECHNICAL_PATTERN'], true) && $this->isTokenSubspan($strong, (string) $normalized)) {
+                    unset($items[$normalized]);
+                    break;
+                }
                 $strongParts = preg_split('/\s+/u', trim($strong)) ?: [];
                 if (count($candidateParts) === 1 && count($strongParts) === 2 && in_array($strongParts[0], ['bộ', 'cụm', 'hệ', 'van'], true) && mb_strlen((string) $candidateParts[0], 'UTF-8') <= 4) continue;
                 if ($this->isTokenSubspan((string) $normalized, $strong) || $this->isIdentifierFragment((string) $normalized, $strong)) {

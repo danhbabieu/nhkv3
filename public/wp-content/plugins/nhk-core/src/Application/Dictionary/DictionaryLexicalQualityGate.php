@@ -13,7 +13,7 @@ final class DictionaryLexicalQualityGate
         'mà', 'và', 'hoặc', 'là', 'có', 'cho', 'với', 'của', 'được', 'trong', 'trên', 'nhưng',
         'dưới', 'này', 'đó', 'thì', 'khi', 'để', 'từ', 'một', 'những', 'các', 'như',
         'thế', 'nào', 'nằm', 'ở', 'trở', 'nếu', 'vì', 'nên', 'khiến', 'tại', 'bởi',
-        'cùng', 'tự', 'thường', 'phổ', 'biến', 'gặp', 'chúng', 'ta', 'họ', 'nó', 'đây', 'điều', 'đầu', 'tiên', 'luôn', 'riêng', 'nghĩa', 'sự', 'chỉ', 'sẽ', 'ấy', 'đã', 'cả', 'rồi', 'vẫn', 'vậy', 'qua', 'còn', 'lại', 'dụng', 'việc', 'chữ',
+        'cùng', 'tự', 'thường', 'phổ', 'biến', 'gặp', 'chúng', 'ta', 'họ', 'nó', 'đây', 'điều', 'đầu', 'tiên', 'luôn', 'riêng', 'nghĩa', 'sự', 'chỉ', 'sẽ', 'ấy', 'đã', 'cả', 'rồi', 'vẫn', 'vậy', 'qua', 'còn', 'lại', 'dụng', 'việc', 'chữ', 'mới',
         'không', 'đến', 'dùng', 'hiệu', 'hai', 'phần', 'sử', 'theo', 'sau', 'trước', 'vào',
         'cũng', 'khá', 'rất', 'nghe', 'nhìn', 'đặc', 'biệt', 'êm', 'đẹp', 'hay', 'thay', 'cực', 'kỳ',
         'ấn', 'tượng', 'hiếm', 'lực', 'also', 'quite', 'unusual', 'very', 'sounds',
@@ -21,7 +21,7 @@ final class DictionaryLexicalQualityGate
         'from', 'with', 'for', 'and', 'or', 'to', 'of', 'in', 'on', 'are', 'is', 'was', 'were', 'used',
     ];
     private const BOUNDARY_PHRASES = [
-        'thay vì', 'mặc dù', 'bởi vì', 'cho nên', 'vì vậy', 'do đó', 'để mà',
+        'thay vì', 'mặc dù', 'bởi vì', 'cho nên', 'vì vậy', 'do đó', 'để mà', 'đồng thời',
     ];
     private const MODIFIER_PREFIX_WORDS = ['tự'];
     /** Lexical heads that can be grammatical boundary words when followed by a continuation. */
@@ -67,6 +67,21 @@ final class DictionaryLexicalQualityGate
         return in_array($this->word($word), ['ấy', 'đã', 'rồi', 'vẫn', 'còn', 'vậy', 'chính', 'lại', 'sẽ'], true);
     }
 
+    public function isDiscourseStart(string $word): bool
+    {
+        return in_array($this->word($word), ['bác', 'chưa', 'nhầm', 'sao', 'tới'], true);
+    }
+
+    public function isBoundaryPhrase(string $word, string $nextWord): bool
+    {
+        return in_array($this->word($word) . ' ' . $this->word($nextWord), self::BOUNDARY_PHRASES, true);
+    }
+
+    public function isNonLexicalSingleWord(string $word): bool
+    {
+        return in_array($this->word($word), self::NON_LEXICAL_SINGLE_WORDS, true);
+    }
+
     public function isCompoundLead(string $word, string $nextWord = ''): bool
     {
         $normalized = $this->word($word);
@@ -99,6 +114,7 @@ final class DictionaryLexicalQualityGate
         $parts = preg_split('/\s+/u', trim($phrase)) ?: [];
         $parts = array_values(array_filter($parts, static fn (string $part): bool => $part !== ''));
         if ($parts === []) return null;
+        if ($this->isDiscourseStart((string) ($parts[0] ?? ''))) return null;
         $normalizedInput = $this->lower(trim((string) preg_replace('/\s+/u', ' ', implode(' ', $parts))));
         foreach ($knownLabels as $knownLabel) {
             $normalizedKnown = $this->lower(trim((string) preg_replace('/\s+/u', ' ', (string) $knownLabel)));
@@ -137,6 +153,10 @@ final class DictionaryLexicalQualityGate
             }
             if ($word !== '' && in_array($word, self::MODIFIER_PREFIX_WORDS, true) && isset($parts[$index + 1])) continue;
             if ($word !== '' && in_array($word, self::BOUNDARY_WORDS, true)) {
+                $parts = array_slice($parts, 0, $index);
+                break;
+            }
+            if ($word !== '' && $this->isDiscourseStart($word)) {
                 $parts = array_slice($parts, 0, $index);
                 break;
             }
