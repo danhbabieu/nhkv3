@@ -250,10 +250,11 @@ final class DictionarySeedCorpusAuditTest extends TestCase
         ))->audit('ARTICLE', null, 1);
 
         self::assertSame(1, $result['sources_scanned']);
-        self::assertLessThanOrEqual(128, intdiv($resolverCalls, 3));
+        self::assertLessThanOrEqual(16, intdiv($resolverCalls, 3));
         self::assertSame('AVAILABLE', $result['status']);
         self::assertTrue($result['read_only']);
         self::assertFalse($result['mutated']);
+        self::assertSame('CORPUS_SOURCE_SEED_BUDGET_REACHED', $result['diagnostics']['source_diagnostics'][0]['code']);
     }
 
     /** @param array<string,DictionaryCorpusSourceReader> $readers @param callable(string):array $entityLookup */

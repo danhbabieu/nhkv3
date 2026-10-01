@@ -21008,3 +21008,27 @@ required before commit. No full Knowledge run, live deployment or live data
 write was performed.
 
 STATUS: `DICTIONARY_ARTICLE_CORPUS_ISOLATION_LOCAL_READY / NO_LIVE_MUTATION / NO_PUSH / NO_DEPLOY`.
+
+# Checkpoint — 2026-10-01 — ARTICLE Ability-path outer isolation
+
+TRACE: The live-shaped path is Ability → `executeMcp` → REST/MCP transport →
+`DictionarySeedAuditHandler` → corpus coordinator. A per-source malformed
+payload could throw while materializing source text before the previous
+interpreter/planner catches; the handler fallback then returned `UNAVAILABLE`
+with no cursor. The resolver path also remained too expensive at 128 seeds.
+
+IMPLEMENTATION: The coordinator now owns an outer per-source `Throwable`
+boundary including source text materialization, with deterministic cursor
+advancement and bounded stage diagnostics. ARTICLE planning uses a generic
+lookup-cost budget of 64 units at four units per resolver seed (16 seeds), and
+reports truncated remainder without dropping the request. Result comparison,
+safe row serialization and cursor encoding remain privacy-safe. Knowledge
+planning is unchanged.
+
+VALIDATION: Ability/transport-shaped targeted Dictionary ARTICLE slice passes
+21 tests / 124 assertions, including source IDs 18, 19, 20, 40 and 41,
+forced resolver failure, unexpected source failure, >12K UTF-8 bytes, cursor
+continuation, read-only flags and private-text exclusion. No full Knowledge
+run, deployment or data write was performed.
+
+STATUS: `DICTIONARY_ARTICLE_ABILITY_OUTER_ISOLATION_LOCAL_READY / NO_LIVE_MUTATION / NO_PUSH / NO_DEPLOY`.
