@@ -248,6 +248,7 @@ final class DictionaryTermDetectorTest extends TestCase
         $article18 = $terms('Nếu thường xuyên xem đồng hồ cổ Pháp, các bác sẽ gặp chữ Carillon khá nhiều. Bài viết giải thích Carillon là gì.');
         self::assertNotContains('bác sẽ', $article18);
         self::assertNotContains('bài viết giải', $article18);
+        self::assertNotContains('chữ carillon', $article18);
         self::assertContains('đồng hồ cổ pháp', $article18);
 
         $article19 = $terms('Cảm giác ấy khiến chiếc đồng hồ giống một vật thể đã tồn tại từ rất lâu.');
@@ -259,6 +260,7 @@ final class DictionaryTermDetectorTest extends TestCase
         self::assertNotContains('khiển', $article41);
         self::assertNotContains('diện vê đét', $article41);
         self::assertNotContains('cả diện vê đét', $article41);
+        self::assertNotContains('vê đét cần', $article41);
         self::assertContains('điều khiển', $article41);
     }
 
@@ -280,6 +282,22 @@ final class DictionaryTermDetectorTest extends TestCase
         }
         self::assertContains('ôđô 36/10', $terms('ÔĐô 36/10.'));
         self::assertContains('w64', $terms('W64.'));
+    }
+
+    public function test_lexical_evidence_prefers_independent_term_over_long_sentence_fragment(): void
+    {
+        $detector = new DictionaryTermDetector();
+        $items = $detector->detect('Bộ thoát hoạt động. Bộ thoát.');
+        $terms = array_column($items, 'normalized_term');
+
+        self::assertSame(['bộ thoát'], $terms);
+        self::assertSame(2, $items[0]['occurrences']);
+        self::assertSame('QUALIFIED', $items[0]['evidence_status']);
+        self::assertTrue($items[0]['resolver_eligible']);
+        self::assertNotContains('bộ thoát hoạt động', $terms);
+
+        $compound = array_column($detector->detect('trục điều tốc, màng đàn hồi, cơ cấu truyền cóc.'), 'normalized_term');
+        foreach (['trục điều tốc', 'màng đàn hồi', 'cơ cấu truyền cóc'] as $term) self::assertContains($term, $compound);
     }
 
     public function test_composite_numeric_configuration_preserves_the_left_boundary_and_hides_fragments(): void

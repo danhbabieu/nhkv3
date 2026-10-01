@@ -190,8 +190,10 @@ final class DictionaryPlanningService
     private function legacyPlanningObservations(array $observations, array $hints, array $approvedLabels): array
     {
         $labels = array_values(array_filter(array_map(fn (mixed $value): string => $this->normalize((string) $value), array_merge($hints, $approvedLabels))));
-        if ($labels === []) return $observations;
         return array_values(array_filter($observations, static function (mixed $observation) use ($labels): bool {
+            if (!is_array($observation)) return false;
+            if (($observation['resolver_eligible'] ?? true) !== true) return false;
+            if ($labels === []) return true;
             if (!is_array($observation) || ($observation['origin'] ?? '') !== 'DOMAIN_PHRASE') return true;
             $term = (string) ($observation['normalized_term'] ?? '');
             foreach ($labels as $label) if ($term === $label || str_contains($term, $label) || str_contains($label, $term)) return true;

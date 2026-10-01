@@ -66,6 +66,25 @@ final class StructuredSemanticInterpreterTest extends TestCase
         self::assertSame([], $value['relation_candidates']);
     }
 
+    public function test_lexical_evidence_gate_keeps_observations_without_sending_them_to_resolver(): void
+    {
+        $interpreter = new StructuredSemanticInterpreter();
+
+        $observation = $interpreter->interpret(['raw_text' => 'carillon'])->toArray();
+        self::assertSame('OBSERVATION_ONLY', $observation['lexical_spans'][0]['evidence_status']);
+        self::assertFalse($observation['lexical_spans'][0]['resolver_eligible']);
+        self::assertSame([], $observation['semantic_query_seeds']);
+        self::assertSame([], $observation['dictionary_delta_candidates']);
+
+        $named = $interpreter->interpret(['raw_text' => 'Khi nhìn một chiếc Atmos chạy.'])->toArray();
+        self::assertContains('atmos', array_column($named['semantic_query_seeds'], 'normalized_form'));
+
+        $qualified = $interpreter->interpret(['raw_text' => 'Bộ thoát hoạt động. Bộ thoát.'])->toArray();
+        self::assertSame(['bộ thoát'], array_column($qualified['semantic_query_seeds'], 'normalized_form'));
+        self::assertSame(2, $qualified['semantic_query_seeds'][0]['occurrences']);
+        self::assertNotContains('bộ thoát hoạt động', array_column($qualified['lexical_spans'], 'normalized_term'));
+    }
+
     public function test_explicit_relation_hints_are_planned_only_and_unregistered_predicates_fail_closed(): void
     {
         $packet = (new StructuredSemanticInterpreter())->interpret([

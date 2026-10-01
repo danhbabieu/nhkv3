@@ -64,9 +64,9 @@ final class DictionarySeedCorpusAuditTest extends TestCase
     public function test_ambiguity_fails_closed_and_private_source_text_is_not_serialized(): void
     {
         $reader = new FakeDictionaryCorpusReader([
-            ['source_id' => 'knowledge:1', 'source_family' => 'private:evidence', 'source_kind' => 'KNOWLEDGE', 'raw_text' => 'Ambiguous', 'context' => ['private_source_text' => 'SECRET CLAIM TEXT']],
+            ['source_id' => 'knowledge:1', 'source_family' => 'private:evidence', 'source_kind' => 'KNOWLEDGE', 'raw_text' => 'Ambiguous Term', 'context' => ['private_source_text' => 'SECRET CLAIM TEXT']],
         ]);
-        $coordinator = $this->coordinator(['KNOWLEDGE' => $reader], static fn (string $term): array => $term === 'ambiguous' ? [['preferred_label' => 'A'], ['preferred_label' => 'B']] : []);
+        $coordinator = $this->coordinator(['KNOWLEDGE' => $reader], static fn (string $term): array => $term === 'ambiguous term' ? [['preferred_label' => 'A'], ['preferred_label' => 'B']] : []);
         $result = $coordinator->audit('KNOWLEDGE', null, 10);
         $serialized = json_encode($result, JSON_THROW_ON_ERROR);
 

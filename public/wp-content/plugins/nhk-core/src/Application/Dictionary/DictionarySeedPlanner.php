@@ -65,7 +65,7 @@ final class DictionarySeedPlanner
             $raw = trim((string) ($seed['raw_span'] ?? $normalized));
             if ($raw !== '' && !in_array($raw, $items[$normalized]['raw_forms'], true)) $items[$normalized]['raw_forms'][] = $raw;
             if (!in_array($sourceFamily, $items[$normalized]['source_families'], true)) $items[$normalized]['source_families'][] = $sourceFamily;
-            $items[$normalized]['occurrences']++;
+            $items[$normalized]['occurrences'] += max(1, (int) ($seed['occurrences'] ?? 1));
             if ((array) ($seed['diagnostics'] ?? []) !== []) $items[$normalized]['diagnostics'] = array_values(array_unique(array_merge($items[$normalized]['diagnostics'], array_map('strval', (array) $seed['diagnostics']))));
         }
 

@@ -110,6 +110,9 @@ final class StructuredSemanticInterpreter
             'normalized_term' => (string) ($span['normalized_term'] ?? ''),
             'origin' => (string) ($span['origin'] ?? 'UNKNOWN'),
             'strength' => (string) ($span['strength'] ?? 'NORMAL'),
+            'evidence_status' => (string) ($span['evidence_status'] ?? 'QUALIFIED'),
+            'resolver_eligible' => ($span['resolver_eligible'] ?? true) === true,
+            'occurrences' => max(1, (int) ($span['occurrences'] ?? 1)),
         ];
     }
 
@@ -134,7 +137,7 @@ final class StructuredSemanticInterpreter
     {
         $approved = $this->strings(($value['metadata']['approved_labels'] ?? []));
         $known = array_map(fn (string $term): string => $this->normalize($term), $approved);
-        return array_values(array_filter($lexical, static fn (array $span): bool => !in_array($span['normalized_term'], $known, true)));
+        return array_values(array_filter($lexical, static fn (array $span): bool => ($span['resolver_eligible'] ?? true) === true && !in_array($span['normalized_term'], $known, true)));
     }
 
     /** @param array<string,mixed> $value @param list<array<string,mixed>> $lexical @return list<array<string,mixed>> */
@@ -198,7 +201,7 @@ final class StructuredSemanticInterpreter
     /** @param array<string,mixed> $value @param list<array<string,mixed>> $claims @return list<array<string,mixed>> */
     private function reuseMatches(array $value, array $claims): array { return array_values(array_filter((array) ($value['existing_knowledge'] ?? []), static fn (mixed $item): bool => is_array($item) && trim((string) ($item['claim_id'] ?? $item['id'] ?? '')) !== '')); }
     /** @param list<array<string,mixed>> $lexical @param list<array<string,mixed>> $unresolved @return list<array<string,mixed>> */
-    private function dictionaryCandidates(array $lexical, array $unresolved): array { return array_values(array_map(static fn (array $item): array => ['term' => $item['term'], 'normalized_term' => $item['normalized_term'], 'status' => 'NEEDS_REVIEW'], $unresolved !== [] ? $unresolved : $lexical)); }
+    private function dictionaryCandidates(array $lexical, array $unresolved): array { $eligible = $unresolved !== [] ? $unresolved : array_values(array_filter($lexical, static fn (array $item): bool => ($item['resolver_eligible'] ?? true) === true)); return array_values(array_map(static fn (array $item): array => ['term' => $item['term'], 'normalized_term' => $item['normalized_term'], 'status' => 'NEEDS_REVIEW'], $eligible)); }
     /** @param list<array<string,mixed>> $claims @return list<array<string,mixed>> */
     private function knowledgeCandidates(array $claims): array { return array_values(array_map(static fn (array $claim): array => $claim + ['status' => 'REVIEW_REQUIRED'], $claims)); }
     /** @param list<array<string,mixed>> $lexical @param list<array<string,mixed>> $claims @param list<array<string,mixed>> $relations @param list<array<string,mixed>> $ambiguous @param list<array<string,mixed>> $unresolved @return list<string> */
@@ -225,6 +228,7 @@ final class StructuredSemanticInterpreter
             return ($leftPosition === false ? PHP_INT_MAX : $leftPosition) <=> ($rightPosition === false ? PHP_INT_MAX : $rightPosition);
         });
         foreach ($lexical as $span) {
+            if (($span['resolver_eligible'] ?? true) !== true) continue;
             $normalized = (string) ($span['normalized_term'] ?? '');
             if ($normalized === '') continue;
             $seeds[] = [
@@ -237,6 +241,7 @@ final class StructuredSemanticInterpreter
                 'facet_hint' => $facet !== '' ? $facet : null,
                 'ambiguity' => isset($ambiguousTerms[$normalized]) ? 'AMBIGUOUS' : 'UNRESOLVED',
                 'diagnostics' => isset($ambiguousTerms[$normalized]) ? ['AMBIGUOUS_CANONICAL_OWNER'] : [],
+                'occurrences' => max(1, (int) ($span['occurrences'] ?? 1)),
             ];
         }
         return $seeds;
