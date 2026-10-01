@@ -128,7 +128,9 @@ final class DictionarySeedCorpusAuditTest extends TestCase
 
         self::assertSame(2, $result['sources_scanned']);
         self::assertSame('CORPUS_SOURCE_PLANNING_FAILED', $result['diagnostics']['source_diagnostics'][0]['code']);
+        self::assertSame('resolver_planner', $result['diagnostics']['source_diagnostics'][0]['stage']);
         self::assertSame('article:19', $result['diagnostics']['source_diagnostics'][0]['source_id']);
+        self::assertArrayNotHasKey('message', $result['diagnostics']['source_diagnostics'][0]);
         self::assertSame('valid term', $result['items'][0]['normalized_form']);
         self::assertFalse($result['mutated']);
     }
@@ -165,10 +167,10 @@ final class DictionarySeedCorpusAuditTest extends TestCase
         self::assertFalse($fault['mutated']);
     }
 
-    public function test_article_source_with_roughly_ten_thousand_characters_does_not_kill_audit(): void
+    public function test_article_source_over_twelve_thousand_utf8_bytes_does_not_kill_audit(): void
     {
         $reader = new FakeDictionaryCorpusReader([
-            ['source_id' => 'article:19', 'source_family' => 'article:19', 'source_kind' => 'ARTICLE', 'raw_text' => str_repeat('Odo 36/10 và ÔĐô 36/10. ', 430), 'context' => []],
+            ['source_id' => 'article:19', 'source_family' => 'article:19', 'source_kind' => 'ARTICLE', 'raw_text' => str_repeat('Odo 36/10 và ÔĐô 36/10. ', 600), 'context' => []],
             ['source_id' => 'article:20', 'source_family' => 'article:20', 'source_kind' => 'ARTICLE', 'raw_text' => 'Valid Term', 'context' => []],
         ]);
         $coordinator = $this->coordinator(['ARTICLE' => $reader], static fn (): array => []);
@@ -217,6 +219,39 @@ final class DictionarySeedCorpusAuditTest extends TestCase
 
         self::assertSame(100, $result['sources_scanned']);
         self::assertCount(50, $result['diagnostics']['source_diagnostics']);
+        self::assertTrue($result['read_only']);
+        self::assertFalse($result['mutated']);
+    }
+
+    public function test_article_planning_bounds_resolver_work_for_many_lexical_seeds(): void
+    {
+        $phrases = [];
+        for ($index = 0; $index < 160; $index++) {
+            $value = $index;
+            $suffix = '';
+            do {
+                $suffix = chr(97 + ($value % 26)) . $suffix;
+                $value = intdiv($value, 26) - 1;
+            } while ($value >= 0);
+            $phrases[] = 'Alpha' . $suffix . ' Device';
+        }
+        $resolverCalls = 0;
+        $resolver = new DictionaryResolver(
+            static fn (): array => [],
+            static function () use (&$resolverCalls): array { $resolverCalls++; return []; },
+            static function () use (&$resolverCalls): array { $resolverCalls++; return []; },
+            static function () use (&$resolverCalls): array { $resolverCalls++; return []; },
+            static fn (): bool => false,
+        );
+        $result = (new DictionarySeedCorpusAuditCoordinator(
+            ['ARTICLE' => new FakeDictionaryCorpusReader([['source_id' => 'article:long', 'source_family' => 'article:long', 'source_kind' => 'ARTICLE', 'raw_text' => implode('. ', $phrases), 'context' => []]])],
+            new StructuredSemanticInterpreter(),
+            new DictionarySeedPlanner($resolver),
+        ))->audit('ARTICLE', null, 1);
+
+        self::assertSame(1, $result['sources_scanned']);
+        self::assertLessThanOrEqual(128, intdiv($resolverCalls, 3));
+        self::assertSame('AVAILABLE', $result['status']);
         self::assertTrue($result['read_only']);
         self::assertFalse($result['mutated']);
     }

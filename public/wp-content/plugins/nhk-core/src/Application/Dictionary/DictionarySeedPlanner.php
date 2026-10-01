@@ -18,12 +18,18 @@ final class DictionarySeedPlanner
         $sourceContext = is_array($value['source_context'] ?? null) ? $value['source_context'] : [];
         $sourceFamily = trim((string) ($options['source_family'] ?? $sourceContext['source_identifier'] ?? $sourceContext['source_kind'] ?? 'unknown')) ?: 'unknown';
         $context = is_array($options['context'] ?? null) ? $options['context'] : [];
+        $maxSeeds = isset($options['max_seeds']) ? max(1, min(128, (int) $options['max_seeds'])) : null;
         $items = [];
+        $bounded = false;
 
         foreach ((array) ($value['semantic_query_seeds'] ?? []) as $seed) {
             if (!is_array($seed)) continue;
             $normalized = trim((string) ($seed['normalized_form'] ?? ''));
             if ($normalized === '') continue;
+            if ($maxSeeds !== null && !isset($items[$normalized]) && count($items) >= $maxSeeds) {
+                $bounded = true;
+                continue;
+            }
             $category = strtoupper(trim((string) ($seed['category'] ?? 'LEXICAL_OBSERVATION')));
             if (!isset($items[$normalized])) {
                 $items[$normalized] = [
@@ -99,7 +105,9 @@ final class DictionarySeedPlanner
         $aggregate = ['total' => count($rows), 'counts_by_classification' => []];
         foreach ($rows as $row) $aggregate['counts_by_classification'][$row['classification']] = ($aggregate['counts_by_classification'][$row['classification']] ?? 0) + 1;
         ksort($aggregate['counts_by_classification']);
-        return ['status' => 'READ_ONLY_PLAN', 'read_only' => true, 'mutated' => false, 'items' => $rows, 'aggregate' => $aggregate, 'diagnostics' => ['deduplication' => 'normalized_form', 'source_family' => $sourceFamily]];
+        $diagnostics = ['deduplication' => 'normalized_form', 'source_family' => $sourceFamily];
+        if ($bounded) $diagnostics['bounded_seed_limit'] = $maxSeeds;
+        return ['status' => 'READ_ONLY_PLAN', 'read_only' => true, 'mutated' => false, 'items' => $rows, 'aggregate' => $aggregate, 'diagnostics' => $diagnostics];
     }
 
     private function normalize(string $value): string

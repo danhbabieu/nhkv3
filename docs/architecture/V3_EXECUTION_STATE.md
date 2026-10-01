@@ -20987,3 +20987,24 @@ input; no live replay was run from this workspace. Canonical WordPress/MySQL
 runtime verification remains environment-gated and is not claimed.
 
 STATUS: `DICTIONARY_GENERIC_SEGMENTATION_CANONICAL_REUSE_LOCAL_READY / NO_LIVE_MUTATION / NO_PUSH / NO_DEPLOY`.
+
+# Checkpoint — 2026-10-01 — ARTICLE seed-audit corpus isolation
+
+ROOT_CAUSE: ARTICLE corpus planning passed an unbounded normalized seed set to
+the resolver. Each lexical seed can trigger repeated canonical Authority,
+Knowledge-list and Article lookups; the resulting resource/runtime exception
+escaped the prior boundary as a transport-level internal error. This is
+generic and is not a byte-length threshold.
+
+IMPLEMENTATION: ARTICLE-only planning now applies a bounded 128-seed work
+budget. Reader, structured interpreter/detector, resolver/planner, aggregation
+and result/legacy serialization failures are isolated with bounded,
+privacy-safe source diagnostics; source counts and cursor continuation remain
+deterministic. Knowledge planning is unchanged. No data mutation occurred.
+
+VALIDATION: Targeted Dictionary corpus/MCP/Article reader slice passes 19 tests
+/ 103 assertions. PHP lint, `git diff --check` and secret review remain
+required before commit. No full Knowledge run, live deployment or live data
+write was performed.
+
+STATUS: `DICTIONARY_ARTICLE_CORPUS_ISOLATION_LOCAL_READY / NO_LIVE_MUTATION / NO_PUSH / NO_DEPLOY`.
