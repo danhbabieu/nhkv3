@@ -92,10 +92,11 @@ final class StructuredSemanticInterpreterTest extends TestCase
         ])->toArray();
 
         $spans = array_column($value['lexical_spans'], null, 'normalized_term');
+        $seeds = array_column($value['semantic_query_seeds'], null, 'normalized_form');
         foreach (['hiện vật mang đồng thời nhiều đặc điểm', 'bộ máy hoàn toàn nguyên bản'] as $noise) {
             self::assertSame('NOISE', $spans[$noise]['evidence_status']);
             self::assertFalse($spans[$noise]['resolver_eligible']);
-            self::assertNotContains($noise, array_column($value['semantic_query_seeds'], 'normalized_form'));
+            self::assertFalse($seeds[$noise]['resolver_eligible']);
         }
     }
 

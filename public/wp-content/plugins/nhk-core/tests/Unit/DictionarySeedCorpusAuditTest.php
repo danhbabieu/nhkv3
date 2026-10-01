@@ -61,6 +61,25 @@ final class DictionarySeedCorpusAuditTest extends TestCase
         self::assertFalse($result['mutated']);
     }
 
+    public function test_aggregate_preserves_raw_forms_and_separates_derived_sources_from_independent_sources(): void
+    {
+        $reader = new FakeDictionaryCorpusReader([
+            ['source_id' => 'knowledge:1', 'source_family' => 'source:a', 'source_kind' => 'KNOWLEDGE', 'raw_text' => 'Alpha', 'context' => ['lexical_hints' => ['Alpha']]],
+            ['source_id' => 'knowledge:2', 'source_family' => 'derived:copy', 'source_kind' => 'KNOWLEDGE', 'raw_text' => 'ALPHA', 'raw_or_derived' => 'DERIVED', 'lineage' => ['parent_source_id' => 'knowledge:1', 'source_family' => 'source:a'], 'context' => ['lexical_hints' => ['ALPHA']]],
+            ['source_id' => 'knowledge:3', 'source_family' => 'source:b', 'source_kind' => 'KNOWLEDGE', 'raw_text' => 'Alfa', 'context' => ['lexical_hints' => ['Alfa']]],
+        ]);
+        $result = $this->coordinator(['KNOWLEDGE' => $reader], static fn (): array => [])->audit('KNOWLEDGE', null, 10);
+
+        $alpha = array_values(array_filter($result['items'], static fn (array $item): bool => $item['normalized_form'] === 'alpha'))[0];
+        self::assertSame(2, $alpha['occurrences']);
+        self::assertSame(2, $alpha['source_count']);
+        self::assertSame(1, $alpha['independent_source_count']);
+        self::assertSame(['Alpha', 'ALPHA'], $alpha['raw_forms']);
+        self::assertSame(['knowledge:1', 'knowledge:2'], $alpha['source_ids']);
+        self::assertSame(['source:a', 'derived:copy'], $alpha['source_families']);
+        self::assertSame(['parent_source_id' => 'knowledge:1', 'source_family' => 'source:a'], $alpha['derived_lineage']);
+    }
+
     public function test_ambiguity_fails_closed_and_private_source_text_is_not_serialized(): void
     {
         $reader = new FakeDictionaryCorpusReader([

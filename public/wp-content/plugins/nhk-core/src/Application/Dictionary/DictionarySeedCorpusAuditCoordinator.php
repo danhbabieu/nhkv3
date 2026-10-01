@@ -100,7 +100,7 @@ final class DictionarySeedCorpusAuditCoordinator
                     foreach ((array) ($plan['items'] ?? []) as $row) {
                         if (!is_array($row)) continue;
                         $lexicalObservations += (int) ($row['occurrences'] ?? 0);
-                        try { $this->merge($items, $row, $sourceId, $family); }
+                        try { $this->merge($items, $row, $sourceId, $family, $source); }
                         catch (\Throwable $error) { $this->diagnostic($diagnostics, ['code' => 'CORPUS_SOURCE_AGGREGATION_FAILED', 'stage' => 'result_aggregation', 'source_scope' => $sourceScope, 'source_id' => $sourceId, 'error' => get_class($error)]); break; }
                     }
                     if ((bool) ($plan['diagnostics']['has_more_seeds'] ?? false)) {
@@ -156,7 +156,7 @@ final class DictionarySeedCorpusAuditCoordinator
     }
 
     /** @param array<string,array<string,mixed>> $items @param array<string,mixed> $row */
-    private function merge(array &$items, array $row, string $sourceId, string $family): void
+    private function merge(array &$items, array $row, string $sourceId, string $family, array $source): void
     {
         $key = trim((string) ($row['normalized_form'] ?? ''));
         if ($key === '') return;
@@ -165,13 +165,22 @@ final class DictionarySeedCorpusAuditCoordinator
             $items[$key]['occurrences'] = 0;
             $items[$key]['source_ids'] = [];
             $items[$key]['source_families'] = [];
+            $items[$key]['independent_source_ids'] = [];
+            $items[$key]['derived_lineage'] = [];
             $items[$key]['ambiguity_count'] = 0;
             $items[$key]['diagnostics'] = [];
         }
         $item =& $items[$key];
         $item['occurrences'] += (int) ($row['occurrences'] ?? 0);
+        foreach ((array) ($row['raw_forms'] ?? []) as $rawForm) {
+            $rawForm = $this->safeString($rawForm, '');
+            if ($rawForm !== '' && !in_array($rawForm, $item['raw_forms'], true)) $item['raw_forms'][] = $rawForm;
+        }
         if (!in_array($sourceId, $item['source_ids'], true)) $item['source_ids'][] = $sourceId;
         if (!in_array($family, $item['source_families'], true)) $item['source_families'][] = $family;
+        $derived = strtoupper((string) ($source['raw_or_derived'] ?? 'RAW')) === 'DERIVED' || (array) ($source['lineage'] ?? []) !== [];
+        if (!$derived && !in_array($sourceId, $item['independent_source_ids'], true)) $item['independent_source_ids'][] = $sourceId;
+        if ($derived && $item['derived_lineage'] === []) $item['derived_lineage'] = $this->safeLineage((array) ($source['lineage'] ?? []));
         $item['ambiguity_count'] = max((int) $item['ambiguity_count'], (int) ($row['ambiguity_count'] ?? 0));
         $item['diagnostics'] = array_values(array_unique(array_merge($item['diagnostics'], (array) ($row['diagnostics'] ?? []))));
         if ($this->rank((string) ($row['classification'] ?? '')) > $this->rank((string) ($item['classification'] ?? ''))) {
@@ -183,7 +192,37 @@ final class DictionarySeedCorpusAuditCoordinator
     /** @return array<string,mixed> */
     private function safeRow(array $row): array
     {
-        return ['normalized_form' => $this->safeString($row['normalized_form'] ?? '', ''), 'category' => $this->safeString($row['category'] ?? '', 'LEXICAL_OBSERVATION'), 'classification' => $this->safeString($row['classification'] ?? '', 'NEW_LEXICAL_CANDIDATE'), 'resolution_status' => $this->safeString($row['resolution_status'] ?? 'UNRESOLVED', 'UNRESOLVED'), 'resolved_destination_type' => $this->safeNullableString($row['resolved_destination_type'] ?? null), 'resolved_destination_id' => $this->safeNullableString($row['resolved_destination_id'] ?? null), 'resolved_dictionary_concept_id' => $this->safeNullableString($row['resolved_dictionary_concept_id'] ?? null), 'occurrences' => (int) ($row['occurrences'] ?? 0), 'source_count' => count($row['source_ids'] ?? []), 'source_family_count' => count($row['source_families'] ?? []), 'ambiguity_count' => (int) ($row['ambiguity_count'] ?? 0), 'suggested_action' => $this->safeNullableString($row['suggested_action'] ?? null), 'diagnostics' => array_values(array_filter(array_map(fn (mixed $value): string => $this->safeString($value, ''), (array) ($row['diagnostics'] ?? [])), static fn (string $value): bool => $value !== ''))];
+        return [
+            'normalized_form' => $this->safeString($row['normalized_form'] ?? '', ''),
+            'category' => $this->safeString($row['category'] ?? '', 'LEXICAL_OBSERVATION'),
+            'classification' => $this->safeString($row['classification'] ?? '', 'NEW_LEXICAL_CANDIDATE'),
+            'resolution_status' => $this->safeString($row['resolution_status'] ?? 'UNRESOLVED', 'UNRESOLVED'),
+            'resolved_destination_type' => $this->safeNullableString($row['resolved_destination_type'] ?? null),
+            'resolved_destination_id' => $this->safeNullableString($row['resolved_destination_id'] ?? null),
+            'resolved_dictionary_concept_id' => $this->safeNullableString($row['resolved_dictionary_concept_id'] ?? null),
+            'occurrences' => (int) ($row['occurrences'] ?? 0),
+            'raw_forms' => array_values(array_filter(array_map(fn (mixed $value): string => $this->safeString($value, ''), (array) ($row['raw_forms'] ?? [])), static fn (string $value): bool => $value !== '')),
+            'source_ids' => array_values(array_filter(array_map(fn (mixed $value): string => $this->safeString($value, ''), (array) ($row['source_ids'] ?? [])), static fn (string $value): bool => $value !== '')),
+            'source_families' => array_values(array_filter(array_map(fn (mixed $value): string => $this->safeString($value, ''), (array) ($row['source_families'] ?? [])), static fn (string $value): bool => $value !== '')),
+            'source_count' => count($row['source_ids'] ?? []),
+            'source_family_count' => count($row['source_families'] ?? []),
+            'independent_source_count' => count($row['independent_source_ids'] ?? []),
+            'derived_lineage' => $this->safeLineage((array) ($row['derived_lineage'] ?? [])),
+            'ambiguity_count' => (int) ($row['ambiguity_count'] ?? 0),
+            'suggested_action' => $this->safeNullableString($row['suggested_action'] ?? null),
+            'diagnostics' => array_values(array_filter(array_map(fn (mixed $value): string => $this->safeString($value, ''), (array) ($row['diagnostics'] ?? [])), static fn (string $value): bool => $value !== '')),
+        ];
+    }
+
+    /** @param array<string,mixed> $lineage @return array<string,string> */
+    private function safeLineage(array $lineage): array
+    {
+        $safe = [];
+        foreach (['parent_source_id', 'source_family'] as $field) {
+            $value = $this->safeString($lineage[$field] ?? '', '');
+            if ($value !== '') $safe[$field] = $value;
+        }
+        return $safe;
     }
 
     private function diagnostic(array &$diagnostics, array $diagnostic): void

@@ -247,7 +247,8 @@ final class StructuredSemanticInterpreter
             return ($leftPosition === false ? PHP_INT_MAX : $leftPosition) <=> ($rightPosition === false ? PHP_INT_MAX : $rightPosition);
         });
         foreach ($lexical as $span) {
-            if (($span['resolver_eligible'] ?? true) !== true) continue;
+            $origin = (string) ($span['origin'] ?? 'UNKNOWN');
+            if (($span['resolver_eligible'] ?? true) !== true && !in_array($origin, ['EDITORIAL_SIGNAL', 'NOISE'], true)) continue;
             $normalized = (string) ($span['normalized_term'] ?? '');
             if ($normalized === '') continue;
             $seeds[] = [
@@ -261,6 +262,7 @@ final class StructuredSemanticInterpreter
                 'ambiguity' => isset($ambiguousTerms[$normalized]) ? 'AMBIGUOUS' : 'UNRESOLVED',
                 'diagnostics' => isset($ambiguousTerms[$normalized]) ? ['AMBIGUOUS_CANONICAL_OWNER'] : [],
                 'occurrences' => max(1, (int) ($span['occurrences'] ?? 1)),
+                'resolver_eligible' => ($span['resolver_eligible'] ?? true) === true,
             ];
         }
         return $seeds;

@@ -27,7 +27,8 @@ final class DictionarySeedPlanner
         $seedGroups = [];
         foreach ((array) ($value['semantic_query_seeds'] ?? []) as $seed) {
             if (!is_array($seed)) continue;
-            if (array_key_exists('resolver_eligible', $seed) && $seed['resolver_eligible'] !== true) continue;
+            $category = strtoupper(trim((string) ($seed['category'] ?? 'LEXICAL_OBSERVATION')));
+            if (array_key_exists('resolver_eligible', $seed) && $seed['resolver_eligible'] !== true && !in_array($category, ['EDITORIAL_SIGNAL', 'NOISE'], true)) continue;
             $normalized = trim((string) ($seed['normalized_form'] ?? ''));
             if ($normalized === '') continue;
             if (!isset($uniqueSeeds[$normalized])) $uniqueSeeds[$normalized] = $seed;
