@@ -271,7 +271,9 @@ final class DictionaryTermDetector
                 if ($bounded !== null) $this->appendGenericSpan($spans, $this->tokens($bounded));
                 $current = [];
             };
-            foreach ($this->tokens(trim($clause, " \t,()[]{}\"'")) as $token) {
+            $clauseTokens = $this->tokens(trim($clause, " \t,()[]{}\"'"));
+            foreach ($clauseTokens as $index => $token) {
+                $nextToken = $clauseTokens[$index + 1] ?? '';
                 if (preg_match('/\d/u', $token)) {
                     $flush();
                     continue;
@@ -282,10 +284,20 @@ final class DictionaryTermDetector
                     continue;
                 }
                 if ($this->qualityGate->isPredicateWord($token)) {
+                    if ($this->qualityGate->isCompoundLead($token) && $this->qualityGate->isLexicalContinuation($nextToken)) {
+                        $flush();
+                        $current[] = $token;
+                        continue;
+                    }
                     $flush();
                     continue;
                 }
                 if ($this->qualityGate->isBoundaryWord($token) && !$this->qualityGate->isModifierWord($token)) {
+                    if ($this->qualityGate->isCompoundLead($token) && $this->qualityGate->isLexicalContinuation($nextToken)) {
+                        $flush();
+                        $current[] = $token;
+                        continue;
+                    }
                     $flush();
                     continue;
                 }

@@ -21098,3 +21098,23 @@ show predicate fragments removed while `carillon odo`, `carillon westminster`,
 remain. No resolver, pagination, cursor, work-budget or Knowledge code changed.
 
 STATUS: `DICTIONARY_GENERIC_LEXICAL_GATE_LOCAL_READY / NO_LIVE_MUTATION / NO_PUSH / NO_DEPLOY`.
+
+# Checkpoint — 2026-10-01 — Vietnamese compound-word boundary preservation
+
+ROOT_CAUSE: Predicate and boundary tokens were treated as complete-word
+boundaries. This split compound terms such as `điều khiển` and `nhận diện`,
+after which the standalone rule promoted `khiển` and `diện` as independent
+candidates. Generic compound leads now retain a lexical continuation before
+the standalone gate runs; aspect/discourse boundaries cut only their own
+phrase context. Approved labels, identifiers, aliases and existing technical
+paths remain unchanged.
+
+VALIDATION: Exact Article 18, 19 and 41 excerpts cover both rejected prose
+fragments and retained terms. The focused Dictionary suite passes 69 tests /
+358 assertions. Candidate output no longer contains `khiển`, `diện vê đét`,
+`bác sẽ`, `bài viết giải`, `cảm giác ấy`, `vật thể đã` or `bên rồi`, while
+`điều khiển`, `cần gạt chọn nhạc` and `quả lắc lớn` remain covered. PHP lint
+and `git diff --check` pass. No pagination, cursor, resolver, Knowledge or
+data mutation changed.
+
+STATUS: `DICTIONARY_COMPOUND_BOUNDARY_LOCAL_READY / NO_LIVE_MUTATION / NO_PUSH / NO_DEPLOY`.

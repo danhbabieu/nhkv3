@@ -240,6 +240,28 @@ final class DictionaryTermDetectorTest extends TestCase
         self::assertNotContains('số đồng hồ vê đét', $article41);
     }
 
+    public function test_article_excerpts_do_not_split_compound_words_at_predicate_boundaries(): void
+    {
+        $detector = new DictionaryTermDetector();
+        $terms = static fn (string $text): array => array_column($detector->detect($text), 'normalized_term');
+
+        $article18 = $terms('Nếu thường xuyên xem đồng hồ cổ Pháp, các bác sẽ gặp chữ Carillon khá nhiều. Bài viết giải thích Carillon là gì.');
+        self::assertNotContains('bác sẽ', $article18);
+        self::assertNotContains('bài viết giải', $article18);
+        self::assertContains('đồng hồ cổ pháp', $article18);
+
+        $article19 = $terms('Cảm giác ấy khiến chiếc đồng hồ giống một vật thể đã tồn tại từ rất lâu.');
+        self::assertNotContains('cảm giác ấy', $article19);
+        self::assertNotContains('vật thể đã', $article19);
+        self::assertContains('đồng hồ', $article19);
+
+        $article41 = $terms('Mở cửa thùng và nhìn vào khu vực điều khiển. Việc nhận diện Vê Đét cần đọc cả diện Vê Đét.');
+        self::assertNotContains('khiển', $article41);
+        self::assertNotContains('diện vê đét', $article41);
+        self::assertNotContains('cả diện vê đét', $article41);
+        self::assertContains('điều khiển', $article41);
+    }
+
     public function test_composite_numeric_configuration_preserves_the_left_boundary_and_hides_fragments(): void
     {
         $units = [
