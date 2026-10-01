@@ -1,5 +1,27 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-01 — Article Dictionary Seed continuation (LOCAL / NO MUTATION)
+
+IMPLEMENTED: Article Dictionary Seed audit now carries an active same-Article
+seed cursor when the existing lookup-cost budget reaches 16 seeds. The cursor
+preserves deterministic normalized-seed order and occurrence aggregation,
+replays only the bounded remainder, and advances to the next Article only
+after the active Article is complete. The cursor includes a privacy-safe
+source fingerprint; changed or missing Article state fails closed with
+`DICTIONARY_SEED_CORPUS_CURSOR_INVALIDATED`.
+
+REGRESSION: Targeted Article 18 → Article 19 (16 + 4 seeds) → Article 20 →
+Article 41 continuation passes without loss or duplicate normalized seeds;
+read-only and zero-mutation flags remain true. Changed-Article continuation
+fails closed. Dictionary/Article corpus and MCP targeted suite passes 34 tests
+and 194 assertions.
+
+NO_DATA_MUTATION: `read_only=true`, `mutated=false`; no Knowledge scan, seed,
+Dictionary write, Article write, schema change, migration, staging or
+production operation was performed.
+
+STATUS: `DICTIONARY_SEED_ARTICLE_CONTINUATION_LOCAL_READY / NO_MUTATION / DEPLOYMENT_NOT_PERFORMED`.
+
 # Checkpoint — 2026-10-01 — Article corpus audit fault closure (LOCAL / NO MUTATION)
 
 ROOT_CAUSE_CONFIRMED: Dictionary Seed direct text validation used PHP `strlen`,

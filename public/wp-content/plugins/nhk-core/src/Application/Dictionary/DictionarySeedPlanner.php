@@ -22,19 +22,25 @@ final class DictionarySeedPlanner
         $maxSeeds = isset($options['max_lookup_cost'])
             ? max(1, min(128, intdiv(max(1, (int) $options['max_lookup_cost']), $lookupCostPerSeed)))
             : (isset($options['max_seeds']) ? max(1, min(128, (int) $options['max_seeds'])) : null);
-        $items = [];
-        $bounded = false;
-        $truncatedSeeds = 0;
-
+        $seedOffset = max(0, (int) ($options['seed_offset'] ?? 0));
+        $uniqueSeeds = [];
+        $seedGroups = [];
         foreach ((array) ($value['semantic_query_seeds'] ?? []) as $seed) {
             if (!is_array($seed)) continue;
             $normalized = trim((string) ($seed['normalized_form'] ?? ''));
             if ($normalized === '') continue;
-            if ($maxSeeds !== null && !isset($items[$normalized]) && count($items) >= $maxSeeds) {
-                $bounded = true;
-                $truncatedSeeds++;
-                continue;
-            }
+            if (!isset($uniqueSeeds[$normalized])) $uniqueSeeds[$normalized] = $seed;
+            $seedGroups[$normalized][] = $seed;
+        }
+        $orderedKeys = array_keys($uniqueSeeds);
+        $selectedKeys = $maxSeeds === null
+            ? array_slice($orderedKeys, $seedOffset)
+            : array_slice($orderedKeys, $seedOffset, $maxSeeds);
+        $truncatedSeeds = max(0, count($orderedKeys) - $seedOffset - count($selectedKeys));
+        $items = [];
+        $bounded = $truncatedSeeds > 0;
+
+        foreach ($selectedKeys as $normalized) foreach ($seedGroups[$normalized] as $seed) {
             $category = strtoupper(trim((string) ($seed['category'] ?? 'LEXICAL_OBSERVATION')));
             if (!isset($items[$normalized])) {
                 $items[$normalized] = [
@@ -115,6 +121,13 @@ final class DictionarySeedPlanner
             $diagnostics['bounded_seed_limit'] = $maxSeeds;
             $diagnostics['truncated_seed_count'] = $truncatedSeeds;
             if (isset($options['max_lookup_cost'])) $diagnostics['bounded_lookup_cost'] = $maxSeeds * $lookupCostPerSeed;
+        }
+        if ($seedOffset > 0 || $maxSeeds !== null) {
+            $diagnostics['seed_offset'] = $seedOffset;
+            $diagnostics['processed_seed_count'] = count($selectedKeys);
+            $diagnostics['total_unique_seed_count'] = count($orderedKeys);
+            $diagnostics['has_more_seeds'] = $truncatedSeeds > 0;
+            $diagnostics['next_seed_offset'] = $truncatedSeeds > 0 ? $seedOffset + count($selectedKeys) : null;
         }
         return ['status' => 'READ_ONLY_PLAN', 'read_only' => true, 'mutated' => false, 'items' => $rows, 'aggregate' => $aggregate, 'diagnostics' => $diagnostics];
     }

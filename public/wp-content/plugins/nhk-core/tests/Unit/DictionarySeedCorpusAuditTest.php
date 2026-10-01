@@ -257,6 +257,58 @@ final class DictionarySeedCorpusAuditTest extends TestCase
         self::assertSame('CORPUS_SOURCE_SEED_BUDGET_REACHED', $result['diagnostics']['source_diagnostics'][0]['code']);
     }
 
+    public function test_article_seed_budget_continues_same_article_without_loss_or_duplicate_before_next_article(): void
+    {
+        $phrases = [];
+        for ($index = 1; $index <= 20; $index++) $phrases[] = 'Seed ' . $index . ' Device';
+        $reader = new FakeDictionaryCorpusReader([
+            ['source_id' => '18', 'source_family' => 'article:18', 'source_kind' => 'ARTICLE', 'raw_text' => 'Article Eighteen', 'context' => ['lexical_hints' => ['Article Eighteen']]],
+            ['source_id' => '19', 'source_family' => 'article:19', 'source_kind' => 'ARTICLE', 'raw_text' => implode('. ', $phrases), 'context' => ['lexical_hints' => $phrases]],
+            ['source_id' => '20', 'source_family' => 'article:20', 'source_kind' => 'ARTICLE', 'raw_text' => 'Article Twenty', 'context' => ['lexical_hints' => ['Article Twenty']]],
+            ['source_id' => '41', 'source_family' => 'article:41', 'source_kind' => 'ARTICLE', 'raw_text' => 'Article Forty One', 'context' => ['lexical_hints' => ['Article Forty One']]],
+        ]);
+        $coordinator = $this->coordinator(['ARTICLE' => $reader], static fn (): array => []);
+
+        $article18 = $coordinator->audit('ARTICLE', null, 1);
+        $article19First = $coordinator->audit('ARTICLE', $article18['next_cursor'], 1);
+        $article19Second = $coordinator->audit('ARTICLE', $article19First['next_cursor'], 1);
+        $article20 = $coordinator->audit('ARTICLE', $article19Second['next_cursor'], 1);
+        $article41 = $coordinator->audit('ARTICLE', $article20['next_cursor'], 1);
+
+        $firstBatch = array_column($article19First['items'], 'normalized_form');
+        $secondBatch = array_column($article19Second['items'], 'normalized_form');
+        self::assertCount(16, $firstBatch);
+        self::assertCount(4, $secondBatch);
+        self::assertSame([], array_intersect($firstBatch, $secondBatch));
+        self::assertCount(20, array_unique(array_merge($firstBatch, $secondBatch)));
+        self::assertSame('19', $article19First['diagnostics']['source_diagnostics'][0]['source_id']);
+        self::assertSame('CORPUS_SOURCE_SEED_BUDGET_REACHED', $article19First['diagnostics']['source_diagnostics'][0]['code']);
+        self::assertSame('article twenty', $article20['items'][0]['normalized_form']);
+        self::assertSame('article forty one', $article41['items'][0]['normalized_form']);
+        foreach ([$article18, $article19First, $article19Second, $article20, $article41] as $result) {
+            self::assertTrue($result['read_only']);
+            self::assertFalse($result['mutated']);
+        }
+    }
+
+    public function test_article_seed_cursor_fails_closed_when_article_changes_between_batches(): void
+    {
+        $phrases = [];
+        for ($index = 1; $index <= 20; $index++) $phrases[] = 'Seed ' . $index . ' Device';
+        $rows = [['source_id' => '19', 'source_family' => 'article:19', 'source_kind' => 'ARTICLE', 'raw_text' => implode('. ', $phrases), 'context' => ['lexical_hints' => $phrases]]];
+        $reader = new class($rows) implements DictionaryCorpusSourceReader {
+            public function __construct(private array $rows) {}
+            public function page(?string $after, int $limit): array { return ['items' => $this->rows, 'has_more' => false, 'next_cursor' => null]; }
+            public function change(): void { $this->rows[0]['raw_text'] .= '. Changed'; }
+        };
+        $coordinator = $this->coordinator(['ARTICLE' => $reader], static fn (): array => []);
+        $first = $coordinator->audit('ARTICLE', null, 1);
+        $reader->change();
+
+        $this->expectExceptionMessage('DICTIONARY_SEED_CORPUS_CURSOR_INVALIDATED');
+        $coordinator->audit('ARTICLE', $first['next_cursor'], 1);
+    }
+
     /** @param array<string,DictionaryCorpusSourceReader> $readers @param callable(string):array $entityLookup */
     private function coordinator(array $readers, callable $entityLookup, ?DictionaryCandidateRepository $queue = null): DictionarySeedCorpusAuditCoordinator
     {

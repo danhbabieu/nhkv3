@@ -30,7 +30,7 @@ final class DictionarySeedCorpusAuditCoordinator
         if (!in_array($scope, self::SCOPES, true)) throw new \InvalidArgumentException('DICTIONARY_SEED_CORPUS_SCOPE_INVALID');
         if ($limit < 1 || $limit > 100) throw new \InvalidArgumentException('DICTIONARY_SEED_CORPUS_LIMIT_INVALID');
         $state = $this->decodeCursor($cursor, $scope);
-        $selected = $scope === 'ALL' ? array_keys($this->readers) : [$scope];
+        $selected = $state['active'] !== null ? [$state['active']['source_scope']] : ($scope === 'ALL' ? array_keys($this->readers) : [$scope]);
         $items = [];
         $sourcesScanned = 0;
         $lexicalObservations = 0;
@@ -40,10 +40,13 @@ final class DictionarySeedCorpusAuditCoordinator
         foreach ($selected as $sourceScope) {
             $reader = $this->readers[$sourceScope] ?? null;
             if (!$reader instanceof DictionaryCorpusSourceReader) continue;
-            try { $page = $reader->page($state['after'][$sourceScope] ?? null, $limit); }
+            $active = is_array($state['active']) && ($state['active']['source_scope'] ?? null) === $sourceScope ? $state['active'] : null;
+            $pageAfter = $active['page_after'] ?? ($state['after'][$sourceScope] ?? null);
+            try { $page = $reader->page($pageAfter, $limit); }
             catch (\Throwable $error) { $this->diagnostic($diagnostics, ['code' => 'CORPUS_SOURCE_PAGE_FAILED', 'stage' => 'article_reader', 'source_scope' => $sourceScope, 'error' => get_class($error)]); continue; }
             foreach ((array) ($page['diagnostics'] ?? []) as $diagnostic) if (is_array($diagnostic)) $this->diagnostic($diagnostics, $diagnostic + ['source_scope' => $sourceScope]);
             $seenSources = [];
+            $activeFound = false;
             foreach ((array) ($page['items'] ?? []) as $rowIndex => $source) {
                 if (!is_array($source)) {
                     $this->diagnostic($diagnostics, ['code' => 'CORPUS_SOURCE_SHAPE_INVALID', 'stage' => 'article_reader', 'source_scope' => $sourceScope, 'source_id' => $sourceScope . ':row:' . (string) $rowIndex]);
@@ -58,6 +61,8 @@ final class DictionarySeedCorpusAuditCoordinator
                 }
                 if (isset($seenSources[$sourceId])) continue;
                 $seenSources[$sourceId] = true;
+                if ($active !== null && $sourceId !== (string) ($active['source_id'] ?? '')) continue;
+                if ($active !== null) $activeFound = true;
                 $sourcesScanned++;
                 try {
                     $text = trim((string) ($source['raw_text'] ?? ''));
@@ -68,6 +73,8 @@ final class DictionarySeedCorpusAuditCoordinator
                         $this->diagnostic($diagnostics, ['code' => 'CORPUS_SOURCE_TEXT_ENCODING_INVALID', 'stage' => 'article_reader', 'source_scope' => $sourceScope, 'source_id' => $sourceId]);
                         continue;
                     }
+                    $sourceFingerprint = $this->sourceFingerprint($sourceId, $family, $text, $context, (string) ($source['locale'] ?? 'vi-VN'));
+                    if ($active !== null && !hash_equals((string) ($active['fingerprint'] ?? ''), $sourceFingerprint)) throw new \InvalidArgumentException('DICTIONARY_SEED_CORPUS_CURSOR_INVALIDATED');
                     try { $packet = $this->interpreter->interpret([
                     'raw_text' => $text,
                     'source_kind' => $sourceScope,
@@ -82,6 +89,7 @@ final class DictionarySeedCorpusAuditCoordinator
                         $planOptions['max_lookup_cost'] = self::MAX_SOURCE_LOOKUP_COST;
                         $planOptions['lookup_cost_per_seed'] = self::ARTICLE_LOOKUP_COST_PER_SEED;
                     }
+                    if ($active !== null) $planOptions['seed_offset'] = (int) ($active['seed_offset'] ?? 0);
                     try {
                         $plan = $this->planner->plan($packet, $planOptions);
                     } catch (\Throwable $error) {
@@ -95,11 +103,22 @@ final class DictionarySeedCorpusAuditCoordinator
                         try { $this->merge($items, $row, $sourceId, $family); }
                         catch (\Throwable $error) { $this->diagnostic($diagnostics, ['code' => 'CORPUS_SOURCE_AGGREGATION_FAILED', 'stage' => 'result_aggregation', 'source_scope' => $sourceScope, 'source_id' => $sourceId, 'error' => get_class($error)]); break; }
                     }
+                    if ((bool) ($plan['diagnostics']['has_more_seeds'] ?? false)) {
+                        $state['active'] = ['source_scope' => $sourceScope, 'source_id' => $sourceId, 'page_after' => $pageAfter, 'fingerprint' => $sourceFingerprint, 'seed_offset' => (int) ($plan['diagnostics']['next_seed_offset'] ?? 0)];
+                        $hasMore = true;
+                    } else {
+                        $state['active'] = null;
+                        $state['after'][$sourceScope] = $sourceId;
+                    }
                 } catch (\Throwable $error) {
+                    if ($error instanceof \InvalidArgumentException && $error->getMessage() === 'DICTIONARY_SEED_CORPUS_CURSOR_INVALIDATED') throw $error;
                     $this->diagnostic($diagnostics, ['code' => 'CORPUS_SOURCE_FAILED', 'stage' => 'source_pipeline', 'source_scope' => $sourceScope, 'source_id' => $sourceId, 'error' => get_class($error)]);
                 }
                 finally { $next = $sourceId; }
+                if ($active !== null || $state['active'] !== null) break;
             }
+            if ($active !== null && !$activeFound) throw new \InvalidArgumentException('DICTIONARY_SEED_CORPUS_CURSOR_INVALIDATED');
+            if ($state['active'] !== null) break;
             $hasMore = $hasMore || (bool) ($page['has_more'] ?? false);
             if ($hasMore) $state['after'][$sourceScope] = (string) ($page['next_cursor'] ?? $next);
         }
@@ -125,7 +144,7 @@ final class DictionarySeedCorpusAuditCoordinator
             $this->diagnostic($diagnostics, ['code' => 'CORPUS_RESULT_SERIALIZATION_FAILED', 'stage' => 'result_serialization', 'source_scope' => $scope, 'error' => get_class($error)]);
             $safeItems = [];
         }
-        $cursorOut = $hasMore ? $this->encodeCursor($scope, $state['after']) : null;
+        $cursorOut = $hasMore ? $this->encodeCursor($scope, $state['after'], $state['active']) : null;
         return [
             'status' => 'AVAILABLE', 'read_only' => true, 'mutated' => false,
             'source_scope' => $scope, 'sources_scanned' => $sourcesScanned,
@@ -203,19 +222,26 @@ final class DictionarySeedCorpusAuditCoordinator
     }
 
     private function rank(string $classification): int { return ['NEW_LEXICAL_CANDIDATE' => 1, 'RESOLVED_EXISTING' => 2, 'ALIAS_TO_EXISTING' => 3, 'EDITORIAL_ONLY' => 4, 'NOISE' => 4, 'SUPPRESSED' => 4, 'AMBIGUOUS' => 5][$classification] ?? 0; }
-    /** @return array{after:array<string,?string>} */
+    private function sourceFingerprint(string $sourceId, string $family, string $text, array $context, string $locale): string
+    {
+        return hash('sha256', $sourceId . "\0" . $family . "\0" . $text . "\0" . (string) json_encode([$context, $locale], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE));
+    }
+
+    /** @return array{after:array<string,?string>,active:?array<string,mixed>} */
     private function decodeCursor(?string $cursor, string $scope): array
     {
-        if ($cursor === null || $cursor === '') return ['after' => []];
+        if ($cursor === null || $cursor === '') return ['after' => [], 'active' => null];
         $decoded = base64_decode(strtr($cursor, '-_', '+/') . str_repeat('=', (4 - strlen($cursor) % 4) % 4), true);
         $value = is_string($decoded) ? json_decode($decoded, true) : null;
         if (!is_array($value) || ($value['scope'] ?? null) !== $scope || !is_array($value['after'] ?? null)) throw new \InvalidArgumentException('DICTIONARY_SEED_CORPUS_CURSOR_INVALID');
-        return ['after' => array_map(static fn (mixed $item): ?string => is_string($item) && $item !== '' ? $item : null, $value['after'])];
+        $active = $value['active'] ?? null;
+        if ($active !== null && (!is_array($active) || !is_string($active['source_scope'] ?? null) || !is_string($active['source_id'] ?? null) || !is_string($active['fingerprint'] ?? null) || !preg_match('/^[a-f0-9]{64}$/i', $active['fingerprint']) || !is_int($active['seed_offset'] ?? null) || $active['seed_offset'] < 0)) throw new \InvalidArgumentException('DICTIONARY_SEED_CORPUS_CURSOR_INVALID');
+        return ['after' => array_map(static fn (mixed $item): ?string => is_string($item) && $item !== '' ? $item : null, $value['after']), 'active' => $active];
     }
-    private function encodeCursor(string $scope, array $after): string
+    private function encodeCursor(string $scope, array $after, ?array $active = null): string
     {
         $safeAfter = [];
         foreach ($after as $sourceScope => $cursor) $safeAfter[$this->safeString($sourceScope, '')] = $this->safeString($cursor, '');
-        return rtrim(strtr(base64_encode((string) json_encode(['scope' => $scope, 'after' => $safeAfter], JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR)), '+/', '-_'), '=');
+        return rtrim(strtr(base64_encode((string) json_encode(['scope' => $scope, 'after' => $safeAfter, 'active' => $active], JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR)), '+/', '-_'), '=');
     }
 }
