@@ -44,16 +44,44 @@ final class DictionaryLexicalHoldoutTest extends TestCase
 
     public function test_holdout_metrics_report_unavailable_when_gold_labels_are_incomplete(): void
     {
-        $incomplete = array_filter(DictionaryLexicalHoldout::cases(), static fn (array $case): bool => ($case['gold_complete'] ?? false) !== true);
+        $metrics = $this->metrics();
 
-        self::assertNotEmpty($incomplete);
-        self::assertSame('UNAVAILABLE', $this->metricFor($incomplete, 'independent_source_count'));
+        self::assertSame('UNAVAILABLE', $metrics['false_positive_lookup_rate']);
+        self::assertSame('UNAVAILABLE', $metrics['independent_source_count']);
+        self::assertNotSame('UNAVAILABLE', $metrics['candidate_precision']);
+        self::assertNotSame('UNAVAILABLE', $metrics['valid_term_recall']);
+        self::assertNotSame('UNAVAILABLE', $metrics['boundary_accuracy']);
     }
 
-    /** @param list<array<string,mixed>> $cases */
-    private function metricFor(array $cases, string $metric): string
+    /** @return array<string,float|string> */
+    private function metrics(): array
     {
-        foreach ($cases as $case) if (($case['gold_complete'] ?? false) !== true) return 'UNAVAILABLE';
-        return $metric === '' ? 'UNAVAILABLE' : 'AVAILABLE';
+        $detector = new DictionaryTermDetector();
+        $expectedQualified = 0;
+        $foundQualified = 0;
+        $truePositive = 0;
+        $expectedSpans = 0;
+        $matchedSpans = 0;
+
+        foreach (DictionaryLexicalHoldout::cases() as $case) {
+            if (($case['gold_complete'] ?? false) !== true) continue;
+            $items = array_column($detector->detect((string) $case['text']), null, 'normalized_term');
+            $foundQualified += count(array_filter($items, static fn (array $item): bool => ($item['evidence_status'] ?? '') === 'QUALIFIED'));
+            foreach ($case['expected'] as $term => $status) {
+                $expectedSpans++;
+                if (isset($items[$term]) && ($items[$term]['evidence_status'] ?? '') === $status) $matchedSpans++;
+                if ($status !== 'QUALIFIED') continue;
+                $expectedQualified++;
+                if (isset($items[$term]) && ($items[$term]['evidence_status'] ?? '') === 'QUALIFIED') $truePositive++;
+            }
+        }
+
+        return [
+            'candidate_precision' => $foundQualified > 0 ? $truePositive / $foundQualified : 'UNAVAILABLE',
+            'valid_term_recall' => $expectedQualified > 0 ? $truePositive / $expectedQualified : 'UNAVAILABLE',
+            'boundary_accuracy' => $expectedSpans > 0 ? $matchedSpans / $expectedSpans : 'UNAVAILABLE',
+            'false_positive_lookup_rate' => 'UNAVAILABLE',
+            'independent_source_count' => 'UNAVAILABLE',
+        ];
     }
 }

@@ -22,7 +22,7 @@ context, ambiguity limits and derived lineage. Incomplete gold dimensions are
 reported unavailable rather than estimated.
 
 REGRESSION: Targeted Dictionary/Semantic/corpus/holdout suite passes 70 tests
-and 410 assertions, with 40 existing PHPUnit deprecations. Article 18, 19 and
+and 413 assertions, with 40 existing PHPUnit deprecations. Article 18, 19 and
 41 sentinels, escape/compound/name/identifier/ambiguity behavior and cursor
 continuation remain green. PHP lint passes for all seven changed PHP files;
 `git diff --check` and changed-scope secret scan pass. No resolver budget was
