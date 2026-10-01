@@ -278,13 +278,16 @@ final class DictionaryTermDetector
                     $flush();
                     continue;
                 }
+                if ($current !== [] && count($current) >= 2 && preg_match('/^\p{Lu}/u', $token) === 1 && $this->qualityGate->isCompoundLead((string) $current[0], (string) $current[1])) {
+                    $flush();
+                }
                 if (mb_strtolower($token, 'UTF-8') === 'làm') {
                     if (count($current) < 2) $flush();
                     else $current[] = $token;
                     continue;
                 }
                 if ($this->qualityGate->isPredicateWord($token)) {
-                    if ($this->qualityGate->isCompoundLead($token) && $this->qualityGate->isLexicalContinuation($nextToken)) {
+                    if ($this->qualityGate->isCompoundLead($token, $nextToken)) {
                         $flush();
                         $current[] = $token;
                         continue;
@@ -293,7 +296,7 @@ final class DictionaryTermDetector
                     continue;
                 }
                 if ($this->qualityGate->isBoundaryWord($token) && !$this->qualityGate->isModifierWord($token)) {
-                    if ($this->qualityGate->isCompoundLead($token) && $this->qualityGate->isLexicalContinuation($nextToken)) {
+                    if ($this->qualityGate->isCompoundLead($token, $nextToken)) {
                         $flush();
                         $current[] = $token;
                         continue;

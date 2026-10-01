@@ -262,6 +262,26 @@ final class DictionaryTermDetectorTest extends TestCase
         self::assertContains('điều khiển', $article41);
     }
 
+    public function test_live_single_word_and_compound_boundary_samples_are_classified_by_context(): void
+    {
+        $detector = new DictionaryTermDetector();
+        $terms = static fn (string $text): array => array_column($detector->detect($text), 'normalized_term');
+
+        foreach (['ông', 'gần', 'rằng', 'qua tưởng', 'vậy chính', 'ông lại', 'vẫn còn'] as $noise) {
+            self::assertNotContains($noise, $terms($noise));
+        }
+
+        self::assertContains('côn đồng bạch', $terms('Sử dụng côn đồng bạch.'));
+        self::assertContains('nhận diện', $terms('Nhận diện Vê Đét.'));
+        self::assertContains('vê đét', $terms('Nhận diện Vê Đét.'));
+        self::assertContains('điều khiển chuông', $terms('Điều khiển chuông.'));
+        foreach (['côn đồng bạch', 'côn lòng máng', 'bộ thoát', 'cần gạt chọn nhạc'] as $term) {
+            self::assertContains($term, $terms($term . '.'));
+        }
+        self::assertContains('ôđô 36/10', $terms('ÔĐô 36/10.'));
+        self::assertContains('w64', $terms('W64.'));
+    }
+
     public function test_composite_numeric_configuration_preserves_the_left_boundary_and_hides_fragments(): void
     {
         $units = [

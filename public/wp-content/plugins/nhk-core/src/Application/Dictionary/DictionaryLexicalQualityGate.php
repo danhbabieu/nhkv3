@@ -13,7 +13,7 @@ final class DictionaryLexicalQualityGate
         'mà', 'và', 'hoặc', 'là', 'có', 'cho', 'với', 'của', 'được', 'trong', 'trên', 'nhưng',
         'dưới', 'này', 'đó', 'thì', 'khi', 'để', 'từ', 'một', 'những', 'các', 'như',
         'thế', 'nào', 'nằm', 'ở', 'trở', 'nếu', 'vì', 'nên', 'khiến', 'tại', 'bởi',
-        'cùng', 'tự', 'thường', 'phổ', 'biến', 'gặp', 'chúng', 'ta', 'họ', 'nó', 'đây', 'điều', 'đầu', 'tiên', 'luôn', 'riêng', 'nghĩa', 'sự', 'chỉ', 'sẽ', 'ấy', 'đã', 'cả', 'rồi',
+        'cùng', 'tự', 'thường', 'phổ', 'biến', 'gặp', 'chúng', 'ta', 'họ', 'nó', 'đây', 'điều', 'đầu', 'tiên', 'luôn', 'riêng', 'nghĩa', 'sự', 'chỉ', 'sẽ', 'ấy', 'đã', 'cả', 'rồi', 'vẫn', 'vậy', 'qua', 'còn', 'lại', 'dụng',
         'không', 'đến', 'dùng', 'hiệu', 'hai', 'phần', 'sử', 'theo', 'sau', 'trước', 'vào',
         'cũng', 'khá', 'rất', 'nghe', 'nhìn', 'đặc', 'biệt', 'êm', 'đẹp', 'hay', 'thay', 'cực', 'kỳ',
         'ấn', 'tượng', 'hiếm', 'lực', 'also', 'quite', 'unusual', 'very', 'sounds',
@@ -24,7 +24,7 @@ final class DictionaryLexicalQualityGate
         'thay vì', 'mặc dù', 'bởi vì', 'cho nên', 'vì vậy', 'do đó', 'để mà',
     ];
     private const MODIFIER_PREFIX_WORDS = ['tự'];
-    /** Compound leads may look grammatical alone but form a lexical unit with the next word. */
+    /** Lexical heads that can be grammatical boundary words when followed by a continuation. */
     private const COMPOUND_LEAD_WORDS = ['điều', 'nhận'];
     /** Generic predicate/aspect markers, not article-specific discard phrases. */
     private const PREDICATE_WORDS = [
@@ -37,7 +37,7 @@ final class DictionaryLexicalQualityGate
     private const NON_LEXICAL_SINGLE_WORDS = [
         'bác', 'bài', 'cả', 'các', 'câu', 'chẳng', 'chúng', 'đây', 'điều', 'độ', 'giá', 'họ', 'một', 'tên',
         'người', 'nó', 'những', 'sự', 'ta', 'thể', 'vậy', 'vì', 'với', 'cần',
-        'mức', 'phần', 'trang', 'thuộc', 'tính', 'đồng', 'dòng', 'lặng', 'việc', 'bên',
+        'mức', 'phần', 'trang', 'thuộc', 'tính', 'đồng', 'dòng', 'lặng', 'việc', 'bên', 'ông', 'gần', 'rằng', 'tưởng', 'chính',
     ];
 
     public function isBoundaryWord(string $word): bool
@@ -55,9 +55,12 @@ final class DictionaryLexicalQualityGate
         return in_array($this->word($word), self::PREDICATE_WORDS, true);
     }
 
-    public function isCompoundLead(string $word): bool
+    public function isCompoundLead(string $word, string $nextWord = ''): bool
     {
-        return in_array($this->word($word), self::COMPOUND_LEAD_WORDS, true);
+        $normalized = $this->word($word);
+        return $nextWord !== ''
+            && $this->isLexicalContinuation($nextWord)
+            && in_array($normalized, self::COMPOUND_LEAD_WORDS, true);
     }
 
     public function isLexicalContinuation(string $word): bool
@@ -89,7 +92,7 @@ final class DictionaryLexicalQualityGate
             $normalizedKnown = $this->lower(trim((string) preg_replace('/\s+/u', ' ', (string) $knownLabel)));
             if ($normalizedKnown !== '' && $normalizedKnown === $normalizedInput) return implode(' ', $parts);
         }
-        if (count($parts) === 2 && $this->isCompoundLead((string) $parts[0]) && $this->isLexicalContinuation((string) $parts[1])) {
+        if (count($parts) >= 2 && $this->isCompoundLead((string) $parts[0], (string) $parts[1])) {
             return implode(' ', $parts);
         }
 
@@ -100,7 +103,9 @@ final class DictionaryLexicalQualityGate
         $parts = array_values(array_filter($parts, static fn (string $part): bool => $part !== ''));
         if ($parts === []) return null;
 
+        $compoundPrefixLength = count($parts) >= 2 && $this->isCompoundLead((string) $parts[0], (string) $parts[1]) ? 2 : 0;
         foreach ($parts as $index => $part) {
+            if ($index < $compoundPrefixLength) continue;
             $word = $this->word($part);
             $nextWord = isset($parts[$index + 1])
                 ? $this->word((string) $parts[$index + 1])
