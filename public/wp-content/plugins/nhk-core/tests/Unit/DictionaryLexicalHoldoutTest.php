@@ -3,7 +3,8 @@ declare(strict_types=1);
 
 namespace NHKTests\Unit;
 
-use NHK\Core\Application\Dictionary\DictionaryTermDetector;
+use NHK\Core\Application\Dictionary\{DictionaryResolver, DictionarySeedPlanner, DictionaryTermDetector};
+use NHK\Core\Application\Semantic\StructuredSemanticInterpreter;
 use NHK\Tests\Fixtures\DictionaryLexicalHoldout;
 use PHPUnit\Framework\TestCase;
 
@@ -46,7 +47,7 @@ final class DictionaryLexicalHoldoutTest extends TestCase
     {
         $metrics = $this->metrics();
 
-        self::assertSame('UNAVAILABLE', $metrics['false_positive_lookup_rate']);
+        self::assertNotSame('UNAVAILABLE', $metrics['false_positive_lookup_rate']);
         self::assertSame('UNAVAILABLE', $metrics['independent_source_count']);
         self::assertNotSame('UNAVAILABLE', $metrics['candidate_precision']);
         self::assertNotSame('UNAVAILABLE', $metrics['valid_term_recall']);
@@ -62,6 +63,9 @@ final class DictionaryLexicalHoldoutTest extends TestCase
         $truePositive = 0;
         $expectedSpans = 0;
         $matchedSpans = 0;
+        $lookupCount = 0;
+        $falsePositiveLookups = 0;
+        $falseNegativeNewTerms = 0;
 
         foreach (DictionaryLexicalHoldout::cases() as $case) {
             if (($case['gold_complete'] ?? false) !== true) continue;
@@ -74,14 +78,41 @@ final class DictionaryLexicalHoldoutTest extends TestCase
                 $expectedQualified++;
                 if (isset($items[$term]) && ($items[$term]['evidence_status'] ?? '') === 'QUALIFIED') $truePositive++;
             }
+
+            $lookupTerms = [];
+            $resolver = new DictionaryResolver(
+                static fn (): array => [],
+                static function (string $term) use (&$lookupTerms): array { $lookupTerms[] = $term; return []; },
+                static fn (): array => [],
+                static fn (): array => [],
+                static fn (): bool => false,
+            );
+            $plan = (new DictionarySeedPlanner($resolver))->plan(
+                (new StructuredSemanticInterpreter())->interpret(['raw_text' => (string) $case['text'], 'source_kind' => 'HOLDOUT', 'source_identity' => ['source_id' => 'holdout:' . $case['id']]]),
+            );
+            $expectedQualifiedTerms = array_keys(array_filter($case['expected'], static fn (string $status): bool => $status === 'QUALIFIED'));
+            $expectedQualifiedSet = array_fill_keys($expectedQualifiedTerms, true);
+            foreach ($lookupTerms as $term) {
+                $lookupCount++;
+                if (!isset($expectedQualifiedSet[$this->normalize($term)])) $falsePositiveLookups++;
+            }
+            $plannedTerms = array_fill_keys(array_column($plan['items'], 'normalized_form'), true);
+            foreach ($expectedQualifiedTerms as $term) if (!isset($plannedTerms[$term])) $falseNegativeNewTerms++;
         }
 
         return [
             'candidate_precision' => $foundQualified > 0 ? $truePositive / $foundQualified : 'UNAVAILABLE',
             'valid_term_recall' => $expectedQualified > 0 ? $truePositive / $expectedQualified : 'UNAVAILABLE',
             'boundary_accuracy' => $expectedSpans > 0 ? $matchedSpans / $expectedSpans : 'UNAVAILABLE',
-            'false_positive_lookup_rate' => 'UNAVAILABLE',
+            'false_positive_lookup_rate' => $lookupCount > 0 ? $falsePositiveLookups / $lookupCount : 'UNAVAILABLE',
+            'false_negative_new_term_rate' => $expectedQualified > 0 ? $falseNegativeNewTerms / $expectedQualified : 'UNAVAILABLE',
             'independent_source_count' => 'UNAVAILABLE',
         ];
+    }
+
+    private function normalize(string $value): string
+    {
+        $value = function_exists('mb_strtolower') ? mb_strtolower($value, 'UTF-8') : strtolower($value);
+        return preg_replace('/\s+/u', ' ', trim($value)) ?? trim($value);
     }
 }

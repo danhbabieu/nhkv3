@@ -34,6 +34,7 @@ final class DictionarySeedCorpusAuditCoordinator
         $items = [];
         $sourcesScanned = 0;
         $lexicalObservations = 0;
+        $observationOnlyCount = 0;
         $next = null;
         $hasMore = false;
         $diagnostics = [];
@@ -55,6 +56,7 @@ final class DictionarySeedCorpusAuditCoordinator
                 }
                 $sourceIdValue = $source['source_id'] ?? '';
                 $sourceId = is_scalar($sourceIdValue) ? trim((string) $sourceIdValue) : '';
+                $sourceIdentityKnown = $sourceId !== '';
                 if ($sourceId === '') {
                     $sourceId = $sourceScope . ':row:' . (string) $rowIndex;
                     $this->diagnostic($diagnostics, ['code' => 'CORPUS_SOURCE_ID_MISSING', 'stage' => 'article_reader', 'source_scope' => $sourceScope, 'source_id' => $sourceId]);
@@ -73,7 +75,11 @@ final class DictionarySeedCorpusAuditCoordinator
                         $this->diagnostic($diagnostics, ['code' => 'CORPUS_SOURCE_TEXT_ENCODING_INVALID', 'stage' => 'article_reader', 'source_scope' => $sourceScope, 'source_id' => $sourceId]);
                         continue;
                     }
-                    $sourceFingerprint = $this->sourceFingerprint($sourceId, $family, $text, $context, (string) ($source['locale'] ?? 'vi-VN'));
+                    $sourceFingerprint = $this->sourceFingerprint($sourceId, $family, $text, $context, (string) ($source['locale'] ?? 'vi-VN'), [
+                        'raw_or_derived' => $source['raw_or_derived'] ?? 'RAW',
+                        'lineage' => is_array($source['lineage'] ?? null) ? $source['lineage'] : [],
+                        'canonical_origin_id' => $source['canonical_origin_id'] ?? null,
+                    ]);
                     if ($active !== null && !hash_equals((string) ($active['fingerprint'] ?? ''), $sourceFingerprint)) throw new \InvalidArgumentException('DICTIONARY_SEED_CORPUS_CURSOR_INVALIDATED');
                     try { $packet = $this->interpreter->interpret([
                     'raw_text' => $text,
@@ -84,6 +90,10 @@ final class DictionarySeedCorpusAuditCoordinator
                     'metadata' => $context,
                     'locale' => (string) ($source['locale'] ?? 'vi-VN'),
                     ]); } catch (\Throwable $error) { $this->diagnostic($diagnostics, ['code' => 'CORPUS_SOURCE_INTERPRETATION_FAILED', 'stage' => 'structured_interpreter_detector', 'source_scope' => $sourceScope, 'source_id' => $sourceId, 'error' => get_class($error)]); continue; }
+                    foreach ((array) ($packet->toArray()['lexical_spans'] ?? []) as $span) {
+                        if (is_array($span) && ($span['evidence_status'] ?? null) === 'OBSERVATION_ONLY') $observationOnlyCount++;
+                    }
+                    $source['_source_identity_known'] = $sourceIdentityKnown;
                     $planOptions = ['source_family' => $family, 'context' => $context];
                     if ($sourceScope === 'ARTICLE') {
                         $planOptions['max_lookup_cost'] = self::MAX_SOURCE_LOOKUP_COST;
@@ -133,7 +143,7 @@ final class DictionarySeedCorpusAuditCoordinator
             };
             if ($key !== null) $aggregateCounts[$key]++;
         }
-        $aggregate = ['sources_scanned' => $sourcesScanned, 'lexical_observations' => $lexicalObservations, 'unique_normalized_terms' => count($rows)] + $aggregateCounts;
+        $aggregate = ['sources_scanned' => $sourcesScanned, 'lexical_observations' => $lexicalObservations, 'observation_only_count' => $observationOnlyCount, 'unique_normalized_terms' => count($rows), 'independent_source_count_scope' => 'AUDIT_PAGE'] + $aggregateCounts;
         try { $comparison = $this->compareLegacyQueue($rows); }
         catch (\Throwable $error) {
             $this->diagnostic($diagnostics, ['code' => 'CORPUS_RESULT_SERIALIZATION_FAILED', 'stage' => 'result_serialization', 'source_scope' => $scope, 'error' => get_class($error)]);
@@ -148,7 +158,7 @@ final class DictionarySeedCorpusAuditCoordinator
         return [
             'status' => 'AVAILABLE', 'read_only' => true, 'mutated' => false,
             'source_scope' => $scope, 'sources_scanned' => $sourcesScanned,
-            'lexical_observations' => $lexicalObservations, 'unique_normalized_terms' => count($rows),
+            'lexical_observations' => $lexicalObservations, 'observation_only_count' => $observationOnlyCount, 'unique_normalized_terms' => count($rows),
             'items' => $safeItems, 'aggregate' => $aggregate,
             'legacy_candidate_comparison' => $comparison, 'next_cursor' => $cursorOut, 'has_more' => $cursorOut !== null,
             'diagnostics' => ['bounded_limit' => $limit, 'ordering' => 'source_id_ascending', 'legacy_queue' => 'comparison_only', 'source_diagnostics' => $diagnostics],
@@ -166,9 +176,11 @@ final class DictionarySeedCorpusAuditCoordinator
             $items[$key]['source_ids'] = [];
             $items[$key]['source_families'] = [];
             $items[$key]['independent_source_ids'] = [];
+            $items[$key]['independent_origin_ids'] = [];
             $items[$key]['derived_lineage'] = [];
             $items[$key]['ambiguity_count'] = 0;
             $items[$key]['diagnostics'] = [];
+            $items[$key]['provenance_uncertain'] = false;
         }
         $item =& $items[$key];
         $item['occurrences'] += (int) ($row['occurrences'] ?? 0);
@@ -178,9 +190,17 @@ final class DictionarySeedCorpusAuditCoordinator
         }
         if (!in_array($sourceId, $item['source_ids'], true)) $item['source_ids'][] = $sourceId;
         if (!in_array($family, $item['source_families'], true)) $item['source_families'][] = $family;
-        $derived = strtoupper((string) ($source['raw_or_derived'] ?? 'RAW')) === 'DERIVED' || (array) ($source['lineage'] ?? []) !== [];
-        if (!$derived && !in_array($sourceId, $item['independent_source_ids'], true)) $item['independent_source_ids'][] = $sourceId;
-        if ($derived && $item['derived_lineage'] === []) $item['derived_lineage'] = $this->safeLineage((array) ($source['lineage'] ?? []));
+        $provenance = $this->provenance($source, $sourceId);
+        if ($provenance['uncertain']) {
+            $item['provenance_uncertain'] = true;
+            $item['diagnostics'][] = 'PROVENANCE_INDEPENDENCE_UNCERTAIN';
+        }
+        if ($provenance['derived']) {
+            if ($item['derived_lineage'] === []) $item['derived_lineage'] = $provenance['lineage'];
+        } elseif (!in_array($provenance['origin_id'], $item['independent_origin_ids'], true)) {
+            $item['independent_origin_ids'][] = $provenance['origin_id'];
+            $item['independent_source_ids'][] = $sourceId;
+        }
         $item['ambiguity_count'] = max((int) $item['ambiguity_count'], (int) ($row['ambiguity_count'] ?? 0));
         $item['diagnostics'] = array_values(array_unique(array_merge($item['diagnostics'], (array) ($row['diagnostics'] ?? []))));
         if ($this->rank((string) ($row['classification'] ?? '')) > $this->rank((string) ($item['classification'] ?? ''))) {
@@ -207,7 +227,9 @@ final class DictionarySeedCorpusAuditCoordinator
             'source_count' => count($row['source_ids'] ?? []),
             'source_family_count' => count($row['source_families'] ?? []),
             'independent_source_count' => count($row['independent_source_ids'] ?? []),
+            'independent_source_count_scope' => 'AUDIT_PAGE',
             'derived_lineage' => $this->safeLineage((array) ($row['derived_lineage'] ?? [])),
+            'provenance_status' => !empty($row['provenance_uncertain']) ? 'UNCERTAIN' : (!empty($row['derived_lineage']) ? 'DERIVED_PRESENT' : 'KNOWN'),
             'ambiguity_count' => (int) ($row['ambiguity_count'] ?? 0),
             'suggested_action' => $this->safeNullableString($row['suggested_action'] ?? null),
             'diagnostics' => array_values(array_filter(array_map(fn (mixed $value): string => $this->safeString($value, ''), (array) ($row['diagnostics'] ?? [])), static fn (string $value): bool => $value !== '')),
@@ -218,11 +240,35 @@ final class DictionarySeedCorpusAuditCoordinator
     private function safeLineage(array $lineage): array
     {
         $safe = [];
-        foreach (['parent_source_id', 'source_family'] as $field) {
+        if (!isset($lineage['parent_source_id']) && is_array($lineage['parent_source_ids'] ?? null)) {
+            $lineage['parent_source_id'] = $lineage['parent_source_ids'][0] ?? null;
+        }
+        if (!isset($lineage['parent_claim_id']) && is_array($lineage['parent_claim_ids'] ?? null)) {
+            $lineage['parent_claim_id'] = $lineage['parent_claim_ids'][0] ?? null;
+        }
+        foreach (['parent_source_id', 'parent_claim_id', 'canonical_origin_id', 'source_family'] as $field) {
             $value = $this->safeString($lineage[$field] ?? '', '');
             if ($value !== '') $safe[$field] = $value;
         }
         return $safe;
+    }
+
+    /** @return array{derived:bool,uncertain:bool,origin_id:string,lineage:array<string,string>} */
+    private function provenance(array $source, string $sourceId): array
+    {
+        $lineage = is_array($source['lineage'] ?? null) ? $source['lineage'] : [];
+        $rawOrDerived = strtoupper(trim((string) ($source['raw_or_derived'] ?? 'RAW')));
+        $hasParent = trim((string) ($lineage['parent_source_id'] ?? '')) !== ''
+            || trim((string) ($lineage['parent_claim_id'] ?? '')) !== ''
+            || (array) ($lineage['parent_source_ids'] ?? []) !== []
+            || (array) ($lineage['parent_claim_ids'] ?? []) !== [];
+        $derived = $rawOrDerived === 'DERIVED' || $hasParent || ($lineage['derived'] ?? false) === true;
+        $origin = trim((string) ($source['canonical_origin_id'] ?? $lineage['canonical_origin_id'] ?? $sourceId));
+        $uncertain = !in_array($rawOrDerived, ['RAW', 'DERIVED'], true)
+            || !$source['_source_identity_known']
+            || ($rawOrDerived === 'DERIVED' && !$hasParent);
+
+        return ['derived' => $derived, 'uncertain' => $uncertain, 'origin_id' => $origin !== '' ? $origin : $sourceId, 'lineage' => $this->safeLineage($lineage)];
     }
 
     private function diagnostic(array &$diagnostics, array $diagnostic): void
@@ -261,9 +307,9 @@ final class DictionarySeedCorpusAuditCoordinator
     }
 
     private function rank(string $classification): int { return ['NEW_LEXICAL_CANDIDATE' => 1, 'RESOLVED_EXISTING' => 2, 'ALIAS_TO_EXISTING' => 3, 'EDITORIAL_ONLY' => 4, 'NOISE' => 4, 'SUPPRESSED' => 4, 'AMBIGUOUS' => 5][$classification] ?? 0; }
-    private function sourceFingerprint(string $sourceId, string $family, string $text, array $context, string $locale): string
+    private function sourceFingerprint(string $sourceId, string $family, string $text, array $context, string $locale, array $provenance = []): string
     {
-        return hash('sha256', $sourceId . "\0" . $family . "\0" . $text . "\0" . (string) json_encode([$context, $locale], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE));
+        return hash('sha256', $sourceId . "\0" . $family . "\0" . $text . "\0" . (string) json_encode([$context, $locale, $provenance], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE));
     }
 
     /** @return array{after:array<string,?string>,active:?array<string,mixed>} */

@@ -1,5 +1,53 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-01 — Universal lexical acquisition acceptance closure (LOCAL / NO MUTATION)
+
+ROOT_CAUSE_FIXED: `DictionarySeedCorpusAuditCoordinator` now treats
+`raw_or_derived=RAW` plus contextual/editorial lineage as an independent raw
+source. Only an explicit DERIVED flag or an actual parent relationship is
+excluded from independent corroboration. Independent origins are deduplicated
+by `canonical_origin_id` when supplied, so replay/copy records do not inflate
+the count. Missing/invalid provenance is reported as `UNCERTAIN` with a
+bounded diagnostic rather than presented as corroboration.
+
+SCOPE_CONFIRMED: `independent_source_count` is ephemeral and `AUDIT_PAGE`
+scoped. Each cursor call starts a new aggregation; the cursor does not claim
+cross-page or corpus-wide source statistics. A persistent cross-page statistic
+would require a separate contract/design gate and was not introduced.
+
+OBSERVATION_ONLY_CONFIRMED: source identity, raw/derived flag and lineage stay
+in the structured packet; observation-only spans do not enter resolver work or
+Dictionary candidate output. The audit exposes only a bounded
+`observation_only_count`, never private source text, and does not increase work
+budget.
+
+INDEPENDENT_HOLDOUT: Added advertising claims, dialogue uncertainty, narrative
+context and a multilingual/new-term case to the labeled holdout. On the
+gold-complete subset, candidate precision is `0.7778`, valid-term recall is
+`1.0`, boundary accuracy is `1.0`, false-positive lookup rate is measurable,
+and false-negative new-term rate is measurable. Incomplete advertising,
+narrative and ambiguity dimensions remain explicitly unavailable rather than
+estimated.
+
+BASELINE_CONFIRMED: The four reported Full Unit failures were reproduced at
+baseline `f73819ec`: one TypeError in
+`WpdbArticleOperationReceiptRepositoryTest` and three existing
+KnowledgeQuality/KnowledgeWriterPreview failures. They are outside this
+lexical diff and were not changed. No full Article or Knowledge corpus was
+run.
+
+REGRESSION: Provenance/cursor/observation targeted suite passes 90 tests and
+518 assertions; Article/MCP sentinel suite passes 10 tests / 60 assertions. Full Unit
+under 512M completes 2,880 tests / 17,177 assertions with the same one TypeError
+and three baseline failures. PHP lint, `git diff --check` and changed-scope
+secret review pass. No data,
+schema, migration, seed, backfill, staging, production state or deployment
+was changed.
+
+NO_DATA_MUTATION: `read_only=true`, `mutated=false`.
+
+STATUS: `UNIVERSAL_LEXICAL_ACQUISITION_ACCEPTANCE_LOCAL_READY / NO_MUTATION / DEPLOYMENT_NOT_PERFORMED`.
+
 # Checkpoint — 2026-10-01 — Universal lexical acquisition holdout and provenance (LOCAL / NO MUTATION)
 
 ROOT_CAUSES_CONFIRMED: Noise/editorial signals could be reintroduced into the

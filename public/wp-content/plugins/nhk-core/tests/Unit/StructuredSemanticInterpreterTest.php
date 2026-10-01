@@ -85,6 +85,23 @@ final class StructuredSemanticInterpreterTest extends TestCase
         self::assertNotContains('bộ thoát hoạt động', array_column($qualified['lexical_spans'], 'normalized_term'));
     }
 
+    public function test_observation_only_packet_retains_source_identity_and_lineage_without_dictionary_work(): void
+    {
+        $value = (new StructuredSemanticInterpreter())->interpret([
+            'raw_text' => 'carillon',
+            'source_kind' => 'ARTICLE',
+            'source_identity' => ['source_id' => 'article:18', 'source_family' => 'ARTICLE'],
+            'raw_or_derived' => 'RAW',
+            'lineage' => ['source_family' => 'ARTICLE', 'editorial_context' => 'publish'],
+        ])->toArray();
+
+        self::assertSame('article:18', $value['source_context']['source_identifier']);
+        self::assertSame(['source_family' => 'ARTICLE', 'editorial_context' => 'publish'], $value['source_context']['lineage']);
+        self::assertSame([], $value['semantic_query_seeds']);
+        self::assertSame([], $value['dictionary_delta_candidates']);
+        self::assertSame('OBSERVATION_ONLY', $value['lexical_spans'][0]['evidence_status']);
+    }
+
     public function test_noise_signals_do_not_reenter_the_qualified_lexical_path(): void
     {
         $value = (new StructuredSemanticInterpreter())->interpret([
