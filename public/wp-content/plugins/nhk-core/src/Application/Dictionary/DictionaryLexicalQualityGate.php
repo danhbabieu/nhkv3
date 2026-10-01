@@ -29,15 +29,15 @@ final class DictionaryLexicalQualityGate
     /** Generic predicate/aspect markers, not article-specific discard phrases. */
     private const PREDICATE_WORDS = [
         'bắt', 'chạy', 'chạm', 'đung', 'đưa', 'đứng', 'đọc', 'đặt', 'gặp',
-        'ghi', 'giúp', 'giống', 'giải', 'hoạt', 'khảo', 'kể', 'khiến', 'lên', 'mở', 'nghĩ', 'phân', 'tách', 'tham', 'xác', 'lưu', 'chơi', 'thích', 'thấy', 'biết', 'yên',
-        'nhận', 'nhìn', 'nói', 'quay', 'sống', 'suy', 'tạo', 'tiếp', 'tinh',
+        'ghi', 'giúp', 'giống', 'giải', 'giữ', 'hoạt', 'khảo', 'kể', 'khiến', 'lên', 'mở', 'nghĩ', 'phân', 'tách', 'tham', 'xác', 'lưu', 'chơi', 'thích', 'thấy', 'biết', 'yên',
+        'nhận', 'nhìn', 'nói', 'quay', 'sống', 'suy', 'tạo', 'tiếp', 'tinh', 'xoay', 'sang', 'ra', 'đời', 'xuống',
         'tồn', 'tránh', 'trở', 'xem', 'yêu', 'đánh', 'đi', 'đến', 'dùng',
         'dễ', 'hãy', 'đừng', 'phải', 'muốn',
     ];
     private const NON_LEXICAL_SINGLE_WORDS = [
         'bác', 'bài', 'cả', 'các', 'câu', 'chẳng', 'chúng', 'đây', 'điều', 'độ', 'giá', 'họ', 'một', 'tên',
         'người', 'nó', 'những', 'sự', 'ta', 'thể', 'vậy', 'vì', 'với', 'cần',
-        'mức', 'phần', 'trang', 'thuộc', 'tính', 'đồng', 'dòng', 'lặng', 'việc', 'bên', 'ông', 'gần', 'rằng', 'tưởng', 'chính', 'chiếc', 'dấu', 'rộng', 'ngay', 'xuyên', 'lâu', 'động',
+        'mức', 'phần', 'trang', 'thuộc', 'tính', 'đồng', 'dòng', 'lặng', 'việc', 'bên', 'ông', 'gần', 'rằng', 'tưởng', 'chính', 'chiếc', 'dấu', 'rộng', 'ngay', 'xuyên', 'lâu', 'động', 'khu',
     ];
 
     public function isBoundaryWord(string $word): bool
@@ -53,6 +53,18 @@ final class DictionaryLexicalQualityGate
     public function isPredicateWord(string $word): bool
     {
         return in_array($this->word($word), self::PREDICATE_WORDS, true);
+    }
+
+    public function isPredicateBoundary(string $word, string $nextWord = ''): bool
+    {
+        $normalized = $this->word($word);
+        if ($normalized === 'truyền') return $this->isBoundaryWord($nextWord) && $this->word($nextWord) !== 'động';
+        return $this->isPredicateWord($normalized);
+    }
+
+    public function isWeakDiscourseBoundary(string $word): bool
+    {
+        return in_array($this->word($word), ['ấy', 'đã', 'rồi', 'vẫn', 'còn', 'vậy', 'chính', 'lại', 'sẽ'], true);
     }
 
     public function isCompoundLead(string $word, string $nextWord = ''): bool
@@ -119,7 +131,7 @@ final class DictionaryLexicalQualityGate
                 $parts = array_slice($parts, 0, $index);
                 break;
             }
-            if ($word !== '' && $this->isPredicateWord($word)) {
+            if ($word !== '' && $this->isPredicateBoundary($word, $nextWord)) {
                 $parts = array_slice($parts, 0, $index);
                 break;
             }

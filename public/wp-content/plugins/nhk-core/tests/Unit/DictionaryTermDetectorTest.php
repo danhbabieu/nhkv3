@@ -254,6 +254,8 @@ final class DictionaryTermDetectorTest extends TestCase
         $article19 = $terms('Cảm giác ấy khiến chiếc đồng hồ giống một vật thể đã tồn tại từ rất lâu.');
         self::assertNotContains('cảm giác ấy', $article19);
         self::assertNotContains('vật thể đã', $article19);
+        self::assertNotContains('cảm giác', $article19);
+        self::assertNotContains('vật thể', $article19);
         self::assertContains('đồng hồ', $article19);
 
         $article41 = $terms('Mở cửa thùng và nhìn vào khu vực điều khiển. Việc nhận diện Vê Đét cần đọc cả diện Vê Đét.');
@@ -296,6 +298,8 @@ final class DictionaryTermDetectorTest extends TestCase
         self::assertTrue($items[0]['resolver_eligible']);
         self::assertNotContains('bộ thoát hoạt động', $terms);
 
+        self::assertContains('trục điều tốc', array_column($detector->detect('Trục điều tốc.'), 'normalized_term'));
+        self::assertContains('màng đàn hồi', array_column($detector->detect('Màng đàn hồi.'), 'normalized_term'));
         $compound = array_column($detector->detect('trục điều tốc, màng đàn hồi, cơ cấu truyền cóc.'), 'normalized_term');
         foreach (['trục điều tốc', 'màng đàn hồi', 'cơ cấu truyền cóc'] as $term) self::assertContains($term, $compound);
     }

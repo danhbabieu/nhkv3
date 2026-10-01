@@ -314,8 +314,9 @@ final class DictionaryTermDetector
                     $flush();
                     continue;
                 }
-                if ($this->qualityGate->isPredicateWord($token)) {
+                if ($this->qualityGate->isPredicateBoundary($token, $nextToken)) {
                     if ($this->qualityGate->isCompoundLead($token, $nextToken)) {
+                        if ($current !== [] && !$this->qualityGate->isStandaloneLexicalWord((string) $current[0])) $flush();
                         $current[] = $token;
                         continue;
                     }
@@ -323,7 +324,12 @@ final class DictionaryTermDetector
                     continue;
                 }
                 if ($this->qualityGate->isBoundaryWord($token) && !$this->qualityGate->isModifierWord($token)) {
+                    if ($this->qualityGate->isWeakDiscourseBoundary($token)) {
+                        $current = [];
+                        continue;
+                    }
                     if ($this->qualityGate->isCompoundLead($token, $nextToken)) {
+                        if ($current !== [] && !$this->qualityGate->isStandaloneLexicalWord((string) $current[0])) $flush();
                         $current[] = $token;
                         continue;
                     }
@@ -364,11 +370,6 @@ final class DictionaryTermDetector
         $value = implode(' ', $tokens);
         if ($this->isEditorialOrNoisePhrase($value)) return;
         $spans[$this->normalizer->normalize($value)] = $value;
-        for ($index = 0; $index < count($tokens) - 1; $index++) {
-            if (!$this->qualityGate->isCompoundLead((string) $tokens[$index], (string) $tokens[$index + 1])) continue;
-            $compound = implode(' ', array_slice($tokens, $index, 2));
-            $spans[$this->normalizer->normalize($compound)] = $compound;
-        }
         if (count($tokens) === 2 && in_array(mb_strtolower((string) $tokens[0], 'UTF-8'), ['bộ', 'cụm', 'hệ', 'van'], true) && mb_strlen((string) $tokens[1], 'UTF-8') <= 4) {
             $atomic = (string) $tokens[1];
             $spans[$this->normalizer->normalize($atomic)] = $atomic;
