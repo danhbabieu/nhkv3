@@ -31,8 +31,14 @@ increased and no new semantic owner, predicate, writer or schema was added.
 OPEN_LIMITATIONS: Advertising/source-genre noun suppression and resolver
 ambiguity metrics lack sufficiently complete independent gold labels; the
 holdout records these as `UNAVAILABLE`. Full Article/Knowledge corpus runs
-were intentionally not performed. Runtime/staging read-back was not needed
-for this local read-only slice and no deployment was performed.
+were intentionally not performed. Independent holdout metrics are candidate
+precision `0.75`, valid-term recall `1.0` and boundary accuracy `1.0`; false-
+positive lookup and independent-source metrics are `UNAVAILABLE`. The full
+Unit suite under 512M completed 2,874 tests / 17,152 assertions with one
+existing `WpdbArticleOperationReceiptRepositoryTest` TypeError and three
+unrelated existing KnowledgeQuality/KnowledgeWriterPreview failures. Runtime/
+staging read-back was not needed for this local read-only slice and no
+deployment was performed.
 
 NO_DATA_MUTATION: `read_only=true`, `mutated=false`; no Dictionary, Knowledge,
 Source, Evidence, Graph, Authority or Article write, schema change, migration,
