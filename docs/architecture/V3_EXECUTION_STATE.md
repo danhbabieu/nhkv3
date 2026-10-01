@@ -21078,3 +21078,23 @@ continuation, read-only flags and private-text exclusion. No full Knowledge
 run, deployment or data write was performed.
 
 STATUS: `DICTIONARY_ARTICLE_ABILITY_OUTER_ISOLATION_LOCAL_READY / NO_LIVE_MUTATION / NO_PUSH / NO_DEPLOY`.
+
+# Checkpoint — 2026-10-01 — Generic lexical extraction quality gate
+
+ROOT_CAUSE: Generic spans were bounded by punctuation and a small function-word
+list only. Predicate fragments, aspect/discourse openings and slash prose forms
+therefore reached the resolver as if they were noun phrases. The prior
+low-value regex list was removed; the gate now uses generic predicate boundaries,
+standalone lexical-word checks, leading grammatical/evaluative rejection and
+source-safe slash-form isolation. Known labels still bypass the generic gate,
+while identifiers, aliases and numeric configurations remain on their existing
+paths.
+
+VALIDATION: Real read-only excerpts from Articles 18, 19 and 41 are covered by
+targeted detector fixtures. The focused Dictionary suite passes 68 tests / 348
+assertions; changed PHP files pass lint and `git diff --check`. Candidate lists
+show predicate fragments removed while `carillon odo`, `carillon westminster`,
+`mặt số`, `atmos`, `quả lắc lớn`, `cần gạt chọn nhạc` and `chương trình chuông`
+remain. No resolver, pagination, cursor, work-budget or Knowledge code changed.
+
+STATUS: `DICTIONARY_GENERIC_LEXICAL_GATE_LOCAL_READY / NO_LIVE_MUTATION / NO_PUSH / NO_DEPLOY`.

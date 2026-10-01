@@ -10,10 +10,10 @@ namespace NHK\Core\Application\Dictionary;
 final class DictionaryLexicalQualityGate
 {
     private const BOUNDARY_WORDS = [
-        'mà', 'và', 'hoặc', 'là', 'có', 'cho', 'với', 'của', 'được', 'trong', 'trên',
+        'mà', 'và', 'hoặc', 'là', 'có', 'cho', 'với', 'của', 'được', 'trong', 'trên', 'nhưng',
         'dưới', 'này', 'đó', 'thì', 'khi', 'để', 'từ', 'một', 'những', 'các', 'như',
         'thế', 'nào', 'nằm', 'ở', 'trở', 'nếu', 'vì', 'nên', 'khiến', 'tại', 'bởi',
-        'cùng', 'tự', 'thường', 'phổ', 'biến', 'gặp', 'chúng', 'ta', 'họ', 'nó',
+        'cùng', 'tự', 'thường', 'phổ', 'biến', 'gặp', 'chúng', 'ta', 'họ', 'nó', 'đây', 'điều', 'đầu', 'tiên', 'luôn', 'riêng', 'nghĩa', 'sự', 'chỉ',
         'không', 'đến', 'dùng', 'hiệu', 'hai', 'phần', 'sử', 'theo', 'sau', 'trước', 'vào',
         'cũng', 'khá', 'rất', 'nghe', 'nhìn', 'đặc', 'biệt', 'êm', 'đẹp', 'hay', 'thay', 'cực', 'kỳ',
         'ấn', 'tượng', 'hiếm', 'lực', 'also', 'quite', 'unusual', 'very', 'sounds',
@@ -24,13 +24,18 @@ final class DictionaryLexicalQualityGate
         'thay vì', 'mặc dù', 'bởi vì', 'cho nên', 'vì vậy', 'do đó', 'để mà',
     ];
     private const MODIFIER_PREFIX_WORDS = ['tự'];
-    private const LOW_VALUE_FRAGMENT_PATTERNS = [
-        '/^(?:đây|tương đối|thuộc tính)$/u',
-        '/^nhiều người(?:\s|$)/u',
-        '/\byêu thích\b/u',
-        '/^(?:giá trị|mức độ)(?:\s+\p{L}+){1,4}$/u',
-        '/^cần\s+(?:tách|phân|xác định|lưu ý)(?:\s+\p{L}+){1,4}$/u',
-        '/\b(?:luôn|không)\s+đồng nghĩa\b/u',
+    /** Generic predicate/aspect markers, not article-specific discard phrases. */
+    private const PREDICATE_WORDS = [
+        'bắt', 'chạy', 'chạm', 'đung', 'đưa', 'đứng', 'đọc', 'đặt', 'gặp',
+        'ghi', 'giúp', 'giống', 'kể', 'khiến', 'lên', 'mở', 'nghĩ', 'phân', 'tách', 'xác', 'lưu', 'chơi', 'thích', 'thấy', 'biết', 'yên',
+        'nhận', 'nhìn', 'nói', 'quay', 'sống', 'suy', 'tạo', 'tiếp', 'tinh',
+        'tồn', 'tránh', 'trở', 'xem', 'yêu', 'đánh', 'đi', 'đến', 'dùng',
+        'dễ', 'hãy', 'đừng', 'phải', 'muốn',
+    ];
+    private const NON_LEXICAL_SINGLE_WORDS = [
+        'bác', 'bài', 'cả', 'các', 'câu', 'chẳng', 'chúng', 'đây', 'điều', 'độ', 'giá', 'họ', 'một', 'tên',
+        'người', 'nó', 'những', 'sự', 'ta', 'thể', 'vậy', 'vì', 'với', 'cần',
+        'mức', 'phần', 'trang', 'thuộc', 'tính', 'đồng', 'dòng', 'lặng',
     ];
 
     public function isBoundaryWord(string $word): bool
@@ -43,11 +48,31 @@ final class DictionaryLexicalQualityGate
         return in_array($this->word($word), self::MODIFIER_PREFIX_WORDS, true);
     }
 
+    public function isPredicateWord(string $word): bool
+    {
+        return in_array($this->word($word), self::PREDICATE_WORDS, true);
+    }
+
+    public function isStandaloneLexicalWord(string $word): bool
+    {
+        $normalized = $this->word($word);
+        return $normalized !== ''
+            && preg_match('/^[\p{L}][\p{L}-]{2,}$/u', $normalized) === 1
+            && !$this->isBoundaryWord($normalized)
+            && !$this->isPredicateWord($normalized)
+            && !in_array($normalized, self::NON_LEXICAL_SINGLE_WORDS, true);
+    }
+
     public function filter(string $phrase, array $knownLabels = []): ?string
     {
         $parts = preg_split('/\s+/u', trim($phrase)) ?: [];
         $parts = array_values(array_filter($parts, static fn (string $part): bool => $part !== ''));
         if ($parts === []) return null;
+        $normalizedInput = $this->lower(trim((string) preg_replace('/\s+/u', ' ', implode(' ', $parts))));
+        foreach ($knownLabels as $knownLabel) {
+            $normalizedKnown = $this->lower(trim((string) preg_replace('/\s+/u', ' ', (string) $knownLabel)));
+            if ($normalizedKnown !== '' && $normalizedKnown === $normalizedInput) return implode(' ', $parts);
+        }
 
         $phrase = $this->isNumericConfiguration($parts)
             ? implode(' ', $parts)
@@ -65,6 +90,10 @@ final class DictionaryLexicalQualityGate
                 $parts = array_slice($parts, 0, $index);
                 break;
             }
+            if ($word !== '' && $this->isPredicateWord($word)) {
+                $parts = array_slice($parts, 0, $index);
+                break;
+            }
             if ($word !== '' && in_array($word, self::MODIFIER_PREFIX_WORDS, true) && isset($parts[$index + 1])) continue;
             if ($word !== '' && in_array($word, self::BOUNDARY_WORDS, true)) {
                 $parts = array_slice($parts, 0, $index);
@@ -78,20 +107,9 @@ final class DictionaryLexicalQualityGate
             array_pop($parts);
         }
 
+        if ($parts !== [] && in_array($this->word((string) $parts[0]), ['giá', 'mức', 'nhiều', 'tương', 'thuộc', 'người', 'số'], true)) return null;
         $result = trim(implode(' ', $parts));
-        if ($result !== '' && $this->isLowValueFragment($result, $knownLabels)) return null;
         return $result === '' ? null : $result;
-    }
-
-    private function isLowValueFragment(string $phrase, array $knownLabels): bool
-    {
-        $normalized = $this->lower(trim((string) preg_replace('/\s+/u', ' ', $phrase)));
-        foreach ($knownLabels as $label) {
-            $known = $this->lower(trim((string) preg_replace('/\s+/u', ' ', (string) $label)));
-            if ($known !== '' && $known === $normalized) return false;
-        }
-        foreach (self::LOW_VALUE_FRAGMENT_PATTERNS as $pattern) if (preg_match($pattern, $normalized) === 1) return true;
-        return false;
     }
 
     private function trimAtKnownLabelBoundary(array $parts, array $knownLabels): string

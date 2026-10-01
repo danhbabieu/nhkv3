@@ -276,6 +276,15 @@ final class DictionaryTermDetector
                     $flush();
                     continue;
                 }
+                if (mb_strtolower($token, 'UTF-8') === 'làm') {
+                    if (count($current) < 2) $flush();
+                    else $current[] = $token;
+                    continue;
+                }
+                if ($this->qualityGate->isPredicateWord($token)) {
+                    $flush();
+                    continue;
+                }
                 if ($this->qualityGate->isBoundaryWord($token) && !$this->qualityGate->isModifierWord($token)) {
                     $flush();
                     continue;
@@ -291,17 +300,25 @@ final class DictionaryTermDetector
     private function appendGenericSpan(array &$spans, array $tokens): void
     {
         if ($tokens === []) return;
-        if (count($tokens) === 1 && preg_match('/^\p{Lu}/u', (string) $tokens[0]) && !in_array(mb_strtolower((string) $tokens[0], 'UTF-8'), ['con', 'chiếc', 'một', 'mẫu'], true)) {
-            $normalized = $this->normalizer->normalize((string) $tokens[0]);
-            if ($normalized !== '' && !$this->qualityGate->isBoundaryWord((string) $tokens[0])) $spans[$normalized] = (string) $tokens[0];
-            return;
-        }
         if (count($tokens) > 6 || $this->containsNumber($tokens)) return;
+        foreach ($tokens as $token) {
+            if (preg_match('/[\/.]/u', (string) $token)) return;
+        }
         if (count($tokens) > 2 && in_array(mb_strtolower((string) $tokens[0], 'UTF-8') . ' ' . mb_strtolower((string) $tokens[1], 'UTF-8'), ['cơ chế', 'tình trạng', 'mô tả', 'cách gọi'], true)) {
             $tokens = array_slice($tokens, 2);
         }
         if (count($tokens) > 1 && in_array(mb_strtolower((string) $tokens[0], 'UTF-8'), ['bản'], true)) array_shift($tokens);
         while (count($tokens) > 1 && in_array(mb_strtolower((string) $tokens[0], 'UTF-8'), ['the', 'a', 'an', 'chiếc', 'một', 'mẫu', 'con'], true)) array_shift($tokens);
+        if (count($tokens) === 1 && $this->qualityGate->isStandaloneLexicalWord((string) $tokens[0])) {
+            $normalized = $this->normalizer->normalize((string) $tokens[0]);
+            if ($normalized !== '') $spans[$normalized] = (string) $tokens[0];
+            return;
+        }
+        if (count($tokens) === 1 && preg_match('/^\p{Lu}/u', (string) $tokens[0]) && !in_array(mb_strtolower((string) $tokens[0], 'UTF-8'), ['con', 'chiếc', 'một', 'mẫu'], true)) {
+            $normalized = $this->normalizer->normalize((string) $tokens[0]);
+            if ($normalized !== '' && $this->qualityGate->isStandaloneLexicalWord((string) $tokens[0])) $spans[$normalized] = (string) $tokens[0];
+            return;
+        }
         if (count($tokens) < 2) return;
         $value = implode(' ', $tokens);
         if ($this->isEditorialOrNoisePhrase($value)) return;

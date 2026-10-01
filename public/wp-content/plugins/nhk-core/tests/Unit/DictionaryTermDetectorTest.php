@@ -207,6 +207,39 @@ final class DictionaryTermDetectorTest extends TestCase
         }
     }
 
+    public function test_article_excerpts_keep_structural_terms_and_cut_predicate_fragments(): void
+    {
+        $detector = new DictionaryTermDetector();
+        $terms = static fn (string $text): array => array_column($detector->detect($text), 'normalized_term');
+
+        $article18 = $terms('Carillon Odo và Carillon Westminster nằm trên mặt số, nhưng người mới chơi rất dễ nghĩ Carillon là tên một hãng đồng hồ.');
+        self::assertContains('carillon odo', $article18);
+        self::assertContains('carillon westminster', $article18);
+        self::assertContains('mặt số', $article18);
+        self::assertNotContains('người mới chơi', $article18);
+        self::assertNotContains('dễ nghĩ carillon', $article18);
+        self::assertNotContains('tên', $article18);
+
+        $article19 = $terms('Khi nhìn một chiếc Atmos chạy, điều đầu tiên người ta thường thấy là sự yên lặng. Không có quả lắc lớn đung đưa.');
+        self::assertContains('atmos', $article19);
+        self::assertContains('quả lắc lớn', $article19);
+        self::assertNotContains('atmos chạy', $article19);
+        self::assertNotContains('điều đầu tiên người', $article19);
+        self::assertNotContains('đầu tiên người', $article19);
+        self::assertNotContains('tiên người', $article19);
+        self::assertNotContains('sự yên lặng', $article19);
+        self::assertNotContains('quả lắc lớn đung đưa', $article19);
+
+        $article41 = $terms('Trên một số đồng hồ Vê Đét hai bài, chi tiết chính là cần gạt chọn nhạc. Một cần gạt nhỏ nhưng nó cho biết chiếc đồng hồ không chỉ có một chương trình chuông.');
+        self::assertContains('cần gạt chọn nhạc', $article41);
+        self::assertContains('chương trình chuông', $article41);
+        self::assertNotContains('cần gạt nhỏ nhưng', $article41);
+        self::assertNotContains('một cần gạt nhỏ', $article41);
+        self::assertNotContains('biết chiếc đồng hồ', $article41);
+        self::assertNotContains('bài', $article41);
+        self::assertNotContains('số đồng hồ vê đét', $article41);
+    }
+
     public function test_composite_numeric_configuration_preserves_the_left_boundary_and_hides_fragments(): void
     {
         $units = [
