@@ -85,6 +85,20 @@ final class StructuredSemanticInterpreterTest extends TestCase
         self::assertNotContains('bộ thoát hoạt động', array_column($qualified['lexical_spans'], 'normalized_term'));
     }
 
+    public function test_noise_signals_do_not_reenter_the_qualified_lexical_path(): void
+    {
+        $value = (new StructuredSemanticInterpreter())->interpret([
+            'raw_text' => 'Hiện vật mang đồng thời nhiều đặc điểm; bộ máy hoàn toàn nguyên bản.',
+        ])->toArray();
+
+        $spans = array_column($value['lexical_spans'], null, 'normalized_term');
+        foreach (['hiện vật mang đồng thời nhiều đặc điểm', 'bộ máy hoàn toàn nguyên bản'] as $noise) {
+            self::assertSame('NOISE', $spans[$noise]['evidence_status']);
+            self::assertFalse($spans[$noise]['resolver_eligible']);
+            self::assertNotContains($noise, array_column($value['semantic_query_seeds'], 'normalized_form'));
+        }
+    }
+
     public function test_explicit_relation_hints_are_planned_only_and_unregistered_predicates_fail_closed(): void
     {
         $packet = (new StructuredSemanticInterpreter())->interpret([

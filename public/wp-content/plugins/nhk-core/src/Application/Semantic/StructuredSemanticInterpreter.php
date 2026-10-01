@@ -35,7 +35,19 @@ final class StructuredSemanticInterpreter
         foreach (array_merge(array_filter($detectorEditorial, static fn (array $signal): bool => preg_match('/(?:hãy|đừng|chỉ\s+cần|cảm\s+thấy|bắt\s+nguồn|ghi\s+nhận)/iu', (string) ($signal['term'] ?? '')) === 1), $detectorNoise) as $signal) {
             $normalized = (string) ($signal['normalized_term'] ?? '');
             $found = false;
-            foreach ($lexical as &$span) if ($span['normalized_term'] === $normalized) { $span['origin'] = (string) ($signal['origin'] ?? $span['origin']); $found = true; break; }
+            foreach ($lexical as &$span) if ($span['normalized_term'] === $normalized) {
+                $origin = (string) ($signal['origin'] ?? $span['origin']);
+                $span['origin'] = $origin;
+                if ($origin === 'NOISE') {
+                    $span['evidence_status'] = 'NOISE';
+                    $span['resolver_eligible'] = false;
+                } elseif ($origin === 'EDITORIAL_SIGNAL') {
+                    $span['evidence_status'] = 'EDITORIAL_ONLY';
+                    $span['resolver_eligible'] = false;
+                }
+                $found = true;
+                break;
+            }
             unset($span);
             if (!$found) $lexical[] = $this->span($signal);
         }
@@ -105,13 +117,20 @@ final class StructuredSemanticInterpreter
     /** @param array<string,mixed> $span @return array<string,mixed> */
     private function span(array $span): array
     {
+        $origin = (string) ($span['origin'] ?? 'UNKNOWN');
+        $evidenceStatus = (string) ($span['evidence_status'] ?? match ($origin) {
+            'NOISE' => 'NOISE',
+            'EDITORIAL_SIGNAL' => 'EDITORIAL_ONLY',
+            default => 'QUALIFIED',
+        });
+
         return [
             'term' => (string) ($span['term'] ?? ''),
             'normalized_term' => (string) ($span['normalized_term'] ?? ''),
-            'origin' => (string) ($span['origin'] ?? 'UNKNOWN'),
+            'origin' => $origin,
             'strength' => (string) ($span['strength'] ?? 'NORMAL'),
-            'evidence_status' => (string) ($span['evidence_status'] ?? 'QUALIFIED'),
-            'resolver_eligible' => ($span['resolver_eligible'] ?? true) === true,
+            'evidence_status' => $evidenceStatus,
+            'resolver_eligible' => ($span['resolver_eligible'] ?? ($evidenceStatus === 'QUALIFIED')) === true,
             'occurrences' => max(1, (int) ($span['occurrences'] ?? 1)),
         ];
     }

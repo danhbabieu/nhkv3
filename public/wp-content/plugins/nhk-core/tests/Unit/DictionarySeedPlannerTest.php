@@ -85,6 +85,36 @@ final class DictionarySeedPlannerTest extends TestCase
         self::assertSame(3, $result['aggregate']['total']);
     }
 
+    public function test_seed_plan_does_not_resolve_observation_only_seed(): void
+    {
+        $lookups = 0;
+        $resolver = new DictionaryResolver(
+            static function () use (&$lookups): array {
+                $lookups++;
+                return [['concept_id' => 'should-not-resolve']];
+            },
+            static fn (): array => [],
+            static fn (): array => [],
+            static fn (): array => [],
+            static fn (): bool => false,
+        );
+
+        $result = (new DictionarySeedPlanner($resolver))->plan([
+            'semantic_query_seeds' => [[
+                'raw_span' => 'carillon',
+                'normalized_form' => 'carillon',
+                'category' => 'LEXICAL_OBSERVATION',
+                'locale' => 'vi-VN',
+                'evidence_status' => 'OBSERVATION_ONLY',
+                'resolver_eligible' => false,
+            ]],
+        ]);
+
+        self::assertSame(0, $lookups);
+        self::assertSame([], $result['items']);
+        self::assertSame(0, $result['aggregate']['total']);
+    }
+
     public function test_seed_plan_exposes_canonical_reuse_and_action_without_creating_a_concept(): void
     {
         $resolver = new DictionaryResolver(
