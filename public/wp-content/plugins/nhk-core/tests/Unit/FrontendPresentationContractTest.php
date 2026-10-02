@@ -20,6 +20,7 @@ final class FrontendPresentationContractTest extends TestCase
         self::assertStringContainsString('default-archive.svg', $source);
         self::assertStringContainsString('card-image', $source);
         self::assertStringContainsString('has_post_thumbnail()', $source);
+        self::assertStringContainsString("the_post_thumbnail('medium'", $source);
     }
 
     public function test_homepage_exposes_visual_media_video_knowledge_and_dictionary_modules(): void
@@ -49,10 +50,18 @@ final class FrontendPresentationContractTest extends TestCase
 
         self::assertStringContainsString('array_slice($latestFeed, 0, 4)', $source);
         self::assertStringContainsString('class="latest-feed-card latest-feed-row"', $source);
-        self::assertStringContainsString('wp_get_attachment_image((int) $item[\'attachment_id\']', $source);
+        self::assertStringContainsString('wp_get_attachment_image((int) $item[\'attachment_id\'], \'medium\'', $source);
         self::assertStringContainsString("\$item['image_srcset'] ?? \$item['srcset']", $source);
         self::assertStringContainsString("\$item['image_sizes'] ?? \$item['sizes']", $source);
         self::assertStringContainsString('latest-feed-card-link', $source);
+    }
+
+    public function test_homepage_article_latest_feed_requests_compact_attachment_derivatives(): void
+    {
+        $source = $this->read('front-page.php');
+
+        self::assertStringContainsString('wp_get_attachment_image((int) $item[\'attachment_id\'], \'medium\'', $source);
+        self::assertStringContainsString("the_post_thumbnail('medium_large'", $source);
     }
 
     public function test_homepage_featured_selection_remains_sticky_first_with_existing_fallbacks(): void
@@ -184,6 +193,10 @@ final class FrontendPresentationContractTest extends TestCase
         $source = $this->read('front-page.php');
 
         self::assertStringContainsString('hero-entry-points', $source);
+        foreach (['/san-pham/', '/thuong-hieu/', '/loai-dong-ho/', '/tu-dien/'] as $gatewayPath) self::assertStringContainsString($gatewayPath, $source);
+        self::assertStringContainsString('$gatewayPaths', $source);
+        self::assertStringContainsString('gatewayDescriptions', $source);
+        self::assertStringNotContainsString('sản phẩm đang có trong kho', mb_strtolower($source));
         self::assertStringContainsString('hero-empty', $source);
         self::assertStringContainsString('($item[\'image_url\'] ?? \'\')', $source);
         self::assertStringContainsString("trim((string) (\$heroMedia[0]['image_url'] ?? '')) !== ''", $source);

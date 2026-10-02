@@ -1,7 +1,7 @@
 <article class="card article-card">
   <a class="card-image" href="<?php the_permalink(); ?>" tabindex="-1" aria-hidden="true">
     <?php if (has_post_thumbnail()): ?>
-      <?php the_post_thumbnail('medium_large', ['loading' => 'lazy', 'alt' => '']); ?>
+      <?php the_post_thumbnail('medium', ['loading' => 'lazy', 'decoding' => 'async', 'alt' => '']); ?>
     <?php else: ?>
       <img class="fallback-visual" src="<?php echo esc_url(get_theme_file_uri('/assets/default-archive.svg')); ?>" alt="" loading="lazy" width="1200" height="750">
     <?php endif; ?>

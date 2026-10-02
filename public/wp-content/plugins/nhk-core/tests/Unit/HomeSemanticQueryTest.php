@@ -6,7 +6,7 @@ namespace NHK\Tests\Unit;
 use NHK\Core\Application\Home\HomeSemanticQuery;
 use NHK\Core\Application\Presentation\PublicNavigationDefinition;
 use NHK\Core\Application\Presentation\{ClockTypeNavigationProjection, NavigationTreeProjector};
-use NHK\Core\Application\Entity\{PublicEntityCollectionQuery, PublicEntityEligibilityPolicy, PublicIdentityContract, PublicRouteResolver};
+use NHK\Core\Application\Entity\{EntityMediaProjection, PublicEntityCollectionQuery, PublicEntityEligibilityPolicy, PublicIdentityContract, PublicRouteResolver};
 use NHK\Core\Application\Media\PublicMediaGalleryQuery;
 use NHK\Core\Application\Video\{VideoFrontendProjection, VideoMediaPresentationResolver};
 use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository, MediaUsageRepository};
@@ -81,6 +81,30 @@ final class HomeSemanticQueryTest extends TestCase
         self::assertSame('/anh/cover.webp', $modules['videos'][0]['thumbnail_url']);
     }
 
+    public function test_home_entity_cards_preserve_compact_representative_projection(): void
+    {
+        $types = new EntityTypeRegistry();
+        CanonicalEntityTypeCatalog::registerInto($types);
+        $authority = new InMemoryAuthorityRepository();
+        $brand = new AuthorityEntity(UuidCodec::newV7(), 'brand', 'nhk:brand:compact-home-card', 'Compact Home Card', 1, ['description' => 'Brand with representative media.'], AuthorityState::ACTIVE, 1, '2026-01-01 00:00:00');
+        $authority->create($brand);
+        $routes = new PublicRouteResolver($authority, $types);
+
+        $mediaId = UuidCodec::newV7();
+        $media = new Media($mediaId, 'compact-home-card', 'Compact home card', 'ready');
+        $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'original', 'compact-home-card.webp', hash('sha256', 'compact-home-card'), 'image/webp', 10, 1200, 800, 'PUBLIC', ['canonical_filename' => 'compact-home-card.webp']);
+        $usage = new MediaUsage(UuidCodec::newV7(), $mediaId, 'brand', $brand->canonicalId, 'representative', activeSlot: 'representative', selectionSource: 'USER_EXPLICIT', selectionPolicy: 'PINNED');
+        $mediaRepo = $this->media([$media]);
+        $entityMedia = new EntityMediaProjection($mediaRepo, $this->assets([$asset]), $this->usages([$usage]));
+        $collection = new PublicEntityCollectionQuery($authority, $types, new PublicIdentityContract($types), new PublicEntityEligibilityPolicy($authority, $types, $routes), $routes, null, null, $entityMedia);
+
+        $modules = (new HomeSemanticQuery($authority, $mediaRepo, $this->videos([]), $types, null, $routes, $collection))->extend([]);
+        $brandCard = array_values(array_filter($modules['entities'], static fn (array $item): bool => ($item['type'] ?? '') === 'brand'))[0] ?? [];
+
+        self::assertStringContainsString('/anh/compact-home-card.webp', (string) ($brandCard['image_url'] ?? ''));
+        self::assertSame($brandCard['image_url'] ?? null, $brandCard['thumbnail_url'] ?? null);
+    }
+
     public function test_home_clock_groups_are_profile_driven_and_skip_incomplete_presentation_records(): void
     {
         $types = new EntityTypeRegistry();
@@ -105,10 +129,18 @@ final class HomeSemanticQueryTest extends TestCase
             'show_in_type_index' => true, 'show_in_header_menu' => true, 'show_in_mobile_menu' => true, 'show_in_sidebar' => true,
         ]);
         $navigation = new ClockTypeNavigationProjection(new NavigationTreeProjector(new InMemoryNavigationRepository([$navigationNode])));
-        $collection = new PublicEntityCollectionQuery($authority, $types, new PublicIdentityContract($types, $identity), new PublicEntityEligibilityPolicy($authority, $types, $routes), $routes, null, null, null, null, null, $navigation);
-        $modules = (new HomeSemanticQuery($authority, $this->media([]), $this->videos([]), $types, null, $routes, $collection))->extend([]);
+        $mediaId = UuidCodec::newV7();
+        $media = new Media($mediaId, 'clock-type-card', 'Clock type card', 'ready');
+        $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'original', 'clock-type-card.webp', hash('sha256', 'clock-type-card'), 'image/webp', 10, 1200, 800, 'PUBLIC', ['canonical_filename' => 'clock-type-card.webp']);
+        $usage = new MediaUsage(UuidCodec::newV7(), $mediaId, 'classification', $clockType->canonicalId, 'representative', activeSlot: 'representative', selectionSource: 'USER_EXPLICIT', selectionPolicy: 'PINNED');
+        $mediaRepo = $this->media([$media]);
+        $entityMedia = new EntityMediaProjection($mediaRepo, $this->assets([$asset]), $this->usages([$usage]));
+        $collection = new PublicEntityCollectionQuery($authority, $types, new PublicIdentityContract($types, $identity), new PublicEntityEligibilityPolicy($authority, $types, $routes), $routes, null, null, $entityMedia, null, null, $navigation);
+        $modules = (new HomeSemanticQuery($authority, $mediaRepo, $this->videos([]), $types, null, $routes, $collection))->extend([]);
 
         self::assertSame(['Đồng hồ công cộng'], array_column($modules['clock_groups'], 'title'));
+        self::assertStringContainsString('/anh/clock-type-card.webp', (string) ($modules['clock_groups'][0]['thumbnail_url'] ?? ''));
+        self::assertSame($modules['clock_groups'][0]['image_url'] ?? null, $modules['clock_groups'][0]['thumbnail_url'] ?? null);
         self::assertSame('Nhóm đồng hồ', $modules['hubs'][0]['label']);
     }
 
@@ -320,6 +352,16 @@ final class HomeSemanticQueryTest extends TestCase
             public function update(MediaAsset $asset, int $expectedRevision = 1): MediaAsset { return $asset; }
             public function listByMediaId(string $mediaId): array { return array_values(array_filter($this->items, static fn(MediaAsset $item): bool => $item->mediaId === $mediaId)); }
             public function findByChecksum(string $checksum): array { return []; }
+        };
+    }
+
+    private function usages(array $items): MediaUsageRepository
+    {
+        return new class($items) implements MediaUsageRepository {
+            public function __construct(private array $items) {}
+            public function create(MediaUsage $usage): MediaUsage { return $usage; }
+            public function listByMediaId(string $mediaId, ?string $role = null): array { return array_values(array_filter($this->items, static fn (MediaUsage $item): bool => $item->mediaId === $mediaId && ($role === null || $item->role === $role))); }
+            public function listByEndpoint(string $type, string $key, ?string $role = null): array { return array_values(array_filter($this->items, static fn (MediaUsage $item): bool => $item->endpointType === $type && $item->endpointKey === $key && ($role === null || $item->role === $role))); }
         };
     }
 
