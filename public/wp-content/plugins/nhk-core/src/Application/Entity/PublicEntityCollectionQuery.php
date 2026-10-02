@@ -202,8 +202,17 @@ final class PublicEntityCollectionQuery
         if ($item === null || trim((string) ($item['url'] ?? '')) === '') return null;
         return [
             'url' => (string) $item['url'],
+            'thumbnail_url' => $item['thumbnail_url'] ?? null,
+            'thumbnail' => is_array($item['thumbnail'] ?? null) ? $item['thumbnail'] : null,
+            'srcset' => $item['srcset'] ?? null,
+            'sizes' => $item['sizes'] ?? null,
             'alt' => (string) ($item['alt'] ?? ''),
             'role' => (string) ($item['role'] ?? ''),
+            'width' => $item['width'] ?? null,
+            'height' => $item['height'] ?? null,
+            'title' => (string) ($item['title'] ?? ''),
+            'caption' => (string) ($item['caption'] ?? ''),
+            'article_url' => $item['article_url'] ?? null,
         ];
     }
 

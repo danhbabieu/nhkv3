@@ -276,9 +276,13 @@ final class SemanticDossierQuery implements EntityDossierReader
             $visual = $this->mediaGallery?->forMedia($media->canonicalId);
             if (is_array($visual)) {
                 $value['image_url'] = $visual['image_url'] ?? null;
+                $value['thumbnail_url'] = $visual['thumbnail_url'] ?? null;
+                $value['srcset'] = $visual['srcset'] ?? null;
+                $value['sizes'] = $visual['sizes'] ?? null;
                 $value['alt'] = $visual['alt'] ?? $media->canonicalName;
                 $value['width'] = $visual['width'] ?? null;
                 $value['height'] = $visual['height'] ?? null;
+                $value['article_url'] = $visual['article_url'] ?? null;
             }
             return $value;
         }

@@ -204,6 +204,32 @@ final class FrontendPresentationContractTest extends TestCase
         self::assertStringContainsString("'label' => 'Sản phẩm'", $definition);
     }
 
+    public function test_entity_cards_prioritize_thumbnail_projection_and_preserve_responsive_metadata(): void
+    {
+        $card = $this->read('template-parts/presentation/entity-card.php');
+        $archive = $this->read('entity.php');
+        $functions = $this->read('functions.php');
+
+        self::assertStringContainsString("\$item['thumbnail_url']", $functions);
+        self::assertStringContainsString("\$nested['url']", $functions);
+        self::assertStringContainsString("\$representative['thumbnail_url']", $functions);
+        self::assertStringContainsString("\$representativeThumbnail['url']", $functions);
+        self::assertStringContainsString('nhk_v3_media_presentation', $card);
+        self::assertStringContainsString("['srcset']", $card);
+        self::assertStringContainsString("['sizes']", $card);
+        self::assertStringContainsString("'representative' => \$item['media']['representative'] ?? null", $archive);
+    }
+
+    public function test_entity_reader_guide_and_local_navigation_are_data_driven(): void
+    {
+        $entity = $this->read('entity.php');
+
+        self::assertStringContainsString('$readerGuideHasContent', $entity);
+        self::assertStringContainsString("'available' => \$readerGuideHasContent", $entity);
+        self::assertStringContainsString('if ($readerGuideHasContent):', $entity);
+        self::assertStringNotContainsString("'dinh-huong' => ['label' => 'Định hướng đọc', 'available' => true]", $entity);
+    }
+
     public function test_homepage_gallery_is_bound_to_public_asset_delivery_before_projection(): void
     {
         $plugin = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Plugin.php');
@@ -394,9 +420,9 @@ final class FrontendPresentationContractTest extends TestCase
     {
         foreach (['entity.php', 'single.php'] as $template) {
             $source = $this->read($template);
-            self::assertStringContainsString('nhk_v3_media_orientation_class', $source);
-            self::assertStringContainsString('video-thumb <?php echo esc_attr($orientation); ?>', $source);
+            self::assertStringContainsString("get_template_part('template-parts/presentation/video-card'", $source);
         }
+        self::assertStringContainsString('visual-card <?php echo esc_attr($orientationClass); ?>', $this->read('template-parts/presentation/video-card.php'));
         self::assertStringContainsString('.visual-frame.nhk-media--portrait', $this->read('presentation.css'));
     }
 

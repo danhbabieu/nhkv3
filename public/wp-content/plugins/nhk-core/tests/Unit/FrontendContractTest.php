@@ -271,8 +271,8 @@ final class FrontendContractTest extends TestCase
         $single = (string) file_get_contents($theme . '/single.php');
         $video = (string) file_get_contents($theme . '/video.php');
 
-        self::assertStringContainsString('$mediaDestination = nhk_v3_public_url', $single);
-        self::assertStringContainsString('$mediaDestination = nhk_v3_public_url', $video);
+        self::assertStringContainsString('$mediaDestination = nhk_v3_media_content_url', $single);
+        self::assertStringContainsString('$mediaDestination = nhk_v3_media_content_url', $video);
         self::assertStringContainsString("if (\$mediaDestination === '') continue", $single);
         self::assertStringContainsString("if (\$mediaDestination === '') continue", $video);
     }

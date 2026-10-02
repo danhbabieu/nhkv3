@@ -215,10 +215,46 @@ function nhk_v3_media_orientation_class(mixed $width, mixed $height): string
 function nhk_v3_media_dimensions(array $item): array
 {
     $thumbnail = is_array($item['thumbnail'] ?? null) ? $item['thumbnail'] : [];
+    $representative = is_array($item['representative'] ?? null) ? $item['representative'] : [];
+    if ($representative !== [] && $thumbnail === []) $thumbnail = is_array($representative['thumbnail'] ?? null) ? $representative['thumbnail'] : [];
     return [
-        'width' => max(0, (int) ($item['width'] ?? $thumbnail['width'] ?? 0)),
-        'height' => max(0, (int) ($item['height'] ?? $thumbnail['height'] ?? 0)),
+        'width' => max(0, (int) ($item['width'] ?? $thumbnail['width'] ?? $representative['width'] ?? 0)),
+        'height' => max(0, (int) ($item['height'] ?? $thumbnail['height'] ?? $representative['height'] ?? 0)),
     ];
+}
+
+/** @return array{url:string,srcset:string,sizes:string,width:int,height:int} */
+function nhk_v3_media_presentation(array $item, bool $compact = true): array
+{
+    $representative = is_array($item['representative'] ?? null) ? $item['representative'] : [];
+    $nested = is_array($item['thumbnail'] ?? null) ? $item['thumbnail'] : [];
+    $representativeThumbnail = is_array($representative['thumbnail'] ?? null) ? $representative['thumbnail'] : [];
+    $candidates = $compact
+        ? [$item['thumbnail_url'] ?? null, $nested['url'] ?? null, $representative['thumbnail_url'] ?? null, $representativeThumbnail['url'] ?? null, $item['image_url'] ?? null, $representative['url'] ?? null, $item['url'] ?? null]
+        : [$item['image_url'] ?? null, $representative['url'] ?? null, $item['url'] ?? null, $item['thumbnail_url'] ?? null, $nested['url'] ?? null];
+    $url = '';
+    foreach ($candidates as $candidate) {
+        if (is_string($candidate) && trim($candidate) !== '') { $url = trim($candidate); break; }
+    }
+    $srcset = '';
+    foreach ([$item['thumbnail_srcset'] ?? null, $item['srcset'] ?? null, $representative['thumbnail_srcset'] ?? null, $representative['srcset'] ?? null] as $candidate) {
+        if (is_string($candidate) && trim($candidate) !== '') { $srcset = trim($candidate); break; }
+    }
+    $sizes = '';
+    foreach ([$item['thumbnail_sizes'] ?? null, $item['sizes'] ?? null, $representative['thumbnail_sizes'] ?? null, $representative['sizes'] ?? null] as $candidate) {
+        if (is_string($candidate) && trim($candidate) !== '') { $sizes = trim($candidate); break; }
+    }
+    $dimensions = nhk_v3_media_dimensions($item);
+    return ['url' => $url, 'srcset' => $srcset, 'sizes' => $sizes, 'width' => $dimensions['width'], 'height' => $dimensions['height']];
+}
+
+function nhk_v3_media_content_url(array $item): string
+{
+    foreach (['detail_url', 'page_url', 'entity_url', 'article_url'] as $key) {
+        $url = nhk_v3_public_url($item[$key] ?? null);
+        if ($url !== '') return $url;
+    }
+    return '';
 }
 
 function nhk_v3_video_summary(mixed $value, string $title = ''): string

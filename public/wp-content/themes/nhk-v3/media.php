@@ -26,7 +26,9 @@ get_header();
   <?php if (!empty($archive['items'])): ?>
     <div class="media-library-grid">
       <?php foreach ($archive['items'] as $item):
-        $image = trim((string) ($item['image_url'] ?? ''));
+        $visual = nhk_v3_media_presentation($item, true);
+        $fullImage = trim((string) ($item['image_url'] ?? ''));
+        $image = $visual['url'];
         $hasRealImage = !empty($item['has_real_image']) && $image !== '';
         $title = nhk_v3_public_brand_text((string) ($item['title'] ?? 'Hình ảnh hiện vật'));
         $alt = (string) ($item['alt'] ?? $title);
@@ -35,7 +37,7 @@ get_header();
       ?>
         <article class="library-item">
           <div class="library-image">
-            <?php if ($hasRealImage): ?><a class="library-image-link" href="<?php echo esc_url($image); ?>" aria-label="Mở ảnh <?php echo esc_attr($title); ?>"><img src="<?php echo esc_url($image); ?>" alt="<?php echo esc_attr($alt); ?>" loading="lazy"<?php if (!empty($item['width'])): ?> width="<?php echo esc_attr((string) $item['width']); ?>"<?php endif; ?><?php if (!empty($item['height'])): ?> height="<?php echo esc_attr((string) $item['height']); ?>"<?php endif; ?>></a><?php else: ?><img src="<?php echo esc_url($fallback); ?>" alt="" loading="lazy" width="1200" height="750"><?php endif; ?>
+            <?php if ($hasRealImage): ?><a class="library-image-link" href="<?php echo esc_url($fullImage !== '' ? $fullImage : $image); ?>" data-full-src="<?php echo esc_url($fullImage !== '' ? $fullImage : $image); ?>" aria-label="Mở ảnh <?php echo esc_attr($title); ?>"><img src="<?php echo esc_url($image); ?>" alt="<?php echo esc_attr($alt); ?>" loading="lazy" decoding="async"<?php if ($visual['srcset'] !== ''): ?> srcset="<?php echo esc_attr($visual['srcset']); ?>"<?php endif; ?><?php if ($visual['sizes'] !== ''): ?> sizes="<?php echo esc_attr($visual['sizes']); ?>"<?php endif; ?><?php if ($visual['width'] > 0): ?> width="<?php echo esc_attr((string) $visual['width']); ?>"<?php endif; ?><?php if ($visual['height'] > 0): ?> height="<?php echo esc_attr((string) $visual['height']); ?>"<?php endif; ?>></a><?php else: ?><img src="<?php echo esc_url($fallback); ?>" alt="" loading="lazy" width="1200" height="750"><?php endif; ?>
           </div>
           <div class="library-item-body">
             <span class="eyebrow">Hình ảnh</span>

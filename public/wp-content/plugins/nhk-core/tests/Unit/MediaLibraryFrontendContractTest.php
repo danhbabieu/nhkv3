@@ -117,9 +117,20 @@ final class MediaLibraryFrontendContractTest extends TestCase
         self::assertStringContainsString("['summary']", $template);
         self::assertStringContainsString('Đọc bài viết', $template);
         self::assertStringContainsString("['article_url']", $template);
-        self::assertStringContainsString('href="<?php echo esc_url($image); ?>"', $template);
+        self::assertStringContainsString('data-full-src', $template);
         self::assertStringContainsString('library-note', $template);
         self::assertStringContainsString("['has_real_image']", $template);
+    }
+
+    public function test_media_archive_is_thumbnail_first_and_keeps_full_asset_for_explicit_image_action(): void
+    {
+        $template = (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/media.php');
+
+        self::assertStringContainsString('nhk_v3_media_presentation($item, true)', $template);
+        self::assertStringContainsString("['srcset']", $template);
+        self::assertStringContainsString("['sizes']", $template);
+        self::assertStringContainsString('data-full-src', $template);
+        self::assertStringContainsString('library-image-link', $template);
     }
 
     public function test_media_template_uses_a_compact_responsive_grid_and_preserves_image_ratio(): void
@@ -156,7 +167,7 @@ final class MediaLibraryFrontendContractTest extends TestCase
         $projection = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/Media/PublicMediaGalleryQuery.php');
 
         self::assertStringContainsString('data-full-src', $template);
-        self::assertStringContainsString("['thumbnail_url']", $template);
+        self::assertStringContainsString('nhk_v3_media_presentation', $template);
         self::assertStringContainsString('dataset.fullSrc', $script);
         self::assertStringContainsString("'thumbnail_url'", $projection);
     }

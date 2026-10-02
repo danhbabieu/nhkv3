@@ -1,5 +1,35 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-02 — Image-led cross-site discovery frontend (LOCAL / NO MUTATION)
+
+IMPLEMENTED: Added a shared compact/full media presentation policy that prefers
+thumbnail derivatives, preserves `srcset`/`sizes` and intrinsic dimensions, and
+keeps canonical assets for explicit full-image actions. Public Entity collection
+and dossier projections now retain the existing derivative metadata. Media,
+Entity, Video and Article related visuals use the policy; related Video cards
+reuse the shared presentation component. Media has no invented detail route:
+content destinations use an approved Article owner only when available, while
+raw asset links remain explicit image-view actions.
+
+UX: Entity Reader Guide and its local navigation are data-driven and disappear
+when all four guide groups are empty. Clock Type identity/semantic vocabulary,
+Media ownership, Graph and schema were unchanged. No archive dossier query or
+new thumbnail pipeline was introduced.
+
+REGRESSION: Focused frontend/media suite passes 395 tests / 2,249 assertions;
+changed-scope PHP lint and diff check pass. The 512M full PHPUnit run completed
+3,079 tests / 17,397 assertions with 33 existing runtime/integration errors, 24
+existing semantic failures and 122 environment-gated skips; no changed-scope
+frontend failure was reported. Default 128M `composer test` also reproduces the
+known TrustedProvidedFileMaterializer memory exhaustion at 2,562/3,047 tests.
+Browser QA remains unavailable because no local HTTP/browser runtime is active;
+no staging build was used as evidence for this undeployed HEAD.
+
+NO_DATA_MUTATION: `read_only=true`, `mutated=false`; no database, migration,
+semantic record, staging, production or deployment action occurred.
+
+STATUS: `IMAGE_LED_DISCOVERY_FRONTEND_LOCAL_IMPLEMENTED / BROWSER_QA_PENDING / NO_MUTATION / UNDEPLOYED`.
+
 # Checkpoint — 2026-10-02 — Responsive discovery frontend hardening (LOCAL / NO MUTATION)
 
 IMPLEMENTED: Removed the unused global-header Clock Type presentation query,
