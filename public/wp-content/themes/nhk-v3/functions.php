@@ -69,6 +69,69 @@ function nhk_v3_navigation_groups(): array
     return ['primary' => [], 'discovery' => [], 'footer' => []];
 }
 
+/**
+ * Select a small contextual discovery subset from the canonical directory.
+ * Relation keys only gate content-backed destinations; links without a
+ * projection remain honest navigation suggestions.
+ *
+ * @param array<string,mixed> $availableGroups
+ * @return list<array{label:string,path:string}>
+ */
+function nhk_v3_contextual_discovery_items(string $context, array $availableGroups = []): array
+{
+    $maps = [
+        'brand' => ['models', 'movements', 'specimens', 'media', 'videos', 'comparison'],
+        'model' => ['movements', 'music', 'components', 'specimens', 'media', 'videos', 'comparison'],
+        'movement' => ['models', 'components', 'specimens', 'media', 'videos'],
+        'music' => ['videos', 'models', 'movements', 'media'],
+        'component' => ['movements', 'models', 'specimens', 'media'],
+        'specimen' => ['media', 'videos', 'models', 'movements', 'comparison'],
+        'clock_type' => ['models', 'specimens', 'media', 'videos', 'comparison'],
+        'article' => ['media', 'videos', 'models', 'movements', 'share'],
+        'media' => ['specimens', 'models', 'videos', 'share'],
+        'video' => ['media', 'specimens', 'models', 'share'],
+        'archive' => ['media', 'videos', 'models'],
+        'search' => ['media', 'videos', 'share'],
+        'homepage' => ['media', 'videos', 'models', 'movements', 'comparison', 'share'],
+        'sidebar' => ['media', 'videos', 'models', 'movements'],
+    ];
+    $labelByDestination = [
+        'models' => 'Mẫu', 'movements' => 'Bộ máy', 'music' => 'Bản nhạc',
+        'components' => 'Linh kiện', 'specimens' => 'Hiện vật', 'media' => 'Hình ảnh',
+        'videos' => 'Video', 'comparison' => 'So sánh', 'share' => 'Góc chia sẻ',
+    ];
+    $groups = nhk_v3_navigation_groups();
+    $canonical = [];
+    foreach ((array) ($groups['discovery'] ?? []) as $item) {
+        if (!is_array($item)) continue;
+        $label = trim((string) ($item['label'] ?? ''));
+        $path = trim((string) ($item['path'] ?? ''));
+        if ($label !== '' && $path !== '') $canonical[$label] = ['label' => $label, 'path' => $path];
+    }
+    $selected = [];
+    foreach ($maps[$context] ?? $maps['sidebar'] as $destination) {
+        $label = $labelByDestination[$destination] ?? '';
+        if ($label === '' || !isset($canonical[$label])) continue;
+        if ($availableGroups !== [] && !empty($availableGroups[$destination])) $selected[] = $canonical[$label];
+        elseif ($availableGroups === []) $selected[] = $canonical[$label];
+    }
+    if ($availableGroups !== []) {
+        foreach ($maps[$context] ?? [] as $destination) {
+            if (count($selected) >= 5) break;
+            $label = $labelByDestination[$destination] ?? '';
+            if ($label !== '' && isset($canonical[$label]) && empty($availableGroups[$destination])) $selected[] = $canonical[$label];
+        }
+    }
+    $seen = [];
+    $selected = array_values(array_filter($selected, static function (array $item) use (&$seen): bool {
+        $path = $item['path'];
+        if (isset($seen[$path])) return false;
+        $seen[$path] = true;
+        return true;
+    }));
+    return array_slice($selected, 0, 5);
+}
+
 /** @return array<string,string> */
 function nhk_v3_navigation_items(): array
 {
@@ -299,7 +362,7 @@ function nhk_v3_entity_archive_presentation(string $type, string $profile = ''):
         'product' => ['eyebrow' => 'Sản phẩm', 'heading' => 'Sản phẩm', 'summary' => 'Tra cứu các hồ sơ sản phẩm hoặc listing đủ điều kiện công khai; sản phẩm không đồng nhất với hiện vật.', 'search_placeholder' => 'Tìm sản phẩm...', 'empty_title' => 'Chưa có hồ sơ sản phẩm công khai.', 'empty_copy' => 'Kho sản phẩm chỉ hiển thị các hồ sơ đủ điều kiện công khai. Bạn vẫn có thể khám phá thương hiệu, loại đồng hồ hoặc hiện vật.', 'allow_filter' => true],
         'classification' => ['eyebrow' => 'Phân loại', 'heading' => 'Phân loại', 'summary' => 'Tra cứu kho phân loại rộng hơn để xem các nhóm và nhãn đã được xác định trong hệ thống.', 'search_placeholder' => 'Tìm phân loại...', 'empty_title' => 'Chưa có hồ sơ phân loại công khai.', 'empty_copy' => 'Kho phân loại hiện chưa có hồ sơ đủ điều kiện hiển thị.', 'allow_filter' => true],
     ];
-    if ($profile === 'clock_type') return ['eyebrow' => 'Loại đồng hồ', 'heading' => 'Loại đồng hồ', 'summary' => 'Bắt đầu từ các loại đồng hồ chính, sau đó đi sâu vào các nhóm con đã được ghi nhận.', 'search_placeholder' => '', 'empty_title' => 'Chưa có loại đồng hồ công khai.', 'empty_copy' => 'Kho loại đồng hồ hiện chưa có nhóm được tuyển chọn để hiển thị.', 'allow_filter' => false];
+    if ($profile === 'clock_type') return ['eyebrow' => 'Loại đồng hồ', 'heading' => 'Loại đồng hồ', 'summary' => 'Duyệt theo loại đồng hồ: bắt đầu từ các nhóm chính, sau đó đi sâu vào các nhóm con đã được ghi nhận.', 'search_placeholder' => '', 'empty_title' => 'Chưa có loại đồng hồ công khai.', 'empty_copy' => 'Kho loại đồng hồ hiện chưa có nhóm được tuyển chọn để hiển thị.', 'allow_filter' => false];
     return $presentations[$type] ?? ['eyebrow' => 'Khám phá', 'heading' => 'Khám phá', 'summary' => 'Tra cứu các hồ sơ công khai trong kho NHK.', 'search_placeholder' => 'Tìm hồ sơ...', 'empty_title' => 'Chưa có hồ sơ công khai.', 'empty_copy' => 'Kho hồ sơ hiện chưa có dữ liệu phù hợp.', 'allow_filter' => true];
 }
 

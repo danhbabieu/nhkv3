@@ -26,6 +26,7 @@ $relationLabels = ['brands' => 'Thương hiệu', 'models' => 'Mẫu đồng h�
   $legacyRelated = is_array($legacyRelated) ? $legacyRelated : [];
   $dictionaryTerms = apply_filters('nhk_v3_public_dictionary_terms_for_text', [], get_the_title() . ' ' . wp_strip_all_tags((string) get_the_content(null, false, $postId)));
   $dictionaryTerms = is_array($dictionaryTerms) ? $dictionaryTerms : [];
+  $articleDiscovery = nhk_v3_contextual_discovery_items('article', array_fill_keys(array_keys(array_filter($relationSections)), true));
 ?>
   <p class="breadcrumb"><a href="<?php echo esc_url(home_url('/')); ?>">NHK</a> <span>/</span> <?php echo nhk_v3_post_categories(', '); ?></p>
   <div class="article-context-layout">
@@ -100,7 +101,7 @@ $relationLabels = ['brands' => 'Thương hiệu', 'models' => 'Mẫu đồng h�
 
     <aside class="context-rail article-rail" aria-label="Ngữ cảnh bài viết">
       <?php if ($dictionaryTerms !== []): ?><div class="context-box"><p class="eyebrow">Từ điển trong bài</p><ul class="context-list"><?php foreach ($dictionaryTerms as $term): $url = nhk_v3_public_url($term['url'] ?? null); if ($url === '') continue; ?><li><a href="<?php echo esc_url($url); ?>"><strong><?php echo esc_html((string) ($term['title'] ?? '')); ?></strong><?php if (($term['description'] ?? '') !== ''): ?><span><?php echo esc_html(wp_trim_words((string) $term['description'], 13)); ?></span><?php endif; ?></a></li><?php endforeach; ?></ul></div><?php endif; ?>
-      <div class="context-box"><p class="eyebrow">Xem thêm</p><nav><a href="<?php echo esc_url(home_url('/thu-vien/')); ?>">Hình ảnh</a><a href="<?php echo esc_url(home_url('/video/')); ?>">Video</a><a href="<?php echo esc_url(home_url('/tu-dien/')); ?>">Từ điển</a><a href="<?php echo esc_url(home_url('/thuong-hieu/')); ?>">Thương hiệu</a></nav></div>
+      <?php if ($articleDiscovery !== []): ?><div class="context-box"><p class="eyebrow">Khám phá thêm</p><nav aria-label="Khám phá theo bài viết"><?php foreach ($articleDiscovery as $item): ?><a href="<?php echo esc_url(home_url($item['path'])); ?>"><?php echo esc_html($item['label']); ?> <span aria-hidden="true">→</span></a><?php endforeach; ?></nav></div><?php endif; ?>
     </aside>
   </div>
 

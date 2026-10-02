@@ -21466,3 +21466,34 @@ verified in this checkpoint. No database, staging, production mutation,
 deployment or cutover was performed.
 
 STATUS: PUBLIC_DISCOVERY_FRONTEND_LOCAL_READY / BROWSER_RUNTIME_NOT_VERIFIED / BASELINE_SUITE_GATED / NO_MUTATION
+
+# Checkpoint — 2026-10-02 — Contextual discovery distribution (Vòng 7)
+
+IMPLEMENTED: Added a bounded theme presentation helper that maps contextual
+destination keys to labels and paths from `PublicNavigationDefinition::groups()['discovery']`.
+Brand, model, movement, music, component, specimen, Clock Type, Article,
+archive, search, sidebar and homepage contexts now select at most five
+destinations. Existing relation-section keys gate content-backed priority;
+remaining entries are explicitly navigation/context suggestions. No second
+navigation universe or dossier query was introduced.
+
+PLACEMENT: Sidebar no longer merges primary navigation or slices the first two
+discovery entries. Article and Entity rails use contextual subsets, while main
+relation/gallery sections remain the full content-backed presentation. Entity
+archives and the homepage receive bounded downstream discovery strips after
+their primary content. Comparison and Góc chia sẻ remain CTA destinations,
+never fabricated relations. Mobile DOM keeps main content before the rail and
+the existing mobile rule makes the rail static rather than sticky/fixed.
+
+VALIDATION: Focused FrontendPresentationContractTest passes 44 tests / 296
+assertions with one pre-existing warning. PHP lint and `git diff --check` pass;
+the changed-lines secret scan found no credential, token or private-key material.
+Full Unit with `memory_limit=512M` completed 2,906 tests / 17,378 assertions
+with one unrelated WpdbArticleOperationReceiptRepository TypeError and three
+unrelated Knowledge/Article failures; 19 warnings, 47 deprecations and 49
+PHPUnit deprecations remain. Local WordPress/MySQL endpoints were unavailable
+on localhost ports checked, so browser smoke for the current checkout remains
+unverified; no remote deployed tab was treated as current-head evidence.
+No semantic/database mutation, deployment or cutover was performed.
+
+STATUS: CONTEXTUAL_DISCOVERY_FRONTEND_LOCAL_READY / BROWSER_RUNTIME_NOT_VERIFIED / FULL_UNIT_BASELINE_GAPS / NO_MUTATION / NO_DEPLOY

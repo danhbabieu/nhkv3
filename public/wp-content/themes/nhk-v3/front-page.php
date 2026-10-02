@@ -149,5 +149,7 @@ get_header();
   <?php if (!empty($home['topics'])): ?>
   <section class="home-semantic-section topics-section"><div class="section-head"><div><p class="eyebrow">Được quan tâm</p><h2>Chủ đề trong kho</h2></div></div><div class="topic-cloud"><?php foreach ($home['topics'] as $topic): $topicUrl = nhk_v3_public_url(get_category_link($topic)); if ($topicUrl === '') continue; ?><a href="<?php echo esc_url($topicUrl); ?>"><?php echo esc_html(nhk_v3_public_category_name((string) $topic->name)); ?><span><?php echo esc_html((string) $topic->count); ?></span></a><?php endforeach; ?></div></section>
   <?php endif; ?>
+
+  <?php $homeDiscovery = nhk_v3_contextual_discovery_items('homepage'); if ($homeDiscovery !== []): ?><section class="home-semantic-section contextual-discovery" aria-labelledby="home-discovery-title"><div class="section-head"><div><p class="eyebrow">Khám phá thêm</p><h2 id="home-discovery-title">Tiếp tục từ những nhánh khác</h2></div></div><nav class="topic-cloud" aria-label="Khám phá thêm trên trang chủ"><?php foreach ($homeDiscovery as $item): ?><a href="<?php echo esc_url(home_url($item['path'])); ?>"><?php echo esc_html($item['label']); ?><span aria-hidden="true">→</span></a><?php endforeach; ?></nav></section><?php endif; ?>
 </main>
 <?php get_footer(); ?>

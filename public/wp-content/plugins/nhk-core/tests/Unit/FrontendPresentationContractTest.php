@@ -327,6 +327,72 @@ final class FrontendPresentationContractTest extends TestCase
         self::assertStringContainsString('Duyệt theo loại đồng hồ', $source);
     }
 
+    public function test_contextual_discovery_is_bounded_and_uses_canonical_navigation(): void
+    {
+        $functions = $this->readTheme('functions.php');
+        $definition = $this->readCore('src/Application/Presentation/PublicNavigationDefinition.php');
+
+        self::assertStringContainsString('function nhk_v3_contextual_discovery_items', $functions);
+        self::assertStringContainsString('PublicNavigationDefinition::groups()', $functions);
+        self::assertStringContainsString("'brand' => ['models', 'movements', 'specimens', 'media', 'videos', 'comparison']", $functions);
+        self::assertStringContainsString('array_slice($selected, 0, 5)', $functions);
+        $helper = substr($functions, strpos($functions, 'function nhk_v3_contextual_discovery_items'), strpos($functions, '/** @return array<string,string> */') - strpos($functions, 'function nhk_v3_contextual_discovery_items'));
+        self::assertStringNotContainsString("'/thu-vien/'", $helper);
+        self::assertStringContainsString("'label' => 'Góc chia sẻ'", $definition);
+    }
+
+    public function test_sidebar_and_article_rail_use_contextual_discovery_instead_of_fixed_menu_items(): void
+    {
+        $sidebar = $this->readTheme('sidebar.php');
+        $article = $this->readTheme('single.php');
+
+        self::assertStringContainsString('nhk_v3_contextual_discovery_items', $sidebar);
+        self::assertStringNotContainsString('array_slice((array) ($nav[\'discovery\'] ?? []), 0, 2)', $sidebar);
+        self::assertStringContainsString('nhk_v3_contextual_discovery_items', $article);
+        self::assertStringNotContainsString("home_url('/thu-vien/')", $article);
+        self::assertStringNotContainsString("home_url('/video/')", $article);
+    }
+
+    public function test_entity_contextual_discovery_is_after_main_and_mobile_rail_is_static(): void
+    {
+        $entity = $this->readTheme('entity.php');
+        $css = $this->readTheme('entity.css');
+
+        self::assertStringContainsString('nhk_v3_contextual_discovery_items', $entity);
+        self::assertLessThan(strpos($entity, '<aside class="context-rail"'), strpos($entity, '<div class="semantic-main">'));
+        self::assertStringContainsString('@media(max-width:48rem){.home-hero-v2,.entity-dossier-hero,.semantic-layout,.article-context-layout,.video-detail-layout{display:block}', $css);
+        self::assertStringContainsString('.context-rail{position:static;padding-top:36px}', $css);
+    }
+
+    public function test_homepage_and_entity_archives_place_bounded_discovery_after_primary_content(): void
+    {
+        $home = $this->readTheme('front-page.php');
+        $entity = $this->readTheme('entity.php');
+
+        self::assertStringContainsString("nhk_v3_contextual_discovery_items('homepage')", $home);
+        self::assertStringContainsString('class="contextual-discovery archive-discovery"', $entity);
+        self::assertStringContainsString("nhk_v3_contextual_discovery_items('archive')", $entity);
+        self::assertStringContainsString('</main>', $home);
+    }
+
+    public function test_canonical_discovery_directory_keeps_all_nine_destinations(): void
+    {
+        $definition = $this->readCore('src/Application/Presentation/PublicNavigationDefinition.php');
+        foreach (['Hình ảnh', 'Video', 'Mẫu', 'Bộ máy', 'Bản nhạc', 'Linh kiện', 'Hiện vật', 'So sánh', 'Góc chia sẻ'] as $label) {
+            self::assertStringContainsString("'label' => '{$label}'", $definition);
+        }
+    }
+
+    private function readTheme(string $file): string
+    {
+        return (string) file_get_contents($this->theme . '/' . $file);
+    }
+
+    private function readCore(string $file): string
+    {
+        return (string) file_get_contents(dirname(__DIR__, 2) . '/' . $file);
+    }
+
     public function test_collector_profile_uses_collector_first_facet_order_and_keeps_makers_last(): void
     {
         $source = $this->read('entity.php');
