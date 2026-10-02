@@ -1,7 +1,7 @@
 <?php
 $item = is_array($args['item'] ?? null) ? $args['item'] : [];
 $title = trim((string) ($item['title'] ?? $item['caption'] ?? $item['name'] ?? 'Hình ảnh'));
-$image = trim((string) ($item['image_url'] ?? $item['url'] ?? $item['media']['url'] ?? ''));
+$image = trim((string) ($item['thumbnail_url'] ?? $item['image_url'] ?? $item['url'] ?? $item['media']['url'] ?? ''));
 $alt = trim((string) ($item['alt'] ?? $item['image_alt'] ?? $item['caption'] ?? $title));
 $link = nhk_v3_public_url($item['detail_url'] ?? $item['page_url'] ?? $item['entity_url'] ?? $item['article_url'] ?? null);
 $dimensions = nhk_v3_media_dimensions($item);
