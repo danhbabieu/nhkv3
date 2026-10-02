@@ -64,7 +64,7 @@ final class FrontendPresentationContractTest extends TestCase
         self::assertStringContainsString('wp_get_attachment_image_src($thumbnailId, \'medium\')', $query);
         self::assertStringContainsString('wp_get_attachment_image_srcset($thumbnailId, \'medium\')', $query);
         self::assertStringContainsString('wp_get_attachment_image_sizes($thumbnailId, \'medium\')', $query);
-        self::assertStringContainsString("wp_get_attachment_image((int) $item['attachment_id'], 'medium'", $source);
+        self::assertStringContainsString('wp_get_attachment_image((int) $item[\'attachment_id\'], \'medium\'', $source);
         self::assertStringContainsString("the_post_thumbnail('medium_large'", $source);
     }
 
