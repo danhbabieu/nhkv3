@@ -106,6 +106,18 @@ final class SearchSemanticQuery
     /** @param array<string,mixed> $item @return array<string,mixed> */
     private function searchEntity(array $item): array
     {
-        return ['type' => $item['type'], 'profile_key' => $item['profile_key'] ?? null, 'profile_label' => $item['profile_label'] ?? null, 'profile_badge' => $item['profile_badge'] ?? null, 'profile_status' => $item['profile_status'] ?? null, 'title' => $item['name'], 'url' => (new PublicSeoProjection())->project(['path' => $item['url'], 'eligible' => true, 'canonical_url' => $item['url'], 'readiness' => 'READY', 'public_eligible' => true], ['type' => 'Entity'])['search']];
+        $representative = is_array($item['media']['representative'] ?? null) ? $item['media']['representative'] : null;
+        return [
+            'type' => $item['type'],
+            'profile_key' => $item['profile_key'] ?? null,
+            'profile_label' => $item['profile_label'] ?? null,
+            'profile_badge' => $item['profile_badge'] ?? null,
+            'profile_status' => $item['profile_status'] ?? null,
+            'title' => $item['name'],
+            'description' => $item['description'] ?? '',
+            'url' => (new PublicSeoProjection())->project(['path' => $item['url'], 'eligible' => true, 'canonical_url' => $item['url'], 'readiness' => 'READY', 'public_eligible' => true], ['type' => 'Entity'])['search'],
+            'media' => ['representative' => $representative],
+            'representative' => $representative,
+        ];
     }
 }

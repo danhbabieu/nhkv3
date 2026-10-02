@@ -35,6 +35,35 @@ final class FrontendContractTest extends TestCase
         self::assertStringNotContainsString("home_url('/model/')", $sidebar);
     }
 
+    public function test_search_and_dictionary_are_first_class_public_discovery_surfaces(): void
+    {
+        $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
+        $index = (string) file_get_contents($theme . '/index.php');
+        $search = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/Search/SearchSemanticQuery.php');
+        $dictionary = (string) file_get_contents($theme . '/dictionary.php');
+
+        self::assertStringContainsString('$hasAnyResults', $index);
+        self::assertStringContainsString('Kết quả tìm kiếm', $index);
+        self::assertStringContainsString('template-parts/presentation/entity-card', $index);
+        self::assertStringContainsString('representative', $search);
+        self::assertStringContainsString('id="main-content"', $dictionary);
+        self::assertStringContainsString('array_keys($groups)', $dictionary);
+        self::assertStringNotContainsString("range('A', 'Z')", $dictionary);
+        self::assertStringContainsString('Từ điển đang được biên tập', $dictionary);
+        self::assertStringContainsString('nhk_v3_navigation_items', $dictionary);
+    }
+
+    public function test_dictionary_presentation_does_not_expose_internal_label_or_scope_keys(): void
+    {
+        $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
+        $dictionary = (string) file_get_contents($theme . '/dictionary.php');
+
+        self::assertStringContainsString('nhk_v3_dictionary_label_kind', $dictionary);
+        self::assertStringContainsString('nhk_v3_dictionary_scope_label', $dictionary);
+        self::assertStringNotContainsString('echo esc_html((string) $label[\'kind\'])', $dictionary);
+        self::assertStringNotContainsString("implode(', ', array_map('strval'", $dictionary);
+    }
+
     public function test_clock_type_frontend_is_profile_driven_and_uses_safe_archive_metadata(): void
     {
         $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';

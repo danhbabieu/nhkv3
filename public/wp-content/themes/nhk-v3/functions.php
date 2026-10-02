@@ -36,6 +36,7 @@ function nhk_v3_assets(): void
     wp_register_style('nhk-v3-knowledge', get_theme_file_uri('knowledge.css'), ['nhk-v3-media-video'], '1.0.2');
     wp_register_style('nhk-v3-presentation', get_theme_file_uri('presentation.css'), ['nhk-v3-knowledge'], '1.0.3');
     wp_register_style('nhk-v3-album-style', get_theme_file_uri('album.css'), ['nhk-v3-entity'], '1.0.2');
+    wp_register_style('nhk-v3-dictionary', get_theme_file_uri('dictionary.css'), ['nhk-v3-presentation'], '1.0.0');
     wp_enqueue_style('nhk-v3-style');
     wp_enqueue_script('nhk-v3-navigation', get_theme_file_uri('navigation.js'), [], '1.1.1', true);
     $needsMediaVideo = is_front_page() || is_singular('post') || (int) get_query_var('nhk_media_page', 0) > 0 || (int) get_query_var('nhk_video_page', 0) > 0;
@@ -46,6 +47,7 @@ function nhk_v3_assets(): void
     if ($needsMediaVideo || $needsKnowledge) wp_enqueue_style('nhk-v3-media-video');
     if ($needsKnowledge) wp_enqueue_style('nhk-v3-knowledge');
     if ($needsPresentation) wp_enqueue_style('nhk-v3-presentation');
+    if (is_array($GLOBALS['nhk_core_dictionary_context'] ?? null)) wp_enqueue_style('nhk-v3-dictionary');
     if (is_singular('post')) {
         wp_enqueue_style('nhk-v3-album-style');
         wp_enqueue_script('nhk-v3-album', get_theme_file_uri('album.js'), [], '1.1.0', true);
@@ -282,6 +284,30 @@ function nhk_v3_public_type(string $type, string $profile = ''): string
 {
     if ($profile === 'clock_type') return 'nhóm đồng hồ';
     return ['wp_post' => 'bài viết', 'post' => 'bài viết', 'brand' => 'thương hiệu', 'model' => 'mẫu đồng hồ', 'variant' => 'biến thể', 'movement' => 'bộ máy', 'music' => 'bản nhạc', 'component' => 'linh kiện', 'classification' => 'phân loại', 'specimen' => 'hiện vật', 'product' => 'sản phẩm', 'media' => 'hình ảnh', 'video' => 'video', 'knowledge' => 'tri thức', 'source' => 'nguồn', 'evidence' => 'bằng chứng', 'publication' => 'ấn phẩm', 'website' => 'website', 'archive' => 'lưu trữ', 'catalog' => 'catalogue', 'interview' => 'phỏng vấn', 'fact' => 'dữ kiện', 'technical' => 'kỹ thuật', 'specification' => 'thông số'][$type] ?? 'nội dung liên quan';
+}
+
+function nhk_v3_dictionary_initial(string $title): string
+{
+    $title = trim($title);
+    if ($title === '') return '#';
+    $initial = function_exists('mb_substr') ? mb_substr($title, 0, 1, 'UTF-8') : substr($title, 0, 1);
+    return function_exists('mb_strtoupper') ? mb_strtoupper($initial, 'UTF-8') : strtoupper($initial);
+}
+
+function nhk_v3_dictionary_anchor(string $initial): string
+{
+    $slug = function_exists('sanitize_title') ? sanitize_title($initial) : strtolower((string) preg_replace('/[^a-z0-9]+/i', '-', $initial));
+    return trim($slug, '-') ?: 'other';
+}
+
+function nhk_v3_dictionary_label_kind(string $kind): string
+{
+    return ['ALIAS' => 'Tên gọi khác', 'COLLOQUIAL' => 'Cách gọi dân gian', 'TECHNICAL' => 'Tên gọi kỹ thuật', 'PHONETIC' => 'Cách đọc'][$kind] ?? '';
+}
+
+function nhk_v3_dictionary_scope_label(string $scope): string
+{
+    return ['VIETNAM' => 'Việt Nam', 'WORKSHOP' => 'Giới thợ', 'TECHNICAL' => 'Kỹ thuật', 'COLLOQUIAL' => 'Dân gian', 'GENERAL' => 'Thông dụng'][$scope] ?? '';
 }
 
 function nhk_v3_public_category_name(string $name): string

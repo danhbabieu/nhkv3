@@ -1,5 +1,36 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-02 — Search + Dictionary first-class discovery frontend (LOCAL / NO MUTATION)
+
+IMPLEMENTED: Search now treats posts, Entity profiles, images, Video and
+Knowledge as peer result groups. It exposes an explicit global result state,
+keeps the empty query as a search form, suppresses group-level false empty
+messages, preserves lightweight Entity representative-media metadata from the
+existing PublicEntityCollectionQuery, and reuses the shared Entity card. Media
+and Video remain bounded text results because no existing lightweight poster
+projection was available; no per-result heavy lookup or new relevance scoring
+was introduced.
+
+DICTIONARY: Added the production theme override for `/tu-dien/` with the
+global `main-content` skip-link target, Vietnamese-first breadcrumbs, grouped
+Unicode-aware initial index derived only from approved public items, truthful
+zero-approved empty state, shared navigation discovery links, bounded
+thumbnail/srcset presentation and reader-facing label/scope mapping. The
+plugin fallback remains unchanged for other themes. No draft, candidate,
+hidden label, internal enum, schema, semantic owner or Graph vocabulary is
+exposed.
+
+REGRESSION: SearchSemanticQuery, DictionaryPublicQuery and full
+FrontendContractTest focus passes 87 tests / 809 assertions; changed-scope PHP
+lint, git diff check and secret review pass. Browser QA is unavailable because
+no local HTTP/browser runtime is active; no staging build was used as evidence
+for this undeployed HEAD.
+
+NO_DATA_MUTATION: `read_only=true`, `mutated=false`; no database, migration,
+semantic record, staging, production state or deployment action occurred.
+
+STATUS: `SEARCH_DICTIONARY_DISCOVERY_FRONTEND_LOCAL_READY / BROWSER_QA_PENDING / NO_MUTATION / UNDEPLOYED`.
+
 # Checkpoint — 2026-10-02 — Image-led cross-site discovery frontend (LOCAL / NO MUTATION)
 
 IMPLEMENTED: Added a shared compact/full media presentation policy that prefers
