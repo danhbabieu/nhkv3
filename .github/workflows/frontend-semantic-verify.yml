@@ -1,7 +1,7 @@
 name: Frontend semantic verification
 on:
   push:
-    branches: [feature/frontend-semantic-projection-v2, feature/frontend-discovery-redesign-20261002]
+    branches: [feature/frontend-semantic-projection-v2]
   workflow_dispatch:
 permissions:
   contents: read
