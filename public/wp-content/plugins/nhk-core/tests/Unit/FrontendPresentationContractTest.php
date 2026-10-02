@@ -50,7 +50,7 @@ final class FrontendPresentationContractTest extends TestCase
 
         self::assertStringContainsString('array_slice($latestFeed, 0, 4)', $source);
         self::assertStringContainsString('class="latest-feed-card latest-feed-row"', $source);
-        self::assertStringContainsString("wp_get_attachment_image((int) $item['attachment_id'], 'medium'", $source);
+        self::assertStringContainsString('wp_get_attachment_image((int) $item[\'attachment_id\'], \'medium\'', $source);
         self::assertStringContainsString("\$item['image_srcset'] ?? \$item['srcset']", $source);
         self::assertStringContainsString("\$item['image_sizes'] ?? \$item['sizes']", $source);
         self::assertStringContainsString('latest-feed-card-link', $source);
@@ -61,9 +61,9 @@ final class FrontendPresentationContractTest extends TestCase
         $query = $this->read('inc/class-nhk-home-page-query.php');
         $source = $this->read('front-page.php');
 
-        self::assertStringContainsString("wp_get_attachment_image_src($thumbnailId, 'medium')", $query);
-        self::assertStringContainsString("wp_get_attachment_image_srcset($thumbnailId, 'medium')", $query);
-        self::assertStringContainsString("wp_get_attachment_image_sizes($thumbnailId, 'medium')", $query);
+        self::assertStringContainsString('wp_get_attachment_image_src($thumbnailId, \'medium\')', $query);
+        self::assertStringContainsString('wp_get_attachment_image_srcset($thumbnailId, \'medium\')', $query);
+        self::assertStringContainsString('wp_get_attachment_image_sizes($thumbnailId, \'medium\')', $query);
         self::assertStringContainsString("wp_get_attachment_image((int) $item['attachment_id'], 'medium'", $source);
         self::assertStringContainsString("the_post_thumbnail('medium_large'", $source);
     }
