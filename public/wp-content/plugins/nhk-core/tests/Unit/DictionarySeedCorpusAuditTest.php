@@ -224,7 +224,7 @@ final class DictionarySeedCorpusAuditTest extends TestCase
     public function test_ambiguity_fails_closed_and_private_source_text_is_not_serialized(): void
     {
         $reader = new FakeDictionaryCorpusReader([
-            ['source_id' => 'knowledge:1', 'source_family' => 'private:evidence', 'source_kind' => 'KNOWLEDGE', 'raw_text' => 'Ambiguous Term', 'context' => ['private_source_text' => 'SECRET CLAIM TEXT']],
+            ['source_id' => 'knowledge:1', 'source_family' => 'private:evidence', 'source_kind' => 'KNOWLEDGE', 'raw_text' => 'Ambiguous Term', 'context' => ['private_source_text' => 'SECRET CLAIM TEXT', 'lexical_hints' => ['Ambiguous Term']]],
         ]);
         $coordinator = $this->coordinator(['KNOWLEDGE' => $reader], static fn (string $term): array => $term === 'ambiguous term' ? [['preferred_label' => 'A'], ['preferred_label' => 'B']] : []);
         $result = $coordinator->audit('KNOWLEDGE', null, 10);
@@ -269,8 +269,8 @@ final class DictionarySeedCorpusAuditTest extends TestCase
     public function test_planner_failure_is_bounded_to_one_source_and_cursor_continues(): void
     {
         $reader = new FakeDictionaryCorpusReader([
-            ['source_id' => 'article:19', 'source_family' => 'article:19', 'source_kind' => 'ARTICLE', 'raw_text' => 'Broken Term', 'context' => []],
-            ['source_id' => 'article:20', 'source_family' => 'article:20', 'source_kind' => 'ARTICLE', 'raw_text' => 'Valid Term', 'context' => []],
+            ['source_id' => 'article:19', 'source_family' => 'article:19', 'source_kind' => 'ARTICLE', 'raw_text' => 'Broken Term', 'context' => ['lexical_hints' => ['Broken Term']]],
+            ['source_id' => 'article:20', 'source_family' => 'article:20', 'source_kind' => 'ARTICLE', 'raw_text' => 'Valid Term', 'context' => ['lexical_hints' => ['Valid Term']]],
         ]);
         $resolver = new DictionaryResolver(
             static fn (): array => [],
@@ -298,9 +298,9 @@ final class DictionarySeedCorpusAuditTest extends TestCase
     public function test_article_cursor_continues_after_faulty_source_between_two_valid_articles(): void
     {
         $reader = new FakeDictionaryCorpusReader([
-            ['source_id' => '18', 'source_family' => 'article:18', 'source_kind' => 'ARTICLE', 'raw_text' => 'Valid Before', 'context' => []],
-            ['source_id' => '19', 'source_family' => 'article:19', 'source_kind' => 'ARTICLE', 'raw_text' => 'Broken Term', 'context' => []],
-            ['source_id' => '20', 'source_family' => 'article:20', 'source_kind' => 'ARTICLE', 'raw_text' => 'Valid After', 'context' => []],
+            ['source_id' => '18', 'source_family' => 'article:18', 'source_kind' => 'ARTICLE', 'raw_text' => 'Valid Before', 'context' => ['lexical_hints' => ['Valid Before']]],
+            ['source_id' => '19', 'source_family' => 'article:19', 'source_kind' => 'ARTICLE', 'raw_text' => 'Broken Term', 'context' => ['lexical_hints' => ['Broken Term']]],
+            ['source_id' => '20', 'source_family' => 'article:20', 'source_kind' => 'ARTICLE', 'raw_text' => 'Valid After', 'context' => ['lexical_hints' => ['Valid After']]],
         ]);
         $resolver = new DictionaryResolver(
             static fn (): array => [],
@@ -345,8 +345,8 @@ final class DictionarySeedCorpusAuditTest extends TestCase
     public function test_invalid_resolver_output_cannot_break_serialization_or_cursor_progress(): void
     {
         $reader = new FakeDictionaryCorpusReader([
-            ['source_id' => 'article:bad', 'source_family' => 'article:bad', 'source_kind' => 'ARTICLE', 'raw_text' => 'Broken Term', 'context' => []],
-            ['source_id' => 'article:next', 'source_family' => 'article:next', 'source_kind' => 'ARTICLE', 'raw_text' => 'Valid Term', 'context' => []],
+            ['source_id' => 'article:bad', 'source_family' => 'article:bad', 'source_kind' => 'ARTICLE', 'raw_text' => 'Broken Term', 'context' => ['lexical_hints' => ['Broken Term']]],
+            ['source_id' => 'article:next', 'source_family' => 'article:next', 'source_kind' => 'ARTICLE', 'raw_text' => 'Valid Term', 'context' => ['lexical_hints' => ['Valid Term']]],
         ]);
         $resolver = new DictionaryResolver(
             static fn (): array => [],
@@ -404,7 +404,7 @@ final class DictionarySeedCorpusAuditTest extends TestCase
             static fn (): bool => false,
         );
         $result = (new DictionarySeedCorpusAuditCoordinator(
-            ['ARTICLE' => new FakeDictionaryCorpusReader([['source_id' => 'article:long', 'source_family' => 'article:long', 'source_kind' => 'ARTICLE', 'raw_text' => implode('. ', $phrases), 'context' => []]])],
+            ['ARTICLE' => new FakeDictionaryCorpusReader([['source_id' => 'article:long', 'source_family' => 'article:long', 'source_kind' => 'ARTICLE', 'raw_text' => implode('. ', $phrases), 'context' => ['lexical_hints' => $phrases]]])],
             new StructuredSemanticInterpreter(),
             new DictionarySeedPlanner($resolver),
         ))->audit('ARTICLE', null, 1);

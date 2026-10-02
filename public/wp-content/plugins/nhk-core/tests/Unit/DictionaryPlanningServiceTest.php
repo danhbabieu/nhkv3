@@ -148,7 +148,7 @@ final class DictionaryPlanningServiceTest extends TestCase
         $service = new DictionaryPlanningService(new DictionaryTermDetector(), $resolver, $candidateRepo, $mentionRepo, new DictionaryLinkPlanner());
 
         foreach (['vách trơn', 'vách hở'] as $term) {
-            $plan = $service->preview('Mô tả ' . $term . ' trong tài liệu.', 'KNOWLEDGE', 'k1');
+            $plan = $service->preview('Mô tả ' . $term . ' trong tài liệu.', 'KNOWLEDGE', 'k1', [], [$term]);
             self::assertCount(1, $plan['ambiguous_terms']);
             self::assertSame($term, $plan['ambiguous_terms'][0]['normalized_term']);
             self::assertSame([], $plan['internal_link_candidates']);

@@ -141,6 +141,7 @@ final class DictionaryTermDetector
             'origin' => $origin,
             'strength' => $strength,
             'evidence_status' => $evidenceStatus,
+            'evidence_reason' => $this->evidenceReason($term, $origin),
             'resolver_eligible' => $evidenceStatus === 'QUALIFIED',
         ];
     }
@@ -275,7 +276,7 @@ final class DictionaryTermDetector
     private function isEligibleStructuralConfiguration(string $phrase, array $eligibleUnits): bool
     {
         $parts = preg_split('/\s+/u', trim($phrase)) ?: [];
-        if (count($parts) < 2 || count($parts) % 2 !== 0) return false;
+        if (count($parts) < 4 || count($parts) % 2 !== 0) return false;
         for ($index = 0; $index < count($parts); $index += 2) {
             if (!preg_match('/^\d{1,3}$/u', (string) $parts[$index])) return false;
             $unit = $this->normalizer->normalize((string) $parts[$index + 1]);
@@ -300,6 +301,8 @@ final class DictionaryTermDetector
             $clauseTokens = $this->tokens(trim($clause, " \t,()[]{}\"'"));
             foreach ($clauseTokens as $index => $token) {
                 $nextToken = $clauseTokens[$index + 1] ?? '';
+                $nextAfterToken = $clauseTokens[$index + 2] ?? '';
+                $previousToken = $clauseTokens[$index - 1] ?? '';
                 if ($skipToken) {
                     $skipToken = false;
                     continue;
@@ -323,6 +326,13 @@ final class DictionaryTermDetector
                     $flush();
                     continue;
                 }
+                if ($current !== [] && count($current) >= 2 && $this->qualityGate->isCompoundLead($token, $nextToken)) {
+                    $flush();
+                }
+                if ($current !== [] && $this->qualityGate->isLexicalContinuationTail($previousToken, $token)) {
+                    $current[] = $token;
+                    continue;
+                }
                 if ($current !== [] && count($current) >= 2 && preg_match('/^\p{Lu}/u', $token) === 1 && $this->qualityGate->isCompoundLead((string) $current[0], (string) $current[1])) {
                     $flush();
                 }
@@ -336,6 +346,10 @@ final class DictionaryTermDetector
                     continue;
                 }
                 if ($this->qualityGate->isPredicateBoundary($token, $nextToken)) {
+                    if ($this->qualityGate->isLexicalContinuationBoundary($token, $nextToken, count($clauseTokens) - $index - 1, $nextAfterToken)) {
+                        $current[] = $token;
+                        continue;
+                    }
                     if ($this->qualityGate->isCompoundLead($token, $nextToken)) {
                         if ($current !== [] && !$this->qualityGate->isStandaloneLexicalWord((string) $current[0])) $flush();
                         $current[] = $token;
@@ -352,6 +366,10 @@ final class DictionaryTermDetector
                     $flush();
                 }
                 if ($this->qualityGate->isBoundaryWord($token) && !$this->qualityGate->isModifierWord($token)) {
+                    if ($this->qualityGate->isLexicalContinuationBoundary($token, $nextToken, count($clauseTokens) - $index - 1, $nextAfterToken)) {
+                        $current[] = $token;
+                        continue;
+                    }
                     if ($this->qualityGate->isWeakDiscourseBoundary($token)) {
                         $current = [];
                         continue;
@@ -384,6 +402,12 @@ final class DictionaryTermDetector
         }
         if (count($tokens) > 1 && in_array(mb_strtolower((string) $tokens[0], 'UTF-8'), ['bản'], true)) array_shift($tokens);
         while (count($tokens) > 1 && in_array(mb_strtolower((string) $tokens[0], 'UTF-8'), ['the', 'a', 'an', 'chiếc', 'một', 'mẫu', 'con'], true)) array_shift($tokens);
+        $hasStandaloneLexicalToken = false;
+        foreach ($tokens as $token) if ($this->qualityGate->isStandaloneLexicalWord((string) $token)) {
+            $hasStandaloneLexicalToken = true;
+            break;
+        }
+        if (!$hasStandaloneLexicalToken && !$this->qualityGate->isTechnicalCompound(implode(' ', $tokens))) return;
         if (count($tokens) === 1 && $this->qualityGate->isStandaloneLexicalWord((string) $tokens[0])) {
             $normalized = $this->normalizer->normalize((string) $tokens[0]);
             if ($normalized !== '') $spans[$normalized] = (string) $tokens[0];
@@ -488,8 +512,27 @@ final class DictionaryTermDetector
     private function evidenceStatus(string $term, string $origin): string
     {
         if (in_array($origin, ['KNOWN_LABEL', 'HINT', 'PROPER_NAME_SPAN', 'IDENTIFIER_SPAN', 'TECHNICAL_PATTERN', 'HYPHENATED_NAME', 'QUOTED_PHRASE', 'STRUCTURAL_CONFIGURATION', 'MUSIC_NAME'], true)) return 'QUALIFIED';
+        if ($origin === 'DOMAIN_PHRASE' && $this->qualityGate->isTechnicalCompound($term)) return 'QUALIFIED';
+        if ($origin === 'DOMAIN_PHRASE') return 'OBSERVATION_ONLY';
         $parts = preg_split('/\s+/u', trim($term)) ?: [];
         return count($parts) >= 2 ? 'QUALIFIED' : 'OBSERVATION_ONLY';
+    }
+
+    private function evidenceReason(string $term, string $origin): string
+    {
+        return match ($origin) {
+            'KNOWN_LABEL' => 'APPROVED_LABEL',
+            'HINT' => 'EXPLICIT_HINT',
+            'PROPER_NAME_SPAN' => 'PROPER_NAME_STRUCTURE',
+            'IDENTIFIER_SPAN', 'TECHNICAL_PATTERN' => 'IDENTIFIER_STRUCTURE',
+            'STRUCTURAL_CONFIGURATION' => 'NUMERIC_CONFIGURATION',
+            'QUOTED_PHRASE' => 'QUOTED_DEFINITION_CONTEXT',
+            'MUSIC_NAME' => 'KNOWN_MUSIC_NAME',
+            'DOMAIN_PHRASE' => $this->qualityGate->isTechnicalCompound($term) ? 'TECHNICAL_COMPOUND_STRUCTURE' : 'INSUFFICIENT_GENERIC_CONTEXT',
+            'EDITORIAL_SIGNAL' => 'EDITORIAL_CONTEXT',
+            'NOISE' => 'NOISE_SIGNAL',
+            default => 'UNSUPPORTED_EVIDENCE',
+        };
     }
 
     private function occurrences(string $text, string $term): int

@@ -90,11 +90,11 @@ final class DictionarySeedAuditMcpTest extends TestCase
             public function __construct()
             {
                 $this->rows = [
-                    ['source_id' => '18', 'source_family' => 'article:18', 'source_kind' => 'ARTICLE', 'raw_text' => 'Valid Before', 'context' => []],
+                    ['source_id' => '18', 'source_family' => 'article:18', 'source_kind' => 'ARTICLE', 'raw_text' => 'Valid Before', 'context' => ['lexical_hints' => ['Valid Before']]],
                     ['source_id' => '19', 'source_family' => 'article:19', 'source_kind' => 'ARTICLE', 'raw_text' => new \stdClass(), 'context' => []],
-                    ['source_id' => '20', 'source_family' => 'article:20', 'source_kind' => 'ARTICLE', 'raw_text' => 'Valid After', 'context' => []],
-                    ['source_id' => '40', 'source_family' => 'article:40', 'source_kind' => 'ARTICLE', 'raw_text' => 'Valid Before Forty', 'context' => []],
-                    ['source_id' => '41', 'source_family' => 'article:41', 'source_kind' => 'ARTICLE', 'raw_text' => 'Valid After Forty', 'context' => []],
+                    ['source_id' => '20', 'source_family' => 'article:20', 'source_kind' => 'ARTICLE', 'raw_text' => 'Valid After', 'context' => ['lexical_hints' => ['Valid After']]],
+                    ['source_id' => '40', 'source_family' => 'article:40', 'source_kind' => 'ARTICLE', 'raw_text' => 'Valid Before Forty', 'context' => ['lexical_hints' => ['Valid Before Forty']]],
+                    ['source_id' => '41', 'source_family' => 'article:41', 'source_kind' => 'ARTICLE', 'raw_text' => 'Valid After Forty', 'context' => ['lexical_hints' => ['Valid After Forty']]],
                 ];
             }
 
@@ -140,9 +140,9 @@ final class DictionarySeedAuditMcpTest extends TestCase
             public function page(?string $after, int $limit): array
             {
                 $rows = [
-                    ['source_id' => '18', 'source_family' => 'article:18', 'source_kind' => 'ARTICLE', 'raw_text' => 'Valid Before', 'context' => []],
-                    ['source_id' => '19', 'source_family' => 'article:19', 'source_kind' => 'ARTICLE', 'raw_text' => 'Broken Resolver Term', 'context' => []],
-                    ['source_id' => '20', 'source_family' => 'article:20', 'source_kind' => 'ARTICLE', 'raw_text' => 'Valid After', 'context' => []],
+                    ['source_id' => '18', 'source_family' => 'article:18', 'source_kind' => 'ARTICLE', 'raw_text' => 'Valid Before', 'context' => ['lexical_hints' => ['Valid Before']]],
+                    ['source_id' => '19', 'source_family' => 'article:19', 'source_kind' => 'ARTICLE', 'raw_text' => 'Broken Resolver Term', 'context' => ['lexical_hints' => ['Broken Resolver Term']]],
+                    ['source_id' => '20', 'source_family' => 'article:20', 'source_kind' => 'ARTICLE', 'raw_text' => 'Valid After', 'context' => ['lexical_hints' => ['Valid After']]],
                 ];
                 $rows = array_values(array_filter($rows, static fn (array $row): bool => $after === null || (int) $row['source_id'] > (int) $after));
                 return ['items' => array_slice($rows, 0, $limit), 'has_more' => count($rows) > $limit, 'next_cursor' => count($rows) > $limit ? (string) $rows[$limit - 1]['source_id'] : null];

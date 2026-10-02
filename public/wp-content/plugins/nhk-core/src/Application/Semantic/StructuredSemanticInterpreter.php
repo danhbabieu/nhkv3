@@ -130,6 +130,7 @@ final class StructuredSemanticInterpreter
             'origin' => $origin,
             'strength' => (string) ($span['strength'] ?? 'NORMAL'),
             'evidence_status' => $evidenceStatus,
+            'evidence_reason' => (string) ($span['evidence_reason'] ?? 'UNSUPPORTED_EVIDENCE'),
             'resolver_eligible' => ($span['resolver_eligible'] ?? ($evidenceStatus === 'QUALIFIED')) === true,
             'occurrences' => max(1, (int) ($span['occurrences'] ?? 1)),
         ];
