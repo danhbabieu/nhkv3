@@ -110,6 +110,21 @@ final class DictionarySeedCorpusAuditTest extends TestCase
         self::assertSame('KNOWN', $item['provenance_status']);
     }
 
+    public function test_raw_derived_raw_case_counts_three_sources_but_only_two_independent_origins(): void
+    {
+        $reader = new FakeDictionaryCorpusReader([
+            ['source_id' => 'source:a', 'source_family' => 'family:a', 'source_kind' => 'KNOWLEDGE', 'raw_text' => 'Alpha', 'raw_or_derived' => 'RAW', 'canonical_origin_id' => 'origin:a', 'context' => ['lexical_hints' => ['Alpha']]],
+            ['source_id' => 'derived:copy', 'source_family' => 'family:derived', 'source_kind' => 'KNOWLEDGE', 'raw_text' => 'ALPHA', 'raw_or_derived' => 'DERIVED', 'lineage' => ['parent_source_id' => 'source:a', 'canonical_origin_id' => 'origin:a'], 'canonical_origin_id' => 'origin:a', 'context' => ['lexical_hints' => ['ALPHA']]],
+            ['source_id' => 'source:b', 'source_family' => 'family:b', 'source_kind' => 'KNOWLEDGE', 'raw_text' => 'alpha', 'raw_or_derived' => 'RAW', 'canonical_origin_id' => 'origin:b', 'context' => ['lexical_hints' => ['alpha']]],
+        ]);
+
+        $result = $this->coordinator(['KNOWLEDGE' => $reader], static fn (): array => [])->audit('KNOWLEDGE', null, 10);
+        $item = $result['items'][0];
+
+        self::assertSame(3, $item['source_count']);
+        self::assertSame(2, $item['independent_source_count']);
+    }
+
     public function test_insufficient_provenance_is_explicitly_uncertain_without_inventing_corroboration(): void
     {
         $reader = new FakeDictionaryCorpusReader([

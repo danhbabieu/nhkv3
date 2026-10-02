@@ -10,6 +10,32 @@ final class DictionaryLexicalHoldout
     {
         return [
             [
+                'id' => 'technical_compounds_required_set',
+                'text' => 'Bộ dẫn hướng từ trở, cơ cấu truyền lực, cần gạt chọn nhạc và côn đồng bạch là các cụm kỹ thuật.',
+                'expected' => [
+                    'bộ dẫn hướng từ trở' => 'QUALIFIED',
+                    'cơ cấu truyền lực' => 'QUALIFIED',
+                    'cần gạt chọn nhạc' => 'QUALIFIED',
+                    'côn đồng bạch' => 'QUALIFIED',
+                ],
+                'forbidden' => ['bộ dẫn hướng', 'cơ cấu truyền lực là các cụm kỹ thuật'],
+                'gold_complete' => true,
+            ],
+            [
+                'id' => 'editorial_noise_required_set',
+                'text' => 'Khách bảo rất đẹp, muốn xem tiếp và được ghi nhận trong tài liệu.',
+                'expected' => [],
+                'forbidden' => ['khách bảo', 'rất đẹp', 'muốn xem tiếp', 'được ghi nhận trong tài liệu'],
+                'gold_complete' => true,
+            ],
+            [
+                'id' => 'identifier_required_set',
+                'text' => 'ÔĐô 36/10 khác với W64 trong bản ghi cấu hình.',
+                'expected' => ['ôđô 36/10' => 'QUALIFIED', 'w64' => 'QUALIFIED'],
+                'forbidden' => ['ôđô', '36/10'],
+                'gold_complete' => true,
+            ],
+            [
                 'id' => 'technical_configuration',
                 'text' => 'Mã Ref 81.12 dùng cấu hình 17 alpha 19 beta.',
                 'expected' => ['ref 81.12' => 'QUALIFIED', '17 alpha 19 beta' => 'QUALIFIED'],
