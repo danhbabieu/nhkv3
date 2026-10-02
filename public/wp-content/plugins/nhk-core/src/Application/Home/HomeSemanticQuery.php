@@ -60,13 +60,15 @@ final class HomeSemanticQuery
                 $modules['hubs'][] = ['type' => 'clock_type', 'label' => 'Nhóm đồng hồ', 'total' => (int) $clockGroups['total'], 'url' => $this->routes()->archivePathForProfile('clock_type')];
                 foreach ((array) ($clockGroups['items'] ?? []) as $item) {
                     if (!is_array($item) || ($item['presentation_readiness']['status'] ?? '') !== 'READY') continue;
+                    $representative = is_array($item['media']['representative'] ?? null) ? $item['media']['representative'] : [];
                     $modules['clock_groups'][] = [
                         'type' => 'clock_type',
                         'title' => (string) ($item['name'] ?? ''),
                         'description' => (string) ($item['description'] ?? ''),
                         'url' => (string) ($item['url'] ?? ''),
-                        'image_url' => $item['media']['representative']['url'] ?? null,
-                        'image_alt' => $item['media']['representative']['alt'] ?? ($item['name'] ?? ''),
+                        'image_url' => $representative['url'] ?? null,
+                        'thumbnail_url' => $representative['thumbnail_url'] ?? ($representative['url'] ?? null),
+                        'image_alt' => $representative['alt'] ?? ($item['name'] ?? ''),
                     ];
                 }
             }
@@ -75,12 +77,14 @@ final class HomeSemanticQuery
                 $archivePath = $this->routes()->archivePath($definition->type);
                 if ($archivePath !== null && (int) ($archive['total'] ?? 0) > 0) $modules['hubs'][] = ['type' => $definition->type, 'total' => (int) $archive['total'], 'url' => $archivePath];
                 foreach ($archive['items'] as $item) {
+                    $representative = is_array($item['media']['representative'] ?? null) ? $item['media']['representative'] : [];
                     $modules['entities'][] = [
                         'type' => $item['type'],
                         'title' => $item['name'],
                         'url' => (new PublicSeoProjection())->project(['path' => $item['url'], 'eligible' => true, 'readiness' => SeoReadinessResult::READY, 'canonical_url' => $item['url'], 'public_eligible' => true], ['type' => 'Entity'])['internal_link'],
-                        'image_url' => $item['media']['representative']['url'] ?? null,
-                        'image_alt' => $item['media']['representative']['alt'] ?? $item['name'],
+                        'image_url' => $representative['url'] ?? null,
+                        'thumbnail_url' => $representative['thumbnail_url'] ?? ($representative['url'] ?? null),
+                        'image_alt' => $representative['alt'] ?? $item['name'],
                     ];
                     if (count($modules['entities']) >= 8) break 2;
                 }

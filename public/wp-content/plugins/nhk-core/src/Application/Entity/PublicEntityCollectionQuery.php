@@ -200,8 +200,11 @@ final class PublicEntityCollectionQuery
     private function publicMediaItem(?array $item): ?array
     {
         if ($item === null || trim((string) ($item['url'] ?? '')) === '') return null;
+        $url = (string) $item['url'];
+        $thumbnailUrl = trim((string) ($item['thumbnail_url'] ?? ''));
         return [
-            'url' => (string) $item['url'],
+            'url' => $url,
+            'thumbnail_url' => $thumbnailUrl !== '' ? $thumbnailUrl : $url,
             'alt' => (string) ($item['alt'] ?? ''),
             'role' => (string) ($item['role'] ?? ''),
         ];

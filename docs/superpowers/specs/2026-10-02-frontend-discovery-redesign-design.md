@@ -126,6 +126,8 @@ Full public assets and compact card assets are distinct presentation concerns.
 
 Do not hard-crop antique objects for this redesign. Existing `object-fit: contain` and intrinsic/orientation-aware frames stay authoritative.
 
+- Public Entity collection/home projections preserve an existing governed `thumbnail_url` when the Media projection supplies one; canonical `url` remains unchanged.
+
 ### Semantic Media
 
 For canonical Media without an attachment derivative, do not invent a transformed URL. Reuse the current governed projection. Future derivative expansion belongs in the Media projection boundary, not template string rewriting.
