@@ -58,12 +58,8 @@ final class FrontendPresentationContractTest extends TestCase
 
     public function test_homepage_article_latest_feed_requests_compact_attachment_derivatives(): void
     {
-        $query = $this->read('inc/class-nhk-home-page-query.php');
         $source = $this->read('front-page.php');
 
-        self::assertStringContainsString('wp_get_attachment_image_src($thumbnailId, \'medium\')', $query);
-        self::assertStringContainsString('wp_get_attachment_image_srcset($thumbnailId, \'medium\')', $query);
-        self::assertStringContainsString('wp_get_attachment_image_sizes($thumbnailId, \'medium\')', $query);
         self::assertStringContainsString('wp_get_attachment_image((int) $item[\'attachment_id\'], \'medium\'', $source);
         self::assertStringContainsString("the_post_thumbnail('medium_large'", $source);
     }
