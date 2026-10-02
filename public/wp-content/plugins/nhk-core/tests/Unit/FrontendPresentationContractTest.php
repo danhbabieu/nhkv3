@@ -186,6 +186,10 @@ final class FrontendPresentationContractTest extends TestCase
         self::assertStringContainsString('Khám phá', $header);
         self::assertStringNotContainsString('LOẠI trên điện thoại', $header);
         self::assertStringNotContainsString('nav-type-menu', $header);
+        self::assertStringNotContainsString('nav-type-menu', $this->read('style.css'));
+        self::assertStringNotContainsString('nth-child(n+6)', $this->read('style.css'));
+        self::assertStringNotContainsString('clockTypePresentationNav', $header);
+        self::assertStringNotContainsString('<span aria-hidden="true">⌄</span>', $header);
     }
 
     public function test_homepage_has_four_reader_gateways_and_compact_feed_derivative(): void
@@ -224,13 +228,13 @@ final class FrontendPresentationContractTest extends TestCase
 
         self::assertStringContainsString('home-hero-v2', $css);
         self::assertStringContainsString('aspect-ratio:4/3', $css);
-        self::assertStringContainsString('grid-template-columns:minmax(0,1.28fr) minmax(300px,.72fr)', $css);
+        self::assertStringContainsString('grid-template-columns:minmax(0,1.28fr) minmax(0,.72fr)', $css);
         self::assertStringNotContainsString('height:100vh', $css);
     }
 
     public function test_homepage_hero_asset_is_bounded_and_cache_busted_for_live_deploy(): void
     {
-        $css = $this->read('entity.css');
+        $css = $this->read('style.css');
         $functions = $this->read('functions.php');
 
         self::assertStringContainsString('.hero-visual{width:min(100%,400px)', $css);

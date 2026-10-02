@@ -2,9 +2,6 @@
 $navGroups = nhk_v3_navigation_groups();
 $primaryNav = is_array($navGroups['primary'] ?? null) ? $navGroups['primary'] : [];
 $discoveryNav = is_array($navGroups['discovery'] ?? null) ? $navGroups['discovery'] : [];
-// Clock Type presentation navigation remains context-owned by /loai-dong-ho/;
-// the global header exposes only the canonical destination above.
-$clockTypePresentationNav = nhk_v3_clock_type_navigation_items('header_menu');
 ?>
 <!doctype html>
 <html <?php language_attributes(); ?>><head><meta charset="<?php bloginfo('charset'); ?>"><meta name="viewport" content="width=device-width, initial-scale=1"><?php wp_head(); ?></head>
@@ -14,7 +11,7 @@ $clockTypePresentationNav = nhk_v3_clock_type_navigation_items('header_menu');
   <div class="header-actions">
     <nav class="nav" id="primary-navigation" aria-label="Điều hướng chính">
       <div class="nav-primary"><?php nhk_v3_render_nav_items($primaryNav); ?></div>
-      <?php if ($discoveryNav !== []): ?><details class="nav-discovery"><summary>Khám phá <span aria-hidden="true">⌄</span></summary><div class="nav-discovery-panel"><?php nhk_v3_render_nav_items($discoveryNav); ?></div></details><?php endif; ?>
+      <?php if ($discoveryNav !== []): ?><details class="nav-discovery"><summary aria-expanded="false">Khám phá</summary><div class="nav-discovery-panel"><?php nhk_v3_render_nav_items($discoveryNav); ?></div></details><?php endif; ?>
     </nav>
     <?php if ($primaryNav === [] && $discoveryNav === []) nhk_v3_nav_fallback(); ?>
     <form class="global-search" role="search" method="get" action="<?php echo esc_url(home_url('/')); ?>"><label class="screen-reader-text" for="nhk-search">Tìm kiếm toàn hệ thống</label><input id="nhk-search" type="search" name="s" value="<?php echo esc_attr(get_search_query()); ?>" placeholder="Tìm trong NHK..." /><button type="submit">Tìm</button></form>

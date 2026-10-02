@@ -1,5 +1,42 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-02 — Responsive discovery frontend hardening (LOCAL / NO MUTATION)
+
+IMPLEMENTED: Removed the unused global-header Clock Type presentation query,
+removed the legacy `.nav-type-menu-mobile` rules and the tablet `nth-child`
+navigation hiding rule, and made the discovery chevron single-source with an
+explicit open-state indicator. Consolidated homepage hero containment into the
+base stylesheet, removed duplicate hero rules from `entity.css`, tightened the
+1024px header spacing/search budget, and made footer groups collapse cleanly at
+narrow mobile widths. No semantic owner, route, content, database or
+presentation-navigation vocabulary changed.
+
+REGRESSION: Frontend contracts now assert five primary destinations remain
+available, the nine-item discovery group is not hidden by viewport selectors,
+global Clock Type presentation is not queried by the header, legacy menu CSS
+is absent, and the duplicate chevron markup is absent. Focused frontend and
+presentation-navigation tests pass 110 tests / 1,012 assertions. PHP lint,
+navigation JS syntax check, diff check and changed-scope secret scan pass.
+
+BROWSER_QA: Read-only staging browser review at desktop width confirmed the
+editorial hierarchy, four gateways, latest feed and nine discovery destinations
+when expanded. The staging build still showed the pre-change duplicate
+chevron, so it was not treated as validation of this un-deployed HEAD. Local
+WordPress browser QA at 360/390/430/768/1024/1440 remains blocked because no
+local HTTP server is listening and the local MySQL runtime is unavailable.
+Image delivery remains contract-verified through `srcset`, `sizes`, width/
+height and `medium` thumbnail projection; `currentSrc` could not be read from
+the unavailable local HEAD browser.
+
+FULL_BASELINE: The 512M PHPUnit run completed 3,076 tests / 17,376 assertions
+with 33 existing integration/runtime errors and 25 existing semantic unit
+failures outside this frontend change, plus existing warnings/deprecations.
+
+NO_DATA_MUTATION: `read_only=true`, `mutated=false`; no database, semantic
+record, schema, migration, staging, production or deployment action occurred.
+
+STATUS: `RESPONSIVE_DISCOVERY_FRONTEND_LOCAL_READY / BROWSER_RUNTIME_BLOCKED / NO_MUTATION / UNDEPLOYED`.
+
 # Checkpoint — 2026-10-02 — Shared lexical style invariance and structural evidence (LOCAL / NO MUTATION)
 
 ROOT_CAUSES_FIXED: Shared lexical segmentation was greedy around grammatical

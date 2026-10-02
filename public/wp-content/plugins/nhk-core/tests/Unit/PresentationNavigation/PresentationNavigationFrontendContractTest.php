@@ -15,7 +15,7 @@ final class PresentationNavigationFrontendContractTest extends TestCase
         self::assertStringContainsString('curatedClockTypeArchive', $home);
         self::assertStringNotContainsString("archiveProfile('clock_type'", $home);
         self::assertStringContainsString('show_in_type_index', $collection . file_get_contents(dirname(__DIR__, 3) . '/src/Domain/PresentationNavigation/NavigationPlacement.php'));
-        self::assertStringContainsString('nhk_v3_clock_type_navigation_items', $header);
+        self::assertStringNotContainsString('nhk_v3_clock_type_navigation_items', $header);
     }
 
     public function test_public_navigation_definition_does_not_contain_curated_clock_type_nodes(): void
