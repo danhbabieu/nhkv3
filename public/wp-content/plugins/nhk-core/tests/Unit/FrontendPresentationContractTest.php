@@ -193,8 +193,10 @@ final class FrontendPresentationContractTest extends TestCase
         $source = $this->read('front-page.php');
 
         self::assertStringContainsString('hero-entry-points', $source);
-        foreach (['Sản phẩm', 'Thương hiệu', 'Loại đồng hồ', 'Từ điển'] as $gateway) self::assertStringContainsString($gateway, $source);
+        foreach (['/san-pham/', '/thuong-hieu/', '/loai-dong-ho/', '/tu-dien/'] as $gatewayPath) self::assertStringContainsString($gatewayPath, $source);
+        self::assertStringContainsString('$gatewayPaths', $source);
         self::assertStringContainsString('gatewayDescriptions', $source);
+        self::assertStringNotContainsString('sản phẩm đang có trong kho', mb_strtolower($source));
         self::assertStringContainsString('hero-empty', $source);
         self::assertStringContainsString('($item[\'image_url\'] ?? \'\')', $source);
         self::assertStringContainsString("trim((string) (\$heroMedia[0]['image_url'] ?? '')) !== ''", $source);

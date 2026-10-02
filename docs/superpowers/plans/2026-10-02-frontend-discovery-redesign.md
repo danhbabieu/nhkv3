@@ -44,13 +44,11 @@ Do not add a new Product query merely for visual symmetry.
 
 Tests first:
 - Article card uses `medium`;
-- Home query resolves Article feed image/srcset/sizes using `medium`;
-- latest feed template requests attachment image size `medium`;
+- latest feed template requests attachment image size `medium` with slot-sized `sizes`;
 - featured lead remains `medium_large`.
 
 Implementation then updates:
 - `template-parts/article-card.php`
-- `inc/class-nhk-home-page-query.php`
 - latest-feed image call in `front-page.php`.
 
 Preserve object-fit contain and existing fallbacks.
@@ -70,10 +68,10 @@ Do not introduce animation dependencies.
 
 Run:
 - focused navigation/presentation unit tests;
-- full NHK Unit suite;
+- full NHK Unit suite where the repository baseline is parseable on the selected PHP runner;
 - Contract suite;
-- `composer lint`;
-- `git diff --check`;
+- changed-file PHP lint and `git diff --check`;
+- record any pre-existing baseline lint blocker separately instead of widening this frontend slice;
 - secret scan if repository helper exists.
 
 If local/runtime browser is available, run frontend route smoke and check `/`, `/san-pham/`, `/thuong-hieu/`, `/loai-dong-ho/`, `/tu-dien/`, `/thu-vien/`, `/video/` at mobile/tablet/desktop. Environment absence is reported as an evidence gap, not converted into PASS.

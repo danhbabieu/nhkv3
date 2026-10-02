@@ -9,6 +9,7 @@ Implementation design for the public NHK V3 frontend. This is a presentation-onl
 - Runtime reviewed through @v55 documentation bootstrap: source revision `885d6cd50e2aba9d810f65c309b9c174aab444d5`.
 - Repository implementation branch starts from `main@6dd5913abe399cafbb2204dea079bd3c57bb7004`, whose only intervening change is outside this frontend scope.
 - Governing sources: `AGENTS.md`, Constitution, frontend route inventory, Media model, Dictionary contract, Clock-Type ecosystem, Public Entity dossier, Shared Feed Ordering and existing Presentation Navigation contracts.
+- Runtime evidence at review time: Brand 7 canonical records; Product 0; Specimen 0; 41 published WordPress Posts; Dictionary storage/readiness READY but 0 APPROVED public concepts. Primary navigation therefore exposes Product and Dictionary as requested entry points without inventing cards, counts or availability claims.
 
 ## Product intent
 
@@ -75,7 +76,7 @@ Exactly one real hero image may use eager/high-priority loading. No slider.
 
 Within the hero, show four large gateway controls using the same canonical navigation definition:
 
-- Sản phẩm — xem các hồ sơ sản phẩm/listing công khai
+- Sản phẩm — mở khu vực sản phẩm/listing công khai mà không ngụ ý hiện đã có hồ sơ
 - Thương hiệu — đi vào hồ sơ nhà sản xuất/thương hiệu
 - Loại đồng hồ — duyệt nhóm đồng hồ đã được biên tập
 - Từ điển — tra thuật ngữ/cách gọi của người chơi
@@ -161,7 +162,7 @@ No new relation predicate, shortcut edge or inherited truth is permitted.
 The redesign is accepted only when:
 
 - no homepage visual except the single hero is eager/high-priority;
-- latest-feed attachment images request `medium`;
+- latest-feed attachment images are rendered with WordPress `medium` at the template boundary; the pre-existing homepage query helper remains untouched in this slice;
 - normal Article cards request `medium`;
 - Video cards remain poster-only;
 - no template changes canonical Media URLs by string manipulation;
@@ -174,7 +175,6 @@ Primary implementation seam:
 - `src/Application/Presentation/PublicNavigationDefinition.php`
 - `themes/nhk-v3/header.php`
 - `themes/nhk-v3/front-page.php`
-- `themes/nhk-v3/inc/class-nhk-home-page-query.php`
 - `themes/nhk-v3/template-parts/article-card.php`
 - `themes/nhk-v3/style.css`
 - focused presentation/navigation tests

@@ -5,12 +5,13 @@ $semantic = is_array($home['semantic'] ?? null) ? $home['semantic'] : [];
 $heroMedia = is_array($semantic['hero_media'] ?? null) ? array_slice($semantic['hero_media'], 0, 1) : [];
 $latestFeed = is_array($home['latest_feed'] ?? null) ? $home['latest_feed'] : [];
 $primaryNavigation = (array) (nhk_v3_navigation_groups()['primary'] ?? []);
-$heroEntryPoints = array_values(array_filter($primaryNavigation, static fn (mixed $item): bool => is_array($item) && in_array((string) ($item['label'] ?? ''), ['Sản phẩm', 'Thương hiệu', 'Loại đồng hồ', 'Từ điển'], true)));
+$gatewayPaths = ['/san-pham/', '/thuong-hieu/', '/loai-dong-ho/', '/tu-dien/'];
+$heroEntryPoints = array_values(array_filter($primaryNavigation, static fn (mixed $item): bool => is_array($item) && in_array((string) ($item['path'] ?? ''), $gatewayPaths, true)));
 $gatewayDescriptions = [
-    'Sản phẩm' => 'Xem các hồ sơ sản phẩm đang có trong kho.',
-    'Thương hiệu' => 'Tra cứu nhà sản xuất và hồ sơ thương hiệu.',
-    'Loại đồng hồ' => 'Duyệt các nhóm đồng hồ đã được biên tập.',
-    'Từ điển' => 'Tra thuật ngữ và cách gọi của người chơi.',
+    '/san-pham/' => 'Tra cứu danh mục sản phẩm và hồ sơ công khai.',
+    '/thuong-hieu/' => 'Tra cứu nhà sản xuất và hồ sơ thương hiệu.',
+    '/loai-dong-ho/' => 'Duyệt các nhóm đồng hồ đã được biên tập.',
+    '/tu-dien/' => 'Tra thuật ngữ và cách gọi của người chơi.',
 ];
 $fallback = get_theme_file_uri('/assets/default-archive.svg');
 get_header();
@@ -22,7 +23,7 @@ get_header();
       <h1>Kho tri thức đồng hồ cổ<br> <em>dành cho người chơi và sưu tầm.</em></h1>
       <p class="hero-copy">Tra cứu sản phẩm, thương hiệu, loại đồng hồ, thuật ngữ và nội dung trong kho NHK.</p>
       <?php get_search_form(); ?>
-      <?php if ($heroEntryPoints !== []): ?><nav class="hero-entry-points" aria-label="Tra cứu chính"><?php foreach ($heroEntryPoints as $item): $gatewayLabel = (string) ($item['label'] ?? ''); ?><a href="<?php echo esc_url(home_url((string) $item['path'])); ?>"><span class="hero-entry-copy"><strong><?php echo esc_html($gatewayLabel); ?></strong><small><?php echo esc_html((string) ($gatewayDescriptions[$gatewayLabel] ?? 'Mở khu vực tra cứu.')); ?></small></span><span class="hero-entry-arrow" aria-hidden="true">→</span></a><?php endforeach; ?></nav><?php endif; ?>
+      <?php if ($heroEntryPoints !== []): ?><nav class="hero-entry-points" aria-label="Tra cứu chính"><?php foreach ($heroEntryPoints as $item): $gatewayLabel = (string) ($item['label'] ?? ''); $gatewayPath = (string) ($item['path'] ?? ''); ?><a href="<?php echo esc_url(home_url($gatewayPath)); ?>"><span class="hero-entry-copy"><strong><?php echo esc_html($gatewayLabel); ?></strong><small><?php echo esc_html((string) ($gatewayDescriptions[$gatewayPath] ?? 'Mở khu vực tra cứu.')); ?></small></span><span class="hero-entry-arrow" aria-hidden="true">→</span></a><?php endforeach; ?></nav><?php endif; ?>
     </div>
     <div class="hero-media-column">
     <div class="hero-visual" aria-label="Ảnh nổi bật từ kho NHK">
