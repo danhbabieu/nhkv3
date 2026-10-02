@@ -3,7 +3,7 @@ $item = is_array($args['item'] ?? null) ? $args['item'] : [];
 $url = nhk_v3_public_url($item['url'] ?? null);
 $title = trim((string) ($item['title'] ?? $item['name'] ?? ''));
 if ($url === '' || $title === '') return;
-$image = trim((string) ($item['image_url'] ?? $item['media']['representative']['url'] ?? ''));
+$image = trim((string) ($item['thumbnail_url'] ?? $item['image_url'] ?? $item['media']['representative']['thumbnail_url'] ?? $item['media']['representative']['url'] ?? ''));
 $alt = trim((string) ($item['image_alt'] ?? $item['media']['representative']['alt'] ?? ''));
 $label = trim((string) ($item['profile_label'] ?? $args['label'] ?? ''));
 $counts = is_array($item['counts'] ?? null) ? $item['counts'] : [];
