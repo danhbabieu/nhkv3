@@ -1,4 +1,5 @@
 name: Frontend discovery verification
+# rerun after assertion fix
 on:
   push:
     branches: [feature/frontend-discovery-redesign-20261002]
