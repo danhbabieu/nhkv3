@@ -27,7 +27,7 @@ final class DictionaryHarvesterTest extends TestCase
         };
         $resolver = new DictionaryResolver(static fn (): array => [], static fn (): array => [], static fn (): array => [], static fn (): array => [], static fn (): bool => false);
         $planning = new DictionaryPlanningService(new DictionaryTermDetector(), $resolver, $candidates, $mentions, new DictionaryLinkPlanner(), static fn (): string => '00000000-0000-7000-8000-000000000001');
-        $result = (new DictionaryHarvester($planning))->harvest([['source_kind' => 'MEDIA', 'source_id' => 'asset-1', 'text' => 'Côn máng', 'context' => ['weak_sources' => ['filename']]]]);
+        $result = (new DictionaryHarvester($planning))->harvest([['source_kind' => 'MEDIA', 'source_id' => 'asset-1', 'text' => 'Côn máng', 'context' => ['weak_sources' => ['filename']], 'hints' => ['Côn máng']]]);
         self::assertSame('MEDIA', $result['items'][0]['source_kind']);
         self::assertFalse($result['items'][0]['semantic_write']);
         self::assertSame(1, $candidates->writes);

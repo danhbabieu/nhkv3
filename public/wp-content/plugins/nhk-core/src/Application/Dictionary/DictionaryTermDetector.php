@@ -23,10 +23,19 @@ final class DictionaryTermDetector
         }
         foreach ($hintLabels as $hint) $this->addIfPresent($out, $text, $hint, 'HINT', 'NORMAL');
 
-        foreach ($this->identifierSpans($text) as $span) {
+        $identifierSpans = $this->identifierSpans($text);
+        foreach ($identifierSpans as $span) {
             $this->add($out, $span, 'IDENTIFIER_SPAN', 'STRONG');
         }
+        for ($index = 0; $index < count($identifierSpans) - 1; $index++) {
+            $left = mb_strpos($text, (string) $identifierSpans[$index]);
+            $right = mb_strpos($text, (string) $identifierSpans[$index + 1], ($left === false ? 0 : $left + mb_strlen((string) $identifierSpans[$index], 'UTF-8')));
+            if ($left === false || $right === false) continue;
+            $between = mb_substr($text, $left + mb_strlen((string) $identifierSpans[$index], 'UTF-8'), $right - $left);
+            foreach ($this->tokens($between) as $token) if ($this->qualityGate->isPredicateWord($token)) $this->add($out, $token, 'DOMAIN_PHRASE', 'WEAK');
+        }
         foreach ($this->properNameSpans($text) as $span) {
+            if ($this->containsApprovedLabel($span, $approvedLabels)) continue;
             $this->add($out, $span, 'PROPER_NAME_SPAN', 'STRONG');
         }
 
@@ -60,6 +69,17 @@ final class DictionaryTermDetector
 
         foreach ($this->genericPhraseSpans($text, $lexicalLabels) as $phrase) {
             $this->add($out, $phrase, 'DOMAIN_PHRASE', 'NORMAL');
+        }
+
+        $strongIdentifierTerms = array_values(array_filter(array_column($out, null), static fn (array $item): bool => in_array($item['origin'] ?? '', ['IDENTIFIER_SPAN', 'TECHNICAL_PATTERN'], true)));
+        usort($strongIdentifierTerms, static fn (array $left, array $right): int => mb_strpos($text, (string) ($left['term'] ?? '')) <=> mb_strpos($text, (string) ($right['term'] ?? '')));
+        for ($index = 0; $index < count($strongIdentifierTerms) - 1; $index++) {
+            $leftTerm = (string) ($strongIdentifierTerms[$index]['term'] ?? '');
+            $rightTerm = (string) ($strongIdentifierTerms[$index + 1]['term'] ?? '');
+            $left = mb_strpos($text, $leftTerm);
+            $right = mb_strpos($text, $rightTerm, ($left === false ? 0 : $left + mb_strlen($leftTerm, 'UTF-8')));
+            if ($left === false || $right === false) continue;
+            foreach ($this->tokens(mb_substr($text, $left + mb_strlen($leftTerm, 'UTF-8'), $right - $left)) as $token) if ($this->qualityGate->isPredicateWord($token)) $this->add($out, $token, 'DOMAIN_PHRASE', 'WEAK');
         }
 
         $out = $this->removeWeakerSubspans($out);
@@ -308,6 +328,9 @@ final class DictionaryTermDetector
                     continue;
                 }
                 if ($this->qualityGate->isBoundaryPhrase($token, $nextToken)) {
+                    if (count($current) === 2 && !$this->qualityGate->isStandaloneLexicalWord((string) $current[0]) && $this->qualityGate->isStandaloneLexicalWord((string) $current[1])) {
+                        $current = [(string) $current[1]];
+                    }
                     $flush();
                     $suppressUntilCapital = false;
                     $skipToken = true;
@@ -346,7 +369,7 @@ final class DictionaryTermDetector
                     continue;
                 }
                 if ($this->qualityGate->isPredicateBoundary($token, $nextToken)) {
-                    if ($this->qualityGate->isLexicalContinuationBoundary($token, $nextToken, count($clauseTokens) - $index - 1, $nextAfterToken)) {
+                    if ($this->qualityGate->isLexicalContinuationBoundary($token, $nextToken, count($clauseTokens) - $index - 1, $nextAfterToken, count($current))) {
                         $current[] = $token;
                         continue;
                     }
@@ -366,7 +389,7 @@ final class DictionaryTermDetector
                     $flush();
                 }
                 if ($this->qualityGate->isBoundaryWord($token) && !$this->qualityGate->isModifierWord($token)) {
-                    if ($this->qualityGate->isLexicalContinuationBoundary($token, $nextToken, count($clauseTokens) - $index - 1, $nextAfterToken)) {
+                    if ($this->qualityGate->isLexicalContinuationBoundary($token, $nextToken, count($clauseTokens) - $index - 1, $nextAfterToken, count($current))) {
                         $current[] = $token;
                         continue;
                     }
@@ -385,6 +408,29 @@ final class DictionaryTermDetector
                 $current[] = $token;
             }
             $flush();
+        }
+        foreach (preg_split('/[.!?;,:\n“”"\']+/u', $text) ?: [] as $clause) {
+            $tokens = $this->tokens(trim($clause, " \t,()[]{}\"'"));
+            $coveredUntil = 0;
+            for ($start = 0; $start < count($tokens); $start++) {
+                if ($start < $coveredUntil) continue;
+                if ($start > 0 && $this->qualityGate->isBoundaryPhrase((string) $tokens[$start - 1], (string) $tokens[$start])) continue;
+                if ($this->qualityGate->isDiscourseStart((string) ($tokens[$start] ?? ''))) continue;
+                for ($length = min(6, count($tokens) - $start); $length >= 2; $length--) {
+                    $candidate = implode(' ', array_slice($tokens, $start, $length));
+                    if ($start + $length < count($tokens) && $this->qualityGate->isBoundaryPhrase((string) $tokens[$start + $length], (string) ($tokens[$start + $length + 1] ?? ''))) continue;
+                    $hasBoundaryPhrase = false;
+                    for ($offset = $start; $offset < $start + $length - 1; $offset++) if ($this->qualityGate->isBoundaryPhrase((string) $tokens[$offset], (string) $tokens[$offset + 1])) $hasBoundaryPhrase = true;
+                    if ($hasBoundaryPhrase) continue;
+                    if (!$this->qualityGate->isTechnicalCompound($candidate)) continue;
+                    $bounded = $this->qualityGate->filter($candidate, $lexicalLabels);
+                    if ($bounded !== null && $bounded === $candidate) {
+                        $this->appendGenericSpan($spans, $this->tokens($candidate));
+                        $coveredUntil = $start + $length;
+                        break;
+                    }
+                }
+            }
         }
         return array_values($spans);
     }
@@ -422,10 +468,6 @@ final class DictionaryTermDetector
         $value = implode(' ', $tokens);
         if ($this->isEditorialOrNoisePhrase($value)) return;
         $spans[$this->normalizer->normalize($value)] = $value;
-        if (count($tokens) === 2 && in_array(mb_strtolower((string) $tokens[0], 'UTF-8'), ['bộ', 'cụm', 'hệ', 'van'], true) && mb_strlen((string) $tokens[1], 'UTF-8') <= 4) {
-            $atomic = (string) $tokens[1];
-            $spans[$this->normalizer->normalize($atomic)] = $atomic;
-        }
     }
 
     private function isEditorialOrNoisePhrase(string $value): bool
@@ -454,10 +496,26 @@ final class DictionaryTermDetector
     {
         $pattern = '/(?<![\p{L}])((?:\p{Lu}[\p{L}]+(?:-\p{Lu}[\p{L}]+)+)(?:\s+\p{Lu}[\p{L}]+(?:-\p{Lu}[\p{L}]+)?){1,3})(?![\p{L}])/u';
         $spans = [];
-        if (preg_match_all($pattern, $text, $matches)) foreach ($matches[1] as $value) $spans[] = trim((string) $value);
+        if (preg_match_all($pattern, $text, $matches)) foreach ($matches[1] as $value) {
+            $value = trim((string) $value);
+            $first = preg_split('/\s+/u', $value)[0] ?? '';
+            if (!$this->qualityGate->isDiscourseStart($first) && !in_array(mb_strtolower($first, 'UTF-8'), ['bản', 'mẫu', 'chiếc', 'một', 'các', 'những'], true)) $spans[] = $value;
+        }
         $contextPattern = '/\b(?:chiếc|mẫu|hãng|chữ|tên|thương\s+hiệu)\s+(\p{Lu}[\p{L}]{2,})\b/u';
         if (preg_match_all($contextPattern, $text, $contextMatches)) foreach ($contextMatches[1] as $value) $spans[] = trim((string) $value);
+        $namePattern = '/(?<![\p{L}])((?:\p{Lu}[\p{L}]{1,})(?:\s+\p{Lu}[\p{L}]{1,}){1,3})(?![\p{L}])/u';
+        if (preg_match_all($namePattern, $text, $nameMatches)) foreach ($nameMatches[1] as $value) {
+            $value = trim((string) $value);
+            $first = preg_split('/\s+/u', $value)[0] ?? '';
+            if (!$this->qualityGate->isDiscourseStart($first) && !in_array(mb_strtolower($first, 'UTF-8'), ['bản', 'mẫu', 'chiếc', 'một', 'các', 'những'], true)) $spans[] = $value;
+        }
         return array_values(array_unique($spans));
+    }
+
+    private function containsApprovedLabel(string $span, array $approvedLabels): bool
+    {
+        foreach ($approvedLabels as $label) if ($this->present($span, trim((string) $label))) return true;
+        return false;
     }
 
     private function removeWeakerSubspans(array $items): array
@@ -468,9 +526,7 @@ final class DictionaryTermDetector
         )));
 
         foreach ($items as $normalized => $item) {
-            if (in_array($item['origin'] ?? '', ['KNOWN_LABEL', 'HINT', 'MUSIC_NAME', 'PROPER_NAME_SPAN', 'IDENTIFIER_SPAN', 'TECHNICAL_PATTERN'], true)) continue;
             $candidateParts = preg_split('/\s+/u', trim((string) $normalized)) ?: [];
-            if (count($candidateParts) === 2 && $this->qualityGate->isCompoundLead((string) $candidateParts[0], (string) $candidateParts[1])) continue;
             foreach ($containers as $strong) {
                 if ((string) $normalized === $strong) continue;
                 $strongItem = $items[$strong] ?? null;
@@ -478,9 +534,11 @@ final class DictionaryTermDetector
                     unset($items[$normalized]);
                     break;
                 }
+                $strongItem = $items[$strong] ?? null;
+                $strongerEvidence = is_array($strongItem) && $this->evidenceRankForItem($strongItem) > $this->evidenceRankForItem($item);
                 $strongParts = preg_split('/\s+/u', trim($strong)) ?: [];
-                if (count($candidateParts) === 1 && count($strongParts) === 2 && in_array($strongParts[0], ['bộ', 'cụm', 'hệ', 'van'], true) && mb_strlen((string) $candidateParts[0], 'UTF-8') <= 4) continue;
-                if ($this->isTokenSubspan((string) $normalized, $strong) || $this->isIdentifierFragment((string) $normalized, $strong)) {
+                $longerSameEvidence = is_array($strongItem) && $this->evidenceRankForItem($strongItem) === $this->evidenceRankForItem($item) && (count($strongParts) > count($candidateParts) || mb_strlen($strong, 'UTF-8') > mb_strlen((string) $normalized, 'UTF-8'));
+                if (($this->isTokenSubspan((string) $normalized, $strong) && ($strongerEvidence || $longerSameEvidence)) || $this->isIdentifierFragment((string) $normalized, $strong)) {
                     unset($items[$normalized]);
                     break;
                 }
@@ -493,7 +551,14 @@ final class DictionaryTermDetector
     {
         $candidateParts = preg_split('/\s+/u', trim($candidate)) ?: [];
         $containerParts = preg_split('/\s+/u', trim($container)) ?: [];
-        if ($candidateParts === [] || count($candidateParts) >= count($containerParts)) return false;
+        if ($candidateParts === []) return false;
+        if (count($candidateParts) < count($containerParts)) {
+            for ($offset = 0; $offset <= count($containerParts) - count($candidateParts); $offset++) {
+                if (array_slice($containerParts, $offset, count($candidateParts)) === $candidateParts) return true;
+            }
+        }
+        $candidateParts = preg_split('/\s+/u', preg_replace('/[-‐‑‒–—―]/u', ' ', trim($candidate)) ?? trim($candidate)) ?: [];
+        $containerParts = preg_split('/\s+/u', preg_replace('/[-‐‑‒–—―]/u', ' ', trim($container)) ?? trim($container)) ?: [];
         for ($offset = 0; $offset <= count($containerParts) - count($candidateParts); $offset++) {
             if (array_slice($containerParts, $offset, count($candidateParts)) === $candidateParts) return true;
         }
@@ -509,13 +574,22 @@ final class DictionaryTermDetector
         return str_starts_with($container, $candidate . '/') || str_starts_with($container, $candidate . '.');
     }
 
+    private function evidenceRankForItem(array $item): int
+    {
+        $origin = (string) ($item['origin'] ?? '');
+        if (in_array($origin, ['KNOWN_LABEL', 'HINT', 'IDENTIFIER_SPAN'], true)) return 4;
+        if (in_array($origin, ['PROPER_NAME_SPAN', 'TECHNICAL_PATTERN', 'STRUCTURAL_CONFIGURATION', 'MUSIC_NAME'], true)) return 3;
+        if (in_array($origin, ['QUOTED_PHRASE', 'HYPHENATED_NAME'], true)) return 2;
+        if ($origin === 'DOMAIN_PHRASE' && ($item['evidence_status'] ?? '') === 'QUALIFIED' && $this->qualityGate->isTechnicalCompound((string) ($item['term'] ?? ''))) return 2;
+        return 1;
+    }
+
     private function evidenceStatus(string $term, string $origin): string
     {
         if (in_array($origin, ['KNOWN_LABEL', 'HINT', 'PROPER_NAME_SPAN', 'IDENTIFIER_SPAN', 'TECHNICAL_PATTERN', 'HYPHENATED_NAME', 'QUOTED_PHRASE', 'STRUCTURAL_CONFIGURATION', 'MUSIC_NAME'], true)) return 'QUALIFIED';
         if ($origin === 'DOMAIN_PHRASE' && $this->qualityGate->isTechnicalCompound($term)) return 'QUALIFIED';
         if ($origin === 'DOMAIN_PHRASE') return 'OBSERVATION_ONLY';
-        $parts = preg_split('/\s+/u', trim($term)) ?: [];
-        return count($parts) >= 2 ? 'QUALIFIED' : 'OBSERVATION_ONLY';
+        return 'OBSERVATION_ONLY';
     }
 
     private function evidenceReason(string $term, string $origin): string

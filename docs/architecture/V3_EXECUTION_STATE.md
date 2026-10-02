@@ -1,5 +1,44 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-02 — Shared lexical style invariance and structural evidence (LOCAL / NO MUTATION)
+
+ROOT_CAUSES_FIXED: Shared lexical segmentation was greedy around grammatical
+boundary/predicate tokens, so technical compounds changed identity when moved
+between list, declarative, definition, question, attribution and conjunction
+contexts. The structural evidence gate also treated generic multi-token prose
+as technical truth, and overlap arbitration did not consistently suppress
+strong proper-name/identifier interiors or preserve the strongest short label.
+
+IMPLEMENTED: Boundary continuation now uses reusable grammar/structural context
+without phrase-specific or domain-head allowlists. Technical compounds are
+qualified only after structural validation; generic/editorial fragments remain
+OBSERVATION_ONLY or are suppressed. Numeric configurations require eligible
+structural units, identifiers retain precedence, proper-name spans are
+deduplicated by evidence strength, and frequency is not used as lexical proof.
+Explicit hints/approved labels remain the supported evidence path for otherwise
+unknown terms.
+
+REGRESSION: Added unseen style matrix coverage for list, assertion, definition,
+question, attribution, conjunction, predicate-tail and identifier contexts;
+technical compounds, editorial noise, unknown observations, numeric
+configurations and proper names pass. Focused lexical/holdout/provenance suite
+passes 67 tests / 446 assertions. Dictionary/Semantic targeted suite passes
+463 tests / 2,380 assertions. Article/MCP sentinel suite passes 25 tests / 146
+assertions. Contract suite passes 6 tests / 48 assertions. Changed-scope PHP
+lint, diff check and secret review pass.
+
+FULL_UNIT_BASELINE: Under 512M, 2,892 tests / 17,275 assertions complete with
+the same one WpdbArticleOperationReceiptRepository TypeError and three existing
+KnowledgeQuality/KnowledgeWriterPreview failures recorded at the prior base.
+Default memory reproduces the environment OOM in
+TrustedProvidedFileMaterializerTest while allocating 52,428,801 bytes under
+128M. No new lexical failure is present.
+
+NO_DATA_MUTATION: `read_only=true`, `mutated=false`; no schema, migration,
+seed, backfill, staging, production state or deployment was changed.
+
+STATUS: `SHARED_LEXICAL_STYLE_INVARIANCE_LOCAL_READY / NO_MUTATION / DEPLOYMENT_NOT_PERFORMED`.
+
 # Checkpoint — 2026-10-01 — Universal lexical acquisition acceptance closure (LOCAL / NO MUTATION)
 
 ROOT_CAUSE_FIXED: `DictionarySeedCorpusAuditCoordinator` now treats

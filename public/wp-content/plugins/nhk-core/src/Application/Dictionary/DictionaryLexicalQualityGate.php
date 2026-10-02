@@ -24,7 +24,7 @@ final class DictionaryLexicalQualityGate
         'thay vì', 'mặc dù', 'bởi vì', 'cho nên', 'vì vậy', 'do đó', 'để mà', 'đồng thời',
     ];
     private const MODIFIER_PREFIX_WORDS = ['tự'];
-    private const NON_CONTINUATION_BOUNDARIES = ['mà', 'và', 'hoặc', 'là', 'có', 'cho', 'với', 'của', 'được', 'trong', 'trên', 'nhưng', 'về', 'này', 'đó', 'thì'];
+    private const NON_CONTINUATION_BOUNDARIES = ['mà', 'và', 'hoặc', 'là', 'có', 'cho', 'với', 'của', 'được', 'trong', 'trên', 'nhưng', 'về', 'này', 'đó', 'thì', 'also', 'quite', 'very', 'and', 'or', 'to', 'of', 'in', 'on', 'are', 'is', 'was', 'were', 'the'];
     /** Lexical heads that can be grammatical boundary words when followed by a continuation. */
     private const COMPOUND_LEAD_WORDS = ['điều', 'nhận'];
     /** Generic predicate/aspect markers, not article-specific discard phrases. */
@@ -33,12 +33,13 @@ final class DictionaryLexicalQualityGate
         'ghi', 'giúp', 'giống', 'giải', 'giữ', 'hoạt', 'khảo', 'kể', 'khiến', 'lên', 'mở', 'nghĩ', 'phân', 'tách', 'tham', 'xác', 'lưu', 'chơi', 'thích', 'thấy', 'biết', 'yên',
         'nhận', 'nhìn', 'nói', 'quay', 'sống', 'suy', 'tạo', 'tiếp', 'tinh', 'xoay', 'sang', 'ra', 'đời', 'xuống',
         'tồn', 'tránh', 'trở', 'xem', 'yêu', 'đánh', 'đi', 'đến', 'dùng', 'bảo', 'truyền', 'động', 'mô', 'tả',
+        'xuất', 'hiện', 'ổn', 'định', 'chia', 'sẻ', 'khác', 'bằng', 'cách', 'gì', 'tư', 'duy', 'gồm', 'chính', 'thức', 'tuyệt', 'đối', 'trạng', 'cao', 'trị',
         'dễ', 'hãy', 'đừng', 'phải', 'muốn',
     ];
     private const NON_LEXICAL_SINGLE_WORDS = [
         'bác', 'bài', 'cả', 'các', 'câu', 'chẳng', 'chúng', 'đây', 'điều', 'độ', 'giá', 'họ', 'khách', 'một', 'tên',
         'người', 'nó', 'những', 'sự', 'ta', 'thể', 'vậy', 'vì', 'với', 'cần',
-        'mức', 'phần', 'trang', 'thuộc', 'tính', 'đồng', 'dòng', 'lặng', 'việc', 'bên', 'ông', 'gần', 'rằng', 'tưởng', 'chính', 'chiếc', 'dấu', 'rộng', 'ngay', 'xuyên', 'lâu', 'động', 'khu',
+        'mức', 'phần', 'trang', 'thuộc', 'tính', 'đồng', 'dòng', 'lặng', 'việc', 'bên', 'ông', 'gần', 'rằng', 'tưởng', 'chính', 'chiếc', 'dấu', 'rộng', 'ngay', 'xuyên', 'lâu', 'động', 'khu', 'vật', 'bộ', 'số',
     ];
 
     public function isBoundaryWord(string $word): bool
@@ -63,26 +64,26 @@ final class DictionaryLexicalQualityGate
         return $this->isPredicateWord($normalized);
     }
 
-    public function isLexicalContinuationBoundary(string $word, string $nextWord, int $remainingTokens, string $nextAfter = ''): bool
+    public function isLexicalContinuationBoundary(string $word, string $nextWord, int $remainingTokens, string $nextAfter = '', int $prefixTokens = 0): bool
     {
-        if ($remainingTokens !== 1 && !$this->isBoundaryWord($nextAfter)) return false;
+        if ($remainingTokens !== 1 && !$this->isBoundaryWord($nextAfter) && !$this->isPredicateWord($nextAfter)) return false;
         $word = $this->word($word);
         $nextWord = $this->word($nextWord);
         if ($word === '' || $nextWord === '') return false;
         if (in_array($word, self::NON_CONTINUATION_BOUNDARIES, true)) return false;
         if ($word === 'truyền') return true;
+        if ($prefixTokens > 0 && $this->isBoundaryWord($word) && $this->isLexicalContinuation($nextWord)) return true;
+        if ($prefixTokens >= 2 && $this->isBoundaryWord($word) && $this->isBoundaryWord($nextWord)) return true;
         if (!$this->isLexicalContinuation($nextWord) && !($this->isBoundaryWord($word) && $this->isBoundaryWord($nextWord))) return false;
         return $this->isPredicateBoundary($word, $nextWord)
-            || ($word === 'từ' && $this->isBoundaryWord($nextWord));
+            || ($this->isBoundaryWord($word) && $this->isBoundaryWord($nextWord));
     }
 
     public function isLexicalContinuationTail(string $previousWord, string $word): bool
     {
         if ($this->isPredicateWord($word) && ($this->word($previousWord) === 'truyền' || $this->isModifierWord($previousWord))) return true;
-        if ($this->word($previousWord) === 'truyền' && $this->isBoundaryWord($word)) return true;
-        return $this->word($previousWord) === 'từ'
-            && !in_array($this->word($word), self::NON_CONTINUATION_BOUNDARIES, true)
-            && $this->isBoundaryWord($word);
+        if ($this->isBoundaryWord($previousWord) && $this->isBoundaryWord($word)) return true;
+        return false;
     }
 
     public function isTechnicalCompound(string $phrase): bool
@@ -90,21 +91,49 @@ final class DictionaryLexicalQualityGate
         $parts = preg_split('/\s+/u', trim($phrase)) ?: [];
         if (count($parts) < 2 || count($parts) > 6) return false;
         $normalized = array_map(fn (string $part): string => $this->word($part), $parts);
-        if (in_array('mô', $normalized, true) || in_array('tả', $normalized, true)) return false;
+        $lexicalCount = 0;
         foreach ($normalized as $index => $word) {
             $next = $normalized[$index + 1] ?? '';
             $remaining = count($normalized) - $index - 1;
-            if ($index === count($normalized) - 1 && $index > 0 && $this->isBoundaryWord($word) && ($this->isBoundaryWord($normalized[$index - 1]) || $this->isPredicateWord($normalized[$index - 1]) || $this->isModifierWord($normalized[$index - 1]))) continue;
+            $previous = $normalized[$index - 1] ?? '';
+            $prefixHasGrammar = false;
+            foreach (array_slice($normalized, 0, $index) as $prefixWord) if ($this->isBoundaryWord($prefixWord) || $this->isPredicateWord($prefixWord)) {
+                $prefixHasGrammar = true;
+                break;
+            }
+            if (in_array($word, self::NON_CONTINUATION_BOUNDARIES, true)) return false;
             if ($this->isModifierWord($word)) continue;
-            if ($this->isBoundaryWord($word) && !$this->isCompoundLead($word, $next) && !$this->isLexicalContinuationBoundary($word, $next, $remaining)) return false;
-            if ($this->isPredicateWord($word) && !($this->word($normalized[$index - 1] ?? '') === 'truyền' || $this->isModifierWord($normalized[$index - 1] ?? '')) && !$this->isLexicalContinuationBoundary($word, $next, $remaining)) return false;
+            if ($this->isStandaloneLexicalWord($word)) $lexicalCount++;
+            if ($this->isPredicateWord($word)) {
+                $validTail = $this->word($previous) === 'truyền'
+                    || $this->isModifierWord($previous)
+                    || ($this->isCompoundLead($word, $next) && $remaining === 1)
+                    || ($this->isStandaloneLexicalWord($previous) && !$prefixHasGrammar && $remaining === 1 && ($this->isStandaloneLexicalWord($next) || $this->isBoundaryWord($next)))
+                    || ($index === 1 && !$this->isStandaloneLexicalWord($previous) && $remaining === 1 && $this->isPredicateWord($next))
+                    || ($this->isBoundaryWord($previous) && $remaining === 0);
+                if (!$validTail) return false;
+                continue;
+            }
+            if ($this->isBoundaryWord($word)) {
+                if ($this->isCompoundLead($word, $next)) continue;
+                if ($index > 0 && $this->isStandaloneLexicalWord($next)) continue;
+                if ($index >= 2 && $this->isBoundaryWord($next)) continue;
+                if ($next === '' && ($this->isPredicateWord($previous) || $this->isStandaloneLexicalWord($previous))) continue;
+                return false;
+            }
+            if (!$this->isStandaloneLexicalWord($word)
+                && !($index === 0 && (($this->isStandaloneLexicalWord($next) && ($this->isStandaloneLexicalWord($normalized[$index + 2] ?? '') || ($normalized[$index + 2] ?? '') === '' || $this->isPredicateWord($normalized[$index + 2] ?? ''))) || ($this->isPredicateWord($next) && $this->isPredicateWord($normalized[$index + 2] ?? ''))))
+                && !($index > 0 && $this->isStandaloneLexicalWord($previous) && ($this->isStandaloneLexicalWord($next) || $next === ''))) return false;
         }
         $asciiCompound = count($normalized) === 2
             && preg_match('/^[a-z][a-z-]*$/', (string) $normalized[0]) === 1
             && preg_match('/^[a-z][a-z-]*$/', (string) $normalized[1]) === 1;
-        return count($normalized) >= 3 || $this->isCompoundLead((string) ($normalized[0] ?? ''), (string) ($normalized[1] ?? ''))
-            || $asciiCompound
-            || in_array((string) ($normalized[0] ?? ''), ['bộ', 'cụm', 'hệ', 'van', 'côn', 'màng', 'trục', 'cần', 'mặt', 'đồng'], true);
+        if ($asciiCompound) return true;
+        if (count($normalized) === 2) {
+            return ($this->isStandaloneLexicalWord((string) ($normalized[0] ?? '')) && !$this->isStandaloneLexicalWord((string) ($normalized[1] ?? '')))
+                || (!$this->isStandaloneLexicalWord((string) ($normalized[0] ?? '')) && $this->isStandaloneLexicalWord((string) ($normalized[1] ?? '')));
+        }
+        return count($normalized) >= 3;
     }
 
     public function isWeakDiscourseBoundary(string $word): bool
@@ -148,7 +177,7 @@ final class DictionaryLexicalQualityGate
     {
         $normalized = $this->word($word);
         return $normalized !== ''
-            && preg_match('/^[\p{L}][\p{L}-]{2,}$/u', $normalized) === 1
+            && preg_match('/^[\p{L}][\p{L}-]{1,}$/u', $normalized) === 1
             && !$this->isBoundaryWord($normalized)
             && !$this->isPredicateWord($normalized)
             && !in_array($normalized, self::NON_LEXICAL_SINGLE_WORDS, true);
@@ -190,15 +219,11 @@ final class DictionaryLexicalQualityGate
                 break;
             }
             if ($this->isCompoundLead($word, $nextWord)) continue;
-            if ($word === 'từ' && $nextWord === 'trở') continue;
-            // “từ trở” is a lexical technical construction; “trở” is only a
-            // clause predicate when it is not attached to that construction.
-            if ($word === 'trở' && $previousWord === 'từ') continue;
             if ($word === 'cần' && $this->isPredicateWord($nextWord)) {
                 $parts = array_slice($parts, 0, $index);
                 break;
             }
-            if ($this->isLexicalContinuationBoundary($word, $nextWord, count($parts) - $index - 1, $nextAfterWord)) continue;
+            if ($this->isLexicalContinuationBoundary($word, $nextWord, count($parts) - $index - 1, $nextAfterWord, $index)) continue;
             if ($this->isLexicalContinuationTail($previousWord, $word)) continue;
             if ($index === count($parts) - 1 && $this->isBoundaryWord($word) && ($this->isBoundaryWord($previousWord) || $this->isPredicateWord($previousWord) || $this->isModifierWord($previousWord))) continue;
             if ($word !== '' && $this->isPredicateBoundary($word, $nextWord)) {

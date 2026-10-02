@@ -515,4 +515,55 @@ final class DictionaryTermDetectorTest extends TestCase
         }
     }
 
+    public function test_technical_span_is_style_invariant_across_shared_input_forms(): void
+    {
+        $detector = new DictionaryTermDetector();
+        $texts = [
+            'Bộ dẫn hướng từ trở, cơ cấu truyền lực và cần gạt chọn nhạc.',
+            'Bộ dẫn hướng từ trở hoạt động ổn định.',
+            'Bộ dẫn hướng từ trở hoạt động thế nào?',
+            'Các bộ phận gồm bộ dẫn hướng từ trở và trục điều tốc.',
+            'Theo tài liệu, bộ dẫn hướng từ trở được mô tả là một cơ cấu.',
+            '“Bộ dẫn hướng từ trở” là một cơ cấu kỹ thuật.',
+        ];
+
+        foreach ($texts as $text) {
+            $terms = array_column($detector->detect($text), 'normalized_term');
+            self::assertContains('bộ dẫn hướng từ trở', $terms, $text);
+            self::assertNotContains('bộ dẫn hướng', $terms, $text);
+            self::assertNotContains('bộ dẫn hướng từ trở hoạt động', $terms, $text);
+        }
+    }
+
+    public function test_unseen_editorial_grammar_does_not_become_a_qualified_phrase(): void
+    {
+        $items = (new DictionaryTermDetector())->detect('Khách bảo mẫu, khách nói chiếc, khách chia sẻ bằng tư duy; xem ebay và xuất hiện nhiều.');
+        $qualified = array_column(array_filter($items, static fn (array $item): bool => ($item['evidence_status'] ?? '') === 'QUALIFIED'), 'normalized_term');
+
+        foreach (['khách bảo mẫu', 'khách nói chiếc', 'khách chia sẻ', 'bằng tư duy', 'xem ebay', 'xuất hiện nhiều'] as $phrase) {
+            self::assertNotContains($phrase, $qualified);
+        }
+    }
+
+    public function test_numeric_configuration_requires_structural_units_not_just_two_word_pairs(): void
+    {
+        $detector = new DictionaryTermDetector();
+        $invalid = $detector->detect('17 alpha 19 khác.');
+        $valid = $detector->detect('17 alpha 19 beta.');
+
+        self::assertNotContains('17 alpha 19 khác', array_column($invalid, 'normalized_term'));
+        self::assertContains('17 alpha 19 beta', array_column($valid, 'normalized_term'));
+    }
+
+    public function test_strong_proper_name_suppresses_its_weak_interior_spans(): void
+    {
+        $items = (new DictionaryTermDetector())->detect('Jean-Léon Reutter và Nguyễn Văn An được ghi nhận.');
+        $terms = array_column($items, 'normalized_term');
+
+        self::assertContains('jean-léon reutter', $terms);
+        self::assertContains('nguyễn văn an', $terms);
+        self::assertNotContains('léon reutter', $terms);
+        self::assertNotContains('nguyễn văn', $terms);
+    }
+
 }
