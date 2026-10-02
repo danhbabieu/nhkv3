@@ -5,7 +5,13 @@ $semantic = is_array($home['semantic'] ?? null) ? $home['semantic'] : [];
 $heroMedia = is_array($semantic['hero_media'] ?? null) ? array_slice($semantic['hero_media'], 0, 1) : [];
 $latestFeed = is_array($home['latest_feed'] ?? null) ? $home['latest_feed'] : [];
 $primaryNavigation = (array) (nhk_v3_navigation_groups()['primary'] ?? []);
-$heroEntryPoints = array_values(array_filter($primaryNavigation, static fn (mixed $item): bool => is_array($item) && in_array((string) ($item['label'] ?? ''), ['Thương hiệu', 'Nhóm đồng hồ'], true)));
+$heroEntryPoints = array_values(array_filter($primaryNavigation, static fn (mixed $item): bool => is_array($item) && in_array((string) ($item['label'] ?? ''), ['Sản phẩm', 'Thương hiệu', 'Loại đồng hồ', 'Từ điển'], true)));
+$gatewayDescriptions = [
+    'Sản phẩm' => 'Xem các hồ sơ sản phẩm đang có trong kho.',
+    'Thương hiệu' => 'Tra cứu nhà sản xuất và hồ sơ thương hiệu.',
+    'Loại đồng hồ' => 'Duyệt các nhóm đồng hồ đã được biên tập.',
+    'Từ điển' => 'Tra thuật ngữ và cách gọi của người chơi.',
+];
 $fallback = get_theme_file_uri('/assets/default-archive.svg');
 get_header();
 ?>
@@ -14,9 +20,9 @@ get_header();
     <div class="hero-copy-block">
       <p class="eyebrow">Kho tri thức · hiện vật thật · nghiên cứu thật</p>
       <h1>Kho tri thức đồng hồ cổ<br> <em>dành cho người chơi và sưu tầm.</em></h1>
-      <p class="hero-copy">Khám phá thương hiệu, nhóm đồng hồ và những câu chuyện trong kho NHK.</p>
+      <p class="hero-copy">Tra cứu sản phẩm, thương hiệu, loại đồng hồ, thuật ngữ và nội dung trong kho NHK.</p>
       <?php get_search_form(); ?>
-      <?php if ($heroEntryPoints !== []): ?><nav class="hero-entry-points" aria-label="Khám phá chính"><?php foreach ($heroEntryPoints as $item): ?><a href="<?php echo esc_url(home_url((string) $item['path'])); ?>"><?php echo esc_html((string) $item['label']); ?><span aria-hidden="true">→</span></a><?php endforeach; ?></nav><?php endif; ?>
+      <?php if ($heroEntryPoints !== []): ?><nav class="hero-entry-points" aria-label="Tra cứu chính"><?php foreach ($heroEntryPoints as $item): $gatewayLabel = (string) ($item['label'] ?? ''); ?><a href="<?php echo esc_url(home_url((string) $item['path'])); ?>"><span class="hero-entry-copy"><strong><?php echo esc_html($gatewayLabel); ?></strong><small><?php echo esc_html((string) ($gatewayDescriptions[$gatewayLabel] ?? 'Mở khu vực tra cứu.')); ?></small></span><span class="hero-entry-arrow" aria-hidden="true">→</span></a><?php endforeach; ?></nav><?php endif; ?>
     </div>
     <div class="hero-media-column">
     <div class="hero-visual" aria-label="Ảnh nổi bật từ kho NHK">
@@ -31,12 +37,12 @@ get_header();
   <section class="home-latest-feed" aria-labelledby="home-latest-title">
     <div class="section-head"><div><p class="eyebrow">Mới cập nhật</p><h2 id="home-latest-title">Mới nhất trong kho</h2><p class="section-deck">Những cập nhật mới nhất từ toàn bộ kho dữ liệu.</p></div></div>
     <div class="latest-feed-list">
-      <?php foreach (array_slice($latestFeed, 0, 4) as $item): $url = nhk_v3_public_url($item['url'] ?? null); if ($url === '') continue; $attachmentId = (int) ($item['attachment_id'] ?? 0); $imageUrl = trim((string) ($item['image_url'] ?? '')); $imageSrcset = trim((string) ($item['image_srcset'] ?? $item['srcset'] ?? '')); $imageSizes = trim((string) ($item['image_sizes'] ?? $item['sizes'] ?? '')); $imageWidth = max(1, (int) ($item['width'] ?? 0)); $imageHeight = max(1, (int) ($item['height'] ?? 0)); ?>
+      <?php foreach (array_slice($latestFeed, 0, 4) as $item): $url = nhk_v3_public_url($item['url'] ?? null); if ($url === '') continue; $attachmentId = (int) ($item['attachment_id'] ?? 0); $imageUrl = trim((string) ($item['thumbnail_url'] ?? $item['image_url'] ?? '')); $imageSrcset = trim((string) ($item['image_srcset'] ?? $item['srcset'] ?? '')); $imageSizes = trim((string) ($item['image_sizes'] ?? $item['sizes'] ?? '')); $imageWidth = max(1, (int) ($item['width'] ?? 0)); $imageHeight = max(1, (int) ($item['height'] ?? 0)); ?>
         <article class="latest-feed-card latest-feed-row">
           <a class="latest-feed-card-link" href="<?php echo esc_url($url); ?>">
             <span class="latest-feed-card-thumb" aria-hidden="true">
               <?php if ($attachmentId > 0 && function_exists('wp_get_attachment_image')): ?>
-                <?php echo wp_get_attachment_image((int) $item['attachment_id'], 'medium_large', false, ['class' => 'latest-feed-card-image', 'loading' => 'lazy', 'sizes' => $imageSizes !== '' ? $imageSizes : '(max-width: 767px) 120px, 220px']); ?>
+                <?php echo wp_get_attachment_image((int) $item['attachment_id'], 'medium', false, ['class' => 'latest-feed-card-image', 'loading' => 'lazy', 'decoding' => 'async', 'sizes' => $imageSizes !== '' ? $imageSizes : '(max-width: 767px) 104px, 120px']); ?>
               <?php elseif ($imageUrl !== ''): ?>
                 <img class="latest-feed-card-image" src="<?php echo esc_url($imageUrl); ?>" alt="" width="<?php echo esc_attr((string) $imageWidth); ?>" height="<?php echo esc_attr((string) $imageHeight); ?>"<?php if ($imageSrcset !== ''): ?> srcset="<?php echo esc_attr($imageSrcset); ?>"<?php endif; ?><?php if ($imageSizes !== ''): ?> sizes="<?php echo esc_attr($imageSizes); ?>"<?php endif; ?> loading="lazy" decoding="async">
               <?php else: ?><img class="latest-feed-card-image fallback-visual" src="<?php echo esc_url($fallback); ?>" alt="" width="640" height="400" loading="lazy" decoding="async"><?php endif; ?>
