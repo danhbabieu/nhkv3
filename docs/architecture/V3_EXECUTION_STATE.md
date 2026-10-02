@@ -21287,3 +21287,31 @@ lint and changed-file lint pass; `git diff --check` passes; review of added
 lines found no credential, token or private-key material.
 
 STATUS: `DICTIONARY_LEXICAL_PROVENANCE_LOCAL_READY / FULL_UNIT_BASELINE_GAPS / NO_LIVE_MUTATION / NO_PUSH / NO_DEPLOY`.
+# Checkpoint — 2026-10-02 — Public discovery navigation and gateway redesign (LOCAL / NO MUTATION)
+
+IMPLEMENTED: Reordered the shared public navigation to the canonical discovery-first
+sequence (Sản phẩm, Thương hiệu, Loại đồng hồ, Từ điển, Tri thức), grouped visual,
+video and semantic destinations under one Khám phá control, and removed the
+duplicate desktop/mobile global Clock Type menus. Clock Type presentation
+navigation remains context-owned by /loai-dong-ho/. The homepage now presents
+four reader gateways, retains unified latest-before-featured ordering, and uses
+medium derivatives plus bounded image sizes for compact feed thumbnails.
+Media cards prefer projection-provided thumbnail URLs/srcset/sizes. Sidebar and
+footer consume the shared navigation definition. No semantic/runtime schema,
+identity, route owner, Graph, Media ingest, or data record changed.
+
+REGRESSION: Added focused contracts for exact navigation order, single global
+Clock Type destination, four homepage gateways, and compact feed derivatives.
+
+VERIFICATION: Frontend/presentation focused suite passed 67 tests / 349
+assertions with one existing warning and PHPUnit deprecations. Full Unit ran
+3,076 tests / 17,363 assertions but remains baseline/environment-gated with 33
+integration errors, 25 unrelated existing unit failures, 122 skips, warnings
+and deprecations; no changed-path frontend failure remained after updating the
+obsolete navigation-label assertion. Changed PHP files lint clean, navigation
+JavaScript syntax check passed, git diff --check passed. Browser/runtime
+smoke was not available because the local WordPress/MySQL runtime is not
+verified in this checkpoint. No database, staging, production mutation,
+deployment or cutover was performed.
+
+STATUS: PUBLIC_DISCOVERY_FRONTEND_LOCAL_READY / BROWSER_RUNTIME_NOT_VERIFIED / BASELINE_SUITE_GATED / NO_MUTATION

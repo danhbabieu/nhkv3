@@ -42,3 +42,11 @@ Version: 1.2.0
 .hero-image-frame{display:grid;place-items:center;width:100%;aspect-ratio:4/3;overflow:hidden}
 .hero-image-frame img{display:block;width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;object-position:center center}
 @media(max-width:48rem){.home-hero-v2{display:block}.hero-media-column{margin-top:24px}.hero-visual{width:100%;max-width:none;margin:0}}
+
+/* Discovery gateways stay readable across the requested viewport range. */
+.hero-gateways{grid-template-columns:repeat(2,minmax(0,1fr));max-width:620px}
+.hero-gateways .hero-entry-card{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto auto;align-items:center;gap:4px 12px;min-height:70px}
+.hero-gateways .hero-entry-card strong{font-size:.95rem}
+.hero-gateways .hero-entry-card span{grid-column:1;color:var(--nhk-muted);font-size:.78rem;line-height:1.35}
+.hero-gateways .hero-entry-card b{grid-column:2;grid-row:1 / span 2;color:var(--nhk-accent);font-size:1.1rem}
+@media(max-width:30rem){.hero-gateways{grid-template-columns:1fr}.hero-gateways .hero-entry-card{min-height:64px}}

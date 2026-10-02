@@ -230,7 +230,7 @@ final class FrontendContractTest extends TestCase
         }
         self::assertStringContainsString('EntityPresentationViewModel', $dossier);
         self::assertStringContainsString('function nhk_v3_navigation_items', $functions);
-        self::assertStringContainsString("'label' => 'Nhóm đồng hồ'", (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/Presentation/PublicNavigationDefinition.php'));
+        self::assertStringContainsString("'label' => 'Loại đồng hồ'", (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/Presentation/PublicNavigationDefinition.php'));
         self::assertStringContainsString('nhk_v3_nav_fallback()', $header);
     }
 

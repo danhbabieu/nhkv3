@@ -11,12 +11,15 @@ final class PublicNavigationDefinition
     {
         return [
             'primary' => [
+                ['label' => 'Sản phẩm', 'path' => '/san-pham/'],
                 ['label' => 'Thương hiệu', 'path' => '/thuong-hieu/'],
-                ['label' => 'Nhóm đồng hồ', 'path' => '/loai-dong-ho/'],
+                ['label' => 'Loại đồng hồ', 'path' => '/loai-dong-ho/'],
+                ['label' => 'Từ điển', 'path' => '/tu-dien/'],
                 ['label' => 'Tri thức', 'path' => '/tri-thuc/'],
-                ['label' => 'Video', 'path' => '/video/'],
             ],
             'discovery' => [
+                ['label' => 'Hình ảnh', 'path' => '/thu-vien/'],
+                ['label' => 'Video', 'path' => '/video/'],
                 ['label' => 'Mẫu', 'path' => '/mau/'],
                 ['label' => 'Bộ máy', 'path' => '/bo-may/'],
                 ['label' => 'Bản nhạc', 'path' => '/ban-nhac/'],
@@ -27,20 +30,24 @@ final class PublicNavigationDefinition
             ],
             'footer' => [
                 'Tra cứu' => [
+                    ['label' => 'Sản phẩm', 'path' => '/san-pham/'],
                     ['label' => 'Thương hiệu', 'path' => '/thuong-hieu/'],
-                    ['label' => 'Nhóm đồng hồ', 'path' => '/loai-dong-ho/'],
-                    ['label' => 'Mẫu', 'path' => '/mau/'],
-                    ['label' => 'Bộ máy', 'path' => '/bo-may/'],
+                    ['label' => 'Loại đồng hồ', 'path' => '/loai-dong-ho/'],
+                    ['label' => 'Từ điển', 'path' => '/tu-dien/'],
                 ],
                 'Nội dung' => [
                     ['label' => 'Tri thức', 'path' => '/tri-thuc/'],
+                    ['label' => 'Hình ảnh', 'path' => '/thu-vien/'],
                     ['label' => 'Video', 'path' => '/video/'],
                     ['label' => 'Góc chia sẻ', 'path' => '/goc-chia-se/'],
                 ],
-                'Công cụ' => [
-                    ['label' => 'So sánh', 'path' => '/so-sanh/'],
+                'Khám phá' => [
+                    ['label' => 'Mẫu', 'path' => '/mau/'],
+                    ['label' => 'Bộ máy', 'path' => '/bo-may/'],
+                    ['label' => 'Bản nhạc', 'path' => '/ban-nhac/'],
                     ['label' => 'Linh kiện', 'path' => '/linh-kien/'],
                     ['label' => 'Hiện vật', 'path' => '/hien-vat/'],
+                    ['label' => 'So sánh', 'path' => '/so-sanh/'],
                 ],
             ],
         ];

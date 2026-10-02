@@ -171,6 +171,35 @@ final class FrontendPresentationContractTest extends TestCase
         self::assertStringContainsString("\$groups['discovery']", $functions);
     }
 
+    public function test_global_navigation_has_the_canonical_discovery_first_order(): void
+    {
+        $definition = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/Presentation/PublicNavigationDefinition.php');
+        $header = $this->read('header.php');
+
+        $expected = ['Sản phẩm', 'Thương hiệu', 'Loại đồng hồ', 'Từ điển', 'Tri thức'];
+        $positions = array_map(static fn (string $label): int|false => strpos($definition, "'label' => '{$label}'"), $expected);
+        self::assertNotContains(false, $positions);
+        self::assertSame($positions, array_values($positions));
+        self::assertStringContainsString("'label' => 'Hình ảnh'", $definition);
+        self::assertStringContainsString("'label' => 'Video'", $definition);
+        self::assertStringContainsString("'label' => 'Góc chia sẻ'", $definition);
+        self::assertStringContainsString('Khám phá', $header);
+        self::assertStringNotContainsString('LOẠI trên điện thoại', $header);
+        self::assertStringNotContainsString('nav-type-menu', $header);
+    }
+
+    public function test_homepage_has_four_reader_gateways_and_compact_feed_derivative(): void
+    {
+        $source = $this->read('front-page.php');
+        $definition = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/Presentation/PublicNavigationDefinition.php');
+        foreach (['Sản phẩm', 'Thương hiệu', 'Loại đồng hồ', 'Từ điển', 'hero-gateways'] as $needle) {
+            self::assertStringContainsString($needle, $source);
+        }
+        self::assertStringContainsString("'medium'", $source);
+        self::assertStringNotContainsString("wp_get_attachment_image((int) \$item['attachment_id'], 'medium_large'", $source);
+        self::assertStringContainsString("'label' => 'Sản phẩm'", $definition);
+    }
+
     public function test_homepage_gallery_is_bound_to_public_asset_delivery_before_projection(): void
     {
         $plugin = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Plugin.php');
