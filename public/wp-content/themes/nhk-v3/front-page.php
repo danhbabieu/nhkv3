@@ -42,9 +42,9 @@ get_header();
           <a class="latest-feed-card-link" href="<?php echo esc_url($url); ?>">
             <span class="latest-feed-card-thumb" aria-hidden="true">
               <?php if ($attachmentId > 0 && function_exists('wp_get_attachment_image')): ?>
-                <?php echo wp_get_attachment_image((int) $item['attachment_id'], 'medium', false, ['class' => 'latest-feed-card-image', 'loading' => 'lazy', 'decoding' => 'async', 'sizes' => $imageSizes !== '' ? $imageSizes : '(max-width: 767px) 104px, 120px']); ?>
+                <?php echo wp_get_attachment_image((int) $item['attachment_id'], 'medium', false, ['class' => 'latest-feed-card-image', 'loading' => 'lazy', 'decoding' => 'async', 'sizes' => '(max-width: 767px) 104px, 120px']); ?>
               <?php elseif ($imageUrl !== ''): ?>
-                <img class="latest-feed-card-image" src="<?php echo esc_url($imageUrl); ?>" alt="" width="<?php echo esc_attr((string) $imageWidth); ?>" height="<?php echo esc_attr((string) $imageHeight); ?>"<?php if ($imageSrcset !== ''): ?> srcset="<?php echo esc_attr($imageSrcset); ?>"<?php endif; ?><?php if ($imageSizes !== ''): ?> sizes="<?php echo esc_attr($imageSizes); ?>"<?php endif; ?> loading="lazy" decoding="async">
+                <img class="latest-feed-card-image" src="<?php echo esc_url($imageUrl); ?>" alt="" width="<?php echo esc_attr((string) $imageWidth); ?>" height="<?php echo esc_attr((string) $imageHeight); ?>"<?php if ($imageSrcset !== ''): ?> srcset="<?php echo esc_attr($imageSrcset); ?>"<?php endif; ?> sizes="(max-width: 767px) 104px, 120px" loading="lazy" decoding="async">
               <?php else: ?><img class="latest-feed-card-image fallback-visual" src="<?php echo esc_url($fallback); ?>" alt="" width="640" height="400" loading="lazy" decoding="async"><?php endif; ?>
             </span>
             <span class="latest-feed-row-body"><span class="latest-feed-row-meta"><span class="latest-feed-badge"><?php echo esc_html((string) ($item['label'] ?? 'Nội dung')); ?></span></span><span class="latest-feed-card-title"><?php echo esc_html((string) ($item['title'] ?? '')); ?></span><?php if (trim((string) ($item['summary'] ?? '')) !== ''): ?><span class="latest-feed-card-summary"><?php echo esc_html((string) ($item['summary'] ?? '')); ?></span><?php endif; ?></span>
