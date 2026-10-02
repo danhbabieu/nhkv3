@@ -129,7 +129,8 @@ final class PublicEntityRoutes
         } else {
             $page = max(1, (int) get_query_var('nhk_entity_page', 1)); $query = trim((string) get_query_var('nhk_entity_q')); $profile = trim((string) get_query_var('nhk_entity_profile'));
             $path = $profile !== '' ? $this->query->archivePathForProfile($profile) : $this->query->archivePath($type);
-            $archive = $profile !== '' ? $this->query->archiveProfile($profile, $page, 24, $query) : $this->query->archive($type, $page, 24, $query);
+            $archiveQuery = self::archiveQueryForPresentation($profile, $query);
+            $archive = $profile !== '' ? $this->query->archiveProfile($profile, $page, 24, $archiveQuery) : $this->query->archive($type, $page, 24, $query);
             if ($profile !== '' && (string) ($archive['type'] ?? '') !== $type) { $this->set404(); return get_404_template(); }
             $GLOBALS['nhk_core_entity_context'] = ['mode' => 'archive', 'type' => $type, 'profile' => $profile, 'archive' => $archive, 'archive_url' => home_url($path ?? '/'), 'seo_projection' => $this->seo($path)];
         }
@@ -158,6 +159,11 @@ final class PublicEntityRoutes
         $segment = trim($capturedSegment, " /\t\n\r\0\x0B");
         if ($segment === '') return '';
         return self::profileDetailRoutePrefix($profileKey) . $segment;
+    }
+
+    public static function archiveQueryForPresentation(string $profileKey, string $query): string
+    {
+        return $profileKey === 'clock_type' ? '' : trim($query);
     }
 
     private static function profileDetailRoutePrefix(string $profileKey): string

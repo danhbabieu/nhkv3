@@ -1,5 +1,44 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-02 — Public entity hub presentation + curated Clock Type boundary (LOCAL / NO MUTATION)
+
+IMPLEMENTED: Added a bounded public entity archive presentation map for Brand,
+Product, Specimen, Model, Movement, Music, Component, Classification and
+curated Clock Type. Each hub now has reader-facing purpose, tailored summary,
+search placeholder and truthful empty copy. Product explicitly remains a
+listing/profile boundary distinct from Specimen; Clock Type is presented as
+the top-level “Loại đồng hồ” destination.
+
+CLOCK_TYPE_BOUNDARY: PublicEntityRoutes now ignores `nhk_entity_q` only for
+the curated `clock_type` presentation route, so `/loai-dong-ho/?nhk_entity_q=x`
+still requests curated Presentation Navigation. PublicEntityCollectionQuery
+and SearchSemanticQuery were not changed; global semantic search continues to
+use `archiveProfile('clock_type', ..., term)`.
+
+EMPTY_AND_FILTER: Archive templates distinguish unavailable storage, query
+no-match and genuinely empty archives. Filtered archives expose an active
+query status and canonical reset link. Curated Clock Type renders no generic
+entity filter. No new query, count projection, N+1 lookup, semantic owner,
+relation, route or schema was introduced.
+
+CHILD_NAVIGATION: When `navigation_children` and semantic hierarchy children
+carry the same names, the presentation renders one child-navigation surface;
+different projections remain separate and are not merged.
+
+REGRESSION: Focused PublicEntityRoutes, FrontendContract,
+PresentationNavigation, SearchSemanticQuery, PublicEntityCollectionQuery and
+ClockTypeFrontendAcceptance suite passes 93 tests / 832 assertions. Changed
+PHP files lint clean and `git diff --check` passes. Changed-scope secret review
+found no credential-like additions.
+
+BROWSER_QA: Not performed; no local HTTP/browser runtime was available for
+this undeployed HEAD. No staging build was used as evidence.
+
+NO_DATA_MUTATION: `read_only=true`, `mutated=false`; no database, migration,
+semantic record, staging, production state or deployment action occurred.
+
+STATUS: `PUBLIC_ENTITY_HUB_PRESENTATION_LOCAL_READY / CLOCK_TYPE_BOUNDARY_LOCKED / BROWSER_RUNTIME_PENDING / NO_MUTATION / UNDEPLOYED`.
+
 # Checkpoint — 2026-10-02 — Search + Dictionary first-class discovery frontend (LOCAL / NO MUTATION)
 
 IMPLEMENTED: Search now treats posts, Entity profiles, images, Video and

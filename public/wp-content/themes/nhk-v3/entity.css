@@ -36,6 +36,10 @@
 .support-card-body time{font-size:.76rem}
 .home-sections{padding-bottom:36px}
 
+.entity-archive-status{margin-top:18px;color:var(--nhk-muted)}
+.entity-filter-reset{font-weight:700;color:var(--nhk-accent);text-decoration:underline;text-underline-offset:3px}
+.entity-filter-reset:focus-visible{outline:2px solid var(--nhk-accent);outline-offset:3px}
+
 @media(max-width:47.999rem){
   .featured-image{max-height:none;aspect-ratio:16/8}
   .featured-body h3{font-size:1.45rem}

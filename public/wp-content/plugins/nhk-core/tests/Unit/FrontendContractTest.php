@@ -78,6 +78,21 @@ final class FrontendContractTest extends TestCase
         self::assertStringNotContainsString('01a09872-6af8-7890-90b7-f913fab7bee4', $entity);
     }
 
+    public function test_public_entity_hubs_have_distinct_presentation_and_clock_type_has_no_generic_filter(): void
+    {
+        $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
+        $functions = (string) file_get_contents($theme . '/functions.php');
+        $entity = (string) file_get_contents($theme . '/entity.php');
+        self::assertStringContainsString('nhk_v3_entity_archive_presentation', $functions);
+        self::assertStringContainsString("'Sản phẩm'", $functions);
+        self::assertStringContainsString('sản phẩm hoặc listing', $functions);
+        self::assertStringContainsString('if ($archivePresentation[\'allow_filter\'])', $entity);
+        self::assertStringContainsString('Kết quả cho', $entity);
+        self::assertStringContainsString('entity-filter-reset', $entity);
+        self::assertStringContainsString('Không tìm thấy', $entity);
+        self::assertStringNotContainsString('Nhóm đồng hồ\' : \'Khám phá', $entity);
+    }
+
     public function test_collector_branch_reader_uses_the_post_id_capture_from_wordpress_stable_keys(): void
     {
         $bootstrap = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Frontend/FrontendSemanticBootstrap.php');

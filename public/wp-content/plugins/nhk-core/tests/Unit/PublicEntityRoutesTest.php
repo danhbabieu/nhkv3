@@ -35,4 +35,10 @@ final class PublicEntityRoutesTest extends TestCase
         self::assertSame('dong-ho-thap', PublicEntityRoutes::profileDetailRouteKey('clock_type', 'thap'));
         self::assertSame('', PublicEntityRoutes::profileDetailRouteKey('clock_type', ''));
     }
+
+    public function test_curated_clock_type_archive_ignores_public_filter_query_without_changing_search_semantics(): void
+    {
+        self::assertSame('', PublicEntityRoutes::archiveQueryForPresentation('clock_type', 'pendulum'));
+        self::assertSame('pendulum', PublicEntityRoutes::archiveQueryForPresentation('brand', 'pendulum'));
+    }
 }
