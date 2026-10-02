@@ -70,10 +70,12 @@ final class FrontendContractTest extends TestCase
         $entity = (string) file_get_contents($theme . '/entity.php');
         $index = (string) file_get_contents($theme . '/index.php');
         $routes = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/PublicEntityRoutes.php');
+        $plugin = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Plugin.php');
         self::assertStringContainsString("profile_key", $entity);
         self::assertStringContainsString("profile_badge", $index);
         self::assertStringContainsString("archiveProfile", $routes);
         self::assertStringContainsString("nhk_entity_profile", $routes);
+        self::assertStringContainsString("private const REWRITE_VERSION = '11';", $plugin);
         self::assertStringNotContainsString('Đồng hồ công cộng', $entity);
         self::assertStringNotContainsString('01a09872-6af8-7890-90b7-f913fab7bee4', $entity);
     }

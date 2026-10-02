@@ -1,5 +1,19 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-02 — Real local browser QA + verified Clock Type rewrite repair (LOCAL / NO SEMANTIC MUTATION)
+
+BASELINE: `main` was clean at `96b0e126` (`feat(frontend): refine public entity hub discovery`). Apache was listening on local port 80 and MySQL on `127.0.0.1:3306`; shell probes were sandbox-blocked, but the in-app browser successfully rendered the current local HEAD.
+
+BROWSER_QA: Read-only local browser review covered `/`, all requested hub/archive routes except the unavailable Dictionary surface, `/loai-dong-ho/?nhk_entity_q=test`, `/` search with matching and non-matching terms, Brand detail `/odo/`, Article detail `/con-va-bua-tren-carillon-vedette-cach-doc-dung-cau-hinh-bo-go/`, and deliberate 404. The browser confirmed `#main-content`, a working skip link, semantic mobile menu disclosure and curated Clock Type behavior. The initial `/loai-dong-ho/` 404 was reproduced; the direct query-var route rendered, proving a stale rewrite-version boundary rather than a missing template.
+
+FIX: Bumped the plugin rewrite version from `10` to `11`, causing the existing guarded rewrite flush on the next local request. `/loai-dong-ho/` then resolved in the real browser and showed the honest unavailable-storage state. No semantic owner, relation, content, migration, staging or production data was changed; only the existing local rewrite-option invalidation path was exercised.
+
+DICTIONARY: `/tu-dien/` remained a real 404 because Dictionary public routes register only when Dictionary schema is available, while this local runtime reports that storage as unavailable. No migration or fixture seeding was performed to manufacture a Dictionary state. This remains `RUNTIME_GATED`, not a browser PASS.
+
+REGRESSION: The new Clock Type frontend contract test failed before the production change and passes after it. Focused PHPUnit, PHP lint, `git diff --check` and changed-scope secret review remain required before commit. Viewport overrides and DOM evaluation (`scrollWidth`, `currentSrc`, `naturalWidth`) were not exposed by the active CUA browser surface, so no viewport matrix or image-network PASS is claimed.
+
+STATUS: `BROWSER_QA_PARTIAL / CLOCK_TYPE_REWRITE_REPAIRED / DICTIONARY_RUNTIME_GATED / NO_SEMANTIC_MUTATION / UNDEPLOYED`.
+
 # Checkpoint — 2026-10-02 — Public entity hub presentation + curated Clock Type boundary (LOCAL / NO MUTATION)
 
 IMPLEMENTED: Added a bounded public entity archive presentation map for Brand,

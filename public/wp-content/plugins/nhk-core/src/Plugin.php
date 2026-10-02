@@ -87,7 +87,7 @@ use NHK\Core\Infrastructure\Capture\{WpdbCaptureAddendumRepository, WpdbCaptureR
 use NHK\Core\Infrastructure\Snapshot\SnapshotRuntimeComposition;
 
 final class Plugin {
-    private const REWRITE_VERSION = '10';
+    private const REWRITE_VERSION = '11';
     public static function boot(string $pluginFile): void {
         global $wpdb;
         $captureRepository = isset($wpdb) && is_object($wpdb) ? new WpdbCaptureRepository($wpdb) : null;
