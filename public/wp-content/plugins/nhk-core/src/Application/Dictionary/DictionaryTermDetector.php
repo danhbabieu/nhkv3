@@ -311,6 +311,7 @@ final class DictionaryTermDetector
         foreach (preg_split('/[.!?;,:\n“”"\']+/u', $text) ?: [] as $clause) {
             $current = [];
             $suppressUntilCapital = false;
+            $suppressPredicateTail = false;
             $skipToken = false;
             $flush = function () use (&$spans, &$current, $lexicalLabels): void {
                 if ($current === []) return;
@@ -323,6 +324,10 @@ final class DictionaryTermDetector
                 $nextToken = $clauseTokens[$index + 1] ?? '';
                 $nextAfterToken = $clauseTokens[$index + 2] ?? '';
                 $previousToken = $clauseTokens[$index - 1] ?? '';
+                if ($suppressPredicateTail) {
+                    if ($this->isCoordinatingToken($token)) $suppressPredicateTail = false;
+                    continue;
+                }
                 if ($skipToken) {
                     $skipToken = false;
                     continue;
@@ -369,6 +374,13 @@ final class DictionaryTermDetector
                     continue;
                 }
                 if ($this->qualityGate->isPredicateBoundary($token, $nextToken)) {
+                    if ($nextToken !== ''
+                        && $current !== []
+                        && $this->qualityGate->isTechnicalCompound(implode(' ', $current))) {
+                        $flush();
+                        $suppressPredicateTail = true;
+                        continue;
+                    }
                     if ($this->qualityGate->isLexicalContinuationBoundary($token, $nextToken, count($clauseTokens) - $index - 1, $nextAfterToken, count($current))) {
                         $current[] = $token;
                         continue;
@@ -411,13 +423,21 @@ final class DictionaryTermDetector
         }
         foreach (preg_split('/[.!?;,:\n“”"\']+/u', $text) ?: [] as $clause) {
             $tokens = $this->tokens(trim($clause, " \t,()[]{}\"'"));
+            $blockedPredicateTail = $this->predicateTailIndexes($tokens);
             $coveredUntil = 0;
             for ($start = 0; $start < count($tokens); $start++) {
-                if ($start < $coveredUntil) continue;
+                if ($start < $coveredUntil || isset($blockedPredicateTail[$start])) continue;
                 if ($start > 0 && $this->qualityGate->isBoundaryPhrase((string) $tokens[$start - 1], (string) $tokens[$start])) continue;
                 if ($this->qualityGate->isDiscourseStart((string) ($tokens[$start] ?? ''))) continue;
                 for ($length = min(6, count($tokens) - $start); $length >= 2; $length--) {
-                    $candidate = implode(' ', array_slice($tokens, $start, $length));
+                    $candidateTokens = array_slice($tokens, $start, $length);
+                    $blocked = false;
+                    for ($offset = $start; $offset < $start + $length; $offset++) if (isset($blockedPredicateTail[$offset])) {
+                        $blocked = true;
+                        break;
+                    }
+                    if ($blocked) continue;
+                    $candidate = implode(' ', $candidateTokens);
                     if ($start + $length < count($tokens) && $this->qualityGate->isBoundaryPhrase((string) $tokens[$start + $length], (string) ($tokens[$start + $length + 1] ?? ''))) continue;
                     $hasBoundaryPhrase = false;
                     for ($offset = $start; $offset < $start + $length - 1; $offset++) if ($this->qualityGate->isBoundaryPhrase((string) $tokens[$offset], (string) $tokens[$offset + 1])) $hasBoundaryPhrase = true;
@@ -433,6 +453,35 @@ final class DictionaryTermDetector
             }
         }
         return array_values($spans);
+    }
+
+    /** @param list<string> $tokens @return array<int,true> */
+    private function predicateTailIndexes(array $tokens): array
+    {
+        $blocked = [];
+        $segmentStart = 0;
+        foreach ($tokens as $index => $token) {
+            if ($this->isCoordinatingToken((string) $token)) {
+                $segmentStart = $index + 1;
+                continue;
+            }
+            $next = (string) ($tokens[$index + 1] ?? '');
+            if ($next === '' || !$this->qualityGate->isPredicateBoundary((string) $token, $next)) continue;
+            $previous = (string) ($tokens[$index - 1] ?? '');
+            if ($this->qualityGate->isLexicalContinuationTail($previous, (string) $token)) continue;
+            $prefixTokens = array_slice($tokens, $segmentStart, $index - $segmentStart);
+            if ($prefixTokens === [] || !$this->qualityGate->isTechnicalCompound(implode(' ', $prefixTokens))) continue;
+            for ($tail = $index; $tail < count($tokens); $tail++) {
+                if ($tail > $index && $this->isCoordinatingToken((string) $tokens[$tail])) break;
+                $blocked[$tail] = true;
+            }
+        }
+        return $blocked;
+    }
+
+    private function isCoordinatingToken(string $token): bool
+    {
+        return in_array(mb_strtolower($token, 'UTF-8'), ['và', 'hoặc', 'nhưng'], true);
     }
 
     /** @param array<string,string> $spans @param list<string> $tokens */

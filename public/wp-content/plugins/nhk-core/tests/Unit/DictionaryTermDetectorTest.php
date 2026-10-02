@@ -343,6 +343,16 @@ final class DictionaryTermDetectorTest extends TestCase
 
         self::assertContains('trục điều tốc', array_column($detector->detect('Trục điều tốc.'), 'normalized_term'));
         self::assertContains('màng đàn hồi', array_column($detector->detect('Màng đàn hồi.'), 'normalized_term'));
+
+        $predicateBoundaries = array_column(
+            $detector->detect('Trục điều tốc giữ tốc độ. Màng đàn hồi truyền lực.'),
+            'normalized_term',
+        );
+        self::assertContains('trục điều tốc', $predicateBoundaries);
+        self::assertContains('màng đàn hồi', $predicateBoundaries);
+        self::assertNotContains('tốc độ', $predicateBoundaries);
+        self::assertNotContains('màng đàn hồi truyền lực', $predicateBoundaries);
+
         $compound = array_column($detector->detect('trục điều tốc, màng đàn hồi, cơ cấu truyền cóc.'), 'normalized_term');
         foreach (['trục điều tốc', 'màng đàn hồi', 'cơ cấu truyền cóc'] as $term) self::assertContains($term, $compound);
     }

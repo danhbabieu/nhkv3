@@ -26,11 +26,11 @@ final class DictionaryLexicalHoldout
                 'text' => 'Cơ cấu truyền cóc, màng đàn hồi truyền lực và trục điều tốc giữ tốc độ. Bộ thoát hoạt động.',
                 'expected' => [
                     'cơ cấu truyền cóc' => 'QUALIFIED',
-                    'màng đàn hồi truyền lực' => 'QUALIFIED',
+                    'màng đàn hồi' => 'QUALIFIED',
                     'trục điều tốc' => 'QUALIFIED',
                     'bộ thoát' => 'QUALIFIED',
                 ],
-                'forbidden' => ['trục điều tốc giữ tốc độ', 'bộ thoát hoạt động', 'truyền lực và trục'],
+                'forbidden' => ['màng đàn hồi truyền lực', 'tốc độ', 'trục điều tốc giữ tốc độ', 'bộ thoát hoạt động', 'truyền lực và trục'],
                 'gold_complete' => true,
             ],
             [
