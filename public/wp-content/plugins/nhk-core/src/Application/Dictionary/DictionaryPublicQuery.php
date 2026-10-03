@@ -41,8 +41,13 @@ final class DictionaryPublicQuery
         $slug = $this->slug($slug);
         if ($slug === '') return ['status' => 'NOT_FOUND'];
         if ($this->entrySenseAvailable() && is_object($this->entries) && method_exists($this->entries, 'listEntries')) {
+            $matches = [];
             foreach ((array) $this->entries->listEntries(2000) as $entry) {
                 if (!$entry instanceof LexicalEntry || $this->slug((string) ($entry->context['public_slug'] ?? '')) !== $slug) continue;
+                $matches[] = $entry;
+            }
+            if (count($matches) > 1) return ['status' => 'AMBIGUOUS', 'slug' => $slug, 'match_count' => count($matches)];
+            foreach ($matches as $entry) {
                 $senses = array_values(array_filter((array) $this->entries->listSenses($entry), static fn (mixed $sense): bool => $sense instanceof DictionaryConcept && $sense->approved()));
                 $item = $this->entryItem($entry, $senses);
                 if (($item['eligible'] ?? false) !== true) return ['status' => 'INCOMPLETE', 'reason' => 'DICTIONARY_ENTRY_NOT_PUBLIC'];

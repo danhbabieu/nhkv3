@@ -73,6 +73,31 @@ final class DictionaryPublicQueryTest extends TestCase
         self::assertSame('READY', $query->detail('con')['status']);
     }
 
+    public function test_entry_detail_fails_closed_when_public_slug_matches_multiple_entries(): void
+    {
+        $first = new DictionaryConcept('c1', 'Côn máy', 'Nghĩa máy', DictionaryConcept::APPROVED);
+        $second = new DictionaryConcept('c2', 'Côn bút', 'Nghĩa bút', DictionaryConcept::APPROVED);
+        $repo = $this->repository([$first, $second], ['c1' => [], 'c2' => []]);
+        $entries = new class($first, $second) {
+            public function __construct(private DictionaryConcept $first, private DictionaryConcept $second) {}
+            public function listEntries(int $limit = 500): array
+            {
+                return [
+                    new LexicalEntry('e1', 'Côn máy', 'côn máy', DictionaryConcept::APPROVED, 'vi-VN', ['public_slug' => 'con'], 1, [$this->first->conceptId]),
+                    new LexicalEntry('e2', 'Côn bút', 'côn bút', DictionaryConcept::APPROVED, 'vi-VN', ['public_slug' => 'con'], 1, [$this->second->conceptId]),
+                ];
+            }
+            public function listSenses(LexicalEntry $entry, array $context = []): array
+            {
+                return [$entry->entryId === 'e1' ? $this->first : $this->second];
+            }
+        };
+
+        $query = new DictionaryPublicQuery($repo, null, null, $entries);
+
+        self::assertSame('AMBIGUOUS', $query->detail('con')['status']);
+    }
+
     public function test_missing_entry_sense_schema_uses_concept_compatibility_without_calling_entry_repository(): void
     {
         $concept = new DictionaryConcept('c1', 'Vai bò', 'Tên gọi dân gian.', DictionaryConcept::APPROVED, null, null, null, ['public_slug' => 'vai-bo']);
