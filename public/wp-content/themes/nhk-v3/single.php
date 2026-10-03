@@ -100,6 +100,7 @@ $relationLabels = ['brands' => 'Thương hiệu', 'models' => 'Mẫu đồng h�
     </article>
 
     <aside class="context-rail article-rail" aria-label="Ngữ cảnh bài viết">
+      <?php get_template_part('template-parts/presentation/contextual-discovery', null, ['modules' => nhk_v3_contextual_discovery_content_modules($relationSections, 'article')]); ?>
       <?php if ($dictionaryTerms !== []): ?><div class="context-box"><p class="eyebrow">Từ điển trong bài</p><ul class="context-list"><?php foreach ($dictionaryTerms as $term): $url = nhk_v3_public_url($term['url'] ?? null); if ($url === '') continue; ?><li><a href="<?php echo esc_url($url); ?>"><strong><?php echo esc_html((string) ($term['title'] ?? '')); ?></strong><?php if (($term['description'] ?? '') !== ''): ?><span><?php echo esc_html(wp_trim_words((string) $term['description'], 13)); ?></span><?php endif; ?></a></li><?php endforeach; ?></ul></div><?php endif; ?>
       <?php if ($articleDiscovery !== []): ?><div class="context-box"><p class="eyebrow">Khám phá thêm</p><nav aria-label="Khám phá theo bài viết"><?php foreach ($articleDiscovery as $item): ?><a href="<?php echo esc_url(home_url($item['path'])); ?>"><?php echo esc_html($item['label']); ?> <span aria-hidden="true">→</span></a><?php endforeach; ?></nav></div><?php endif; ?>
     </aside>

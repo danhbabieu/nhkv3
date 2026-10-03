@@ -21497,3 +21497,30 @@ unverified; no remote deployed tab was treated as current-head evidence.
 No semantic/database mutation, deployment or cutover was performed.
 
 STATUS: CONTEXTUAL_DISCOVERY_FRONTEND_LOCAL_READY / BROWSER_RUNTIME_NOT_VERIFIED / FULL_UNIT_BASELINE_GAPS / NO_MUTATION / NO_DEPLOY
+
+# Checkpoint — 2026-10-03 — Contextual content discovery (Vòng 8)
+
+IMPLEMENTED: Added a read-only contextual content module that consumes the
+already assembled Entity dossier relation_sections and Article relation
+sections. It renders bounded compact Entity, Media and Video previews only
+when canonical public URLs/content projections exist; empty relations emit no
+fake cards. Full relation sections remain the primary content owner.
+
+PLACEMENT: Entity detail rails now render up to three relation-backed modules;
+Article rails preview Media, Video and related Entity content before the
+link-only contextual suggestions. Media, Video and comparison surfaces add
+downstream navigation after their primary content. Entity archives map
+discovery by brand/model/movement/music/component/specimen/clock type/product
+context. Homepage discovery excludes Hình ảnh and Video when dedicated
+sections already have content. Góc chia sẻ remains CTA-only; no query or fake
+editorial archive was introduced.
+
+VALIDATION: New Vòng 8 RED tests failed before implementation and pass after
+implementation. FrontendPresentationContractTest currently passes after the
+archive expectation was updated for the required context-specific map; changed
+PHP files lint clean and git diff --check is required before commit. Browser
+runtime remains unverified because the local WordPress/MySQL endpoint is not
+available in this checkpoint. No database, staging, production mutation,
+deployment or cutover was performed.
+
+STATUS: CONTEXTUAL_CONTENT_DISCOVERY_FRONTEND_LOCAL_READY / BROWSER_RUNTIME_NOT_VERIFIED / FULL_UNIT_BASELINE_GAPS / NO_MUTATION / NO_DEPLOY

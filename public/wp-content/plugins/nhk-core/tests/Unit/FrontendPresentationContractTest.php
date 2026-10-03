@@ -364,6 +364,56 @@ final class FrontendPresentationContractTest extends TestCase
         self::assertStringContainsString('.context-rail{position:static;padding-top:36px}', $css);
     }
 
+    public function test_v8_contextual_content_modules_are_relation_backed_and_bounded(): void
+    {
+        $functions = $this->read('functions.php');
+        $module = $this->read('template-parts/presentation/contextual-discovery.php');
+        $entity = $this->read('entity.php');
+        $article = $this->read('single.php');
+
+        self::assertStringContainsString('function nhk_v3_contextual_discovery_content_modules', $functions);
+        self::assertStringContainsString('array_slice($items, 0, $limit)', $functions);
+        self::assertStringContainsString("'content_backed' => true", $functions);
+        self::assertStringContainsString('nhk_v3_media_presentation', $module);
+        self::assertStringContainsString('video-card', $module);
+        self::assertStringContainsString('nhk_v3_contextual_discovery_content_modules', $entity);
+        self::assertStringContainsString('nhk_v3_contextual_discovery_content_modules', $article);
+        self::assertStringContainsString('$relationSections', $entity);
+        self::assertStringContainsString('$relationSections', $article);
+    }
+
+    public function test_v8_archive_maps_are_context_specific_and_homepage_excludes_dedicated_branches(): void
+    {
+        $functions = $this->read('functions.php');
+        $entity = $this->read('entity.php');
+        $home = $this->read('front-page.php');
+
+        self::assertStringContainsString("'archive_brand' =>", $functions);
+        self::assertStringContainsString("'archive_movement' =>", $functions);
+        self::assertNotSame(strpos($functions, "'archive_brand' =>"), strpos($functions, "'archive_movement' =>"));
+        self::assertStringContainsString('$archiveContext', $entity);
+        self::assertStringContainsString("archive_' . $type", $entity);
+        self::assertStringContainsString('$homeDiscoveryExcluded', $home);
+        self::assertStringContainsString("'media'", $home);
+        self::assertStringContainsString("'videos'", $home);
+    }
+
+    public function test_v8_downstream_discovery_follows_media_video_and_comparison_primary_content(): void
+    {
+        $media = $this->read('media.php');
+        $video = $this->read('video.php');
+        $comparison = $this->read('comparison.php');
+
+        self::assertStringContainsString('media-downstream-discovery', $media);
+        self::assertStringContainsString('video-downstream-discovery', $video);
+        self::assertStringContainsString('comparison-downstream-discovery', $comparison);
+        self::assertStringContainsString("nhk_v3_contextual_discovery_items('media')", $media);
+        self::assertStringContainsString("nhk_v3_contextual_discovery_items('video')", $video);
+        self::assertStringContainsString("nhk_v3_contextual_discovery_items('comparison')", $comparison);
+        self::assertStringContainsString('entity-pagination', $media);
+        self::assertStringContainsString('entity-pagination', $video);
+    }
+
     public function test_homepage_and_entity_archives_place_bounded_discovery_after_primary_content(): void
     {
         $home = $this->readTheme('front-page.php');
@@ -371,7 +421,7 @@ final class FrontendPresentationContractTest extends TestCase
 
         self::assertStringContainsString("nhk_v3_contextual_discovery_items('homepage')", $home);
         self::assertStringContainsString('class="contextual-discovery archive-discovery"', $entity);
-        self::assertStringContainsString("nhk_v3_contextual_discovery_items('archive')", $entity);
+        self::assertStringContainsString('$archiveContext', $entity);
         self::assertStringContainsString('</main>', $home);
     }
 

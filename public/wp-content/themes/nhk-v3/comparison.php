@@ -20,4 +20,5 @@ get_header();
       </section>
     <?php else: ?><div class="empty"><h2>Chưa đủ hồ sơ để so sánh</h2><p>Chỉ hồ sơ đang hoạt động mới được hiển thị. Nhập đường dẫn hồ sơ đã có trong NHK.</p></div><?php endif; ?>
   <?php else: ?><div class="empty comparison-help"><h2>Bắt đầu từ hai hồ sơ</h2><p>Nhập hai đường dẫn hồ sơ để đọc cạnh nhau.</p></div><?php endif; ?>
+  <section class="contextual-discovery comparison-downstream-discovery"><p class="eyebrow">Khám phá tiếp</p><h2>Tiếp tục đọc trong NHK</h2><nav class="topic-cloud" aria-label="Khám phá tiếp sau so sánh"><?php foreach (nhk_v3_contextual_discovery_items('comparison') as $item): ?><a href="<?php echo esc_url(home_url($item['path'])); ?>"><?php echo esc_html($item['label']); ?> →</a><?php endforeach; ?></nav></section>
 </main><?php get_footer();

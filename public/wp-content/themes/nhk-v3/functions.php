@@ -91,6 +91,15 @@ function nhk_v3_contextual_discovery_items(string $context, array $availableGrou
         'media' => ['specimens', 'models', 'videos', 'share'],
         'video' => ['media', 'specimens', 'models', 'share'],
         'archive' => ['media', 'videos', 'models'],
+        'archive_brand' => ['models', 'movements', 'specimens', 'media', 'comparison'],
+        'archive_model' => ['movements', 'music', 'components', 'specimens', 'media'],
+        'archive_movement' => ['models', 'components', 'specimens', 'media', 'videos'],
+        'archive_music' => ['videos', 'models', 'movements', 'media'],
+        'archive_component' => ['movements', 'models', 'specimens', 'media'],
+        'archive_specimen' => ['media', 'videos', 'models', 'movements'],
+        'archive_clock_type' => ['models', 'specimens', 'media', 'videos'],
+        'archive_product' => ['specimens', 'models', 'media', 'comparison'],
+        'comparison' => ['models', 'movements', 'specimens', 'media'],
         'search' => ['media', 'videos', 'share'],
         'homepage' => ['media', 'videos', 'models', 'movements', 'comparison', 'share'],
         'sidebar' => ['media', 'videos', 'models', 'movements'],
@@ -130,6 +139,28 @@ function nhk_v3_contextual_discovery_items(string $context, array $availableGrou
         return true;
     }));
     return array_slice($selected, 0, 5);
+}
+
+/** @param array<string,mixed> $relationSections @return list<array<string,mixed>> */
+function nhk_v3_contextual_discovery_content_modules(array $relationSections, string $context = ''): array
+{
+    $order = $context === 'article' ? ['media', 'videos', 'models', 'movements', 'articles'] : ['models', 'movements', 'music', 'components', 'specimens', 'media', 'videos', 'articles'];
+    $labels = ['models' => 'Mẫu liên quan', 'movements' => 'Bộ máy liên quan', 'music' => 'Bản nhạc liên quan', 'components' => 'Linh kiện liên quan', 'specimens' => 'Hiện vật liên quan', 'media' => 'Hình ảnh liên quan', 'videos' => 'Video liên quan', 'articles' => 'Bài viết liên quan'];
+    $modules = [];
+    foreach ($order as $group) {
+        $items = is_array($relationSections[$group] ?? null) ? $relationSections[$group] : [];
+        $items = array_values(array_filter($items, static function ($item) use ($group): bool {
+            if (!is_array($item)) return false;
+            if ($group === 'media') return nhk_v3_media_presentation($item)['url'] !== '' && nhk_v3_media_content_url($item) !== '';
+            return trim((string) ($item['title'] ?? $item['name'] ?? '')) !== '' && nhk_v3_public_url($item['url'] ?? null) !== '';
+        }));
+        if ($items === []) continue;
+        $kind = $group === 'media' ? 'media' : ($group === 'videos' ? 'video' : ($group === 'articles' ? 'article' : 'entity'));
+        $limit = $kind === 'video' ? 2 : ($kind === 'media' ? 3 : 2);
+        $modules[] = ['kind' => $kind, 'group' => $group, 'title' => $labels[$group] ?? 'Liên quan', 'items' => array_slice($items, 0, $limit), 'content_backed' => true];
+        if (count($modules) >= 3) break;
+    }
+    return $modules;
 }
 
 /** @return array<string,string> */
