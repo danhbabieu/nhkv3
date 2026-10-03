@@ -1,0 +1,71 @@
+<?php
+declare(strict_types=1);
+
+namespace NHK\Tests\Unit;
+
+use NHK\Core\Application\Dictionary\DictionaryEnrichmentAudit;
+use NHK\Core\Domain\Dictionary\{DictionaryConcept, LexicalEntry, LexicalEntryForm};
+use PHPUnit\Framework\TestCase;
+
+final class DictionaryEnrichmentAuditTest extends TestCase
+{
+    public function test_audit_is_bounded_and_preserves_explicit_coverage_states(): void
+    {
+        $sense = new DictionaryConcept('sense-1', '400 ngày', 'Đồng hồ.', DictionaryConcept::APPROVED, 'classification', 'owner-1', null, ['approved_legacy_labels' => ['400-Day Clock']]);
+        $entry = new LexicalEntry('entry-1', '400 ngày', '400 ngày', DictionaryConcept::APPROVED, 'vi-VN', ['public_slug' => '400-ngay'], 4, ['sense-1']);
+        $entries = new class($entry, $sense) {
+            public function __construct(private LexicalEntry $entry, private DictionaryConcept $sense) {}
+            public function listEntries(int $limit): array { return [$this->entry]; }
+            public function listSenses(LexicalEntry $entry): array { return [$this->sense]; }
+            public function listForms(LexicalEntry $entry): array { return [new LexicalEntryForm($entry->entryId, '400 ngày', '400 ngày', LexicalEntryForm::PREFERRED, 'vi-VN')]; }
+            public function semanticReference(string $entryId, string $senseId): array { return ['status' => 'PRESENT_VALID', 'type' => 'classification', 'id' => 'owner-1', 'revision' => 3]; }
+        };
+        $audit = new DictionaryEnrichmentAudit(
+            $entries,
+            new class { public function listLabels(string $id, bool $active = true): array { return []; } },
+            static fn (string $type, string $id, array $context = []): array => [
+                'knowledge' => ['status' => 'EMPTY', 'count' => 0],
+                'media' => ['status' => 'UNAVAILABLE', 'count' => 0],
+                'video' => ['status' => 'AVAILABLE', 'count' => 2],
+                'articles' => ['status' => 'AVAILABLE', 'count' => 1],
+                'brands' => ['status' => 'EMPTY', 'count' => 0],
+                'models' => ['status' => 'EMPTY', 'count' => 0],
+                'specimens' => ['status' => 'EMPTY', 'count' => 0],
+                'mentions' => ['status' => 'AVAILABLE', 'count' => 4, 'by_kind' => ['ARTICLE' => 2, 'VIDEO' => 2]],
+                'related_terms' => ['status' => 'AVAILABLE', 'count' => 1],
+            ],
+            static fn (DictionaryConcept $sense): array => ['classification' => 'EXACT_UNIQUE', 'target' => ['type' => $sense->destinationType, 'id' => $sense->destinationId], 'evidence' => ['explicit_legacy_destination'], 'reason' => 'explicit destination'],
+        );
+
+        $result = $audit->audit(1);
+
+        self::assertSame('AVAILABLE', $result['status']);
+        self::assertTrue($result['read_only']);
+        self::assertFalse($result['mutated']);
+        self::assertCount(1, $result['items']);
+        self::assertSame('PRESENT_VALID', $result['items'][0]['semantic_reference']['status']);
+        self::assertSame('UNAVAILABLE', $result['items'][0]['coverage']['media']['status']);
+        self::assertSame(2, $result['items'][0]['mentions']['by_kind']['ARTICLE']);
+        self::assertSame('OWNER_GAP', $result['items'][0]['classification']);
+    }
+
+    public function test_audit_cursor_continues_without_scanning_public_detail_unboundedly(): void
+    {
+        $make = static fn (string $id, string $label): LexicalEntry => new LexicalEntry($id, $label, strtolower($label), DictionaryConcept::APPROVED, 'vi-VN', [], 1, [$id . '-sense']);
+        $entries = new class($make('entry-1', 'Một'), $make('entry-2', 'Hai')) {
+            public function __construct(private LexicalEntry $one, private LexicalEntry $two) {}
+            public function listEntries(int $limit): array { return [$this->one, $this->two]; }
+            public function listSenses(LexicalEntry $entry): array { return [new DictionaryConcept($entry->senseIds[0], $entry->preferredForm, 'Nghĩa', DictionaryConcept::APPROVED)]; }
+            public function listForms(LexicalEntry $entry): array { return []; }
+            public function semanticReference(string $entryId, string $senseId): array { return ['status' => 'ABSENT']; }
+        };
+        $audit = new DictionaryEnrichmentAudit($entries, new class { public function listLabels(string $id, bool $active = true): array { return []; } }, static fn (): array => [], static fn (): array => ['classification' => 'NO_OWNER']);
+
+        $first = $audit->audit(1);
+        $second = $audit->audit(1, $first['next_cursor']);
+
+        self::assertTrue($first['has_more']);
+        self::assertSame('entry-2', $second['items'][0]['entry_id']);
+        self::assertFalse($second['has_more']);
+    }
+}
