@@ -67,6 +67,9 @@ final class McpContractTest extends TestCase
             'nhk.dictionary.relation.handoff',
             'nhk.dictionary.backfill.dry_run',
             'nhk.dictionary.profile',
+            'nhk.dictionary.materialization.profile',
+            'nhk.dictionary.materialization.plan',
+            'nhk.dictionary.materialization.apply',
             'nhk.search',
             'nhk.canonical.inventory',
             'nhk.graph.inventory',
@@ -509,6 +512,8 @@ final class McpContractTest extends TestCase
             'nhk-v3/dictionary-mentions-list',
             'nhk-v3/dictionary-backfill-dry-run',
             'nhk-v3/dictionary-profile',
+            'nhk-v3/dictionary-materialization-profile',
+            'nhk-v3/dictionary-materialization-plan',
             'nhk-v3/knowledge-writer-preview',
         ], McpAbilityRegistration::readAbilityNames());
         self::assertSame('nhk-v3/entity-get', McpAbilityRegistration::abilityNameForTool('nhk.entity.get'));
@@ -562,6 +567,7 @@ final class McpContractTest extends TestCase
             'nhk-v3/dictionary-label-save',
             'nhk-v3/dictionary-candidate-review',
             'nhk-v3/dictionary-relation-handoff',
+            'nhk-v3/dictionary-materialization-apply',
         ], McpAbilityRegistration::governedAbilityNames());
         self::assertSame('nhk-v3/article-preflight', McpAbilityRegistration::abilityNameForTool('nhk.article.preflight'));
         self::assertSame('nhk-v3/article-ingest', McpAbilityRegistration::abilityNameForTool('nhk.article.ingest'));

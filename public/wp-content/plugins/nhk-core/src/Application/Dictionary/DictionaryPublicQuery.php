@@ -9,11 +9,11 @@ use NHK\Core\Domain\Dictionary\LexicalEntry;
 
 final class DictionaryPublicQuery
 {
-    public function __construct(private DictionaryConceptRepository $concepts, private $imageResolver = null, private $destinationValidator = null, private $entries = null) {}
+    public function __construct(private DictionaryConceptRepository $concepts, private $imageResolver = null, private $destinationValidator = null, private $entries = null, private $entrySenseReady = null) {}
 
     public function hub(int $limit = 500): array
     {
-        if (is_object($this->entries) && method_exists($this->entries, 'listEntries')) {
+        if ($this->entrySenseAvailable() && is_object($this->entries) && method_exists($this->entries, 'listEntries')) {
             $entryItems = [];
             foreach ((array) $this->entries->listEntries($limit) as $entry) {
                 if (!$entry instanceof LexicalEntry) continue;
@@ -40,7 +40,7 @@ final class DictionaryPublicQuery
     {
         $slug = $this->slug($slug);
         if ($slug === '') return ['status' => 'NOT_FOUND'];
-        if (is_object($this->entries) && method_exists($this->entries, 'listEntries')) {
+        if ($this->entrySenseAvailable() && is_object($this->entries) && method_exists($this->entries, 'listEntries')) {
             foreach ((array) $this->entries->listEntries(2000) as $entry) {
                 if (!$entry instanceof LexicalEntry || $this->slug((string) ($entry->context['public_slug'] ?? '')) !== $slug) continue;
                 $senses = array_values(array_filter((array) $this->entries->listSenses($entry), static fn (mixed $sense): bool => $sense instanceof DictionaryConcept && $sense->approved()));
@@ -135,5 +135,11 @@ final class DictionaryPublicQuery
         if (function_exists('sanitize_title')) return (string) sanitize_title($value);
         $value = function_exists('iconv') ? (string) (iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $value) ?: $value) : $value;
         return trim((string) preg_replace('/[^a-z0-9]+/i', '-', strtolower($value)), '-');
+    }
+
+    private function entrySenseAvailable(): bool
+    {
+        if (!is_callable($this->entrySenseReady)) return true;
+        try { return (bool) ($this->entrySenseReady)(); } catch (\Throwable) { return false; }
     }
 }

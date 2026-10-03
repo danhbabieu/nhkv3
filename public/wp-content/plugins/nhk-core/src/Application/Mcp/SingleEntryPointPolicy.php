@@ -60,6 +60,7 @@ final class SingleEntryPointPolicy
         'nhk.dictionary.label.save',
         'nhk.dictionary.candidate.review',
         'nhk.dictionary.relation.handoff',
+        'nhk.dictionary.materialization.apply',
     ];
 
     /** Lifecycle continuation for an existing Capture-owned Article draft. */

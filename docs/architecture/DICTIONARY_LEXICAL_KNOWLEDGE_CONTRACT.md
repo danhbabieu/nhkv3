@@ -19,6 +19,17 @@
 This contract distinguishes `CURRENT LAW`, `CURRENT IMPLEMENTATION`,
 `APPROVED TARGET DESIGN` and `IMPLEMENTATION GAP`. They are not interchangeable.
 
+### Materialization boundary — 2026-10-03
+
+Migration024 is additive schema only and does not populate Entry, Form or
+Entry→Sense rows. Existing Concept data is materialized only through the
+Dictionary-owned planner/service runbook. The safe default is one existing
+Concept to one Entry while retaining the Concept UUID as Sense identity;
+many Concepts to one Entry is curator review only. Production is read-only.
+The MCP profile/plan operations are bounded diagnostics, while apply is
+internal/admin, exact-fingerprint, revision-bound, idempotent and read-back
+verified.
+
 ## 1. Purpose
 
 Dictionary detection participates in the shared ephemeral interpretation

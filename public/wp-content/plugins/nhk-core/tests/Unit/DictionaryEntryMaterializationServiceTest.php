@@ -30,7 +30,7 @@ final class DictionaryEntryMaterializationServiceTest extends TestCase
             public function findForConcept(string $id): ?LexicalEntry { return null; }
             public function createWithSense(LexicalEntry $entry, DictionaryConcept $sense, array $context): array
             {
-                self::assertSame($this->concept->conceptId, $sense->conceptId);
+                if ($this->concept->conceptId !== $sense->conceptId) throw new \LogicException('unexpected sense');
                 $this->writes++;
                 return ['entry' => $entry, 'sense' => $sense, 'forms' => []];
             }
@@ -40,7 +40,7 @@ final class DictionaryEntryMaterializationServiceTest extends TestCase
         $service = new DictionaryEntryMaterializationService(
             $concepts,
             $entries,
-            static fn (): ?array => null,
+            static function (string $key, string $fingerprint) use (&$receipts): ?array { return $receipts[$key] ?? null; },
             static function (string $key, string $fingerprint, array $result) use (&$receipts): void { $receipts[$key] = ['fingerprint' => $fingerprint, 'result' => $result]; },
             static function (array $event) use (&$audits): void { $audits[] = $event; },
         );

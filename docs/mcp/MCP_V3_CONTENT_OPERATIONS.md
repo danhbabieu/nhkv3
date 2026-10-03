@@ -1298,3 +1298,27 @@ register Dictionary endpoints or predicates, copy Knowledge/Evidence payloads,
 or create Media/Video relations. Entry preferred-wording writes and
 Entry/Sense MCP capabilities remain deferred until CAS, idempotency,
 capability, bounded read-back and compatibility identifiers are specified.
+
+Dictionary Entry/Sense materialization exposes bounded read-only
+`nhk.dictionary.materialization.profile` and
+`nhk.dictionary.materialization.plan` operations. The internal/admin
+`nhk.dictionary.materialization.apply` operation requires an exact reviewed
+plan fingerprint, idempotency key and current Concept revisions, and permits
+only independent `1 Concept → 1 Entry → existing Concept-as-Sense` items.
+It never merges equal labels, creates Graph edges, copies Knowledge/Evidence
+or performs bulk backfill. Unavailable WordPress/MySQL runtime remains an
+explicit unavailable result, not an empty inventory.
+
+## Dictionary Entry/Sense schema readiness
+
+nhk.dictionary.profile reports migration.current, migration.target,
+readiness.entry_sense_schema_ready and readiness.runtime_mode. When Migration015
+is ready but Migration024 is absent, the mode is COMPATIBILITY_CONCEPT_MODE;
+Concept search/resolve/profile continue and no Entry/Sense SQL is issued.
+Entry/Sense writes fail closed with DICTIONARY_ENTRY_SENSE_SCHEMA_UNAVAILABLE.
+
+The canonical deployment operation is the existing maintenance boundary:
+php public/wp-content/plugins/nhk-core/bin/nhk-core-maintenance.php --operation=migration-up --pack=<pack> --run-id=<run-id> --source-revision=<40-hex-revision>
+It delegates to Plugin::runPendingMigrations(), uses MigrationDatabaseGuard and
+verifies all three Migration024 tables before success. It is never run from a
+frontend request.

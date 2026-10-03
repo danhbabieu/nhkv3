@@ -25,6 +25,7 @@ final class DictionaryMutationService
         private $actor = null,
         private $entryRepository = null,
         private $knowledgeValidator = null,
+        private $entrySenseReady = null,
     ) {}
 
     public function updateConcept(string $conceptId, int $expectedRevision, string $preferredLabel, string $definition, array $context, string $idempotencyKey): array
@@ -81,6 +82,7 @@ final class DictionaryMutationService
 
     public function createEntryWithSense(string $preferredForm, string $definition, array $context, string $idempotencyKey, ?string $locale = 'vi-VN'): array
     {
+        $this->assertEntrySenseReady();
         $preferredForm = trim($preferredForm);
         if ($preferredForm === '' || trim($definition) === '') throw new \InvalidArgumentException('DICTIONARY_ENTRY_SENSE_CONTENT_REQUIRED');
         if (!is_object($this->entryRepository) || !method_exists($this->entryRepository, 'createWithSense')) throw new \RuntimeException('DICTIONARY_ENTRY_REPOSITORY_UNAVAILABLE');
@@ -98,6 +100,7 @@ final class DictionaryMutationService
 
     public function addFormToEntry(string $entryId, int $expectedRevision, string $form, array $context, string $idempotencyKey, string $kind = LexicalEntryForm::ALTERNATE, ?string $locale = 'vi-VN'): array
     {
+        $this->assertEntrySenseReady();
         $form = trim($form);
         $normalized = (new DictionaryTermNormalizer())->normalize($form);
         if ($form === '' || $normalized === '') throw new \InvalidArgumentException('DICTIONARY_ENTRY_FORM_REQUIRED');
@@ -114,6 +117,7 @@ final class DictionaryMutationService
 
     public function addSenseToEntry(string $entryId, int $expectedRevision, string $conceptId, array $context, string $idempotencyKey, ?string $semanticType = null, ?string $semanticId = null, ?int $semanticRevision = null): array
     {
+        $this->assertEntrySenseReady();
         if (!is_object($this->entryRepository) || !method_exists($this->entryRepository, 'addSenseToEntry')) throw new \RuntimeException('DICTIONARY_ENTRY_REPOSITORY_UNAVAILABLE');
         $sense = $this->requireConcept($conceptId);
         $semanticType ??= $sense->destinationType;
@@ -129,6 +133,13 @@ final class DictionaryMutationService
         $concept = $this->concepts->findById($conceptId);
         if (!$concept instanceof DictionaryConcept) throw new \RuntimeException('DICTIONARY_CONCEPT_NOT_FOUND');
         return $concept;
+    }
+
+    private function assertEntrySenseReady(): void
+    {
+        if (is_callable($this->entrySenseReady) && !(bool) ($this->entrySenseReady)()) {
+            throw new \RuntimeException('DICTIONARY_ENTRY_SENSE_SCHEMA_UNAVAILABLE');
+        }
     }
 
     private function mutate(string $idempotencyKey, array $payload, callable $operation): array

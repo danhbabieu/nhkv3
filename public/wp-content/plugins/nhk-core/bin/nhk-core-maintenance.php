@@ -117,7 +117,9 @@ try {
         $payload = ['status' => 'pass', 'identifier' => 'v3-snapshot-import', 'receipt' => $receipt, 'snapshot_path' => $input];
     } elseif ($operation === 'migration-up') {
         Plugin::runPendingMigrations();
-        $payload = ['status' => 'pass', 'identifier' => 'remote-migration-up', 'current' => (int) get_option('nhk_core_migration_current', 0), 'target' => (int) get_option('nhk_core_migration_target', 0), 'pack' => $pack, 'run_id' => $runId, 'source_revision' => $sourceRevision];
+        $status = new MigrationStatus();
+        if (!$status->dictionaryEntrySenseSchemaReady()) throw new \RuntimeException('MIGRATION_SCHEMA_NOT_READY');
+        $payload = ['status' => 'pass', 'identifier' => 'remote-migration-up', 'current' => (int) get_option('nhk_core_migration_current', 0), 'target' => (int) get_option('nhk_core_migration_target', 0), 'dictionary_entry_sense_schema_ready' => true, 'pack' => $pack, 'run_id' => $runId, 'source_revision' => $sourceRevision];
     } elseif (in_array($operation, ['canonical-inventory', 'graph-inventory', 'relation-dry-run'], true)) {
         do_action('rest_api_init');
         $request = new \WP_REST_Request('POST', '/nhk/v1/mcp');

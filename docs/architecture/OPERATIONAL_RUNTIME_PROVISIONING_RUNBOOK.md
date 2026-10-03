@@ -337,3 +337,17 @@ or `CANONICAL_RUNTIME_WRITE_POLICY_BLOCKED` as applicable.
 **No semantic mutation:** PASS. This runbook creates no Authority, Capture,
 Proposal, Graph edge, Knowledge, Evidence, Source, Media, Video, Article,
 Public Identity, route or Clock Type.
+
+## NHK Core schema migration after code release
+
+Releases may install code before schema. After bootstrap and before marking the
+release ready, run the existing maintenance operation with deployment
+authorization:
+
+php public/wp-content/plugins/nhk-core/bin/nhk-core-maintenance.php --operation=migration-up --pack=<pack> --run-id=<run-id> --source-revision=<40-hex-revision>
+
+The command delegates to Plugin::runPendingMigrations(), enforces
+MigrationDatabaseGuard, and verifies the migration ledger plus Migration024's
+three tables. A non-zero result or MIGRATION_SCHEMA_NOT_READY is
+DEPLOYMENT_NOT_READY; frontend requests only detect readiness and use
+compatibility mode, never run migrations.

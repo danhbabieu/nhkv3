@@ -407,6 +407,7 @@ final class McpAbilityRegistration
         'nhk.dictionary.label.save' => 'nhk-v3/dictionary-label-save',
         'nhk.dictionary.candidate.review' => 'nhk-v3/dictionary-candidate-review',
         'nhk.dictionary.relation.handoff' => 'nhk-v3/dictionary-relation-handoff',
+        'nhk.dictionary.materialization.apply' => 'nhk-v3/dictionary-materialization-apply',
     ];
 
     /**

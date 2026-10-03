@@ -866,3 +866,21 @@ integration remains environment-gated; no mapping backfill or live mutation
 was performed. Public Entry routes, Entry/Sense MCP writes, complete Knowledge
 destination lifecycle, Dictionary Media binding and Video association remain
 implementation gaps.
+
+## Dictionary Entry materialization checkpoint — 2026-10-03
+
+STATUS: `PLANNER_AND_BOUNDED_APPLY_IMPLEMENTED / PRODUCTION_READ_ONLY /
+LOCAL_TESTED / WORDPRESS_RUNTIME_INTEGRATION_BLOCKED`.
+
+The planner classifies Migration015 Concepts against Migration024 mappings and
+emits deterministic fingerprints, preferred-form divergence warnings and
+explicit grouping-review candidates. The apply service reuses the existing
+Concept UUID as Sense identity and refuses stale plans, retired/ambiguous
+items and implicit grouping. MCP catalog/dispatch/capability metadata includes
+bounded profile/plan reads and an internal/admin apply operation. Local
+WordPress/MySQL bootstrap reported `Error establishing a database connection`,
+so deployed/runtime counts and discovery are not claimed.
+
+## 2026-10-03 Dictionary deploy/readiness correction
+
+Dictionary Entry/Sense runtime is schema-gated by DictionaryEntrySenseMigration024::schemaReady(). Code-before-schema releases fall back to Concept compatibility mode without querying Entry/Form/Sense tables; profile diagnostics expose the mode and migration current/target. The existing maintenance migration lifecycle fails closed unless all three Migration024 tables are verified after Plugin::runPendingMigrations().

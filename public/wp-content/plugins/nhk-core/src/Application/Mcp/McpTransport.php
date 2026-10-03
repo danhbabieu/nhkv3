@@ -180,7 +180,7 @@ final class McpTransport
             'nhk.proposal.apply' => 'nhk_apply_proposals',
             'nhk.relation.backfill.apply' => 'nhk_apply_proposals',
             'nhk.public-url.audit', 'nhk.public-url.reproject' => 'nhk_manage_public_urls',
-            'nhk.dictionary.concept.create', 'nhk.dictionary.entry.create-with-sense', 'nhk.dictionary.entry.form.add', 'nhk.dictionary.entry.sense.add', 'nhk.dictionary.concept.update', 'nhk.dictionary.concept.lifecycle', 'nhk.dictionary.label.save', 'nhk.dictionary.candidate.review', 'nhk.dictionary.relation.handoff' => 'nhk_curate_dictionary',
+            'nhk.dictionary.concept.create', 'nhk.dictionary.entry.create-with-sense', 'nhk.dictionary.entry.form.add', 'nhk.dictionary.entry.sense.add', 'nhk.dictionary.concept.update', 'nhk.dictionary.concept.lifecycle', 'nhk.dictionary.label.save', 'nhk.dictionary.candidate.review', 'nhk.dictionary.relation.handoff', 'nhk.dictionary.materialization.apply' => 'nhk_curate_dictionary',
             default => null,
         };
         if ($capability !== null && (!$this->can || !(bool) ($this->can)($capability))) throw new McpPermissionDenied($capability);
@@ -229,6 +229,9 @@ final class McpTransport
             'nhk.dictionary.relation.handoff' => $this->dictionary?->handoff($arguments) ?? throw new \RuntimeException('DICTIONARY_HANDLER_UNAVAILABLE'),
             'nhk.dictionary.backfill.dry_run' => $this->dictionary?->backfillDryRun((array) ($arguments['sources'] ?? [])) ?? throw new \RuntimeException('DICTIONARY_HANDLER_UNAVAILABLE'),
             'nhk.dictionary.profile' => $this->dictionary?->profile($arguments) ?? throw new \RuntimeException('DICTIONARY_HANDLER_UNAVAILABLE'),
+            'nhk.dictionary.materialization.profile' => $this->dictionary?->materializationProfile($arguments) ?? throw new \RuntimeException('DICTIONARY_HANDLER_UNAVAILABLE'),
+            'nhk.dictionary.materialization.plan' => $this->dictionary?->materializationPlan($arguments) ?? throw new \RuntimeException('DICTIONARY_HANDLER_UNAVAILABLE'),
+            'nhk.dictionary.materialization.apply' => $this->dictionary?->materializationApply($arguments) ?? throw new \RuntimeException('DICTIONARY_HANDLER_UNAVAILABLE'),
             'nhk.capture.get' => $this->read->captureGet((string) ($arguments['id'] ?? '')),
             'nhk.entity.neighborhood' => $this->read->entityNeighborhood((string) ($arguments['type'] ?? ''), (string) ($arguments['id'] ?? ''), (string) ($arguments['profile'] ?? ''), (int) ($arguments['max_hops'] ?? 2), (int) ($arguments['limit'] ?? 50)),
             'nhk.article.preflight' => $this->article?->preflight($arguments) ?? throw new \RuntimeException('ARTICLE_INGEST_HANDLER_UNAVAILABLE'),

@@ -93,7 +93,7 @@ final class DictionaryAdminRegistrationIdempotencyTest extends TestCase
         DictionaryBootstrap::boot();
 
         self::assertSame($runtime, DictionaryBootstrap::runtime());
-        self::assertSame(1, $GLOBALS['nhk_dictionary_test_option_updates']['nhk_core_migration_target'] ?? 0);
+        self::assertSame(0, $GLOBALS['nhk_dictionary_test_option_updates']['nhk_core_migration_target'] ?? 0);
 
         $entry = (string) file_get_contents(dirname(__DIR__, 2) . '/nhk-core.php');
         $plugin = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Plugin.php');

@@ -18,6 +18,7 @@ final class DictionaryEntryMaterializationPlanner
      * @param callable(string):?LexicalEntry $entryForConcept
      * @param callable(string):list<DictionaryLabel> $labelsForConcept
      * @param callable(string,string,string):bool|null $destinationValidator
+     * @param callable():bool|null $entrySenseReady
      */
     public function __construct(
         private DictionaryConceptRepository $concepts,
@@ -25,6 +26,7 @@ final class DictionaryEntryMaterializationPlanner
         private $labelsForConcept,
         private $destinationValidator = null,
         ?DictionaryTermNormalizer $normalizer = null,
+        private $entrySenseReady = null,
     ) {
         $this->normalizer = $normalizer ?? new DictionaryTermNormalizer();
     }
@@ -34,6 +36,9 @@ final class DictionaryEntryMaterializationPlanner
      */
     public function plan(array $input = []): array
     {
+        if (is_callable($this->entrySenseReady) && !(bool) ($this->entrySenseReady)()) {
+            return ['status' => 'UNAVAILABLE', 'reason' => 'DICTIONARY_ENTRY_SENSE_SCHEMA_UNAVAILABLE', 'items' => [], 'grouping_candidates' => [], 'count' => 0];
+        }
         $concepts = $this->selectConcepts($input);
         $items = [];
         foreach ($concepts as $concept) {

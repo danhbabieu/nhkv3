@@ -28,6 +28,7 @@ final class DictionaryRuntime
     private WpdbDictionaryCandidateRepository $candidates;
     private WpdbDictionaryMentionRepository $mentions;
     private WpdbDictionaryEntryRepository $entries;
+    private DictionaryEntryMaterializationPlanner $materializationPlanner;
     private DictionaryPlanningService $planning;
     private DictionarySeedPlanner $seedPlanner;
     private DictionaryCurationService $curation;
@@ -41,6 +42,17 @@ final class DictionaryRuntime
         $this->candidates = new WpdbDictionaryCandidateRepository($database);
         $this->mentions = new WpdbDictionaryMentionRepository($database);
         $this->entries = new WpdbDictionaryEntryRepository($database, $this->concepts);
+        $this->materializationPlanner = new DictionaryEntryMaterializationPlanner(
+            $this->concepts,
+            fn (string $conceptId): ?\NHK\Core\Domain\Dictionary\LexicalEntry => $this->entries->findDurableForConcept($conceptId),
+            fn (string $conceptId): array => $this->concepts->listLabels($conceptId, true),
+            function (string $type, string $id, string $url): bool {
+                if ($type === 'dictionary') return true;
+                return $this->revalidateDelegatedDestination($type, $id, $url) !== null;
+            },
+            $this->normalizer,
+            fn (): bool => $this->entrySenseAvailable(),
+        );
         $this->types = new EntityTypeRegistry();
         CanonicalEntityTypeCatalog::registerInto($this->types);
         $this->authority = new WpdbAuthorityRepository($database);
@@ -120,6 +132,7 @@ final class DictionaryRuntime
             },
             fn (?string $type, ?string $id, ?string $url): ?string => $this->revalidateDelegatedDestination($type, $id, $url),
             $this->entries,
+            fn (): bool => $this->entrySenseAvailable(),
         );
     }
 
@@ -127,6 +140,24 @@ final class DictionaryRuntime
     {
         try { return DictionaryMigration015::schemaReady($this->database); }
         catch (\Throwable) { return false; }
+    }
+
+    public function baseAvailable(): bool { return $this->available(); }
+
+    public function entrySenseAvailable(): bool
+    {
+        if (!$this->baseAvailable()) return false;
+        try { return DictionaryEntrySenseMigration024::schemaReady($this->database); }
+        catch (\Throwable) { return false; }
+    }
+
+    public function readiness(): array
+    {
+        $base = $this->baseAvailable();
+        $entrySense = $this->entrySenseAvailable();
+        $state = ['base_dictionary_storage_ready' => $base, 'entry_sense_schema_ready' => $entrySense, 'runtime_mode' => $entrySense ? 'ENTRY_SENSE_MODE' : 'COMPATIBILITY_CONCEPT_MODE'];
+        if (!$entrySense) $state['reason'] = 'ENTRY_SENSE_SCHEMA_UNAVAILABLE';
+        return $state;
     }
 
     public function preview(string $text, string $sourceKind, string $sourceId = '', array $context = [], array $hints = []): array
@@ -215,8 +246,36 @@ final class DictionaryRuntime
 
     public function resolveEntrySense(string $term, array $context = []): array
     {
-        if (!DictionaryEntrySenseMigration024::schemaReady($this->database)) return ['status' => 'UNAVAILABLE', 'reason' => 'DICTIONARY_ENTRY_SENSE_SCHEMA_UNAVAILABLE'];
+        if (!$this->entrySenseAvailable()) return ['status' => 'UNAVAILABLE', 'reason' => 'DICTIONARY_ENTRY_SENSE_SCHEMA_UNAVAILABLE'];
         return (new DictionaryEntrySenseResolver($this->entries, fn (?string $type, ?string $id, ?string $url): ?string => $this->revalidateDelegatedDestination($type, $id, $url), $this->normalizer))->resolve($term, $context);
+    }
+
+    public function materializationPlanner(): DictionaryEntryMaterializationPlanner
+    {
+        return $this->materializationPlanner;
+    }
+
+    public function materializationService(): DictionaryEntryMaterializationService
+    {
+        $audit = new WpdbAuditSink($this->database);
+        return new DictionaryEntryMaterializationService(
+            $this->concepts,
+            $this->entries,
+            function (string $key, string $fingerprint): ?array {
+                $row = $this->database->get_row($this->database->prepare('SELECT context_json FROM ' . $this->database->prefix . 'nhk_audit_events WHERE event_type=%s AND object_type=%s AND object_key=%s ORDER BY id DESC LIMIT 1', 'DictionaryEntryMaterialization', 'dictionary_materialization', $key), ARRAY_A);
+                if (!is_array($row)) return null;
+                $context = json_decode((string) ($row['context_json'] ?? ''), true);
+                if (!is_array($context) || (string) ($context['fingerprint'] ?? '') !== $fingerprint) return ['fingerprint' => (string) ($context['fingerprint'] ?? ''), 'result' => (array) ($context['result'] ?? [])];
+                return ['fingerprint' => $fingerprint, 'result' => (array) ($context['result'] ?? [])];
+            },
+            function (string $key, string $fingerprint, array $result) use ($audit): void {
+                $audit->recordEvent('DictionaryEntryMaterialization', 'dictionary_materialization', $key, function_exists('get_current_user_id') ? (int) get_current_user_id() : null, ['fingerprint' => $fingerprint, 'result' => $result]);
+            },
+            function (array $event) use ($audit): void {
+                $audit->recordEvent('DictionaryEntryMaterializationItem', 'dictionary_materialization', (string) ($event['concept_id'] ?? ''), function_exists('get_current_user_id') ? (int) get_current_user_id() : null, $event);
+            },
+            fn (): bool => $this->entrySenseAvailable(),
+        );
     }
 
     public function candidate(string $candidateId): ?\NHK\Core\Domain\Dictionary\DictionaryCandidate
@@ -270,7 +329,11 @@ final class DictionaryRuntime
         return [
             'status' => 'available',
             'storage' => ['status' => 'READY', 'migration' => DictionaryMigration015::VERSION],
-            'readiness' => ['status' => 'READY', 'public_hub' => ($hub['status'] ?? '') === 'AVAILABLE', 'owner_revalidation' => true, 'backfill' => 'DRY_RUN_ONLY'],
+            'readiness' => $this->readiness() + ['status' => $this->entrySenseAvailable() ? 'READY' : 'COMPATIBILITY'],
+            'migration' => ['current' => (int) get_option('nhk_core_migration_current', 0), 'target' => (int) get_option('nhk_core_migration_target', 0)],
+            'public_hub' => ['status' => ($hub['status'] ?? '') === 'AVAILABLE' ? 'READY' : 'UNAVAILABLE', 'compatibility_fallback' => !$this->entrySenseAvailable()],
+            'owner_revalidation' => true,
+            'backfill' => 'DRY_RUN_ONLY',
             'coverage' => ['concepts' => $statusCounts, 'candidates' => $candidateCounts, 'mentions_by_source' => $mentionCounts, 'public_items_returned' => count($publicItems), 'public_items_bounded' => true],
             'public_preview' => $preview,
             'public_hub_preview' => ['status' => $hub['status'] ?? 'UNAVAILABLE', 'canonical_url' => $hub['canonical_url'] ?? '/tu-dien/', 'items' => array_slice($publicItems, 0, 20)],
@@ -302,6 +365,7 @@ final class DictionaryRuntime
                 }
                 return $this->revalidateDelegatedDestination($type, $id, $url);
             },
+            fn (): bool => $this->entrySenseAvailable(),
         );
     }
 

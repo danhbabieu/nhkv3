@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Tests\Integration;
 
-use NHK\Core\Infrastructure\Migration\{ClaimProjectionMigration016, DictionaryMigration015, EditorialCaptureAddendumMigration018, GovernanceSubjectBindingMigration020, MediaBindingOperationMigration022, MediaUsageMetadataMigration021, PublicIdentityMigration014, VisualSupportRequirementMigration019};
+use NHK\Core\Infrastructure\Migration\{ClaimProjectionMigration016, DictionaryEntrySenseMigration024, DictionaryMigration015, EditorialCaptureAddendumMigration018, GovernanceSubjectBindingMigration020, MediaBindingOperationMigration022, MediaUsageMetadataMigration021, PublicIdentityMigration014, VisualSupportRequirementMigration019};
 use NHK\Core\Plugin;
 use NHK\Tests\Support\TestDatabaseGuard;
 use PHPUnit\Framework\TestCase;
@@ -39,15 +39,15 @@ final class MaintenanceMigrationIntegrationTest extends TestCase
         update_option('nhk_core_migration_target', $this->previousTarget, false);
     }
 
-    public function test_pending_runner_moves_15_to_22_with_the_projection_capture_visual_support_usage_and_binding_schema_contract(): void
+    public function test_pending_runner_moves_15_to_24_with_the_projection_capture_visual_support_usage_binding_and_entry_sense_schema_contract(): void
     {
         global $wpdb;
         $before = $this->canonicalCounts();
 
         Plugin::runPendingMigrations();
 
-        self::assertSame(22, (int) get_option('nhk_core_migration_current', 0));
-        self::assertSame(22, (int) get_option('nhk_core_migration_target', 0));
+        self::assertSame(24, (int) get_option('nhk_core_migration_current', 0));
+        self::assertSame(24, (int) get_option('nhk_core_migration_target', 0));
         self::assertTrue(ClaimProjectionMigration016::schemaReady($wpdb));
         self::assertTrue(\NHK\Core\Infrastructure\Migration\EditorialCaptureMigration017::schemaReady($wpdb));
         self::assertTrue(EditorialCaptureAddendumMigration018::schemaReady($wpdb));
@@ -55,6 +55,7 @@ final class MaintenanceMigrationIntegrationTest extends TestCase
         self::assertTrue(GovernanceSubjectBindingMigration020::schemaReady($wpdb));
         self::assertTrue(MediaUsageMetadataMigration021::schemaReady($wpdb));
         self::assertTrue(MediaBindingOperationMigration022::schemaReady($wpdb));
+        self::assertTrue(DictionaryEntrySenseMigration024::schemaReady($wpdb));
         self::assertSame([
             'PRIMARY',
             'projection_node_revision',
@@ -79,9 +80,9 @@ final class MaintenanceMigrationIntegrationTest extends TestCase
 
         Plugin::runPendingMigrations();
 
-        self::assertSame(22, (int) get_option('nhk_core_migration_current', 0));
+        self::assertSame(24, (int) get_option('nhk_core_migration_current', 0));
         self::assertTrue(GovernanceSubjectBindingMigration020::schemaReady($wpdb));
-        self::assertSame(22, (int) get_option('nhk_core_migration_target', 0));
+        self::assertSame(24, (int) get_option('nhk_core_migration_target', 0));
         self::assertSame($firstSchema, $this->createStatements());
         self::assertSame($firstCounts, $this->canonicalCounts());
     }

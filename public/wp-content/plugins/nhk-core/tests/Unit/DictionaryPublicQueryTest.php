@@ -73,6 +73,23 @@ final class DictionaryPublicQueryTest extends TestCase
         self::assertSame('READY', $query->detail('con')['status']);
     }
 
+    public function test_missing_entry_sense_schema_uses_concept_compatibility_without_calling_entry_repository(): void
+    {
+        $concept = new DictionaryConcept('c1', 'Vai bò', 'Tên gọi dân gian.', DictionaryConcept::APPROVED, null, null, null, ['public_slug' => 'vai-bo']);
+        $repo = $this->repository([$concept], ['c1' => [new DictionaryLabel('c1', 'Vai bò', 'vai-bo', DictionaryLabel::PREFERRED)]]);
+        $entries = new class {
+            public function listEntries(int $limit = 500): array { throw new \LogicException('entry repository must not be queried'); }
+        };
+
+        $query = new DictionaryPublicQuery($repo, null, null, $entries, static fn (): bool => false);
+        $packet = $query->hub();
+
+        self::assertSame('AVAILABLE', $packet['status']);
+        self::assertSame('Vai bò', $packet['items'][0]['title']);
+        self::assertSame('/tu-dien/vai-bo/', $packet['items'][0]['url']);
+        self::assertSame('READY', $query->detail('vai-bo')['status']);
+    }
+
     private function repository(array $concepts, array $labels): DictionaryConceptRepository
     {
         return new class($concepts, $labels) implements DictionaryConceptRepository {

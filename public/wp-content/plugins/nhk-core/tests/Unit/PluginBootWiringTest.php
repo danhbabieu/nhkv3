@@ -52,18 +52,13 @@ final class PluginBootWiringTest extends TestCase
         self::assertStringContainsString('EntityDossierBootstrap::boot();', $entrypoint);
     }
 
-    public function test_boot_does_not_run_migrations_without_explicit_runtime_gate(): void
+    public function test_frontend_boot_does_not_run_migrations_and_maintenance_owns_the_runner(): void
     {
         $plugin = (string) file_get_contents(__DIR__ . '/../../src/Plugin.php');
 
-        self::assertStringContainsString(
-            "if (self::runtimeMigrationsEnabled()) self::runPendingMigrations();",
-            $plugin
-        );
-        self::assertStringContainsString(
-            "defined('NHK_RUN_MIGRATIONS') && NHK_RUN_MIGRATIONS === true",
-            $plugin
-        );
+        self::assertStringNotContainsString('self::runPendingMigrations();', substr($plugin, 0, strpos($plugin, 'public static function runPendingMigrations(): void')));
+        self::assertStringNotContainsString('runtimeMigrationsEnabled', $plugin);
+        self::assertStringNotContainsString('update_option(\'nhk_core_migration_target\'', substr($plugin, 0, strpos($plugin, 'public static function runPendingMigrations(): void')));
         self::assertStringContainsString(
             'self::runPendingMigrations();',
             substr($plugin, strpos($plugin, 'public static function activate(): void'))

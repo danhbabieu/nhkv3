@@ -30,4 +30,12 @@ final class MaintenanceMigrationRunnerTest extends TestCase
 
         self::assertStringContainsString("MigrationDatabaseGuard::assertUpAllowed((string) \$wpdb->get_var('SELECT DATABASE()'), 'PENDING_MIGRATIONS');", $plugin);
     }
+
+    public function test_runner_verifies_dictionary_entry_sense_schema_after_pending_migrations(): void
+    {
+        $plugin = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Plugin.php');
+        $entrypoint = (string) file_get_contents(dirname(__DIR__, 2) . '/bin/nhk-core-maintenance.php');
+        self::assertStringContainsString("if (!DictionaryEntrySenseMigration024::schemaReady(\$wpdb)) throw new \\RuntimeException('MIGRATION_SCHEMA_NOT_READY');", $plugin);
+        self::assertStringContainsString('dictionary_entry_sense_schema_ready', $entrypoint);
+    }
 }

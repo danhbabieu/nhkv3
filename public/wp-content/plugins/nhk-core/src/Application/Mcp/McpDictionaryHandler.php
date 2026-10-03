@@ -65,6 +65,9 @@ final class McpDictionaryHandler
     }
 
     public function profile(array $input): array { return $this->runtime->profile(isset($input['concept_id']) ? (string) $input['concept_id'] : null, isset($input['slug']) ? (string) $input['slug'] : null); }
+    public function materializationProfile(array $input): array { return $this->runtime->materializationPlanner()->plan($input); }
+    public function materializationPlan(array $input): array { return $this->runtime->materializationPlanner()->plan($input); }
+    public function materializationApply(array $input): array { return $this->runtime->materializationService()->apply((array) ($input['plan'] ?? []), (string) ($input['approved_plan_fingerprint'] ?? ''), (string) ($input['idempotency_key'] ?? '')); }
 
     public function createConcept(array $input): array { return $this->runtime->mutation()->createDraft((string) ($input['preferred_label'] ?? ''), (string) ($input['definition'] ?? ''), (array) ($input['context'] ?? []), (string) ($input['idempotency_key'] ?? '')); }
     public function createEntryWithSense(array $input): array { return $this->runtime->mutation()->createEntryWithSense((string) ($input['preferred_form'] ?? ''), (string) ($input['definition'] ?? ''), (array) ($input['context'] ?? []), (string) ($input['idempotency_key'] ?? '')); }

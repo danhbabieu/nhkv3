@@ -21719,3 +21719,40 @@ present. PHP lint and `git diff --check` pass. No commit, push, deploy, staging,
 production or V2 mutation performed.
 
 STATUS: `DICTIONARY_ENTRY_SENSE_LOCAL_READY / TARGETED_TESTS_GREEN / FULL_SUITE_ENVIRONMENT_BASELINE_FAILURES / UNCOMMITTED`
+
+# Checkpoint — 2026-10-03 — Dictionary Entry materialization safety slice
+
+IMPLEMENTED: Added read-only `DictionaryEntryMaterializationPlanner` and
+bounded `DictionaryEntryMaterializationService`. Same-label Concepts remain
+separate and produce `GROUP_SENSES_UNDER_ENTRY / REVIEW_REQUIRED`; no
+semantic merge is possible through the default apply path. Existing Concept
+UUIDs are reused as Sense identities.
+
+MCP: Added bounded read-only materialization profile/plan projections and an
+internal/admin fingerprint-, idempotency- and revision-bound apply operation.
+Migration024 remains additive and does not populate rows automatically.
+
+VALIDATION: Focused planner/service/resolver/mutation/migration/MCP suite passes
+24 tests / 2,461 assertions; changed PHP files pass lint. Local WordPress
+runtime inventory is `INTEGRATION_BLOCKED` because WP-CLI reported
+`Error establishing a database connection`. No production/staging/V2 data or
+semantic owner mutation occurred.
+
+STATUS: `DICTIONARY_MATERIALIZATION_LOCAL_READY / RUNTIME_INTEGRATION_BLOCKED /
+PRODUCTION_READ_ONLY / NO_DEPLOYMENT / UNCOMMITTED`
+
+# Checkpoint — 2026-10-03 — deploy-before-schema Dictionary correction
+
+IMPLEMENTED: Entry/Sense public reads, materialization planning/apply and
+Entry/Sense mutations are gated by Migration024 schema readiness. Migration015
+only uses Concept compatibility mode and reports
+ENTRY_SENSE_SCHEMA_UNAVAILABLE / COMPATIBILITY_CONCEPT_MODE; no frontend
+request creates tables or reaches Entry SQL. The canonical maintenance
+migration-up operation delegates to Plugin::runPendingMigrations() and verifies
+all three Migration024 tables before success.
+
+VALIDATION: Focused Dictionary/runtime/deployment suite passes 214 tests / 1,012
+assertions with one existing deprecation. Changed PHP files lint clean. No
+database, staging, production, V2, backfill or deployment mutation occurred.
+
+STATUS: DICTIONARY_SCHEMA_GATED / DEPLOY_MIGRATION_POSTCONDITION_ADDED / NO_DEPLOYMENT / UNCOMMITTED

@@ -38,11 +38,20 @@ final class WpdbDictionaryEntryRepository implements DictionaryEntryRepository
     public function findForConcept(string $conceptId): ?LexicalEntry
     {
         try {
-            $row = $this->database->get_row($this->database->prepare("SELECT e.* FROM {$this->entries} e INNER JOIN {$this->senses} s ON s.entry_uuid=e.entry_uuid WHERE s.concept_uuid=%s AND s.state=1 LIMIT 1", UuidCodec::toBinary($conceptId)), ARRAY_A);
-            if (is_array($row)) return $this->hydrateEntry($row);
+            $durable = $this->findDurableForConcept($conceptId);
+            if ($durable instanceof LexicalEntry) return $durable;
             $concept = $this->concepts->findById($conceptId);
             if (!$concept instanceof DictionaryConcept) return null;
             return new LexicalEntry($conceptId, $concept->preferredLabel, $this->normalize($concept->preferredLabel), $concept->status, null, [], $concept->revision, [$conceptId]);
+        } catch (\Throwable) { return null; }
+    }
+
+    /** Read only a persisted Entry→Sense mapping; never returns the compatibility fallback. */
+    public function findDurableForConcept(string $conceptId): ?LexicalEntry
+    {
+        try {
+            $row = $this->database->get_row($this->database->prepare("SELECT e.* FROM {$this->entries} e INNER JOIN {$this->senses} s ON s.entry_uuid=e.entry_uuid WHERE s.concept_uuid=%s AND s.state=1 LIMIT 1", UuidCodec::toBinary($conceptId)), ARRAY_A);
+            return is_array($row) ? $this->hydrateEntry($row) : null;
         } catch (\Throwable) { return null; }
     }
 
@@ -79,13 +88,14 @@ final class WpdbDictionaryEntryRepository implements DictionaryEntryRepository
     public function createWithSense(LexicalEntry $entry, DictionaryConcept $sense, array $context = []): array
     {
         if ($this->findById($entry->entryId) instanceof LexicalEntry) throw new \RuntimeException('DICTIONARY_ENTRY_DUPLICATE');
-        if ($this->concepts->findById($sense->conceptId) !== null) throw new \RuntimeException('DICTIONARY_SENSE_DUPLICATE');
+        $existingSense = $this->concepts->findById($sense->conceptId);
+        if ($existingSense instanceof DictionaryConcept) $sense = $existingSense;
         $now = gmdate('Y-m-d H:i:s.u');
         $this->database->query('START TRANSACTION');
         try {
             $insert = $this->database->query($this->database->prepare("INSERT INTO {$this->entries} (entry_uuid,preferred_form,normalized_preferred_form,status,locale,context_json,revision,created_at,updated_at) VALUES (%s,%s,%s,%s,%s,%s,%d,%s,%s)", UuidCodec::toBinary($entry->entryId), $entry->preferredForm, $entry->normalizedPreferredForm, $entry->status, $entry->locale, $this->json($entry->context), $entry->revision, $now, $now));
             if ($insert === false) throw new \RuntimeException('DICTIONARY_ENTRY_CREATE_FAILED');
-            $this->concepts->createConcept($sense);
+            if (!$existingSense instanceof DictionaryConcept) $this->concepts->createConcept($sense);
             $this->addForm($this->form($entry, LexicalEntryForm::PREFERRED));
             $this->insertSense($entry->entryId, $sense, $context);
             $read = $this->findById($entry->entryId);

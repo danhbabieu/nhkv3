@@ -92,10 +92,6 @@ final class Plugin {
     public static function boot(string $pluginFile): void {
         global $wpdb;
         $captureRepository = isset($wpdb) && is_object($wpdb) ? new WpdbCaptureRepository($wpdb) : null;
-        // Keep an already-installed site aware of the code's migration target;
-        // activation is not required for an upgrade health check to be honest.
-        update_option('nhk_core_migration_target', DictionaryEntrySenseMigration024::VERSION, false);
-        if (self::runtimeMigrationsEnabled()) self::runPendingMigrations();
         DictionaryBootstrap::boot();
         add_action('nhk_v3_media_canonical_readback', static function (\NHK\Core\Domain\Media\Media $media, array $assets, array $contexts = []): void {
             global $wpdb;
@@ -2057,14 +2053,11 @@ final class Plugin {
         );
     }
 
-    private static function runtimeMigrationsEnabled(): bool
-    {
-        return defined('NHK_RUN_MIGRATIONS') && NHK_RUN_MIGRATIONS === true;
-    }
     public static function runPendingMigrations(): void
     {
         global $wpdb;
         MigrationDatabaseGuard::assertUpAllowed((string) $wpdb->get_var('SELECT DATABASE()'), 'PENDING_MIGRATIONS');
+        update_option('nhk_core_migration_target', DictionaryEntrySenseMigration024::VERSION, false);
         if ((int) get_option('nhk_core_migration_current', 0) < ArticleIngestMigration010::VERSION) (new ArticleIngestMigration010())->up();
         if ((int) get_option('nhk_core_migration_current', 0) < ArticleMediaMigration011::VERSION) (new ArticleMediaMigration011())->up();
         if ((int) get_option('nhk_core_migration_current', 0) < MediaWordPressBridgeMigration012::VERSION) (new MediaWordPressBridgeMigration012())->up();
@@ -2080,6 +2073,7 @@ final class Plugin {
         if ((int) get_option('nhk_core_migration_current', 0) < MediaBindingOperationMigration022::VERSION || !MediaBindingOperationMigration022::schemaReady($wpdb)) (new MediaBindingOperationMigration022())->up();
         if ((int) get_option('nhk_core_migration_current', 0) < PresentationNavigationMigration023::VERSION || !PresentationNavigationMigration023::schemaReady($wpdb)) (new PresentationNavigationMigration023())->up();
         if ((int) get_option('nhk_core_migration_current', 0) < DictionaryEntrySenseMigration024::VERSION || !DictionaryEntrySenseMigration024::schemaReady($wpdb)) (new DictionaryEntrySenseMigration024())->up();
+        if (!DictionaryEntrySenseMigration024::schemaReady($wpdb)) throw new \RuntimeException('MIGRATION_SCHEMA_NOT_READY');
     }
     public static function activate(): void {
         global $wpdb;

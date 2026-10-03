@@ -376,3 +376,31 @@ existing Concept/Label writers remain the only durable writers until a
 CAS/read-back cutover is designed. Public Entry routes, Entry/Sense MCP
 mutations, complete Knowledge destination lifecycle, governed Dictionary
 Media binding and Video association remain `IMPLEMENTATION GAP`.
+
+## 13. Materialization checkpoint — 2026-10-03
+
+`SCHEMA MIGRATION != SEMANTIC MATERIALIZATION`. The read-only
+`DictionaryEntryMaterializationPlanner` inventories existing Migration015
+Concepts against Migration024 mappings and classifies unmapped, mapped,
+inconsistent, retired, destination-invalid and preferred-wording-divergent
+cases. The safe default is `1 existing Concept → 1 Entry → 1 existing
+Concept-as-Sense`; existing Concept UUIDs remain the Sense identity.
+
+Equal labels, normalized forms, slugs, destinations and similar definitions
+never merge Concepts. Such collisions emit
+`GROUP_SENSES_UNDER_ENTRY / REVIEW_REQUIRED` only. Apply requires the exact
+planner fingerprint, current Concept revision, idempotency and read-back, and
+only accepts eligible one-to-one items. Production remains read-only; no
+Knowledge, Source/Evidence, Graph, Candidate or Mention write is included.
+
+## 14. Deploy-before-schema invariant — 2026-10-03
+
+`CODE DEPLOYMENT MAY PRECEDE SCHEMA MIGRATION, THEREFORE ENTRY/SENSE READS MUST BE SCHEMA-GATED AND FAIL TO COMPATIBILITY MODE, NEVER RAW SQL ERROR.`
+
+`SCHEMA MIGRATION IS A DEPLOYMENT LIFECYCLE STEP, NOT A FRONTEND REQUEST SIDE EFFECT.`
+
+`DictionaryEntrySenseMigration024::schemaReady()` is the authoritative
+`ENTRY_SENSE_SCHEMA_READY` capability. Public hub/detail, profile and planning
+surfaces use Migration015 Concept compatibility mode while it is false; Entry,
+Form and Sense repositories are not queried. Entry/Sense mutations fail closed
+with `DICTIONARY_ENTRY_SENSE_SCHEMA_UNAVAILABLE`.
