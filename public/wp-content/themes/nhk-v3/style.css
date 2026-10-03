@@ -1,7 +1,7 @@
 /*
 Theme Name: NHK V3 Editorial
 Description: Clean editorial discovery surface for NHK V3.
-Version: 1.3.3
+Version: 1.3.5
 */
 :root{--nhk-bg:#f6f2eb;--nhk-surface:#fffdf9;--nhk-text:#24201c;--nhk-muted:#70685f;--nhk-border:#ded6cb;--nhk-accent:#8c4f2f;--nhk-accent-secondary:#b18a5a;--nhk-radius:3px;--nhk-shadow:0 10px 30px rgba(57,41,28,.08);--nhk-content-width:760px;--nhk-wide-width:1180px;--nhk-type-body:1rem;--nhk-type-body-lg:1.12rem;--nhk-type-display-max:3rem;--nhk-type-display-fluid:clamp(2.25rem,5vw,var(--nhk-type-display-max));--nhk-leading-copy:1.85;--nhk-space-1:.5rem;--nhk-space-2:1rem;--nhk-space-3:1.5rem;--nhk-space-4:2.5rem;--nhk-space-5:4rem;--nhk-gutter:24px;--nhk-breakpoint-mobile:390px;--nhk-breakpoint-tablet:48rem;--nhk-breakpoint-laptop:64rem;--nhk-breakpoint-wide:80rem}
 *,*::before,*::after{box-sizing:border-box}body{margin:0;color:var(--nhk-text);background:var(--nhk-bg);font:var(--nhk-type-body)/1.5 Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}a{color:var(--nhk-accent)}
@@ -52,3 +52,5 @@ Version: 1.3.3
 .hero-gateways .hero-entry-card span{grid-column:1;color:var(--nhk-muted);font-size:.78rem;line-height:1.35}
 .hero-gateways .hero-entry-card b{grid-column:2;grid-row:1 / span 2;color:var(--nhk-accent);font-size:1.1rem}
 @media(max-width:30rem){.hero-gateways{grid-template-columns:1fr}.hero-gateways .hero-entry-card{min-height:64px}}
+@media(min-width:24.376rem){.footer-inner nav.footer-groups{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:24.375rem){.footer-inner nav.footer-groups{grid-template-columns:1fr}}

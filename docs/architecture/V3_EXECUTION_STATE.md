@@ -1,5 +1,33 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-03 — Browser-QA verified footer overflow repair (LOCAL / NO DEPLOYMENT)
+
+BROWSER_QA: Read-only local browser validation covered `/`, `/thuong-hieu/`, `/loai-dong-ho/`, `/mau/`, `/bo-may/`, `/thu-vien/`, `/video/`, `/so-sanh/`, `/odo/`, a long Article and search results at 390×844, 430×932, 768×1024, 1024×768 and 1440×900. DOM evaluation confirmed `document.documentElement.scrollWidth <= document.documentElement.clientWidth` for all 55 route/viewport combinations. Header/menu, hero and four gateways, mobile main-before-rail order, grid transitions, footer, relation/discovery wrapping and image `contain` presentation were visually checked; homepage section headings occur once each.
+
+ROOT_CAUSE: At 390px, `.footer-groups` retained three `110px` minimum columns plus gaps, producing a 410px document width from a 390px viewport. The footer owns the overflow.
+
+FIX: At the 390px boundary, footer groups use the existing single-column presentation; above it, the three-column footer uses flexible zero minimums. Stylesheet asset version was bumped for local browser cache invalidation. No `overflow-x:hidden`, route, data, schema, semantic owner or deployment state changed.
+
+REGRESSION: Frontend contract tests pass 120 tests / 1,116 assertions with 2 existing warnings; PHP lint and `git diff --check` pass.
+
+STATUS: `RESPONSIVE_BROWSER_QA_PASS / VERIFIED_FOOTER_OVERFLOW_REPAIRED / NO_DATA_MUTATION / UNDEPLOYED`.
+
+# Checkpoint — 2026-10-03 — Dictionary Entry/Sense final verification (LOCAL / NO DEPLOYMENT)
+
+VERIFICATION: Dictionary/MCP-focused Unit coverage passes 421 tests / 6,712
+assertions; changed PHP files lint clean; Contract passes 6 tests / 48
+assertions; `git diff --check` passes for the reviewed commit. Full Unit is
+2,925 tests with 3 failures reproduced on the parent commit and one
+order-dependent repository error in the full run; the isolated error test
+passes. Integration is environment-blocked: `NHK_WP_TEST_PATH` and guarded
+`nhk_v3_test` are unavailable.
+
+STATUS: Migration024 is additive schema/read foundation only. Compatibility
+fallback is read-only and no Entry/Sense rows are populated. Entry-centric
+public route, Entry/Sense MCP mutation, context-qualified sense filtering,
+complete Knowledge lifecycle, Dictionary Media binding and Video binding are
+not READY. No data mutation, deployment or commit was performed.
+
 # Checkpoint — 2026-10-03 — Browser-QA presentation repair (LOCAL / NO DEPLOYMENT)
 
 IMPLEMENTED: Repaired the shared relation/discovery presentation seam after
