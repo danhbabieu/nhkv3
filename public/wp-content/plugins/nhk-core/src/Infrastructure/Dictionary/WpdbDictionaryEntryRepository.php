@@ -156,6 +156,23 @@ final class WpdbDictionaryEntryRepository implements DictionaryEntryRepository
         return array_values(array_filter(array_map(fn (array $row): ?LexicalEntry => $this->hydrateEntry($row), $rows)));
     }
 
+    public function findByPublicSlug(string $slug): ?LexicalEntry
+    {
+        try {
+            $row = $this->database->get_row($this->database->prepare("SELECT * FROM {$this->entries} WHERE status=%s AND JSON_UNQUOTE(JSON_EXTRACT(context_json,'$.public_slug'))=%s ORDER BY id LIMIT 1", DictionaryConcept::APPROVED, trim($slug)), ARRAY_A);
+            return is_array($row) ? $this->hydrateEntry($row) : null;
+        } catch (\Throwable) { return null; }
+    }
+
+    /** @return list<LexicalEntry> */
+    public function findEntriesBySemanticReference(string $type, string $id, int $limit = 13): array
+    {
+        try {
+            $rows = $this->database->get_results($this->database->prepare("SELECT DISTINCT e.* FROM {$this->entries} e INNER JOIN {$this->senses} s ON s.entry_uuid=e.entry_uuid WHERE e.status=%s AND s.state=1 AND s.semantic_reference_type=%s AND s.semantic_reference_id=%s ORDER BY e.preferred_form,e.id LIMIT %d", DictionaryConcept::APPROVED, trim($type), trim($id), max(1, min(13, $limit))), ARRAY_A) ?: [];
+            return array_values(array_filter(array_map(fn (array $row): ?LexicalEntry => $this->hydrateEntry($row), $rows)));
+        } catch (\Throwable) { return []; }
+    }
+
     public function createWithSense(LexicalEntry $entry, DictionaryConcept $sense, array $context = []): array
     {
         if ($this->findById($entry->entryId) instanceof LexicalEntry) throw new \RuntimeException('DICTIONARY_ENTRY_DUPLICATE');

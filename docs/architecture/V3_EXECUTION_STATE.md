@@ -1,5 +1,27 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-03 — Dictionary public detail composition (LOCAL / NO MUTATION)
+
+IMPLEMENTED: Added the dedicated `DictionaryDetailQuery` composition boundary,
+mapping-first per-Sense semantic packets, unique-owner dossier reuse, bounded
+reverse Mention projection, repository-level public-slug/reference reads and
+governed related-term lookup. `DictionaryPublicQuery::hub()` now emits only
+lexical Entry summaries; runtime detail wiring reuses canonical dossier/source
+adapters. Public route SEO consumes explicit `INDEXABLE`/`NOINDEX` state and
+the theme renders independent Sense sections followed by weaker lexical
+Mention groups. No 400-day mapping was applied.
+
+VERIFICATION: Focused detail/search suite passes 17 tests / 60 assertions;
+the broader Dictionary/Semantic/Graph/Knowledge/Video/frontend subset passes
+340 tests / 2,010 assertions except the pre-existing stylesheet version
+contract (`style.css` is 1.3.5 while that contract expects 1.3.3). Full Unit
+revalidation reaches 3,142 tests with existing environment-gated integration
+errors and unrelated baseline failures; no Dictionary failure is present.
+Changed PHP syntax checks pass. No migration, semantic mutation, deployment,
+push or live acceptance was performed.
+
+STATUS: `DICTIONARY_PUBLIC_DETAIL_COMPOSITION_LOCAL / NO_DATA_MUTATION / UNCOMMITTED / BASELINE_GATES_RECORDED`.
+
 # Checkpoint — 2026-10-03 — Dictionary public detail foundation (LOCAL / NO MUTATION)
 
 IMPLEMENTED: Added mapping-first semantic-reference reads for Entry/Sense,

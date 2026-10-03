@@ -124,6 +124,32 @@ final class DictionaryRuntime
             },
         );
         $mediaProjection = new EntityMediaProjection(new WpdbMediaRepository($database), new WpdbMediaAssetRepository($database), new WpdbMediaUsageRepository($database));
+        $mentionProjection = new DictionaryMentionPublicProjection($this->mentions, function (string $kind, string $id): ?array {
+            $kind = strtoupper(trim($kind));
+            if ($kind === 'ARTICLE' && function_exists('get_post')) {
+                $post = get_post((int) $id);
+                if ($post instanceof \WP_Post && $post->post_status === 'publish') return ['id' => (string) $post->ID, 'title' => (string) $post->post_title, 'url' => (string) get_permalink($post)];
+            }
+            if ($kind === 'KNOWLEDGE') foreach ($this->knowledge->list() as $claim) if ($claim instanceof KnowledgeClaim && $claim->active && $claim->canonicalId === $id) return ['id' => $id, 'title' => $claim->claimText, 'url' => null];
+            if (in_array($kind, ['MEDIA', 'VIDEO'], true)) return ['id' => $id, 'title' => $kind === 'MEDIA' ? 'Hình ảnh liên quan' : 'Video liên quan', 'url' => null];
+            return null;
+        });
+        $detailQuery = new DictionaryDetailQuery(
+            $this->concepts,
+            $this->entries,
+            fn (?string $type, ?string $id, ?string $url): ?string => $this->revalidateDelegatedDestination($type, $id, $url),
+            function (string $type, string $id): array {
+                if (!$this->types->has($type)) return [];
+                $entity = $this->authority->findByCanonicalId($id);
+                if (!$entity instanceof AuthorityEntity || !$entity->active() || $entity->entityType !== $type) return [];
+                $value = ['dossier' => []];
+                if (function_exists('apply_filters') && has_filter('nhk_v3_entity_detail_projection')) $value = apply_filters('nhk_v3_entity_detail_projection', $value, $entity);
+                if (is_array($value) && is_array($value['dossier'] ?? null)) return $value['dossier'];
+                return ['identity' => ['type' => $entity->entityType, 'id' => $entity->canonicalId, 'title' => $entity->canonicalName, 'url' => $this->routes->path($entity)]];
+            },
+            fn (string $conceptId): array => $mentionProjection->forConcept($conceptId, 50),
+            new DictionaryRelatedTermProjection($this->entries),
+        );
         $this->publicQuery = new DictionaryPublicQuery(
             $this->concepts,
             static function (string $conceptId) use ($mediaProjection): ?array {
@@ -144,6 +170,7 @@ final class DictionaryRuntime
                 }
                 return ['identity' => ['type' => $entity->entityType, 'id' => $entity->canonicalId, 'title' => $entity->canonicalName, 'url' => $this->routes->path($entity)]];
             },
+            $detailQuery,
         );
     }
 

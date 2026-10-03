@@ -65,8 +65,12 @@ final class PublicDictionaryRoutes
         $mode = (string) ($context['mode'] ?? '');
         if ($mode === 'detail') {
             $item = is_array($result['item'] ?? null) ? $result['item'] : [];
-            $canonical = $this->absolute((string) ($result['canonical_url'] ?? ''));
+            $seo = is_array($result['seo'] ?? null) ? $result['seo'] : [];
+            $canonical = $this->absolute((string) ($seo['canonical'] ?? $result['canonical_url'] ?? ''));
             if ($canonical !== '') echo '<link rel="canonical" href="' . esc_url($canonical) . '" />' . "\n";
+            if (($seo['robots'] ?? '') !== '') echo '<meta name="robots" content="' . esc_attr((string) $seo['robots']) . '" />' . "\n";
+            if (($seo['sitemap'] ?? true) === false) echo '<meta name="nhk-dictionary-sitemap" content="exclude" />' . "\n";
+            if (($seo['state'] ?? '') === 'REDIRECT') return;
             $schema = ['@context' => 'https://schema.org', '@type' => 'DefinedTerm', 'name' => (string) ($item['title'] ?? ''), 'description' => (string) ($item['description'] ?? ''), 'url' => $canonical, 'inDefinedTermSet' => $this->absolute('/tu-dien/')];
             echo '<script type="application/ld+json">' . wp_json_encode($schema, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . '</script>' . "\n";
             return;

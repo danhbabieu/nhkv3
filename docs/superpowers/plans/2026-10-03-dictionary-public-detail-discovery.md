@@ -18,7 +18,15 @@
 - Public packets contain only renderable public data and no internal diagnostics.
 - Existing owner projections remain the source of truth.
 - Hub/search must remain lightweight; detail enrichment is detail-only.
-- Do not create a commit in this run; leave changes reviewable in the current checkout.
+ - The user-requested completion checkpoint is committed once after all verification passes; no intermediate checkpoint commit.
+
+## Completion evidence — 2026-10-03
+
+- `DictionaryDetailQuery` is the runtime composition boundary for one Entry and independent Sense packets.
+- Hub/search uses lexical summaries only; semantic dossier, Graph, source and related-term work is detail-only.
+- Mapping references take precedence; invalid/stale mapping states never fall through to another owner.
+- Reverse Mentions and bounded related-term projection are wired through application adapters.
+- Route SEO consumes the detail SEO packet; theme renders per-Sense semantic sections and a final, weaker Mention section.
 
 ## Review Focus
 

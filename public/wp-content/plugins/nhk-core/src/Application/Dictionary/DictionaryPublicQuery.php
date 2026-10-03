@@ -9,7 +9,7 @@ use NHK\Core\Domain\Dictionary\LexicalEntry;
 
 final class DictionaryPublicQuery
 {
-    public function __construct(private DictionaryConceptRepository $concepts, private $imageResolver = null, private $destinationValidator = null, private $entries = null, private $entrySenseReady = null, private $semanticProjection = null) {}
+    public function __construct(private DictionaryConceptRepository $concepts, private $imageResolver = null, private $destinationValidator = null, private $entries = null, private $entrySenseReady = null, private $semanticProjection = null, private ?DictionaryDetailQuery $detailQuery = null) {}
 
     public function hub(int $limit = 500, string $query = '', string $initial = ''): array
     {
@@ -20,8 +20,7 @@ final class DictionaryPublicQuery
             foreach ((array) $this->entries->listEntries($limit) as $entry) {
                 if (!$entry instanceof LexicalEntry) continue;
                 $senses = array_values(array_filter((array) $this->entries->listSenses($entry), static fn (mixed $sense): bool => $sense instanceof DictionaryConcept && $sense->approved()));
-                $item = $this->entryItem($entry, $senses);
-                $item['related_terms'] = $this->relatedTerms($entry, $senses[0] ?? null, $limit);
+                $item = $this->entryHubItem($entry, $senses);
                 if (($item['eligible'] ?? false) === true) $entryItems[] = $item;
             }
             $entryItems = $this->filterAndRank($entryItems, $query, $initial);
@@ -41,6 +40,7 @@ final class DictionaryPublicQuery
 
     public function detail(string $slug): array
     {
+        if ($this->detailQuery !== null) return $this->detailQuery->detail($slug);
         $slug = $this->slug($slug);
         if ($slug === '') return ['status' => 'NOT_FOUND'];
         if ($this->entrySenseAvailable() && is_object($this->entries) && method_exists($this->entries, 'listEntries')) {
@@ -70,6 +70,20 @@ final class DictionaryPublicQuery
         if (($item['eligible'] ?? false) !== true) return ['status' => 'INCOMPLETE', 'reason' => 'CANONICAL_DESTINATION_NOT_READY', 'concept_id' => $concept->conceptId];
         if (($item['dedicated'] ?? true) === false) return ['status' => 'REDIRECT', 'destination_url' => $item['url'], 'concept_id' => $concept->conceptId];
         return ['status' => 'READY', 'item' => $item, 'labels' => $item['labels'], 'canonical_url' => $item['url'], 'indexable' => true];
+    }
+
+    /** Lightweight Entry summary used by hub/search; no dossier, Graph or source reads. */
+    private function entryHubItem(LexicalEntry $entry, array $senses): array
+    {
+        $slug = $this->slug((string) ($entry->context['public_slug'] ?? $entry->preferredForm));
+        if ($senses === [] || $slug === '') return ['eligible' => false, 'entry_id' => $entry->entryId];
+        $forms = $this->entryForms($entry);
+        $labels = [];
+        foreach ($senses as $sense) foreach ($this->concepts->listLabels($sense->conceptId) as $label) {
+            if ($label instanceof DictionaryLabel && $label->active) $labels[] = ['label' => $label->label, 'kind' => $label->kind, 'locale' => $label->locale];
+        }
+        $searchLabels = array_merge($labels, array_map(static fn (array $form): array => ['label' => $form['form']], $forms));
+        return ['entry_id' => $entry->entryId, 'title' => $entry->preferredForm, 'description' => count($senses) === 1 ? $senses[0]->definition : '', 'term_type' => 'ENTRY', 'labels' => array_values(array_filter($labels, static fn (array $label): bool => ($label['kind'] ?? '') !== 'HIDDEN'),), 'search_labels' => $searchLabels, 'url' => '/tu-dien/' . $slug . '/', 'dedicated' => true, 'indexable' => true, 'eligible' => true, 'forms' => $forms, 'senses' => array_map(static fn (DictionaryConcept $sense): array => ['sense_id' => $sense->conceptId, 'title' => $sense->preferredLabel, 'description' => $sense->definition, 'context' => $sense->context], $senses), 'image' => null];
     }
 
     private function item(DictionaryConcept $concept): array
