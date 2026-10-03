@@ -414,6 +414,34 @@ final class FrontendPresentationContractTest extends TestCase
         self::assertStringContainsString('entity-pagination', $video);
     }
 
+    public function test_v9_homepage_excludes_real_dedicated_media_and_video_sections(): void
+    {
+        $home = $this->read('front-page.php');
+        self::assertStringContainsString("if (\$mediaItems !== [])", $home);
+        self::assertStringContainsString("if (\$videos !== [])", $home);
+        self::assertStringNotContainsString("if (!empty(\$home['media']))", $home);
+        self::assertStringNotContainsString("if (!empty(\$home['videos']))", $home);
+    }
+
+    public function test_v9_video_compact_variant_is_real_and_not_double_linked(): void
+    {
+        $card = $this->read('template-parts/presentation/video-card.php');
+        $module = $this->read('template-parts/presentation/contextual-discovery.php');
+        self::assertStringContainsString("\$compact = !empty(\$args['compact'])", $card);
+        self::assertStringContainsString('video-card--compact', $card);
+        self::assertStringContainsString("!\$compact", $card);
+        self::assertStringContainsString("if (\$kind !== 'video')", $module);
+        self::assertStringContainsString('thumbnail_srcset', $card);
+    }
+
+    public function test_v9_compact_media_preview_preserves_responsive_projection_metadata(): void
+    {
+        $module = $this->read('template-parts/presentation/contextual-discovery.php');
+        foreach (['$visual[\'srcset\']', '$visual[\'sizes\']', '$visual[\'width\']', '$visual[\'height\']'] as $needle) {
+            self::assertStringContainsString($needle, $module);
+        }
+    }
+
     public function test_homepage_and_entity_archives_place_bounded_discovery_after_primary_content(): void
     {
         $home = $this->readTheme('front-page.php');
@@ -538,7 +566,8 @@ final class FrontendPresentationContractTest extends TestCase
             $source = $this->read($template);
             self::assertStringContainsString("get_template_part('template-parts/presentation/video-card'", $source);
         }
-        self::assertStringContainsString('visual-card <?php echo esc_attr($orientationClass); ?>', $this->read('template-parts/presentation/video-card.php'));
+        self::assertStringContainsString('$orientationClass = nhk_v3_media_orientation_class', $this->read('template-parts/presentation/video-card.php'));
+        self::assertStringContainsString('video-card--compact', $this->read('template-parts/presentation/video-card.php'));
         self::assertStringContainsString('.visual-frame.nhk-media--portrait', $this->read('presentation.css'));
     }
 

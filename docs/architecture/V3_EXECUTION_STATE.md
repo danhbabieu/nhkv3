@@ -21524,3 +21524,23 @@ available in this checkpoint. No database, staging, production mutation,
 deployment or cutover was performed.
 
 STATUS: CONTEXTUAL_CONTENT_DISCOVERY_FRONTEND_LOCAL_READY / BROWSER_RUNTIME_NOT_VERIFIED / FULL_UNIT_BASELINE_GAPS / NO_MUTATION / NO_DEPLOY
+
+# Checkpoint — 2026-10-03 — Contextual discovery quality hardening (Vòng 9)
+
+FIXED: Homepage final discovery exclusion now uses the actual rendered
+semantic `$mediaItems` and `$videos` sections instead of a non-existent
+`$home['media']` / `$home['videos']` shape. Empty dedicated sections continue
+to allow the destination CTA.
+
+FIXED: Shared Video card now reads the explicit `compact` argument. Compact
+rail cards use a smaller poster/title treatment, retain canonical URL and
+responsive image metadata, omit long context/date copy, and avoid a second
+outer title link. Contextual Media previews now preserve srcset, sizes,
+width and height from `nhk_v3_media_presentation()`.
+
+VALIDATION: FrontendPresentationContractTest passes 50 tests / 350 assertions
+with two existing warnings. Changed templates lint clean and git diff --check
+passes. No route, query, Graph, semantic, database, deployment or cutover
+change was introduced. Browser runtime remains unverified.
+
+STATUS: CONTEXTUAL_DISCOVERY_QUALITY_HARDENED / BROWSER_RUNTIME_NOT_VERIFIED / NO_MUTATION / NO_DEPLOY
