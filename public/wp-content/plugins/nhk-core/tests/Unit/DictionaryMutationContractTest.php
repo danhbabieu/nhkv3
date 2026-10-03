@@ -123,6 +123,23 @@ final class DictionaryMutationContractTest extends TestCase
         $service->addFormToEntry('22222222-2222-7222-8222-222222222222', 1, 'CÔN', ['normalized_form' => 'con'], 'form-1');
     }
 
+    public function test_entry_form_rejects_unsupported_kind_before_repository_write(): void
+    {
+        $repo = new class implements DictionaryConceptRepository {
+            public function findById(string $conceptId): ?DictionaryConcept { return new DictionaryConcept($conceptId, 'Côn', 'Nghĩa', DictionaryConcept::DRAFT); }
+            public function findApprovedByNormalizedLabel(string $normalizedLabel, array $context = []): array { return []; }
+            public function listApproved(int $limit = 500): array { return []; }
+            public function listLabels(string $conceptId, bool $includeInactive = false): array { return []; }
+            public function createConcept(DictionaryConcept $concept): DictionaryConcept { return $concept; }
+            public function updateConcept(DictionaryConcept $concept, int $expectedRevision): DictionaryConcept { return $concept; }
+            public function addLabel(DictionaryLabel $label): DictionaryLabel { return $label; }
+            public function saveLabel(DictionaryLabel $label, string $previousNormalizedLabel, int $expectedConceptRevision): DictionaryLabel { return $label; }
+        };
+        $service = new DictionaryMutationService($repo, entryRepository: new class { public function findById(string $id): LexicalEntry { return new LexicalEntry($id, 'Côn', 'côn'); } public function addFormToEntry(string $id, int $revision, LexicalEntryForm $form): array { throw new \LogicException('write must not reach repository'); } });
+        $this->expectExceptionMessage('DICTIONARY_ENTRY_FORM_KIND_INVALID');
+        $service->addFormToEntry('entry-1', 1, 'Jahresuhr/400', [], 'hidden-1', 'HIDDEN');
+    }
+
     public function test_existing_entry_sense_mapping_can_update_semantic_reference_with_idempotency(): void
     {
         $concept = new DictionaryConcept('sense-1', '400 ngày', 'Loại đồng hồ.', DictionaryConcept::APPROVED);

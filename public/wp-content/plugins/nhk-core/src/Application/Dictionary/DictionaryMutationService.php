@@ -102,6 +102,7 @@ final class DictionaryMutationService
     {
         $this->assertEntrySenseReady();
         $form = trim($form);
+        if (!in_array($kind, [LexicalEntryForm::PREFERRED, LexicalEntryForm::ALTERNATE, LexicalEntryForm::COLLOQUIAL, LexicalEntryForm::TECHNICAL, LexicalEntryForm::PHONETIC], true)) throw new \InvalidArgumentException('DICTIONARY_ENTRY_FORM_KIND_INVALID');
         $normalized = (new DictionaryTermNormalizer())->normalize($form);
         if ($form === '' || $normalized === '') throw new \InvalidArgumentException('DICTIONARY_ENTRY_FORM_REQUIRED');
         if (!is_object($this->entryRepository) || !method_exists($this->entryRepository, 'addFormToEntry')) throw new \RuntimeException('DICTIONARY_ENTRY_REPOSITORY_UNAVAILABLE');

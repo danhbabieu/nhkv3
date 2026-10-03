@@ -29,6 +29,10 @@ final class DictionaryEnrichmentPlan
                 $actions[] = $base + ['action_type' => $duplicate ? 'NOOP' : 'ADD_ENTRY_FORM', 'status' => $duplicate ? 'NOOP' : 'READY', 'reason' => $duplicate ? 'Form already exists' : 'approved durable label'];
             }
             if (($owner['classification'] ?? '') !== 'EXACT_UNIQUE') $actions[] = ['action_type' => 'REVIEW_REQUIRED', 'status' => 'REVIEW_REQUIRED', 'entry_id' => $item['entry_id'] ?? '', 'sense_id' => $sense['sense_id'] ?? '', 'current_revision' => (int) ($sense['current_revision'] ?? 0), 'target' => $owner['target'] ?? null, 'evidence' => $owner['evidence'] ?? [], 'risk' => 'SEMANTIC_OWNER', 'reason' => $owner['reason'] ?? 'owner resolution is not exact and unique'];
+            else {
+                $referenceStatus = strtoupper((string) ($sense['semantic_reference']['status'] ?? $item['semantic_reference']['status'] ?? 'ABSENT'));
+                if ($referenceStatus !== 'PRESENT_VALID') $actions[] = ['action_type' => 'SET_SEMANTIC_REFERENCE', 'status' => $referenceStatus === 'STALE' || $referenceStatus === 'INVALID' ? 'BLOCKED' : 'READY', 'entry_id' => $item['entry_id'] ?? '', 'sense_id' => $sense['sense_id'] ?? '', 'current_revision' => (int) ($sense['current_revision'] ?? 0), 'target' => $owner['target'] ?? null, 'evidence' => $owner['evidence'] ?? [], 'risk' => 'SEMANTIC_REFERENCE', 'reason' => $referenceStatus === 'ABSENT' ? 'exact unique owner reference is absent' : 'existing semantic reference requires review'];
+            }
         }
         usort($actions, static fn (array $a, array $b): int => json_encode($a, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) <=> json_encode($b, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
         $status = $actions === [] ? 'NOOP' : (count(array_filter($actions, static fn (array $a): bool => ($a['status'] ?? '') === 'REVIEW_REQUIRED' || ($a['status'] ?? '') === 'BLOCKED')) > 0 ? 'REVIEW_REQUIRED' : 'READY');

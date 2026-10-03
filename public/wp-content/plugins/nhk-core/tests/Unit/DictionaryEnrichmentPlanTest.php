@@ -55,4 +55,19 @@ final class DictionaryEnrichmentPlanTest extends TestCase
         self::assertSame('AMBIGUOUS', $resolver->resolve($sense, ['label_similarity' => [['id' => 'owner-1'], ['id' => 'owner-2']]])['classification']);
         self::assertSame('NO_OWNER', $resolver->resolve(new DictionaryConcept('sense-2', 'Không biết', 'Nghĩa', DictionaryConcept::APPROVED), [])['classification']);
     }
+
+    public function test_hidden_form_is_blocked_and_stale_reference_cannot_be_applied(): void
+    {
+        $plan = new DictionaryEnrichmentPlan(new class { public function listForms(string $entryId): array { return []; } }, new DictionaryEnrichmentOwnerResolver());
+        $result = $plan->build(['items' => [[
+            'entry_id' => 'entry-400', 'sense_id' => 'sense-400', 'current_revision' => 7,
+            'approved_legacy_labels' => [['label' => 'Jahresuhr/400', 'kind' => 'HIDDEN', 'source' => 'approved']],
+            'semantic_reference' => ['status' => 'STALE', 'type' => 'classification', 'id' => 'owner-400', 'revision' => 2],
+            'owner_resolution' => ['classification' => 'EXACT_UNIQUE', 'target' => ['type' => 'classification', 'id' => 'owner-400', 'revision' => 3], 'evidence' => ['exact_stable_identity']],
+        ]]]);
+
+        self::assertSame('REVIEW_REQUIRED', $result['status']);
+        self::assertNotEmpty(array_filter($result['actions'], static fn (array $action): bool => ($action['status'] ?? '') === 'BLOCKED'));
+        self::assertNotEmpty(array_filter($result['actions'], static fn (array $action): bool => ($action['action_type'] ?? '') === 'SET_SEMANTIC_REFERENCE'));
+    }
 }
