@@ -56,9 +56,79 @@ final class WpdbDictionaryEntryRepository implements DictionaryEntryRepository
         $out = [];
         foreach ($ids as $id) {
             $concept = $this->concepts->findById((string) $id);
-            if ($concept instanceof DictionaryConcept) $out[$concept->conceptId] = $concept;
+            if ($concept instanceof DictionaryConcept && $this->matchesContext($concept->context, $context)) $out[$concept->conceptId] = $concept;
         }
         return array_values($out);
+    }
+
+    public function findById(string $entryId): ?LexicalEntry
+    {
+        try {
+            $row = $this->database->get_row($this->database->prepare("SELECT * FROM {$this->entries} WHERE entry_uuid=%s LIMIT 1", UuidCodec::toBinary($entryId)), ARRAY_A);
+            return is_array($row) ? $this->hydrateEntry($row) : null;
+        } catch (\Throwable) { return null; }
+    }
+
+    /** @return list<LexicalEntry> */
+    public function listEntries(int $limit = 500): array
+    {
+        $rows = $this->database->get_results($this->database->prepare("SELECT * FROM {$this->entries} WHERE status=%s ORDER BY preferred_form,id LIMIT %d", DictionaryConcept::APPROVED, max(1, min(2000, $limit))), ARRAY_A) ?: [];
+        return array_values(array_filter(array_map(fn (array $row): ?LexicalEntry => $this->hydrateEntry($row), $rows)));
+    }
+
+    public function createWithSense(LexicalEntry $entry, DictionaryConcept $sense, array $context = []): array
+    {
+        if ($this->findById($entry->entryId) instanceof LexicalEntry) throw new \RuntimeException('DICTIONARY_ENTRY_DUPLICATE');
+        if ($this->concepts->findById($sense->conceptId) !== null) throw new \RuntimeException('DICTIONARY_SENSE_DUPLICATE');
+        $now = gmdate('Y-m-d H:i:s.u');
+        $this->database->query('START TRANSACTION');
+        try {
+            $insert = $this->database->query($this->database->prepare("INSERT INTO {$this->entries} (entry_uuid,preferred_form,normalized_preferred_form,status,locale,context_json,revision,created_at,updated_at) VALUES (%s,%s,%s,%s,%s,%s,%d,%s,%s)", UuidCodec::toBinary($entry->entryId), $entry->preferredForm, $entry->normalizedPreferredForm, $entry->status, $entry->locale, $this->json($entry->context), $entry->revision, $now, $now));
+            if ($insert === false) throw new \RuntimeException('DICTIONARY_ENTRY_CREATE_FAILED');
+            $this->concepts->createConcept($sense);
+            $this->addForm($this->form($entry, LexicalEntryForm::PREFERRED));
+            $this->insertSense($entry->entryId, $sense, $context);
+            $read = $this->findById($entry->entryId);
+            $senseRead = $this->concepts->findById($sense->conceptId);
+            if (!$read instanceof LexicalEntry || !$senseRead instanceof DictionaryConcept) throw new \RuntimeException('DICTIONARY_ENTRY_READBACK_FAILED');
+            $this->database->query('COMMIT');
+            return ['entry' => new LexicalEntry($read->entryId, $read->preferredForm, $read->normalizedPreferredForm, $read->status, $read->locale, $read->context, $read->revision, [$senseRead->conceptId]), 'sense' => $senseRead, 'forms' => [$this->form($read, LexicalEntryForm::PREFERRED)]];
+        } catch (\Throwable $e) {
+            $this->database->query('ROLLBACK');
+            throw $e;
+        }
+    }
+
+    public function addFormToEntry(string $entryId, int $expectedRevision, LexicalEntryForm $form): array
+    {
+        $entry = $this->findById($entryId);
+        if (!$entry instanceof LexicalEntry) throw new \RuntimeException('DICTIONARY_ENTRY_NOT_FOUND');
+        if ($entry->revision !== $expectedRevision) throw new \RuntimeException('DICTIONARY_ENTRY_REVISION_CONFLICT');
+        $hash = hash('sha256', $this->json($this->sort($form->context)));
+        $duplicate = $this->database->get_var($this->database->prepare("SELECT id FROM {$this->forms} WHERE entry_uuid=%s AND normalized_form=%s AND context_hash=%s LIMIT 1", UuidCodec::toBinary($entryId), $form->normalizedForm, $hash));
+        if ($duplicate !== null) return ['entry' => $entry, 'form' => $form, 'duplicate' => true];
+        $this->addForm($form);
+        $ok = $this->database->query($this->database->prepare("UPDATE {$this->entries} SET revision=revision+1,updated_at=%s WHERE entry_uuid=%s AND revision=%d", gmdate('Y-m-d H:i:s.u'), UuidCodec::toBinary($entryId), $expectedRevision));
+        if ($ok !== 1) throw new \RuntimeException('DICTIONARY_ENTRY_REVISION_CONFLICT');
+        $updated = $this->findById($entryId);
+        if (!$updated instanceof LexicalEntry) throw new \RuntimeException('DICTIONARY_ENTRY_READBACK_FAILED');
+        return ['entry' => $updated, 'form' => $form];
+    }
+
+    public function addSenseToEntry(string $entryId, int $expectedRevision, DictionaryConcept $sense, array $context = [], ?string $semanticType = null, ?string $semanticId = null, ?int $semanticRevision = null): array
+    {
+        $entry = $this->findById($entryId);
+        if (!$entry instanceof LexicalEntry) throw new \RuntimeException('DICTIONARY_ENTRY_NOT_FOUND');
+        if ($entry->revision !== $expectedRevision) throw new \RuntimeException('DICTIONARY_ENTRY_REVISION_CONFLICT');
+        $duplicate = $this->database->get_var($this->database->prepare("SELECT id FROM {$this->senses} WHERE entry_uuid=%s AND concept_uuid=%s LIMIT 1", UuidCodec::toBinary($entryId), UuidCodec::toBinary($sense->conceptId)));
+        if ($duplicate !== null) return ['entry' => $entry, 'sense' => $sense, 'duplicate' => true];
+        if ($this->concepts->findById($sense->conceptId) === null) $this->concepts->createConcept($sense);
+        $this->insertSense($entryId, $sense, $context, $semanticType, $semanticId, $semanticRevision);
+        $ok = $this->database->query($this->database->prepare("UPDATE {$this->entries} SET revision=revision+1,updated_at=%s WHERE entry_uuid=%s AND revision=%d", gmdate('Y-m-d H:i:s.u'), UuidCodec::toBinary($entryId), $expectedRevision));
+        if ($ok !== 1) throw new \RuntimeException('DICTIONARY_ENTRY_REVISION_CONFLICT');
+        $updated = $this->findById($entryId);
+        if (!$updated instanceof LexicalEntry) throw new \RuntimeException('DICTIONARY_ENTRY_READBACK_FAILED');
+        return ['entry' => $updated, 'sense' => $sense];
     }
 
     public function addForm(LexicalEntryForm $form): LexicalEntryForm
@@ -76,6 +146,26 @@ final class WpdbDictionaryEntryRepository implements DictionaryEntryRepository
     {
         try { return new LexicalEntry(UuidCodec::fromBinary($row['entry_uuid']), (string) $row['preferred_form'], (string) $row['normalized_preferred_form'], (string) $row['status'], ($row['locale'] ?? null) !== null ? (string) $row['locale'] : null, $this->decode((string) ($row['context_json'] ?? '{}')), (int) ($row['revision'] ?? 1)); }
         catch (\Throwable) { return null; }
+    }
+
+    private function insertSense(string $entryId, DictionaryConcept $sense, array $context, ?string $semanticType = null, ?string $semanticId = null, ?int $semanticRevision = null): void
+    {
+        $hash = hash('sha256', $this->json($this->sort($context)));
+        $ok = $this->database->query($this->database->prepare("INSERT INTO {$this->senses} (entry_uuid,concept_uuid,sense_context_hash,semantic_reference_type,semantic_reference_id,semantic_reference_revision,context_json,state,created_at,updated_at) VALUES (%s,%s,%s,%s,%s,%s,%s,1,%s,%s)", UuidCodec::toBinary($entryId), UuidCodec::toBinary($sense->conceptId), $hash, $semanticType, $semanticId, $semanticRevision, $this->json($context), gmdate('Y-m-d H:i:s.u'), gmdate('Y-m-d H:i:s.u')));
+        if ($ok === false) throw new \RuntimeException('DICTIONARY_ENTRY_SENSE_CREATE_FAILED');
+    }
+
+    private function form(LexicalEntry $entry, string $kind): LexicalEntryForm
+    {
+        return new LexicalEntryForm($entry->entryId, $entry->preferredForm, $entry->normalizedPreferredForm, $kind, $entry->locale, $entry->context);
+    }
+
+    private function matchesContext(array $senseContext, array $requested): bool
+    {
+        foreach (['domain', 'locale', 'region', 'community', 'usage_scope'] as $key) {
+            if (array_key_exists($key, $requested) && $requested[$key] !== null && $requested[$key] !== '' && ($senseContext[$key] ?? null) !== $requested[$key]) return false;
+        }
+        return true;
     }
 
     private function normalize(string $value): string { return function_exists('mb_strtolower') ? mb_strtolower(trim($value), 'UTF-8') : strtolower(trim($value)); }

@@ -63,4 +63,33 @@ final class DictionaryEntrySenseResolverTest extends TestCase
         self::assertNull($result['destination_url']);
         self::assertSame('model-1', $result['destination_id']);
     }
+
+    public function test_context_selects_one_sense_and_missing_context_is_ambiguous(): void
+    {
+        $first = new DictionaryConcept('11111111-1111-7111-8111-111111111111', 'Côn', 'Máy', DictionaryConcept::APPROVED, null, null, null, ['domain' => 'máy']);
+        $second = new DictionaryConcept('33333333-3333-7333-8333-333333333333', 'Côn', 'Bút', DictionaryConcept::APPROVED, null, null, null, ['domain' => 'bút']);
+        $repo = new class($first, $second) implements DictionaryEntryRepository {
+            public function __construct(private DictionaryConcept $first, private DictionaryConcept $second) {}
+            public function findByForm(string $normalizedForm, array $context = []): array { return [new LexicalEntry('22222222-2222-7222-8222-222222222222', 'Côn', 'côn', 'APPROVED', null, [], 1, [$this->first->conceptId, $this->second->conceptId])]; }
+            public function findForConcept(string $conceptId): ?LexicalEntry { return null; }
+            public function listSenses(LexicalEntry $entry, array $context = []): array { return $context === [] ? [$this->first, $this->second] : array_values(array_filter([$this->first, $this->second], static fn (DictionaryConcept $sense): bool => ($sense->context['domain'] ?? null) === ($context['domain'] ?? null))); }
+            public function addForm(LexicalEntryForm $form): LexicalEntryForm { return $form; }
+        };
+        $resolver = new DictionaryEntrySenseResolver($repo);
+        self::assertSame('RESOLVED', $resolver->resolve('côn', ['domain' => 'máy'])['status']);
+        self::assertSame('AMBIGUOUS', $resolver->resolve('côn')['status']);
+    }
+
+    public function test_invalid_semantic_reference_fails_closed(): void
+    {
+        $concept = new DictionaryConcept('11111111-1111-7111-8111-111111111111', 'X', 'Meaning', DictionaryConcept::APPROVED, 'knowledge', '11111111-1111-7111-8111-111111111111', null);
+        $repo = new class($concept) implements DictionaryEntryRepository {
+            public function __construct(private DictionaryConcept $concept) {}
+            public function findByForm(string $normalizedForm, array $context = []): array { return [new LexicalEntry('22222222-2222-7222-8222-222222222222', 'X', 'x', 'APPROVED', null, [], 1, [$this->concept->conceptId])]; }
+            public function findForConcept(string $conceptId): ?LexicalEntry { return null; }
+            public function listSenses(LexicalEntry $entry, array $context = []): array { return [$this->concept]; }
+            public function addForm(LexicalEntryForm $form): LexicalEntryForm { return $form; }
+        };
+        self::assertSame('UNKNOWN', (new DictionaryEntrySenseResolver($repo, static fn (): bool => false))->resolve('x')['status']);
+    }
 }

@@ -47,7 +47,7 @@ final class DictionaryCurationService
 
     public function decide(string $candidateId, int $expectedRevision, string $state, array $decision = []): DictionaryCandidate
     {
-        if (!in_array($state, [DictionaryCandidateState::AMBIGUOUS, DictionaryCandidateState::REJECTED, DictionaryCandidateState::IGNORED, DictionaryCandidateState::DO_NOT_SUGGEST, DictionaryCandidateState::NEEDS_REVIEW], true)) throw new \InvalidArgumentException('DICTIONARY_DECISION_STATE_NOT_ALLOWED');
+        if (!in_array($state, [DictionaryCandidateState::AMBIGUOUS, DictionaryCandidateState::REJECTED, DictionaryCandidateState::IGNORED, DictionaryCandidateState::DO_NOT_SUGGEST, DictionaryCandidateState::NEEDS_REVIEW, DictionaryCandidateState::PROPOSED_NEW, DictionaryCandidateState::RESOLVED_EXISTING], true)) throw new \InvalidArgumentException('DICTIONARY_DECISION_STATE_NOT_ALLOWED');
         $candidate = $this->requireCandidate($candidateId, $expectedRevision);
         return $this->candidates->saveDecision($this->withState($candidate, $state, $decision), $expectedRevision);
     }

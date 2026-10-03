@@ -21687,3 +21687,35 @@ integration-blocked and no database data was changed.
 STATUS: `DICTIONARY_ENTRY_SENSE_CODE_SIDE_LOCAL_TESTED /
 INTEGRATION_BLOCKED / NO_STAGING_MUTATION / NO_PRODUCTION_MUTATION /
 NO_V2_MUTATION / NO_DEPLOYMENT`.
+# Checkpoint — 2026-10-03 — Dictionary Entry/Sense lifecycle closure (LOCAL / NO MUTATION / UNCOMMITTED)
+
+IMPLEMENTED: Dictionary-owned Entry/Form/Sense lifecycle now has UUID-based
+create-with-first-Sense, Entry CAS/revision, idempotent audit receipt boundary,
+duplicate/no-op detection, normalized-form collision rejection, transactional
+Entry+Sense creation and canonical read-back. Existing DictionaryConcept remains
+the durable Sense identity; no Migration024 population or read-path mapping was
+added.
+
+IMPLEMENTED: Entry→Sense resolution now preserves raw-sense ambiguity, applies
+domain/locale/context filtering, revalidates delegated semantic references and
+fails closed for invalid Knowledge/owner references. Public Dictionary projection
+prefers Entry-centric multi-sense pages, preserves Concept compatibility fallback,
+redirects single-sense delegated entries one hop, and excludes delegated routes
+from sitemap eligibility. Templates render definitions, context and owner links
+for multiple senses.
+
+IMPLEMENTED: Internal/admin MCP catalog, dispatch, transport capability gate,
+Ability mapping and candidate review contract expose
+`entry.create-with-sense`, `entry.form.add`, `entry.sense.add` plus
+`CREATE_ENTRY_WITH_SENSE`, `ADD_SENSE_TO_ENTRY`, and `ADD_FORM_TO_ENTRY`; legacy
+candidate actions remain available.
+
+VALIDATION: Targeted Dictionary/MCP suite passes 146 tests / 797 assertions;
+focused resolver/public/mutation/MCP suite passes 16 tests / 74 assertions;
+McpContractTest passes 41 tests / 738 assertions. Full suite under 512M reports
+3112 tests / 17690 assertions with the same environment/integration failures and
+unrelated frontend/Knowledge baseline failures; no new Dictionary failure is
+present. PHP lint and `git diff --check` pass. No commit, push, deploy, staging,
+production or V2 mutation performed.
+
+STATUS: `DICTIONARY_ENTRY_SENSE_LOCAL_READY / TARGETED_TESTS_GREEN / FULL_SUITE_ENVIRONMENT_BASELINE_FAILURES / UNCOMMITTED`

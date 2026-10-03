@@ -6,6 +6,7 @@ namespace NHK\Tests\Unit;
 use NHK\Core\Application\Dictionary\DictionaryPublicQuery;
 use NHK\Core\Contracts\Dictionary\DictionaryConceptRepository;
 use NHK\Core\Domain\Dictionary\{DictionaryConcept, DictionaryLabel};
+use NHK\Core\Domain\Dictionary\LexicalEntry;
 use PHPUnit\Framework\TestCase;
 
 final class DictionaryPublicQueryTest extends TestCase
@@ -49,9 +50,27 @@ final class DictionaryPublicQueryTest extends TestCase
 
         $packet = $query->hub();
 
-        self::assertCount(1, $packet['items']);
+        if (count($packet['items']) !== 1) self::fail(json_encode($packet, JSON_UNESCAPED_UNICODE));
         self::assertSame('/ban-nhac/westminster/', $packet['items'][0]['url']);
         self::assertFalse($packet['items'][0]['indexable']);
+    }
+
+    public function test_entry_hub_and_detail_render_multiple_senses_without_collapsing_them(): void
+    {
+        $first = new DictionaryConcept('11111111-1111-7111-8111-111111111111', 'Côn máy', 'Nghĩa máy', DictionaryConcept::APPROVED, 'model', '22222222-2222-7222-8222-222222222222', '/dong-ho/may/', ['domain' => 'máy']);
+        $second = new DictionaryConcept('33333333-3333-7333-8333-333333333333', 'Côn bút', 'Nghĩa bút', DictionaryConcept::APPROVED, null, null, null, ['domain' => 'bút']);
+        $repo = $this->repository([$first, $second], ['11111111-1111-7111-8111-111111111111' => [], '33333333-3333-7333-8333-333333333333' => []]);
+        $entries = new class($first, $second) {
+            public function __construct(private DictionaryConcept $first, private DictionaryConcept $second) {}
+            public function listEntries(int $limit = 500): array { return [new LexicalEntry('44444444-4444-7444-8444-444444444444', 'Côn', 'côn', DictionaryConcept::APPROVED, 'vi-VN', ['public_slug' => 'con'], 1, [$this->first->conceptId, $this->second->conceptId])]; }
+            public function listSenses(LexicalEntry $entry, array $context = []): array { return [$this->first, $this->second]; }
+        };
+        $query = new DictionaryPublicQuery($repo, null, static fn (?string $type, ?string $id, ?string $url): ?string => $url, $entries);
+        $packet = $query->hub();
+        if (count($packet['items']) !== 1) self::fail(json_encode($packet, JSON_UNESCAPED_UNICODE));
+        self::assertCount(2, $packet['items'][0]['senses']);
+        self::assertSame('/tu-dien/con/', $packet['items'][0]['url']);
+        self::assertSame('READY', $query->detail('con')['status']);
     }
 
     private function repository(array $concepts, array $labels): DictionaryConceptRepository

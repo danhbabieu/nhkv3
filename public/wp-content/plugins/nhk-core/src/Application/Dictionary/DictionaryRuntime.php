@@ -119,6 +119,7 @@ final class DictionaryRuntime
                 return is_array($projection['representative'] ?? null) ? $projection['representative'] : null;
             },
             fn (?string $type, ?string $id, ?string $url): ?string => $this->revalidateDelegatedDestination($type, $id, $url),
+            $this->entries,
         );
     }
 
@@ -291,6 +292,15 @@ final class DictionaryRuntime
             },
             function (string $key, string $fingerprint, array $result) use ($audit): void {
                 $audit->recordEvent('DictionaryMutation', 'dictionary', $key, function_exists('get_current_user_id') ? (int) get_current_user_id() : null, ['fingerprint' => $fingerprint, 'result' => $result]);
+            },
+            null,
+            $this->entries,
+            function (?string $type, ?string $id, ?string $url): string|bool|null {
+                if ($type === 'knowledge' && $id !== null) {
+                    $claim = $this->knowledge->findByCanonicalId($id);
+                    return $claim instanceof KnowledgeClaim && $claim->active && $claim->isPublic();
+                }
+                return $this->revalidateDelegatedDestination($type, $id, $url);
             },
         );
     }

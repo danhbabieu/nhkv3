@@ -180,7 +180,7 @@ final class McpTransport
             'nhk.proposal.apply' => 'nhk_apply_proposals',
             'nhk.relation.backfill.apply' => 'nhk_apply_proposals',
             'nhk.public-url.audit', 'nhk.public-url.reproject' => 'nhk_manage_public_urls',
-            'nhk.dictionary.concept.create', 'nhk.dictionary.concept.update', 'nhk.dictionary.concept.lifecycle', 'nhk.dictionary.label.save', 'nhk.dictionary.candidate.review', 'nhk.dictionary.relation.handoff' => 'nhk_curate_dictionary',
+            'nhk.dictionary.concept.create', 'nhk.dictionary.entry.create-with-sense', 'nhk.dictionary.entry.form.add', 'nhk.dictionary.entry.sense.add', 'nhk.dictionary.concept.update', 'nhk.dictionary.concept.lifecycle', 'nhk.dictionary.label.save', 'nhk.dictionary.candidate.review', 'nhk.dictionary.relation.handoff' => 'nhk_curate_dictionary',
             default => null,
         };
         if ($capability !== null && (!$this->can || !(bool) ($this->can)($capability))) throw new McpPermissionDenied($capability);
@@ -219,6 +219,9 @@ final class McpTransport
             'nhk.dictionary.candidate.get' => $this->dictionary?->candidateDetail((string) ($arguments['candidate_id'] ?? ''), (int) ($arguments['limit'] ?? 50), (int) ($arguments['offset'] ?? 0)) ?? throw new \RuntimeException('DICTIONARY_HANDLER_UNAVAILABLE'),
             'nhk.dictionary.mentions.list' => $this->dictionary?->mentions($arguments) ?? throw new \RuntimeException('DICTIONARY_HANDLER_UNAVAILABLE'),
             'nhk.dictionary.concept.create' => $this->dictionary?->createConcept($arguments) ?? throw new \RuntimeException('DICTIONARY_HANDLER_UNAVAILABLE'),
+            'nhk.dictionary.entry.create-with-sense' => $this->dictionary?->createEntryWithSense($arguments) ?? throw new \RuntimeException('DICTIONARY_HANDLER_UNAVAILABLE'),
+            'nhk.dictionary.entry.form.add' => $this->dictionary?->addFormToEntry($arguments) ?? throw new \RuntimeException('DICTIONARY_HANDLER_UNAVAILABLE'),
+            'nhk.dictionary.entry.sense.add' => $this->dictionary?->addSenseToEntry($arguments) ?? throw new \RuntimeException('DICTIONARY_HANDLER_UNAVAILABLE'),
             'nhk.dictionary.concept.update' => $this->dictionary?->updateConcept($arguments) ?? throw new \RuntimeException('DICTIONARY_HANDLER_UNAVAILABLE'),
             'nhk.dictionary.concept.lifecycle' => $this->dictionary?->lifecycle($arguments) ?? throw new \RuntimeException('DICTIONARY_HANDLER_UNAVAILABLE'),
             'nhk.dictionary.label.save' => $this->dictionary?->saveLabel($arguments) ?? throw new \RuntimeException('DICTIONARY_HANDLER_UNAVAILABLE'),

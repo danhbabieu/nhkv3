@@ -1,6 +1,6 @@
 # NHK V3 Dictionary Entry/Sense Architecture Decision
 
-> **DOCUMENTATION-ONLY DESIGN — 2026-10-03.** This document is subordinate to
+> **DOCUMENTATION + READ-SLICE STATUS — 2026-10-03.** This document is subordinate to
 > `docs/constitution/NHK_V3_CONSTITUTION.md` and
 > `docs/architecture/DICTIONARY_LEXICAL_KNOWLEDGE_CONTRACT.md`.
 > It does not authorize code, migration, data mutation, rekeying, Graph
@@ -13,9 +13,9 @@ This decision separates four facts that must never be presented as one:
 | Layer | Meaning for this decision |
 |---|---|
 | **CURRENT LAW** | Dictionary is lexical curation only. Authority owns canonical entities; Knowledge owns atomic claims; Source/Evidence owns provenance/support; Graph owns semantic relations; WordPress owns editorial posts; Media/Asset/Usage and Video retain their own boundaries. |
-| **CURRENT IMPLEMENTATION** | Migration015 persists `concepts`, `labels`, `candidates` and `mentions`. `DictionaryConcept` combines preferred label, lexical definition and optional destination snapshot. There is no runtime `LexicalEntry`, `LexicalSense` or sense-reference store. |
+| **CURRENT IMPLEMENTATION** | Migration015 remains the compatibility source. Additive Migration024 tables, `LexicalEntry`/`LexicalEntryForm` values, a read repository and an internal Entry/Sense resolver now exist in code. No Entry/Sense rows are populated, no Entry/Sense mutation MCP operation exists, and `DictionaryConcept` remains the durable Sense identity. |
 | **APPROVED TARGET DESIGN** | `DictionaryConcept` retains its UUID and durable identity and plays the target semantic role of `LexicalSense`. The target model is `LexicalEntry → Forms → 1..N DictionaryConcept-as-LexicalSense`. `LexicalSense` is a design role for the current Concept, not a new runtime class/table. Candidate and Mention remain discovery/provenance objects. |
-| **IMPLEMENTATION GAP** | Entry/Sense persistence, resolver traversal, multi-sense public rendering and review action distinctions are not implemented or runtime-proven. Migration015 data has not been transformed. |
+| **IMPLEMENTATION GAP** | Durable Entry/Form/Sense write lifecycle, context-qualified sense filtering, multi-sense public rendering, review action distinctions, and Entry-centric public routing are not implemented or runtime-proven. Migration015 data has not been transformed. |
 
 All status statements in this document use those labels. “Target”, “should” and
 “recommended” are not claims that a runtime capability exists.

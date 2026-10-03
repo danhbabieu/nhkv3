@@ -626,12 +626,13 @@ the catalog rows for `nhk.dictionary.concept.*`, `nhk.dictionary.label.save`,
 runtime Concept/Label/Candidate/Mention operations.
 
 The Entry/Sense architecture documented in
-`docs/architecture/DICTIONARY_ENTRY_SENSE_ARCHITECTURE.md` is a
-DESIGN/DOCUMENTATION target only. No `LexicalEntry`, `LexicalSense`, Entry/Form
-or Sense-specific MCP tool is claimed by this catalog. Current Dictionary MCP
-operations remain Concept/Label/Candidate/Mention operations and must continue
-to report unavailable/runtime gaps honestly rather than projecting the target
-model as implemented.
+`docs/architecture/DICTIONARY_ENTRY_SENSE_ARCHITECTURE.md` now has an internal
+additive schema/read slice: `LexicalEntry`, `LexicalEntryForm`, compatibility
+repository fallback and resolver. No Entry/Sense rows are populated, no
+`LexicalEntry`, `LexicalSense`, Entry/Form or Sense-specific MCP mutation tool
+exists, and current Dictionary MCP operations remain
+Concept/Label/Candidate/Mention operations. Public Entry routes and write
+lifecycle remain explicit gaps.
 
 The approved target keeps every Migration015 UUID and uses the safe default
 `1 old Concept → 1 compatibility Entry → 1 Sense`; no rekey, auto-merge,

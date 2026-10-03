@@ -5,13 +5,25 @@ namespace NHK\Core\Application\Dictionary;
 
 use NHK\Core\Contracts\Dictionary\DictionaryConceptRepository;
 use NHK\Core\Domain\Dictionary\{DictionaryConcept, DictionaryLabel};
+use NHK\Core\Domain\Dictionary\LexicalEntry;
 
 final class DictionaryPublicQuery
 {
-    public function __construct(private DictionaryConceptRepository $concepts, private $imageResolver = null, private $destinationValidator = null) {}
+    public function __construct(private DictionaryConceptRepository $concepts, private $imageResolver = null, private $destinationValidator = null, private $entries = null) {}
 
     public function hub(int $limit = 500): array
     {
+        if (is_object($this->entries) && method_exists($this->entries, 'listEntries')) {
+            $entryItems = [];
+            foreach ((array) $this->entries->listEntries($limit) as $entry) {
+                if (!$entry instanceof LexicalEntry) continue;
+                $senses = array_values(array_filter((array) $this->entries->listSenses($entry), static fn (mixed $sense): bool => $sense instanceof DictionaryConcept && $sense->approved()));
+                $item = $this->entryItem($entry, $senses);
+                if (($item['eligible'] ?? false) === true) $entryItems[] = $item;
+            }
+            usort($entryItems, static fn (array $a, array $b): int => strnatcasecmp((string) $a['title'], (string) $b['title']));
+            return ['status' => 'AVAILABLE', 'items' => $entryItems, 'count' => count($entryItems), 'canonical_url' => '/tu-dien/', 'warnings' => []];
+        }
         $items = [];
         $warnings = [];
         foreach ($this->concepts->listApproved($limit) as $concept) {
@@ -28,6 +40,16 @@ final class DictionaryPublicQuery
     {
         $slug = $this->slug($slug);
         if ($slug === '') return ['status' => 'NOT_FOUND'];
+        if (is_object($this->entries) && method_exists($this->entries, 'listEntries')) {
+            foreach ((array) $this->entries->listEntries(2000) as $entry) {
+                if (!$entry instanceof LexicalEntry || $this->slug((string) ($entry->context['public_slug'] ?? '')) !== $slug) continue;
+                $senses = array_values(array_filter((array) $this->entries->listSenses($entry), static fn (mixed $sense): bool => $sense instanceof DictionaryConcept && $sense->approved()));
+                $item = $this->entryItem($entry, $senses);
+                if (($item['eligible'] ?? false) !== true) return ['status' => 'INCOMPLETE', 'reason' => 'DICTIONARY_ENTRY_NOT_PUBLIC'];
+                if (($item['dedicated'] ?? true) === false) return ['status' => 'REDIRECT', 'destination_url' => $item['url'], 'entry_id' => $entry->entryId];
+                return ['status' => 'READY', 'item' => $item, 'labels' => $item['labels'], 'canonical_url' => $item['url'], 'indexable' => true];
+            }
+        }
         $matches = [];
         foreach ($this->concepts->listApproved(2000) as $concept) {
             if (!$concept instanceof DictionaryConcept || !$concept->approved()) continue;
@@ -89,6 +111,21 @@ final class DictionaryPublicQuery
             'eligible' => $eligible,
             'indexable' => $eligible && !$delegated,
         ];
+    }
+
+    private function entryItem(LexicalEntry $entry, array $senses): array
+    {
+        $entrySlug = $this->slug((string) ($entry->context['public_slug'] ?? $entry->preferredForm));
+        $senseItems = [];
+        foreach ($senses as $sense) {
+            $item = $this->item($sense);
+            if (($sense->destinationType !== null || $sense->destinationId !== null) && ($item['eligible'] ?? false) !== true) return ['eligible' => false, 'entry_id' => $entry->entryId];
+            $senseItems[] = ['sense_id' => $sense->conceptId, 'title' => $sense->preferredLabel, 'description' => $sense->definition, 'context' => $sense->context, 'url' => $item['url'], 'destination_type' => $sense->destinationType, 'destination_id' => $sense->destinationId, 'labels' => $item['labels']];
+        }
+        if ($senseItems === []) return ['eligible' => false, 'entry_id' => $entry->entryId];
+        $delegated = count($senseItems) === 1 && trim((string) ($senseItems[0]['destination_type'] ?? '')) !== '';
+        $url = $delegated ? $senseItems[0]['url'] : ($entrySlug !== '' ? '/tu-dien/' . $entrySlug . '/' : null);
+        return ['entry_id' => $entry->entryId, 'title' => $entry->preferredForm, 'description' => $senseItems[0]['description'], 'term_type' => 'ENTRY', 'labels' => $senseItems[0]['labels'], 'url' => $url, 'dedicated' => !$delegated, 'indexable' => !$delegated && $url !== null, 'eligible' => $url !== null, 'senses' => $senseItems, 'image' => null];
     }
 
     private function slug(string $value): string

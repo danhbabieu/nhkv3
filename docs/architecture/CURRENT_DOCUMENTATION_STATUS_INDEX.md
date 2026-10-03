@@ -70,19 +70,23 @@ Entry/Sense schema, migration or runtime change.
 Source/Evidence, Graph, Media/MediaUsage and Video retain their owners.
 
 **CURRENT IMPLEMENTATION:** Migration015 Concept/Label/Candidate/Mention remains
-runtime truth. Concept detail is Concept-centric by `public_slug`; duplicate
-Concept slugs are `AMBIGUOUS`. Candidate actions remain `ATTACH`,
-`CREATE_DRAFT`, `AMBIGUOUS`, `REJECT`, `IGNORE` and `DO_NOT_SUGGEST`.
+the compatibility source. Additive Migration024 tables plus internal
+LexicalEntry/LexicalEntryForm read values, repository fallback and an
+Entry/Sense resolver exist; no rows are populated and Concept detail remains
+Concept-centric by `public_slug`. Duplicate Concept slugs are `AMBIGUOUS`.
+Candidate actions remain `ATTACH`, `CREATE_DRAFT`, `AMBIGUOUS`, `REJECT`,
+`IGNORE` and `DO_NOT_SUGGEST`.
 
 **APPROVED TARGET DESIGN:** `LexicalEntry → Forms → 1..N
 DictionaryConcept-as-LexicalSense`; old Concept UUIDs remain durable. The
 public target is `/tu-dien/{entry-slug}/`, with multi-Sense disambiguation and
 direct owner links where delegated.
 
-**IMPLEMENTATION GAP:** Entry/Sense persistence, preferred-wording ownership
-and synchronization, Knowledge destination completeness, Entry-centric routes,
-and governed Dictionary Media binding writes are not implemented. No target
-Entry/Sense MCP operation is current or READY.
+**IMPLEMENTATION GAP:** Entry/Form/Sense write lifecycle, preferred-wording
+ownership and synchronization, context-qualified sense filtering, Knowledge
+destination completeness, Entry-centric routes, and governed Dictionary Media
+binding writes are not implemented. No target Entry/Sense MCP operation is
+current or READY.
 
 ## 0.1 Governed Conversational Authority — 2026-09-11
 

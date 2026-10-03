@@ -10,11 +10,11 @@
 > Graph relation, that change must be proposed through the normal constitutional
 > and registry-governance process rather than inferred from this document.
 
-> **Entry/Sense design status — 2026-10-03:** The current runtime remains the
-> Concept/Label/Candidate/Mention model from Migration015. The approved target
-> `LexicalEntry → Forms → DictionaryConcept-as-LexicalSense` is documented in
-> `DICTIONARY_ENTRY_SENSE_ARCHITECTURE.md` only; it is not implemented runtime,
-> not a schema declaration and not an authorization to migrate existing rows.
+> **Entry/Sense status — 2026-10-03:** Migration015 remains the compatibility
+> source. An additive Migration024 schema plus internal read-only Entry/Form/
+> Concept-as-Sense code exists; it does not populate rows, expose Entry/Sense
+> MCP mutations, or authorize migration of existing rows. The approved target
+> and remaining gaps are documented in `DICTIONARY_ENTRY_SENSE_ARCHITECTURE.md`.
 
 This contract distinguishes `CURRENT LAW`, `CURRENT IMPLEMENTATION`,
 `APPROVED TARGET DESIGN` and `IMPLEMENTATION GAP`. They are not interchangeable.

@@ -6,6 +6,7 @@ namespace NHK\Tests\Unit;
 use NHK\Core\Application\Dictionary\DictionaryMutationService;
 use NHK\Core\Contracts\Dictionary\DictionaryConceptRepository;
 use NHK\Core\Domain\Dictionary\{DictionaryConcept, DictionaryLabel};
+use NHK\Core\Domain\Dictionary\{LexicalEntry, LexicalEntryForm};
 use PHPUnit\Framework\TestCase;
 
 final class DictionaryMutationContractTest extends TestCase
@@ -61,5 +62,45 @@ final class DictionaryMutationContractTest extends TestCase
         $reactivated = $service->setConceptStatus('concept-1', 2, DictionaryConcept::APPROVED, 'reactivate-1');
         self::assertSame(DictionaryConcept::APPROVED, $reactivated['concept']->status);
         self::assertSame(3, $reactivated['concept']->revision);
+    }
+
+    public function test_entry_lifecycle_requires_entry_repository_and_returns_read_back(): void
+    {
+        $repo = new class implements DictionaryConceptRepository {
+            public function findById(string $conceptId): ?DictionaryConcept { return new DictionaryConcept($conceptId, 'Côn', 'Nghĩa', DictionaryConcept::DRAFT); }
+            public function findApprovedByNormalizedLabel(string $normalizedLabel, array $context = []): array { return []; }
+            public function listApproved(int $limit = 500): array { return []; }
+            public function listLabels(string $conceptId, bool $includeInactive = false): array { return []; }
+            public function createConcept(DictionaryConcept $concept): DictionaryConcept { return $concept; }
+            public function updateConcept(DictionaryConcept $concept, int $expectedRevision): DictionaryConcept { return $concept; }
+            public function addLabel(DictionaryLabel $label): DictionaryLabel { return $label; }
+            public function saveLabel(DictionaryLabel $label, string $previousNormalizedLabel, int $expectedConceptRevision): DictionaryLabel { return $label; }
+        };
+        $entries = new class {
+            public function createWithSense(LexicalEntry $entry, DictionaryConcept $sense, array $context): array { return ['entry' => $entry, 'sense' => $sense, 'forms' => []]; }
+        };
+        $service = new \NHK\Core\Application\Dictionary\DictionaryMutationService($repo, entryRepository: $entries);
+        $result = $service->createEntryWithSense('Côn', 'Nghĩa', [], 'entry-create-1');
+        self::assertInstanceOf(LexicalEntry::class, $result['entry']);
+        self::assertInstanceOf(DictionaryConcept::class, $result['sense']);
+        self::assertSame(1, $result['entry']->revision);
+    }
+
+    public function test_entry_form_collision_is_rejected_before_repository_write(): void
+    {
+        $repo = new class implements DictionaryConceptRepository {
+            public function findById(string $conceptId): ?DictionaryConcept { return new DictionaryConcept($conceptId, 'Côn', 'Nghĩa', DictionaryConcept::DRAFT); }
+            public function findApprovedByNormalizedLabel(string $normalizedLabel, array $context = []): array { return []; }
+            public function listApproved(int $limit = 500): array { return []; }
+            public function listLabels(string $conceptId, bool $includeInactive = false): array { return []; }
+            public function createConcept(DictionaryConcept $concept): DictionaryConcept { return $concept; }
+            public function updateConcept(DictionaryConcept $concept, int $expectedRevision): DictionaryConcept { return $concept; }
+            public function addLabel(DictionaryLabel $label): DictionaryLabel { return $label; }
+            public function saveLabel(DictionaryLabel $label, string $previousNormalizedLabel, int $expectedConceptRevision): DictionaryLabel { return $label; }
+        };
+        $entries = new class { public int $writes = 0; public function addFormToEntry(string $id, int $revision, LexicalEntryForm $form): array { $this->writes++; return []; } };
+        $service = new \NHK\Core\Application\Dictionary\DictionaryMutationService($repo, entryRepository: $entries);
+        $this->expectExceptionMessage('DICTIONARY_ENTRY_FORM_COLLISION');
+        $service->addFormToEntry('22222222-2222-7222-8222-222222222222', 1, 'CÔN', ['normalized_form' => 'con'], 'form-1');
     }
 }

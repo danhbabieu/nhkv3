@@ -67,6 +67,9 @@ final class McpDictionaryHandler
     public function profile(array $input): array { return $this->runtime->profile(isset($input['concept_id']) ? (string) $input['concept_id'] : null, isset($input['slug']) ? (string) $input['slug'] : null); }
 
     public function createConcept(array $input): array { return $this->runtime->mutation()->createDraft((string) ($input['preferred_label'] ?? ''), (string) ($input['definition'] ?? ''), (array) ($input['context'] ?? []), (string) ($input['idempotency_key'] ?? '')); }
+    public function createEntryWithSense(array $input): array { return $this->runtime->mutation()->createEntryWithSense((string) ($input['preferred_form'] ?? ''), (string) ($input['definition'] ?? ''), (array) ($input['context'] ?? []), (string) ($input['idempotency_key'] ?? '')); }
+    public function addFormToEntry(array $input): array { return $this->runtime->mutation()->addFormToEntry((string) $input['entry_id'], (int) $input['expected_revision'], (string) $input['form'], (array) ($input['context'] ?? []), (string) $input['idempotency_key'], (string) ($input['kind'] ?? 'ALTERNATE')); }
+    public function addSenseToEntry(array $input): array { return $this->runtime->mutation()->addSenseToEntry((string) $input['entry_id'], (int) $input['expected_revision'], (string) $input['concept_id'], (array) ($input['context'] ?? []), (string) $input['idempotency_key']); }
     public function updateConcept(array $input): array { return $this->runtime->mutation()->updateConcept((string) $input['concept_id'], (int) $input['expected_revision'], (string) $input['preferred_label'], (string) ($input['definition'] ?? ''), (array) ($input['context'] ?? []), (string) $input['idempotency_key']); }
     public function lifecycle(array $input): array { return $this->runtime->mutation()->setConceptStatus((string) $input['concept_id'], (int) $input['expected_revision'], (string) $input['status'], (string) $input['idempotency_key']); }
 
@@ -79,6 +82,9 @@ final class McpDictionaryHandler
     public function review(array $input): array
     {
         $decision = strtoupper((string) $input['decision']); $id = (string) $input['candidate_id']; $revision = (int) $input['expected_revision']; $curation = $this->runtime->curation();
+        $candidate = $this->runtime->candidate($id);
+        if ($candidate === null) throw new \RuntimeException('DICTIONARY_CANDIDATE_NOT_FOUND');
+        $mutation = $this->runtime->mutation();
         return $this->runtime->mutation()->idempotent('candidate_review', [
             'candidate_id' => $id,
             'expected_revision' => $revision,
@@ -89,12 +95,38 @@ final class McpDictionaryHandler
         ], (string) $input['idempotency_key'], fn (): array => match ($decision) {
             'ATTACH' => $curation->attachToExisting($id, $revision, (string) ($input['concept_id'] ?? '')),
             'CREATE_DRAFT' => $curation->createDraftFromCandidate($id, $revision, (string) ($input['preferred_label'] ?? ''), (string) ($input['definition'] ?? '')),
+            'CREATE_ENTRY_WITH_SENSE' => $this->reviewCreateEntry($mutation, $curation, $candidate, $revision, $input),
+            'ADD_SENSE_TO_ENTRY' => $this->reviewAddSense($mutation, $curation, $candidate, $revision, $input),
+            'ADD_FORM_TO_ENTRY' => $this->reviewAddForm($mutation, $curation, $candidate, $revision, $input),
             'AMBIGUOUS' => ['candidate' => $curation->decide($id, $revision, DictionaryCandidateState::AMBIGUOUS)],
             'REJECT' => ['candidate' => $curation->decide($id, $revision, DictionaryCandidateState::REJECTED)],
             'IGNORE' => ['candidate' => $curation->decide($id, $revision, DictionaryCandidateState::IGNORED)],
             'DO_NOT_SUGGEST' => ['candidate' => $curation->decide($id, $revision, DictionaryCandidateState::DO_NOT_SUGGEST)],
             default => throw new \InvalidArgumentException('DICTIONARY_REVIEW_DECISION_INVALID'),
         });
+    }
+
+    private function reviewCreateEntry(object $mutation, object $curation, object $candidate, int $revision, array $input): array
+    {
+        $raw = trim((string) ($candidate->rawForms[0] ?? $candidate->normalizedTerm));
+        $result = $mutation->createEntryWithSense($raw, (string) ($input['definition'] ?? ''), $candidate->context, (string) $input['idempotency_key']);
+        $result['candidate'] = $curation->decide($candidate->candidateId, $revision, DictionaryCandidateState::PROPOSED_NEW, ['entry_id' => $result['entry']->entryId]);
+        return $result;
+    }
+
+    private function reviewAddSense(object $mutation, object $curation, object $candidate, int $revision, array $input): array
+    {
+        $result = $mutation->addSenseToEntry((string) ($input['entry_id'] ?? ''), (int) ($input['entry_expected_revision'] ?? 0), (string) ($input['concept_id'] ?? ''), $candidate->context, (string) $input['idempotency_key']);
+        $result['candidate'] = $curation->decide($candidate->candidateId, $revision, DictionaryCandidateState::RESOLVED_EXISTING, ['entry_id' => $result['entry']->entryId, 'sense_id' => $result['sense']->conceptId]);
+        return $result;
+    }
+
+    private function reviewAddForm(object $mutation, object $curation, object $candidate, int $revision, array $input): array
+    {
+        $raw = trim((string) ($candidate->rawForms[0] ?? $candidate->normalizedTerm));
+        $result = $mutation->addFormToEntry((string) ($input['entry_id'] ?? ''), (int) ($input['entry_expected_revision'] ?? 0), $raw, $candidate->context, (string) $input['idempotency_key']);
+        $result['candidate'] = $curation->decide($candidate->candidateId, $revision, DictionaryCandidateState::RESOLVED_EXISTING, ['entry_id' => $result['entry']->entryId, 'form' => $raw]);
+        return $result;
     }
 
     public function handoff(array $input): array { return $this->runtime->relationHandoff()->prepare($input); }
