@@ -9,7 +9,7 @@ use NHK\Core\Domain\Dictionary\LexicalEntry;
 
 final class DictionaryPublicQuery
 {
-    public function __construct(private DictionaryConceptRepository $concepts, private $imageResolver = null, private $destinationValidator = null, private $entries = null, private $entrySenseReady = null) {}
+    public function __construct(private DictionaryConceptRepository $concepts, private $imageResolver = null, private $destinationValidator = null, private $entries = null, private $entrySenseReady = null, private $semanticProjection = null) {}
 
     public function hub(int $limit = 500, string $query = '', string $initial = ''): array
     {
@@ -21,6 +21,7 @@ final class DictionaryPublicQuery
                 if (!$entry instanceof LexicalEntry) continue;
                 $senses = array_values(array_filter((array) $this->entries->listSenses($entry), static fn (mixed $sense): bool => $sense instanceof DictionaryConcept && $sense->approved()));
                 $item = $this->entryItem($entry, $senses);
+                $item['related_terms'] = $this->relatedTerms($entry, $senses[0] ?? null, $limit);
                 if (($item['eligible'] ?? false) === true) $entryItems[] = $item;
             }
             $entryItems = $this->filterAndRank($entryItems, $query, $initial);
@@ -52,8 +53,8 @@ final class DictionaryPublicQuery
             foreach ($matches as $entry) {
                 $senses = array_values(array_filter((array) $this->entries->listSenses($entry), static fn (mixed $sense): bool => $sense instanceof DictionaryConcept && $sense->approved()));
                 $item = $this->entryItem($entry, $senses);
+                $item['related_terms'] = $this->relatedTerms($entry, $senses[0] ?? null, 12);
                 if (($item['eligible'] ?? false) !== true) return ['status' => 'INCOMPLETE', 'reason' => 'DICTIONARY_ENTRY_NOT_PUBLIC'];
-                if (($item['dedicated'] ?? true) === false) return ['status' => 'REDIRECT', 'destination_url' => $item['url'], 'entry_id' => $entry->entryId];
                 return ['status' => 'READY', 'item' => $item, 'labels' => $item['labels'], 'canonical_url' => $item['url'], 'indexable' => true];
             }
         }
@@ -167,12 +168,72 @@ final class DictionaryPublicQuery
             $item = $this->item($sense);
             $hasDelegatedDestination = trim((string) ($sense->destinationType ?? '')) !== '' || trim((string) ($sense->destinationId ?? '')) !== '';
             if ($hasDelegatedDestination && ($item['eligible'] ?? false) !== true) return ['eligible' => false, 'entry_id' => $entry->entryId];
-            $senseItems[] = ['sense_id' => $sense->conceptId, 'title' => $sense->preferredLabel, 'description' => $sense->definition, 'context' => $sense->context, 'url' => $item['url'], 'destination_type' => $sense->destinationType, 'destination_id' => $sense->destinationId, 'labels' => $item['labels'], 'search_labels' => $item['search_labels'] ?? $item['labels']];
+            $senseItem = ['sense_id' => $sense->conceptId, 'title' => $sense->preferredLabel, 'description' => $sense->definition, 'context' => $sense->context, 'url' => $item['url'], 'destination_type' => $sense->destinationType, 'destination_id' => $sense->destinationId, 'labels' => $item['labels'], 'search_labels' => $item['search_labels'] ?? $item['labels']];
+            $senseItem += $this->semanticSections($sense->destinationType, $sense->destinationId);
+            $senseItems[] = $senseItem;
         }
         if ($senseItems === []) return ['eligible' => false, 'entry_id' => $entry->entryId];
-        $delegated = count($senseItems) === 1 && trim((string) ($senseItems[0]['destination_type'] ?? '')) !== '';
-        $url = $delegated ? $senseItems[0]['url'] : ($entrySlug !== '' ? '/tu-dien/' . $entrySlug . '/' : null);
-        return ['entry_id' => $entry->entryId, 'title' => $entry->preferredForm, 'description' => $senseItems[0]['description'], 'term_type' => 'ENTRY', 'labels' => $senseItems[0]['labels'], 'search_labels' => $senseItems[0]['search_labels'], 'url' => $url, 'dedicated' => !$delegated, 'indexable' => !$delegated && $url !== null, 'eligible' => $url !== null, 'senses' => $senseItems, 'image' => null];
+        // An Entry owns the lexical discovery page even when its Sense points
+        // at a canonical owner. The owner is projected as semantic context;
+        // only the legacy Concept-only path redirects to an owner.
+        $delegated = false;
+        $url = $entrySlug !== '' ? '/tu-dien/' . $entrySlug . '/' : null;
+        $forms = $this->entryForms($entry);
+        $first = $senseItems[0];
+        return ['entry_id' => $entry->entryId, 'title' => $entry->preferredForm, 'description' => $first['description'], 'term_type' => 'ENTRY', 'labels' => $first['labels'], 'search_labels' => array_values(array_merge($first['search_labels'], array_map(static fn (array $form): array => ['label' => $form['form']], $forms))), 'url' => $url, 'dedicated' => !$delegated, 'indexable' => !$delegated && $url !== null, 'eligible' => $url !== null, 'forms' => $forms, 'senses' => $senseItems, 'canonical_owner' => $first['canonical_owner'] ?? null, 'knowledge' => $first['knowledge'] ?? ['items' => []], 'semantic_relations' => $first['semantic_relations'] ?? ['groups' => []], 'brands' => $first['brands'] ?? ['items' => []], 'models' => $first['models'] ?? ['items' => []], 'specimens' => $first['specimens'] ?? ['items' => []], 'media' => $first['media'] ?? ['items' => []], 'videos' => $first['videos'] ?? ['items' => []], 'articles' => $first['articles'] ?? ['items' => []], 'mentions' => ['groups' => []], 'image' => null];
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function entryForms(LexicalEntry $entry): array
+    {
+        if (!is_object($this->entries) || !method_exists($this->entries, 'listForms')) return [['form' => $entry->preferredForm, 'kind' => 'PREFERRED', 'locale' => $entry->locale, 'context' => $entry->context]];
+        $forms = [];
+        foreach ((array) $this->entries->listForms($entry) as $form) {
+            if (is_object($form) && property_exists($form, 'form')) $forms[] = ['form' => (string) $form->form, 'kind' => (string) ($form->kind ?? 'ALTERNATE'), 'locale' => $form->locale ?? null, 'context' => is_array($form->context ?? null) ? $form->context : []];
+            elseif (is_array($form) && trim((string) ($form['form'] ?? '')) !== '') $forms[] = ['form' => (string) $form['form'], 'kind' => (string) ($form['kind'] ?? 'ALTERNATE'), 'locale' => $form['locale'] ?? null, 'context' => is_array($form['context'] ?? null) ? $form['context'] : []];
+        }
+        return $forms !== [] ? $forms : [['form' => $entry->preferredForm, 'kind' => 'PREFERRED', 'locale' => $entry->locale, 'context' => $entry->context]];
+    }
+
+    /** @return array<string,mixed> */
+    private function semanticSections(?string $type, ?string $id): array
+    {
+        $empty = ['canonical_owner' => null, 'knowledge' => ['items' => []], 'semantic_relations' => ['groups' => []], 'brands' => ['items' => []], 'models' => ['items' => []], 'specimens' => ['items' => []], 'media' => ['items' => []], 'videos' => ['items' => []], 'articles' => ['items' => []]];
+        if (!is_callable($this->semanticProjection) || trim((string) $type) === '' || trim((string) $id) === '') return $empty;
+        try {
+            $projection = ($this->semanticProjection)((string) $type, (string) $id);
+            if (!is_array($projection)) return $empty;
+            $owner = is_array($projection['identity'] ?? null) ? $projection['identity'] : null;
+            $relations = is_array($projection['relation_sections'] ?? null) ? $projection['relation_sections'] : [];
+            $knowledge = is_array($projection['knowledge'] ?? null) ? $projection['knowledge'] : [];
+            $empty['canonical_owner'] = $owner;
+            $empty['knowledge'] = ['items' => is_array($knowledge['items'] ?? null) ? $knowledge['items'] : (is_array($knowledge['facets'] ?? null) ? $knowledge['facets'] : [])];
+            $empty['semantic_relations'] = ['groups' => $relations];
+            foreach (['brands', 'models', 'specimens', 'media', 'videos', 'articles'] as $group) $empty[$group] = ['items' => is_array($relations[$group] ?? null) ? $relations[$group] : []];
+            return $empty;
+        } catch (\Throwable) { return $empty; }
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function relatedTerms(LexicalEntry $entry, ?DictionaryConcept $sense, int $limit): array
+    {
+        if (!is_object($this->entries) || !method_exists($this->entries, 'listEntries')) return [];
+        $items = [];
+        $ownerType = $sense?->destinationType;
+        $ownerId = $sense?->destinationId;
+        if (trim((string) $ownerType) === '' || trim((string) $ownerId) === '') return [];
+        foreach ((array) $this->entries->listEntries(max(1, min(2000, $limit + 1))) as $candidate) {
+            if (!$candidate instanceof LexicalEntry || $candidate->entryId === $entry->entryId) continue;
+            $candidateSenses = (array) $this->entries->listSenses($candidate);
+            $sharedOwner = false;
+            foreach ($candidateSenses as $candidateSense) if ($candidateSense instanceof DictionaryConcept && $candidateSense->destinationType === $ownerType && $candidateSense->destinationId === $ownerId) { $sharedOwner = true; break; }
+            if (!$sharedOwner) continue;
+            $slug = $this->slug((string) ($candidate->context['public_slug'] ?? $candidate->preferredForm));
+            if ($slug === '') continue;
+            $items[] = ['entry_id' => $candidate->entryId, 'title' => $candidate->preferredForm, 'url' => '/tu-dien/' . $slug . '/'];
+            if (count($items) >= $limit) break;
+        }
+        return $items;
     }
 
     private function slug(string $value): string

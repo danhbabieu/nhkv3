@@ -70,6 +70,23 @@ final class WpdbDictionaryEntryRepository implements DictionaryEntryRepository
         return array_values($out);
     }
 
+    /** @return list<LexicalEntryForm> */
+    public function listForms(LexicalEntry $entry): array
+    {
+        try {
+            $rows = $this->database->get_results($this->database->prepare("SELECT form_text,normalized_form,form_kind,locale,context_json,state FROM {$this->forms} WHERE entry_uuid=%s AND state=1 ORDER BY id", UuidCodec::toBinary($entry->entryId)), ARRAY_A) ?: [];
+            $forms = [];
+            foreach ($rows as $row) {
+                $form = trim((string) ($row['form_text'] ?? ''));
+                $normalized = trim((string) ($row['normalized_form'] ?? ''));
+                if ($form === '' || $normalized === '') continue;
+                $context = json_decode((string) ($row['context_json'] ?? '{}'), true);
+                $forms[] = new LexicalEntryForm($entry->entryId, $form, $normalized, (string) ($row['form_kind'] ?? LexicalEntryForm::ALTERNATE), ($row['locale'] ?? null) !== null ? (string) $row['locale'] : null, is_array($context) ? $context : [], true);
+            }
+            return $forms;
+        } catch (\Throwable) { return []; }
+    }
+
     public function findById(string $entryId): ?LexicalEntry
     {
         try {

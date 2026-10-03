@@ -28,6 +28,56 @@ final class DictionaryPublicQueryTest extends TestCase
         self::assertSame(['Côn'], array_column(array_slice($items, 0, 1), 'title'));
     }
 
+    public function test_numeric_entry_search_resolves_preferred_and_all_forms(): void
+    {
+        $sense = new DictionaryConcept('400-sense', '400 ngày', 'Loại đồng hồ.', DictionaryConcept::APPROVED, null, null, null, ['public_slug' => '400-ngay']);
+        $repo = $this->repository([$sense], ['400-sense' => []]);
+        $entries = new class($sense) {
+            public function __construct(private DictionaryConcept $sense) {}
+            public function listEntries(int $limit = 500): array { return [new LexicalEntry('400-entry', '400 ngày', '400 ngày', DictionaryConcept::APPROVED, 'vi-VN', ['public_slug' => '400-ngay'], 1, [$this->sense->conceptId])]; }
+            public function listSenses(LexicalEntry $entry, array $context = []): array { return [$this->sense]; }
+            public function listForms(LexicalEntry $entry): array { return [
+                new \NHK\Core\Domain\Dictionary\LexicalEntryForm($entry->entryId, '400 ngày', '400 ngày', 'PREFERRED'),
+                new \NHK\Core\Domain\Dictionary\LexicalEntryForm($entry->entryId, '400-Day Clock', '400-day clock', 'ALTERNATE'),
+                new \NHK\Core\Domain\Dictionary\LexicalEntryForm($entry->entryId, 'Jahresuhr/400', 'jahresuhr/400', 'ALTERNATE'),
+                new \NHK\Core\Domain\Dictionary\LexicalEntryForm($entry->entryId, 'Anniversary clock', 'anniversary clock', 'TECHNICAL'),
+            ]; }
+        };
+        $query = new DictionaryPublicQuery($repo, null, null, $entries);
+
+        foreach (['400', '400 ngày', '400-Day Clock', 'Anniversary clock'] as $term) {
+            $items = $query->hub(500, $term)['items'];
+            self::assertCount(1, $items, $term);
+            self::assertSame('400 ngày', $items[0]['title'], $term);
+        }
+    }
+
+    public function test_detail_packet_exposes_structured_semantic_sections_without_graph_mutation(): void
+    {
+        $sense = new DictionaryConcept('sense-400', '400 ngày', 'Loại đồng hồ.', DictionaryConcept::APPROVED, 'classification', 'owner-400', '/loai-dong-ho/400-ngay/', ['public_slug' => '400-ngay']);
+        $repo = $this->repository([$sense], ['sense-400' => []]);
+        $entries = new class($sense) {
+            public function __construct(private DictionaryConcept $sense) {}
+            public function listEntries(int $limit = 500): array { return [new LexicalEntry('entry-400', '400 ngày', '400 ngày', DictionaryConcept::APPROVED, 'vi-VN', ['public_slug' => '400-ngay'], 1, [$this->sense->conceptId])]; }
+            public function listSenses(LexicalEntry $entry, array $context = []): array { return [$this->sense]; }
+            public function listForms(LexicalEntry $entry): array { return []; }
+        };
+        $projection = static fn (string $type, string $id): array => [
+            'identity' => ['type' => $type, 'id' => $id, 'title' => 'Đồng hồ 400 ngày', 'url' => '/loai-dong-ho/400-ngay/'],
+            'knowledge' => ['items' => [['id' => 'knowledge-1']]],
+            'relation_sections' => ['brands' => [['title' => 'Junghans']], 'models' => [], 'specimens' => [], 'media' => [['title' => 'Ảnh']], 'videos' => [['title' => 'Video']], 'articles' => [['title' => 'Bài viết']]],
+        ];
+        $query = new DictionaryPublicQuery($repo, null, null, $entries, null, $projection);
+
+        $item = $query->detail('400-ngay')['item'];
+
+        self::assertSame('Đồng hồ 400 ngày', $item['canonical_owner']['title']);
+        self::assertSame([['id' => 'knowledge-1']], $item['knowledge']['items']);
+        self::assertSame('Junghans', $item['brands']['items'][0]['title']);
+        self::assertSame('Ảnh', $item['media']['items'][0]['title']);
+        self::assertSame([], $item['mentions']['groups']);
+    }
+
     public function test_public_search_supports_visible_alias_and_hidden_lookup_without_exposing_hidden_label(): void
     {
         $concept = new DictionaryConcept('c1', 'Cylindre à picots', 'Bộ thoát.', DictionaryConcept::APPROVED, null, null, null, ['public_slug' => 'cylindre-a-picots']);

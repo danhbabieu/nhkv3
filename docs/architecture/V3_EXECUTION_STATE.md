@@ -21836,3 +21836,27 @@ remain pending.
 
 STATUS: `DEPLOY_MIGRATION_GATE_LOCAL_READY / MIGRATION024_READBACK_UNVERIFIED /
 NO_DEPLOYMENT / UNCOMMITTED`.
+
+# Checkpoint — 2026-10-03 — Dictionary 400 ngày public discovery closure (LOCAL / NO MUTATION)
+
+IMPLEMENTED: Public Entry projection now reads persisted Forms so numeric,
+exact, alternate and technical searches resolve the Entry `400 ngày`. Entry
+detail remains Dictionary-owned when its Sense has a semantic reference, and
+projects the canonical owner, Knowledge, existing Graph relation groups,
+Brands/Models/Specimens, Media, Videos, Articles, bounded related Dictionary
+terms and a structured Mentions placeholder without creating Graph edges or
+copying semantic data. The semantic owner is revalidated through the existing
+Authority/dossier read boundary; the theme renders the application packet only.
+
+REGRESSION: Added public-query coverage for `400`, `400 ngày`, `400-Day Clock`
+and `Anniversary clock`, all returning title `400 ngày`, plus structured detail
+packet coverage. Focused Dictionary/Semantic/Clock dossier suite passes 184
+tests / 1,012 assertions; changed PHP files lint clean and `git diff --check`
+passes. No materialization, raw data write, Graph mutation, deployment,
+staging, production, V2 or live semantic mutation was performed.
+
+RUNTIME: The exact public HTTP URLs and deployed SHA remain environment-gated;
+this checkout does not claim live browser acceptance until the target runtime
+and Migration024 read-back are available.
+
+STATUS: `LOCAL_PUBLIC_DICTIONARY_DETAIL_READY / LIVE_HTTP_PENDING / NO_DATA_MUTATION / UNCOMMITTED`.

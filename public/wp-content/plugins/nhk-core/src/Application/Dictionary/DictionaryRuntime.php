@@ -133,6 +133,17 @@ final class DictionaryRuntime
             fn (?string $type, ?string $id, ?string $url): ?string => $this->revalidateDelegatedDestination($type, $id, $url),
             $this->entries,
             fn (): bool => $this->entrySenseAvailable(),
+            function (string $type, string $id): array {
+                if (!$this->types->has($type)) return [];
+                $entity = $this->authority->findByCanonicalId($id);
+                if (!$entity instanceof \NHK\Core\Domain\Authority\AuthorityEntity || !$entity->active() || $entity->entityType !== $type) return [];
+                $value = ['dossier' => []];
+                if (function_exists('apply_filters') && has_filter('nhk_v3_entity_detail_projection')) {
+                    $value = apply_filters('nhk_v3_entity_detail_projection', $value, $entity);
+                    if (is_array($value) && is_array($value['dossier'] ?? null)) return $value['dossier'];
+                }
+                return ['identity' => ['type' => $entity->entityType, 'id' => $entity->canonicalId, 'title' => $entity->canonicalName, 'url' => $this->routes->path($entity)]];
+            },
         );
     }
 
