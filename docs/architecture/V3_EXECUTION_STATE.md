@@ -1,5 +1,24 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-03 — Dictionary empty-destination validation gap closed locally
+
+ROOT_CAUSE: The deployed materialization planner treated legacy empty-string
+`destination_type`/`destination_id` values as a present delegation and called
+the owner validator, producing `DESTINATION_INVALID` for all 29 APPROVED
+Concepts even though their destination was absent. This was reproduced in the
+staging read-only plan and in a new unit test.
+
+FIX: Empty or whitespace-only type and id are now normalized as absent. A
+partial destination remains invalid, and a non-empty type/id pair still uses
+the canonical destination validator. No owner identity, URL, Concept, status,
+Knowledge, Graph, Media or Video record was changed.
+
+VERIFICATION: The new test failed before the implementation change and passes
+after it. Focused Dictionary/deployment/MCP suite passes 80 tests / 909
+assertions with 41 existing PHPUnit deprecations; `git diff --check` passes.
+
+STATUS: `LOCAL_FIX_READY / DEPLOYMENT_PENDING / NO_LIVE_SEMANTIC_MUTATION`.
+
 # Checkpoint — 2026-10-03 — Migration024 deployment gate implemented locally
 
 IMPLEMENTED: The canonical deploy verifier now transfers files, invokes the

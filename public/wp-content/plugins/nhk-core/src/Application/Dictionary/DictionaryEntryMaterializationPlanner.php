@@ -164,10 +164,12 @@ final class DictionaryEntryMaterializationPlanner
 
     private function invalidDestination(DictionaryConcept $concept): bool
     {
-        if ($concept->destinationType === null && $concept->destinationId === null) return false;
-        if ($concept->destinationType === null || $concept->destinationId === null) return true;
+        $type = trim((string) ($concept->destinationType ?? ''));
+        $id = trim((string) ($concept->destinationId ?? ''));
+        if ($type === '' && $id === '') return false;
+        if ($type === '' || $id === '') return true;
         if (!is_callable($this->destinationValidator)) return false;
-        try { return ($this->destinationValidator)($concept->destinationType, $concept->destinationId, $concept->destinationUrl) === false; }
+        try { return ($this->destinationValidator)($type, $id, $concept->destinationUrl) === false; }
         catch (\Throwable) { return true; }
     }
 

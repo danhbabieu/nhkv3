@@ -51,6 +51,46 @@ final class DictionaryEntryMaterializationPlannerTest extends TestCase
         self::assertNotSame('', $result['fingerprint']);
     }
 
+    public function test_empty_legacy_destination_fields_are_treated_as_unmapped_not_invalid(): void
+    {
+        $concept = new DictionaryConcept(
+            '33333333-3333-7333-8333-333333333333',
+            'Bộ nhớ cơ khí',
+            'Một nghĩa đã được duyệt',
+            DictionaryConcept::APPROVED,
+            '',
+            '',
+            '',
+            [],
+            1,
+        );
+        $repo = new class($concept) implements DictionaryConceptRepository {
+            public function __construct(private DictionaryConcept $concept) {}
+            public function findById(string $conceptId): ?DictionaryConcept { return $conceptId === $this->concept->conceptId ? $this->concept : null; }
+            public function findApprovedByNormalizedLabel(string $normalizedLabel, array $context = []): array { return []; }
+            public function listApproved(int $limit = 500): array { return [$this->concept]; }
+            public function listByStatus(string $status, int $limit = 500): array { return $status === $this->concept->status ? [$this->concept] : []; }
+            public function listLabels(string $conceptId, bool $includeInactive = false): array { return []; }
+            public function createConcept(DictionaryConcept $concept): DictionaryConcept { throw new \LogicException(); }
+            public function updateConcept(DictionaryConcept $concept, int $expectedRevision): DictionaryConcept { throw new \LogicException(); }
+            public function addLabel(DictionaryLabel $label): DictionaryLabel { throw new \LogicException(); }
+            public function saveLabel(DictionaryLabel $label, string $previousNormalizedLabel, int $expectedConceptRevision): DictionaryLabel { throw new \LogicException(); }
+        };
+        $planner = new DictionaryEntryMaterializationPlanner(
+            $repo,
+            static fn (string $conceptId): ?LexicalEntry => null,
+            static fn (string $conceptId): array => [new DictionaryLabel($conceptId, 'Bộ nhớ cơ khí', 'bộ nhớ cơ khí', DictionaryLabel::PREFERRED)],
+            static fn (string $type, string $id, string $url): bool => false,
+        );
+
+        $item = $planner->plan(['concept_id' => $concept->conceptId])['items'][0];
+
+        self::assertSame('UNMAPPED_CONCEPT', $item['classification']);
+        self::assertSame('READY', $item['eligibility']);
+        self::assertSame([], $item['warnings']);
+        self::assertSame([], $item['conflicts']);
+    }
+
     public function test_equal_labels_are_review_only_and_never_grouped(): void
     {
         $first = new DictionaryConcept('11111111-1111-7111-8111-111111111111', 'Côn', 'Nghĩa A', DictionaryConcept::APPROVED, null, null, null, ['domain' => 'A'], 1);
