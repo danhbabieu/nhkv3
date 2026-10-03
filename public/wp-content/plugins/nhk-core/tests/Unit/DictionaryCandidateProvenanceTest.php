@@ -54,4 +54,46 @@ final class DictionaryCandidateProvenanceTest extends TestCase
         self::assertIsString($migration);
         self::assertStringContainsString('concept_uuid BINARY(16) NULL', $migration);
     }
+
+    public function test_mention_repository_reads_mentions_reverse_by_concept(): void
+    {
+        if (!defined('ARRAY_A')) define('ARRAY_A', 'ARRAY_A');
+        $conceptId = '018f2f9a-0000-7000-8000-000000000001';
+        $database = new class($conceptId) {
+            public string $prefix = 'wp_';
+            public function __construct(private string $conceptId) {}
+            public function prepare(string $query, mixed ...$args): string { return $query; }
+            public function get_results(string $query, mixed $output): array { return [[
+                'mention_uuid' => UuidCodec::toBinary('018f2f9a-0000-7000-8000-000000000002'),
+                'fingerprint' => hash('sha256', 'mention'), 'source_kind' => 'ARTICLE', 'source_id' => '42',
+                'normalized_term' => '400 ngày', 'context_hash' => hash('sha256', '{}'), 'concept_uuid' => UuidCodec::toBinary($this->conceptId),
+                'context_json' => '{}', 'strength' => 'NORMAL', 'created_at' => '2026-10-03 00:00:00',
+            ]]; }
+        };
+
+        $mentions = (new WpdbDictionaryMentionRepository($database))->listByConcept($conceptId, 10, 0);
+
+        self::assertCount(1, $mentions);
+        self::assertSame($conceptId, $mentions[0]->conceptId);
+        self::assertSame('ARTICLE', $mentions[0]->sourceKind);
+    }
+
+    public function test_public_mention_projection_groups_only_resolved_public_sources(): void
+    {
+        $repository = new class {
+            public function listByConcept(string $conceptId, int $limit, int $offset): array
+            {
+                return [
+                    new DictionaryMention('018f2f9a-0000-7000-8000-000000000003', hash('sha256', 'article'), 'ARTICLE', '42', '400 ngày', hash('sha256', '{}')),
+                    new DictionaryMention('018f2f9a-0000-7000-8000-000000000004', hash('sha256', 'private'), 'VIDEO', 'private-1', '400 ngày', hash('sha256', '{}')),
+                ];
+            }
+        };
+
+        $result = (new \NHK\Core\Application\Dictionary\DictionaryMentionPublicProjection($repository, static fn (string $kind, string $id): ?array => $kind === 'ARTICLE' ? ['title' => 'Bài viết', 'url' => '/bai-viet/'] : null))->forConcept('concept-1');
+
+        self::assertSame('AVAILABLE_WITH_ITEMS', $result['status']);
+        self::assertSame('Bài viết', $result['groups']['ARTICLE'][0]['title']);
+        self::assertArrayNotHasKey('VIDEO', $result['groups']);
+    }
 }

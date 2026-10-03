@@ -1,5 +1,27 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-03 — Dictionary public detail foundation (LOCAL / NO MUTATION)
+
+IMPLEMENTED: Added mapping-first semantic-reference reads for Entry/Sense,
+including explicit `MAPPING`/compatibility fallback metadata; added the
+governed application boundary for updating an existing Entry/Sense semantic
+reference with Entry revision CAS, idempotency and read-back contract; fixed
+multi-Sense public packets so owner/Knowledge/semantic sections are not
+promoted from the first Sense; added bounded reverse Mention repository and
+public-source projection primitives.
+
+VERIFICATION: Focused Dictionary suite passes 34 tests / 107 assertions with
+1 existing PHPUnit deprecation. Changed PHP files lint clean and `git diff
+--check` passes. No migration, materialization, Graph edge, database mutation,
+deployment, push or commit performed.
+
+REMAINING: Full DictionaryDetailQuery composition, runtime wiring of public
+Mention source resolvers, governed reverse related-term projection, complete
+route/SEO state integration and final theme section rendering remain pending;
+the current checkpoint does not claim public detail completion.
+
+STATUS: `DICTIONARY_PUBLIC_DETAIL_FOUNDATION_LOCAL / NO_DATA_MUTATION / UNCOMMITTED`.
+
 # Checkpoint — 2026-10-03 — Dictionary public search/projection closure (LOCAL / NO MUTATION)
 
 IMPLEMENTED: Added bounded GET search and initial filtering to the existing

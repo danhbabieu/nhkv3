@@ -168,8 +168,9 @@ final class DictionaryPublicQuery
             $item = $this->item($sense);
             $hasDelegatedDestination = trim((string) ($sense->destinationType ?? '')) !== '' || trim((string) ($sense->destinationId ?? '')) !== '';
             if ($hasDelegatedDestination && ($item['eligible'] ?? false) !== true) return ['eligible' => false, 'entry_id' => $entry->entryId];
-            $senseItem = ['sense_id' => $sense->conceptId, 'title' => $sense->preferredLabel, 'description' => $sense->definition, 'context' => $sense->context, 'url' => $item['url'], 'destination_type' => $sense->destinationType, 'destination_id' => $sense->destinationId, 'labels' => $item['labels'], 'search_labels' => $item['search_labels'] ?? $item['labels']];
-            $senseItem += $this->semanticSections($sense->destinationType, $sense->destinationId);
+            [$semanticType, $semanticId, $semanticReference] = $this->senseSemanticReference($entry, $sense);
+            $senseItem = ['sense_id' => $sense->conceptId, 'title' => $sense->preferredLabel, 'description' => $sense->definition, 'context' => $sense->context, 'url' => $item['url'], 'destination_type' => $semanticType, 'destination_id' => $semanticId, 'semantic_reference' => $semanticReference, 'labels' => $item['labels'], 'search_labels' => $item['search_labels'] ?? $item['labels']];
+            $senseItem += $this->semanticSections($semanticType, $semanticId);
             $senseItems[] = $senseItem;
         }
         if ($senseItems === []) return ['eligible' => false, 'entry_id' => $entry->entryId];
@@ -180,7 +181,58 @@ final class DictionaryPublicQuery
         $url = $entrySlug !== '' ? '/tu-dien/' . $entrySlug . '/' : null;
         $forms = $this->entryForms($entry);
         $first = $senseItems[0];
-        return ['entry_id' => $entry->entryId, 'title' => $entry->preferredForm, 'description' => $first['description'], 'term_type' => 'ENTRY', 'labels' => $first['labels'], 'search_labels' => array_values(array_merge($first['search_labels'], array_map(static fn (array $form): array => ['label' => $form['form']], $forms))), 'url' => $url, 'dedicated' => !$delegated, 'indexable' => !$delegated && $url !== null, 'eligible' => $url !== null, 'forms' => $forms, 'senses' => $senseItems, 'canonical_owner' => $first['canonical_owner'] ?? null, 'knowledge' => $first['knowledge'] ?? ['items' => []], 'semantic_relations' => $first['semantic_relations'] ?? ['groups' => []], 'brands' => $first['brands'] ?? ['items' => []], 'models' => $first['models'] ?? ['items' => []], 'specimens' => $first['specimens'] ?? ['items' => []], 'media' => $first['media'] ?? ['items' => []], 'videos' => $first['videos'] ?? ['items' => []], 'articles' => $first['articles'] ?? ['items' => []], 'mentions' => ['groups' => []], 'image' => null];
+        $singleSense = count($senseItems) === 1;
+        return [
+            'entry_id' => $entry->entryId,
+            'title' => $entry->preferredForm,
+            'description' => $singleSense ? $first['description'] : '',
+            'term_type' => 'ENTRY',
+            'labels' => $first['labels'],
+            'search_labels' => array_values(array_merge($first['search_labels'], array_map(static fn (array $form): array => ['label' => $form['form']], $forms))),
+            'url' => $url,
+            'dedicated' => !$delegated,
+            'indexable' => !$delegated && $url !== null,
+            'eligible' => $url !== null,
+            'forms' => $forms,
+            'senses' => $senseItems,
+            'canonical_owner' => $singleSense ? ($first['canonical_owner'] ?? null) : null,
+            'knowledge' => $singleSense ? ($first['knowledge'] ?? ['items' => []]) : ['items' => []],
+            'semantic_relations' => $singleSense ? ($first['semantic_relations'] ?? ['groups' => []]) : ['groups' => []],
+            'brands' => $singleSense ? ($first['brands'] ?? ['items' => []]) : ['items' => []],
+            'models' => $singleSense ? ($first['models'] ?? ['items' => []]) : ['items' => []],
+            'specimens' => $singleSense ? ($first['specimens'] ?? ['items' => []]) : ['items' => []],
+            'media' => $singleSense ? ($first['media'] ?? ['items' => []]) : ['items' => []],
+            'videos' => $singleSense ? ($first['videos'] ?? ['items' => []]) : ['items' => []],
+            'articles' => $singleSense ? ($first['articles'] ?? ['items' => []]) : ['items' => []],
+            'mentions' => ['groups' => []],
+            'image' => null,
+        ];
+    }
+
+    /** @return array{0:?string,1:?string,2:array<string,mixed>} */
+    private function senseSemanticReference(LexicalEntry $entry, DictionaryConcept $sense): array
+    {
+        if (is_object($this->entries) && method_exists($this->entries, 'semanticReference')) {
+            try {
+                $reference = ($this->entries)->semanticReference($entry->entryId, $sense->conceptId);
+                if (is_array($reference)) {
+                    $type = trim((string) ($reference['type'] ?? ''));
+                    $id = trim((string) ($reference['id'] ?? ''));
+                    if ($type !== '' && $id !== '') return [$type, $id, $reference];
+                }
+            } catch (\Throwable) {
+                // Compatibility fallback below is intentionally read-only.
+            }
+        }
+        $type = trim((string) ($sense->destinationType ?? ''));
+        $id = trim((string) ($sense->destinationId ?? ''));
+        return [$type !== '' ? $type : null, $id !== '' ? $id : null, [
+            'status' => $type !== '' && $id !== '' ? 'AVAILABLE' : 'ABSENT',
+            'type' => $type !== '' ? $type : null,
+            'id' => $id !== '' ? $id : null,
+            'revision' => null,
+            'source' => $type !== '' && $id !== '' ? 'LEGACY_CONCEPT_SNAPSHOT' : 'NONE',
+        ]];
     }
 
     /** @return list<array<string,mixed>> */

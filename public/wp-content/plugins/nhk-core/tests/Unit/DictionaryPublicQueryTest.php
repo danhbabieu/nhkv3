@@ -158,6 +158,53 @@ final class DictionaryPublicQueryTest extends TestCase
         self::assertSame('READY', $query->detail('con')['status']);
     }
 
+    public function test_multi_sense_entry_keeps_semantic_projection_inside_each_sense(): void
+    {
+        $first = new DictionaryConcept('s1', 'Côn', 'Nghĩa máy', DictionaryConcept::APPROVED, 'model', 'm1', '/mau/m1/', ['domain' => 'máy']);
+        $second = new DictionaryConcept('s2', 'Côn', 'Nghĩa bút', DictionaryConcept::APPROVED, 'component', 'c1', '/linh-kien/c1/', ['domain' => 'bút']);
+        $repo = $this->repository([$first, $second], ['s1' => [], 's2' => []]);
+        $entries = new class($first, $second) {
+            public function __construct(private DictionaryConcept $first, private DictionaryConcept $second) {}
+            public function listEntries(int $limit = 500): array { return [new LexicalEntry('entry-côn', 'Côn', 'côn', DictionaryConcept::APPROVED, 'vi-VN', ['public_slug' => 'con'], 1, ['s1', 's2'])]; }
+            public function listSenses(LexicalEntry $entry, array $context = []): array { return [$this->first, $this->second]; }
+        };
+        $projection = static fn (string $type, string $id): array => [
+            'identity' => ['type' => $type, 'id' => $id, 'title' => $id],
+            'knowledge' => ['items' => [['id' => 'k-' . $id]]],
+            'relation_sections' => [],
+        ];
+
+        $item = (new DictionaryPublicQuery($repo, null, null, $entries, null, $projection))->detail('con')['item'];
+
+        self::assertNull($item['canonical_owner']);
+        self::assertSame([], $item['knowledge']['items']);
+        self::assertSame('m1', $item['senses'][0]['canonical_owner']['id']);
+        self::assertSame('c1', $item['senses'][1]['canonical_owner']['id']);
+        self::assertSame('k-m1', $item['senses'][0]['knowledge']['items'][0]['id']);
+        self::assertSame('k-c1', $item['senses'][1]['knowledge']['items'][0]['id']);
+    }
+
+    public function test_entry_sense_mapping_overrides_legacy_concept_destination_for_public_projection(): void
+    {
+        $sense = new DictionaryConcept('sense-map', '400 ngày', 'Loại đồng hồ.', DictionaryConcept::APPROVED, 'classification', 'legacy-owner', '/legacy/', ['public_slug' => '400-ngay']);
+        $repo = $this->repository([$sense], ['sense-map' => []]);
+        $entries = new class($sense) {
+            public function __construct(private DictionaryConcept $sense) {}
+            public function listEntries(int $limit = 500): array { return [new LexicalEntry('entry-map', '400 ngày', '400 ngày', DictionaryConcept::APPROVED, 'vi-VN', ['public_slug' => '400-ngay'], 4, [$this->sense->conceptId])]; }
+            public function listSenses(LexicalEntry $entry, array $context = []): array { return [$this->sense]; }
+            public function semanticReference(string $entryId, string $senseId): array { return ['status' => 'AVAILABLE', 'type' => 'classification', 'id' => 'mapped-owner', 'revision' => 9, 'source' => 'MAPPING']; }
+        };
+        $seen = [];
+        $projection = static function (string $type, string $id) use (&$seen): array {
+            $seen[] = [$type, $id];
+            return ['identity' => ['type' => $type, 'id' => $id, 'title' => $id], 'knowledge' => ['items' => []], 'relation_sections' => []];
+        };
+
+        (new DictionaryPublicQuery($repo, null, null, $entries, null, $projection))->detail('400-ngay');
+
+        self::assertSame([['classification', 'mapped-owner']], $seen);
+    }
+
     public function test_entry_detail_fails_closed_when_public_slug_matches_multiple_entries(): void
     {
         $first = new DictionaryConcept('c1', 'Côn máy', 'Nghĩa máy', DictionaryConcept::APPROVED);
@@ -240,6 +287,33 @@ final class DictionaryPublicQueryTest extends TestCase
 
         self::assertInstanceOf(LexicalEntry::class, $entry);
         self::assertSame([$senseId], $entry->senseIds);
+    }
+
+    public function test_persisted_entry_repository_reads_mapping_level_semantic_reference(): void
+    {
+        if (!defined('ARRAY_A')) define('ARRAY_A', 'ARRAY_A');
+        $entryId = '11111111-1111-7111-8111-111111111111';
+        $senseId = '22222222-2222-7222-8222-222222222222';
+        $database = new class($entryId, $senseId) {
+            public string $prefix = 'wp_';
+            public function __construct(private string $entryId, private string $senseId) {}
+            public function prepare(string $query, mixed ...$args): string { return $query; }
+            public function get_row(string $query, mixed $output): array
+            {
+                if (str_contains($query, 'semantic_reference_type')) return ['semantic_reference_type' => 'classification', 'semantic_reference_id' => 'mapped-owner', 'semantic_reference_revision' => 9];
+                return ['entry_uuid' => UuidCodec::toBinary($this->entryId), 'preferred_form' => 'Côn', 'normalized_preferred_form' => 'côn', 'status' => DictionaryConcept::APPROVED, 'locale' => 'vi-VN', 'context_json' => '{}', 'revision' => 1];
+            }
+            public function get_results(string $query, mixed $output): array { return [['concept_uuid' => UuidCodec::toBinary($this->senseId)]]; }
+        };
+        $concepts = $this->repository([new DictionaryConcept($senseId, 'Côn', 'Nghĩa', DictionaryConcept::APPROVED)], []);
+
+        $reference = (new WpdbDictionaryEntryRepository($database, $concepts))->semanticReference($entryId, $senseId);
+
+        self::assertSame('AVAILABLE', $reference['status']);
+        self::assertSame('classification', $reference['type']);
+        self::assertSame('mapped-owner', $reference['id']);
+        self::assertSame(9, $reference['revision']);
+        self::assertSame('MAPPING', $reference['source']);
     }
 
     private function repository(array $concepts, array $labels): DictionaryConceptRepository

@@ -122,4 +122,37 @@ final class DictionaryMutationContractTest extends TestCase
         $this->expectExceptionMessage('DICTIONARY_ENTRY_FORM_COLLISION');
         $service->addFormToEntry('22222222-2222-7222-8222-222222222222', 1, 'CÔN', ['normalized_form' => 'con'], 'form-1');
     }
+
+    public function test_existing_entry_sense_mapping_can_update_semantic_reference_with_idempotency(): void
+    {
+        $concept = new DictionaryConcept('sense-1', '400 ngày', 'Loại đồng hồ.', DictionaryConcept::APPROVED);
+        $repo = new class($concept) implements DictionaryConceptRepository {
+            public function __construct(private DictionaryConcept $concept) {}
+            public function findById(string $conceptId): ?DictionaryConcept { return $conceptId === $this->concept->conceptId ? $this->concept : null; }
+            public function findApprovedByNormalizedLabel(string $normalizedLabel, array $context = []): array { return []; }
+            public function listApproved(int $limit = 500): array { return []; }
+            public function listLabels(string $conceptId, bool $includeInactive = false): array { return []; }
+            public function createConcept(DictionaryConcept $concept): DictionaryConcept { return $concept; }
+            public function updateConcept(DictionaryConcept $concept, int $expectedRevision): DictionaryConcept { return $concept; }
+            public function addLabel(DictionaryLabel $label): DictionaryLabel { return $label; }
+            public function saveLabel(DictionaryLabel $label, string $previousNormalizedLabel, int $expectedConceptRevision): DictionaryLabel { return $label; }
+        };
+        $entries = new class {
+            public int $calls = 0;
+            public function setSenseSemanticReference(string $entryId, string $senseId, int $expectedRevision, string $type, string $id, ?int $revision): array
+            {
+                $this->calls++;
+                return ['entry_id' => $entryId, 'sense_id' => $senseId, 'semantic_reference' => ['type' => $type, 'id' => $id, 'revision' => $revision], 'entry_revision' => $expectedRevision + 1];
+            }
+        };
+        $receipts = [];
+        $service = new DictionaryMutationService($repo, null, static function (string $key, string $fingerprint) use (&$receipts): ?array { return $receipts[$key] ?? null; }, static function (string $key, string $fingerprint, array $result) use (&$receipts): void { $receipts[$key] = ['fingerprint' => $fingerprint, 'result' => $result]; }, null, $entries, static fn (): bool => true);
+
+        $first = $service->setSenseSemanticReference('entry-1', 'sense-1', 4, 'classification', 'owner-1', 9, 'mapping-1');
+        $replay = $service->setSenseSemanticReference('entry-1', 'sense-1', 4, 'classification', 'owner-1', 9, 'mapping-1');
+
+        self::assertSame($first['semantic_reference'], $replay['semantic_reference']);
+        self::assertSame(5, $replay['entry_revision']);
+        self::assertSame(1, $entries->calls);
+    }
 }

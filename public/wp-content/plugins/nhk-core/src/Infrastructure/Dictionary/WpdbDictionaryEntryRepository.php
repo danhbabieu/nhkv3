@@ -87,6 +87,60 @@ final class WpdbDictionaryEntryRepository implements DictionaryEntryRepository
         } catch (\Throwable) { return []; }
     }
 
+    /** @return array<string,mixed> */
+    public function semanticReference(string $entryId, string $senseId): array
+    {
+        try {
+            $row = $this->database->get_row($this->database->prepare(
+                "SELECT semantic_reference_type,semantic_reference_id,semantic_reference_revision FROM {$this->senses} WHERE entry_uuid=%s AND concept_uuid=%s AND state=1 LIMIT 1",
+                UuidCodec::toBinary($entryId),
+                UuidCodec::toBinary($senseId),
+            ), ARRAY_A);
+            if (!is_array($row)) return ['status' => 'ABSENT', 'source' => 'NONE', 'type' => null, 'id' => null, 'revision' => null];
+            $type = trim((string) ($row['semantic_reference_type'] ?? ''));
+            $id = trim((string) ($row['semantic_reference_id'] ?? ''));
+            if ($type === '' && $id === '') return ['status' => 'ABSENT', 'source' => 'MAPPING', 'type' => null, 'id' => null, 'revision' => null];
+            if ($type === '' || $id === '') return ['status' => 'INVALID', 'source' => 'MAPPING', 'type' => $type !== '' ? $type : null, 'id' => $id !== '' ? $id : null, 'revision' => null];
+            return ['status' => 'AVAILABLE', 'source' => 'MAPPING', 'type' => $type, 'id' => $id, 'revision' => ($row['semantic_reference_revision'] ?? null) !== null ? (int) $row['semantic_reference_revision'] : null];
+        } catch (\Throwable) {
+            return ['status' => 'UNAVAILABLE_IMPLEMENTATION_GAP', 'source' => 'MAPPING', 'type' => null, 'id' => null, 'revision' => null];
+        }
+    }
+
+    /** @return array<string,mixed> */
+    public function setSenseSemanticReference(string $entryId, string $senseId, int $expectedRevision, string $semanticType, string $semanticId, ?int $semanticRevision): array
+    {
+        $entry = $this->findById($entryId);
+        if (!$entry instanceof LexicalEntry) throw new \RuntimeException('DICTIONARY_ENTRY_NOT_FOUND');
+        if ($entry->revision !== $expectedRevision) throw new \RuntimeException('DICTIONARY_ENTRY_REVISION_CONFLICT');
+        $mapping = $this->database->get_var($this->database->prepare(
+            "SELECT id FROM {$this->senses} WHERE entry_uuid=%s AND concept_uuid=%s AND state=1 LIMIT 1",
+            UuidCodec::toBinary($entryId), UuidCodec::toBinary($senseId),
+        ));
+        if ($mapping === null) throw new \RuntimeException('DICTIONARY_SENSE_MAPPING_NOT_FOUND');
+        $this->database->query('START TRANSACTION');
+        try {
+            $updated = $this->database->query($this->database->prepare(
+                "UPDATE {$this->senses} SET semantic_reference_type=%s,semantic_reference_id=%s,semantic_reference_revision=%s,updated_at=%s WHERE id=%d AND state=1",
+                $semanticType, $semanticId, $semanticRevision, gmdate('Y-m-d H:i:s.u'), (int) $mapping,
+            ));
+            if ($updated !== 1) throw new \RuntimeException('DICTIONARY_ENTRY_SENSE_UPDATE_FAILED');
+            $revisionUpdated = $this->database->query($this->database->prepare(
+                "UPDATE {$this->entries} SET revision=revision+1,updated_at=%s WHERE entry_uuid=%s AND revision=%d",
+                gmdate('Y-m-d H:i:s.u'), UuidCodec::toBinary($entryId), $expectedRevision,
+            ));
+            if ($revisionUpdated !== 1) throw new \RuntimeException('DICTIONARY_ENTRY_REVISION_CONFLICT');
+            $read = $this->semanticReference($entryId, $senseId);
+            $updatedEntry = $this->findById($entryId);
+            if (($read['status'] ?? '') !== 'AVAILABLE' || !$updatedEntry instanceof LexicalEntry) throw new \RuntimeException('DICTIONARY_ENTRY_SENSE_READBACK_FAILED');
+            $this->database->query('COMMIT');
+            return ['entry' => $updatedEntry, 'sense_id' => $senseId, 'semantic_reference' => $read, 'entry_revision' => $updatedEntry->revision];
+        } catch (\Throwable $e) {
+            $this->database->query('ROLLBACK');
+            throw $e;
+        }
+    }
+
     public function findById(string $entryId): ?LexicalEntry
     {
         try {

@@ -57,6 +57,22 @@ final class WpdbDictionaryMentionRepository implements DictionaryMentionReposito
         return array_values(array_filter(array_map(fn (array $row): ?DictionaryMention => $this->hydrate($row), $rows)));
     }
 
+    /** @return list<DictionaryMention> */
+    public function listByConcept(string $conceptId, int $limit = 100, int $offset = 0): array
+    {
+        try {
+            $limit = max(1, min(101, $limit));
+            $offset = max(0, min(100000, $offset));
+            $rows = $this->database->get_results($this->database->prepare(
+                "SELECT * FROM {$this->table} WHERE concept_uuid=%s ORDER BY id LIMIT %d OFFSET %d",
+                UuidCodec::toBinary($conceptId), $limit, $offset,
+            ), ARRAY_A) ?: [];
+            return array_values(array_filter(array_map(fn (array $row): ?DictionaryMention => $this->hydrate($row), $rows)));
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
     private function findByFingerprint(string $fingerprint): ?DictionaryMention
     {
         $row = $this->database->get_row($this->database->prepare("SELECT * FROM {$this->table} WHERE fingerprint=%s LIMIT 1", $fingerprint), ARRAY_A);

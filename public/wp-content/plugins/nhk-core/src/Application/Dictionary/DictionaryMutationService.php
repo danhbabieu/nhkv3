@@ -128,6 +128,30 @@ final class DictionaryMutationService
         });
     }
 
+    public function setSenseSemanticReference(string $entryId, string $senseId, int $expectedEntryRevision, string $semanticType, string $semanticId, ?int $semanticRevision, string $idempotencyKey): array
+    {
+        $this->assertEntrySenseReady();
+        if (!is_object($this->entryRepository) || !method_exists($this->entryRepository, 'setSenseSemanticReference')) throw new \RuntimeException('DICTIONARY_ENTRY_REPOSITORY_UNAVAILABLE');
+        $semanticType = trim($semanticType);
+        $semanticId = trim($semanticId);
+        if ($semanticType === '' || $semanticId === '') throw new \InvalidArgumentException('DICTIONARY_SEMANTIC_REFERENCE_REQUIRED');
+        if (is_callable($this->knowledgeValidator) && ($this->knowledgeValidator)($semanticType, $semanticId, null) === false) throw new \RuntimeException('DICTIONARY_SEMANTIC_REFERENCE_INVALID');
+        $payload = [
+            'operation' => 'dictionary.entry-sense.semantic-reference.set',
+            'entry_id' => $entryId,
+            'sense_id' => $senseId,
+            'expected_entry_revision' => $expectedEntryRevision,
+            'semantic_type' => $semanticType,
+            'semantic_id' => $semanticId,
+            'semantic_revision' => $semanticRevision,
+        ];
+        return $this->mutate($idempotencyKey, $payload, function () use ($entryId, $senseId, $expectedEntryRevision, $semanticType, $semanticId, $semanticRevision): array {
+            $result = ($this->entryRepository)->setSenseSemanticReference($entryId, $senseId, $expectedEntryRevision, $semanticType, $semanticId, $semanticRevision);
+            if (!is_array($result)) throw new \RuntimeException('DICTIONARY_ENTRY_SENSE_READBACK_FAILED');
+            return $result;
+        });
+    }
+
     private function requireConcept(string $conceptId): DictionaryConcept
     {
         $concept = $this->concepts->findById($conceptId);
