@@ -11,8 +11,10 @@ final class DictionaryPublicQuery
 {
     public function __construct(private DictionaryConceptRepository $concepts, private $imageResolver = null, private $destinationValidator = null, private $entries = null, private $entrySenseReady = null) {}
 
-    public function hub(int $limit = 500): array
+    public function hub(int $limit = 500, string $query = '', string $initial = ''): array
     {
+        $query = $this->normalize($query);
+        $initial = $this->normalizeInitial($initial);
         if ($this->entrySenseAvailable() && is_object($this->entries) && method_exists($this->entries, 'listEntries')) {
             $entryItems = [];
             foreach ((array) $this->entries->listEntries($limit) as $entry) {
@@ -21,8 +23,8 @@ final class DictionaryPublicQuery
                 $item = $this->entryItem($entry, $senses);
                 if (($item['eligible'] ?? false) === true) $entryItems[] = $item;
             }
-            usort($entryItems, static fn (array $a, array $b): int => strnatcasecmp((string) $a['title'], (string) $b['title']));
-            return ['status' => 'AVAILABLE', 'items' => $entryItems, 'count' => count($entryItems), 'canonical_url' => '/tu-dien/', 'warnings' => []];
+            $entryItems = $this->filterAndRank($entryItems, $query, $initial);
+            return ['status' => 'AVAILABLE', 'items' => $entryItems, 'count' => count($entryItems), 'total_count' => count($entryItems), 'query' => $query, 'initial' => $initial, 'canonical_url' => '/tu-dien/', 'warnings' => []];
         }
         $items = [];
         $warnings = [];
@@ -32,8 +34,8 @@ final class DictionaryPublicQuery
             if (($item['eligible'] ?? false) !== true) { $warnings[] = 'DICTIONARY_DESTINATION_INCOMPLETE:' . $concept->conceptId; continue; }
             $items[] = $item;
         }
-        usort($items, static fn (array $a, array $b): int => strnatcasecmp((string) $a['title'], (string) $b['title']));
-        return ['status' => 'AVAILABLE', 'items' => $items, 'count' => count($items), 'canonical_url' => '/tu-dien/', 'warnings' => $warnings];
+        $items = $this->filterAndRank($items, $query, $initial);
+        return ['status' => 'AVAILABLE', 'items' => $items, 'count' => count($items), 'total_count' => count($items), 'query' => $query, 'initial' => $initial, 'canonical_url' => '/tu-dien/', 'warnings' => $warnings];
     }
 
     public function detail(string $slug): array
@@ -107,7 +109,8 @@ final class DictionaryPublicQuery
             'term_type' => (string) ($concept->context['term_type'] ?? 'GENERAL'),
             'category' => (string) ($concept->context['category'] ?? ''),
             'usage_scope' => is_array($concept->context['usage_scope'] ?? null) ? $concept->context['usage_scope'] : [],
-            'labels' => $labels,
+            'labels' => array_values(array_filter($labels, static fn (array $label): bool => (string) ($label['kind'] ?? '') !== 'HIDDEN')),
+            'search_labels' => $labels,
             'url' => $eligible ? $url : null,
             'dedicated' => !$delegated,
             'destination_type' => $concept->destinationType,
@@ -118,6 +121,44 @@ final class DictionaryPublicQuery
         ];
     }
 
+    /** @param list<array<string,mixed>> $items @return list<array<string,mixed>> */
+    private function filterAndRank(array $items, string $query, string $initial): array
+    {
+        $ranked = [];
+        foreach ($items as $item) {
+            $title = $this->normalize((string) ($item['title'] ?? ''));
+            if ($initial !== '' && $this->normalizeInitial($title) !== $initial) continue;
+            $fields = [$title];
+            foreach ((array) ($item['search_labels'] ?? $item['labels'] ?? []) as $label) if (is_array($label)) $fields[] = $this->normalize((string) ($label['label'] ?? ''));
+            $fields[] = $this->normalize((string) ($item['description'] ?? ''));
+            $score = $query === '' ? 0 : $this->matchScore($title, $fields, $query);
+            if ($query !== '' && $score === null) continue;
+            $item['_public_search_score'] = $score ?? 0;
+            $ranked[] = $item;
+        }
+        usort($ranked, static function (array $a, array $b): int {
+            $score = ((int) ($b['_public_search_score'] ?? 0)) <=> ((int) ($a['_public_search_score'] ?? 0));
+            if ($score !== 0) return $score;
+            return strnatcasecmp((string) ($a['title'] ?? ''), (string) ($b['title'] ?? ''));
+        });
+        foreach ($ranked as &$item) unset($item['_public_search_score']);
+        unset($item);
+        return $ranked;
+    }
+
+    /** @param list<string> $fields */
+    private function matchScore(string $title, array $fields, string $query): ?int
+    {
+        if ($title === $query) return 700;
+        foreach (array_slice($fields, 1) as $field) if ($field === $query) return 600;
+        if (str_starts_with($title, $query)) return 500;
+        foreach (array_slice($fields, 1) as $field) if (str_starts_with($field, $query)) return 400;
+        if (str_contains($title, $query)) return 300;
+        foreach (array_slice($fields, 1) as $field) if (str_contains($field, $query)) return 200;
+        $definition = end($fields);
+        return is_string($definition) && str_contains($definition, $query) ? 100 : null;
+    }
+
     private function entryItem(LexicalEntry $entry, array $senses): array
     {
         $entrySlug = $this->slug((string) ($entry->context['public_slug'] ?? $entry->preferredForm));
@@ -126,12 +167,12 @@ final class DictionaryPublicQuery
             $item = $this->item($sense);
             $hasDelegatedDestination = trim((string) ($sense->destinationType ?? '')) !== '' || trim((string) ($sense->destinationId ?? '')) !== '';
             if ($hasDelegatedDestination && ($item['eligible'] ?? false) !== true) return ['eligible' => false, 'entry_id' => $entry->entryId];
-            $senseItems[] = ['sense_id' => $sense->conceptId, 'title' => $sense->preferredLabel, 'description' => $sense->definition, 'context' => $sense->context, 'url' => $item['url'], 'destination_type' => $sense->destinationType, 'destination_id' => $sense->destinationId, 'labels' => $item['labels']];
+            $senseItems[] = ['sense_id' => $sense->conceptId, 'title' => $sense->preferredLabel, 'description' => $sense->definition, 'context' => $sense->context, 'url' => $item['url'], 'destination_type' => $sense->destinationType, 'destination_id' => $sense->destinationId, 'labels' => $item['labels'], 'search_labels' => $item['search_labels'] ?? $item['labels']];
         }
         if ($senseItems === []) return ['eligible' => false, 'entry_id' => $entry->entryId];
         $delegated = count($senseItems) === 1 && trim((string) ($senseItems[0]['destination_type'] ?? '')) !== '';
         $url = $delegated ? $senseItems[0]['url'] : ($entrySlug !== '' ? '/tu-dien/' . $entrySlug . '/' : null);
-        return ['entry_id' => $entry->entryId, 'title' => $entry->preferredForm, 'description' => $senseItems[0]['description'], 'term_type' => 'ENTRY', 'labels' => $senseItems[0]['labels'], 'url' => $url, 'dedicated' => !$delegated, 'indexable' => !$delegated && $url !== null, 'eligible' => $url !== null, 'senses' => $senseItems, 'image' => null];
+        return ['entry_id' => $entry->entryId, 'title' => $entry->preferredForm, 'description' => $senseItems[0]['description'], 'term_type' => 'ENTRY', 'labels' => $senseItems[0]['labels'], 'search_labels' => $senseItems[0]['search_labels'], 'url' => $url, 'dedicated' => !$delegated, 'indexable' => !$delegated && $url !== null, 'eligible' => $url !== null, 'senses' => $senseItems, 'image' => null];
     }
 
     private function slug(string $value): string
@@ -141,6 +182,19 @@ final class DictionaryPublicQuery
         if (function_exists('sanitize_title')) return (string) sanitize_title($value);
         $value = function_exists('iconv') ? (string) (iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $value) ?: $value) : $value;
         return trim((string) preg_replace('/[^a-z0-9]+/i', '-', strtolower($value)), '-');
+    }
+
+    private function normalize(string $value): string
+    {
+        return (new DictionaryTermNormalizer())->normalize($value);
+    }
+
+    private function normalizeInitial(string $value): string
+    {
+        $value = $this->normalize($value);
+        if ($value === '') return '';
+        $initial = function_exists('mb_substr') ? mb_substr($value, 0, 1, 'UTF-8') : substr($value, 0, 1);
+        return function_exists('mb_strtoupper') ? mb_strtoupper($initial, 'UTF-8') : strtoupper($initial);
     }
 
     private function entrySenseAvailable(): bool

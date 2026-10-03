@@ -41,7 +41,9 @@ final class PublicDictionaryRoutes
             }
             $GLOBALS['nhk_core_dictionary_context'] = ['mode' => 'detail', 'result' => $result];
         } else {
-            $packet = $this->query->hub();
+            $query = isset($_GET['q']) && is_string($_GET['q']) ? sanitize_text_field(wp_unslash($_GET['q'])) : '';
+            $initial = isset($_GET['initial']) && is_string($_GET['initial']) ? sanitize_text_field(wp_unslash($_GET['initial'])) : '';
+            $packet = $this->query->hub(500, $query, $initial);
             if (($packet['status'] ?? '') !== 'AVAILABLE') {
                 $this->set404();
                 return get_404_template();
@@ -49,7 +51,8 @@ final class PublicDictionaryRoutes
             $GLOBALS['nhk_core_dictionary_context'] = ['mode' => 'hub', 'result' => $packet];
         }
 
-        $theme = locate_template('dictionary.php');
+        // The active theme owns the public presentation; the plugin file is a portability fallback.
+        $theme = locate_template('dictionary.php', false, false);
         if ($theme !== '') return $theme;
         return dirname(__DIR__, 3) . '/templates/dictionary.php';
     }

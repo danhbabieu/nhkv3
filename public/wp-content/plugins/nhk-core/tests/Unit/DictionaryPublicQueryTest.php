@@ -13,6 +13,39 @@ use PHPUnit\Framework\TestCase;
 
 final class DictionaryPublicQueryTest extends TestCase
 {
+    public function test_public_search_ranks_preferred_exact_before_alias_and_definition_matches(): void
+    {
+        $preferred = new DictionaryConcept('c1', 'Côn', 'Bộ phận hình nón.', DictionaryConcept::APPROVED, null, null, null, ['public_slug' => 'con']);
+        $alias = new DictionaryConcept('c2', 'Bộ máy', 'Côn là cách gọi trong giới sưu tầm.', DictionaryConcept::APPROVED, null, null, null, ['public_slug' => 'bo-may']);
+        $repo = $this->repository([$preferred, $alias], [
+            'c1' => [new DictionaryLabel('c1', 'Côn', 'côn', DictionaryLabel::PREFERRED)],
+            'c2' => [new DictionaryLabel('c2', 'Côn máy', 'côn máy', DictionaryLabel::COLLOQUIAL)],
+        ]);
+
+        $items = (new DictionaryPublicQuery($repo))->hub(500, 'côn')['items'];
+
+        self::assertSame('Côn', $items[0]['title']);
+        self::assertSame(['Côn'], array_column(array_slice($items, 0, 1), 'title'));
+    }
+
+    public function test_public_search_supports_visible_alias_and_hidden_lookup_without_exposing_hidden_label(): void
+    {
+        $concept = new DictionaryConcept('c1', 'Cylindre à picots', 'Bộ thoát.', DictionaryConcept::APPROVED, null, null, null, ['public_slug' => 'cylindre-a-picots']);
+        $repo = $this->repository([$concept], [
+            'c1' => [
+                new DictionaryLabel('c1', 'Quả lô gai', 'quả lô gai', DictionaryLabel::ALTERNATE),
+                new DictionaryLabel('c1', 'Pinned cylinder', 'pinned cylinder', DictionaryLabel::HIDDEN),
+            ],
+        ]);
+
+        $visible = (new DictionaryPublicQuery($repo))->hub(500, 'Quả lô gai')['items'];
+        $hidden = (new DictionaryPublicQuery($repo))->hub(500, 'Pinned cylinder')['items'];
+
+        self::assertSame('Cylindre à picots', $visible[0]['title']);
+        self::assertCount(1, $hidden);
+        self::assertNotContains('Pinned cylinder', array_column($hidden[0]['labels'], 'label'));
+    }
+
     public function test_hub_delegates_existing_owner_and_keeps_dedicated_dictionary_route_only_when_needed(): void
     {
         $owner = new DictionaryConcept('c1', 'Westminster', 'Bản nhạc được tra cứu.', DictionaryConcept::APPROVED, 'music', 'music-1', '/ban-nhac/westminster/', ['category' => 'music']);

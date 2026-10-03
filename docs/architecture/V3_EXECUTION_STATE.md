@@ -1,5 +1,28 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-03 — Dictionary public search/projection closure (LOCAL / NO MUTATION)
+
+IMPLEMENTED: Added bounded GET search and initial filtering to the existing
+DictionaryPublicQuery boundary, with deterministic preferred/alias/prefix/
+contains/definition ranking. Hidden labels remain lookup-only and are omitted
+from public detail/hub labels. The theme now renders the search control and a
+distinct no-match state; empty-dictionary messaging is only shown for an
+unfiltered empty packet. Theme-first template ownership is explicit, with the
+plugin template retained only as fallback.
+
+REVIEW: Existing Entry/Sense, canonical owner delegation, DefinedTerm JSON-LD
+and sitemap projections fit the target. No Dictionary Graph endpoint, inferred
+relation, facet heuristic, new schema, materialization or data mutation was
+introduced. The deployed JSON-LD/HTML contradiction requires live browser
+read-back; it is not reproducible from this checkout alone.
+
+VERIFICATION: DictionaryPublicQueryTest passes 10 tests / 26 assertions;
+changed PHP files lint clean; `git diff --check` passes. The focused frontend
+run has one pre-existing unrelated design-token failure (`Version: 1.3.3`
+expected versus current stylesheet `1.3.5`). No deployment or push performed.
+
+STATUS: `LOCAL_PUBLIC_SEARCH_READY / LIVE_BROWSER_PENDING / NO_DATA_MUTATION`.
+
 # Checkpoint — 2026-10-03 — Dictionary empty-destination validation gap closed locally
 
 ROOT_CAUSE: The deployed materialization planner treated legacy empty-string
