@@ -33,10 +33,12 @@ final class DictionaryRuntime
     private DictionarySeedPlanner $seedPlanner;
     private DictionaryCurationService $curation;
     private DictionaryPublicQuery $publicQuery;
+    private DictionaryEnrichmentCoverage $enrichmentCoverage;
     private ?array $detectionLabels = null;
 
     public function __construct(private object $database)
     {
+        $this->enrichmentCoverage = new DictionaryEnrichmentCoverage();
         $this->normalizer = new DictionaryTermNormalizer();
         $this->concepts = new WpdbDictionaryConceptRepository($database);
         $this->candidates = new WpdbDictionaryCandidateRepository($database);
@@ -271,6 +273,7 @@ final class DictionaryRuntime
 
     public function curation(): DictionaryCurationService { return $this->curation; }
     public function publicQuery(): DictionaryPublicQuery { return $this->publicQuery; }
+    public function enrichmentCoverage(): DictionaryEnrichmentCoverage { return $this->enrichmentCoverage; }
     public function concepts(): WpdbDictionaryConceptRepository { return $this->concepts; }
     public function candidates(): WpdbDictionaryCandidateRepository { return $this->candidates; }
     public function mentions(): WpdbDictionaryMentionRepository { return $this->mentions; }
