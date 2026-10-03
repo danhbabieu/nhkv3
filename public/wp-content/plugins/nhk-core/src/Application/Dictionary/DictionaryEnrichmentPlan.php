@@ -36,8 +36,10 @@ final class DictionaryEnrichmentPlan
         }
         usort($actions, static fn (array $a, array $b): int => json_encode($a, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) <=> json_encode($b, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
         $status = $actions === [] ? 'NOOP' : (count(array_filter($actions, static fn (array $a): bool => ($a['status'] ?? '') === 'REVIEW_REQUIRED' || ($a['status'] ?? '') === 'BLOCKED')) > 0 ? 'REVIEW_REQUIRED' : 'READY');
-        return ['status' => $status, 'actions' => $actions, 'owner_candidates' => [], 'fingerprint' => hash('sha256', json_encode($this->sort($actions), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR))];
+        return ['status' => $status, 'actions' => $actions, 'owner_candidates' => [], 'fingerprint' => $this->fingerprint($actions)];
     }
+
+    public function fingerprint(array $actions): string { return hash('sha256', json_encode($this->sort($actions), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)); }
 
     private function existingForms(string $entryId): array { if (!method_exists($this->entries, 'listForms')) return []; return (array) $this->entries->listForms($entryId); }
     private function sort(mixed $value): mixed { if (!is_array($value)) return $value; if (!array_is_list($value)) ksort($value); foreach ($value as $key => $item) $value[$key] = $this->sort($item); return $value; }

@@ -65,6 +65,9 @@ final class McpDictionaryHandler
     }
 
     public function profile(array $input): array { return $this->runtime->profile(isset($input['concept_id']) ? (string) $input['concept_id'] : null, isset($input['slug']) ? (string) $input['slug'] : null); }
+    public function enrichmentAudit(array $input): array { $limit = (int) ($input['limit'] ?? 50); if ($limit < 1 || $limit > 100) throw new \InvalidArgumentException('DICTIONARY_ENRICHMENT_LIMIT_INVALID'); return $this->runtime->enrichmentAudit($input); }
+    public function enrichmentPlan(array $input): array { $limit = (int) ($input['limit'] ?? 50); if ($limit < 1 || $limit > 100) throw new \InvalidArgumentException('DICTIONARY_ENRICHMENT_LIMIT_INVALID'); return $this->runtime->enrichmentPlan($input); }
+    public function enrichmentApply(array $input): array { if (!isset($input['plan'], $input['approved_plan_fingerprint'], $input['idempotency_key'])) throw new \InvalidArgumentException('DICTIONARY_ENRICHMENT_APPLY_INPUT_INVALID'); return $this->runtime->enrichmentApply($input); }
     public function materializationProfile(array $input): array { return $this->runtime->materializationPlanner()->plan($input); }
     public function materializationPlan(array $input): array { return $this->runtime->materializationPlanner()->plan($input); }
     public function materializationApply(array $input): array { return $this->runtime->materializationService()->apply((array) ($input['plan'] ?? []), (string) ($input['approved_plan_fingerprint'] ?? ''), (string) ($input['idempotency_key'] ?? '')); }

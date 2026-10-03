@@ -361,6 +361,8 @@ final class McpAbilityRegistration
         'nhk.public-url.audit' => 'nhk-v3/public-url-audit',
         'nhk.knowledge.quality-audit' => 'nhk-v3/knowledge-quality-audit',
         'nhk.dictionary.seed-audit' => 'nhk-v3/dictionary-seed-audit',
+        'nhk.dictionary.enrichment.audit' => 'nhk-v3/dictionary-enrichment-audit',
+        'nhk.dictionary.enrichment.plan' => 'nhk-v3/dictionary-enrichment-plan',
     ];
 
     /** @var array<string,string> */
@@ -408,6 +410,7 @@ final class McpAbilityRegistration
         'nhk.dictionary.candidate.review' => 'nhk-v3/dictionary-candidate-review',
         'nhk.dictionary.relation.handoff' => 'nhk-v3/dictionary-relation-handoff',
         'nhk.dictionary.materialization.apply' => 'nhk-v3/dictionary-materialization-apply',
+        'nhk.dictionary.enrichment.apply' => 'nhk-v3/dictionary-enrichment-apply',
     ];
 
     /**

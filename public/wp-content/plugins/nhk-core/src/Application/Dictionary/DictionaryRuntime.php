@@ -274,6 +274,39 @@ final class DictionaryRuntime
     public function curation(): DictionaryCurationService { return $this->curation; }
     public function publicQuery(): DictionaryPublicQuery { return $this->publicQuery; }
     public function enrichmentCoverage(): DictionaryEnrichmentCoverage { return $this->enrichmentCoverage; }
+    public function enrichmentAudit(array $input): array
+    {
+        if (!$this->available()) return ['status' => 'unavailable', 'reason' => 'DICTIONARY_STORAGE_UNAVAILABLE', 'read_only' => true, 'mutated' => false];
+        $audit = new DictionaryEnrichmentAudit($this->entries, $this->concepts, fn (string $type, string $id, array $context = []): array => $this->enrichmentCoverage->forReference($type, $id, $context), fn (DictionaryConcept $sense): array => (new DictionaryEnrichmentOwnerResolver())->resolve($sense));
+        return $audit->audit((int) ($input['limit'] ?? 50), isset($input['cursor']) ? (string) $input['cursor'] : null, isset($input['entry_id']) ? (string) $input['entry_id'] : null, isset($input['sense_id']) ? (string) $input['sense_id'] : null, (bool) ($input['public_only'] ?? true));
+    }
+    public function enrichmentPlan(array $input): array
+    {
+        if (!$this->available()) return ['status' => 'unavailable', 'reason' => 'DICTIONARY_STORAGE_UNAVAILABLE', 'read_only' => true, 'mutated' => false];
+        $audit = is_array($input['audit'] ?? null) ? $input['audit'] : $this->enrichmentAudit($input);
+        return (new DictionaryEnrichmentPlan($this->entries, new DictionaryEnrichmentOwnerResolver()))->build($audit, $input);
+    }
+    public function enrichmentApply(array $input): array
+    {
+        if (!$this->available()) return ['status' => 'unavailable', 'reason' => 'DICTIONARY_STORAGE_UNAVAILABLE', 'read_only' => false, 'mutated' => false];
+        $plan = is_array($input['plan'] ?? null) ? $input['plan'] : [];
+        $expected = trim((string) ($input['approved_plan_fingerprint'] ?? ''));
+        $fingerprint = (new DictionaryEnrichmentPlan($this->entries, new DictionaryEnrichmentOwnerResolver()))->fingerprint((array) ($plan['actions'] ?? []));
+        if ($expected === '' || !hash_equals($fingerprint, $expected) || ($plan['fingerprint'] ?? '') !== $expected) return ['status' => 'blocked', 'reason' => 'DICTIONARY_ENRICHMENT_PLAN_FINGERPRINT_INVALID', 'read_only' => false, 'mutated' => false];
+        if (($plan['status'] ?? '') !== 'READY') return ['status' => 'blocked', 'reason' => 'DICTIONARY_ENRICHMENT_PLAN_NOT_READY', 'read_only' => false, 'mutated' => false];
+        $idempotency = trim((string) ($input['idempotency_key'] ?? ''));
+        if ($idempotency === '') throw new \InvalidArgumentException('DICTIONARY_IDEMPOTENCY_KEY_REQUIRED');
+        $results = [];
+        foreach ((array) $plan['actions'] as $index => $action) if (($action['status'] ?? '') === 'READY') {
+            $key = $idempotency . ':' . $index;
+            $results[] = match ($action['action_type'] ?? '') {
+                'ADD_ENTRY_FORM' => $this->mutation()->addFormToEntry((string) $action['entry_id'], (int) $action['current_revision'], (string) $action['form'], ['enrichment_plan' => $expected], $key, (string) ($action['kind'] ?? 'ALTERNATE'), isset($action['locale']) ? (string) $action['locale'] : null),
+                'SET_SEMANTIC_REFERENCE' => $this->mutation()->setSenseSemanticReference((string) $action['entry_id'], (string) $action['sense_id'], (int) $action['current_revision'], (string) ($action['target']['type'] ?? ''), (string) ($action['target']['id'] ?? ''), isset($action['target']['revision']) ? (int) $action['target']['revision'] : null, $key),
+                default => ['status' => 'NOOP'],
+            };
+        }
+        return ['status' => 'applied', 'read_only' => false, 'mutated' => $results !== [], 'fingerprint' => $expected, 'items' => $results];
+    }
     public function concepts(): WpdbDictionaryConceptRepository { return $this->concepts; }
     public function candidates(): WpdbDictionaryCandidateRepository { return $this->candidates; }
     public function mentions(): WpdbDictionaryMentionRepository { return $this->mentions; }
