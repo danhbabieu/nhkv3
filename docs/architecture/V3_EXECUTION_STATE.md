@@ -1,5 +1,19 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-03 — Migration024 deployment gate implemented locally
+
+IMPLEMENTED: The canonical deploy verifier now transfers files, invokes the
+existing remote `migration-up` maintenance operation, validates the exact
+Migration024 receipt (source revision, pack, run ID, current/target >= 24 and
+three-table schema readiness), and only then runs MCP/public verification.
+Migration authorization is supplied from the existing deployment config only
+to the maintenance command; `MigrationDatabaseGuard` remains authoritative.
+
+VERIFICATION: Focused deploy/runtime/maintenance tests pass locally. No remote
+deployment, migration, semantic mutation or materialization was performed.
+Live staging verification remains pending and must use the environment-owned
+authorization configuration.
+
 # Checkpoint — 2026-10-03 — Browser-QA verified footer overflow repair (LOCAL / NO DEPLOYMENT)
 
 BROWSER_QA: Read-only local browser validation covered `/`, `/thuong-hieu/`, `/loai-dong-ho/`, `/mau/`, `/bo-may/`, `/thu-vien/`, `/video/`, `/so-sanh/`, `/odo/`, a long Article and search results at 390×844, 430×932, 768×1024, 1024×768 and 1440×900. DOM evaluation confirmed `document.documentElement.scrollWidth <= document.documentElement.clientWidth` for all 55 route/viewport combinations. Header/menu, hero and four gateways, mobile main-before-rail order, grid transitions, footer, relation/discovery wrapping and image `contain` presentation were visually checked; homepage section headings occur once each.
@@ -21756,3 +21770,27 @@ assertions with one existing deprecation. Changed PHP files lint clean. No
 database, staging, production, V2, backfill or deployment mutation occurred.
 
 STATUS: DICTIONARY_SCHEMA_GATED / DEPLOY_MIGRATION_POSTCONDITION_ADDED / NO_DEPLOYMENT / UNCOMMITTED
+
+# Checkpoint — 2026-10-03 — Mandatory deploy migration gate (LOCAL / NO DEPLOYMENT)
+
+IMPLEMENTED: The canonical deploy verifier now performs
+`source verify → build → deploy files → remote migration-up → migration
+read-back → MCP/runtime verify → release pass`. It reuses the existing
+`RemoteDeploymentAdapter` and `RemoteRuntimeAdapter`; no parallel transport or
+raw SQL path was added.
+
+FAIL-CLOSED: Remote migration-up must return the exact `pack`, `run_id` and
+40-hex `source_revision`, plus `current=24`, `target=24` and
+`dictionary_entry_sense_schema_ready=true`. Stale source, missing authorization
+configuration, transport failure, incomplete target or missing Migration024
+schema stops the verifier before application/runtime verification. Authorization
+is supplied from the existing deployment configuration to the explicit remote
+maintenance process, while `MigrationDatabaseGuard` remains authoritative.
+
+VALIDATION: Focused deploy/runtime tests pass 18 tests / 74 assertions; changed
+PHP files lint clean. No real deployment, database, staging, production, V2 or
+semantic mutation was performed. Full-suite and live remote migration read-back
+remain pending.
+
+STATUS: `DEPLOY_MIGRATION_GATE_LOCAL_READY / MIGRATION024_READBACK_UNVERIFIED /
+NO_DEPLOYMENT / UNCOMMITTED`.

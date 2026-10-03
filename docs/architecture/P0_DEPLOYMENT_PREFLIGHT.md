@@ -33,6 +33,7 @@ NHK_DEMO_DEPLOY_CONFIG=/absolute/path/to/deploy.ini \
 ./scripts/nhk-deploy-verify \
   --target=demo.1945.vn \
   --base-url=https://demo.1945.vn \
+  --pack=deployment \
   --expected-head="$(git rev-parse HEAD)" \
   --json
 ```
@@ -51,13 +52,27 @@ NHK_DEMO_DEPLOY_CONFIG=/absolute/path/to/deploy.ini \
 
 The wrapper runs `composer install`, then `composer generate:mcp-docs`,
 validates the generated `resources/canonical-docs/manifest.json`, transfers
-the plugin through `RemoteDeploymentAdapter`, and probes the direct target
-endpoint `/wp-json/nhk/v1/mcp`. The probe checks MCP initialization,
+the plugin through `RemoteDeploymentAdapter`, runs the canonical remote
+`migration-up` maintenance operation, verifies its receipt, and only then
+probes the direct target endpoint `/wp-json/nhk/v1/mcp`. The migration receipt
+must report `status=pass`, `current=24`, `target=24`,
+`dictionary_entry_sense_schema_ready=true`, and exact `source_revision`,
+`pack`, and `run_id` bindings. The probe checks MCP initialization,
 `tools/list`, `nhk.documentation.bootstrap` and `nhk.documentation.list`, then
 compares `documentation_version`, `manifest_hash`, `build_identity` and every
 manifest file SHA-256. It exits non-zero on `DOC_BUILD_FAILED`,
 `DOC_MANIFEST_MISMATCH`, `MCP_BOOTSTRAP_UNAVAILABLE` or
-`DEPLOYMENT_NOT_ACTIVE`; an rsync success alone is never a release success.
+`DEPLOYMENT_NOT_ACTIVE`, as well as `MIGRATION_UP_FAILED`,
+`REMOTE_SOURCE_REVISION_MISMATCH`, `MIGRATION_TARGET_NOT_REACHED`,
+`DICTIONARY_ENTRY_SENSE_SCHEMA_NOT_READY` or missing migration authorization;
+an rsync success alone is never a release success.
+
+The deploy config must provide `migration_runtime=demo`,
+`authorized_migration_database=<environment-owned database name>` and
+`environment_type=staging`. These values are passed only to the explicit
+maintenance process; secrets and database names are not committed to the
+repository. `MigrationDatabaseGuard` remains the authority for allowing the
+UP operation.
 
 The wrapper does not guess a cache flush, PHP-FPM reload or OPcache command.
 Those actions are hosting-specific and are not required by the canonical file

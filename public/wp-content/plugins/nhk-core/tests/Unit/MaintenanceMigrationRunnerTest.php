@@ -38,4 +38,12 @@ final class MaintenanceMigrationRunnerTest extends TestCase
         self::assertStringContainsString("if (!DictionaryEntrySenseMigration024::schemaReady(\$wpdb)) throw new \\RuntimeException('MIGRATION_SCHEMA_NOT_READY');", $plugin);
         self::assertStringContainsString('dictionary_entry_sense_schema_ready', $entrypoint);
     }
+
+    public function test_migration_receipt_requires_target_24_and_machine_readable_schema_failure(): void
+    {
+        $entrypoint = (string) file_get_contents(dirname(__DIR__, 2) . '/bin/nhk-core-maintenance.php');
+        self::assertStringContainsString("if (\$current !== 24 || \$target !== 24) throw new \\RuntimeException('MIGRATION_TARGET_NOT_REACHED');", $entrypoint);
+        self::assertStringContainsString("'DICTIONARY_ENTRY_SENSE_SCHEMA_NOT_READY'", $entrypoint);
+        self::assertStringContainsString("'dictionary_entry_sense_schema_ready' => \$schemaReady", $entrypoint);
+    }
 }

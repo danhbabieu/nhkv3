@@ -9,6 +9,7 @@ use NHK\Core\Application\Collector\CollectorFacetMaintenanceService;
 use NHK\Core\Application\Snapshot\{CanonicalSnapshotExportService, CanonicalSnapshotImportService, RecoveryRuntimeGuard, SnapshotArtifactCodec};
 use NHK\Core\Contracts\Snapshot\{CanonicalSnapshotSource, CanonicalSnapshotWriter};
 use NHK\Core\Application\Audit\ClockTypeClassificationAudit;
+use NHK\Core\Application\Mcp\McpDocumentationRegistry;
 
 $operation = null;
 $json = false;
@@ -116,10 +117,18 @@ try {
         $receipt = (new CanonicalSnapshotImportService(new RecoveryRuntimeGuard($allowedDatabases)))->import($snapshot, $writer, $recoveryMode);
         $payload = ['status' => 'pass', 'identifier' => 'v3-snapshot-import', 'receipt' => $receipt, 'snapshot_path' => $input];
     } elseif ($operation === 'migration-up') {
+        $documentation = (new McpDocumentationRegistry())->bootstrap();
+        if (!is_string($documentation['source_revision'] ?? null) || !hash_equals($documentation['source_revision'], $sourceRevision)) {
+            throw new \RuntimeException('MIGRATION_SOURCE_REVISION_MISMATCH');
+        }
         Plugin::runPendingMigrations();
         $status = new MigrationStatus();
-        if (!$status->dictionaryEntrySenseSchemaReady()) throw new \RuntimeException('MIGRATION_SCHEMA_NOT_READY');
-        $payload = ['status' => 'pass', 'identifier' => 'remote-migration-up', 'current' => (int) get_option('nhk_core_migration_current', 0), 'target' => (int) get_option('nhk_core_migration_target', 0), 'dictionary_entry_sense_schema_ready' => true, 'pack' => $pack, 'run_id' => $runId, 'source_revision' => $sourceRevision];
+        $current = (int) get_option('nhk_core_migration_current', 0);
+        $target = (int) get_option('nhk_core_migration_target', 0);
+        if ($current !== 24 || $target !== 24) throw new \RuntimeException('MIGRATION_TARGET_NOT_REACHED');
+        $schemaReady = $status->dictionaryEntrySenseSchemaReady();
+        if (!$schemaReady) throw new \RuntimeException('DICTIONARY_ENTRY_SENSE_SCHEMA_NOT_READY');
+        $payload = ['status' => 'pass', 'identifier' => 'remote-migration-up', 'current' => $current, 'target' => $target, 'dictionary_entry_sense_schema_ready' => $schemaReady, 'pack' => $pack, 'run_id' => $runId, 'source_revision' => $sourceRevision];
     } elseif (in_array($operation, ['canonical-inventory', 'graph-inventory', 'relation-dry-run'], true)) {
         do_action('rest_api_init');
         $request = new \WP_REST_Request('POST', '/nhk/v1/mcp');
@@ -190,7 +199,7 @@ try {
         $payload = ['status' => 'blocked', 'reason_code' => 'CUTOVER_APPLICATION_WIRING_REQUIRED', 'operation' => $operation];
     }
 } catch (Throwable $error) {
-    $reason = in_array($operation, ['v3-snapshot-export', 'v3-snapshot-import'], true)
+    $reason = in_array($operation, ['migration-up', 'v3-snapshot-export', 'v3-snapshot-import'], true)
         ? (string) $error->getMessage()
         : 'REMOTE_RUNTIME_BOOTSTRAP_FAILED';
     $payload = ['status' => 'failed', 'reason_code' => $reason !== '' ? $reason : 'REMOTE_RUNTIME_BOOTSTRAP_FAILED'];

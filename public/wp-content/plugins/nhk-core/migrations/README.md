@@ -25,14 +25,20 @@ php wp-content/plugins/nhk-core/bin/nhk-core-maintenance.php \
   --json
 ```
 
-`migration-up` delegates to `Plugin::runPendingMigrations()`, which executes
-the pending sequence in order through Migration 017. It is an explicit
-maintenance operation; ordinary frontend requests do not run migrations.
+`migration-up` first verifies that the immutable deployed documentation
+snapshot carries the exact requested source revision, then delegates to
+`Plugin::runPendingMigrations()`. It is an explicit maintenance operation;
+ordinary frontend requests do not run migrations.
 
 Every UP run first passes `MigrationDatabaseGuard`. Canonical development and
 integration databases are `nhk_v3` and `nhk_v3_test`. A demo staging run also
 requires `WP_ENVIRONMENT_TYPE=staging`, `NHK_MIGRATION_RUNTIME=demo` and an
 exact `NHK_AUTHORIZED_MIGRATION_DATABASE` match. The command must report
-`current=17` and `target=17`; a second invocation is an idempotent no-op. The
-additive Migration 017 creates the durable editorial Capture checkpoint table;
-it does not migrate legacy article bodies or populate semantic records.
+`current=24` and `target=24`, with
+`dictionary_entry_sense_schema_ready=true` and exact `pack`, `run_id`, and
+`source_revision` values; a second invocation is an idempotent no-op. The
+deployed documentation snapshot must carry the same source revision supplied
+to the command. Migration024 creates only the three additive Entry/Sense
+tables (`nhk_dictionary_entries`, `nhk_dictionary_forms`, and
+`nhk_dictionary_entry_senses`); it does not backfill, materialize Concepts or
+populate semantic records. Zero rows is a successful schema state.

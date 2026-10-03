@@ -73,4 +73,18 @@ final class NhkDeployVerifyCliContractTest extends TestCase
         self::assertStringNotContainsString('$verifier->verify($baseUrl, $expectedManifest, $expectedBuildIdentity)', $runner);
         self::assertStringContainsString("throw new RuntimeException('DOC_BOOTSTRAP_INVALID')", $runner);
     }
+
+    public function test_deploy_verifier_requires_remote_migration_before_runtime_verification(): void
+    {
+        $runner = (string) file_get_contents(dirname(__DIR__, 6) . '/tools/nhk-deploy-verify.php');
+        self::assertStringContainsString('RemoteRuntimeAdapter', $runner);
+        self::assertStringContainsString("->run(\$context, 'migration-up')", $runner);
+        self::assertStringContainsString('MIGRATION_UP_FAILED', $runner);
+        self::assertStringContainsString("'migration' =>", $runner);
+        self::assertLessThan(
+            strpos($runner, '$verifier->verify('),
+            strpos($runner, "->run(\$context, 'migration-up')"),
+            'migration-up must complete before MCP verification',
+        );
+    }
 }

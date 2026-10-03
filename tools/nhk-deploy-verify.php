@@ -4,6 +4,7 @@ declare(strict_types=1);
 use NHK\Core\Application\Demo\DemoCutoverContext;
 use NHK\Core\Application\Mcp\McpDocumentationRegistry;
 use NHK\Core\Infrastructure\Demo\RemoteDeploymentAdapter;
+use NHK\Core\Infrastructure\Demo\RemoteRuntimeAdapter;
 use NHK\Core\Infrastructure\Demo\RemoteMcpDocumentationVerifier;
 use NHK\Core\Infrastructure\Demo\PluginHeaderVersionReader;
 
@@ -13,10 +14,11 @@ $baseUrl = null;
 $expectedHead = null;
 $pull = false;
 $json = false;
+$pack = 'deployment';
 
 foreach (array_slice($argv, 1) as $argument) {
     if ($argument === '--help') {
-        echo "Usage: nhk-deploy-verify --target=demo.1945.vn [--base-url=https://demo.1945.vn] [--expected-head=<40-hex>] [--pull] [--json]\n";
+        echo "Usage: nhk-deploy-verify --target=demo.1945.vn [--base-url=https://demo.1945.vn] [--pack=<pack>] [--expected-head=<40-hex>] [--pull] [--json]\n";
         exit(0);
     }
     if ($argument === '--pull') { $pull = true; continue; }
@@ -24,12 +26,14 @@ foreach (array_slice($argv, 1) as $argument) {
     if (str_starts_with($argument, '--target=')) { $target = substr($argument, 9); continue; }
     if (str_starts_with($argument, '--base-url=')) { $baseUrl = substr($argument, 11); continue; }
     if (str_starts_with($argument, '--expected-head=')) { $expectedHead = strtolower(substr($argument, 16)); continue; }
+    if (str_starts_with($argument, '--pack=')) { $pack = substr($argument, 7); continue; }
     fwrite(STDERR, "UNKNOWN_ARGUMENT\n");
     exit(64);
 }
 
 if ($target === null) finish(['status' => 'blocked', 'reason_code' => 'TARGET_REQUIRED'], $json, 64);
 if ($target !== 'demo.1945.vn') finish(['status' => 'blocked', 'reason_code' => 'DEPLOYMENT_TARGET_NOT_ALLOWLISTED'], $json, 2);
+if (preg_match('/^[a-z0-9][a-z0-9._-]*$/', $pack) !== 1) finish(['status' => 'blocked', 'reason_code' => 'DEPLOYMENT_PACK_INVALID'], $json, 64);
 $baseUrl ??= 'https://' . $target;
 if (!validBaseUrl($baseUrl, $target)) finish(['status' => 'blocked', 'reason_code' => 'MCP_TARGET_NOT_ALLOWLISTED'], $json, 2);
 if ($expectedHead !== null && preg_match('/^[a-f0-9]{40}$/', $expectedHead) !== 1) finish(['status' => 'blocked', 'reason_code' => 'EXPECTED_HEAD_INVALID'], $json, 64);
@@ -70,12 +74,22 @@ try {
     finish(['status' => 'failed', 'reason_code' => $e->getMessage() ?? 'DOC_BUILD_FAILED'], $json, 2);
 }
 
-$deployment = RemoteDeploymentAdapter::fromEnvironment($root)->deploy(new DemoCutoverContext($target, 'deployment', $head, bin2hex(random_bytes(8))));
+$context = new DemoCutoverContext($target, $pack, $head, bin2hex(random_bytes(8)));
+$deployment = RemoteDeploymentAdapter::fromEnvironment($root)->deploy($context);
 if (!$deployment->isPass()) finish(['status' => $deployment->status, 'reason_code' => $deployment->reasonCode], $json, 2);
 // The transport fingerprint covers the deployed plugin tree; the MCP build
 // identity covers the canonical documentation projection. They are distinct
 // identities and are verified independently below.
 if ((string) $deployment->fingerprint === '') finish(['status' => 'failed', 'reason_code' => 'DEPLOYMENT_IDENTITY_UNAVAILABLE'], $json, 2);
+
+$migration = RemoteRuntimeAdapter::fromEnvironment()->run($context, 'migration-up');
+if (!$migration->isPass()) {
+    finish([
+        'status' => $migration->status,
+        'reason_code' => $migration->reasonCode === 'REMOTE_RUNTIME_EXECUTION_FAILED' ? 'MIGRATION_UP_FAILED' : $migration->reasonCode,
+        'migration' => $migration->metadata,
+    ], $json, 2);
+}
 
 $authorizationHeader = null;
 $wpUser = getenv('NHK_DEMO_WP_USER');
@@ -123,6 +137,7 @@ finish([
     'release_identity' => $localBootstrap['release_identity'],
     'documents' => count((array) ($localBootstrap['manifest']['files'] ?? [])),
     'deployment_identifier' => $deployment->identifier,
+    'migration' => $migration->metadata,
     'verification' => 'direct-mcp-bootstrap-and-list',
 ], $json, 0);
 

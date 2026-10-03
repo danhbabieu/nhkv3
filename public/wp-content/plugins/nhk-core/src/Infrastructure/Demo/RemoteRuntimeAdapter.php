@@ -21,6 +21,8 @@ final class RemoteRuntimeAdapter
         private readonly string $pluginPath,
         private readonly Closure $executor,
         private readonly ?string $sshKey = null,
+        /** @var array{migration_runtime:string,authorized_database:string,environment:string}|null */
+        private readonly ?array $migrationConfig = null,
     ) {}
 
     public static function fromEnvironment(?Closure $executor = null): self
@@ -34,11 +36,20 @@ final class RemoteRuntimeAdapter
             return new self('demo.1945.vn', '', $executor ?? self::defaultExecutor());
         }
         $key = $values['ssh_key'] ?? null;
+        $migrationRuntime = $values['migration_runtime'] ?? null;
+        $authorizedDatabase = $values['authorized_migration_database'] ?? null;
+        $environment = $values['environment_type'] ?? null;
+        $migrationConfig = is_string($migrationRuntime) && $migrationRuntime !== ''
+            && is_string($authorizedDatabase) && $authorizedDatabase !== ''
+            && is_string($environment) && $environment !== ''
+            ? ['migration_runtime' => $migrationRuntime, 'authorized_database' => $authorizedDatabase, 'environment' => $environment]
+            : null;
         return new self(
             (string) $values['ssh_target'],
             rtrim((string) $values['remote_path'], '/'),
             $executor ?? self::defaultExecutor(),
             is_string($key) && $key !== '' ? $key : null,
+            $migrationConfig,
         );
     }
 
@@ -53,6 +64,12 @@ final class RemoteRuntimeAdapter
         if ($this->pluginPath === '' || preg_match('#^/[^\0]+$#', $this->pluginPath) !== 1) {
             return StageResult::blocked('REMOTE_PLUGIN_PATH_INVALID');
         }
+        if ($operation === 'migration-up' && $this->migrationConfig === null) {
+            return StageResult::blocked('MIGRATION_AUTHORIZATION_CONFIG_REQUIRED');
+        }
+        if ($operation === 'migration-up' && preg_match('/^[a-f0-9]{40}$/i', $context->sourceRevision) !== 1) {
+            return StageResult::blocked('MIGRATION_SOURCE_REVISION_INVALID');
+        }
 
         $command = [
             'ssh', '-o', 'BatchMode=yes',
@@ -60,6 +77,14 @@ final class RemoteRuntimeAdapter
         if ($this->sshKey !== null) $command = array_merge($command, ['-i', $this->sshKey]);
         $command = array_merge($command, [
             $this->target,
+        ]);
+        if ($operation === 'migration-up') {
+            $command[] = 'env';
+            $command[] = 'NHK_MIGRATION_RUNTIME=' . $this->migrationConfig['migration_runtime'];
+            $command[] = 'NHK_AUTHORIZED_MIGRATION_DATABASE=' . $this->migrationConfig['authorized_database'];
+            $command[] = 'WP_ENVIRONMENT_TYPE=' . $this->migrationConfig['environment'];
+        }
+        $command = array_merge($command, [
             'php', $this->pluginPath . '/bin/nhk-core-maintenance.php',
             '--operation=' . $operation,
             '--pack=' . $context->pack,
@@ -73,6 +98,9 @@ final class RemoteRuntimeAdapter
             if ($operation === 'clock-type-audit' && is_array($decoded) && in_array(($decoded['reason_code'] ?? null), ['REMOTE_OPERATION_NOT_ALLOWLISTED', 'LIVE_AUDIT_SURFACE_NOT_EXPOSED'], true)) {
                 return StageResult::blocked('LIVE_AUDIT_SURFACE_NOT_EXPOSED');
             }
+            if ($operation === 'migration-up' && is_array($decoded) && is_string($decoded['reason_code'] ?? null) && $decoded['reason_code'] !== '') {
+                return StageResult::failed($decoded['reason_code']);
+            }
             return StageResult::failed('REMOTE_RUNTIME_EXECUTION_FAILED');
         }
         try {
@@ -83,9 +111,21 @@ final class RemoteRuntimeAdapter
         if (!is_array($payload) || ($payload['status'] ?? null) !== 'pass') {
             return StageResult::blocked((string) ($payload['reason_code'] ?? 'REMOTE_RUNTIME_UNAVAILABLE'));
         }
+        if ($operation === 'migration-up') {
+            foreach (['pack' => $context->pack, 'run_id' => $context->runId, 'source_revision' => $context->sourceRevision] as $field => $expected) {
+                if (!is_string($payload[$field] ?? null) || !hash_equals($expected, $payload[$field])) {
+                    return StageResult::failed($field === 'source_revision' ? 'REMOTE_SOURCE_REVISION_MISMATCH' : 'REMOTE_MAINTENANCE_CONTEXT_MISMATCH');
+                }
+            }
+        }
+        if ($operation === 'migration-up') {
+            if ((int) ($payload['current'] ?? 0) !== 24 || (int) ($payload['target'] ?? 0) !== 24) return StageResult::failed('MIGRATION_TARGET_NOT_REACHED');
+            if (($payload['dictionary_entry_sense_schema_ready'] ?? false) !== true) return StageResult::failed('DICTIONARY_ENTRY_SENSE_SCHEMA_NOT_READY');
+        }
         return StageResult::pass(
             is_string($payload['identifier'] ?? null) ? $payload['identifier'] : 'remote-' . $operation,
             is_string($payload['fingerprint'] ?? null) ? $payload['fingerprint'] : null,
+            $operation === 'migration-up' ? $payload : [],
         );
     }
 
