@@ -463,7 +463,7 @@ final class FrontendPresentationContractTest extends TestCase
         $comparison = $this->readTheme('comparison.php');
         $entity = $this->readTheme('entity.css');
 
-        self::assertStringContainsString('nav.topic-cloud', $presentation);
+        self::assertStringContainsString('.contextual-discovery .topic-cloud', $presentation);
         self::assertStringContainsString('align-items:center;gap:10px', $presentation);
         self::assertStringContainsString('.related-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:', $entity);
         self::assertStringContainsString('class="topic-cloud"', $comparison);
@@ -489,6 +489,28 @@ final class FrontendPresentationContractTest extends TestCase
         self::assertStringNotContainsString('media-card-image', $module);
         self::assertStringContainsString('-webkit-line-clamp:2', $css);
         self::assertStringNotContainsString('video-card--compact .video-card-copy strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}', $css);
+    }
+
+    public function test_mobile_compact_discovery_keeps_the_wrapper_full_width_and_sizes_media_inside_links(): void
+    {
+        $css = $this->readTheme('presentation.css');
+
+        self::assertStringContainsString('.compact-discovery-item{display:grid;grid-template-columns:minmax(0,1fr);', $css);
+        self::assertStringNotContainsString('.compact-discovery-item{grid-template-columns:52px minmax(0,1fr)}', $css);
+        self::assertStringContainsString('.compact-discovery-media-link{display:grid;grid-template-columns:58px minmax(0,1fr);', $css);
+        self::assertStringContainsString('.video-card--compact .video-card-link{display:grid;grid-template-columns:72px minmax(0,1fr);', $css);
+        self::assertStringNotContainsString('.compact-discovery-thumb{display:block;width:58px;height:44px;', $css);
+    }
+
+    public function test_topic_cloud_flex_treatment_is_scoped_to_discovery_contexts(): void
+    {
+        $css = $this->readTheme('presentation.css');
+
+        self::assertStringContainsString('.contextual-discovery .topic-cloud{display:flex;flex-wrap:wrap;', $css);
+        self::assertStringNotContainsString('.topic-cloud,.context-box', $css);
+        $home = $this->readTheme('front-page.php');
+        self::assertStringContainsString('class="home-semantic-section topics-section"', $home);
+        self::assertStringContainsString('class="topic-cloud"', $home);
     }
 
     public function test_contextual_css_uses_only_nhk_tokens_and_resets_section_headers(): void
