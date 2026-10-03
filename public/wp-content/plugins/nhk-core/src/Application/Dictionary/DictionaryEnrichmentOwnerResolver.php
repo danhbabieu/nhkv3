@@ -16,6 +16,8 @@ final class DictionaryEnrichmentOwnerResolver
             return $this->exact($explicit, ['explicit_legacy_destination'], 'existing explicit legacy destination');
         }
         if (isset($context['label_similarity'])) return ['classification' => count((array) $context['label_similarity']) > 1 ? 'AMBIGUOUS' : 'NO_OWNER', 'target' => null, 'evidence' => ['label_similarity'], 'reason' => 'label similarity is not governed evidence'];
+        $mapping = $context['semantic_reference'] ?? null;
+        if (is_array($mapping) && strtoupper((string) ($mapping['status'] ?? '')) === 'PRESENT_VALID' && trim((string) ($mapping['type'] ?? '')) !== '' && trim((string) ($mapping['id'] ?? '')) !== '') return $this->exact($mapping, ['existing_governed_mapping'], 'existing mapping-level semantic reference');
         if ($sense->destinationType !== null && $sense->destinationId !== null && trim($sense->destinationType) !== '' && trim($sense->destinationId) !== '') {
             return $this->exact(['type' => $sense->destinationType, 'id' => $sense->destinationId], ['explicit_legacy_destination'], 'existing explicit legacy destination');
         }

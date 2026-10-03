@@ -28,7 +28,7 @@ final class DictionaryEnrichmentAudit
                 if (!$sense instanceof DictionaryConcept || ($senseId !== null && $sense->conceptId !== $senseId)) continue;
                 if ($publicOnly && !$sense->approved()) continue;
                 $reference = method_exists($this->entries, 'semanticReference') ? (array) $this->entries->semanticReference($entry->entryId, $sense->conceptId) : ['status' => 'ABSENT'];
-                $resolved = is_callable($this->ownerResolver) ? (array) ($this->ownerResolver)($sense) : (new DictionaryEnrichmentOwnerResolver())->resolve($sense);
+                $resolved = is_callable($this->ownerResolver) ? (array) ($this->ownerResolver)($sense, ['semantic_reference' => $reference, 'entry_id' => $entry->entryId]) : (new DictionaryEnrichmentOwnerResolver())->resolve($sense, ['semantic_reference' => $reference]);
                 $ownerType = trim((string) ($resolved['target']['type'] ?? $reference['type'] ?? ''));
                 $ownerId = trim((string) ($resolved['target']['id'] ?? $reference['id'] ?? ''));
                 $coverage = ($ownerType !== '' && $ownerId !== '' && is_callable($this->coverage)) ? (array) ($this->coverage)($ownerType, $ownerId, ['entry_id' => $entry->entryId, 'sense_id' => $sense->conceptId]) : [];

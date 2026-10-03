@@ -68,4 +68,23 @@ final class DictionaryEnrichmentAuditTest extends TestCase
         self::assertSame('entry-2', $second['items'][0]['entry_id']);
         self::assertFalse($second['has_more']);
     }
+
+    public function test_mapping_level_present_reference_is_strong_owner_evidence(): void
+    {
+        $sense = new DictionaryConcept('sense-map', '400 ngày', 'Định nghĩa', DictionaryConcept::APPROVED);
+        $entry = new LexicalEntry('entry-map', '400 ngày', '400 ngày', DictionaryConcept::APPROVED, 'vi-VN', [], 3, [$sense->conceptId]);
+        $entries = new class($entry, $sense) {
+            public function __construct(private LexicalEntry $entry, private DictionaryConcept $sense) {}
+            public function listEntries(int $limit): array { return [$this->entry]; }
+            public function listSenses(LexicalEntry $entry): array { return [$this->sense]; }
+            public function listForms(LexicalEntry $entry): array { return []; }
+            public function semanticReference(string $entryId, string $senseId): array { return ['status' => 'PRESENT_VALID', 'type' => 'classification', 'id' => 'owner-400', 'revision' => 9]; }
+        };
+        $audit = new DictionaryEnrichmentAudit($entries, new class { public function listLabels(string $id, bool $active = true): array { return []; } }, static fn (): array => [], static fn (DictionaryConcept $sense, array $context = []): array => (new \NHK\Core\Application\Dictionary\DictionaryEnrichmentOwnerResolver())->resolve($sense, $context));
+
+        $item = $audit->audit(1)['items'][0];
+
+        self::assertSame('EXACT_UNIQUE', $item['senses'][0]['owner_resolution']['classification']);
+        self::assertSame('owner-400', $item['senses'][0]['owner_resolution']['target']['id']);
+    }
 }
