@@ -1,5 +1,27 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-03 — Dictionary enrichment audit/planning foundation (LOCAL / NO DATA MUTATION)
+
+IMPLEMENTED: Added bounded generic Entry/Sense enrichment audit, strong-evidence
+owner resolver, deterministic Form/semantic-reference plan fingerprints,
+owner-coverage status packets, internal capability-gated MCP audit/plan
+operations and internal exact-plan apply delegation through the existing
+Dictionary mutation service. Durable array Forms now render on public detail.
+No Dictionary Graph endpoint or owner-data writer was added.
+
+VERIFICATION: Dictionary-focused suite passes 177 tests / 880 assertions with
+one pre-existing deprecation; MCP-focused suite passes 147 tests / 4,700
+assertions with three pre-existing deprecations; public Dictionary/route suite
+passes 35 tests / 210 assertions. Changed PHP lint and `git diff --check` pass.
+No staging/production mutation, migration, deployment or push was performed.
+
+DATA: No enrichment was applied. The runtime currently exposes deterministic
+audit/plan behavior and fails closed when storage is unavailable. The 400-day
+case is generic-plan eligible only if runtime evidence resolves its existing
+classification owner as `EXACT_UNIQUE`; no object was materialized or mapped.
+
+STATUS: `DICTIONARY_ENRICHMENT_AUDIT_PLAN_LOCAL / NO_DATA_MUTATION / INTERNAL_APPLY_GUARDED / DEPLOYMENT_PENDING`.
+
 # Checkpoint — 2026-10-03 — Dictionary public detail composition (LOCAL / NO MUTATION)
 
 IMPLEMENTED: Added the dedicated `DictionaryDetailQuery` composition boundary,

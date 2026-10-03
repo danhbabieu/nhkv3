@@ -66,6 +66,13 @@ Entry/Sense schema, migration or runtime change.
 
 ## 0.0.3 Dictionary Entry/Sense documentation checkpoint — 2026-10-03
 
+## 0.0.4 Dictionary enrichment audit operations — 2026-10-03
+
+`DICTIONARY_ENRICHMENT_AUDIT_OPERATIONS.md` documents the implemented bounded
+read-only audit/plan boundary and the internal/admin exact-plan apply seam.
+It does not authorize owner-data writes: Knowledge, Graph, Media, Video and
+Article enrichment remains owned by their existing Governance pipelines.
+
 **CURRENT LAW:** Dictionary remains lexical curation only; Authority, Knowledge,
 Source/Evidence, Graph, Media/MediaUsage and Video retain their owners.
 
