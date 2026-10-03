@@ -430,7 +430,7 @@ final class FrontendPresentationContractTest extends TestCase
         self::assertStringContainsString("\$compact = !empty(\$args['compact'])", $card);
         self::assertStringContainsString('video-card--compact', $card);
         self::assertStringContainsString("!\$compact", $card);
-        self::assertStringContainsString("if (\$kind !== 'video')", $module);
+        self::assertStringContainsString("if (\$kind !== 'video' && \$kind !== 'media')", $module);
         self::assertStringContainsString('thumbnail_srcset', $card);
     }
 
@@ -439,6 +439,67 @@ final class FrontendPresentationContractTest extends TestCase
         $module = $this->read('template-parts/presentation/contextual-discovery.php');
         foreach (['$visual[\'srcset\']', '$visual[\'sizes\']', '$visual[\'width\']', '$visual[\'height\']'] as $needle) {
             self::assertStringContainsString($needle, $module);
+        }
+    }
+
+    public function test_contextual_modules_have_context_copy_and_canonical_ctas_without_duplicate_navigation(): void
+    {
+        $functions = $this->readTheme('functions.php');
+        $module = $this->readTheme('template-parts/presentation/contextual-discovery.php');
+
+        self::assertStringContainsString("'cta_label' =>", $functions);
+        self::assertStringContainsString("nhk_v3_contextual_discovery_items", $functions);
+        self::assertStringContainsString("'article' => 'Liên quan đến bài viết'", $functions);
+        self::assertStringContainsString("'entity' => 'Trong hồ sơ này'", $functions);
+        self::assertStringContainsString('Xem tất cả', $functions);
+        self::assertStringContainsString("nhk_v3_contextual_discovery_items('module'", $functions);
+        self::assertStringContainsString("if (!empty(\$availableGroups[\$destination])) continue;", $functions);
+        self::assertStringContainsString("\$module['content_backed']", $module);
+    }
+
+    public function test_shared_discovery_and_relation_presentation_wraps_with_gap(): void
+    {
+        $presentation = $this->readTheme('presentation.css');
+        $comparison = $this->readTheme('comparison.php');
+        $entity = $this->readTheme('entity.css');
+
+        self::assertStringContainsString('nav.topic-cloud', $presentation);
+        self::assertStringContainsString('align-items:center;gap:10px', $presentation);
+        self::assertStringContainsString('.related-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:', $entity);
+        self::assertStringContainsString('class="topic-cloud"', $comparison);
+    }
+
+    public function test_entity_card_has_explicit_no_image_state_without_placeholder_frame(): void
+    {
+        $card = $this->readTheme('template-parts/presentation/entity-card.php');
+        $presentation = $this->readTheme('presentation.css');
+
+        self::assertStringContainsString('is-no-image', $card);
+        self::assertStringContainsString('.entity-card.is-no-image .entity-card-image{display:none}', $presentation);
+        self::assertStringNotContainsString('image-placeholder', $card);
+    }
+
+    public function test_compact_media_is_one_whole_row_link_and_compact_video_titles_are_clamped(): void
+    {
+        $media = $this->readTheme('template-parts/presentation/media-card.php');
+        $module = $this->readTheme('template-parts/presentation/contextual-discovery.php');
+        $css = $this->readTheme('presentation.css');
+
+        self::assertStringContainsString('media-card-link', $media);
+        self::assertStringNotContainsString('media-card-image', $module);
+        self::assertStringContainsString('-webkit-line-clamp:2', $css);
+        self::assertStringNotContainsString('video-card--compact .video-card-copy strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}', $css);
+    }
+
+    public function test_contextual_css_uses_only_nhk_tokens_and_resets_section_headers(): void
+    {
+        $css = $this->readTheme('presentation.css');
+
+        foreach (['var(--nhk-border)', 'var(--nhk-surface)', 'var(--nhk-muted)', 'var(--nhk-text)', '.contextual-discovery-module .section-head{margin:0'] as $needle) {
+            self::assertStringContainsString($needle, $css);
+        }
+        foreach (['var(--line', 'var(--paper', 'var(--muted'] as $needle) {
+            self::assertStringNotContainsString($needle, $css);
         }
     }
 

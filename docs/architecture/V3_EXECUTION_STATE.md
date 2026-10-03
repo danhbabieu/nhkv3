@@ -1,5 +1,46 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-03 — Browser-QA presentation repair (LOCAL / NO DEPLOYMENT)
+
+IMPLEMENTED: Repaired the shared relation/discovery presentation seam after
+browser-confirmed defects. Contextual navigation now excludes destinations
+already represented by relation-backed modules; relation/discovery links use
+shared wrapping and gap treatment; content-backed modules use `Liên quan`;
+entity cards expose an explicit `is-no-image` state without a fabricated image
+frame; entity contexts reliably enqueue the shared presentation stylesheet.
+
+REGRESSION: Focused FrontendPresentationContractTest passes 55 tests / 377
+assertions with 2 existing warnings. Changed PHP files lint clean and
+`git diff --check` passes. Local browser recheck covered `/odo/`,
+`/thuong-hieu/` and `/so-sanh/`; exact viewport overrides were not available.
+
+NO_ARCHITECTURE_CHANGE: No query, schema, Graph, relation data or semantic
+owner was changed. No deployment or external mutation occurred.
+
+STATUS: `RELATION_DISCOVERY_PRESENTATION_REPAIRED / NO_DATA_MUTATION / UNDEPLOYED`.
+
+# Checkpoint — 2026-10-03 — Dictionary Entry/Sense architecture research (DOCUMENTATION-ONLY)
+
+RESEARCH: Reviewed the mandatory Constitution/contracts and current Dictionary,
+MediaUsage, EntityMediaProjection, Video, Knowledge, Graph registry and MCP
+boundaries. Current runtime is Migration015 Concept/Label/Candidate/Mention;
+there is no implemented LexicalEntry/LexicalSense store. The architecture
+decision recommends an additive Entry → Form → Sense target with typed owner
+references, lexical attestation separate from Evidence, and no Dictionary Graph
+endpoint.
+
+DOCUMENTS: Added `DICTIONARY_ENTRY_SENSE_ARCHITECTURE.md`; clarified the
+Entry/Sense target and compatibility law in
+`DICTIONARY_LEXICAL_KNOWLEDGE_CONTRACT.md`; updated the status index and MCP
+documentation boundary to distinguish design from runtime.
+
+NO_CODE_CHANGE: PHP/runtime files unchanged.
+NO_SCHEMA_CHANGE: No migration, table alteration or registry change.
+NO_DATA_MUTATION: No seed, backfill, merge, rekey, staging or production write.
+NO_DEPLOYMENT: No build publish, push or deployment performed.
+
+STATUS: `DICTIONARY_ENTRY_SENSE_DESIGN_DOCUMENTED / NO_CODE_CHANGE / NO_SCHEMA_CHANGE / NO_DATA_MUTATION / NO_DEPLOYMENT`.
+
 # Checkpoint — 2026-10-03 — Release candidate acceptance snapshot
 
 The current non-normative runtime evidence is maintained in
@@ -21553,3 +21594,49 @@ passes. No route, query, Graph, semantic, database, deployment or cutover
 change was introduced. Browser runtime remains unverified.
 
 STATUS: CONTEXTUAL_DISCOVERY_QUALITY_HARDENED / BROWSER_RUNTIME_NOT_VERIFIED / NO_MUTATION / NO_DEPLOY
+
+# Checkpoint — 2026-10-03 — Site-wide presentation refinement (Vòng 10)
+
+IMPLEMENTED: Contextual content modules now use context-specific Vietnamese
+copy, expose compact canonical discovery CTAs, and avoid repeating a
+content-backed destination in link-only navigation. Media compact previews
+use one whole-row click target with preserved responsive image metadata.
+Compact Video titles are clamped to two lines without nowrap. Contextual rail
+CSS now uses the existing --nhk-* token system and resets major section
+header spacing. Entity and Article templates pass their presentation context;
+no route, query, Graph, semantic data or schema boundary changed.
+
+VALIDATION: FrontendPresentationContractTest passes 53 tests / 368 assertions.
+Changed theme PHP files pass php -l; stale contextual CSS tokens are absent;
+git diff --check passes. Full PHPUnit with memory_limit=512M completes
+3,066 tests with 33 pre-existing/environmental errors, 24 unrelated
+failures, 122 skips, 20 warnings and 50 PHPUnit deprecations; the focused
+frontend suite is green. Browser runtime remains unverified. No database,
+staging, production, deployment or cutover mutation was performed.
+
+STATUS: SITE_PRESENTATION_REFINEMENT_LOCAL_READY / BROWSER_RUNTIME_NOT_VERIFIED / FULL_UNIT_BASELINE_GAPS / NO_MUTATION / NO_DEPLOY
+
+# Checkpoint — 2026-10-03 — Dictionary Entry/Sense architecture documentation
+
+DOCUMENTATION_ONLY: Completed the Entry/Sense architecture review across the
+Dictionary architecture/contract, documentation status index, execution state
+and MCP content-operations contract. The approved target preserves every
+Migration015 Concept/Label/Candidate/Mention UUID and uses
+`1 old Concept → 1 compatibility Entry → 1 Sense`, with
+`DictionaryConcept` playing the target `LexicalSense` role. It does not create
+a parallel Sense owner.
+
+NO_CODE_CHANGE: No PHP, theme, plugin or runtime file was changed.
+NO_SCHEMA_CHANGE: No migration or schema change was made.
+NO_DATA_MUTATION: No database, semantic record, staging or production data was
+read for mutation or changed.
+NO_DEPLOYMENT: No push, deployment, cutover or live acceptance was performed.
+
+ENTRY_SENSE_STATUS: Entry/Sense persistence, Entry-centric public rendering,
+preferred-wording ownership/synchronization, complete Knowledge delegation and
+governed Dictionary Media binding remain IMPLEMENTATION GAP. Entry/Sense target
+MCP operations remain DESIGN / NOT IMPLEMENTED. Universal Structured Semantic
+Intake history and law were not rewritten.
+
+STATUS: `DOCUMENTATION_ONLY / NO_CODE_CHANGE / NO_SCHEMA_CHANGE /
+NO_DATA_MUTATION / NO_DEPLOYMENT / ENTRY_SENSE_NOT_IMPLEMENTED`.

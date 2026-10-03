@@ -34,14 +34,14 @@ function nhk_v3_assets(): void
     wp_register_style('nhk-v3-entity', get_theme_file_uri('entity.css'), ['nhk-v3-style'], '1.1.0');
     wp_register_style('nhk-v3-media-video', get_theme_file_uri('media-video.css'), ['nhk-v3-entity'], '1.0.3');
     wp_register_style('nhk-v3-knowledge', get_theme_file_uri('knowledge.css'), ['nhk-v3-media-video'], '1.0.2');
-    wp_register_style('nhk-v3-presentation', get_theme_file_uri('presentation.css'), ['nhk-v3-knowledge'], '1.0.3');
+    wp_register_style('nhk-v3-presentation', get_theme_file_uri('presentation.css'), ['nhk-v3-knowledge'], '1.0.4');
     wp_register_style('nhk-v3-album-style', get_theme_file_uri('album.css'), ['nhk-v3-entity'], '1.0.2');
     wp_register_style('nhk-v3-dictionary', get_theme_file_uri('dictionary.css'), ['nhk-v3-presentation'], '1.0.0');
     wp_enqueue_style('nhk-v3-style');
     wp_enqueue_script('nhk-v3-navigation', get_theme_file_uri('navigation.js'), [], '1.1.1', true);
     $needsMediaVideo = is_front_page() || is_singular('post') || (int) get_query_var('nhk_media_page', 0) > 0 || (int) get_query_var('nhk_video_page', 0) > 0;
     $needsKnowledge = is_front_page() || (int) get_query_var('nhk_knowledge_page', 0) > 0;
-    $needsEntity = is_front_page() || is_singular('post') || (int) get_query_var('nhk_entity_page', 0) > 0 || $needsMediaVideo || $needsKnowledge;
+    $needsEntity = is_front_page() || is_singular('post') || is_array($GLOBALS['nhk_core_entity_context'] ?? null) || (int) get_query_var('nhk_entity_page', 0) > 0 || $needsMediaVideo || $needsKnowledge;
     $needsPresentation = $needsEntity || $needsMediaVideo || $needsKnowledge;
     if ($needsEntity) wp_enqueue_style('nhk-v3-entity');
     if ($needsMediaVideo || $needsKnowledge) wp_enqueue_style('nhk-v3-media-video');
@@ -117,19 +117,20 @@ function nhk_v3_contextual_discovery_items(string $context, array $availableGrou
         $path = trim((string) ($item['path'] ?? ''));
         if ($label !== '' && $path !== '') $canonical[$label] = ['label' => $label, 'path' => $path];
     }
+    if ($context === 'module') {
+        foreach ($availableGroups as $destination => $available) {
+            if (!$available) continue;
+            $label = $labelByDestination[(string) $destination] ?? '';
+            if ($label !== '' && isset($canonical[$label])) return [$canonical[$label]];
+        }
+        return [];
+    }
     $selected = [];
     foreach ($maps[$context] ?? $maps['sidebar'] as $destination) {
         $label = $labelByDestination[$destination] ?? '';
         if ($label === '' || !isset($canonical[$label])) continue;
-        if ($availableGroups !== [] && !empty($availableGroups[$destination])) $selected[] = $canonical[$label];
-        elseif ($availableGroups === []) $selected[] = $canonical[$label];
-    }
-    if ($availableGroups !== []) {
-        foreach ($maps[$context] ?? [] as $destination) {
-            if (count($selected) >= 5) break;
-            $label = $labelByDestination[$destination] ?? '';
-            if ($label !== '' && isset($canonical[$label]) && empty($availableGroups[$destination])) $selected[] = $canonical[$label];
-        }
+        if (!empty($availableGroups[$destination])) continue;
+        $selected[] = $canonical[$label];
     }
     $seen = [];
     $selected = array_values(array_filter($selected, static function (array $item) use (&$seen): bool {
@@ -139,6 +140,13 @@ function nhk_v3_contextual_discovery_items(string $context, array $availableGrou
         return true;
     }));
     return array_slice($selected, 0, 5);
+}
+
+function nhk_v3_contextual_discovery_copy(string $context): string
+{
+    $copy = ['article' => 'Liên quan đến bài viết', 'entity' => 'Trong hồ sơ này'];
+    if ($context === 'entity') return 'Liên quan';
+    return $copy[$context] ?? $copy['entity'];
 }
 
 /** @param array<string,mixed> $relationSections @return list<array<string,mixed>> */
@@ -157,7 +165,9 @@ function nhk_v3_contextual_discovery_content_modules(array $relationSections, st
         if ($items === []) continue;
         $kind = $group === 'media' ? 'media' : ($group === 'videos' ? 'video' : ($group === 'articles' ? 'article' : 'entity'));
         $limit = $kind === 'video' ? 2 : ($kind === 'media' ? 3 : 2);
-        $modules[] = ['kind' => $kind, 'group' => $group, 'title' => $labels[$group] ?? 'Liên quan', 'items' => array_slice($items, 0, $limit), 'content_backed' => true];
+        $cta = nhk_v3_contextual_discovery_items('module', [$group => true]);
+        $ctaLabel = $group === 'media' ? 'Mở thư viện' : ($group === 'videos' ? 'Xem Video' : 'Xem tất cả ' . ($labels[$group] ?? 'liên quan'));
+        $modules[] = ['kind' => $kind, 'group' => $group, 'title' => $labels[$group] ?? 'Liên quan', 'items' => array_slice($items, 0, $limit), 'content_backed' => true, 'cta_label' => $ctaLabel, 'cta' => $cta[0] ?? null];
         if (count($modules) >= 3) break;
     }
     return $modules;
