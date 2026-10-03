@@ -56,4 +56,23 @@ final class DictionaryDetailQueryTest extends TestCase
         self::assertSame('INVALID', $sensePacket['semantic_reference']['status']);
         self::assertNull($sensePacket['canonical_owner']);
     }
+
+    public function test_detail_exposes_durable_array_forms_without_running_enrichment_audit(): void
+    {
+        $sense = new DictionaryConcept('sense-forms', '400 ngày', 'Định nghĩa', DictionaryConcept::APPROVED);
+        $entry = new LexicalEntry('entry-forms', '400 ngày', '400 ngày', DictionaryConcept::APPROVED, 'vi-VN', ['public_slug' => '400-ngay'], 1, [$sense->conceptId]);
+        $entries = new class($entry, $sense) {
+            public function __construct(private LexicalEntry $entry, private DictionaryConcept $sense) {}
+            public function findByPublicSlug(string $slug): LexicalEntry { return $this->entry; }
+            public function listSenses(LexicalEntry $entry): array { return [$this->sense]; }
+            public function listForms(LexicalEntry $entry): array { return [['form' => 'Jahresuhr/400', 'kind' => 'ALTERNATE', 'locale' => 'de-DE']]; }
+            public function semanticReference(string $entryId, string $senseId): array { return ['status' => 'ABSENT']; }
+            public function enrichmentAudit(): never { throw new \LogicException('public detail must not audit enrichment'); }
+        };
+
+        $result = (new DictionaryDetailQuery(new class { public function listLabels(string $id): array { return []; } }, $entries))->detail('400-ngay');
+
+        self::assertSame('Jahresuhr/400', $result['item']['forms'][0]['form']);
+        self::assertSame('de-DE', $result['item']['forms'][0]['locale']);
+    }
 }
