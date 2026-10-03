@@ -17,6 +17,7 @@ final class McpDocumentationRegistry
         'constitution' => ['path' => 'docs/constitution/NHK_V3_CONSTITUTION.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'constitution'],
         'documentation-status-index' => ['path' => 'docs/architecture/CURRENT_DOCUMENTATION_STATUS_INDEX.md', 'classification' => 'canonical_index', 'status' => 'ACTIVE', 'domain' => 'operator'],
         'execution-runtime-state' => ['path' => 'docs/architecture/V3_EXECUTION_STATE.md', 'classification' => 'current_evidence', 'status' => 'ACTIVE', 'domain' => 'deployment'],
+        'current-runtime-state' => ['path' => 'docs/architecture/CURRENT_RUNTIME_STATE.md', 'classification' => 'current_evidence', 'status' => 'ACTIVE', 'domain' => 'deployment'],
         'authority' => ['path' => 'docs/architecture/02_AUTHORITY_BOUNDARY.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'authority'],
         'authority-core' => ['path' => 'docs/architecture/13_AUTHORITY_CORE_CONTRACT.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'authority'],
         'canonical-domain-foundation' => ['path' => 'docs/architecture/21_P5_CANONICAL_DOMAIN_FOUNDATION.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'authority'],
