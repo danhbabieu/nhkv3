@@ -83,6 +83,16 @@ final class PluginBootWiringTest extends TestCase
         );
     }
 
+    public function test_rest_bootstrap_captures_home_semantic_query_for_video_reconciliation(): void
+    {
+        $plugin = (string) file_get_contents(__DIR__ . '/../../src/Plugin.php');
+
+        self::assertStringContainsString(
+            'add_action(\'rest_api_init\', static function () use (&$sharedAttachmentBridge, &$captureRepository, $claimOwnerUrl, &$homeSemanticQuery): void {',
+            $plugin,
+        );
+    }
+
     public function test_capture_repository_has_one_declaration_before_every_rest_api_use(): void
     {
         $plugin = (string) file_get_contents(__DIR__ . '/../../src/Plugin.php');

@@ -294,7 +294,7 @@ final class Plugin {
             if ($publicMediaDelivery !== null) (new PublicMediaAssetRoutes($publicMediaDelivery))->register();
             (new PublicKnowledgeRoutes(new KnowledgePageQuery($publicClaims, $publicEvidence, $publicSources, $publicStatus)))->register();
         }
-        add_action('rest_api_init', static function () use (&$sharedAttachmentBridge, &$captureRepository, $claimOwnerUrl): void {
+        add_action('rest_api_init', static function () use (&$sharedAttachmentBridge, &$captureRepository, $claimOwnerUrl, &$homeSemanticQuery): void {
             (new HealthCheck(new MigrationStatus()))->register_routes();
             global $wpdb;
             if (!isset($wpdb) || !is_object($wpdb)) return;
