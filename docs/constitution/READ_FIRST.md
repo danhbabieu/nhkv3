@@ -18,6 +18,10 @@ needed for the task → checkpoint → Capture`. GitHub is not required for this
 read path. A mutation-capable actor must be able to call the documentation
 read surface through the same MCP connection.
 
+For release acceptance, `docs/architecture/CURRENT_RUNTIME_STATE.md` is a
+non-normative current-state aid. It never overrides this router, the
+Constitution or an ACTIVE contract.
+
 The canonical documentation abilities are `nhk-v3/documentation-bootstrap`,
 `nhk-v3/documentation-get` and `nhk-v3/documentation-list`. `documentation-get`
 accepts only a manifest-allowlisted repository-relative path and bounded line

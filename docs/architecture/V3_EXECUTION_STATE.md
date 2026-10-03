@@ -1,5 +1,14 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-03 — Release candidate acceptance snapshot
+
+The current non-normative runtime evidence is maintained in
+`docs/architecture/CURRENT_RUNTIME_STATE.md`. This checkpoint records the
+release acceptance state only: local schema/runtime and Contract gates pass;
+the RC-owned bootstrap capture regression is fixed and committed; baseline
+Unit/integration environment gates remain classified; staging publish is
+blocked by the existing deployment authorization policy and was not attempted.
+
 # Checkpoint — 2026-10-02 — Real local browser QA + verified Clock Type rewrite repair (LOCAL / NO SEMANTIC MUTATION)
 
 BASELINE: `main` was clean at `96b0e126` (`feat(frontend): refine public entity hub discovery`). Apache was listening on local port 80 and MySQL on `127.0.0.1:3306`; shell probes were sandbox-blocked, but the in-app browser successfully rendered the current local HEAD.
