@@ -8,10 +8,10 @@ use NHK\Core\Domain\Authority\{AuthorityEntity, CanonicalEntityTypeCatalog, Enti
 use NHK\Core\Domain\Dictionary\{DictionaryConcept, DictionaryLabel};
 use NHK\Core\Domain\Knowledge\KnowledgeClaim;
 use NHK\Core\Infrastructure\Authority\WpdbAuthorityRepository;
-use NHK\Core\Infrastructure\Dictionary\{WpdbDictionaryCandidateRepository, WpdbDictionaryConceptRepository, WpdbDictionaryMentionRepository};
+use NHK\Core\Infrastructure\Dictionary\{WpdbDictionaryCandidateRepository, WpdbDictionaryConceptRepository, WpdbDictionaryMentionRepository, WpdbDictionaryEntryRepository};
 use NHK\Core\Infrastructure\Knowledge\WpdbKnowledgeRepository;
 use NHK\Core\Infrastructure\Media\{WpdbMediaAssetRepository, WpdbMediaRepository, WpdbMediaUsageRepository};
-use NHK\Core\Infrastructure\Migration\DictionaryMigration015;
+use NHK\Core\Infrastructure\Migration\{DictionaryMigration015, DictionaryEntrySenseMigration024};
 use NHK\Core\Infrastructure\Video\WpdbVideoRepository;
 use NHK\Core\Infrastructure\Governance\WpdbAuditSink;
 use NHK\Core\Domain\Graph\PredicateRegistry;
@@ -27,6 +27,7 @@ final class DictionaryRuntime
     private WpdbDictionaryConceptRepository $concepts;
     private WpdbDictionaryCandidateRepository $candidates;
     private WpdbDictionaryMentionRepository $mentions;
+    private WpdbDictionaryEntryRepository $entries;
     private DictionaryPlanningService $planning;
     private DictionarySeedPlanner $seedPlanner;
     private DictionaryCurationService $curation;
@@ -39,6 +40,7 @@ final class DictionaryRuntime
         $this->concepts = new WpdbDictionaryConceptRepository($database);
         $this->candidates = new WpdbDictionaryCandidateRepository($database);
         $this->mentions = new WpdbDictionaryMentionRepository($database);
+        $this->entries = new WpdbDictionaryEntryRepository($database, $this->concepts);
         $this->types = new EntityTypeRegistry();
         CanonicalEntityTypeCatalog::registerInto($this->types);
         $this->authority = new WpdbAuthorityRepository($database);
@@ -208,6 +210,12 @@ final class DictionaryRuntime
     public function resolve(string $term, array $context = [], array $hints = []): array
     {
         return $this->preview($term, 'MCP_RESOLVE', '', $context, $hints);
+    }
+
+    public function resolveEntrySense(string $term, array $context = []): array
+    {
+        if (!DictionaryEntrySenseMigration024::schemaReady($this->database)) return ['status' => 'UNAVAILABLE', 'reason' => 'DICTIONARY_ENTRY_SENSE_SCHEMA_UNAVAILABLE'];
+        return (new DictionaryEntrySenseResolver($this->entries, fn (?string $type, ?string $id, ?string $url): ?string => $this->revalidateDelegatedDestination($type, $id, $url), $this->normalizer))->resolve($term, $context);
     }
 
     public function candidate(string $candidateId): ?\NHK\Core\Domain\Dictionary\DictionaryCandidate

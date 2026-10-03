@@ -60,6 +60,30 @@ Dictionary, Capture and Living Knowledge contain implementation slices of these
 stages, but the repository does not claim a complete universal packet or
 interpreter runtime until executable coverage and contract tests prove it.
 
+Entry/Sense documentation is a separate architecture evolution after this
+intake law. It does not rewrite the historical intake amendments, authorize an
+Entry/Sense schema, migration or runtime change.
+
+## 0.0.3 Dictionary Entry/Sense documentation checkpoint — 2026-10-03
+
+**CURRENT LAW:** Dictionary remains lexical curation only; Authority, Knowledge,
+Source/Evidence, Graph, Media/MediaUsage and Video retain their owners.
+
+**CURRENT IMPLEMENTATION:** Migration015 Concept/Label/Candidate/Mention remains
+runtime truth. Concept detail is Concept-centric by `public_slug`; duplicate
+Concept slugs are `AMBIGUOUS`. Candidate actions remain `ATTACH`,
+`CREATE_DRAFT`, `AMBIGUOUS`, `REJECT`, `IGNORE` and `DO_NOT_SUGGEST`.
+
+**APPROVED TARGET DESIGN:** `LexicalEntry → Forms → 1..N
+DictionaryConcept-as-LexicalSense`; old Concept UUIDs remain durable. The
+public target is `/tu-dien/{entry-slug}/`, with multi-Sense disambiguation and
+direct owner links where delegated.
+
+**IMPLEMENTATION GAP:** Entry/Sense persistence, preferred-wording ownership
+and synchronization, Knowledge destination completeness, Entry-centric routes,
+and governed Dictionary Media binding writes are not implemented. No target
+Entry/Sense MCP operation is current or READY.
+
 ## 0.1 Governed Conversational Authority — 2026-09-11
 
 The current Capture boundary now has typed purposes `EDITORIAL`, `AUTHORITY`
@@ -372,7 +396,7 @@ Available`, `Frontend Available`, `Frontend Blocked`.
 | Area | Current boundary | Current status / reuse rule |
 |---|---|---|
 | Article | WordPress `wp_posts` owns editorial title/body/excerpt/order/public editorial URL | semantic truth remains separate; Article completion is cross-boundary and runtime-gated; no body copy into Knowledge/Graph/receipts; `nhk.capture.ingest` is the only normal Capture boundary, with one draft only for `IMAGE_ARTICLE`/`TEXT_ARTICLE` |
-| Dictionary / lexical curation | dedicated Concept/Label/Candidate/Mention lexical stores under `DICTIONARY_LEXICAL_KNOWLEDGE_CONTRACT.md` | lexical lookup/curation only; search first, reuse existing owner, unknown terms become private candidates; no Authority/Knowledge/Evidence/Graph truth; research preview is read-only and stored Article body is never rewritten by auto-link projection |
+| Dictionary / lexical curation | dedicated Concept/Label/Candidate/Mention lexical stores under `DICTIONARY_LEXICAL_KNOWLEDGE_CONTRACT.md`; Entry/Sense target is documented in `DICTIONARY_ENTRY_SENSE_ARCHITECTURE.md` | **CURRENT IMPLEMENTATION:** Concept-centric `public_slug` detail and Migration015 UUIDs; current Candidate workflow is `ATTACH`/`CREATE_DRAFT`/`AMBIGUOUS`/`REJECT`/`IGNORE`/`DO_NOT_SUGGEST`. **APPROVED TARGET DESIGN:** Entry-centric `LexicalEntry → Forms → 1..N DictionaryConcept-as-LexicalSense`; no parallel Sense owner. **IMPLEMENTATION GAP:** Entry/Sense runtime, preferred-wording synchronization, complete Knowledge delegation, Entry route and governed Dictionary Media binding. No Authority/Knowledge/Evidence/Graph truth; research preview is read-only and stored Article body is never rewritten by auto-link projection |
 | Authority | nine registered canonical types | canonical UUID/stable key/revision; no prose/URL/checksum-derived identity |
 | Entity Profile / Clock Type | `ENTITY_PROFILE_CLOCK_TYPE_CONTRACT.md` | Brand and Clock Type are independent profiles; Clock Type is `classification + family=clock_type`; current public detail namespace is `/dong-ho-{type-slug}/` while Brand remains `/{brand-slug}/`; the prefix is presentation-only and does not alter semantic identity. PR3 adds shared dossier/root read foundation, PR4.1 wires shadow diagnostics and a Graph-backed membership reader, PR5 adds a locally tested Governance-only new-data membership candidate/apply seam plus bounded derived Brand↔Type read recipe, PR6 adds a read-only legacy target/source dry-run audit, and PR6.1 adds production-owner Knowledge/Evidence and cursor-inventory read bridges. Legacy `clock-type` remains compatibility-read only; no shadow/candidate/audit result is Graph/Knowledge/Evidence/Video truth, and staging/live apply remains prohibited. |
 | Graph | only semantic relation persistence | current executable predicate vocabulary includes `about`, `depicts`, `model_of`, `variant_of`, `uses_movement`, `supports_music`, `configured_with_music`, `observed_playing_music`, `subtype_of` and `classified_as`; hierarchy is ACTIVE/same-family/cycle-free and membership is scope-bound; physical row completeness/family audit remains a separate runtime/data question |
@@ -501,11 +525,12 @@ or editorial publication is part of this discovery checkpoint.
   equivalent type-specific completeness recipes for Model, Movement, Variant
   and the remaining Entity types must be added deliberately rather than by
   increasing the generic graph traversal bound;
-- Dictionary migration 015 remains the canonical storage and the runtime now
-  activates its existing repositories, harvester, Admin curator and executable
-  MCP catalog; target-environment migration/public-route/read-back acceptance,
-  initial curated data and any legacy dry-run remain runtime-gated and have not
-  been claimed here;
+- Dictionary migration 015 remains the canonical current storage and the
+  runtime activates its existing repositories, harvester, Admin curator and
+  executable MCP catalog. The Entry/Sense architecture is DESIGN/DOCUMENTATION
+  only, not IMPLEMENTED RUNTIME; no target-environment migration, public-route
+  read-back acceptance, initial curated data, legacy mapping or Sense backfill
+  is claimed here;
 - dedicated Product–Specimen canonical relation;
 - approved Classification membership predicate (`classified_as`) and governed Graph relation apply; read-only Graph inventory/relation dry-run capability is implemented;
 - Collector facet registry and `collector_facet_update` governed maintenance path are implemented code-side; the CLI dry-run is read-only and target-runtime data/apply/read-back remain separately environment-gated;
@@ -823,3 +848,17 @@ Synthetic/focused tests are green. Full Unit with `memory_limit=512M` reaches
 by the existing large-file materializer memory test. WordPress/MySQL
 read-only corpus regression is not available in this workspace. No migration,
 schema change, semantic mutation, backfill, deploy or Graph write occurred.
+
+## Dictionary Entry/Sense runtime slice — 2026-10-03
+
+STATUS: `IMPLEMENTED_CODE_SIDE / TESTED_LOCAL / INTEGRATION_BLOCKED /
+NO_SEMANTIC_MUTATION / NO_DEPLOY`.
+
+Migration 024 adds the Entry/Form/Entry→Concept mapping structure
+additively. The repository and resolver support explicit target rows plus a
+read-only Migration015 compatibility projection, with deterministic ambiguity
+and destination revalidation. Focused local tests pass. WordPress/MySQL
+integration remains environment-gated; no mapping backfill or live mutation
+was performed. Public Entry routes, Entry/Sense MCP writes, complete Knowledge
+destination lifecycle, Dictionary Media binding and Video association remain
+implementation gaps.

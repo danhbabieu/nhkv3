@@ -10,6 +10,15 @@
 > Graph relation, that change must be proposed through the normal constitutional
 > and registry-governance process rather than inferred from this document.
 
+> **Entry/Sense design status — 2026-10-03:** The current runtime remains the
+> Concept/Label/Candidate/Mention model from Migration015. The approved target
+> `LexicalEntry → Forms → DictionaryConcept-as-LexicalSense` is documented in
+> `DICTIONARY_ENTRY_SENSE_ARCHITECTURE.md` only; it is not implemented runtime,
+> not a schema declaration and not an authorization to migrate existing rows.
+
+This contract distinguishes `CURRENT LAW`, `CURRENT IMPLEMENTATION`,
+`APPROVED TARGET DESIGN` and `IMPLEMENTATION GAP`. They are not interchangeable.
+
 ## 1. Purpose
 
 Dictionary detection participates in the shared ephemeral interpretation
@@ -124,7 +133,68 @@ A mention records that a term/concept was observed in a bounded content context
 such as a WordPress Article, Knowledge claim, Media/MediaUsage or Video.
 
 A mention is **not** a Graph relation, Evidence, proof of identity or proof of a
-semantic relationship. It records lexical occurrence and provenance only.
+semantic relationship. It records lexical occurrence and provenance only. Do
+not add a duplicated Entry foreign key merely for reverse lookup;
+`mentions_by_entry(entry_id)` can be derived through Entry↔Sense mapping.
+Lexical provenance is not Knowledge Evidence.
+
+### 2.5 Entry/Sense target boundary (documentation-only)
+
+The approved target model makes `LexicalEntry` the owner of a lexical form
+family and the existing `DictionaryConcept` the durable identity playing the
+semantic role `LexicalSense`. The target is:
+
+`LexicalEntry → Forms → 1..N DictionaryConcept-as-LexicalSense`.
+
+`LexicalSense` is a design role, not a new runtime class/table or parallel
+owner. Forms are Entry-level by default and may carry a bounded Sense
+qualification when the same surface form has multiple meanings. Sense owns
+lexical definition, domain/context, usage notes/examples and an optional typed
+reference to an existing canonical owner. It does not own an Authority
+identity, Knowledge claim, Source/Evidence payload, Graph edge, Media binary or
+Video identity.
+
+`LexicalEntry` owns the headword/preferred display form. General forms/aliases
+belong to the Entry/Form boundary; Sense-specific forms exist only with a clear
+semantic reason. Runtime currently has both
+`DictionaryConcept.preferred_label` and `DictionaryLabel(kind=PREFERRED)`,
+which can be edited independently. `DictionaryConcept.preferred_label` is a
+compatibility field during migration, not a second long-term owner.
+
+**CURRENT IMPLEMENTATION GAP:** preferred wording synchronization is not
+solved by the current runtime.
+
+The safe migration default is `1 old Concept → 1 compatibility Entry → 1
+Sense`; the old Concept UUID remains durable. This target does not permit
+automatic merge or reinterpretation based on preferred/normalized label
+equality. Current `preferred_label`, `definition`, `destination_type/id/url`
+and context remain compatibility data until a future dry-run mapping
+distinguishes one-to-one, multi-sense and destination-review cases.
+`PREFERRED` remains a current Label kind; it is not a second owner of the
+future preferred form.
+
+The target resolver is `Form → Entry → Sense → semantic_reference(type,id) →
+semantic owner → Public Projection → current canonical route`. The
+`destination_type`, `destination_id` and `destination_url` fields are only a
+compatibility representation during transition; URL is never semantic
+identity. Reverse Entity/Classification/Brand/Knowledge/Article → Dictionary
+is a derived query/projection, not a persisted mirror array/edge merely for UI.
+
+The current Candidate runtime operations are only `ATTACH`, `CREATE_DRAFT`,
+`AMBIGUOUS`, `REJECT`, `IGNORE` and `DO_NOT_SUGGEST`. The target design uses
+`CREATE_ENTRY_WITH_SENSE`, `ADD_SENSE_TO_ENTRY`, `ADD_FORM_TO_ENTRY` and
+optional `ADD_SENSE_SPECIFIC_FORM`; these are DESIGN / NOT IMPLEMENTED, not
+current MCP names.
+The review decision remains Dictionary curation and does not create Authority,
+Knowledge, Evidence or Graph truth.
+
+### 2.6 Authority Alias versus Dictionary Form
+
+An Authority Alias is an exact identity-resolution asset owned by Authority.
+A Dictionary Form is lexical wording owned by Dictionary. The resolver may
+read Authority aliases when resolving a term, but Dictionary must not bulk-copy
+all Authority aliases. A Dictionary Form is created only when it has explicit
+lexical or editorial value.
 
 ## 3. Detection sources and trust
 
@@ -324,6 +394,17 @@ An approved concept may select existing eligible Media as an illustration
 through the existing MediaUsage/projection boundary. The image is reused; it is
 not copied into a dictionary-owned binary store.
 
+**CURRENT IMPLEMENTATION:** reads follow
+`DictionaryRuntime → EntityMediaProjection->forEntity('dictionary_concept',
+conceptId)` when a stored MediaUsage endpoint exists. The normal governed write
+path is `MediaTargetNormalizer → MediaTargetRegistry → Graph
+EndpointTypeRegistry`, and Dictionary is not a Graph endpoint. Normal governed
+Dictionary Media binding writes are therefore incomplete.
+
+**STATUS: IMPLEMENTATION GAP.** Do not resolve this by making Dictionary a
+Graph endpoint. A future lexical/presentation target registry or bounded
+MediaUsage target validation is deferred to a later implementation plan.
+
 A dictionary illustration is presentation context only and does not prove the
 term's definition or semantic relation.
 
@@ -345,6 +426,22 @@ with recoverable lineage; it does not rewrite the source transcript or create
 an alias automatically. A target hint narrows lookup only and never makes
 every matching word in the transcript a label, relation or fact about that
 target.
+
+No `Video --about--> DictionaryConcept` is permitted. A future video
+pronunciation/explanation/illustration association would be lexical or
+presentation scope outside Graph; direct Sense↔Video binding is deferred from
+the first implementation slice.
+
+## 11.1 Knowledge destination status
+
+**CONTRACT TARGET:** Entity, Knowledge and Article destinations are allowed
+through typed semantic references.
+
+**CURRENT IMPLEMENTATION:** the resolver has Knowledge lookup, but curation
+approval primarily accepts Authority entity types and delegated destination
+revalidation handles Authority and Article, not Knowledge fully.
+
+**STATUS: IMPLEMENTATION GAP.** Knowledge delegation is not READY.
 
 ## 12. Auto-link projection
 
@@ -376,11 +473,17 @@ Search may expand approved labels/aliases to their concept/destination. Draft,
 ambiguous, rejected, ignored and suppressed candidates are excluded from public
 search expansion.
 
-The public `/tu-dien/` hub lists approved dictionary concepts and approved
-labels. If a concept delegates ownership to an existing Entity, Knowledge or
-Article, the hub item links directly to that owner. A dedicated dictionary
-route exists only for concepts whose canonical destination is the dictionary
-page itself.
+The approved target public detail route is `/tu-dien/{entry-slug}/` and is
+Entry-centric; one Entry may render many Senses. If multiple Senses delegate to
+different owners, the page is a lexical disambiguation page and each Sense
+links to its owner. If one Sense delegates completely to one owner, do not
+create a competing indexable Dictionary detail page: hub/search may link
+directly to the owner. Any legacy Dictionary URL redirects in one direct 301
+hop, never a chain.
+
+**CURRENT IMPLEMENTATION:** detail remains Concept-centric by one
+`public_slug`; multiple Concepts with the same slug are `AMBIGUOUS`. The
+Entry-centric route is not runtime behavior.
 
 The hub is a first-class discovery surface and should support reader-oriented
 browse/search such as preferred label, aliases and bounded lexical grouping when
@@ -669,6 +772,28 @@ The internal/admin-only `nhk.dictionary.seed-audit` operation exposes bounded,
 privacy-safe pagination/filtering and aggregate counts with explicit
 `read_only=true`, `mutated=false` and unavailable handling. It is not in the
 public operator allowlist.
+
+## Entry/Sense runtime checkpoint — 2026-10-03
+
+Migration 024 is additive and introduces `nhk_dictionary_entries`,
+`nhk_dictionary_forms` and `nhk_dictionary_entry_senses`. It does not alter,
+populate, merge or rekey Migration015 tables. `DictionaryConcept` remains the
+durable compatibility Sense identity. The code-side repository reads explicit
+Entry/Form/Sense rows when present and otherwise derives a read-only
+one-Concept compatibility Entry; this derivation never writes a mapping.
+
+`DictionaryEntrySenseResolver` implements the bounded read path
+`normalized Form → Entry → approved Sense → revalidated owner route`. One
+viable Sense resolves; multiple viable Senses remain `AMBIGUOUS`; a stale or
+invalid owner route is not accepted as identity. No new Graph endpoint,
+predicate, Evidence store, Knowledge claim copy, Media relation or Video
+relation is introduced.
+
+This checkpoint is `IMPLEMENTED_CODE_SIDE / TESTED_LOCAL` for schema-readiness
+contracts and resolver behavior only. Entry preferred-wording writes, public
+Entry-centric route projection, Entry/Sense MCP mutations, full Knowledge
+destination approval/read-back, Dictionary Media binding and Video association
+remain `IMPLEMENTATION GAP`.
 
 All future source adapters enter Dictionary through the same
 `StructuredInterpretationPacket`: physical ingest → source adapter → Shared

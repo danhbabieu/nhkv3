@@ -615,6 +615,43 @@ belong to Graph through the existing Governance proposal/approval/apply path.
 The Dictionary handoff tool emits a validated source/target/predicate packet;
 it does not persist a Graph edge or invent a predicate.
 
+The current Dictionary MCP truth remains Concept/Label/Candidate/Mention:
+`ATTACH`, `CREATE_DRAFT`, `AMBIGUOUS`, `REJECT`, `IGNORE` and
+`DO_NOT_SUGGEST` are the current Candidate workflow semantics. The target
+Entry/Sense semantics `CREATE_ENTRY_WITH_SENSE`, `ADD_SENSE_TO_ENTRY`,
+`ADD_FORM_TO_ENTRY` and optional `ADD_SENSE_SPECIFIC_FORM` are DESIGN / NOT
+IMPLEMENTED and must not be presented as current operations. In particular,
+the catalog rows for `nhk.dictionary.concept.*`, `nhk.dictionary.label.save`,
+`nhk.dictionary.candidate.review` and `nhk.dictionary.mentions.list` remain
+runtime Concept/Label/Candidate/Mention operations.
+
+The Entry/Sense architecture documented in
+`docs/architecture/DICTIONARY_ENTRY_SENSE_ARCHITECTURE.md` is a
+DESIGN/DOCUMENTATION target only. No `LexicalEntry`, `LexicalSense`, Entry/Form
+or Sense-specific MCP tool is claimed by this catalog. Current Dictionary MCP
+operations remain Concept/Label/Candidate/Mention operations and must continue
+to report unavailable/runtime gaps honestly rather than projecting the target
+model as implemented.
+
+The approved target keeps every Migration015 UUID and uses the safe default
+`1 old Concept → 1 compatibility Entry → 1 Sense`; no rekey, auto-merge,
+implicit semantic backfill, delete or reset is authorized. Any future grouping
+is explicit and human-governed.
+
+Dictionary is not a Graph endpoint. The current Dictionary Media read seam is
+`DictionaryRuntime → EntityMediaProjection->forEntity('dictionary_concept',
+conceptId)` when stored MediaUsage exists, while the normal governed write seam
+is `MediaTargetNormalizer → MediaTargetRegistry → Graph EndpointTypeRegistry`.
+The governed Dictionary Media binding write path is therefore an
+IMPLEMENTATION GAP, not a new endpoint. Video may produce lexical
+Mention/Candidate from authorized metadata/transcript, but no
+`Video --about--> DictionaryConcept` is allowed.
+
+The contract target permits Entity / Knowledge / Article destinations. Current
+Knowledge lookup exists, but curation approval and delegated revalidation do
+not yet cover Knowledge completely. Knowledge delegation is an
+IMPLEMENTATION GAP and is not READY.
+
 ## 3. Use-case capability matrix
 
 | USE CASE | CURRENT CAPABILITY | STATUS |
@@ -1247,3 +1284,16 @@ MediaUsage, invalidates affected projection dependencies and performs final
 read-back. This is not a new MCP writer. Missing feature illustration is
 distinct from missing representative image; visual suitability never promotes
 Evidence/Claim and public output omits private/review/ineligible Media.
+
+### Dictionary Entry/Sense read boundary — 2026-10-03
+
+The first Entry/Sense code slice is application-internal and read-only. The
+additive Migration024 tables are not exposed as MCP mutation operations. A
+future MCP read operation may delegate to the same resolver, but current
+`nhk.dictionary.*` operations remain backward compatible and unchanged. The
+resolver path is `normalized Form → Entry → approved Concept-as-Sense →
+revalidated owner route`; multiple viable Senses remain ambiguous. It does not
+register Dictionary endpoints or predicates, copy Knowledge/Evidence payloads,
+or create Media/Video relations. Entry preferred-wording writes and
+Entry/Sense MCP capabilities remain deferred until CAS, idempotency,
+capability, bounded read-back and compatibility identifiers are specified.

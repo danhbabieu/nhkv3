@@ -21640,3 +21640,22 @@ Intake history and law were not rewritten.
 
 STATUS: `DOCUMENTATION_ONLY / NO_CODE_CHANGE / NO_SCHEMA_CHANGE /
 NO_DATA_MUTATION / NO_DEPLOYMENT / ENTRY_SENSE_NOT_IMPLEMENTED`.
+
+# Checkpoint — 2026-10-03 — Dictionary Entry/Sense additive read slice
+
+IMPLEMENTED_CODE_SIDE: Added Migration024 with additive Entry, Form and
+Entry→existing-Concept/Sense mapping tables. Migration015 remains unchanged;
+024 performs no backfill, merge, rekey or semantic data mutation. Added the
+LexicalEntry/LexicalEntryForm domain values, repository contract and WordPress
+repository with a read-only Migration015 compatibility fallback. Added the
+Entry→Sense resolver with deterministic ambiguity and owner-route
+revalidation, without registering Dictionary Graph endpoints or predicates.
+
+VALIDATION: Focused Entry/Sense tests pass 5 tests / 10 assertions. Changed
+PHP files pass lint. Guarded WordPress/MySQL integration was not available in
+this environment, so migration read-back and live runtime bootstrap remain
+integration-blocked and no database data was changed.
+
+STATUS: `DICTIONARY_ENTRY_SENSE_CODE_SIDE_LOCAL_TESTED /
+INTEGRATION_BLOCKED / NO_STAGING_MUTATION / NO_PRODUCTION_MUTATION /
+NO_V2_MUTATION / NO_DEPLOYMENT`.

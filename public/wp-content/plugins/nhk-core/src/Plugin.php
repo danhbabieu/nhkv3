@@ -18,6 +18,7 @@ use NHK\Core\Infrastructure\Migration\MediaWordPressBridgeMigration012;
 use NHK\Core\Infrastructure\Migration\OwnerPublicationDecisionMigration013;
 use NHK\Core\Infrastructure\Migration\PublicIdentityMigration014;
 use NHK\Core\Infrastructure\Migration\DictionaryMigration015;
+use NHK\Core\Infrastructure\Migration\DictionaryEntrySenseMigration024;
 use NHK\Core\Infrastructure\Migration\ClaimProjectionMigration016;
 use NHK\Core\Infrastructure\Migration\{EditorialCaptureAddendumMigration018, EditorialCaptureMigration017, GovernanceSubjectBindingMigration020, MediaBindingOperationMigration022, MediaUsageMetadataMigration021, PresentationNavigationMigration023, VisualSupportRequirementMigration019};
 use NHK\Core\Infrastructure\Migration\MigrationDatabaseGuard;
@@ -93,7 +94,7 @@ final class Plugin {
         $captureRepository = isset($wpdb) && is_object($wpdb) ? new WpdbCaptureRepository($wpdb) : null;
         // Keep an already-installed site aware of the code's migration target;
         // activation is not required for an upgrade health check to be honest.
-        update_option('nhk_core_migration_target', PresentationNavigationMigration023::VERSION, false);
+        update_option('nhk_core_migration_target', DictionaryEntrySenseMigration024::VERSION, false);
         if (self::runtimeMigrationsEnabled()) self::runPendingMigrations();
         DictionaryBootstrap::boot();
         add_action('nhk_v3_media_canonical_readback', static function (\NHK\Core\Domain\Media\Media $media, array $assets, array $contexts = []): void {
@@ -2078,12 +2079,13 @@ final class Plugin {
         if ((int) get_option('nhk_core_migration_current', 0) < MediaUsageMetadataMigration021::VERSION || !MediaUsageMetadataMigration021::schemaReady($wpdb)) (new MediaUsageMetadataMigration021())->up();
         if ((int) get_option('nhk_core_migration_current', 0) < MediaBindingOperationMigration022::VERSION || !MediaBindingOperationMigration022::schemaReady($wpdb)) (new MediaBindingOperationMigration022())->up();
         if ((int) get_option('nhk_core_migration_current', 0) < PresentationNavigationMigration023::VERSION || !PresentationNavigationMigration023::schemaReady($wpdb)) (new PresentationNavigationMigration023())->up();
+        if ((int) get_option('nhk_core_migration_current', 0) < DictionaryEntrySenseMigration024::VERSION || !DictionaryEntrySenseMigration024::schemaReady($wpdb)) (new DictionaryEntrySenseMigration024())->up();
     }
     public static function activate(): void {
         global $wpdb;
         MigrationDatabaseGuard::assertUpAllowed((string) $wpdb->get_var('SELECT DATABASE()'), 'PLUGIN_ACTIVATION_MIGRATIONS');
         add_option('nhk_core_migration_current', 0, '', false);
-        add_option('nhk_core_migration_target', PresentationNavigationMigration023::VERSION, '', false);
+        add_option('nhk_core_migration_target', DictionaryEntrySenseMigration024::VERSION, '', false);
         (new GraphMigration001())->up();
         (new AuthorityMigration002())->up();
         (new GovernanceMigration003())->up();
