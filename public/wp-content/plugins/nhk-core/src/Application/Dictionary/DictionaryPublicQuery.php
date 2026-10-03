@@ -43,7 +43,7 @@ final class DictionaryPublicQuery
         if ($this->entrySenseAvailable() && is_object($this->entries) && method_exists($this->entries, 'listEntries')) {
             $matches = [];
             foreach ((array) $this->entries->listEntries(2000) as $entry) {
-                if (!$entry instanceof LexicalEntry || $this->slug((string) ($entry->context['public_slug'] ?? '')) !== $slug) continue;
+                if (!$entry instanceof LexicalEntry || $this->slug((string) ($entry->context['public_slug'] ?? $entry->preferredForm)) !== $slug) continue;
                 $matches[] = $entry;
             }
             if (count($matches) > 1) return ['status' => 'AMBIGUOUS', 'slug' => $slug, 'match_count' => count($matches)];
@@ -124,7 +124,8 @@ final class DictionaryPublicQuery
         $senseItems = [];
         foreach ($senses as $sense) {
             $item = $this->item($sense);
-            if (($sense->destinationType !== null || $sense->destinationId !== null) && ($item['eligible'] ?? false) !== true) return ['eligible' => false, 'entry_id' => $entry->entryId];
+            $hasDelegatedDestination = trim((string) ($sense->destinationType ?? '')) !== '' || trim((string) ($sense->destinationId ?? '')) !== '';
+            if ($hasDelegatedDestination && ($item['eligible'] ?? false) !== true) return ['eligible' => false, 'entry_id' => $entry->entryId];
             $senseItems[] = ['sense_id' => $sense->conceptId, 'title' => $sense->preferredLabel, 'description' => $sense->definition, 'context' => $sense->context, 'url' => $item['url'], 'destination_type' => $sense->destinationType, 'destination_id' => $sense->destinationId, 'labels' => $item['labels']];
         }
         if ($senseItems === []) return ['eligible' => false, 'entry_id' => $entry->entryId];

@@ -154,8 +154,15 @@ final class WpdbDictionaryEntryRepository implements DictionaryEntryRepository
 
     private function hydrateEntry(array $row): ?LexicalEntry
     {
-        try { return new LexicalEntry(UuidCodec::fromBinary($row['entry_uuid']), (string) $row['preferred_form'], (string) $row['normalized_preferred_form'], (string) $row['status'], ($row['locale'] ?? null) !== null ? (string) $row['locale'] : null, $this->decode((string) ($row['context_json'] ?? '{}')), (int) ($row['revision'] ?? 1)); }
-        catch (\Throwable) { return null; }
+        try {
+            $entryId = UuidCodec::fromBinary($row['entry_uuid']);
+            $senseRows = $this->database->get_results($this->database->prepare("SELECT concept_uuid FROM {$this->senses} WHERE entry_uuid=%s AND state=1 ORDER BY id", UuidCodec::toBinary($entryId)), ARRAY_A) ?: [];
+            $senseIds = [];
+            foreach ($senseRows as $senseRow) {
+                try { $senseIds[] = UuidCodec::fromBinary($senseRow['concept_uuid']); } catch (\Throwable) { continue; }
+            }
+            return new LexicalEntry($entryId, (string) $row['preferred_form'], (string) $row['normalized_preferred_form'], (string) $row['status'], ($row['locale'] ?? null) !== null ? (string) $row['locale'] : null, $this->decode((string) ($row['context_json'] ?? '{}')), (int) ($row['revision'] ?? 1), array_values(array_unique($senseIds)));
+        } catch (\Throwable) { return null; }
     }
 
     private function insertSense(string $entryId, DictionaryConcept $sense, array $context, ?string $semanticType = null, ?string $semanticId = null, ?int $semanticRevision = null): void

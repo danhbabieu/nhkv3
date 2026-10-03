@@ -7,6 +7,8 @@ use NHK\Core\Application\Dictionary\DictionaryPublicQuery;
 use NHK\Core\Contracts\Dictionary\DictionaryConceptRepository;
 use NHK\Core\Domain\Dictionary\{DictionaryConcept, DictionaryLabel};
 use NHK\Core\Domain\Dictionary\LexicalEntry;
+use NHK\Core\Infrastructure\Dictionary\WpdbDictionaryEntryRepository;
+use NHK\Core\Shared\Uuid\UuidCodec;
 use PHPUnit\Framework\TestCase;
 
 final class DictionaryPublicQueryTest extends TestCase
@@ -113,6 +115,48 @@ final class DictionaryPublicQueryTest extends TestCase
         self::assertSame('Vai bò', $packet['items'][0]['title']);
         self::assertSame('/tu-dien/vai-bo/', $packet['items'][0]['url']);
         self::assertSame('READY', $query->detail('vai-bo')['status']);
+    }
+
+    public function test_entry_with_empty_destination_fields_is_public_standalone(): void
+    {
+        $concept = new DictionaryConcept('c-empty', 'Bộ nhớ cơ khí', 'Nghĩa độc lập.', DictionaryConcept::APPROVED, '', '', '', []);
+        $repo = $this->repository([$concept], ['c-empty' => []]);
+        $entries = new class($concept) {
+            public function __construct(private DictionaryConcept $concept) {}
+            public function listEntries(int $limit = 500): array
+            {
+                return [new LexicalEntry('e-empty', 'Bộ nhớ cơ khí', 'bộ nhớ cơ khí', DictionaryConcept::APPROVED, 'vi-VN', ['public_slug' => 'bo-nho-co-khi'], 1, [$this->concept->conceptId])];
+            }
+            public function listSenses(LexicalEntry $entry, array $context = []): array { return [$this->concept]; }
+        };
+
+        $query = new DictionaryPublicQuery($repo, null, static fn (?string $type, ?string $id, ?string $url): ?string => null, $entries);
+
+        self::assertSame(1, $query->hub()['count']);
+        self::assertSame('READY', $query->detail('bo-nho-co-khi')['status']);
+    }
+
+    public function test_persisted_entry_hydration_includes_active_sense_ids(): void
+    {
+        if (!defined('ARRAY_A')) define('ARRAY_A', 'ARRAY_A');
+        $entryId = '11111111-1111-7111-8111-111111111111';
+        $senseId = '22222222-2222-7222-8222-222222222222';
+        $database = new class($entryId, $senseId) {
+            public string $prefix = 'wp_';
+            public function __construct(private string $entryId, private string $senseId) {}
+            public function prepare(string $query, mixed ...$args): string { return $query; }
+            public function get_row(string $query, mixed $output): array
+            {
+                return ['entry_uuid' => UuidCodec::toBinary($this->entryId), 'preferred_form' => 'Côn', 'normalized_preferred_form' => 'côn', 'status' => DictionaryConcept::APPROVED, 'locale' => 'vi-VN', 'context_json' => '{}', 'revision' => 1];
+            }
+            public function get_results(string $query, mixed $output): array { return [['concept_uuid' => UuidCodec::toBinary($this->senseId)]]; }
+        };
+        $concepts = $this->repository([new DictionaryConcept($senseId, 'Côn', 'Nghĩa', DictionaryConcept::APPROVED)], []);
+
+        $entry = (new WpdbDictionaryEntryRepository($database, $concepts))->findDurableForConcept($senseId);
+
+        self::assertInstanceOf(LexicalEntry::class, $entry);
+        self::assertSame([$senseId], $entry->senseIds);
     }
 
     private function repository(array $concepts, array $labels): DictionaryConceptRepository
