@@ -5,7 +5,7 @@
 > entity, endpoint, predicate, field, operation or data mutation.
 
 Status: approved contract with an initial read-only runtime slice, updated
-2026-09-05 for Dictionary lexical planning. Post references, bounded Knowledge
+2026-10-04 for Dictionary lexical planning and lexical-semantic editorial enrichment. Post references, bounded Knowledge
 → Evidence → Source inventory, shared semantic traversal, route-gated link
 planning and Dictionary preview are wired. Full target-runtime acceptance still
 requires guarded integration evidence.
@@ -47,6 +47,50 @@ Preflight may preview known terms, ambiguous terms, candidate terms and canonica
 internal-link destinations, but it must not persist Dictionary Candidate or
 Mention rows. Unknown/review-pending lexical terms are not by themselves an
 Article publication blocker. Ambiguous terms simply remain unlinked.
+
+## Lexical-semantic editorial enrichment law — 2026-10-04
+
+Article enrichment must join natural language, keyword/query planning,
+Dictionary and Knowledge without collapsing their ownership boundaries.
+
+The Article composer works from truth toward wording:
+
+```text
+resolved subject
+  → eligible Knowledge Claims
+  → scope/provenance/evidence filtering
+  → Dictionary Sense/Form map for the selected concepts
+  → bounded keyword/query-intent map
+  → audience/register choice
+  → natural prose + headings + internal-link/SEO projection
+```
+
+A keyword is never a fact source. A Dictionary definition is never a substitute
+for a canonical Claim. Graph reachability only finds candidates. The final prose
+may vary naturally while the selected Claim IDs/revisions and lexical Sense
+resolution remain traceable in the planning/read-back packet.
+
+The enrichment planner should diagnose different gaps separately:
+
+- lexical gap: missing/weak accepted wording for an already understood concept;
+- Knowledge gap: missing or insufficiently supported factual content;
+- relation gap: missing independently valid semantic connection;
+- editorial coverage gap: valid facts exist but the reader explanation is thin;
+- query/keyword gap: reader vocabulary/search intent is not adequately covered.
+
+A query/keyword gap must be repaired through lexical/query planning, not by
+inventing Knowledge. Likewise a lexical gap must not trigger duplicate Claims.
+
+Natural-language quality is a first-class projection concern: use the preferred
+term where clarity requires it, then vary only through approved/applicable Forms
+or clearly attributed community wording. Do not stuff exact keywords or repeat
+aliases mechanically. SEO/query coverage should emerge from concept coverage,
+not drive semantic truth.
+
+After an Article save, the existing Dictionary observation boundary may record
+idempotent Mention/Candidate state. Generated Article/SEO wording retains
+derived lineage and cannot count as independent corroboration or independently
+raise lexical authority.
 
 ## Research packet
 

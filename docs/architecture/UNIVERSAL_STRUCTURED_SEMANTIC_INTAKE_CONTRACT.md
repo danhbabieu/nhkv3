@@ -131,6 +131,49 @@ the same lexical, subject, scope, provenance and Governance boundaries. A user
 assertion is not Evidence merely because it is explicit; it is a bounded
 observation/provenance signal for planning.
 
+### Conversational lexical capture law — 2026-10-04
+
+Human/Chat input has two independently gated outputs:
+
+```text
+USER / CHAT
+  → lexical observation track → Dictionary resolution / reuse / private Candidate
+  → semantic truth track      → Authority / Knowledge / Relation planning
+```
+
+The governing distinction is:
+
+```text
+SEMANTIC SUBJECT UNRESOLVED ≠ LEXICAL OBSERVATION INVALID
+LEXICAL CANDIDATE ≠ SEMANTIC FACT
+```
+
+A downstream semantic-subject, Knowledge, Relation or Authority gate may block
+semantic mutation, but it must not by itself erase a reusable lexical
+observation that already passed the shared lexical-quality boundary. When the
+submission is authenticated/allowed, the Capture has a durable source identity,
+and a span is lexically eligible, the Dictionary path must independently:
+
+1. search and resolve approved Forms/Labels first;
+2. reuse the existing Entry/Sense when resolution is unique and applicable;
+3. otherwise create or increment only a private review Candidate, preserving
+   the exact observed form, normalized form, source lineage and uncertainty;
+4. persist a Mention only when a durable source binding can be represented
+   without inventing an Article, Knowledge owner, Authority owner or Graph edge;
+5. remain idempotent for replay of the same Capture/source fingerprint.
+
+No primary canonical semantic subject is required merely to remember that a
+qualified term was observed. Conversely, lexical durability never grants
+semantic truth: unresolved Brand/Model/person-like wording remains lexical
+review state and must not mint Authority. Spelling, ASR and transcription
+uncertainty must preserve the raw form; a suggested correction may aid lookup
+but may not silently replace the user's observed wording or assert identity.
+
+A whole-Capture authorization failure, invalid payload or rejected lexical span
+may still prevent persistence. A downstream semantic review requirement is not
+such a reason. Generated or derived restatements retain lineage and must not
+inflate independent lexical occurrence counts.
+
 ### Image / Media adapter (planned seam)
 
 The future Media adapter must expose this ordered, read-back-oriented pipeline:
@@ -421,6 +464,64 @@ reachability alone is not a relation or evidence.
 
 Relation mutation remains governed and read back. The packet cannot invent an
 endpoint, predicate, relation type, direction or semantic owner.
+
+## 10.1 Lexical-semantic editorial enrichment law
+
+Dictionary, keywords, Knowledge, relations and prose have different jobs and
+must remain separate while composing one coherent reader-facing result:
+
+- **Dictionary / Entry / Sense / Form** owns language: what a term means
+  lexically, accepted forms, aliases, technical/colloquial register and the
+  lexical route to an existing semantic owner when one is known.
+- **Keyword/query intent** is a retrieval and SEO planning signal derived from
+  reader intent plus resolved lexical/semantic context. It is not identity,
+  Knowledge, Evidence or a relation.
+- **Knowledge** owns factual propositions with canonical subject, scope,
+  provenance, evidence and revision.
+- **Graph/relations** discover bounded context and candidate paths; reachability
+  does not make a claim applicable.
+- **Writer/editorial synthesis** chooses the natural surface wording for the
+  selected, eligible facts. It owns prose, not truth.
+
+For enrichment and "write better" flows, the required composition direction is:
+
+```text
+EDITORIAL INTENT
+  → resolve canonical subject
+  → retrieve and select eligible Knowledge
+  → validate scope / provenance / evidence / applicability
+  → resolve Dictionary Senses for the concepts actually being expressed
+  → expand bounded keyword/query intent from those Senses + reader intent
+  → choose preferred / alternate / colloquial / technical Forms by register
+  → compose natural prose
+  → compliance / SEO / public projection / read-back
+```
+
+The reverse direction is forbidden: a keyword, popular phrase, Dictionary
+definition, Graph neighbor or stylistic phrase must never manufacture a fact.
+
+Enrichment planning must distinguish at least conceptually between:
+
+```text
+LEXICAL GAP            = fact/meaning exists, but wording/forms are incomplete
+SEMANTIC KNOWLEDGE GAP = factual proposition is missing or insufficiently supported
+RELATION GAP           = an independently valid semantic relation is missing
+EDITORIAL COVERAGE GAP = facts exist but reader-facing explanation is incomplete
+```
+
+These are planning classes, not permission to add new storage enums.
+
+Natural prose must not be reduced to exact-match keyword stuffing. Prefer the
+canonical/preferred term when clarity benefits, then use only Forms that resolve
+to the same applicable Sense and fit the intended audience/register. Do not
+invent synonyms merely for variation. A keyword may guide headings, query
+coverage and retrieval, but fact selection must already be justified by
+Knowledge and scope.
+
+Generated Article/SEO/summary text may be scanned again for lexical diagnostics
+only with derived lineage. It is not an independent occurrence family,
+corroborating Source, Evidence or automatic Dictionary approval. This prevents a
+self-reinforcing loop in which generated wording makes itself look authoritative.
 
 ## 11. Synthesis and public projection
 

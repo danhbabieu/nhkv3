@@ -1,5 +1,51 @@
 # NHK V3 Execution State
 
+## Checkpoint — 2026-10-04 — Human/Chat lexical intake acceptance gap (STAGING RUNTIME / BOUNDED MUTATION ATTEMPT)
+
+RUNTIME: The deployed MCP runtime read back source revision
+`b760e0f80c2a531968a1e7c6ff35a743ba9f89ee`, Migration 24/24 and READY
+Entry/Sense mode before this probe. The probe used the canonical
+`nhk.capture.ingest` entry point with a Human/Chat description centered on
+the collector term `côn hoa thị`.
+
+INTERPRETATION: Shared interpretation correctly marked `côn hoa thị` as a
+qualified resolver-eligible lexical span and produced Dictionary delta
+candidates. It also recognized/reused existing Junghans and wall-clock
+canonical context while leaving unresolved wording such as GustavBecker-related
+text in review state. Weak fragments such as generic/adjectival prose were
+classified observation-only rather than promoted as resolver-eligible terms.
+
+BLOCKER: The `KNOWLEDGE_DELTA` Capture
+`01a10584-4a23-7373-8b95-514b41b44bd8` stopped at
+`SUBJECT_CONFLICT_REVIEW_REQUIRED`. The runtime proposed existing Brand
+Junghans `333e62c4-62ad-4b9b-a75f-e8e8ff6a73b2` as the primary subject, but
+the attempted subject continuation returned
+`CAPTURE_SUBJECT_RECONCILIATION_INTENT_NOT_SUPPORTED`.
+
+READ-BACK: Dictionary Candidate queues for `NEEDS_REVIEW` and `DETECTED`
+remained unchanged after the blocked Capture; therefore the qualified lexical
+observation was not durably persisted as a new Candidate. No Authority,
+Knowledge, Graph, Media, Video or Article owner was created by this probe.
+
+LAW / REQUIRED FIX: Human/Chat lexical persistence is an independent bounded
+Dictionary concern. A downstream semantic-subject gate may block Knowledge or
+Relation mutation but must not discard an otherwise valid lexical observation.
+The target behavior is
+`CHAT → lexical filter → resolve/reuse → private Candidate/Mention provenance`
+without inventing a semantic owner and without auto-approval. Replay must be
+idempotent; generated/derived wording must not inflate independent occurrence
+counts.
+
+EDITORIAL ENRICHMENT LAW: Future Article/Media/Video/chat enrichment uses
+`eligible Knowledge → Dictionary Sense/Form → bounded keyword/query intent →
+natural register-aware prose`. Dictionary owns language, Knowledge owns facts,
+Graph discovers context, keywords guide retrieval/SEO and Writer owns prose.
+The reverse direction is forbidden: keyword frequency, Dictionary definitions,
+Graph reachability and generated prose do not manufacture factual truth.
+
+STATUS: `LEXICAL_INTERPRETATION_PASS / DURABLE_CHAT_CANDIDATE_PERSISTENCE_GAP /
+SEMANTIC_OWNER_NOT_MINTED / LAW_DOCUMENTED / IMPLEMENTATION_FIX_PENDING`.
+
 ## Checkpoint — 2026-10-04 — Dictionary Issue #29 code-side completion (REMOTE MAIN / NO NEW DATA MUTATION)
 
 REMOTE MAIN: Issue #29 implementation and Controller review rounds 1–2 are now

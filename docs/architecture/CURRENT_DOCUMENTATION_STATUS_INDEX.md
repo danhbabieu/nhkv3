@@ -98,6 +98,28 @@ sense filtering, Knowledge destination completeness, and governed Dictionary
 Media binding writes remain incomplete. The enrichment audit/plan/apply
 capabilities are current; their live enrichment state is not yet applied.
 
+## 0.0.5 Conversational lexical capture and editorial enrichment law — 2026-10-04
+
+The ACTIVE Universal Intake and Dictionary contracts now make Human/Chat a
+first-class lexical source and separate two gates: lexical observation
+persistence versus semantic truth mutation. A qualified lexical span may be
+reused or persisted as a private Candidate even when a downstream
+Knowledge/Authority/Relation subject remains unresolved. That independence does
+not approve the term or create semantic truth.
+
+The same contracts now define the editorial bridge:
+`Knowledge → Dictionary Sense/Form → keyword/query intent → natural wording`.
+Knowledge owns facts; Dictionary owns controlled language; keywords guide
+retrieval/SEO; Graph supplies bounded discovery; Writer owns prose. Keyword
+frequency, Dictionary wording and generated text cannot manufacture Claims,
+Evidence, identity or relations.
+
+The 2026-10-04 staging/runtime chat probe exposed an implementation gap:
+lexical candidates were interpreted correctly but a `KNOWLEDGE_DELTA`
+subject-review gate prevented durable Candidate persistence. Treat this as a
+runtime gap to close, not as permission to discard lexical observations. Exact
+receipt is recorded in `V3_EXECUTION_STATE.md`.
+
 ## 0.1 Governed Conversational Authority — 2026-09-11
 
 The current Capture boundary now has typed purposes `EDITORIAL`, `AUTHORITY`

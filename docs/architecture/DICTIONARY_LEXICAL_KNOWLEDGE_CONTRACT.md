@@ -1,6 +1,6 @@
 # NHK V3 Dictionary Lexical Knowledge Contract
 
-> **APPROVED SUBORDINATE CONTRACT — updated 2026-09-29.**
+> **APPROVED SUBORDINATE CONTRACT — updated 2026-10-04.**
 > This contract is subordinate to `docs/constitution/NHK_V3_CONSTITUTION.md`.
 > It introduces a bounded lexical/curation layer. It does **not** create a new
 > Authority entity type, Graph predicate, semantic evidence source, Article body
@@ -260,6 +260,57 @@ provenance store. A missing unresolved concept is represented as `NULL`; the
 all-zero UUID is treated as a legacy/null sentinel on read and is never a valid
 Dictionary owner.
 
+### Human/Chat lexical persistence law — 2026-10-04
+
+Human/Chat is a first-class lexical observation source. A valid term observed in
+conversation must not depend on a successful Knowledge/Authority/Relation
+mutation merely to become durable private lexical review state.
+
+The required behavior is:
+
+```text
+Chat text
+  → shared lexical-quality filter
+  → exact/applicable Dictionary resolution
+  → REUSE existing Entry/Sense/Form when unique
+  → otherwise private Candidate upsert
+  → source provenance / Mention when a durable source binding is available
+```
+
+A semantic owner may remain unresolved. In particular,
+`SUBJECT_CONFLICT_REVIEW_REQUIRED` on a Knowledge path must not, by itself,
+discard a qualified Dictionary observation. The lexical path is allowed to
+converge independently because Candidate/Mention are lexical provenance, not
+semantic truth.
+
+Persistence remains fail-closed and bounded:
+
+- Candidate upsert is idempotent by normalized term plus bounded context/source
+  fingerprint and accumulates observed raw forms without duplicate occurrences;
+- the original user wording is preserved even when lookup uses a corrected,
+  normalized or alternate form;
+- typo/ASR correction is a lookup suggestion, never silent semantic identity;
+- known Forms reuse the existing Sense rather than creating a duplicate;
+- ambiguous or unknown proper names stay private lexical review state and never
+  create Authority automatically;
+- no public approval, semantic reference, Knowledge claim, Evidence, Graph
+  relation or public URL follows merely from conversational frequency.
+
+If the runtime cannot bind a Mention to a durable source without inventing an
+owner, it may persist the Candidate with Capture/source provenance and defer the
+Mention. It must not create a fake Article or Knowledge record simply to host a
+lexical occurrence.
+
+**CURRENT RUNTIME GAP (2026-10-04):** a live Human/Chat acceptance probe
+identified qualified Dictionary delta candidates such as `côn hoa thị` and
+reused existing Junghans / wall-clock identities, but the
+`KNOWLEDGE_DELTA` Capture stopped at `SUBJECT_CONFLICT_REVIEW_REQUIRED`.
+The attempted subject continuation returned
+`CAPTURE_SUBJECT_RECONCILIATION_INTENT_NOT_SUPPORTED`, and no durable
+Dictionary Candidate was added. This is an implementation gap against the law
+above, not desired behavior. See `V3_EXECUTION_STATE.md` for the runtime
+receipt.
+
 ## 4. Resolution order
 
 For every detected normalized term, the resolver executes in this order:
@@ -394,6 +445,40 @@ Evidence requirements.
 A public dictionary page may point readers to existing Knowledge, but it must
 not copy a Knowledge claim into lexical storage and then present the copied text
 as an independently sourced fact.
+
+## 9.1 Dictionary as the lexical bridge for enrichment and writing
+
+Dictionary provides the controlled language layer between canonical semantic
+truth and natural editorial wording. It does not become the truth owner.
+
+For Article, Media, Video and conversational enrichment:
+
+```text
+eligible Knowledge Claim
+  → concept expressed by the Claim
+  → Dictionary Sense
+  → accepted Forms / register
+  → bounded keyword/query variants
+  → natural reader-facing wording
+```
+
+The bridge is bidirectional for lookup but one-way for truth. Reader wording,
+search keywords, colloquial labels and technical labels can help resolve a
+Sense and find the canonical owner; they cannot create a Claim. A Dictionary
+definition may explain lexical meaning, but factual statements still come from
+the owning Knowledge/Authority boundaries with their scope/provenance/evidence.
+
+Writers may use preferred, alternate, colloquial or technical Forms only when
+they resolve to the same applicable Sense. Register selection should make prose
+natural for the audience rather than mechanically repeating one exact keyword.
+Unknown or review-pending Forms may be quoted as user/community wording with
+clear lineage when editorially useful, but they are not presented as approved
+canonical terminology.
+
+Keyword clustering must therefore be Sense-aware: variants that resolve to one
+Sense can support one reader intent cluster, while identical strings that
+resolve to different Senses remain separated. Keyword popularity or frequency
+never merges Senses, creates semantic references or overrides ambiguity.
 
 ## 10. Media/Image integration
 
