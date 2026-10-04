@@ -142,13 +142,16 @@ final class MediaBatchUploadService
         $media = is_array($item['media'] ?? null) ? $item['media'] : (is_array($item['media_context'] ?? null) ? $item['media_context'] : []);
         $explicit = trim((string) ($media['title'] ?? $item['title'] ?? ''));
         if ($explicit !== '') return $explicit;
+        $itemDescription = trim((string) ($media['description'] ?? $item['description'] ?? ''));
+        if ($itemDescription !== '') return $itemDescription;
         if (isset($orderedDescriptions[$index])) return $orderedDescriptions[$index];
         if ($count === 1) {
             $singleContext = trim((string) ($metadata['description'] ?? ''));
             if ($singleContext !== '') return $singleContext;
         }
+        if (strtolower(trim((string) ($metadata['source'] ?? ''))) === 'chatgpt_widget') return '';
         // Batch context is never a semantic title. Keep an honest, item-scoped
-        // filename stem until an operator supplies a title.
+        // filename stem only for non-widget compatibility callers.
         $filename = trim((string) ($item['filename'] ?? ''));
         if ($filename === '') return '';
         $stem = trim((string) pathinfo($filename, PATHINFO_FILENAME));

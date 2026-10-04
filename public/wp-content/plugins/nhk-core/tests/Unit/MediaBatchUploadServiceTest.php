@@ -152,7 +152,7 @@ final class MediaBatchUploadServiceTest extends TestCase
         @unlink($first['tmp_name']); @unlink($second['tmp_name']);
     }
 
-    public function test_ambiguous_batch_context_keeps_original_filename_stem_without_fake_title(): void
+    public function test_widget_upload_cannot_use_a_camera_filename_as_a_semantic_title(): void
     {
         $file = $this->file('IMG_0001.jpg', 'bytes');
         $titles = [];
@@ -167,12 +167,70 @@ final class MediaBatchUploadServiceTest extends TestCase
         };
 
         try {
-            $result = (new MediaBatchUploadService($ingestor, $repository))->upload('missing-context', [], ['files' => [$file]]);
-            self::assertSame(1, $result['succeeded']);
-            self::assertSame('IMG_0001', $titles[0] ?? '');
-            self::assertTrue($result['items'][0]['metadata_pending_title']);
+            $result = (new MediaBatchUploadService($ingestor, $repository))->upload('missing-context', ['source' => 'chatgpt_widget'], ['files' => [$file]]);
+            self::assertSame(0, $result['succeeded']);
+            self::assertSame('TRUSTWORTHY_FILENAME_CONTEXT_REQUIRED', $result['errors'][0]['code']);
+            self::assertSame([], $titles);
         } finally {
             @unlink($file['tmp_name']);
+        }
+    }
+
+    public function test_widget_upload_preserves_explicit_name_and_physical_filename_provenance(): void
+    {
+        $file = $this->file('IMG_5917.jpeg', 'bytes');
+        $captured = [];
+        $ingestor = new class($captured) implements WordPressMediaAttachmentIngestor {
+            public function __construct(private array &$captured) {}
+            public function ingest(array $file, string $filename, string $title, int $maxWidth, int $maxHeight, int $quality): array
+            {
+                $this->captured = [$filename, $title];
+                return ['attachment_id' => 1, 'canonical_url' => '/anh/bo-con-hoa-thi.webp', 'filename' => 'bo-con-hoa-thi.webp', 'original_filename' => $filename, 'mime' => 'image/webp', 'filesize' => 5, 'width' => 1, 'height' => 1];
+            }
+            public function read(int $attachmentId): ?array { return ['attachment_id' => $attachmentId]; }
+        };
+        $repository = new class implements MediaBatchUploadRepository {
+            public function find(string $idempotencyKey): ?array { return null; }
+            public function save(string $idempotencyKey, array $record): void {}
+        };
+
+        try {
+            $result = (new MediaBatchUploadService($ingestor, $repository))->upload(
+                'explicit-widget-name',
+                ['source' => 'chatgpt_widget'],
+                ['files' => [$file]],
+                [['media' => ['title' => 'Bộ côn hoa thị trên đồng hồ treo tường Junghans']]],
+            );
+            self::assertSame(['IMG_5917.jpeg', 'Bộ côn hoa thị trên đồng hồ treo tường Junghans'], $captured);
+            self::assertSame('IMG_5917.jpeg', $result['items'][0]['original_filename']);
+            self::assertNotSame('img-5917.webp', $result['items'][0]['filename']);
+        } finally {
+            @unlink($file['tmp_name']);
+        }
+    }
+
+    public function test_widget_batch_requires_explicit_name_or_ordered_context_for_every_image(): void
+    {
+        $files = [$this->file('IMG_0001.jpg', 'one'), $this->file('IMG_0002.jpg', 'two')];
+        $ingestor = new class implements WordPressMediaAttachmentIngestor {
+            public function ingest(array $file, string $filename, string $title, int $maxWidth, int $maxHeight, int $quality): array { return ['attachment_id' => 1, 'canonical_url' => '/anh/anh-truoc.webp', 'filename' => 'anh-truoc.webp', 'original_filename' => $filename, 'mime' => 'image/webp', 'filesize' => 3, 'width' => 1, 'height' => 1]; }
+            public function read(int $attachmentId): ?array { return ['attachment_id' => $attachmentId]; }
+        };
+        $repository = new class implements MediaBatchUploadRepository {
+            public function find(string $idempotencyKey): ?array { return null; }
+            public function save(string $idempotencyKey, array $record): void {}
+        };
+
+        try {
+            $result = (new MediaBatchUploadService($ingestor, $repository))->upload('widget-batch-names', ['source' => 'chatgpt_widget'], ['files' => $files], [
+                ['media' => ['title' => 'Ảnh trước']],
+                [],
+            ]);
+            self::assertSame(1, $result['succeeded']);
+            self::assertSame(1, $result['failed']);
+            self::assertSame('TRUSTWORTHY_FILENAME_CONTEXT_REQUIRED', $result['errors'][0]['code']);
+        } finally {
+            foreach ($files as $file) @unlink($file['tmp_name']);
         }
     }
 

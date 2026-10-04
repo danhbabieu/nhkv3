@@ -12099,7 +12099,7 @@ function normalizeSelectedFiles(value) {
     if (typeof reference.fileId !== "string" || reference.fileId === "") return [];
     if (typeof reference.fileName !== "string" || reference.fileName === "") return [];
     if (typeof reference.mimeType !== "string" || reference.mimeType === "") return [];
-    return [{ kind: "library", clientFileId: reference.fileId, fileId: reference.fileId, fileName: reference.fileName, mimeType: reference.mimeType, name: reference.fileName, feature: "" }];
+    return [{ kind: "library", clientFileId: reference.fileId, fileId: reference.fileId, fileName: reference.fileName, mimeType: reference.mimeType, name: "", feature: "" }];
   });
 }
 function splitFeatureRequests(value) {
@@ -12661,8 +12661,13 @@ async function start() {
       previews.append(figure);
     });
     summary.textContent = selected.length ? `${selected.length} ảnh đã chọn.` : "Chưa chọn ảnh.";
-    const disabled = !connected || uploading || selected.length === 0 || !supportsFileUpload();
-    upload.disabled = disabled;
+    updateUploadState();
+  }
+  function updateUploadState() {
+    const hasUnnamedImage = selected.some((item) => item.name.trim() === "");
+    const namingNotice = document.getElementById("name-requirement");
+    if (namingNotice) namingNotice.hidden = !hasUnnamedImage;
+    upload.disabled = !connected || uploading || selected.length === 0 || hasUnnamedImage || !supportsFileUpload();
   }
   function renderUploads(items) {
     results.replaceChildren();
@@ -12837,7 +12842,7 @@ async function start() {
     const namingContext = context.value.trim();
     uploading = true;
     enrichmentStatus = "PENDING";
-    renderSelection();
+    updateUploadState();
     setState("UPLOADING", "Đang chuẩn bị bài viết từ Media đã tải…");
     const operationKey = retryOperationKey ?? createIdempotencyKey();
     submissionId = operationKey;
@@ -12971,7 +12976,7 @@ async function start() {
     enrichmentStatus = "NOT_RUN";
     retryOperationKey = null;
     retryAttempt = 0;
-    selected = asFiles(input.files).filter((file) => IMAGE_TYPES.test(file.type)).map((file) => ({ kind: "local", clientFileId: `${file.name}:${file.size}:${file.lastModified}`, file, name: file.name, feature: "" }));
+    selected = asFiles(input.files).filter((file) => IMAGE_TYPES.test(file.type)).map((file) => ({ kind: "local", clientFileId: `${file.name}:${file.size}:${file.lastModified}`, file, name: "", feature: "" }));
     recordDiagnostic("FILE_SELECTED", "DONE", "LOCAL_FILE_SELECTED");
     recordDiagnostic("FILE_PREVIEW_READY", "DONE", "LOCAL_FILE_PREVIEW_READY");
     renderSelection();
@@ -13000,6 +13005,7 @@ async function start() {
     if (!item || !target.dataset.field) return;
     if (target.dataset.field === "name") item.name = target.value;
     if (target.dataset.field === "feature") item.feature = target.value;
+    updateUploadState();
   });
   previews.addEventListener("click", (event) => {
     const target = event.target;
@@ -13041,6 +13047,7 @@ else void boot();</script>
       <button id="select" type="button" hidden disabled>Chọn ảnh từ thư viện ChatGPT</button>
       <button id="upload" type="button" disabled>TẢI LÊN</button>
     </div>
+    <p id="name-requirement" class="failure" hidden>Mỗi ảnh cần một tên mô tả trước khi tải lên. Tên tệp vật lý chỉ là thông tin nguồn.</p>
     <label for="description">Mô tả chung</label>
     <textarea id="description" maxlength="20000" placeholder="Mô tả chung cho toàn bộ ảnh…"></textarea>
     <div id="summary" aria-live="polite">Chưa chọn ảnh.</div>

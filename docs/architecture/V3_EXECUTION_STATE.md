@@ -22528,3 +22528,23 @@ schema migration or data mutation was performed. Runtime acceptance remains
 pending; no deployment or push occurred.
 
 STATUS: `CAPTURE_VIDEO_REUSE_AND_PARTIAL_RETRY_FIXED / DICTIONARY_AUDIT_PROVIDER_CONSISTENT / RUNTIME_ACCEPTANCE_PENDING / NO_DATA_MUTATION`.
+
+# Checkpoint — 2026-10-04 — Widget image naming fail-closed repair (LOCAL / NO MUTATION)
+
+IMPLEMENTED: The image widget now starts local and ChatGPT-library semantic
+names empty, keeps physical filenames as provenance display, blocks `TẢI LÊN`
+until every selected image has a descriptive name, and re-evaluates that gate
+on name edits. `MediaBatchUploadService` no longer derives a filename stem for
+`chatgpt_widget`; explicit titles, per-image descriptions, ordered descriptions
+and permitted single-image context remain accepted, otherwise the item fails
+with `TRUSTWORTHY_FILENAME_CONTEXT_REQUIRED`.
+
+REGRESSION: Camera filenames cannot become semantic titles; explicit names are
+passed through to attachment ingestion while `original_filename` remains the
+physical filename; widget batches require naming context per image; idempotent
+replay and descriptive WebP filename coverage remain green.
+
+VALIDATION: Focused Media/widget/filename suite passed 27 tests / 135
+assertions. No schema, migration, database/data mutation, deployment or push.
+
+STATUS: `MEDIA_WIDGET_FILENAME_FALLBACK_FIXED / LOCAL_VERIFICATION_PENDING_COMMIT / NO_DATA_MUTATION`.
