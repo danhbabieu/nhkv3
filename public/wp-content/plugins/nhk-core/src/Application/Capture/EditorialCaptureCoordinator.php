@@ -708,6 +708,41 @@ final class EditorialCaptureCoordinator
                 $semanticContext['shared_enrichment'] = $sharedEnrichment;
                 $diagnostics['shared_enrichment'] = $this->sharedEnrichmentSummary($sharedEnrichment);
             }
+            // Capture aggregates the existing owner packets at this boundary.
+            // The envelope is orchestration/provenance only; owner planners,
+            // Governance and canonical repositories remain authoritative.
+            $planningEnvelope = CaptureEnrichmentPlanningEnvelope::fromState(
+                $record->captureId,
+                $record->requestFingerprint,
+                $input,
+                $interpretation,
+                $assets,
+                $diagnostics,
+                $receipts,
+            );
+            $planningEnvelopeArray = $planningEnvelope->toArray();
+            $diagnostics['enrichment_planning_envelope'] = [
+                'version' => $planningEnvelope->version,
+                'fingerprint' => $planningEnvelope->fingerprint(),
+                'completion_state' => $planningEnvelope->completionState,
+                'owner_statuses' => array_map(static fn (array $track): string => (string) ($track['status'] ?? ''), $planningEnvelope->ownerTracks),
+            ];
+            $record = $this->save(
+                $record,
+                $record->stage,
+                $assets,
+                $diagnostics,
+                $receipts,
+                'ENRICHMENT_PLANNING_ENVELOPE',
+                $record->articleId,
+                $record->articleStateToken,
+                $record->status,
+                null,
+                $record->context + ['enrichment_planning_envelope' => $planningEnvelopeArray],
+            );
+            $assets = $record->assets;
+            $diagnostics = $record->diagnostics;
+            $receipts = $record->phaseReceipts;
             $isMediaEnrichment = strtoupper(trim((string) ($intent['intent'] ?? ''))) === 'MEDIA_ENRICHMENT';
             if ($isMediaEnrichment) {
                 // MEDIA_ENRICHMENT owns Media and MediaUsage only. Do not

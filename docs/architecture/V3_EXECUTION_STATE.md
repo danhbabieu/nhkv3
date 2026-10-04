@@ -1,5 +1,19 @@
 # NHK V3 Execution State
 
+## Checkpoint — 2026-10-04 — Capture enrichment planning envelope and dependency-aware partial retry (LOCAL / NO DATA MUTATION)
+
+IMPLEMENTED: Added the Capture-scoped versioned `CaptureEnrichmentPlanningEnvelope` as an orchestration/provenance aggregate over existing Capture context, interpretation, assets, phase receipts and owner diagnostics. The envelope carries deterministic request/interpretation/plan/dependency fingerprints, selected candidates, dependency closure, review/blocker diagnostics, apply/read-back receipts and completion state without becoming a semantic owner or duplicating owner payloads. The coordinator persists the envelope through its existing Capture CAS/context boundary.
+
+IMPLEMENTED: Added `CaptureOwnerOutcome` to normalize owner-specific domain results into the common orchestration vocabulary (`NOT_APPLICABLE`, `PLANNED`, `REVIEW_REQUIRED`, `BLOCKED`, `READY`, `APPLIED`, `READ_BACK_VERIFIED`, `FAILED_RETRYABLE`, `FAILED_FINAL`) while retaining each domain's original status. Added `CaptureOwnerDag` with cycle rejection, dependency-blocked downstream status, revision-stale `REPLAN_REQUIRED` detection and partial retry selection; completed owner outcomes are not replayed.
+
+REGRESSION COVERAGE: Added source-agnostic text/image/video/mixed envelope tests, deterministic fingerprint binding, owner outcome normalization, lexical-success/authority-blocked partial semantics, changed dependency revision replan, cycle rejection and existing Capture convergence/shared-enrichment regressions.
+
+VERIFICATION: Focused Capture/semantic/enrichment matrix passes 93 tests / 454 assertions with 4 PHPUnit deprecations. Full Unit suite at PHP 512M completes 3,040 tests / 18,274 assertions with 1 pre-existing WPDB receipt TypeError and 9 pre-existing unrelated Knowledge/MCP/Media/remote-deployment failures; no failure is in the changed Capture planning files. Changed PHP files lint clean and `git diff --check` passes.
+
+DESIGN BOUNDARIES: No migration, schema change, semantic owner, Dictionary Graph endpoint, Dictionary→MediaUsage binding, direct writer, staging/live mutation, deployment or push was performed. Article/Media/Video/Dictionary/Knowledge/Graph/Governance owner lifecycles remain delegated to their existing planners and canonical read-back boundaries.
+
+STATUS: `CAPTURE_ENRICHMENT_ORCHESTRATION_ENVELOPE_LOCAL / PARTIAL_RETRY_DAG_GREEN / FULL_UNIT_BASELINE_FAILURES_UNRELATED / NO_DATA_MUTATION / COMMIT_PENDING`
+
 ## Checkpoint — 2026-10-04 — Dictionary enrichment sequential CAS and validation parity (LOCAL / NO DATA MUTATION)
 
 ROOT_CAUSE: `enrichmentApply()` reused the original Entry revision for every
