@@ -123,6 +123,36 @@ final class DictionaryMutationContractTest extends TestCase
         $service->addFormToEntry('22222222-2222-7222-8222-222222222222', 1, 'CÔN', ['normalized_form' => 'con'], 'form-1');
     }
 
+    public function test_entry_form_mutation_preserves_requested_locale_for_all_supported_form_locales(): void
+    {
+        $repo = new class implements DictionaryConceptRepository {
+            public function findById(string $conceptId): ?DictionaryConcept { return new DictionaryConcept($conceptId, 'Côn', 'Nghĩa', DictionaryConcept::DRAFT); }
+            public function findApprovedByNormalizedLabel(string $normalizedLabel, array $context = []): array { return []; }
+            public function listApproved(int $limit = 500): array { return []; }
+            public function listLabels(string $conceptId, bool $includeInactive = false): array { return []; }
+            public function createConcept(DictionaryConcept $concept): DictionaryConcept { return $concept; }
+            public function updateConcept(DictionaryConcept $concept, int $expectedRevision): DictionaryConcept { return $concept; }
+            public function addLabel(DictionaryLabel $label): DictionaryLabel { return $label; }
+            public function saveLabel(DictionaryLabel $label, string $previousNormalizedLabel, int $expectedConceptRevision): DictionaryLabel { return $label; }
+        };
+        $entries = new class {
+            public array $forms = [];
+            public function findById(string $id): LexicalEntry { return new LexicalEntry($id, 'Côn', 'con', DictionaryConcept::DRAFT, 'vi-VN', [], 1); }
+            public function addFormToEntry(string $id, int $revision, LexicalEntryForm $form): array
+            {
+                $this->forms[] = $form;
+                return ['entry' => new LexicalEntry($id, 'Côn', 'con', DictionaryConcept::DRAFT, 'vi-VN', [], $revision + 1), 'form' => $form];
+            }
+        };
+        $service = new DictionaryMutationService($repo, entryRepository: $entries);
+
+        foreach ([['Selection cam', 'en'], ['Jaquemart', 'fr'], ['Jahresuhr/400', 'de'], ['400 ngày', 'vi-VN']] as [$form, $locale]) {
+            $service->addFormToEntry('entry-' . $locale, 1, $form, [], 'form-' . $locale, LexicalEntryForm::ALTERNATE, $locale);
+        }
+
+        self::assertSame(['en', 'fr', 'de', 'vi-VN'], array_map(static fn (LexicalEntryForm $form): ?string => $form->locale, $entries->forms));
+    }
+
     public function test_entry_form_rejects_unsupported_kind_before_repository_write(): void
     {
         $repo = new class implements DictionaryConceptRepository {

@@ -1,5 +1,34 @@
 # NHK V3 Execution State
 
+## Checkpoint — 2026-10-04 — Dictionary mixed-plan lexical closure (LOCAL / NO DATA MUTATION)
+
+ROOT_CAUSE: `enrichmentApply()` rejected the entire deterministic plan when its
+top-level status was `REVIEW_REQUIRED`, even when independent
+`ADD_ENTRY_FORM` actions were `READY` and `LEXICAL_ONLY`. The direct form MCP
+handler also omitted its optional locale argument; enrichment planning did not
+carry bounded form/sense context into the governed mutation.
+
+IMPLEMENTATION: The existing `DictionaryEnrichmentApplyCoordinator` now walks
+the exact original action list, applies only `READY` actions through the
+existing CAS/idempotency mutation boundary, and emits explicit applied/noop/
+skipped-review/skipped-blocked/failed receipt items. Top-level `REVIEW_REQUIRED`
+and `BLOCKED` plans remain fingerprint-bound and may execute only their eligible
+subset; review actions are never downgraded or removed. Form actions preserve
+kind, locale and bounded context. The public compatibility handler now forwards
+locale to the already-existing mutation API.
+
+REGRESSION COVERAGE: Added mixed-plan lexical subset/receipt coverage, locale
+propagation for `en`, `fr`, `de` and `vi-VN`, and governed mutation read-back
+fixtures. Existing same-Entry sequential CAS, replay and external stale
+revision tests remain covered.
+
+VERIFICATION: Changed PHP files lint clean; `git diff --check` passes. The
+worktree has no PHPUnit binary/vendor installation, so PHPUnit execution is
+pending in the project test environment. No materialization, migration, raw
+SQL, semantic-owner mutation, staging mutation, deployment or push was run.
+
+STATUS: `DICTIONARY_MIXED_PLAN_LEXICAL_CLOSURE_LOCAL / PHP_LINT_GREEN / PHPUNIT_UNAVAILABLE / NO_DATA_MUTATION / COMMIT_PENDING`
+
 ## Checkpoint — 2026-10-04 — Capture enrichment planning envelope and dependency-aware partial retry (LOCAL / NO DATA MUTATION)
 
 IMPLEMENTED: Added the Capture-scoped versioned `CaptureEnrichmentPlanningEnvelope` as an orchestration/provenance aggregate over existing Capture context, interpretation, assets, phase receipts and owner diagnostics. The envelope carries deterministic request/interpretation/plan/dependency fingerprints, selected candidates, dependency closure, review/blocker diagnostics, apply/read-back receipts and completion state without becoming a semantic owner or duplicating owner payloads. The coordinator persists the envelope through its existing Capture CAS/context boundary.

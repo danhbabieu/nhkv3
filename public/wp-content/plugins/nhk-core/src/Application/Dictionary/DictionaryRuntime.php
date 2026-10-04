@@ -347,13 +347,13 @@ final class DictionaryRuntime
         $expected = trim((string) ($input['approved_plan_fingerprint'] ?? ''));
         $fingerprint = (new DictionaryEnrichmentPlan($this->entries, new DictionaryEnrichmentOwnerResolver()))->fingerprint((array) ($plan['actions'] ?? []));
         if ($expected === '' || !hash_equals($fingerprint, $expected) || ($plan['fingerprint'] ?? '') !== $expected) return ['status' => 'blocked', 'reason' => 'DICTIONARY_ENRICHMENT_PLAN_FINGERPRINT_INVALID', 'read_only' => false, 'mutated' => false];
-        if (($plan['status'] ?? '') !== 'READY') return ['status' => 'blocked', 'reason' => 'DICTIONARY_ENRICHMENT_PLAN_NOT_READY', 'read_only' => false, 'mutated' => false];
+        if (!in_array(($plan['status'] ?? ''), ['READY', 'NOOP', 'REVIEW_REQUIRED', 'BLOCKED'], true)) return ['status' => 'blocked', 'reason' => 'DICTIONARY_ENRICHMENT_PLAN_STATUS_INVALID', 'read_only' => false, 'mutated' => false];
         $idempotency = trim((string) ($input['idempotency_key'] ?? ''));
         if ($idempotency === '') throw new \InvalidArgumentException('DICTIONARY_IDEMPOTENCY_KEY_REQUIRED');
         $coordinator = new DictionaryEnrichmentApplyCoordinator(
             function (array $action, int $revision, string $key) use ($expected): array {
                 return match ($action['action_type'] ?? '') {
-                    'ADD_ENTRY_FORM' => $this->mutation()->addFormToEntry((string) $action['entry_id'], $revision, (string) $action['form'], ['enrichment_plan' => $expected], $key, (string) ($action['kind'] ?? 'ALTERNATE'), isset($action['locale']) ? (string) $action['locale'] : null),
+                    'ADD_ENTRY_FORM' => $this->mutation()->addFormToEntry((string) $action['entry_id'], $revision, (string) $action['form'], (array) ($action['context'] ?? []) + ['enrichment_plan' => $expected], $key, (string) ($action['kind'] ?? 'ALTERNATE'), isset($action['locale']) ? (string) $action['locale'] : null),
                     'SET_SEMANTIC_REFERENCE' => $this->mutation()->setSenseSemanticReference((string) $action['entry_id'], (string) $action['sense_id'], $revision, (string) ($action['target']['type'] ?? ''), (string) ($action['target']['id'] ?? ''), isset($action['target']['revision']) ? (int) $action['target']['revision'] : null, $key),
                     default => ['status' => 'NOOP'],
                 };

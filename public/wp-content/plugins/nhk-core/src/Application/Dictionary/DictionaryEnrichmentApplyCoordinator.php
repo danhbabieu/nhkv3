@@ -23,9 +23,32 @@ final class DictionaryEnrichmentApplyCoordinator
     {
         $items = [];
         $entryRevisions = [];
+        $appliedCount = 0;
         $readyCount = 0;
+        $noopCount = 0;
+        $skippedReviewRequiredCount = 0;
+        $skippedBlockedCount = 0;
+        $failedCount = 0;
         foreach ($actions as $index => $action) {
-            if (($action['status'] ?? '') !== 'READY') continue;
+            $actionStatus = strtoupper((string) ($action['status'] ?? ''));
+            if ($actionStatus !== 'READY') {
+                $receiptStatus = match ($actionStatus) {
+                    'NOOP' => 'noop',
+                    'REVIEW_REQUIRED' => 'skipped_review_required',
+                    'BLOCKED' => 'skipped_blocked',
+                    default => 'skipped',
+                };
+                if ($receiptStatus === 'noop') $noopCount++;
+                if ($receiptStatus === 'skipped_review_required') $skippedReviewRequiredCount++;
+                if ($receiptStatus === 'skipped_blocked') $skippedBlockedCount++;
+                $items[] = [
+                    'status' => $receiptStatus,
+                    'action_index' => $index,
+                    'action_type' => (string) ($action['action_type'] ?? ''),
+                    'idempotency_key' => $idempotencyKey . ':' . $index,
+                ];
+                continue;
+            }
             $readyCount++;
             $entryId = trim((string) ($action['entry_id'] ?? ''));
             $key = $idempotencyKey . ':' . $index;
@@ -43,20 +66,45 @@ final class DictionaryEnrichmentApplyCoordinator
                     if (!is_array($result)) throw new \RuntimeException('DICTIONARY_ENTRY_READBACK_FAILED');
                     if (is_callable($this->writeReceipt)) ($this->writeReceipt)($key, $result);
                 }
-                $items[] = $result + ['action_index' => $index, 'idempotency_key' => $key];
+                $appliedCount++;
+                $items[] = $result + ['status' => 'applied', 'action_index' => $index, 'idempotency_key' => $key];
                 if (isset($result['entry_revision']) && is_int($result['entry_revision'])) $entryRevisions[$entryId] = $result['entry_revision'];
                 elseif (is_callable($this->readRevision)) $entryRevisions[$entryId] = (int) ($this->readRevision)($entryId);
             } catch (\Throwable $e) {
+                $hadPriorItems = $items !== [];
+                $failedCount++;
+                $items[] = [
+                    'status' => 'failed',
+                    'action_index' => $index,
+                    'action_type' => (string) ($action['action_type'] ?? ''),
+                    'idempotency_key' => $key,
+                    'error' => ['code' => $e->getMessage()],
+                ];
                 return [
-                    'status' => $items === [] ? 'blocked' : 'partial',
-                    'applied_count' => count($items),
+                    'status' => $hadPriorItems ? 'partial' : 'blocked',
+                    'applied_count' => $appliedCount,
                     'ready_count' => $readyCount,
+                    'noop_count' => $noopCount,
+                    'skipped_review_required_count' => $skippedReviewRequiredCount,
+                    'skipped_blocked_count' => $skippedBlockedCount,
+                    'failed_count' => $failedCount,
                     'items' => $items,
                     'entry_revisions' => $entryRevisions,
                     'error' => ['code' => $e->getMessage(), 'action_index' => $index, 'idempotency_key' => $key],
                 ];
             }
         }
-        return ['status' => 'applied', 'applied_count' => count($items), 'ready_count' => $readyCount, 'items' => $items, 'entry_revisions' => $entryRevisions];
+        $status = $appliedCount === 0 ? 'noop' : (($skippedReviewRequiredCount + $skippedBlockedCount) > 0 ? 'partial' : 'applied');
+        return [
+            'status' => $status,
+            'applied_count' => $appliedCount,
+            'ready_count' => $readyCount,
+            'noop_count' => $noopCount,
+            'skipped_review_required_count' => $skippedReviewRequiredCount,
+            'skipped_blocked_count' => $skippedBlockedCount,
+            'failed_count' => $failedCount,
+            'items' => $items,
+            'entry_revisions' => $entryRevisions,
+        ];
     }
 }

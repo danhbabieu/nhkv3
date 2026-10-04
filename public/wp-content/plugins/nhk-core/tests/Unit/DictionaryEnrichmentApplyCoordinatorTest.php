@@ -8,6 +8,37 @@ use PHPUnit\Framework\TestCase;
 
 final class DictionaryEnrichmentApplyCoordinatorTest extends TestCase
 {
+    public function test_mixed_plan_applies_lexical_ready_actions_and_receipts_noneligible_actions(): void
+    {
+        $revision = 1;
+        $calls = [];
+        $coordinator = new DictionaryEnrichmentApplyCoordinator(
+            static function (array $action, int $currentRevision, string $key) use (&$calls, &$revision): array {
+                $calls[] = [$action['action_type'], $currentRevision, $key];
+                return ['entry_revision' => ++$revision, 'action' => $action['action_type']];
+            },
+            static fn (string $key): ?array => null,
+            static function (string $key, array $result): void {},
+            static function () use (&$revision): int { return $revision; },
+        );
+
+        $result = $coordinator->apply([
+            ['action_type' => 'ADD_ENTRY_FORM', 'status' => 'READY', 'risk' => 'LEXICAL_ONLY', 'entry_id' => 'entry-1', 'current_revision' => 1],
+            ['action_type' => 'ADD_ENTRY_FORM', 'status' => 'READY', 'risk' => 'LEXICAL_ONLY', 'entry_id' => 'entry-1', 'current_revision' => 1],
+            ['action_type' => 'REVIEW_REQUIRED', 'status' => 'REVIEW_REQUIRED', 'risk' => 'SEMANTIC_OWNER', 'entry_id' => 'entry-2'],
+            ['action_type' => 'NOOP', 'status' => 'NOOP', 'entry_id' => 'entry-3'],
+            ['action_type' => 'SET_SEMANTIC_REFERENCE', 'status' => 'BLOCKED', 'risk' => 'SEMANTIC_REFERENCE', 'entry_id' => 'entry-4'],
+        ], 'mixed-plan');
+
+        self::assertSame('partial', $result['status']);
+        self::assertSame(2, $result['applied_count']);
+        self::assertSame(1, $result['noop_count']);
+        self::assertSame(1, $result['skipped_review_required_count']);
+        self::assertSame(1, $result['skipped_blocked_count']);
+        self::assertSame(['ADD_ENTRY_FORM', 'ADD_ENTRY_FORM'], array_column($calls, 0));
+        self::assertSame(['applied', 'applied', 'skipped_review_required', 'noop', 'skipped_blocked'], array_column($result['items'], 'status'));
+    }
+
     public function test_multiple_actions_refresh_revision_after_each_successful_mutation(): void
     {
         $revision = 1;

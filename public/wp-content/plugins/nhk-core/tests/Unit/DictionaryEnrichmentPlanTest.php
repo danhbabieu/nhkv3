@@ -87,4 +87,28 @@ final class DictionaryEnrichmentPlanTest extends TestCase
         self::assertNotEmpty(array_filter($result['actions'], static fn (array $action): bool => ($action['status'] ?? '') === 'BLOCKED'));
         self::assertNotEmpty(array_filter($result['actions'], static fn (array $action): bool => ($action['action_type'] ?? '') === 'SET_SEMANTIC_REFERENCE'));
     }
+
+    public function test_locale_is_preserved_on_each_form_action(): void
+    {
+        $plan = new DictionaryEnrichmentPlan(new class {
+            public function listForms(string $entryId): array { return []; }
+        }, new DictionaryEnrichmentOwnerResolver());
+
+        $result = $plan->build(['items' => [[
+            'entry_id' => 'entry-1', 'sense_id' => 'sense-1', 'current_revision' => 1,
+            'approved_legacy_labels' => [
+                ['label' => 'Selection cam', 'kind' => 'ALTERNATE', 'locale' => 'en', 'source' => 'approved'],
+                ['label' => 'Jaquemart', 'kind' => 'ALTERNATE', 'locale' => 'fr', 'source' => 'approved'],
+                ['label' => 'Jahresuhr/400', 'kind' => 'ALTERNATE', 'locale' => 'de', 'source' => 'approved'],
+                ['label' => '400 ngày', 'kind' => 'ALTERNATE', 'locale' => 'vi-VN', 'source' => 'approved'],
+            ],
+            'owner_resolution' => ['classification' => 'NO_OWNER'],
+        ]]]);
+
+        $locales = [];
+        foreach ($result['actions'] as $action) $locales[$action['form']] = $action['locale'];
+        self::assertSame(['en', 'fr', 'de', 'vi-VN'], [
+            $locales['Selection cam'], $locales['Jaquemart'], $locales['Jahresuhr/400'], $locales['400 ngày'],
+        ]);
+    }
 }
