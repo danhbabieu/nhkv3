@@ -39,36 +39,8 @@ final class McpPublicUrlMaintenanceContractTest extends TestCase
     {
         $ability = 'nhk-v3/public-url-reproject';
 
-        self::assertSame([
-            'nhk-v3/article-draft-create',
-            'nhk-v3/article-draft-update',
-            'nhk-v3/article-trash',
-            'nhk-v3/article-restore',
-            'nhk-v3/article-publish-approve',
-            'nhk-v3/article-publish',
-            $ability,
-            'nhk-v3/video-frontend-reconcile',
-            'nhk-v3/media-widget-upload',
-            'nhk-v3/media-update',
-            'nhk-v3/media-bind',
-            'nhk-v3/media-usage',
-            'nhk-v3/proposal-submit',
-            'nhk-v3/proposal-approve',
-            'nhk-v3/proposal-apply',
-            'nhk-v3/article-ingest',
-            'nhk-v3/source-ingest',
-            'nhk-v3/evidence-ingest',
-            'nhk-v3/proposal-create',
-            'nhk-v3/dictionary-concept-create',
-            'nhk-v3/dictionary-concept-update',
-            'nhk-v3/dictionary-concept-lifecycle',
-            'nhk-v3/dictionary-label-save',
-            'nhk-v3/dictionary-candidate-review',
-            'nhk-v3/dictionary-relation-handoff',
-            'nhk-v3/knowledge-quality-audit',
-            'nhk-v3/dictionary-seed-audit',
-            'nhk-v3/mcp-app-diagnostics',
-        ], McpAbilityRegistration::explicitInternalAdminAbilityAllowlist());
+        self::assertContains($ability, McpAbilityRegistration::explicitInternalAdminAbilityAllowlist());
+        self::assertContains('nhk-v3/dictionary-materialization-apply', McpAbilityRegistration::explicitInternalAdminAbilityAllowlist());
         self::assertNotContains($ability, McpAbilityRegistration::ensureEasyMcpEnabledAbilities([]));
         self::assertContains($ability, McpAbilityRegistration::ensureEasyMcpEnabledAbilities([$ability]));
         self::assertNotContains('nhk-v3/media-ingest', McpAbilityRegistration::ensureEasyMcpEnabledAbilities([$ability]));

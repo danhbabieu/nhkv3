@@ -1,5 +1,27 @@
 # NHK V3 Execution State
 
+## Checkpoint — 2026-10-04 — Dictionary materialization exposure contract locked (LOCAL / NO DATA MUTATION)
+
+ROOT_CAUSE: `McpAbilityRegistration` mapped the three materialization tools, but
+`nhk-v3/dictionary-materialization-apply` was missing from the explicit
+internal/admin Easy MCP allowlist. The catalog, dispatch registry, manifest and
+Single Entry Point policy therefore agreed on the operation while the external
+Ability descriptor surface could omit the apply ability. `profile` and `plan`
+remain public/read-only; `apply` remains internal/admin governed.
+
+IMPLEMENTATION: Added the missing internal/admin allowlist entry only. Added
+contract coverage across catalog, dispatch, manifest, Ability mapping and
+Single Entry Point policy, plus the exact `Côn hoa thị` code-level planner and
+apply fixtures for Concept `01a10626-1317-77fc-9504-5800350cd07b`. No
+materialization logic, API names, Entry/Sense semantics or runtime data changed.
+
+STATUS: `MATERIALIZATION_EXPOSURE_CONTRACT_LOCKED`.
+
+- CODE COMPLETE: exposure contract and regression coverage are implemented locally.
+- LIVE SESSION DISCOVERY NOT YET REVALIDATED: a fresh/new MCP session is still required.
+- NO DATA MUTATION: no live materialization, enrichment apply, Graph, public URL or other semantic write ran.
+- NO DEPLOYMENT: no deployment or runtime restart was performed.
+
 ## Checkpoint — 2026-10-04 — Human/Chat lexical persistence boundary fix (LOCAL / NO DATA MUTATION)
 
 ROOT_CAUSE: `EditorialCaptureCoordinator` persisted the shared interpretation

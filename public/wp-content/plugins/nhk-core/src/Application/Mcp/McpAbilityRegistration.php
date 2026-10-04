@@ -57,6 +57,7 @@ final class McpAbilityRegistration
         'nhk-v3/dictionary-label-save',
         'nhk-v3/dictionary-candidate-review',
         'nhk-v3/dictionary-relation-handoff',
+        'nhk-v3/dictionary-materialization-apply',
         self::MCP_APP_DIAGNOSTICS_ABILITY,
     ];
 

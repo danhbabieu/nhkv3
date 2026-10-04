@@ -12,13 +12,13 @@ final class DictionaryEntryMaterializationServiceTest extends TestCase
 {
     public function test_apply_reuses_existing_concept_and_is_idempotent(): void
     {
-        $concept = new DictionaryConcept('11111111-1111-7111-8111-111111111111', 'Côn', 'Nghĩa', DictionaryConcept::APPROVED, null, null, null, [], 4);
+        $concept = new DictionaryConcept('01a10626-1317-77fc-9504-5800350cd07b', 'Côn hoa thị', 'Nghĩa', DictionaryConcept::APPROVED, null, null, null, [], 4);
         $concepts = new class($concept) implements DictionaryConceptRepository {
             public function __construct(public DictionaryConcept $concept) {}
             public function findById(string $id): ?DictionaryConcept { return $id === $this->concept->conceptId ? $this->concept : null; }
             public function findApprovedByNormalizedLabel(string $n, array $c = []): array { return []; }
             public function listApproved(int $l = 500): array { return [$this->concept]; }
-            public function listLabels(string $id, bool $a = false): array { return [new DictionaryLabel($id, 'Côn', 'côn', DictionaryLabel::PREFERRED)]; }
+            public function listLabels(string $id, bool $a = false): array { return [new DictionaryLabel($id, 'Côn hoa thị', 'côn hoa thị', DictionaryLabel::PREFERRED)]; }
             public function createConcept(DictionaryConcept $c): DictionaryConcept { throw new \LogicException('no concept writes'); }
             public function updateConcept(DictionaryConcept $c, int $r): DictionaryConcept { throw new \LogicException('no concept writes'); }
             public function addLabel(DictionaryLabel $l): DictionaryLabel { throw new \LogicException('no label writes'); }
@@ -47,12 +47,12 @@ final class DictionaryEntryMaterializationServiceTest extends TestCase
         $plan = ['status' => 'READY', 'items' => [[
             'concept_id' => $concept->conceptId,
             'concept_revision' => 4,
-            'preferred_label' => 'Côn',
+            'preferred_label' => 'Côn hoa thị',
             'context' => [],
             'eligibility' => 'READY',
             'classification' => 'UNMAPPED_CONCEPT',
             'proposed_operation' => 'CREATE_ENTRY_AND_MAP_EXISTING_SENSE',
-            'form' => ['text' => 'Côn', 'normalized_form' => 'côn', 'locale' => 'vi-VN'],
+            'form' => ['text' => 'Côn hoa thị', 'normalized_form' => 'côn hoa thị', 'locale' => 'vi-VN'],
         ]]];
         $plan['fingerprint'] = hash('sha256', json_encode($plan, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
 
@@ -62,6 +62,7 @@ final class DictionaryEntryMaterializationServiceTest extends TestCase
         self::assertSame(1, $entries->writes);
         self::assertSame($first, $replay);
         self::assertSame($concept->conceptId, $first['items'][0]['sense_id']);
+        self::assertSame('Côn hoa thị', $first['items'][0]['form']);
         self::assertCount(1, $audits);
     }
 

@@ -13,8 +13,8 @@ final class DictionaryEntryMaterializationPlannerTest extends TestCase
     public function test_unmapped_concept_gets_safe_one_to_one_plan(): void
     {
         $concept = new DictionaryConcept(
-            '11111111-1111-7111-8111-111111111111',
-            'Côn',
+            '01a10626-1317-77fc-9504-5800350cd07b',
+            'Côn hoa thị',
             'Một nghĩa đã được duyệt',
             DictionaryConcept::APPROVED,
             'model',
@@ -38,7 +38,7 @@ final class DictionaryEntryMaterializationPlannerTest extends TestCase
         $planner = new DictionaryEntryMaterializationPlanner(
             $repo,
             static fn (string $conceptId): ?LexicalEntry => null,
-            static fn (string $conceptId): array => [new DictionaryLabel($conceptId, 'Côn', 'côn', DictionaryLabel::PREFERRED, 'vi-VN')],
+            static fn (string $conceptId): array => [new DictionaryLabel($conceptId, 'Côn hoa thị', 'côn hoa thị', DictionaryLabel::PREFERRED, 'vi-VN')],
         );
 
         $result = $planner->plan(['concept_id' => $concept->conceptId]);
@@ -47,7 +47,11 @@ final class DictionaryEntryMaterializationPlannerTest extends TestCase
         self::assertSame('UNMAPPED_CONCEPT', $result['items'][0]['classification']);
         self::assertSame('CREATE_ENTRY_AND_MAP_EXISTING_SENSE', $result['items'][0]['proposed_operation']);
         self::assertSame($concept->revision, $result['items'][0]['concept_revision']);
-        self::assertSame('côn', $result['items'][0]['form']['normalized_form']);
+        self::assertSame('côn hoa thị', $result['items'][0]['form']['normalized_form']);
+        self::assertSame('Côn hoa thị', $result['items'][0]['form']['text']);
+        self::assertSame('01a10626-1317-77fc-9504-5800350cd07b', $result['items'][0]['concept_id']);
+        self::assertSame('model-1', $result['items'][0]['semantic_reference']['id']);
+        self::assertSame([], $result['grouping_candidates']);
         self::assertNotSame('', $result['fingerprint']);
     }
 
