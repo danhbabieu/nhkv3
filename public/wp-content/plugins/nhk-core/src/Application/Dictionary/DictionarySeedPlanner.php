@@ -89,16 +89,30 @@ final class DictionarySeedPlanner
                 }
                 break;
             }
-            $resolution = $this->resolver->resolve((string) ($item['raw_forms'][0] ?? $item['normalized_form']), $context + ['locale' => $item['locale']]);
+            $resolutionContext = $context + ['source_locale' => $item['locale']];
+            $resolution = $this->resolver->resolve((string) ($item['raw_forms'][0] ?? $item['normalized_form']), $resolutionContext);
             $lookupCalls++;
+            $fallbackStatus = null;
             if ($resolution->status === DictionaryResolution::UNKNOWN) {
-                foreach ($this->lookupVariants($seedGroups[$item['normalized_form']] ?? []) as $variant) {
+                $variants = $this->lookupVariants($seedGroups[$item['normalized_form']] ?? []);
+                if ($variants !== [] && $lookupBudget !== null && $lookupCalls >= $lookupBudget) {
+                    $drop = false;
+                    foreach (array_keys($items) as $key) {
+                        if ($key === $item['normalized_form']) $drop = true;
+                        if ($drop) unset($items[$key]);
+                    }
+                    break;
+                }
+                foreach ($variants as $variant) {
                     if ($lookupBudget !== null && $lookupCalls >= $lookupBudget) break;
-                    $fallback = $this->resolver->resolve($variant, $context + ['locale' => $item['locale']]);
+                    $fallback = $this->resolver->resolve($variant, $resolutionContext);
                     $lookupCalls++;
                     if ($fallback->status === DictionaryResolution::UNKNOWN) continue;
-                    $resolution = $fallback;
-                    $item['diagnostics'][] = 'STRUCTURAL_VARIANT_REUSED';
+                    $fallbackStatus = $fallback->status;
+                    if (in_array($fallback->status, [DictionaryResolution::RESOLVED, DictionaryResolution::AMBIGUOUS], true)) $resolution = $fallback;
+                    if ($fallback->status === DictionaryResolution::RESOLVED) $item['diagnostics'][] = 'STRUCTURAL_VARIANT_REUSED';
+                    if ($fallback->status === DictionaryResolution::AMBIGUOUS) $item['diagnostics'][] = 'DICTIONARY_STRUCTURAL_VARIANT_AMBIGUOUS';
+                    if ($fallback->status === DictionaryResolution::SUPPRESSED) $item['diagnostics'][] = 'DICTIONARY_STRUCTURAL_VARIANT_SUPPRESSED';
                     break;
                 }
             }
@@ -170,7 +184,7 @@ final class DictionarySeedPlanner
                 if ($variant !== '' && !in_array($variant, $variants, true)) $variants[] = $variant;
             }
         }
-        return $variants;
+        return array_slice($variants, 0, 1);
     }
 
     private function normalize(string $value): string

@@ -28,4 +28,20 @@ final class DictionaryRuntimeContractTest extends TestCase
         self::assertStringNotContainsString('$this->types->all()', $body);
         self::assertStringNotContainsString('$this->authority->listByType', $body);
     }
+
+    public function test_entry_mode_public_terms_uses_single_sense_identity_and_fails_closed_for_multi_sense(): void
+    {
+        $runtime = (new \ReflectionClass(\NHK\Core\Application\Dictionary\DictionaryRuntime::class))->newInstanceWithoutConstructor();
+        $normalizer = new \ReflectionProperty($runtime, 'normalizer');
+        $normalizer->setValue($runtime, new \NHK\Core\Application\Dictionary\DictionaryTermNormalizer());
+        $method = new \ReflectionMethod($runtime, 'publicTermsFromHubItems');
+        $method->setAccessible(true);
+        $terms = $method->invoke($runtime, [
+            ['entry_id' => 'entry-1', 'url' => '/tu-dien/anniversary-clock/', 'labels' => [['label' => 'Anniversary clock', 'kind' => 'PREFERRED']], 'senses' => [['sense_id' => 'sense-1']]],
+            ['entry_id' => 'entry-2', 'url' => '/tu-dien/ambiguous/', 'labels' => [['label' => 'Ambiguous', 'kind' => 'PREFERRED']], 'senses' => [['sense_id' => 'sense-a'], ['sense_id' => 'sense-b']]],
+        ]);
+
+        self::assertSame([['concept_id' => 'sense-1', 'label' => 'Anniversary clock', 'url' => '/tu-dien/anniversary-clock/']], $terms);
+        self::assertNotContains('entry-1', array_column($terms, 'concept_id'));
+    }
 }

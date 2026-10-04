@@ -185,6 +185,40 @@ final class DictionarySeedPlannerTest extends TestCase
         self::assertSame(1, $calls);
     }
 
+    public function test_budget_exhaustion_does_not_classify_partially_evaluated_seed_as_new(): void
+    {
+        $calls = [];
+        $resolver = new DictionaryResolver(
+            static function (string $term) use (&$calls): array { $calls[] = $term; return []; },
+            static fn (): array => [], static fn (): array => [], static fn (): array => [], static fn (): bool => false,
+        );
+
+        $result = (new DictionarySeedPlanner($resolver))->plan(['semantic_query_seeds' => [[
+            'raw_span' => '8 alpha 8 beta', 'normalized_form' => '8 alpha 8 beta', 'lookup_variants' => ['alpha 8 beta'], 'category' => 'CONFIGURATION', 'resolver_eligible' => true,
+        ]]], ['max_lookup_cost' => 1]);
+
+        self::assertSame(['8 alpha 8 beta'], $calls);
+        self::assertSame([], $result['items']);
+        self::assertTrue($result['diagnostics']['budget_exhausted']);
+        self::assertTrue($result['diagnostics']['has_more_seeds']);
+        self::assertSame(0, $result['diagnostics']['next_seed_offset']);
+    }
+
+    public function test_planner_uses_only_the_first_packet_lookup_variant(): void
+    {
+        $calls = [];
+        $resolver = new DictionaryResolver(
+            static function (string $term) use (&$calls): array { $calls[] = $term; return []; },
+            static fn (): array => [], static fn (): array => [], static fn (): array => [], static fn (): bool => false,
+        );
+
+        (new DictionarySeedPlanner($resolver))->plan(['semantic_query_seeds' => [[
+            'raw_span' => '8 alpha 8 beta', 'normalized_form' => '8 alpha 8 beta', 'lookup_variants' => ['alpha 8 beta', 'beta 8 alpha'], 'category' => 'CONFIGURATION', 'resolver_eligible' => true,
+        ]]]);
+
+        self::assertSame(['8 alpha 8 beta', 'alpha 8 beta'], $calls);
+    }
+
     public function test_lookup_budget_replays_after_fallback_at_the_next_unresolved_seed(): void
     {
         $lookups = [];
@@ -213,7 +247,7 @@ final class DictionarySeedPlannerTest extends TestCase
         $resolver = new DictionaryResolver(
             static fn (string $term): array => in_array($term, ['400 ngày', 'anniversary clock'], true) ? [[
                 'concept_id' => '01a0ff0c-6687-798d-8f44-6761d242815a',
-                'preferred_label' => '400 ngày', 'destination_type' => 'dictionary', 'destination_id' => '01a0ff0c-6687-798d-8f44-6761d242815a',
+                'preferred_label' => '400 ngày', 'destination_type' => 'dictionary', 'destination_id' => '01a0ff0c-6687-798d-8f44-6761d242815a', 'locale' => 'en',
             ]] : [],
             static fn (): array => [], static fn (): array => [], static fn (): array => [], static fn (): bool => false,
         );
@@ -229,6 +263,20 @@ final class DictionarySeedPlannerTest extends TestCase
         self::assertCount(2, $known);
         self::assertSame(['01a0ff0c-6687-798d-8f44-6761d242815a', '01a0ff0c-6687-798d-8f44-6761d242815a'], array_column($known, 'resolved_dictionary_concept_id'));
         self::assertNotContains('NEW_CONCEPT_CANDIDATE', array_column($known, 'suggested_action'));
+    }
+
+    public function test_suppressed_structural_fallback_does_not_suppress_original_observation(): void
+    {
+        $resolver = new DictionaryResolver(
+            static fn (): array => [], static fn (): array => [], static fn (): array => [], static fn (): array => [],
+            static fn (string $term): bool => $term === 'alpha 8 beta',
+        );
+        $result = (new DictionarySeedPlanner($resolver))->plan(['semantic_query_seeds' => [[
+            'raw_span' => '8 alpha 8 beta', 'normalized_form' => '8 alpha 8 beta', 'lookup_variants' => ['alpha 8 beta'], 'category' => 'CONFIGURATION', 'resolver_eligible' => true,
+        ]]]);
+
+        self::assertSame('NEW_LEXICAL_CANDIDATE', $result['items'][0]['classification']);
+        self::assertContains('DICTIONARY_STRUCTURAL_VARIANT_SUPPRESSED', $result['items'][0]['diagnostics']);
     }
 
     public function test_seed_plan_exposes_canonical_reuse_and_action_without_creating_a_concept(): void

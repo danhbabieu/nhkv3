@@ -143,4 +143,15 @@ final class DictionaryResolverTest extends TestCase
 
         self::assertSame(DictionaryResolution::UNKNOWN, $resolver->resolve('Clock', ['domain' => 'music'])->status);
     }
+
+    public function test_source_locale_does_not_reject_exact_foreign_label_without_explicit_lexical_constraint(): void
+    {
+        $resolver = new DictionaryResolver(
+            approvedLabelLookup: static fn (): array => [['concept_id' => 'sense-400', 'preferred_label' => 'Anniversary clock', 'locale' => 'en']],
+            entityLookup: static fn (): array => [], knowledgeLookup: static fn (): array => [], articleLookup: static fn (): array => [], suppressionLookup: static fn (): bool => false,
+        );
+
+        self::assertSame(DictionaryResolution::RESOLVED, $resolver->resolve('Anniversary clock', ['source_locale' => 'vi-VN'])->status);
+        self::assertSame(DictionaryResolution::UNKNOWN, $resolver->resolve('Anniversary clock', ['lexical_locale' => 'vi-VN'])->status);
+    }
 }

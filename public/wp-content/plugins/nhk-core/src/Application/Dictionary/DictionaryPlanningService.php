@@ -54,19 +54,22 @@ final class DictionaryPlanningService
             if (!is_array($seed)) continue;
             $normalized = $this->normalize((string) ($seed['normalized_form'] ?? ''));
             if ($normalized === '' || strtoupper((string) ($seed['category'] ?? '')) !== 'CONFIGURATION' || ($seed['resolver_eligible'] ?? true) !== true) continue;
-            foreach ((array) ($seed['lookup_variants'] ?? []) as $variant) {
+            foreach (array_slice((array) ($seed['lookup_variants'] ?? []), 0, 1) as $variant) {
                 $variant = $this->normalize((string) $variant);
                 if ($variant !== '') $lookupVariantsByTerm[$normalized][] = $variant;
             }
             if (isset($lookupVariantsByTerm[$normalized])) $lookupVariantsByTerm[$normalized] = array_values(array_unique($lookupVariantsByTerm[$normalized]));
         }
         foreach ($this->legacyPlanningObservations((array) ($packet['lexical_spans'] ?? []), $hints, $approvedLabels) as $observation) {
+            $observedNormalized = $this->normalize((string) ($observation['normalized_term'] ?? $observation['term']));
             $resolution = $this->resolver->resolve((string) $observation['term'], $lexicalContext);
+            $fallbackStatus = null;
             if ($resolution->status === DictionaryResolution::UNKNOWN && ($observation['origin'] ?? '') === 'STRUCTURAL_CONFIGURATION') {
                 foreach ($lookupVariantsByTerm[$this->normalize((string) ($observation['normalized_term'] ?? ''))] ?? [] as $variant) {
                     $fallback = $this->resolver->resolve($variant, $lexicalContext);
                     if ($fallback->status === DictionaryResolution::UNKNOWN) continue;
-                    $resolution = $fallback;
+                    $fallbackStatus = $fallback->status;
+                    if (in_array($fallback->status, [DictionaryResolution::RESOLVED, DictionaryResolution::AMBIGUOUS], true)) $resolution = $fallback;
                     break;
                 }
             }
@@ -76,10 +79,10 @@ final class DictionaryPlanningService
             if ($persist) {
                 $mention = new DictionaryMention(
                     $this->id(),
-                    $this->fingerprint($sourceKind, $sourceId, $resolution->normalizedTerm, $contextHash),
+                    $this->fingerprint($sourceKind, $sourceId, $observedNormalized, $contextHash),
                     strtoupper(trim($sourceKind)),
                     trim($sourceId),
-                    $resolution->normalizedTerm,
+                    $observedNormalized,
                     $contextHash,
                     $conceptId,
                     $context,
@@ -93,7 +96,7 @@ final class DictionaryPlanningService
             if ($resolution->status === DictionaryResolution::RESOLVED) {
                 $row = [
                     'term' => $observation['term'],
-                    'normalized_term' => $resolution->normalizedTerm,
+                    'normalized_term' => $observedNormalized,
                     'concept_id' => $resolution->conceptId,
                     'preferred_label' => $resolution->preferredLabel,
                     'destination_type' => $resolution->destinationType,
@@ -112,22 +115,24 @@ final class DictionaryPlanningService
                 continue;
             }
 
-            if ($resolution->status === DictionaryResolution::SUPPRESSED || $this->candidates->suppressed($resolution->normalizedTerm, $contextHash)) {
+            if ($fallbackStatus === DictionaryResolution::SUPPRESSED) $warnings[] = 'DICTIONARY_STRUCTURAL_VARIANT_SUPPRESSED';
+            if ($resolution->status === DictionaryResolution::SUPPRESSED || $this->candidates->suppressed($observedNormalized, $contextHash)) {
                 $warnings[] = 'DICTIONARY_TERM_SUPPRESSED';
                 continue;
             }
 
             if ($resolution->status === DictionaryResolution::AMBIGUOUS) {
+                if ($fallbackStatus === DictionaryResolution::AMBIGUOUS) $warnings[] = 'DICTIONARY_STRUCTURAL_VARIANT_AMBIGUOUS';
                 $row = [
                     'candidate_id' => null,
                     'term' => $observation['term'],
-                    'normalized_term' => $resolution->normalizedTerm,
+                    'normalized_term' => $observedNormalized,
                     'candidates' => $resolution->candidates,
                 ];
                 if ($persist && !$mentionReplay) {
                     $saved = $this->candidates->upsertObservation(new DictionaryCandidate(
                         $this->id(),
-                        $resolution->normalizedTerm,
+                        $observedNormalized,
                         $contextHash,
                         [(string) $observation['term']],
                         DictionaryCandidateState::AMBIGUOUS,
@@ -149,7 +154,7 @@ final class DictionaryPlanningService
                 $candidateTerms[] = [
                     'candidate_id' => null,
                     'term' => $observation['term'],
-                    'normalized_term' => $resolution->normalizedTerm,
+                    'normalized_term' => $observedNormalized,
                     'state' => DictionaryCandidateState::NEEDS_REVIEW,
                     'occurrences' => null,
                     'origin' => $observation['origin'],
@@ -159,7 +164,7 @@ final class DictionaryPlanningService
 
             $candidate = new DictionaryCandidate(
                 $this->id(),
-                $resolution->normalizedTerm,
+                $observedNormalized,
                 $contextHash,
                 [(string) $observation['term']],
                 DictionaryCandidateState::NEEDS_REVIEW,
@@ -174,7 +179,7 @@ final class DictionaryPlanningService
                 $candidateTerms[] = [
                     'candidate_id' => null,
                     'term' => $observation['term'],
-                    'normalized_term' => $resolution->normalizedTerm,
+                    'normalized_term' => $observedNormalized,
                     'state' => DictionaryCandidateState::NEEDS_REVIEW,
                     'occurrences' => null,
                     'origin' => $observation['origin'],
@@ -186,7 +191,7 @@ final class DictionaryPlanningService
             $candidateTerms[] = [
                 'candidate_id' => $saved->candidateId,
                 'term' => $observation['term'],
-                'normalized_term' => $saved->normalizedTerm,
+                'normalized_term' => $observedNormalized,
                 'state' => $saved->state,
                 'occurrences' => $saved->occurrences,
                 'origin' => $observation['origin'],

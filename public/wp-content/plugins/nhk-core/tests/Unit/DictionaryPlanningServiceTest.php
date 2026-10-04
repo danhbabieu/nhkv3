@@ -214,4 +214,55 @@ final class DictionaryPlanningServiceTest extends TestCase
         self::assertSame('sense-8-8', $plan['resolved_terms'][0]['concept_id']);
         self::assertSame([], $plan['candidate_terms']);
     }
+
+    public function test_structural_fallback_preserves_original_mention_provenance(): void
+    {
+        $candidateRepo = new class implements DictionaryCandidateRepository {
+            public function upsertObservation(DictionaryCandidate $candidate): DictionaryCandidate { return $candidate; }
+            public function suppressed(string $normalizedTerm, string $contextHash): bool { return false; }
+            public function listForReview(int $limit = 100): array { return []; }
+            public function findById(string $candidateId): ?DictionaryCandidate { return null; }
+            public function saveDecision(DictionaryCandidate $candidate, int $expectedRevision): DictionaryCandidate { return $candidate; }
+        };
+        $mentionRepo = new class implements DictionaryMentionRepository {
+            public array $items = [];
+            public function upsert(DictionaryMention $mention): DictionaryMention { $this->items[] = $mention; return $mention; }
+            public function listBySource(string $sourceKind, string $sourceId): array { return $this->items; }
+        };
+        $resolver = new DictionaryResolver(
+            static fn (string $term): array => $term === 'côn 8 búa' ? [['concept_id' => 'sense-88', 'destination_url' => '/tu-dien/con-8-bua/']] : [],
+            static fn (): array => [], static fn (): array => [], static fn (): array => [], static fn (): bool => false,
+        );
+        $service = new DictionaryPlanningService(new DictionaryTermDetector(), $resolver, $candidateRepo, $mentionRepo, new DictionaryLinkPlanner());
+
+        $plan = $service->plan('8 côn 8 búa', 'ARTICLE', 'article-88');
+
+        self::assertSame('8 côn 8 búa', $mentionRepo->items[0]->normalizedTerm);
+        self::assertSame('8 côn 8 búa', $plan['resolved_terms'][0]['normalized_term']);
+        self::assertSame('sense-88', $plan['resolved_terms'][0]['concept_id']);
+    }
+
+    public function test_structural_fallback_ambiguity_is_not_reported_as_reuse(): void
+    {
+        $candidateRepo = new class implements DictionaryCandidateRepository {
+            public function upsertObservation(DictionaryCandidate $candidate): DictionaryCandidate { return $candidate; }
+            public function suppressed(string $normalizedTerm, string $contextHash): bool { return false; }
+            public function listForReview(int $limit = 100): array { return []; }
+            public function findById(string $candidateId): ?DictionaryCandidate { return null; }
+            public function saveDecision(DictionaryCandidate $candidate, int $expectedRevision): DictionaryCandidate { return $candidate; }
+        };
+        $mentions = new class implements DictionaryMentionRepository {
+            public function upsert(DictionaryMention $mention): DictionaryMention { return $mention; }
+            public function listBySource(string $sourceKind, string $sourceId): array { return []; }
+        };
+        $resolver = new DictionaryResolver(
+            static fn (string $term): array => $term === 'côn 8 búa' ? [['concept_id' => 'a'], ['concept_id' => 'b']] : [],
+            static fn (): array => [], static fn (): array => [], static fn (): array => [], static fn (): bool => false,
+        );
+        $plan = (new DictionaryPlanningService(new DictionaryTermDetector(), $resolver, $candidateRepo, $mentions, new DictionaryLinkPlanner()))->preview('8 côn 8 búa', 'ARTICLE', 'article-ambiguous');
+
+        self::assertCount(1, $plan['ambiguous_terms']);
+        self::assertContains('DICTIONARY_STRUCTURAL_VARIANT_AMBIGUOUS', $plan['warnings']);
+        self::assertNotContains('STRUCTURAL_VARIANT_REUSED', $plan['warnings']);
+    }
 }

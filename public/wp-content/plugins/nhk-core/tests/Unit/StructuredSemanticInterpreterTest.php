@@ -117,12 +117,12 @@ final class StructuredSemanticInterpreterTest extends TestCase
         }
     }
 
-    public function test_qualified_two_pair_configuration_exposes_one_compact_lookup_variant(): void
+    public function test_qualified_two_pair_configuration_exposes_one_compact_lookup_variant_only_when_cardinalities_match(): void
     {
         $packet = (new StructuredSemanticInterpreter())->interpret([
-            'text' => '36 ngày 10 tháng',
+            'text' => '8 alpha 8 beta',
             'source_kind' => 'human_chat',
-            'metadata' => ['lexical_hints' => [['kind' => 'STRUCTURAL_UNIT', 'term' => 'ngày'], ['kind' => 'STRUCTURAL_UNIT', 'term' => 'tháng']]],
+            'metadata' => ['lexical_hints' => [['kind' => 'STRUCTURAL_UNIT', 'term' => 'alpha'], ['kind' => 'STRUCTURAL_UNIT', 'term' => 'beta']]],
         ])->toArray();
 
         $configuration = array_values(array_filter(
@@ -131,15 +131,23 @@ final class StructuredSemanticInterpreterTest extends TestCase
         ));
 
         self::assertCount(1, $configuration);
-        self::assertSame(['ngày 10 tháng'], $configuration[0]['lookup_variants']);
-        self::assertSame('36 ngày 10 tháng', $configuration[0]['normalized_form']);
+        self::assertSame(['alpha 8 beta'], $configuration[0]['lookup_variants']);
+        self::assertSame('8 alpha 8 beta', $configuration[0]['normalized_form']);
         self::assertTrue($configuration[0]['resolver_eligible']);
+
+        $unequal = (new StructuredSemanticInterpreter())->interpret([
+            'text' => '8 alpha 10 beta',
+            'source_kind' => 'human_chat',
+            'metadata' => ['lexical_hints' => [['kind' => 'STRUCTURAL_UNIT', 'term' => 'alpha'], ['kind' => 'STRUCTURAL_UNIT', 'term' => 'beta']]],
+        ])->toArray();
+        $unequalConfiguration = array_values(array_filter($unequal['semantic_query_seeds'], static fn (array $seed): bool => ($seed['category'] ?? '') === 'CONFIGURATION'));
+        self::assertSame([], $unequalConfiguration[0]['lookup_variants']);
     }
 
     public function test_qualified_configuration_suppresses_weaker_contained_unit_spans(): void
     {
         $packet = (new StructuredSemanticInterpreter())->interpret([
-            'text' => 'máy 8 côn 8 búa',
+            'text' => 'Con này dáng vai bò, máy 8 côn 8 búa, chơi Westminster, có ngắt chuông đêm, mặt số nổi.',
             'source_kind' => 'human_chat',
             'metadata' => ['lexical_hints' => [['kind' => 'STRUCTURAL_UNIT', 'term' => 'côn'], ['kind' => 'STRUCTURAL_UNIT', 'term' => 'búa']]],
         ])->toArray();

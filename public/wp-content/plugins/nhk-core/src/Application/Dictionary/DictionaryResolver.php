@@ -80,7 +80,7 @@ final class DictionaryResolver
     private function labelAppliesToContext(array $row, array $requested): bool
     {
         $labelLocale = trim((string) ($row['locale'] ?? ''));
-        $requestedLocale = trim((string) ($requested['locale'] ?? ''));
+        $requestedLocale = trim((string) ($requested['lexical_locale'] ?? ''));
         if ($labelLocale !== '' && $requestedLocale !== '' && strcasecmp($labelLocale, $requestedLocale) !== 0) return false;
 
         $labelContext = is_array($row['context'] ?? null) ? $row['context'] : [];

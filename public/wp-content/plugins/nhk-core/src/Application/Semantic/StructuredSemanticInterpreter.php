@@ -280,6 +280,7 @@ final class StructuredSemanticInterpreter
         $normalized = $this->normalize((string) ($span['normalized_term'] ?? ''));
         if (preg_match('/^(\d{1,3})\s+[\p{L}][\p{L}-]*\s+(\d{1,3})\s+[\p{L}][\p{L}-]*$/u', $normalized, $match) !== 1) return [];
         preg_match('/^(\d{1,3})\s+([\p{L}][\p{L}-]*)\s+(\d{1,3})\s+([\p{L}][\p{L}-]*)$/u', $normalized, $parts);
+        if (($parts[1] ?? '') !== ($parts[3] ?? '')) return [];
         return [implode(' ', [$parts[2], $parts[3], $parts[4]])];
     }
 
