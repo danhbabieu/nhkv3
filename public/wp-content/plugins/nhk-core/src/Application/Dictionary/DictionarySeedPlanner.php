@@ -82,7 +82,23 @@ final class DictionarySeedPlanner
                 $item['suggested_action'] = 'SUPPRESS_NOISE';
                 continue;
             }
-            $resolution = $this->resolver->resolve((string) ($item['raw_forms'][0] ?? $item['normalized_form']), $context + ['locale' => $item['locale']]);
+            $resolutionContext = $context + ['locale' => $item['locale']];
+            $resolution = $this->resolver->resolve((string) ($item['raw_forms'][0] ?? $item['normalized_form']), $resolutionContext);
+            if ($resolution->status === DictionaryResolution::UNKNOWN && $item['category'] === 'CONFIGURATION') {
+                foreach ($this->configurationLookupVariants((string) $item['normalized_form']) as $variant) {
+                    $variantResolution = $this->resolver->resolve($variant, $resolutionContext);
+                    if ($variantResolution->status === DictionaryResolution::AMBIGUOUS) {
+                        $resolution = $variantResolution;
+                        $item['diagnostics'][] = 'STRUCTURAL_CONFIGURATION_AMBIGUOUS';
+                        break;
+                    }
+                    if ($variantResolution->status === DictionaryResolution::RESOLVED) {
+                        $resolution = $variantResolution;
+                        $item['diagnostics'][] = 'STRUCTURAL_CONFIGURATION_REUSE';
+                        break;
+                    }
+                }
+            }
             $item['resolution'] = [
                 'status' => $resolution->status,
                 'concept_id' => $resolution->status === DictionaryResolution::RESOLVED ? $resolution->conceptId : null,
@@ -132,6 +148,28 @@ final class DictionarySeedPlanner
             $diagnostics['next_seed_offset'] = $truncatedSeeds > 0 ? $seedOffset + count($selectedKeys) : null;
         }
         return ['status' => 'READ_ONLY_PLAN', 'read_only' => true, 'mutated' => false, 'items' => $rows, 'aggregate' => $aggregate, 'diagnostics' => $diagnostics];
+    }
+
+    /**
+     * Produce bounded lookup-only variants for an already-qualified two-unit
+     * numeric configuration. This never asserts equivalence: the canonical
+     * resolver must still return one exact existing owner/Sense.
+     *
+     * Example shape: "8 alpha 8 beta" -> "alpha 8 beta".
+     * Unequal cardinalities and non-structural input are left untouched.
+     *
+     * @return list<string>
+     */
+    private function configurationLookupVariants(string $normalized): array
+    {
+        $tokens = preg_split('/\\s+/u', trim($normalized)) ?: [];
+        if (count($tokens) !== 4) return [];
+        if (!preg_match('/^\\d{1,3}$/', $tokens[0]) || !preg_match('/^\\d{1,3}$/', $tokens[2])) return [];
+        if ((int) $tokens[0] !== (int) $tokens[2]) return [];
+        if (!preg_match('/^[\\p{L}][\\p{L}-]*$/u', $tokens[1]) || !preg_match('/^[\\p{L}][\\p{L}-]*$/u', $tokens[3])) return [];
+
+        $variant = implode(' ', [$tokens[1], $tokens[2], $tokens[3]]);
+        return $variant === $normalized ? [] : [$variant];
     }
 
     private function normalize(string $value): string

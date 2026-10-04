@@ -244,6 +244,66 @@ final class DictionarySeedPlannerTest extends TestCase
         self::assertSame('NEW_CONCEPT_CANDIDATE', $result['items'][0]['suggested_action']);
     }
 
+    public function test_configuration_seed_reuses_existing_sense_through_bounded_structural_variant(): void
+    {
+        $resolver = new DictionaryResolver(
+            static fn (string $term): array => $term === 'côn 8 búa' ? [[
+                'concept_id' => '11111111-1111-7111-8111-111111111111',
+                'preferred_label' => 'Côn 8 búa',
+                'destination_type' => 'dictionary',
+                'destination_id' => '11111111-1111-7111-8111-111111111111',
+            ]] : [],
+            static fn (): array => [],
+            static fn (): array => [],
+            static fn (): array => [],
+            static fn (): bool => false,
+        );
+
+        $result = (new DictionarySeedPlanner($resolver))->plan([
+            'semantic_query_seeds' => [[
+                'raw_span' => '8 côn 8 búa',
+                'normalized_form' => '8 côn 8 búa',
+                'category' => 'CONFIGURATION',
+                'locale' => 'vi-VN',
+            ]],
+        ], ['source_family' => 'chat:configuration']);
+
+        $item = $result['items'][0];
+        self::assertSame('ALIAS_TO_EXISTING', $item['classification']);
+        self::assertSame('RESOLVED', $item['resolution_status']);
+        self::assertSame('11111111-1111-7111-8111-111111111111', $item['resolved_dictionary_concept_id']);
+        self::assertSame('ADD_ALIAS_CANDIDATE', $item['suggested_action']);
+        self::assertContains('STRUCTURAL_CONFIGURATION_REUSE', $item['diagnostics']);
+        self::assertNotSame('NEW_CONCEPT_CANDIDATE', $item['suggested_action']);
+    }
+
+    public function test_configuration_seed_does_not_collapse_unequal_cardinalities(): void
+    {
+        $resolver = new DictionaryResolver(
+            static fn (string $term): array => $term === 'alpha 10 beta' ? [[
+                'concept_id' => '22222222-2222-7222-8222-222222222222',
+                'preferred_label' => 'Alpha 10 beta',
+            ]] : [],
+            static fn (): array => [],
+            static fn (): array => [],
+            static fn (): array => [],
+            static fn (): bool => false,
+        );
+
+        $result = (new DictionarySeedPlanner($resolver))->plan([
+            'semantic_query_seeds' => [[
+                'raw_span' => '8 alpha 10 beta',
+                'normalized_form' => '8 alpha 10 beta',
+                'category' => 'CONFIGURATION',
+                'locale' => 'vi-VN',
+            ]],
+        ]);
+
+        self::assertSame('NEW_LEXICAL_CANDIDATE', $result['items'][0]['classification']);
+        self::assertSame('NEW_CONCEPT_CANDIDATE', $result['items'][0]['suggested_action']);
+        self::assertNotContains('STRUCTURAL_CONFIGURATION_REUSE', $result['items'][0]['diagnostics']);
+    }
+
     private function types(): EntityTypeRegistry
     {
         $types = new EntityTypeRegistry();
