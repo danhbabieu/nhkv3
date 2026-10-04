@@ -242,10 +242,13 @@ Senses. Detail rendering is Sense-aware:
 - a standalone Dictionary URL exists only when Dictionary owns the reader
   destination under the existing Public Identity/SEO rules.
 
-**CURRENT IMPLEMENTATION:** Dictionary is still Concept-centric: detail is
-resolved by one `public_slug`; multiple Concepts with the same slug are
-`AMBIGUOUS`. Entry-centric rendering and `/tu-dien/{entry-slug}/` are not
-runtime behavior.
+**CURRENT IMPLEMENTATION:** Migration024-backed Entry/Sense read paths are
+runtime behavior when the schema gate is ready: `/tu-dien/` is Entry-based and
+`/tu-dien/{entry-slug}/` is the Entry public detail route, while
+`DictionaryConcept` remains the durable Sense identity. The compatibility
+Concept path still resolves one `public_slug` and treats multiple matching
+Concepts as `AMBIGUOUS`; full Entry/Form/Sense write lifecycle and owner-specific
+enrichment remain implementation gaps.
 
 Resolver and auto-linking remain `Form → Entry → Sense → owner → current URL`.
 No URL is derived from a lexical UUID, label text, destination snapshot or

@@ -154,4 +154,16 @@ final class DictionaryResolverTest extends TestCase
         self::assertSame(DictionaryResolution::RESOLVED, $resolver->resolve('Anniversary clock', ['source_locale' => 'vi-VN'])->status);
         self::assertSame(DictionaryResolution::UNKNOWN, $resolver->resolve('Anniversary clock', ['lexical_locale' => 'vi-VN'])->status);
     }
+
+    public function test_scope_and_term_type_are_bounded_lexical_applicability_fields(): void
+    {
+        $resolver = new DictionaryResolver(
+            approvedLabelLookup: static fn (): array => [['concept_id' => 'sense-clock', 'preferred_label' => 'Clock', 'context' => ['scope' => 'technical', 'term_type' => 'COMPONENT']]],
+            entityLookup: static fn (): array => [], knowledgeLookup: static fn (): array => [], articleLookup: static fn (): array => [], suppressionLookup: static fn (): bool => false,
+        );
+
+        self::assertSame(DictionaryResolution::RESOLVED, $resolver->resolve('Clock', ['scope' => 'technical', 'term_type' => 'COMPONENT'])->status);
+        self::assertSame(DictionaryResolution::UNKNOWN, $resolver->resolve('Clock', ['scope' => 'general', 'term_type' => 'COMPONENT'])->status);
+        self::assertSame(DictionaryResolution::UNKNOWN, $resolver->resolve('Clock', ['scope' => 'technical', 'term_type' => 'MUSIC'])->status);
+    }
 }

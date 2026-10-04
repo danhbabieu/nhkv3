@@ -29,6 +29,14 @@ final class DictionaryResolver
             $this->rows(($this->approvedLabelLookup)($normalized, $context)),
             fn (array $row): bool => $this->labelAppliesToContext($row, $context),
         ));
+        $labelsByConcept = [];
+        foreach ($labels as $label) {
+            $identity = trim((string) ($label['concept_id'] ?? ''));
+            if ($identity === '') $identity = trim((string) ($label['destination_type'] ?? '')) . ':' . trim((string) ($label['destination_id'] ?? ''));
+            if ($identity === ':') $identity = trim((string) ($label['id'] ?? ''));
+            if ($identity !== '') $labelsByConcept[$identity] = $label;
+        }
+        $labels = array_values($labelsByConcept);
         if (count($labels) > 1) {
             return new DictionaryResolution(DictionaryResolution::AMBIGUOUS, $term, $normalized, candidates: $labels, context: $context);
         }
@@ -75,7 +83,8 @@ final class DictionaryResolver
 
     /**
      * Curation/provenance metadata is not lexical identity. Only the bounded
-     * scope fields in the Dictionary contract participate in applicability.
+     * lexical applicability fields domain, region, community, usage_scope,
+     * scope and term_type participate in applicability.
      */
     private function labelAppliesToContext(array $row, array $requested): bool
     {
@@ -84,7 +93,7 @@ final class DictionaryResolver
         if ($labelLocale !== '' && $requestedLocale !== '' && strcasecmp($labelLocale, $requestedLocale) !== 0) return false;
 
         $labelContext = is_array($row['context'] ?? null) ? $row['context'] : [];
-        foreach (['domain', 'region', 'community', 'usage_scope'] as $key) {
+        foreach (['domain', 'region', 'community', 'usage_scope', 'scope', 'term_type'] as $key) {
             if (!array_key_exists($key, $labelContext) || $labelContext[$key] === null || $labelContext[$key] === '') continue;
             if (!array_key_exists($key, $requested) || $requested[$key] === null || $requested[$key] === '' || $requested[$key] !== $labelContext[$key]) return false;
         }

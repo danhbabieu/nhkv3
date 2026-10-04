@@ -242,7 +242,7 @@ final class DictionaryPlanningService
     private function lexicalContext(array $context): array
     {
         $bounded = [];
-        foreach (['locale', 'domain', 'usage_scope', 'region', 'community', 'scope', 'term_type'] as $key) {
+        foreach (['locale', 'lexical_locale', 'domain', 'usage_scope', 'region', 'community', 'scope', 'term_type'] as $key) {
             if (!array_key_exists($key, $context)) continue;
             $value = $context[$key];
             if (is_string($value)) {

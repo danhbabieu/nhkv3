@@ -10,6 +10,33 @@ use PHPUnit\Framework\TestCase;
 
 final class DictionaryPlanningServiceTest extends TestCase
 {
+    public function test_planning_service_preserves_explicit_lexical_locale_separately_from_source_locale(): void
+    {
+        $candidateRepo = new class implements DictionaryCandidateRepository {
+            public function upsertObservation(DictionaryCandidate $candidate): DictionaryCandidate { return $candidate; }
+            public function suppressed(string $normalizedTerm, string $contextHash): bool { return false; }
+            public function listForReview(int $limit = 100): array { return []; }
+            public function findById(string $candidateId): ?DictionaryCandidate { return null; }
+            public function saveDecision(DictionaryCandidate $candidate, int $expectedRevision): DictionaryCandidate { return $candidate; }
+        };
+        $mentions = new class implements DictionaryMentionRepository {
+            public function upsert(DictionaryMention $mention): DictionaryMention { return $mention; }
+            public function listBySource(string $sourceKind, string $sourceId): array { return []; }
+        };
+        $resolver = new DictionaryResolver(
+            static fn (string $term, array $context): array => $term === 'anniversary clock' ? [['concept_id' => 'sense-400', 'preferred_label' => 'Anniversary clock', 'locale' => 'en']] : [],
+            static fn (): array => [], static fn (): array => [], static fn (): array => [], static fn (): bool => false,
+        );
+        $service = new DictionaryPlanningService(new DictionaryTermDetector(), $resolver, $candidateRepo, $mentions, new DictionaryLinkPlanner());
+
+        $sourceOnly = $service->preview('Anniversary clock', 'ARTICLE', 'article-source', ['source_locale' => 'vi-VN'], ['Anniversary clock']);
+        $explicitVi = $service->preview('Anniversary clock', 'ARTICLE', 'article-vi', ['source_locale' => 'vi-VN', 'lexical_locale' => 'vi-VN'], ['Anniversary clock']);
+        $explicitEn = $service->preview('Anniversary clock', 'ARTICLE', 'article-en', ['source_locale' => 'vi-VN', 'lexical_locale' => 'en'], ['Anniversary clock']);
+
+        self::assertCount(1, $sourceOnly['resolved_terms']);
+        self::assertCount(1, $explicitVi['candidate_terms']);
+        self::assertCount(1, $explicitEn['resolved_terms']);
+    }
     public function test_unknown_hint_creates_one_private_candidate_and_mention_without_blocking(): void
     {
         $candidateRepo = new class implements DictionaryCandidateRepository {

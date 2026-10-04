@@ -32,14 +32,14 @@ final class WpdbDictionaryConceptRepository implements DictionaryConceptReposito
     {
         $out = [];
         $rows = $this->database->get_results($this->database->prepare(
-            "SELECT c.*,l.label_text,l.label_kind,l.locale,l.context_json AS label_context_json FROM {$this->labels} l INNER JOIN {$this->concepts} c ON c.concept_uuid=l.concept_uuid WHERE l.normalized_label=%s AND l.state=1 AND c.status=%s ORDER BY c.id,l.id",
+            "SELECT c.*,l.label_text,l.label_kind,l.locale,l.context_json AS label_context_json FROM {$this->labels} l INNER JOIN {$this->concepts} c ON c.concept_uuid=l.concept_uuid WHERE l.normalized_label=%s AND l.state=1 AND c.status=%s ORDER BY c.id,l.id LIMIT 256",
             $normalizedLabel,
             DictionaryConcept::APPROVED,
         ), ARRAY_A) ?: [];
         foreach ($rows as $row) {
             $concept = $this->hydrateConcept($row);
             if ($concept === null) continue;
-            $out[$concept->conceptId] = [
+            $out[] = [
                 'concept_id' => $concept->conceptId,
                 'preferred_label' => $concept->preferredLabel,
                 'definition' => $concept->definition,
@@ -52,7 +52,7 @@ final class WpdbDictionaryConceptRepository implements DictionaryConceptReposito
                 'context' => $this->decode((string) ($row['label_context_json'] ?? '{}')),
             ];
         }
-        return array_values($out);
+        return $out ?? [];
     }
 
     public function listApproved(int $limit = 500): array
