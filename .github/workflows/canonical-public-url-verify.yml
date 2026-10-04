@@ -29,6 +29,15 @@ jobs:
         run: |
           git fetch origin main
           git diff --check origin/main...HEAD
+      - name: Focused Dictionary verification
+        run: |
+          vendor/bin/phpunit \
+            public/wp-content/plugins/nhk-core/tests/Unit/DictionarySeedPlannerTest.php \
+            public/wp-content/plugins/nhk-core/tests/Unit/McpDictionaryToolsContractTest.php \
+            public/wp-content/plugins/nhk-core/tests/Unit/McpDocumentationRegistryTest.php \
+            public/wp-content/plugins/nhk-core/tests/Unit/DictionaryMutationContractTest.php \
+            public/wp-content/plugins/nhk-core/tests/Unit/McpDiscoveryExecutionParityTest.php \
+            public/wp-content/plugins/nhk-core/tests/Unit/McpWidgetAbilityExposureTest.php
       - name: PHP lint
         run: composer lint
       - name: Focused public URL tests
