@@ -1,5 +1,25 @@
 # NHK V3 Execution State
 
+## Checkpoint — 2026-10-04 — Dictionary code-side completion (LOCAL / UNPUSHED)
+
+LOCAL MAIN: `59b5b4e3e503fbeef0162cc13aaa1dc1c7571a89` with the local
+execution-state follow-up `ca30847e`. The local Dictionary implementation now
+contains the Entry/Form/Sense route round-trip, mapping-first semantic-reference
+read path, canonical exact-owner audit resolution, deterministic enrichment
+planning and guarded apply contract, bounded public projections, multi-Sense
+isolation, reverse Mentions, related-term projection, SEO states and MCP
+registration/contract coverage. The runtime normalizer regression is covered by
+`publicTermsFromHubItems()` and the Entry-mode multi-Sense fail-closed test.
+
+LOCAL VERIFICATION: A clean checkout ran 244 Dictionary/semantic/MCP tests with
+1,675 assertions passing; PHP lint and `git diff --check` are required before
+the next local commit. No remote publish, deployment, runtime mutation,
+materialization, semantic apply, Graph, Knowledge, Media, Video or Article
+mutation was performed in this checkpoint.
+
+STATUS: `CODE_IMPLEMENTED / LOCAL_VERIFIED / UNPUSHED / UNDEPLOYED /
+DATA_NOT_APPLIED / LIVE_ACCEPTANCE_PENDING`.
+
 ## Checkpoint — 2026-10-04 — Dictionary staging route/runtime and read-only enrichment audit
 
 DEPLOYED: Canonical staging deployment completed through the existing
