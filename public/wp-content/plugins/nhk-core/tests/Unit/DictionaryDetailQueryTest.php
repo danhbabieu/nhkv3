@@ -75,4 +75,24 @@ final class DictionaryDetailQueryTest extends TestCase
         self::assertSame('Jahresuhr/400', $result['item']['forms'][0]['form']);
         self::assertSame('de-DE', $result['item']['forms'][0]['locale']);
     }
+
+    public function test_detail_resolves_the_same_fallback_slug_emitted_by_the_hub(): void
+    {
+        $sense = new DictionaryConcept('sense-fallback', '400 ngày', 'Định nghĩa', DictionaryConcept::APPROVED);
+        $entry = new LexicalEntry('entry-fallback', '400 ngày', '400 ngày', DictionaryConcept::APPROVED, 'vi-VN', [], 1, [$sense->conceptId]);
+        $entries = new class($entry, $sense) {
+            public function __construct(private LexicalEntry $entry, private DictionaryConcept $sense) {}
+            public function findByPublicSlug(string $slug): ?LexicalEntry { return null; }
+            public function listEntries(int $limit = 2000): array { return [$this->entry]; }
+            public function listSenses(LexicalEntry $entry): array { return [$this->sense]; }
+            public function listForms(LexicalEntry $entry): array { return []; }
+            public function semanticReference(string $entryId, string $senseId): array { return ['status' => 'ABSENT']; }
+        };
+
+        $result = (new DictionaryDetailQuery(new class { public function listLabels(string $id): array { return []; } }, $entries))->detail('400-ng-ay');
+
+        self::assertSame('READY', $result['status']);
+        self::assertSame('400 ngày', $result['item']['title']);
+        self::assertSame('/tu-dien/400-ng-ay/', $result['item']['url']);
+    }
 }

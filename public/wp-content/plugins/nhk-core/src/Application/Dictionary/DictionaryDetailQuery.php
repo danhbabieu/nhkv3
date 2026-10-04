@@ -86,7 +86,7 @@ final class DictionaryDetailQuery
     {
         if (method_exists($this->entries, 'findByPublicSlug')) {
             $entry = $this->entries->findByPublicSlug($slug);
-            return $entry instanceof LexicalEntry ? [$entry] : [];
+            if ($entry instanceof LexicalEntry) return [$entry];
         }
         $out = [];
         foreach ((array) $this->entries->listEntries(2000) as $entry) if ($entry instanceof LexicalEntry && $this->slug((string) ($entry->context['public_slug'] ?? $entry->preferredForm)) === $slug) $out[] = $entry;
@@ -142,5 +142,12 @@ final class DictionaryDetailQuery
     private function labels(DictionaryConcept $sense): array { return array_values(array_filter(array_map(static fn (mixed $label): ?array => $label instanceof DictionaryLabel && $label->active ? ['label' => $label->label, 'kind' => $label->kind, 'locale' => $label->locale] : null, (array) $this->concepts->listLabels($sense->conceptId)), 'is_array')); }
     private function forms(LexicalEntry $entry): array { if (!method_exists($this->entries, 'listForms')) return [['form' => $entry->preferredForm, 'kind' => 'PREFERRED', 'locale' => $entry->locale]]; $out = []; foreach ((array) $this->entries->listForms($entry) as $form) { if (is_object($form) && trim((string) ($form->form ?? '')) !== '') $out[] = ['form' => $form->form, 'kind' => $form->kind ?? 'ALTERNATE', 'locale' => $form->locale ?? null]; elseif (is_array($form) && trim((string) ($form['form'] ?? '')) !== '') $out[] = ['form' => $form['form'], 'kind' => $form['kind'] ?? 'ALTERNATE', 'locale' => $form['locale'] ?? null]; } return $out !== [] ? $out : [['form' => $entry->preferredForm, 'kind' => 'PREFERRED', 'locale' => $entry->locale]]; }
     private function seo(array $item, array $senses): array { $hasOwner = false; foreach ($senses as $sense) if (is_array($sense['canonical_owner'] ?? null)) { $hasOwner = true; break; } return ['state' => $hasOwner ? (count($senses) > 1 ? 'NOINDEX' : 'NOINDEX') : 'INDEXABLE', 'canonical' => $item['url'], 'robots' => $hasOwner ? 'noindex,follow' : 'index,follow', 'sitemap' => !$hasOwner]; }
-    private function slug(string $value): string { $value = trim($value); if (function_exists('sanitize_title')) return (string) sanitize_title($value); return trim((string) preg_replace('/[^a-z0-9]+/i', '-', strtolower($value)), '-'); }
+    private function slug(string $value): string
+    {
+        $value = trim($value);
+        if ($value === '') return '';
+        if (function_exists('sanitize_title')) return (string) sanitize_title($value);
+        $value = function_exists('iconv') ? (string) (iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $value) ?: $value) : $value;
+        return trim((string) preg_replace('/[^a-z0-9]+/i', '-', strtolower($value)), '-');
+    }
 }

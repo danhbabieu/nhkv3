@@ -1,5 +1,35 @@
 # NHK V3 Execution State
 
+## Checkpoint — 2026-10-04 — Dictionary Gate 0/1 route round-trip (LOCAL / NO MUTATION)
+
+BASELINE: Repository HEAD was `88cf710c` on
+`codex/dictionary-structural-resolution`. Gate 0 classified the current
+Dictionary state as follows: `ALREADY_DONE` = Entry/Sense public detail,
+mapping-first semantic references, per-Sense projection isolation, reverse
+Mention projection, governed related-term projection, lightweight hub and
+explicit SEO packet; `PARTIAL` = live runtime/read-back, canonical owner
+mapping, owner-backed Knowledge/Media/Video/Article sections and full canary;
+`MISSING` = no verified live 29-Entry audit/apply/read-back; `RUNTIME_ONLY` =
+deployed/staging route and data state.
+
+ROOT_CAUSE: The hub generated a fallback slug from `preferredForm` when an
+Entry lacked persisted `public_slug`, while `DictionaryDetailQuery` preferred
+`findByPublicSlug()` and used a non-equivalent transliteration fallback. The
+generated detail URL could therefore fail to resolve back to the Entry.
+
+FIX: Detail resolution now retries the same bounded `listEntries(2000)` slug
+rule after a persisted public-slug miss, and its fallback transliteration is
+aligned with the hub. A regression test covers the hub-generated fallback URL.
+No semantic mapping, owner data, migration, materialization, Graph edge or
+external runtime state was changed.
+
+VERIFICATION: Focused Dictionary/Entry-Sense/enrichment suite passes 31 tests /
+102 assertions; changed PHP files lint clean; `git diff --check` passes. TDD
+RED was observed with `NOT_FOUND`, then GREEN with `READY`.
+
+DATA_APPLIED: 0. DEPLOYED: NO. STATUS:
+`DICTIONARY_ROUTE_ROUND_TRIP_LOCAL / NO_DATA_MUTATION / UNDEPLOYED`.
+
 ## Checkpoint — 2026-10-04 — Dictionary structural lookup resolution (LOCAL / NO MUTATION)
 
 IMPLEMENTED: The shared interpreter now exposes at most one generic compact
