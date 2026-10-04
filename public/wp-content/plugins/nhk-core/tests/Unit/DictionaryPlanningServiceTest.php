@@ -182,4 +182,36 @@ final class DictionaryPlanningServiceTest extends TestCase
         self::assertSame(['domain' => 'clock'], $candidateRepo->items[1]->context);
         self::assertNotSame($mentionRepo->items[0]->sourceId, $mentionRepo->items[1]->sourceId);
     }
+
+    public function test_structural_planning_reuses_shared_lookup_hint_only_after_primary_unknown(): void
+    {
+        $candidateRepo = new class implements DictionaryCandidateRepository {
+            public function upsertObservation(DictionaryCandidate $candidate): DictionaryCandidate { return $candidate; }
+            public function suppressed(string $normalizedTerm, string $contextHash): bool { return false; }
+            public function listForReview(int $limit = 100): array { return []; }
+            public function findById(string $candidateId): ?DictionaryCandidate { return null; }
+            public function saveDecision(DictionaryCandidate $candidate, int $expectedRevision): DictionaryCandidate { return $candidate; }
+        };
+        $mentionRepo = new class implements DictionaryMentionRepository {
+            public function upsert(DictionaryMention $mention): DictionaryMention { return $mention; }
+            public function listBySource(string $sourceKind, string $sourceId): array { return []; }
+        };
+        $lookups = [];
+        $resolver = new DictionaryResolver(
+            static function (string $term) use (&$lookups): array {
+                $lookups[] = $term;
+                return $term === 'côn 8 búa' ? [['concept_id' => 'sense-8-8', 'preferred_label' => 'Côn 8 búa', 'destination_url' => '/tu-dien/con-8-bua/']] : [];
+            },
+            static fn (): array => [], static fn (): array => [], static fn (): array => [], static fn (): bool => false,
+        );
+        $service = new DictionaryPlanningService(new DictionaryTermDetector(), $resolver, $candidateRepo, $mentionRepo, new DictionaryLinkPlanner());
+
+        $plan = $service->preview('8 côn 8 búa', 'KNOWLEDGE', 'k-8-8', [], [
+            ['kind' => 'STRUCTURAL_UNIT', 'term' => 'côn'], ['kind' => 'STRUCTURAL_UNIT', 'term' => 'búa'],
+        ]);
+
+        self::assertSame(['8 côn 8 búa', 'côn 8 búa'], $lookups);
+        self::assertSame('sense-8-8', $plan['resolved_terms'][0]['concept_id']);
+        self::assertSame([], $plan['candidate_terms']);
+    }
 }

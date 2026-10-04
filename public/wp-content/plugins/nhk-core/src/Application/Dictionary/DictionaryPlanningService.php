@@ -49,8 +49,27 @@ final class DictionaryPlanningService
             'text' => $text,
             'metadata' => ['approved_labels' => $approvedLabels, 'lexical_hints' => $hints] + $context,
         ]))->toArray();
+        $lookupVariantsByTerm = [];
+        foreach ((array) ($packet['semantic_query_seeds'] ?? []) as $seed) {
+            if (!is_array($seed)) continue;
+            $normalized = $this->normalize((string) ($seed['normalized_form'] ?? ''));
+            if ($normalized === '' || strtoupper((string) ($seed['category'] ?? '')) !== 'CONFIGURATION' || ($seed['resolver_eligible'] ?? true) !== true) continue;
+            foreach ((array) ($seed['lookup_variants'] ?? []) as $variant) {
+                $variant = $this->normalize((string) $variant);
+                if ($variant !== '') $lookupVariantsByTerm[$normalized][] = $variant;
+            }
+            if (isset($lookupVariantsByTerm[$normalized])) $lookupVariantsByTerm[$normalized] = array_values(array_unique($lookupVariantsByTerm[$normalized]));
+        }
         foreach ($this->legacyPlanningObservations((array) ($packet['lexical_spans'] ?? []), $hints, $approvedLabels) as $observation) {
             $resolution = $this->resolver->resolve((string) $observation['term'], $lexicalContext);
+            if ($resolution->status === DictionaryResolution::UNKNOWN && ($observation['origin'] ?? '') === 'STRUCTURAL_CONFIGURATION') {
+                foreach ($lookupVariantsByTerm[$this->normalize((string) ($observation['normalized_term'] ?? ''))] ?? [] as $variant) {
+                    $fallback = $this->resolver->resolve($variant, $lexicalContext);
+                    if ($fallback->status === DictionaryResolution::UNKNOWN) continue;
+                    $resolution = $fallback;
+                    break;
+                }
+            }
             $conceptId = $resolution->conceptId;
             $mentionReplay = false;
 
