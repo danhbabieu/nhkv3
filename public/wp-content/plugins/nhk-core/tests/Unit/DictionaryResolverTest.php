@@ -101,4 +101,46 @@ final class DictionaryResolverTest extends TestCase
         self::assertNull($result->destinationUrl);
         self::assertSame('một thuật ngữ hoàn toàn mới', $result->normalizedTerm);
     }
+
+    public function test_exact_approved_label_with_curation_metadata_remains_resolvable(): void
+    {
+        $resolver = new DictionaryResolver(
+            approvedLabelLookup: static fn (): array => [[
+                'concept_id' => 'sense-400', 'preferred_label' => '400 ngày',
+                'destination_type' => 'dictionary', 'destination_id' => 'sense-400',
+                'context' => ['migrated_from_duplicate_draft' => true, 'review_actor' => 'curator'],
+            ]],
+            entityLookup: static fn (): array => [], knowledgeLookup: static fn (): array => [], articleLookup: static fn (): array => [], suppressionLookup: static fn (): bool => false,
+        );
+
+        $result = $resolver->resolve('400 ngày', ['locale' => 'vi-VN']);
+
+        self::assertSame(DictionaryResolution::RESOLVED, $result->status);
+        self::assertSame('sense-400', $result->destinationId);
+    }
+
+    public function test_exact_wording_with_two_applicable_approved_senses_remains_ambiguous(): void
+    {
+        $resolver = new DictionaryResolver(
+            approvedLabelLookup: static fn (): array => [
+                ['concept_id' => 'sense-a', 'preferred_label' => 'Anniversary clock', 'context' => ['research_source' => 'a']],
+                ['concept_id' => 'sense-b', 'preferred_label' => 'Anniversary clock', 'context' => ['research_source' => 'b']],
+            ],
+            entityLookup: static fn (): array => [], knowledgeLookup: static fn (): array => [], articleLookup: static fn (): array => [], suppressionLookup: static fn (): bool => false,
+        );
+
+        self::assertSame(DictionaryResolution::AMBIGUOUS, $resolver->resolve('Anniversary clock')->status);
+    }
+
+    public function test_incompatible_lexical_scope_is_not_broadened_by_exact_wording(): void
+    {
+        $resolver = new DictionaryResolver(
+            approvedLabelLookup: static fn (): array => [[
+                'concept_id' => 'sense-clock', 'preferred_label' => 'Clock', 'context' => ['domain' => 'horology'],
+            ]],
+            entityLookup: static fn (): array => [], knowledgeLookup: static fn (): array => [], articleLookup: static fn (): array => [], suppressionLookup: static fn (): bool => false,
+        );
+
+        self::assertSame(DictionaryResolution::UNKNOWN, $resolver->resolve('Clock', ['domain' => 'music'])->status);
+    }
 }

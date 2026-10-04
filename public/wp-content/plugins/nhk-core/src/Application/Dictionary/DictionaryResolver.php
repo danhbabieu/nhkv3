@@ -25,7 +25,10 @@ final class DictionaryResolver
             return new DictionaryResolution(DictionaryResolution::UNKNOWN, $term, '', context: $context);
         }
 
-        $labels = $this->rows(($this->approvedLabelLookup)($normalized, $context));
+        $labels = array_values(array_filter(
+            $this->rows(($this->approvedLabelLookup)($normalized, $context)),
+            fn (array $row): bool => $this->labelAppliesToContext($row, $context),
+        ));
         if (count($labels) > 1) {
             return new DictionaryResolution(DictionaryResolution::AMBIGUOUS, $term, $normalized, candidates: $labels, context: $context);
         }
@@ -68,5 +71,23 @@ final class DictionaryResolver
             [$row],
             $context,
         );
+    }
+
+    /**
+     * Curation/provenance metadata is not lexical identity. Only the bounded
+     * scope fields in the Dictionary contract participate in applicability.
+     */
+    private function labelAppliesToContext(array $row, array $requested): bool
+    {
+        $labelLocale = trim((string) ($row['locale'] ?? ''));
+        $requestedLocale = trim((string) ($requested['locale'] ?? ''));
+        if ($labelLocale !== '' && $requestedLocale !== '' && strcasecmp($labelLocale, $requestedLocale) !== 0) return false;
+
+        $labelContext = is_array($row['context'] ?? null) ? $row['context'] : [];
+        foreach (['domain', 'region', 'community', 'usage_scope'] as $key) {
+            if (!array_key_exists($key, $labelContext) || $labelContext[$key] === null || $labelContext[$key] === '') continue;
+            if (!array_key_exists($key, $requested) || $requested[$key] === null || $requested[$key] === '' || $requested[$key] !== $labelContext[$key]) return false;
+        }
+        return true;
     }
 }

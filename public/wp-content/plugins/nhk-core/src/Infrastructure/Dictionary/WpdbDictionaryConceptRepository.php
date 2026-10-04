@@ -30,32 +30,27 @@ final class WpdbDictionaryConceptRepository implements DictionaryConceptReposito
 
     public function findApprovedByNormalizedLabel(string $normalizedLabel, array $context = []): array
     {
-        $hashes = array_values(array_unique([$this->contextHash($context), $this->contextHash([])]));
         $out = [];
-        foreach ($hashes as $hash) {
-            $rows = $this->database->get_results($this->database->prepare(
-                "SELECT c.*,l.label_text,l.label_kind,l.locale,l.context_json AS label_context_json FROM {$this->labels} l INNER JOIN {$this->concepts} c ON c.concept_uuid=l.concept_uuid WHERE l.normalized_label=%s AND l.context_hash=%s AND l.state=1 AND c.status=%s ORDER BY c.id,l.id",
-                $normalizedLabel,
-                $hash,
-                DictionaryConcept::APPROVED,
-            ), ARRAY_A) ?: [];
-            foreach ($rows as $row) {
-                $concept = $this->hydrateConcept($row);
-                if ($concept === null) continue;
-                $out[$concept->conceptId] = [
-                    'concept_id' => $concept->conceptId,
-                    'preferred_label' => $concept->preferredLabel,
-                    'definition' => $concept->definition,
-                    'destination_type' => $concept->destinationType,
-                    'destination_id' => $concept->destinationId,
-                    'destination_url' => $concept->destinationUrl,
-                    'label' => (string) ($row['label_text'] ?? ''),
-                    'label_kind' => (string) ($row['label_kind'] ?? ''),
-                    'locale' => ($row['locale'] ?? null) !== null ? (string) $row['locale'] : null,
-                    'context' => $this->decode((string) ($row['label_context_json'] ?? '{}')),
-                ];
-            }
-            if ($out !== [] && $hash !== $this->contextHash([])) break;
+        $rows = $this->database->get_results($this->database->prepare(
+            "SELECT c.*,l.label_text,l.label_kind,l.locale,l.context_json AS label_context_json FROM {$this->labels} l INNER JOIN {$this->concepts} c ON c.concept_uuid=l.concept_uuid WHERE l.normalized_label=%s AND l.state=1 AND c.status=%s ORDER BY c.id,l.id",
+            $normalizedLabel,
+            DictionaryConcept::APPROVED,
+        ), ARRAY_A) ?: [];
+        foreach ($rows as $row) {
+            $concept = $this->hydrateConcept($row);
+            if ($concept === null) continue;
+            $out[$concept->conceptId] = [
+                'concept_id' => $concept->conceptId,
+                'preferred_label' => $concept->preferredLabel,
+                'definition' => $concept->definition,
+                'destination_type' => $concept->destinationType,
+                'destination_id' => $concept->destinationId,
+                'destination_url' => $concept->destinationUrl,
+                'label' => (string) ($row['label_text'] ?? ''),
+                'label_kind' => (string) ($row['label_kind'] ?? ''),
+                'locale' => ($row['locale'] ?? null) !== null ? (string) $row['locale'] : null,
+                'context' => $this->decode((string) ($row['label_context_json'] ?? '{}')),
+            ];
         }
         return array_values($out);
     }
