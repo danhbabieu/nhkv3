@@ -107,12 +107,82 @@ final class DictionarySeedPlannerTest extends TestCase
                 'locale' => 'vi-VN',
                 'evidence_status' => 'OBSERVATION_ONLY',
                 'resolver_eligible' => false,
+                'lookup_variants' => ['should-not-resolve'],
             ]],
         ]);
 
         self::assertSame(0, $lookups);
         self::assertSame([], $result['items']);
         self::assertSame(0, $result['aggregate']['total']);
+    }
+
+    public function test_unknown_primary_reuses_exact_unique_structural_variant_without_changing_observation_identity(): void
+    {
+        $lookups = [];
+        $resolver = new DictionaryResolver(
+            static function (string $term) use (&$lookups): array {
+                $lookups[] = $term;
+                return $term === '400' ? [['preferred_label' => '400-Day Clock', 'destination_type' => 'classification', 'destination_id' => 'sense-400']] : [];
+            },
+            static fn (): array => [], static fn (): array => [], static fn (): array => [], static fn (): bool => false,
+        );
+
+        $result = (new DictionarySeedPlanner($resolver))->plan(['semantic_query_seeds' => [[
+            'raw_span' => '400 ngày', 'normalized_form' => '400 ngày', 'lookup_variants' => ['400'], 'category' => 'CONFIGURATION', 'locale' => 'vi-VN', 'resolver_eligible' => true,
+        ]]]);
+
+        self::assertSame(['400 ngày', '400'], $lookups);
+        self::assertSame('400 ngày', $result['items'][0]['normalized_form']);
+        self::assertSame(['400 ngày'], $result['items'][0]['raw_forms']);
+        self::assertSame('ALIAS_TO_EXISTING', $result['items'][0]['classification']);
+        self::assertSame('sense-400', $result['items'][0]['resolved_destination_id']);
+        self::assertContains('STRUCTURAL_VARIANT_REUSED', $result['items'][0]['diagnostics']);
+    }
+
+    public function test_primary_resolution_does_not_consume_structural_fallback(): void
+    {
+        $lookups = [];
+        $resolver = new DictionaryResolver(
+            static function (string $term) use (&$lookups): array { $lookups[] = $term; return [['preferred_label' => '400 ngày', 'destination_type' => 'sense', 'destination_id' => 'sense-1']]; },
+            static fn (): array => [], static fn (): array => [], static fn (): array => [], static fn (): bool => false,
+        );
+
+        (new DictionarySeedPlanner($resolver))->plan(['semantic_query_seeds' => [[
+            'raw_span' => '400 ngày', 'normalized_form' => '400 ngày', 'lookup_variants' => ['400'], 'category' => 'CONFIGURATION', 'resolver_eligible' => true,
+        ]]]);
+
+        self::assertSame(['400 ngày'], $lookups);
+    }
+
+    public function test_ambiguous_structural_fallback_never_uses_first_candidate(): void
+    {
+        $resolver = new DictionaryResolver(
+            static fn (string $term): array => $term === '400' ? [['id' => 'a'], ['id' => 'b']] : [],
+            static fn (): array => [], static fn (): array => [], static fn (): array => [], static fn (): bool => false,
+        );
+
+        $result = (new DictionarySeedPlanner($resolver))->plan(['semantic_query_seeds' => [[
+            'raw_span' => '400 ngày', 'normalized_form' => '400 ngày', 'lookup_variants' => ['400'], 'category' => 'CONFIGURATION', 'resolver_eligible' => true,
+        ]]]);
+
+        self::assertSame('AMBIGUOUS', $result['items'][0]['classification']);
+        self::assertSame([], $result['items'][0]['resolution']['destination_ids']);
+        self::assertSame('REVIEW_AMBIGUITY', $result['items'][0]['suggested_action']);
+    }
+
+    public function test_lookup_budget_counts_primary_and_fallback_calls(): void
+    {
+        $calls = 0;
+        $resolver = new DictionaryResolver(
+            static function () use (&$calls): array { $calls++; return []; },
+            static fn (): array => [], static fn (): array => [], static fn (): array => [], static fn (): bool => false,
+        );
+
+        (new DictionarySeedPlanner($resolver))->plan(['semantic_query_seeds' => [[
+            'raw_span' => '400 ngày', 'normalized_form' => '400 ngày', 'lookup_variants' => ['400'], 'category' => 'CONFIGURATION', 'resolver_eligible' => true,
+        ]]], ['max_lookup_cost' => 1]);
+
+        self::assertSame(1, $calls);
     }
 
     public function test_seed_plan_exposes_canonical_reuse_and_action_without_creating_a_concept(): void

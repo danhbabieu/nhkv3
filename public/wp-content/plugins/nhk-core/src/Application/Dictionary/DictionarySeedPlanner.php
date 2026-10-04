@@ -19,6 +19,8 @@ final class DictionarySeedPlanner
         $sourceFamily = trim((string) ($options['source_family'] ?? $sourceContext['source_identifier'] ?? $sourceContext['source_kind'] ?? 'unknown')) ?: 'unknown';
         $context = is_array($options['context'] ?? null) ? $options['context'] : [];
         $lookupCostPerSeed = max(1, min(16, (int) ($options['lookup_cost_per_seed'] ?? 1)));
+        $lookupBudget = isset($options['max_lookup_cost']) ? max(1, min(128, (int) $options['max_lookup_cost'])) : null;
+        $lookupCalls = 0;
         $maxSeeds = isset($options['max_lookup_cost'])
             ? max(1, min(128, intdiv(max(1, (int) $options['max_lookup_cost']), $lookupCostPerSeed)))
             : (isset($options['max_seeds']) ? max(1, min(128, (int) $options['max_seeds'])) : null);
@@ -82,7 +84,23 @@ final class DictionarySeedPlanner
                 $item['suggested_action'] = 'SUPPRESS_NOISE';
                 continue;
             }
+            if ($lookupBudget !== null && $lookupCalls >= $lookupBudget) {
+                unset($items[$item['normalized_form']]);
+                break;
+            }
             $resolution = $this->resolver->resolve((string) ($item['raw_forms'][0] ?? $item['normalized_form']), $context + ['locale' => $item['locale']]);
+            $lookupCalls++;
+            if ($resolution->status === DictionaryResolution::UNKNOWN) {
+                foreach ($this->lookupVariants($seedGroups[$item['normalized_form']] ?? []) as $variant) {
+                    if ($lookupBudget !== null && $lookupCalls >= $lookupBudget) break;
+                    $fallback = $this->resolver->resolve($variant, $context + ['locale' => $item['locale']]);
+                    $lookupCalls++;
+                    if ($fallback->status === DictionaryResolution::UNKNOWN) continue;
+                    $resolution = $fallback;
+                    $item['diagnostics'][] = 'STRUCTURAL_VARIANT_REUSED';
+                    break;
+                }
+            }
             $item['resolution'] = [
                 'status' => $resolution->status,
                 'concept_id' => $resolution->status === DictionaryResolution::RESOLVED ? $resolution->conceptId : null,
@@ -118,20 +136,35 @@ final class DictionarySeedPlanner
         $aggregate = ['total' => count($rows), 'counts_by_classification' => []];
         foreach ($rows as $row) $aggregate['counts_by_classification'][$row['classification']] = ($aggregate['counts_by_classification'][$row['classification']] ?? 0) + 1;
         ksort($aggregate['counts_by_classification']);
-        $diagnostics = ['deduplication' => 'normalized_form', 'source_family' => $sourceFamily];
+        $diagnostics = ['deduplication' => 'normalized_form', 'source_family' => $sourceFamily, 'resolver_lookup_count' => $lookupCalls];
         if ($bounded) {
             $diagnostics['bounded_seed_limit'] = $maxSeeds;
             $diagnostics['truncated_seed_count'] = $truncatedSeeds;
-            if (isset($options['max_lookup_cost'])) $diagnostics['bounded_lookup_cost'] = $maxSeeds * $lookupCostPerSeed;
+            if (isset($options['max_lookup_cost'])) $diagnostics['bounded_lookup_cost'] = $lookupBudget;
         }
         if ($seedOffset > 0 || $maxSeeds !== null) {
             $diagnostics['seed_offset'] = $seedOffset;
-            $diagnostics['processed_seed_count'] = count($selectedKeys);
+            $diagnostics['processed_seed_count'] = count($rows);
             $diagnostics['total_unique_seed_count'] = count($orderedKeys);
-            $diagnostics['has_more_seeds'] = $truncatedSeeds > 0;
-            $diagnostics['next_seed_offset'] = $truncatedSeeds > 0 ? $seedOffset + count($selectedKeys) : null;
+            $hasMore = count($rows) < count($selectedKeys) || $truncatedSeeds > 0;
+            $diagnostics['has_more_seeds'] = $hasMore;
+            $diagnostics['next_seed_offset'] = $hasMore ? $seedOffset + count($rows) : null;
         }
         return ['status' => 'READ_ONLY_PLAN', 'read_only' => true, 'mutated' => false, 'items' => $rows, 'aggregate' => $aggregate, 'diagnostics' => $diagnostics];
+    }
+
+    /** @param list<array<string,mixed>> $seeds @return list<string> */
+    private function lookupVariants(array $seeds): array
+    {
+        $variants = [];
+        foreach ($seeds as $seed) {
+            if (strtoupper(trim((string) ($seed['category'] ?? ''))) !== 'CONFIGURATION' || ($seed['resolver_eligible'] ?? true) !== true) continue;
+            foreach ((array) ($seed['lookup_variants'] ?? []) as $variant) {
+                $variant = trim((string) $variant);
+                if ($variant !== '' && !in_array($variant, $variants, true)) $variants[] = $variant;
+            }
+        }
+        return $variants;
     }
 
     private function normalize(string $value): string

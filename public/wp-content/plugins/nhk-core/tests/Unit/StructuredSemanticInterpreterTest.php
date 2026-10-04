@@ -117,6 +117,38 @@ final class StructuredSemanticInterpreterTest extends TestCase
         }
     }
 
+    public function test_qualified_two_pair_configuration_exposes_one_compact_lookup_variant(): void
+    {
+        $packet = (new StructuredSemanticInterpreter())->interpret([
+            'text' => '36 ngày 10 tháng',
+            'source_kind' => 'human_chat',
+            'metadata' => ['lexical_hints' => [['kind' => 'STRUCTURAL_UNIT', 'term' => 'ngày'], ['kind' => 'STRUCTURAL_UNIT', 'term' => 'tháng']]],
+        ])->toArray();
+
+        $configuration = array_values(array_filter(
+            $packet['semantic_query_seeds'],
+            static fn (array $seed): bool => ($seed['category'] ?? '') === 'CONFIGURATION',
+        ));
+
+        self::assertCount(1, $configuration);
+        self::assertSame(['36/10'], $configuration[0]['lookup_variants']);
+        self::assertSame('36 ngày 10 tháng', $configuration[0]['normalized_form']);
+        self::assertTrue($configuration[0]['resolver_eligible']);
+    }
+
+    public function test_unequal_multi_pair_configuration_does_not_expose_reduction_variant(): void
+    {
+        $packet = (new StructuredSemanticInterpreter())->interpret([
+            'text' => '36 ngày 10 tháng 2 năm',
+            'source_kind' => 'human_chat',
+            'metadata' => ['lexical_hints' => [['kind' => 'STRUCTURAL_UNIT', 'term' => 'ngày'], ['kind' => 'STRUCTURAL_UNIT', 'term' => 'tháng'], ['kind' => 'STRUCTURAL_UNIT', 'term' => 'năm']]],
+        ])->toArray();
+
+        foreach ($packet['semantic_query_seeds'] as $seed) {
+            if (($seed['category'] ?? '') === 'CONFIGURATION') self::assertSame([], $seed['lookup_variants']);
+        }
+    }
+
     public function test_explicit_relation_hints_are_planned_only_and_unregistered_predicates_fail_closed(): void
     {
         $packet = (new StructuredSemanticInterpreter())->interpret([

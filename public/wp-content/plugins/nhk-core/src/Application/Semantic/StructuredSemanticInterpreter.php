@@ -264,9 +264,19 @@ final class StructuredSemanticInterpreter
                 'diagnostics' => isset($ambiguousTerms[$normalized]) ? ['AMBIGUOUS_CANONICAL_OWNER'] : [],
                 'occurrences' => max(1, (int) ($span['occurrences'] ?? 1)),
                 'resolver_eligible' => ($span['resolver_eligible'] ?? true) === true,
+                'lookup_variants' => $this->structuralLookupVariants($span),
             ];
         }
         return $seeds;
+    }
+
+    /** @param array<string,mixed> $span @return list<string> */
+    private function structuralLookupVariants(array $span): array
+    {
+        if (($span['origin'] ?? '') !== 'STRUCTURAL_CONFIGURATION' || ($span['evidence_status'] ?? '') !== 'QUALIFIED' || ($span['resolver_eligible'] ?? false) !== true) return [];
+        $normalized = $this->normalize((string) ($span['normalized_term'] ?? ''));
+        if (preg_match('/^(\d{1,3})\s+[\p{L}][\p{L}-]*\s+(\d{1,3})\s+[\p{L}][\p{L}-]*$/u', $normalized, $match) !== 1) return [];
+        return [$match[1] . '/' . $match[2]];
     }
 
     private function queryCategory(string $origin): string
