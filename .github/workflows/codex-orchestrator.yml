@@ -1,0 +1,173 @@
+name: NHK Codex Orchestrator
+
+on:
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Emit a synthetic NOOP result without invoking Codex
+        required: true
+        default: true
+        type: boolean
+      issue_number:
+        description: Optional issue number to receive the dry-run result comment
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codex-orchestrator-${{ github.event.issue.number || inputs.issue_number || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      allowed: ${{ steps.guard.outputs.allowed }}
+      status: ${{ steps.guard.outputs.status }}
+      reason: ${{ steps.guard.outputs.reason }}
+      task_id: ${{ steps.guard.outputs.task_id }}
+      gate_id: ${{ steps.guard.outputs.gate_id }}
+      base_sha: ${{ steps.guard.outputs.base_sha }}
+      issue_number: ${{ steps.guard.outputs.issue_number }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 1
+      - name: Resolve current base
+        id: base
+        shell: bash
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Parse and authorize event
+        id: guard
+        env:
+          ACTUAL_BASE_SHA: ${{ steps.base.outputs.sha }}
+          DRY_RUN: ${{ inputs.dry_run || 'false' }}
+          DISPATCH_ISSUE_NUMBER: ${{ inputs.issue_number || '' }}
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { parseCodexCommand } from './.github/codex-orchestrator/command-parser.mjs';
+          import { evaluateRunGuard } from './.github/codex-orchestrator/guard.mjs';
+
+          const event = JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'));
+          const output = process.env.GITHUB_OUTPUT;
+          const emit = (key, value) => fs.appendFileSync(output, `${key}=${String(value).replace(/\n/g, ' ')}\n`);
+
+          if (event.action === undefined && process.env.DRY_RUN === 'true') {
+            emit('allowed', 'true');
+            emit('status', 'READY');
+            emit('reason', 'workflow_dispatch dry-run');
+            emit('task_id', 'dry-run');
+            emit('gate_id', 'control-plane');
+            emit('base_sha', process.env.ACTUAL_BASE_SHA);
+            emit('issue_number', process.env.DISPATCH_ISSUE_NUMBER || '');
+            process.exit(0);
+          }
+
+          let parsed;
+          try {
+            parsed = parseCodexCommand(event.comment?.body ?? '');
+          } catch (error) {
+            parsed = { isCommand: false, error: error.message };
+          }
+          const labels = (event.issue?.labels ?? []).map((label) => typeof label === 'string' ? label : label.name);
+          const authorizedAssociations = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
+          const guard = evaluateRunGuard({
+            repository: event.repository?.full_name,
+            hasTaskLabel: labels.includes('codex-task'),
+            actorAuthorized: authorizedAssociations.has(event.comment?.author_association),
+            taskTerminal: labels.some((label) => ['codex-complete', 'codex-cancelled'].includes(label)),
+            isCommand: parsed.isCommand === true,
+            expectedBaseSha: parsed.expectedBaseSha,
+            actualBaseSha: process.env.ACTUAL_BASE_SHA,
+          });
+          emit('allowed', String(guard.allowed));
+          emit('status', guard.status);
+          emit('reason', guard.reason);
+          emit('task_id', parsed.taskId ?? 'unknown');
+          emit('gate_id', parsed.gateId ?? 'unknown');
+          emit('base_sha', parsed.expectedBaseSha ?? process.env.ACTUAL_BASE_SHA);
+          emit('issue_number', event.issue?.number ?? '');
+          NODE
+
+  execute:
+    needs: guard
+    if: needs.guard.outputs.allowed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 1
+      - name: Emit synthetic dry-run packet
+        if: github.event_name == 'workflow_dispatch' && inputs.dry_run
+        shell: bash
+        env:
+          TASK_ID: ${{ needs.guard.outputs.task_id }}
+          GATE_ID: ${{ needs.guard.outputs.gate_id }}
+          BASE_SHA: ${{ needs.guard.outputs.base_sha }}
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const packet = {
+            protocol_version: '1.0',
+            task_id: process.env.TASK_ID,
+            gate_id: process.env.GATE_ID,
+            status: 'NOOP',
+            base_sha: process.env.BASE_SHA,
+            head_sha: process.env.BASE_SHA,
+            root_cause: 'dry-run: Codex was not invoked',
+            actions_taken: ['parsed trusted workflow_dispatch input', 'emitted synthetic result packet'],
+            files_changed: [],
+            tests_run: [{ command: 'dry-run', exit_code: 0, summary: 'control plane reached execute job' }],
+            verification: { scope_satisfied: true, independent_checks_passed: true },
+            mutations: [],
+            blockers: [],
+            recommended_next_step: 'inspect workflow evidence before enabling live Codex execution'
+          };
+          fs.writeFileSync('codex-result.json', JSON.stringify(packet, null, 2));
+          NODE
+      - name: Upload result evidence
+        if: github.event_name == 'workflow_dispatch' && inputs.dry_run
+        uses: actions/upload-artifact@v4
+        with:
+          name: codex-orchestrator-result-${{ github.run_id }}
+          path: codex-result.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Comment dry-run result when issue supplied
+        if: github.event_name == 'workflow_dispatch' && inputs.dry_run && needs.guard.outputs.issue_number != ''
+        uses: actions/github-script@v7
+        env:
+          ISSUE_NUMBER: ${{ needs.guard.outputs.issue_number }}
+        with:
+          script: |
+            const fs = require('fs');
+            const packet = JSON.parse(fs.readFileSync('codex-result.json', 'utf8'));
+            const body = `## Codex Orchestrator Result\n- Status: **${packet.status}**\n- Task: \`${packet.task_id}\`\n- Gate: \`${packet.gate_id}\`\n- Dry run: Codex was not invoked.`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: Number(process.env.ISSUE_NUMBER),
+              body
+            });
+      - name: Stop before live Codex in Slice A
+        if: github.event_name == 'issue_comment'
+        shell: bash
+        run: |
+          echo "Live Codex execution is intentionally disabled in Slice A."
+          exit 1
