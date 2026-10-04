@@ -20995,7 +20995,6 @@ push occurred.
 
 STATUS: `IMAGE_CAPTURE_MEDIA_ARTICLE_PUBLIC_LOCAL_READY / INTEGRATION_ENVIRONMENT_GATED / NO_SERVER_ACTION`
 
-<<<<<<< HEAD
 # Checkpoint — 2026-09-25 — Video universal owner lifecycle staging failure boundary (LOCAL / NO SERVER ACTION)
 
 ROOT_CAUSE: The shared Capture continuation classified a bounded Video staging-admission denial as the generic Video transient failure VIDEO_EXTERNAL_TRANSIENT_FAILURE, hiding the exact operator/deployment action required by the fail-closed staging contract. The existing lifecycle receipt already emitted CONTROLLED_APPLY once; a regression test now locks that invariant.
