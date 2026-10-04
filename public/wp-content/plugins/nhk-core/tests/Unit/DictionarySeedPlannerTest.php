@@ -185,6 +185,29 @@ final class DictionarySeedPlannerTest extends TestCase
         self::assertSame(1, $calls);
     }
 
+    public function test_lookup_budget_replays_after_fallback_at_the_next_unresolved_seed(): void
+    {
+        $lookups = [];
+        $resolver = new DictionaryResolver(
+            static function (string $term) use (&$lookups): array {
+                $lookups[] = $term;
+                return $term === 'compact' ? [['preferred_label' => 'Compact', 'destination_type' => 'classification', 'destination_id' => 'compact-1']] : [];
+            },
+            static fn (): array => [], static fn (): array => [], static fn (): array => [], static fn (): bool => false,
+        );
+
+        $result = (new DictionarySeedPlanner($resolver))->plan(['semantic_query_seeds' => [
+            ['raw_span' => 'structural', 'normalized_form' => 'structural', 'category' => 'CONFIGURATION', 'lookup_variants' => ['compact'], 'resolver_eligible' => true],
+            ['raw_span' => 'next', 'normalized_form' => 'next', 'category' => 'LEXICAL_TERM', 'resolver_eligible' => true],
+        ]], ['max_lookup_cost' => 2]);
+
+        self::assertSame(['structural', 'compact'], $lookups);
+        self::assertCount(1, $result['items']);
+        self::assertTrue($result['diagnostics']['budget_exhausted']);
+        self::assertTrue($result['diagnostics']['has_more_seeds']);
+        self::assertSame(1, $result['diagnostics']['next_seed_offset']);
+    }
+
     public function test_seed_plan_exposes_canonical_reuse_and_action_without_creating_a_concept(): void
     {
         $resolver = new DictionaryResolver(

@@ -18,12 +18,9 @@ final class DictionarySeedPlanner
         $sourceContext = is_array($value['source_context'] ?? null) ? $value['source_context'] : [];
         $sourceFamily = trim((string) ($options['source_family'] ?? $sourceContext['source_identifier'] ?? $sourceContext['source_kind'] ?? 'unknown')) ?: 'unknown';
         $context = is_array($options['context'] ?? null) ? $options['context'] : [];
-        $lookupCostPerSeed = max(1, min(16, (int) ($options['lookup_cost_per_seed'] ?? 1)));
         $lookupBudget = isset($options['max_lookup_cost']) ? max(1, min(128, (int) $options['max_lookup_cost'])) : null;
         $lookupCalls = 0;
-        $maxSeeds = isset($options['max_lookup_cost'])
-            ? max(1, min(128, intdiv(max(1, (int) $options['max_lookup_cost']), $lookupCostPerSeed)))
-            : (isset($options['max_seeds']) ? max(1, min(128, (int) $options['max_seeds'])) : null);
+        $maxSeeds = isset($options['max_seeds']) ? max(1, min(128, (int) $options['max_seeds'])) : null;
         $seedOffset = max(0, (int) ($options['seed_offset'] ?? 0));
         $uniqueSeeds = [];
         $seedGroups = [];
@@ -85,7 +82,11 @@ final class DictionarySeedPlanner
                 continue;
             }
             if ($lookupBudget !== null && $lookupCalls >= $lookupBudget) {
-                unset($items[$item['normalized_form']]);
+                $drop = false;
+                foreach (array_keys($items) as $key) {
+                    if ($key === $item['normalized_form']) $drop = true;
+                    if ($drop) unset($items[$key]);
+                }
                 break;
             }
             $resolution = $this->resolver->resolve((string) ($item['raw_forms'][0] ?? $item['normalized_form']), $context + ['locale' => $item['locale']]);
@@ -133,20 +134,25 @@ final class DictionarySeedPlanner
         unset($item);
 
         $rows = array_values($items);
+        $budgetTruncated = $lookupBudget !== null && $lookupCalls >= $lookupBudget && count($rows) < count($selectedKeys)
+            ? count($selectedKeys) - count($rows)
+            : 0;
+        $bounded = $bounded || $budgetTruncated > 0;
         $aggregate = ['total' => count($rows), 'counts_by_classification' => []];
         foreach ($rows as $row) $aggregate['counts_by_classification'][$row['classification']] = ($aggregate['counts_by_classification'][$row['classification']] ?? 0) + 1;
         ksort($aggregate['counts_by_classification']);
         $diagnostics = ['deduplication' => 'normalized_form', 'source_family' => $sourceFamily, 'resolver_lookup_count' => $lookupCalls];
         if ($bounded) {
             $diagnostics['bounded_seed_limit'] = $maxSeeds;
-            $diagnostics['truncated_seed_count'] = $truncatedSeeds;
+            $diagnostics['truncated_seed_count'] = $truncatedSeeds + $budgetTruncated;
             if (isset($options['max_lookup_cost'])) $diagnostics['bounded_lookup_cost'] = $lookupBudget;
+            if ($budgetTruncated > 0) $diagnostics['budget_exhausted'] = true;
         }
-        if ($seedOffset > 0 || $maxSeeds !== null) {
+        if ($seedOffset > 0 || $maxSeeds !== null || $lookupBudget !== null) {
             $diagnostics['seed_offset'] = $seedOffset;
             $diagnostics['processed_seed_count'] = count($rows);
             $diagnostics['total_unique_seed_count'] = count($orderedKeys);
-            $hasMore = count($rows) < count($selectedKeys) || $truncatedSeeds > 0;
+            $hasMore = count($rows) < count($selectedKeys) || $truncatedSeeds > 0 || $budgetTruncated > 0;
             $diagnostics['has_more_seeds'] = $hasMore;
             $diagnostics['next_seed_offset'] = $hasMore ? $seedOffset + count($rows) : null;
         }

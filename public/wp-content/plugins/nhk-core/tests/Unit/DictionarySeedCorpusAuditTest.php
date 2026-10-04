@@ -410,7 +410,7 @@ final class DictionarySeedCorpusAuditTest extends TestCase
         ))->audit('ARTICLE', null, 1);
 
         self::assertSame(1, $result['sources_scanned']);
-        self::assertLessThanOrEqual(16, intdiv($resolverCalls, 3));
+        self::assertLessThanOrEqual(64, intdiv($resolverCalls, 3));
         self::assertSame('AVAILABLE', $result['status']);
         self::assertTrue($result['read_only']);
         self::assertFalse($result['mutated']);
@@ -420,7 +420,7 @@ final class DictionarySeedCorpusAuditTest extends TestCase
     public function test_article_seed_budget_continues_same_article_without_loss_or_duplicate_before_next_article(): void
     {
         $phrases = [];
-        for ($index = 1; $index <= 20; $index++) $phrases[] = 'Seed ' . $index . ' Device';
+        for ($index = 1; $index <= 80; $index++) $phrases[] = 'Seed ' . $index . ' Device';
         $reader = new FakeDictionaryCorpusReader([
             ['source_id' => '18', 'source_family' => 'article:18', 'source_kind' => 'ARTICLE', 'raw_text' => 'Article Eighteen', 'context' => ['lexical_hints' => ['Article Eighteen']]],
             ['source_id' => '19', 'source_family' => 'article:19', 'source_kind' => 'ARTICLE', 'raw_text' => implode('. ', $phrases), 'context' => ['lexical_hints' => $phrases]],
@@ -437,10 +437,10 @@ final class DictionarySeedCorpusAuditTest extends TestCase
 
         $firstBatch = array_column($article19First['items'], 'normalized_form');
         $secondBatch = array_column($article19Second['items'], 'normalized_form');
-        self::assertCount(16, $firstBatch);
-        self::assertCount(4, $secondBatch);
+        self::assertCount(64, $firstBatch);
+        self::assertCount(16, $secondBatch);
         self::assertSame([], array_intersect($firstBatch, $secondBatch));
-        self::assertCount(20, array_unique(array_merge($firstBatch, $secondBatch)));
+        self::assertCount(80, array_unique(array_merge($firstBatch, $secondBatch)));
         self::assertSame('19', $article19First['diagnostics']['source_diagnostics'][0]['source_id']);
         self::assertSame('CORPUS_SOURCE_SEED_BUDGET_REACHED', $article19First['diagnostics']['source_diagnostics'][0]['code']);
         self::assertSame('article twenty', $article20['items'][0]['normalized_form']);
@@ -454,7 +454,7 @@ final class DictionarySeedCorpusAuditTest extends TestCase
     public function test_article_seed_cursor_fails_closed_when_article_changes_between_batches(): void
     {
         $phrases = [];
-        for ($index = 1; $index <= 20; $index++) $phrases[] = 'Seed ' . $index . ' Device';
+        for ($index = 1; $index <= 80; $index++) $phrases[] = 'Seed ' . $index . ' Device';
         $rows = [['source_id' => '19', 'source_family' => 'article:19', 'source_kind' => 'ARTICLE', 'raw_text' => implode('. ', $phrases), 'context' => ['lexical_hints' => $phrases]]];
         $reader = new class($rows) implements DictionaryCorpusSourceReader {
             public function __construct(private array $rows) {}
