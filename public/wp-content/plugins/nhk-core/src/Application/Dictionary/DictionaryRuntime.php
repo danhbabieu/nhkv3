@@ -213,7 +213,7 @@ final class DictionaryRuntime
             return $items;
         };
         return [
-            'knowledge' => function (string $type, string $id) use ($packet, $items): array { $value = $packet($type, $id); $rows = is_array($value['knowledge']['items'] ?? null) ? $value['knowledge']['items'] : []; return ['status' => $rows === [] ? 'AVAILABLE_EMPTY' : 'AVAILABLE_WITH_ITEMS', 'count' => count($rows), 'items' => $rows]; },
+            'knowledge' => function (string $type, string $id) use ($packet): array { return DictionaryEnrichmentCoverage::knowledgeFromOwnerDossier($packet($type, $id)); },
             'media' => function (string $type, string $id) use ($packet, $items): array { $value = $packet($type, $id); $rows = []; if (is_array($value['primary_media'] ?? null)) $rows[] = $value['primary_media']; $rows = array_merge($rows, $items((array) ($value['relation_sections'] ?? []), ['media'])); return ['status' => $rows === [] ? 'AVAILABLE_EMPTY' : 'AVAILABLE_WITH_ITEMS', 'count' => count($rows), 'items' => $rows]; },
             'video' => function (string $type, string $id) use ($packet, $items): array { $rows = $items($packet($type, $id)['relation_sections'] ?? [], ['videos']); return ['status' => $rows === [] ? 'AVAILABLE_EMPTY' : 'AVAILABLE_WITH_ITEMS', 'count' => count($rows), 'items' => $rows]; },
             'articles' => function (string $type, string $id) use ($packet, $items): array { $rows = $items($packet($type, $id)['relation_sections'] ?? [], ['articles', 'wp_posts']); return ['status' => $rows === [] ? 'AVAILABLE_EMPTY' : 'AVAILABLE_WITH_ITEMS', 'count' => count($rows), 'items' => $rows]; },

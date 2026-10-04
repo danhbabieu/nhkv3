@@ -8,6 +8,33 @@ use PHPUnit\Framework\TestCase;
 
 final class DictionaryEnrichmentCoverageTest extends TestCase
 {
+    public function test_knowledge_owner_packet_matches_bounded_public_dictionary_projection(): void
+    {
+        $packet = ['knowledge' => ['status' => 'AVAILABLE', 'facets' => [
+            'movement' => [['id' => 'k1'], ['id' => 'k2']],
+            'material' => [['id' => 'k3']],
+            'origin' => [['id' => 'k4'], ['id' => 'k5']],
+            'overflow' => [['id' => 'k6']],
+        ]]];
+
+        $coverage = DictionaryEnrichmentCoverage::knowledgeFromOwnerDossier($packet);
+
+        self::assertSame('AVAILABLE_WITH_ITEMS', $coverage['status']);
+        self::assertSame(6, $coverage['count']);
+        self::assertSame(['k1', 'k2', 'k3', 'k4', 'k5', 'k6'], array_column($coverage['items'], 'id'));
+        self::assertFalse($coverage['has_more']);
+    }
+
+    public function test_knowledge_owner_packet_preserves_empty_and_unavailable_states(): void
+    {
+        self::assertSame('AVAILABLE_EMPTY', DictionaryEnrichmentCoverage::knowledgeFromOwnerDossier([
+            'knowledge' => ['status' => 'AVAILABLE', 'facets' => []],
+        ])['status']);
+        self::assertSame('UNAVAILABLE', DictionaryEnrichmentCoverage::knowledgeFromOwnerDossier([
+            'knowledge' => ['status' => 'UNAVAILABLE', 'facets' => []],
+        ])['status']);
+    }
+
     public function test_coverage_keeps_available_empty_and_unavailable_distinct_and_counts_mentions(): void
     {
         $coverage = new DictionaryEnrichmentCoverage([

@@ -4,6 +4,8 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Dictionary\DictionaryEnrichmentAudit;
+use NHK\Core\Application\Dictionary\DictionaryEnrichmentCoverage;
+use NHK\Core\Application\Dictionary\DictionaryDetailQuery;
 use NHK\Core\Domain\Dictionary\{DictionaryConcept, LexicalEntry, LexicalEntryForm};
 use PHPUnit\Framework\TestCase;
 
@@ -106,5 +108,44 @@ final class DictionaryEnrichmentAuditTest extends TestCase
         self::assertSame('AVAILABLE', $item['semantic_reference']['status']);
         self::assertSame('EXACT_UNIQUE', $item['senses'][0]['owner_resolution']['classification']);
         self::assertSame('COMPLETE', $item['classification']);
+    }
+
+    public function test_audit_uses_the_same_semantic_reference_owner_and_bounded_knowledge_as_public_detail(): void
+    {
+        $sense = new DictionaryConcept('sense-400', '400 ngày', 'Định nghĩa', DictionaryConcept::APPROVED, 'classification', 'owner-400');
+        $entry = new LexicalEntry('entry-400', '400 ngày', '400 ngày', DictionaryConcept::APPROVED, 'vi-VN', ['public_slug' => '400-ngay'], 1, ['sense-400']);
+        $entries = new class($entry, $sense) {
+            public function __construct(private LexicalEntry $entry, private DictionaryConcept $sense) {}
+            public function listEntries(int $limit): array { return [$this->entry]; }
+            public function listSenses(LexicalEntry $entry): array { return [$this->sense]; }
+            public function listForms(LexicalEntry $entry): array { return []; }
+            public function semanticReference(string $entryId, string $senseId): array { return ['status' => 'PRESENT_VALID', 'type' => 'classification', 'id' => 'owner-400', 'revision' => 7]; }
+        };
+        $ownerDossier = ['identity' => ['type' => 'classification', 'id' => 'owner-400'], 'knowledge' => ['status' => 'AVAILABLE', 'facets' => [
+            'movement' => [['id' => 'k1'], ['id' => 'k2']],
+            'material' => [['id' => 'k3']],
+            'origin' => [['id' => 'k4'], ['id' => 'k5']],
+        ]]];
+        $audit = new DictionaryEnrichmentAudit(
+            $entries,
+            new class { public function listLabels(string $id, bool $active = true): array { return []; } },
+            function (string $type, string $id, array $context = []) use ($ownerDossier): array { return ['knowledge' => DictionaryEnrichmentCoverage::knowledgeFromOwnerDossier($ownerDossier)]; },
+            static fn (DictionaryConcept $sense, array $context = []): array => (new \NHK\Core\Application\Dictionary\DictionaryEnrichmentOwnerResolver())->resolve($sense, $context),
+        );
+
+        $item = $audit->audit(1)['items'][0];
+        $public = (new DictionaryDetailQuery(
+            new class { public function listLabels(string $id): array { return []; } },
+            $entries,
+            null,
+            function (string $type, string $id) use ($ownerDossier): array { return $ownerDossier; },
+        ))->detail('400-ngay')['item']['senses'][0]['knowledge'];
+
+        self::assertSame('PRESENT_VALID', $item['semantic_reference']['status']);
+        self::assertSame('owner-400', $item['senses'][0]['owner_resolution']['target']['id']);
+        self::assertSame('AVAILABLE_WITH_ITEMS', $item['coverage']['knowledge']['status']);
+        self::assertSame(5, $item['coverage']['knowledge']['count']);
+        self::assertSame(['k1', 'k2', 'k3', 'k4', 'k5'], array_column($item['coverage']['knowledge']['items'], 'id'));
+        self::assertSame($public['items'], $item['coverage']['knowledge']['items']);
     }
 }

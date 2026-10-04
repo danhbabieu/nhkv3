@@ -25,6 +25,29 @@ STATUS: `DICTIONARY_STORAGE_AND_DISPLAY_COMPLETE_ON_STAGING`
 
 KNOWN_P2_DATA_CLEANUP: `Selection cam locale vi-VN → en`
 
+## Checkpoint — 2026-10-04 — Dictionary audit Knowledge coverage parity (LOCAL / NO DATA MUTATION)
+
+ROOT_CAUSE: Dictionary public detail flattened the canonical owner dossier's
+Knowledge facets into its bounded item projection, while enrichment audit read
+only `knowledge.items`; the same Sense semantic reference and classification
+owner therefore appeared as `AVAILABLE_EMPTY` in audit.
+
+IMPLEMENTATION: Reused one owner-dossier Knowledge normalizer for audit
+coverage. It flattens the canonical scoped facets, applies the same six-item
+bound, and preserves `AVAILABLE_EMPTY`, `UNAVAILABLE` and `BLOCKED` without
+converting provider failures into empty results.
+
+REGRESSION COVERAGE: Added 400 ngày Sense → semantic_reference → classification
+owner coverage parity for public detail and enrichment audit, plus real empty
+and unavailable Knowledge provider states.
+
+VERIFICATION: Dictionary Unit set passes 231 tests / 1,041 assertions with
+existing warnings/deprecations. Changed PHP files lint clean, `git diff
+--check` passes and the changed-file secret review is clean. No migration,
+schema change, data mutation, deployment or push was performed.
+
+STATUS: `DICTIONARY_AUDIT_KNOWLEDGE_PARITY_FIXED / FOCUSED_GREEN / NO_DATA_MUTATION / COMMIT_PENDING`
+
 ## Checkpoint — 2026-10-04 — Dictionary mixed-plan lexical closure (LOCAL / NO DATA MUTATION)
 
 ROOT_CAUSE: `enrichmentApply()` rejected the entire deterministic plan when its

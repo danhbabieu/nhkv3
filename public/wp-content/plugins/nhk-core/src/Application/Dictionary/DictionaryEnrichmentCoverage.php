@@ -48,4 +48,32 @@ final class DictionaryEnrichmentCoverage
         $out['items'] = $items;
         return $out;
     }
+
+    /**
+     * Adapt the canonical owner dossier's public Knowledge projection to the
+     * same bounded item scope used by Dictionary detail.
+     *
+     * @param array<string,mixed> $ownerDossier
+     * @return array<string,mixed>
+     */
+    public static function knowledgeFromOwnerDossier(array $ownerDossier): array
+    {
+        $knowledge = $ownerDossier['knowledge'] ?? null;
+        if (!is_array($knowledge)) return ['status' => 'UNAVAILABLE', 'count' => 0, 'items' => []];
+
+        $status = strtoupper(trim((string) ($knowledge['status'] ?? 'AVAILABLE')));
+        if (in_array($status, ['UNAVAILABLE', 'BLOCKED'], true)) return ['status' => $status, 'count' => 0, 'items' => []];
+
+        $items = is_array($knowledge['items'] ?? null) ? $knowledge['items'] : [];
+        if ($items === [] && is_array($knowledge['facets'] ?? null)) {
+            foreach ($knowledge['facets'] as $facetItems) foreach ((array) $facetItems as $item) if (is_array($item)) $items[] = $item;
+        }
+        $bounded = array_slice($items, 0, 6);
+        return [
+            'status' => $bounded === [] ? 'AVAILABLE_EMPTY' : 'AVAILABLE_WITH_ITEMS',
+            'count' => count($bounded),
+            'items' => $bounded,
+            'has_more' => count($items) > 6,
+        ];
+    }
 }
