@@ -57,6 +57,22 @@ final class DictionaryEnrichmentPlanTest extends TestCase
         self::assertSame('NO_OWNER', $resolver->resolve(new DictionaryConcept('sense-2', 'Không biết', 'Nghĩa', DictionaryConcept::APPROVED), [])['classification']);
     }
 
+    public function test_owner_resolver_accepts_one_exact_canonical_resolver_result(): void
+    {
+        $resolver = new DictionaryEnrichmentOwnerResolver(static fn (string $hint): array => [[
+            'id' => 'owner-1',
+            'type' => 'classification',
+            'revision' => 2,
+            'match_class' => 'EXACT_NORMALIZED_NAME_OR_ALIAS',
+        ]]);
+
+        $result = $resolver->resolve(new DictionaryConcept('sense-1', '400 ngày', 'Định nghĩa', DictionaryConcept::APPROVED));
+
+        self::assertSame('EXACT_UNIQUE', $result['classification']);
+        self::assertSame('owner-1', $result['target']['id']);
+        self::assertSame(['unique_resolver_result'], $result['evidence']);
+    }
+
     public function test_hidden_form_is_blocked_and_stale_reference_cannot_be_applied(): void
     {
         $plan = new DictionaryEnrichmentPlan(new class { public function listForms(string $entryId): array { return []; } }, new DictionaryEnrichmentOwnerResolver());

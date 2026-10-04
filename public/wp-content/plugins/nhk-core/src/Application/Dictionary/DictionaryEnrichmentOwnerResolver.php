@@ -8,6 +8,8 @@ use NHK\Core\Domain\Dictionary\DictionaryConcept;
 /** Resolves only explicit, governed evidence; lexical similarity is never enough. */
 final class DictionaryEnrichmentOwnerResolver
 {
+    public function __construct(private readonly mixed $canonicalResolver = null) {}
+
     /** @return array{classification:string,target:?array,evidence:list<mixed>,reason:string} */
     public function resolve(DictionaryConcept $sense, array $context = []): array
     {
@@ -25,6 +27,18 @@ final class DictionaryEnrichmentOwnerResolver
             $value = $context[$key] ?? null;
             if (is_array($value) && isset($value['type'], $value['id'])) return $this->exact($value, [$key], $key);
             if (is_array($value) && count($value) === 1 && isset($value[0]['type'], $value[0]['id'])) return $this->exact($value[0], [$key], $key);
+        }
+        if (is_callable($this->canonicalResolver)) {
+            $canonicalResolver = $this->canonicalResolver;
+            $matches = array_values(array_filter((array) ($canonicalResolver($sense->preferredLabel) ?? []), static function (mixed $match): bool {
+                if (!is_array($match) || trim((string) ($match['type'] ?? '')) === '' || trim((string) ($match['id'] ?? '')) === '') return false;
+                return in_array((string) ($match['match_class'] ?? ''), [
+                    'EXACT_CANONICAL_IDENTITY', 'EXACT_STABLE_KEY', 'EXACT_CANONICAL_NAME',
+                    'EXACT_NORMALIZED_NAME_OR_ALIAS', 'EXACT_COMPOSITE_IDENTITY',
+                ], true);
+            }));
+            if (count($matches) === 1) return $this->exact($matches[0], ['unique_resolver_result'], 'unique canonical resolver result');
+            if (count($matches) > 1) return ['classification' => 'AMBIGUOUS', 'target' => null, 'evidence' => ['unique_resolver_result'], 'reason' => 'canonical resolver returned multiple exact owners'];
         }
         return ['classification' => 'NO_OWNER', 'target' => null, 'evidence' => [], 'reason' => 'no strong owner evidence'];
     }

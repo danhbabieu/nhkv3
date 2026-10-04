@@ -257,10 +257,21 @@ final class DictionaryRuntime
     public function publicTerms(): array
     {
         if (!$this->available()) return [];
+        return $this->publicTermsFromHubItems((array) ($this->publicQuery->hub(2000)['items'] ?? []));
+    }
+
+    /** @param list<array<string,mixed>> $hubItems @return list<array{concept_id:string,label:string,url:string}> */
+    private function publicTermsFromHubItems(array $hubItems): array
+    {
         $items = [];
-        foreach ((array) ($this->publicQuery->hub(2000)['items'] ?? []) as $item) {
+        foreach ($hubItems as $item) {
             if (!is_array($item) || trim((string) ($item['url'] ?? '')) === '') continue;
             $conceptId = trim((string) ($item['concept_id'] ?? ''));
+            $senses = array_values(array_filter((array) ($item['senses'] ?? []), static fn (mixed $sense): bool => is_array($sense) && trim((string) ($sense['sense_id'] ?? '')) !== ''));
+            if ($senses !== []) {
+                if (count($senses) !== 1) continue;
+                $conceptId = trim((string) $senses[0]['sense_id']);
+            }
             foreach ((array) ($item['labels'] ?? []) as $label) {
                 if (!is_array($label) || (string) ($label['kind'] ?? '') === DictionaryLabel::HIDDEN) continue;
                 $text = trim((string) ($label['label'] ?? ''));
@@ -277,7 +288,9 @@ final class DictionaryRuntime
     public function enrichmentAudit(array $input): array
     {
         if (!$this->available()) return ['status' => 'unavailable', 'reason' => 'DICTIONARY_STORAGE_UNAVAILABLE', 'read_only' => true, 'mutated' => false];
-        $audit = new DictionaryEnrichmentAudit($this->entries, $this->concepts, fn (string $type, string $id, array $context = []): array => $this->enrichmentCoverage->forReference($type, $id, $context), fn (DictionaryConcept $sense): array => (new DictionaryEnrichmentOwnerResolver())->resolve($sense));
+        $canonicalResolver = new CanonicalAuthoritySubjectResolver($this->authority, $this->types);
+        $ownerResolver = new DictionaryEnrichmentOwnerResolver($canonicalResolver);
+        $audit = new DictionaryEnrichmentAudit($this->entries, $this->concepts, fn (string $type, string $id, array $context = []): array => $this->enrichmentCoverage->forReference($type, $id, $context), fn (DictionaryConcept $sense): array => $ownerResolver->resolve($sense));
         return $audit->audit((int) ($input['limit'] ?? 50), isset($input['cursor']) ? (string) $input['cursor'] : null, isset($input['entry_id']) ? (string) $input['entry_id'] : null, isset($input['sense_id']) ? (string) $input['sense_id'] : null, (bool) ($input['public_only'] ?? true));
     }
     public function enrichmentPlan(array $input): array
