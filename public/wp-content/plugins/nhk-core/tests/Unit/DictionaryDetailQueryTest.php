@@ -131,7 +131,7 @@ final class DictionaryDetailQueryTest extends TestCase
             'knowledge' => ['facets' => ['movement' => [['id' => 'k1']], 'material' => [['id' => 'k2']], 'origin' => [['id' => 'k3']], 'sound' => [['id' => 'k4']], 'case' => [['id' => 'k5']], 'extra' => [['id' => 'k6']], 'overflow' => [['id' => 'k7']]]],
             'primary_media' => ['id' => 'media-hero', 'url' => '/anh/hero.webp'],
             'media_gallery' => [['id' => 'media-hero', 'url' => '/anh/hero.webp'], ['id' => 'media-2', 'url' => '/anh/2.webp']],
-            'relation_sections' => ['media' => [['id' => 'wrong-media']], 'videos' => [['id' => 'video-1', 'url' => '/video/v/']], 'wp_posts' => [['id' => 'article-1', 'url' => '/bai-viet/a/']], 'brands' => [['title' => 'Junghans']]],
+            'relation_sections' => ['technical' => [['title' => 'Dùng chung với chuông', 'url' => '/tri-thuc/chuong/','predicate' => 'supports']], 'media' => [['id' => 'wrong-media']], 'videos' => [['id' => 'video-1', 'url' => '/video/v/']], 'wp_posts' => [['id' => 'article-1', 'url' => '/bai-viet/a/']], 'brands' => [['title' => 'Junghans']]],
         ];
 
         $item = (new DictionaryDetailQuery(new class { public function listLabels(string $id): array { return []; } }, $entries, null, $projection))->detail('400-ngay')['item']['senses'][0];
@@ -141,6 +141,7 @@ final class DictionaryDetailQueryTest extends TestCase
         self::assertSame('media-hero', $item['media']['items'][0]['id']);
         self::assertSame('video-1', $item['videos']['items'][0]['id']);
         self::assertSame('article-1', $item['articles']['items'][0]['id']);
+        self::assertSame([['title' => 'Dùng chung với chuông', 'url' => '/tri-thuc/chuong/']], $item['semantic_relations']['items']);
     }
 
     public function test_owner_backed_rich_lexical_entry_is_noindex_but_remains_sitemap_excluded(): void
@@ -160,5 +161,53 @@ final class DictionaryDetailQueryTest extends TestCase
         self::assertSame('NOINDEX', $result['seo']['state']);
         self::assertFalse($result['seo']['sitemap']);
         self::assertSame('noindex,follow', $result['seo']['robots']);
+    }
+
+    public function test_semantic_article_mention_is_suppressed_when_article_already_has_a_semantic_section(): void
+    {
+        $sense = new DictionaryConcept('sense-dedupe', 'Côn', 'Định nghĩa.', DictionaryConcept::APPROVED, 'model', 'owner-1');
+        $entry = new LexicalEntry('entry-dedupe', 'Côn', 'côn', DictionaryConcept::APPROVED, 'vi-VN', ['public_slug' => 'con'], 1, [$sense->conceptId]);
+        $entries = new class($entry, $sense) {
+            public function __construct(private LexicalEntry $entry, private DictionaryConcept $sense) {}
+            public function findByPublicSlug(string $slug): LexicalEntry { return $this->entry; }
+            public function listSenses(LexicalEntry $entry): array { return [$this->sense]; }
+            public function listForms(LexicalEntry $entry): array { return []; }
+            public function semanticReference(string $entryId, string $senseId): array { return ['status' => 'AVAILABLE', 'type' => 'model', 'id' => 'owner-1', 'source' => 'MAPPING']; }
+        };
+
+        $result = (new DictionaryDetailQuery(
+            new class { public function listLabels(string $id): array { return []; } },
+            $entries,
+            null,
+            static fn (): array => [
+                'identity' => ['type' => 'model', 'id' => 'owner-1', 'title' => 'Mẫu'],
+                'knowledge' => ['items' => []],
+                'relation_sections' => ['articles' => [['id' => 'article-1', 'title' => 'Bài viết', 'url' => '/bai-viet/con/']]],
+            ],
+            static fn (): array => ['status' => 'AVAILABLE_WITH_ITEMS', 'groups' => ['ARTICLE' => [['id' => 'article-1', 'title' => 'Bài viết', 'url' => '/bai-viet/con/']]]],
+        ))->detail('con');
+
+        self::assertSame('article-1', $result['item']['senses'][0]['articles']['items'][0]['id']);
+        self::assertSame([], $result['item']['mentions']['groups']);
+    }
+
+    public function test_owner_only_entry_returns_one_hop_redirect_destination_from_shared_seo_decision(): void
+    {
+        $sense = new DictionaryConcept('sense-redirect', 'Westminster', '', DictionaryConcept::APPROVED, 'music', 'owner-music', '/ban-nhac/westminster/');
+        $entry = new LexicalEntry('entry-redirect', 'Westminster', 'westminster', DictionaryConcept::APPROVED, 'vi-VN', ['public_slug' => 'westminster'], 1, [$sense->conceptId]);
+        $entries = new class($entry, $sense) {
+            public function __construct(private LexicalEntry $entry, private DictionaryConcept $sense) {}
+            public function findByPublicSlug(string $slug): LexicalEntry { return $this->entry; }
+            public function listSenses(LexicalEntry $entry): array { return [$this->sense]; }
+            public function listForms(LexicalEntry $entry): array { return []; }
+            public function semanticReference(string $entryId, string $senseId): array { return ['status' => 'AVAILABLE', 'type' => 'music', 'id' => 'owner-music', 'source' => 'MAPPING']; }
+        };
+
+        $result = (new DictionaryDetailQuery(new class { public function listLabels(string $id): array { return []; } }, $entries, null, static fn (): array => ['identity' => ['type' => 'music', 'id' => 'owner-music', 'title' => 'Westminster', 'url' => '/ban-nhac/westminster/'], 'knowledge' => ['items' => []], 'relation_sections' => []]))->detail('westminster');
+
+        self::assertSame('REDIRECT', $result['status']);
+        self::assertSame('/ban-nhac/westminster/', $result['destination_url']);
+        self::assertSame('/ban-nhac/westminster/', $result['seo']['canonical']);
+        self::assertFalse($result['seo']['sitemap']);
     }
 }

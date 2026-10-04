@@ -78,7 +78,8 @@ final class DictionaryDetailQuery
             'eligible' => true, 'image' => null,
         ];
         $seo = $this->seo($item, $sensePackets);
-        return ['status' => $seo['state'] === 'REDIRECT' ? 'REDIRECT' : 'READY', 'item' => $item, 'labels' => $item['labels'], 'canonical_url' => $seo['canonical'], 'seo' => $seo, 'indexable' => $seo['state'] === 'INDEXABLE'];
+        $pageStatus = $seo['state'] === 'REDIRECT' ? 'REDIRECT' : ($seo['state'] === 'BLOCKED' ? 'INCOMPLETE' : 'READY');
+        return ['status' => $pageStatus, 'item' => $item, 'labels' => $item['labels'], 'canonical_url' => $seo['canonical'], 'destination_url' => $seo['state'] === 'REDIRECT' ? $seo['canonical'] : null, 'seo' => $seo, 'indexable' => $seo['state'] === 'INDEXABLE'];
     }
 
     /** @return list<LexicalEntry> */
@@ -121,7 +122,7 @@ final class DictionaryDetailQuery
         $result['canonical_owner'] = is_array($packet['identity'] ?? null) ? $packet['identity'] : null;
         $knowledgeItems = is_array($knowledge['items'] ?? null) ? $knowledge['items'] : $this->flattenFacets($knowledge['facets'] ?? []);
         $result['knowledge'] = $this->bucket(array_slice($knowledgeItems, 0, 6), count($knowledgeItems) > 6);
-        $result['semantic_relations'] = $this->bucket($relations);
+        $result['semantic_relations'] = $this->bucket($this->publicRelationItems($relations));
         foreach (['brands', 'models', 'specimens'] as $name) $result['derived_entities'][$name] = $this->bucket(is_array($relations[$name] ?? null) ? $relations[$name] : []);
         $media = [];
         if (is_array($packet['primary_media'] ?? null)) $media[] = $packet['primary_media'];
@@ -161,6 +162,24 @@ final class DictionaryDetailQuery
             if (count($deduped) >= $limit) break;
         }
         return array_values($deduped);
+    }
+    private function publicRelationItems(array $relations): array
+    {
+        $items = [];
+        $excluded = ['brands', 'models', 'specimens', 'media', 'videos', 'articles', 'wp_posts', 'knowledge'];
+        foreach ($relations as $group => $values) {
+            if (in_array(strtolower((string) $group), $excluded, true)) continue;
+            foreach ((array) $values as $value) {
+                if (!is_array($value)) continue;
+                $title = trim((string) ($value['title'] ?? $value['name'] ?? ''));
+                if ($title === '') continue;
+                $item = ['title' => $title];
+                $url = trim((string) ($value['url'] ?? $value['canonical_url'] ?? ''));
+                if ($url !== '') $item['url'] = $url;
+                $items[] = $item;
+            }
+        }
+        return $this->dedupeItems($items, 24);
     }
     private function unavailableSemantic(): array
     {

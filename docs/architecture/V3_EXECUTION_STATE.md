@@ -22324,3 +22324,42 @@ production, deployment or push performed.
 
 STATUS: `DICTIONARY_CODE_SIDE_REPAIR_READY / RUNTIME_ACCEPTANCE_PENDING /
 FRONTEND_HTTP_REGRESSION_PENDING / NO_DATA_MUTATION`.
+
+# Checkpoint — 2026-10-04 — Dictionary code-side P1 closure (LOCAL / NO MUTATION)
+
+IMPLEMENTED: Closed the remaining public Dictionary code contracts. Detail
+breadcrumbs now follow `Trang chủ → Từ điển → Entry`; per-Sense owner,
+Knowledge, Media, Video, Article, Brand, Model, Specimen, Related Terms and
+reader-safe technical relation items link only when a public URL exists. Sense
+definitions are rendered once, and the lexical Mention section remains last
+and visually weaker. Added dedicated ARTICLE/KNOWLEDGE/MEDIA/VIDEO Mention
+source fixtures with public-route omission rules and semantic-source dedupe.
+
+SEO: The shared Dictionary decision now drives redirect destination, canonical,
+robots, sitemap and DefinedTerm description consistently. Owner-only Entries
+redirect one hop; rich owner-backed Entries are `NOINDEX`; standalone lexical
+Entries are indexable; multi-Sense Entries keep their lexical URL; invalid or
+unavailable mapped owners fail closed without JSON-LD publication. Technical
+relation projection strips raw predicates and internal diagnostics before the
+theme boundary.
+
+VALIDATION: Dictionary/frontend/dossier/Clock-Type/SEO/sitemap focused slice
+passes 328 tests / 2,010 assertions with 1 warning, 2 deprecations and 41
+PHPUnit deprecations. Expanded Dictionary closure slice passes 107 tests /
+896 assertions before the final SEO/structured-data additions; final targeted
+Dictionary/SEO/frontend slice passes 96 tests / 860 assertions with 41 PHPUnit
+deprecations. PHP lint, `git diff --check` and changed-scope secret review
+pass. Full Unit under PHP `memory_limit=512M` passes 3,025 tests through
+execution with 1 error and 10 failures; every failing test is reproduced on
+the parent of `72dff0a5` and is therefore `PRE_EXISTING_BASELINE` (one
+repository fixture TypeError, Knowledge/MCP expectation drift, missing local
+WordPress media fixtures, and remote deployment environment behavior).
+
+RUNTIME_ACCEPTANCE_PENDING: deployed source/build identity, live HTTP/read-back,
+runtime dossier/data audit, semantic apply and live browser acceptance remain
+deferred. No migration, materialization, semantic enrichment apply, Graph,
+Knowledge, Media, Video or Article mutation, staging/production action,
+deployment or push occurred.
+
+STATUS: `DICTIONARY_ARCHITECTURE_CODE_COMPLETE / RUNTIME_ACCEPTANCE_PENDING /
+PRE_EXISTING_BROAD_UNIT_BASELINE / NO_DATA_MUTATION / LOCAL_CHECKPOINT_READY`.

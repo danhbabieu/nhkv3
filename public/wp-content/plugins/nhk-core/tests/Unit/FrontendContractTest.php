@@ -53,6 +53,18 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString('nhk_v3_navigation_items', $dictionary);
     }
 
+    public function test_dictionary_detail_renders_contract_breadcrumb_and_reader_safe_sense_links(): void
+    {
+        $dictionary = (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/dictionary.php');
+
+        self::assertStringContainsString('home_url(\'/tu-dien/\')); ?>">Từ điển</a>', $dictionary);
+        self::assertStringContainsString("<?php echo esc_html((string) (\$result['item']['title'] ?? '')); ?>", $dictionary);
+        self::assertStringContainsString("if (trim((string) (\$value['url'] ?? '')) !== ''): ?><a href=\"<?php echo esc_url((string) \$value['url']); ?>\">", $dictionary);
+        self::assertStringContainsString("'semantic_relations' => 'Quan hệ kỹ thuật'", $dictionary);
+        self::assertStringContainsString("if (trim((string) (\$mention['url'] ?? '')) !== ''): ?><a href=\"<?php echo esc_url((string) \$mention['url']); ?>\">", $dictionary);
+        self::assertSame(1, substr_count($dictionary, 'echo esc_html((string) ($sense[\'description\'] ?? \'\'));'));
+    }
+
     public function test_dictionary_presentation_does_not_expose_internal_label_or_scope_keys(): void
     {
         $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
@@ -232,7 +244,7 @@ final class FrontendContractTest extends TestCase
         foreach (['--ink:', '--line:', '--paper:', '--max:'] as $legacyToken) {
             self::assertStringNotContainsString($legacyToken, $style);
         }
-        self::assertStringContainsString('Version: 1.3.3', $style);
+        self::assertStringContainsString('Version: 1.3.5', $style);
     }
 
     public function test_theme_accessibility_contract_has_skip_link_keyboard_menu_and_main_targets(): void
@@ -590,12 +602,25 @@ final class FrontendContractTest extends TestCase
     public function test_public_detail_templates_do_not_render_operational_identifiers(): void
     {
         $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
-        foreach (['entity.php', 'media.php', 'knowledge.php', 'video.php', 'comparison.php'] as $template) {
+        foreach (['entity.php', 'media.php', 'knowledge.php', 'video.php', 'comparison.php', 'dictionary.php'] as $template) {
             $contents = (string) file_get_contents($theme . '/' . $template);
             foreach (['Mã hồ sơ', 'Phiên bản', 'Mã video', 'entity-key', 'entity-card-key'] as $technicalLabel) {
                 self::assertStringNotContainsString($technicalLabel, $contents, $template . ' renders operational identifier: ' . $technicalLabel);
             }
         }
+    }
+
+    public function test_dictionary_public_packet_and_structured_data_are_reader_safe_and_contract_driven(): void
+    {
+        $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
+        $dictionary = (string) file_get_contents($theme . '/dictionary.php');
+        $routes = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/PublicDictionaryRoutes.php');
+
+        foreach (['canonical_uuid', 'stable_key', 'source_id', 'raw_predicate', 'diagnostics', 'SQLSTATE', 'Evidence'] as $internal) self::assertStringNotContainsString($internal, $dictionary);
+        self::assertStringContainsString("'@type' => 'DefinedTerm'", $routes);
+        self::assertStringContainsString("'inDefinedTermSet'", $routes);
+        self::assertStringContainsString('$senseDescriptions', $routes);
+        self::assertStringContainsString("(\$seo['state'] ?? '') === 'REDIRECT'", $routes);
     }
 
     public function test_public_related_and_external_links_fail_closed_when_url_is_missing(): void

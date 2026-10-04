@@ -71,7 +71,13 @@ final class PublicDictionaryRoutes
             if (($seo['robots'] ?? '') !== '') echo '<meta name="robots" content="' . esc_attr((string) $seo['robots']) . '" />' . "\n";
             if (($seo['sitemap'] ?? true) === false) echo '<meta name="nhk-dictionary-sitemap" content="exclude" />' . "\n";
             if (($seo['state'] ?? '') === 'REDIRECT') return;
-            $schema = ['@context' => 'https://schema.org', '@type' => 'DefinedTerm', 'name' => (string) ($item['title'] ?? ''), 'description' => (string) ($item['description'] ?? ''), 'url' => $canonical, 'inDefinedTermSet' => $this->absolute('/tu-dien/')];
+            $description = trim((string) ($item['description'] ?? ''));
+            if ($description === '') {
+                $senseDescriptions = [];
+                foreach ((array) ($item['senses'] ?? []) as $sense) if (is_array($sense) && trim((string) ($sense['description'] ?? '')) !== '') $senseDescriptions[] = trim((string) $sense['description']);
+                $description = implode(' ', array_slice($senseDescriptions, 0, 6));
+            }
+            $schema = ['@context' => 'https://schema.org', '@type' => 'DefinedTerm', 'name' => (string) ($item['title'] ?? ''), 'description' => $description, 'url' => $canonical, 'inDefinedTermSet' => $this->absolute('/tu-dien/')];
             echo '<script type="application/ld+json">' . wp_json_encode($schema, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . '</script>' . "\n";
             return;
         }
