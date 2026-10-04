@@ -22262,3 +22262,24 @@ SAFETY: No migration, database write, staging/production mutation, Capture
 mutation, deployment, push or production action occurred.
 
 STATUS: `IMAGE_CAPTURE_MEDIA_ARTICLE_PUBLIC_FALSE_COMPLETE_FIXED / READY_FOR_STAGING_DEPLOY / NO_SERVER_ACTION`
+# Checkpoint — 2026-10-04 — Dictionary architecture closure read-model repair
+
+IMPLEMENTED: Fixed the canonical Entity dossier wiring bypass caused by an
+empty dossier seed; Dictionary now allows the shared `SemanticDossierQuery` and
+Clock-Type projection to hydrate the Sense owner packet. Dictionary detail
+adapts canonical Knowledge facets with a six-item cap/`has_more`, applies the
+approved Media precedence with bounded gallery dedupe, preserves mapping-level
+invalid/stale fail-closed states, and uses a shared Dictionary SEO decision for
+INDEXABLE/NOINDEX/REDIRECT/BLOCKED projection. Related Terms now support same
+owner plus bounded canonical dossier/Graph-discovered owners; reverse Mention
+resolution no longer emits generic Media/Video placeholders when canonical
+readers cannot resolve the source.
+
+VALIDATION: Focused Dictionary/dossier/Clock-Type/Graph/SEO/sitemap suite passes
+53 tests / 209 assertions with one existing deprecation. Changed PHP lint and
+`git diff --check` pass. No migration, materialization rerun, semantic
+enrichment apply, Graph/Knowledge/Media/Video/Article mutation, staging,
+production, deployment or push performed.
+
+STATUS: `DICTIONARY_CODE_SIDE_REPAIR_READY / RUNTIME_ACCEPTANCE_PENDING /
+FRONTEND_HTTP_REGRESSION_PENDING / NO_DATA_MUTATION`.

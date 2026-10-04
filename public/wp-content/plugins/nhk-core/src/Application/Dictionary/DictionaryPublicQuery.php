@@ -83,7 +83,11 @@ final class DictionaryPublicQuery
             if ($label instanceof DictionaryLabel && $label->active) $labels[] = ['label' => $label->label, 'kind' => $label->kind, 'locale' => $label->locale];
         }
         $searchLabels = array_merge($labels, array_map(static fn (array $form): array => ['label' => $form['form']], $forms));
-        return ['entry_id' => $entry->entryId, 'title' => $entry->preferredForm, 'description' => count($senses) === 1 ? $senses[0]->definition : '', 'term_type' => 'ENTRY', 'labels' => array_values(array_filter($labels, static fn (array $label): bool => ($label['kind'] ?? '') !== 'HIDDEN'),), 'search_labels' => $searchLabels, 'url' => '/tu-dien/' . $slug . '/', 'dedicated' => true, 'indexable' => true, 'eligible' => true, 'forms' => $forms, 'senses' => array_map(static fn (DictionaryConcept $sense): array => ['sense_id' => $sense->conceptId, 'title' => $sense->preferredLabel, 'description' => $sense->definition, 'context' => $sense->context], $senses), 'image' => null];
+        $ownerBacked = false;
+        if (count($senses) === 1 && method_exists($this->entries, 'semanticReference')) {
+            try { $ownerBacked = in_array(strtoupper((string) (($this->entries->semanticReference($entry->entryId, $senses[0]->conceptId)['status'] ?? ''))), ['AVAILABLE', 'AVAILABLE_WITH_ITEMS', 'PRESENT_VALID'], true); } catch (\Throwable) { $ownerBacked = false; }
+        }
+        return ['entry_id' => $entry->entryId, 'title' => $entry->preferredForm, 'description' => count($senses) === 1 ? $senses[0]->definition : '', 'term_type' => 'ENTRY', 'labels' => array_values(array_filter($labels, static fn (array $label): bool => ($label['kind'] ?? '') !== 'HIDDEN'),), 'search_labels' => $searchLabels, 'url' => '/tu-dien/' . $slug . '/', 'dedicated' => true, 'indexable' => !$ownerBacked, 'eligible' => true, 'forms' => $forms, 'senses' => array_map(static fn (DictionaryConcept $sense): array => ['sense_id' => $sense->conceptId, 'title' => $sense->preferredLabel, 'description' => $sense->definition, 'context' => $sense->context], $senses), 'image' => null];
     }
 
     private function item(DictionaryConcept $concept): array
@@ -233,6 +237,7 @@ final class DictionaryPublicQuery
                     $type = trim((string) ($reference['type'] ?? ''));
                     $id = trim((string) ($reference['id'] ?? ''));
                     if ($type !== '' && $id !== '') return [$type, $id, $reference];
+                    if (strtoupper((string) ($reference['status'] ?? 'ABSENT')) !== 'ABSENT') return [null, null, $reference];
                 }
             } catch (\Throwable) {
                 // Compatibility fallback below is intentionally read-only.
@@ -273,7 +278,9 @@ final class DictionaryPublicQuery
             $relations = is_array($projection['relation_sections'] ?? null) ? $projection['relation_sections'] : [];
             $knowledge = is_array($projection['knowledge'] ?? null) ? $projection['knowledge'] : [];
             $empty['canonical_owner'] = $owner;
-            $empty['knowledge'] = ['items' => is_array($knowledge['items'] ?? null) ? $knowledge['items'] : (is_array($knowledge['facets'] ?? null) ? $knowledge['facets'] : [])];
+            $knowledgeItems = is_array($knowledge['items'] ?? null) ? $knowledge['items'] : [];
+            if ($knowledgeItems === [] && is_array($knowledge['facets'] ?? null)) foreach ($knowledge['facets'] as $facet) foreach ((array) $facet as $item) if (is_array($item)) $knowledgeItems[] = $item;
+            $empty['knowledge'] = ['items' => array_slice($knowledgeItems, 0, 6), 'has_more' => count($knowledgeItems) > 6];
             $empty['semantic_relations'] = ['groups' => $relations];
             foreach (['brands', 'models', 'specimens', 'media', 'videos', 'articles'] as $group) $empty[$group] = ['items' => is_array($relations[$group] ?? null) ? $relations[$group] : []];
             return $empty;

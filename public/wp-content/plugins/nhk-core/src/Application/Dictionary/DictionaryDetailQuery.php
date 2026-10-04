@@ -37,7 +37,7 @@ final class DictionaryDetailQuery
             $type = trim((string) ($reference['type'] ?? ''));
             $id = trim((string) ($reference['id'] ?? ''));
             $key = $type . ':' . $id;
-            $semantic = $semanticCache[$key] ??= $this->projectSemantic($type, $id);
+            $semantic = $semanticCache[$key] ??= $this->projectSemantic($type, $id, $reference);
             if ($key !== ':') $semanticKeys[$key] = true;
             $mentions = $this->projectMentions($sense->conceptId);
             foreach ((array) ($mentions['groups'] ?? []) as $kind => $items) foreach ((array) $items as $item) {
@@ -108,10 +108,10 @@ final class DictionaryDetailQuery
     }
 
     /** @return array<string,mixed> */
-    private function projectSemantic(string $type, string $id): array
+    private function projectSemantic(string $type, string $id, array $reference = []): array
     {
         $empty = ['canonical_owner' => null, 'knowledge' => $this->bucket(), 'media' => $this->bucket(), 'videos' => $this->bucket(), 'articles' => $this->bucket(), 'semantic_relations' => $this->bucket(), 'derived_entities' => ['brands' => $this->bucket(), 'models' => $this->bucket(), 'specimens' => $this->bucket()], 'source_keys' => []];
-        if ($type === '' || $id === '') return $empty;
+        if ($type === '' || $id === '' || !in_array(strtoupper((string) ($reference['status'] ?? 'AVAILABLE')), ['AVAILABLE', 'AVAILABLE_WITH_ITEMS', 'PRESENT_VALID'], true)) return $empty;
         if (!is_callable($this->semanticProjection)) return $this->unavailableSemantic();
         try { $packet = ($this->semanticProjection)($type, $id); } catch (\Throwable) { return $this->unavailableSemantic(); }
         if (!is_array($packet)) return $this->unavailableSemantic();
@@ -119,10 +119,20 @@ final class DictionaryDetailQuery
         $knowledge = is_array($packet['knowledge'] ?? null) ? $packet['knowledge'] : [];
         $result = $empty;
         $result['canonical_owner'] = is_array($packet['identity'] ?? null) ? $packet['identity'] : null;
-        $result['knowledge'] = $this->bucket(is_array($knowledge['items'] ?? null) ? array_slice($knowledge['items'], 0, 6) : []);
+        $knowledgeItems = is_array($knowledge['items'] ?? null) ? $knowledge['items'] : $this->flattenFacets($knowledge['facets'] ?? []);
+        $result['knowledge'] = $this->bucket(array_slice($knowledgeItems, 0, 6), count($knowledgeItems) > 6);
         $result['semantic_relations'] = $this->bucket($relations);
         foreach (['brands', 'models', 'specimens'] as $name) $result['derived_entities'][$name] = $this->bucket(is_array($relations[$name] ?? null) ? $relations[$name] : []);
-        foreach (['media', 'videos', 'articles'] as $name) $result[$name] = $this->bucket(is_array($relations[$name] ?? null) ? $relations[$name] : []);
+        $media = [];
+        if (is_array($packet['primary_media'] ?? null)) $media[] = $packet['primary_media'];
+        foreach ((array) ($packet['media_gallery'] ?? []) as $item) if (is_array($item)) $media[] = $item;
+        $media = $this->dedupeItems($media, 8);
+        if ($media === []) $media = $this->dedupeItems(is_array($relations['media'] ?? null) ? $relations['media'] : [], 8);
+        $result['media'] = $this->bucket($media);
+        foreach (['videos', 'articles'] as $name) {
+            $source = is_array($relations[$name] ?? null) ? $relations[$name] : (is_array($relations[$name === 'articles' ? 'wp_posts' : $name] ?? null) ? $relations[$name === 'articles' ? 'wp_posts' : $name] : []);
+            $result[$name] = $this->bucket($source);
+        }
         foreach (['media' => 'MEDIA', 'videos' => 'VIDEO', 'articles' => 'ARTICLE', 'knowledge' => 'KNOWLEDGE'] as $name => $kind) foreach ($result[$name]['items'] as $row) if (is_array($row)) $result['source_keys'][$kind . ':' . ($row['id'] ?? $row['canonical_id'] ?? $row['url'] ?? $row['title'] ?? '')] = true;
         return $result;
     }
@@ -133,7 +143,25 @@ final class DictionaryDetailQuery
         try { $value = ($this->mentionProjection)($conceptId); return is_array($value) ? $value : ['status' => 'AVAILABLE_EMPTY', 'groups' => []]; } catch (\Throwable) { return ['status' => 'BLOCKED', 'groups' => []]; }
     }
 
-    private function bucket(array $items = []): array { return ['status' => $items === [] ? 'AVAILABLE_EMPTY' : 'AVAILABLE_WITH_ITEMS', 'items' => array_values($items)]; }
+    private function bucket(array $items = [], bool $hasMore = false): array { return ['status' => $items === [] ? 'AVAILABLE_EMPTY' : 'AVAILABLE_WITH_ITEMS', 'items' => array_values($items), 'has_more' => $hasMore]; }
+    private function flattenFacets(mixed $facets): array
+    {
+        $items = [];
+        foreach ((array) $facets as $facetItems) foreach ((array) $facetItems as $item) if (is_array($item)) $items[] = $item;
+        return $items;
+    }
+    private function dedupeItems(array $items, int $limit): array
+    {
+        $deduped = [];
+        foreach ($items as $item) {
+            if (!is_array($item)) continue;
+            $key = trim((string) ($item['id'] ?? $item['canonical_id'] ?? $item['url'] ?? $item['title'] ?? ''));
+            if ($key === '' || isset($deduped[$key])) continue;
+            $deduped[$key] = $item;
+            if (count($deduped) >= $limit) break;
+        }
+        return array_values($deduped);
+    }
     private function unavailableSemantic(): array
     {
         $bucket = ['status' => 'UNAVAILABLE_IMPLEMENTATION_GAP', 'items' => []];
@@ -141,7 +169,7 @@ final class DictionaryDetailQuery
     }
     private function labels(DictionaryConcept $sense): array { return array_values(array_filter(array_map(static fn (mixed $label): ?array => $label instanceof DictionaryLabel && $label->active ? ['label' => $label->label, 'kind' => $label->kind, 'locale' => $label->locale] : null, (array) $this->concepts->listLabels($sense->conceptId)), 'is_array')); }
     private function forms(LexicalEntry $entry): array { if (!method_exists($this->entries, 'listForms')) return [['form' => $entry->preferredForm, 'kind' => 'PREFERRED', 'locale' => $entry->locale]]; $out = []; foreach ((array) $this->entries->listForms($entry) as $form) { if (is_object($form) && trim((string) ($form->form ?? '')) !== '') $out[] = ['form' => $form->form, 'kind' => $form->kind ?? 'ALTERNATE', 'locale' => $form->locale ?? null]; elseif (is_array($form) && trim((string) ($form['form'] ?? '')) !== '') $out[] = ['form' => $form['form'], 'kind' => $form['kind'] ?? 'ALTERNATE', 'locale' => $form['locale'] ?? null]; } return $out !== [] ? $out : [['form' => $entry->preferredForm, 'kind' => 'PREFERRED', 'locale' => $entry->locale]]; }
-    private function seo(array $item, array $senses): array { $hasOwner = false; foreach ($senses as $sense) if (is_array($sense['canonical_owner'] ?? null)) { $hasOwner = true; break; } return ['state' => $hasOwner ? (count($senses) > 1 ? 'NOINDEX' : 'NOINDEX') : 'INDEXABLE', 'canonical' => $item['url'], 'robots' => $hasOwner ? 'noindex,follow' : 'index,follow', 'sitemap' => !$hasOwner]; }
+    private function seo(array $item, array $senses): array { return (new DictionarySeoDecision())->decide((string) ($item['url'] ?? ''), $senses); }
     private function slug(string $value): string
     {
         $value = trim($value);

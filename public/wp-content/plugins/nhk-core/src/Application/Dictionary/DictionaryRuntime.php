@@ -16,6 +16,8 @@ use NHK\Core\Infrastructure\Video\WpdbVideoRepository;
 use NHK\Core\Infrastructure\Governance\WpdbAuditSink;
 use NHK\Core\Domain\Graph\PredicateRegistry;
 use NHK\Core\Application\Semantic\CanonicalAuthoritySubjectResolver;
+use NHK\Core\Application\Media\PublicMediaGalleryQuery;
+use NHK\Core\Application\Video\{VideoPublicContextSelector, VideoUrlPolicy};
 
 final class DictionaryRuntime
 {
@@ -126,14 +128,30 @@ final class DictionaryRuntime
             },
         );
         $mediaProjection = new EntityMediaProjection(new WpdbMediaRepository($database), new WpdbMediaAssetRepository($database), new WpdbMediaUsageRepository($database));
-        $mentionProjection = new DictionaryMentionPublicProjection($this->mentions, function (string $kind, string $id): ?array {
+        $mentionGallery = new PublicMediaGalleryQuery(new WpdbMediaRepository($database), new WpdbMediaAssetRepository($database));
+        $videoRepository = new WpdbVideoRepository($database);
+        $mentionProjection = new DictionaryMentionPublicProjection($this->mentions, function (string $kind, string $id) use ($mentionGallery, $videoRepository): ?array {
             $kind = strtoupper(trim($kind));
             if ($kind === 'ARTICLE' && function_exists('get_post')) {
                 $post = get_post((int) $id);
                 if ($post instanceof \WP_Post && $post->post_status === 'publish') return ['id' => (string) $post->ID, 'title' => (string) $post->post_title, 'url' => (string) get_permalink($post)];
             }
             if ($kind === 'KNOWLEDGE') foreach ($this->knowledge->list() as $claim) if ($claim instanceof KnowledgeClaim && $claim->active && $claim->canonicalId === $id) return ['id' => $id, 'title' => $claim->claimText, 'url' => null];
-            if (in_array($kind, ['MEDIA', 'VIDEO'], true)) return ['id' => $id, 'title' => $kind === 'MEDIA' ? 'Hình ảnh liên quan' : 'Video liên quan', 'url' => null];
+            if ($kind === 'MEDIA') {
+                $media = $mentionGallery->forMedia($id);
+                if (is_array($media) && trim((string) ($media['title'] ?? '')) !== '') return ['id' => $id, 'title' => (string) $media['title'], 'url' => (string) ($media['image_url'] ?? ''), 'thumbnail_url' => $media['thumbnail_url'] ?? null];
+            }
+            if ($kind === 'VIDEO') {
+                $video = $videoRepository->findByCanonicalId($id);
+                if ($video !== null && $video->active && $video->hasValidPublicReference()) {
+                    $metadata = is_array($video->metadata) ? $video->metadata : [];
+                    $editorial = is_array($metadata['editorial'] ?? null) ? $metadata['editorial'] : [];
+                    $title = trim((string) ($editorial['title'] ?? '')) ?: $video->title;
+                    $route = (new VideoUrlPolicy())->project($video, new VideoPublicContextSelector());
+                    $url = ($route['eligible'] ?? false) === true ? (string) ($route['path'] ?? '') : '';
+                    if ($url !== '') return ['id' => $id, 'title' => $title, 'url' => $url];
+                }
+            }
             return null;
         });
         $detailQuery = new DictionaryDetailQuery(
@@ -144,13 +162,28 @@ final class DictionaryRuntime
                 if (!$this->types->has($type)) return [];
                 $entity = $this->authority->findByCanonicalId($id);
                 if (!$entity instanceof AuthorityEntity || !$entity->active() || $entity->entityType !== $type) return [];
-                $value = ['dossier' => []];
+                $value = ['dossier' => null];
                 if (function_exists('apply_filters') && has_filter('nhk_v3_entity_detail_projection')) $value = apply_filters('nhk_v3_entity_detail_projection', $value, $entity);
                 if (is_array($value) && is_array($value['dossier'] ?? null)) return $value['dossier'];
                 return ['identity' => ['type' => $entity->entityType, 'id' => $entity->canonicalId, 'title' => $entity->canonicalName, 'url' => $this->routes->path($entity)]];
             },
             fn (string $conceptId): array => $mentionProjection->forConcept($conceptId, 50),
-            new DictionaryRelatedTermProjection($this->entries),
+            new DictionaryRelatedTermProjection($this->entries, function (string $type, string $id): array {
+                if (!$this->types->has($type)) return [];
+                $entity = $this->authority->findByCanonicalId($id);
+                if (!$entity instanceof AuthorityEntity || !$entity->active() || $entity->entityType !== $type) return [];
+                $value = ['dossier' => null];
+                if (function_exists('apply_filters') && has_filter('nhk_v3_entity_detail_projection')) $value = apply_filters('nhk_v3_entity_detail_projection', $value, $entity);
+                $sections = is_array($value['dossier']['relation_sections'] ?? null) ? $value['dossier']['relation_sections'] : [];
+                $candidates = [];
+                foreach ($sections as $group => $items) foreach ((array) $items as $item) {
+                    if (!is_array($item)) continue;
+                    $candidateId = trim((string) ($item['canonical_id'] ?? $item['id'] ?? ''));
+                    $candidateType = trim((string) ($item['type'] ?? rtrim((string) $group, 's')));
+                    if ($candidateId !== '' && $candidateType !== '') $candidates[] = ['type' => $candidateType, 'id' => $candidateId, 'origin' => $item['origin'] ?? ['kind' => 'DERIVED', 'hop_count' => 2]];
+                }
+                return $candidates;
+            }),
         );
         $this->publicQuery = new DictionaryPublicQuery(
             $this->concepts,
@@ -165,7 +198,7 @@ final class DictionaryRuntime
                 if (!$this->types->has($type)) return [];
                 $entity = $this->authority->findByCanonicalId($id);
                 if (!$entity instanceof \NHK\Core\Domain\Authority\AuthorityEntity || !$entity->active() || $entity->entityType !== $type) return [];
-                $value = ['dossier' => []];
+                $value = ['dossier' => null];
                 if (function_exists('apply_filters') && has_filter('nhk_v3_entity_detail_projection')) {
                     $value = apply_filters('nhk_v3_entity_detail_projection', $value, $entity);
                     if (is_array($value) && is_array($value['dossier'] ?? null)) return $value['dossier'];
