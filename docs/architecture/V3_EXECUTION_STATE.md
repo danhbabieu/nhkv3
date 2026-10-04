@@ -1,5 +1,38 @@
 # NHK V3 Execution State
 
+## Checkpoint — 2026-10-04 — Dictionary enrichment sequential CAS and validation parity (LOCAL / NO DATA MUTATION)
+
+ROOT_CAUSE: `enrichmentApply()` reused the original Entry revision for every
+READY action, so a multi-action plan on one Entry self-conflicted after its
+first successful mutation. The apply loop also had no explicit partial receipt
+semantics. Audit normalized repository `AVAILABLE` mappings as `INVALID`, and
+the runtime audit path did not revalidate mapped owners through the canonical
+owner boundary used by public detail.
+
+IMPLEMENTATION: Added the bounded `DictionaryEnrichmentApplyCoordinator` over
+the existing Dictionary mutation/repository boundary. It refreshes the
+canonical Entry revision after each successful action, preserves the exact
+plan fingerprint and action order, reuses per-action idempotency receipts on
+retry, rejects stale external revisions before mutation and returns explicit
+`partial`/`blocked` diagnostics. Form mutation validation now runs inside the
+existing idempotent callback so replay receipts are checked before a stale
+revision guard. Audit/runtime and public detail now accept the same valid
+mapping states and revalidate delegated owners through one canonical route
+validator; invalid/stale mappings do not fall back to legacy owner hints.
+
+REGRESSION: Added multi-action same-Entry revision progression, explicit
+partial failure/resume, idempotent replay and stale external CAS tests, plus
+`AVAILABLE` semantic-reference audit parity coverage.
+
+VERIFICATION: Focused apply/audit/plan/mutation suite passes 19 tests / 60
+assertions. Dictionary/MCP filtered unit suite passes 251 tests / 1,253
+assertions with 1 warning, 2 deprecations and 40 PHPUnit deprecations. Changed
+PHP files lint clean and `git diff --check` passes. No migration,
+materialization, Dictionary/Graph/Knowledge/Media/Video/Article/Authority
+mutation, staging action, deployment or push was performed.
+
+STATUS: `DICTIONARY_ENRICHMENT_CAS_PARITY_FIXED / FOCUSED_GREEN / NO_DATA_MUTATION / COMMIT_PENDING`
+
 ## Checkpoint — 2026-10-04 — Dictionary materialization exposure contract locked (LOCAL / NO DATA MUTATION)
 
 ROOT_CAUSE: `McpAbilityRegistration` mapped the three materialization tools, but

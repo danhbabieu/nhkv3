@@ -100,7 +100,13 @@ final class DictionaryDetailQuery
         if (method_exists($this->entries, 'semanticReference')) {
             try {
                 $reference = $this->entries->semanticReference($entry->entryId, $sense->conceptId);
-                if (is_array($reference) && trim((string) ($reference['type'] ?? '')) !== '' && trim((string) ($reference['id'] ?? '')) !== '') return $reference + ['source' => 'MAPPING'];
+                if (is_array($reference) && trim((string) ($reference['type'] ?? '')) !== '' && trim((string) ($reference['id'] ?? '')) !== '') {
+                    if (is_callable($this->destinationValidator)) {
+                        $validated = ($this->destinationValidator)($reference['type'], $reference['id'], null);
+                        if ($validated === null || $validated === false) return ['status' => 'INVALID', 'source' => 'MAPPING', 'type' => $reference['type'], 'id' => $reference['id'], 'revision' => $reference['revision'] ?? null];
+                    }
+                    return $reference + ['source' => 'MAPPING'];
+                }
                 if (is_array($reference) && strtoupper((string) ($reference['status'] ?? '')) !== 'ABSENT') return $reference + ['source' => 'MAPPING'];
             } catch (\Throwable) { return ['status' => 'BLOCKED', 'source' => 'MAPPING', 'reason' => 'MAPPING_READ_FAILED', 'type' => null, 'id' => null]; }
         }

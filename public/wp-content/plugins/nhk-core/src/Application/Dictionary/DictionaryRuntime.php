@@ -323,7 +323,15 @@ final class DictionaryRuntime
         if (!$this->available()) return ['status' => 'unavailable', 'reason' => 'DICTIONARY_STORAGE_UNAVAILABLE', 'read_only' => true, 'mutated' => false];
         $canonicalResolver = new CanonicalAuthoritySubjectResolver($this->authority, $this->types);
         $ownerResolver = new DictionaryEnrichmentOwnerResolver($canonicalResolver);
-        $audit = new DictionaryEnrichmentAudit($this->entries, $this->concepts, fn (string $type, string $id, array $context = []): array => $this->enrichmentCoverage->forReference($type, $id, $context), fn (DictionaryConcept $sense): array => $ownerResolver->resolve($sense));
+        $audit = new DictionaryEnrichmentAudit($this->entries, $this->concepts, fn (string $type, string $id, array $context = []): array => $this->enrichmentCoverage->forReference($type, $id, $context), function (DictionaryConcept $sense, array $context = []) use ($ownerResolver): array {
+            $reference = is_array($context['semantic_reference'] ?? null) ? $context['semantic_reference'] : [];
+            if (in_array(strtoupper((string) ($reference['status'] ?? '')), ['AVAILABLE', 'PRESENT_VALID'], true)) {
+                $validated = $this->revalidateDelegatedDestination((string) ($reference['type'] ?? ''), (string) ($reference['id'] ?? ''), null);
+                if ($validated === null) $reference['status'] = 'INVALID';
+                $context['semantic_reference'] = $reference;
+            }
+            return $ownerResolver->resolve($sense, $context);
+        });
         return $audit->audit((int) ($input['limit'] ?? 50), isset($input['cursor']) ? (string) $input['cursor'] : null, isset($input['entry_id']) ? (string) $input['entry_id'] : null, isset($input['sense_id']) ? (string) $input['sense_id'] : null, (bool) ($input['public_only'] ?? true));
     }
     public function enrichmentPlan(array $input): array
@@ -342,16 +350,28 @@ final class DictionaryRuntime
         if (($plan['status'] ?? '') !== 'READY') return ['status' => 'blocked', 'reason' => 'DICTIONARY_ENRICHMENT_PLAN_NOT_READY', 'read_only' => false, 'mutated' => false];
         $idempotency = trim((string) ($input['idempotency_key'] ?? ''));
         if ($idempotency === '') throw new \InvalidArgumentException('DICTIONARY_IDEMPOTENCY_KEY_REQUIRED');
-        $results = [];
-        foreach ((array) $plan['actions'] as $index => $action) if (($action['status'] ?? '') === 'READY') {
-            $key = $idempotency . ':' . $index;
-            $results[] = match ($action['action_type'] ?? '') {
-                'ADD_ENTRY_FORM' => $this->mutation()->addFormToEntry((string) $action['entry_id'], (int) $action['current_revision'], (string) $action['form'], ['enrichment_plan' => $expected], $key, (string) ($action['kind'] ?? 'ALTERNATE'), isset($action['locale']) ? (string) $action['locale'] : null),
-                'SET_SEMANTIC_REFERENCE' => $this->mutation()->setSenseSemanticReference((string) $action['entry_id'], (string) $action['sense_id'], (int) $action['current_revision'], (string) ($action['target']['type'] ?? ''), (string) ($action['target']['id'] ?? ''), isset($action['target']['revision']) ? (int) $action['target']['revision'] : null, $key),
-                default => ['status' => 'NOOP'],
-            };
-        }
-        return ['status' => 'applied', 'read_only' => false, 'mutated' => $results !== [], 'fingerprint' => $expected, 'items' => $results];
+        $coordinator = new DictionaryEnrichmentApplyCoordinator(
+            function (array $action, int $revision, string $key) use ($expected): array {
+                return match ($action['action_type'] ?? '') {
+                    'ADD_ENTRY_FORM' => $this->mutation()->addFormToEntry((string) $action['entry_id'], $revision, (string) $action['form'], ['enrichment_plan' => $expected], $key, (string) ($action['kind'] ?? 'ALTERNATE'), isset($action['locale']) ? (string) $action['locale'] : null),
+                    'SET_SEMANTIC_REFERENCE' => $this->mutation()->setSenseSemanticReference((string) $action['entry_id'], (string) $action['sense_id'], $revision, (string) ($action['target']['type'] ?? ''), (string) ($action['target']['id'] ?? ''), isset($action['target']['revision']) ? (int) $action['target']['revision'] : null, $key),
+                    default => ['status' => 'NOOP'],
+                };
+            },
+            function (string $key): ?array {
+                $row = $this->database->get_row($this->database->prepare('SELECT context_json FROM ' . $this->database->prefix . 'nhk_audit_events WHERE event_type=%s AND object_type=%s AND object_key=%s ORDER BY id DESC LIMIT 1', 'DictionaryMutation', 'dictionary', $key), ARRAY_A);
+                if (!is_array($row)) return null;
+                $context = json_decode((string) ($row['context_json'] ?? ''), true);
+                return is_array($context) && is_array($context['result'] ?? null) ? $context['result'] : null;
+            },
+            static function (string $key, array $result): void {},
+            function (string $entryId): ?int {
+                $entry = $this->entries->findById($entryId);
+                return $entry instanceof \NHK\Core\Domain\Dictionary\LexicalEntry ? $entry->revision : null;
+            },
+        );
+        $applied = $coordinator->apply((array) $plan['actions'], $idempotency);
+        return $applied + ['read_only' => false, 'mutated' => ($applied['applied_count'] ?? 0) > 0, 'fingerprint' => $expected];
     }
     public function concepts(): WpdbDictionaryConceptRepository { return $this->concepts; }
     public function candidates(): WpdbDictionaryCandidateRepository { return $this->candidates; }

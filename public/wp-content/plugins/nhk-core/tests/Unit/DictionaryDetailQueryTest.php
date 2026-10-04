@@ -57,6 +57,25 @@ final class DictionaryDetailQueryTest extends TestCase
         self::assertNull($sensePacket['canonical_owner']);
     }
 
+    public function test_mapping_with_unresolvable_owner_is_invalid_on_public_detail(): void
+    {
+        $sense = new DictionaryConcept('s1', '400 ngày', 'Định nghĩa', DictionaryConcept::APPROVED);
+        $entry = new LexicalEntry('entry-1', '400 ngày', '400 ngày', DictionaryConcept::APPROVED, 'vi-VN', ['public_slug' => '400-ngay'], 1, ['s1']);
+        $entries = new class($entry, $sense) {
+            public function __construct(private LexicalEntry $entry, private DictionaryConcept $sense) {}
+            public function findByPublicSlug(string $slug): LexicalEntry { return $this->entry; }
+            public function listSenses(LexicalEntry $entry): array { return [$this->sense]; }
+            public function listForms(LexicalEntry $entry): array { return []; }
+            public function semanticReference(string $entryId, string $senseId): array { return ['status' => 'AVAILABLE', 'source' => 'MAPPING', 'type' => 'classification', 'id' => 'missing-owner']; }
+        };
+        $query = new DictionaryDetailQuery(new class { public function listLabels(string $id): array { return []; } }, $entries, static fn (): ?string => null);
+
+        $sensePacket = $query->detail('400-ngay')['item']['senses'][0];
+
+        self::assertSame('INVALID', $sensePacket['semantic_reference']['status']);
+        self::assertNull($sensePacket['canonical_owner']);
+    }
+
     public function test_detail_exposes_durable_array_forms_without_running_enrichment_audit(): void
     {
         $sense = new DictionaryConcept('sense-forms', '400 ngày', 'Định nghĩa', DictionaryConcept::APPROVED);

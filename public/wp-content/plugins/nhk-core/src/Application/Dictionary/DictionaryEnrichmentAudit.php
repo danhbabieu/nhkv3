@@ -53,7 +53,7 @@ final class DictionaryEnrichmentAudit
         } catch (\Throwable) { return []; }
     }
 
-    private function reference(array $reference): array { $status = strtoupper(trim((string) ($reference['status'] ?? 'ABSENT'))); return ['status' => in_array($status, ['PRESENT_VALID', 'ABSENT', 'STALE', 'INVALID', 'AMBIGUOUS'], true) ? $status : 'INVALID', 'type' => $reference['type'] ?? null, 'id' => $reference['id'] ?? null, 'revision' => $reference['revision'] ?? null, 'source' => $reference['source'] ?? null]; }
+    private function reference(array $reference): array { $status = strtoupper(trim((string) ($reference['status'] ?? 'ABSENT'))); return ['status' => in_array($status, ['AVAILABLE', 'PRESENT_VALID', 'ABSENT', 'STALE', 'INVALID', 'AMBIGUOUS'], true) ? $status : 'INVALID', 'type' => $reference['type'] ?? null, 'id' => $reference['id'] ?? null, 'revision' => $reference['revision'] ?? null, 'source' => $reference['source'] ?? null]; }
     private function forms(array $forms): array
     {
         $mapped = array_map(static fn (mixed $form): ?array => is_object($form)

@@ -106,10 +106,10 @@ final class DictionaryMutationService
         $normalized = (new DictionaryTermNormalizer())->normalize($form);
         if ($form === '' || $normalized === '') throw new \InvalidArgumentException('DICTIONARY_ENTRY_FORM_REQUIRED');
         if (!is_object($this->entryRepository) || !method_exists($this->entryRepository, 'addFormToEntry')) throw new \RuntimeException('DICTIONARY_ENTRY_REPOSITORY_UNAVAILABLE');
-        $entry = method_exists($this->entryRepository, 'findById') ? $this->entryRepository->findById($entryId) : null;
-        if (!$entry instanceof LexicalEntry || $normalized === $entry->normalizedPreferredForm) throw new \RuntimeException('DICTIONARY_ENTRY_FORM_COLLISION');
         $payload = ['operation' => 'entry.form.add', 'entry_id' => $entryId, 'expected_revision' => $expectedRevision, 'form' => $form, 'normalized_form' => $normalized, 'context' => $this->sort($context), 'kind' => $kind, 'locale' => $locale];
         return $this->mutate($idempotencyKey, $payload, function () use ($entryId, $expectedRevision, $form, $normalized, $context, $kind, $locale): array {
+            $entry = method_exists($this->entryRepository, 'findById') ? $this->entryRepository->findById($entryId) : null;
+            if (!$entry instanceof LexicalEntry || $normalized === $entry->normalizedPreferredForm) throw new \RuntimeException('DICTIONARY_ENTRY_FORM_COLLISION');
             $saved = ($this->entryRepository)->addFormToEntry($entryId, $expectedRevision, new LexicalEntryForm($entryId, $form, $normalized, $kind, $locale, $context));
             if (!is_array($saved) || !($saved['entry'] ?? null) instanceof LexicalEntry) throw new \RuntimeException('DICTIONARY_ENTRY_READBACK_FAILED');
             return $saved;
