@@ -1,24 +1,34 @@
 # NHK V3 Execution State
 
-## Checkpoint — 2026-10-04 — Dictionary code-side completion (LOCAL / UNPUSHED)
+## Checkpoint — 2026-10-04 — Dictionary Issue #29 code-side completion (REMOTE MAIN / NO NEW DATA MUTATION)
 
-LOCAL MAIN: `59b5b4e3e503fbeef0162cc13aaa1dc1c7571a89` with the local
-execution-state follow-up `ca30847e`. The local Dictionary implementation now
-contains the Entry/Form/Sense route round-trip, mapping-first semantic-reference
-read path, canonical exact-owner audit resolution, deterministic enrichment
-planning and guarded apply contract, bounded public projections, multi-Sense
-isolation, reverse Mentions, related-term projection, SEO states and MCP
-registration/contract coverage. The runtime normalizer regression is covered by
-`publicTermsFromHubItems()` and the Entry-mode multi-Sense fail-closed test.
+REMOTE MAIN: Issue #29 implementation and Controller review rounds 1–2 are now
+present on the repository default branch. Fix round 2 is represented by
+`59b5b4e3e503fbeef0162cc13aaa1dc1c7571a89`; this document is not a
+self-referential HEAD oracle. Use documentation-bootstrap `source_revision`
+and build identity for deployed-runtime truth.
 
-LOCAL VERIFICATION: A clean checkout ran 244 Dictionary/semantic/MCP tests with
-1,675 assertions passing; PHP lint and `git diff --check` are required before
-the next local commit. No remote publish, deployment, runtime mutation,
-materialization, semantic apply, Graph, Knowledge, Media, Video or Article
-mutation was performed in this checkpoint.
+IMPLEMENTED: Entry/Form/Sense route round-trip, mapping-first semantic-reference
+reads, exact approved-label applicability with lexical-scope filtering,
+post-filter collapse by durable Sense/Concept identity, source-locale versus
+explicit lexical-locale separation, bounded structural lookup fallback,
+deterministic resolver-call budgeting, Entry-mode public auto-link terms,
+canonical exact-owner audit resolution, deterministic enrichment planning and
+guarded apply contracts are covered in code and regression tests.
 
-STATUS: `CODE_IMPLEMENTED / LOCAL_VERIFIED / UNPUSHED / UNDEPLOYED /
-DATA_NOT_APPLIED / LIVE_ACCEPTANCE_PENDING`.
+VERIFICATION: The reported Issue #29 focused matrix passed 230 tests / 2,142
+assertions; broader Unit completed 3,007 tests / 18,093 assertions. Baseline
+comparison reproduced one TypeError and nine pre-existing failures; two
+RemoteDeploymentAdapter failures were classified outside Issue #29 scope.
+Changed-file PHP lint, `git diff --check` and secret scan passed.
+
+DEPLOYMENT / DATA: No new deployment, materialization, enrichment apply, or
+staging/live semantic mutation was performed for Fix round 2. The deployed
+staging checkpoint below remains authoritative until a fresh runtime
+documentation-bootstrap/read-back proves a later source revision.
+
+STATUS: `ISSUE_29_CODE_COMPLETE_ON_MAIN / FIX_ROUND_2_GREEN /
+NO_NEW_DEPLOYMENT / NO_DATA_MUTATION / RUNTIME_READBACK_PENDING`.
 
 ## Checkpoint — 2026-10-04 — Dictionary staging route/runtime and read-only enrichment audit
 
