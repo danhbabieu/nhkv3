@@ -1,7 +1,7 @@
 # NHK Codex Orchestrator Design
 
 Date: 2026-10-04
-Status: DESIGN_PENDING_APPROVAL
+Status: APPROVED_FOR_IMPLEMENTATION
 
 ## 1. Goal
 
