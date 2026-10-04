@@ -1395,9 +1395,14 @@ final class Plugin {
                             if (!is_array($assetInput)) continue;
                             $ordinal = (int) ($assetInput['ordinal'] ?? -1);
                             if ($ordinal < 0 || !isset($items[$ordinal])) continue;
-                            $featureRequests = array_values(array_filter(array_map(static fn (mixed $value): string => trim((string) $value), (array) ($assetInput['feature_requests'] ?? [])), static fn (string $value): bool => $value !== ''));
-                            $items[$ordinal]['media_context'] = array_replace(is_array($items[$ordinal]['media_context'] ?? null) ? $items[$ordinal]['media_context'] : [], array_filter(['title' => trim((string) ($assetInput['name'] ?? ''))], static fn (mixed $value): bool => $value !== ''));
-                            $items[$ordinal]['capture_asset_input'] = ['name' => trim((string) ($assetInput['name'] ?? '')), 'feature_requests' => $featureRequests];
+                            $legacyName = trim((string) ($assetInput['name'] ?? ''));
+                            $legacyFeatures = array_values(array_filter(array_map(static fn (mixed $value): string => trim((string) $value), (array) ($assetInput['feature_requests'] ?? [])), static fn (string $value): bool => $value !== ''));
+                            if ($legacyName !== '') {
+                                $items[$ordinal]['media_context'] = array_replace(is_array($items[$ordinal]['media_context'] ?? null) ? $items[$ordinal]['media_context'] : [], ['title' => $legacyName]);
+                            }
+                            if ($legacyName !== '' || $legacyFeatures !== []) {
+                                $items[$ordinal]['capture_asset_input'] = array_filter(['name' => $legacyName, 'feature_requests' => $legacyFeatures], static fn (mixed $value): bool => $value !== [] && $value !== '');
+                            }
                             $items[$ordinal]['sort_order'] = $ordinal;
                         }
                         return ['status' => 'verified', 'items' => $items, 'count' => count($items), 'reused' => true];

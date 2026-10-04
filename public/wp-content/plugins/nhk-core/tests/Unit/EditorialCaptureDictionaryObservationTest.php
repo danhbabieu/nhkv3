@@ -49,9 +49,10 @@ final class EditorialCaptureDictionaryObservationTest extends TestCase
             static fn (array $context): array => ['status' => 'verified'],
         );
 
+        $text = 'Côn hoa thị là bộ có đặc trưng của dòng đồng hồ Junghans' . str_repeat(' và phần mô tả bổ sung này được giữ nguyên', 20) . '.';
         $result = $coordinator->execute([
             'idempotency_key' => 'capture-dictionary-before-subject-blocker',
-            'text' => 'Côn hoa thị là bộ có đặc trưng của dòng đồng hồ Junghans.',
+            'text' => $text,
             'subject_hints' => ['Subject A', 'Subject B'],
         ]);
 
@@ -60,7 +61,8 @@ final class EditorialCaptureDictionaryObservationTest extends TestCase
         self::assertCount(1, $observations);
         self::assertSame('CAPTURE', $observations[0]['kind']);
         self::assertSame($result->captureId, $observations[0]['sourceId']);
-        self::assertSame('Côn hoa thị là bộ có đặc trưng của dòng đồng hồ Junghans.', $observations[0]['text']);
+        self::assertSame($text, $observations[0]['text']);
+        self::assertSame($text, $result->context['raw_input']);
     }
 }
 

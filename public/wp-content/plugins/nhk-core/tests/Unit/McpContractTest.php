@@ -239,7 +239,9 @@ final class McpContractTest extends TestCase
         self::assertArrayHasKey('asset_inputs', $tools['nhk.capture.ingest']['inputSchema']['properties']);
         self::assertArrayHasKey('description', $tools['nhk.capture.ingest']['inputSchema']['properties']);
         self::assertArrayHasKey('shared_description', $tools['nhk.capture.ingest']['inputSchema']['properties']);
-        self::assertSame(['client_file_id', 'ordinal', 'name', 'feature_requests'], $tools['nhk.capture.ingest']['inputSchema']['properties']['asset_inputs']['items']['required']);
+        self::assertSame(['client_file_id', 'ordinal'], $tools['nhk.capture.ingest']['inputSchema']['properties']['asset_inputs']['items']['required']);
+        self::assertTrue($tools['nhk.capture.ingest']['inputSchema']['properties']['asset_inputs']['items']['properties']['name']['deprecated']);
+        self::assertTrue($tools['nhk.capture.ingest']['inputSchema']['properties']['asset_inputs']['items']['properties']['feature_requests']['deprecated']);
         self::assertSame(20, $tools['nhk.capture.ingest']['inputSchema']['properties']['asset_inputs']['maxItems']);
         self::assertSame(['representative'], $tools['nhk.media.bind']['inputSchema']['properties']['role']['enum']);
         self::assertContains('nhk.article.publish', SingleEntryPointPolicy::internalOnlyTools());

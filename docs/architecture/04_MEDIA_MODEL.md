@@ -111,23 +111,26 @@ Usage không tự tạo `depicts`, `about`, Knowledge, Source hoặc Evidence. R
 thay ảnh đại diện. Checksum, tên file, URL attachment và thời điểm upload không
 được dùng để merge hoặc thay canonical Media identity.
 
-## Multi-image metadata ownership — 2026-09-18
+## Multi-image metadata ownership — current law
 
-The Capture uploader's per-asset `name` and `feature_requests[]` are ordered
-submission context. They are preserved with the Capture asset manifest and
-are not a second semantic store. `name` may inform bounded Media presentation
-metadata; each Feature request must be resolved, scoped and dispositioned
-independently before any governed MediaUsage binding. Ambiguous requests stay
-review-required and do not invalidate unrelated resolved requests.
+The normal Capture uploader has one semantic input only: full USER_TEXT in
+`Capture.text/raw_input`. Its `asset_inputs[]` packet is ordered physical
+lineage (`client_file_id`, `ordinal`) and is not semantic truth. The uploader
+does not invent per-asset names or Feature requests, and does not fan out the
+task text into Media metadata.
 
-Capture/submission text is batch context or an ordered user instruction. It is
-not implicitly a canonical title, alt text, caption or description for every
-Media item. Each file keeps a stable ordinal (`files[i]` ↔ `items[i]`) and may
-carry explicit per-item Media metadata. An ordered natural-language mapping is
-accepted only when its item count matches the file count with sufficient
-confidence; otherwise the batch context is retained and item metadata uses a
-safe neutral fallback or remains review-required. The implementation MUST NOT
-fabricate missing descriptions or duplicate free-form batch text across Media.
+Physical filenames are retained only as `original_filename`/source provenance.
+They are never a canonical Media name, WordPress attachment title, semantic
+asset name, Feature, Authority hint or Graph relation. Canonical presentation
+metadata is reconciled only by the existing governed Media owner after the
+Shared Semantic Core produces trustworthy context; otherwise storage may use a
+neutral provisional label.
+
+Historical packets may retain `name`/`feature_requests` for read-compatible
+replay at the compatibility boundary. New packets must not require or emit
+those fields. Capture interpretation still runs on the complete USER_TEXT,
+including when semantic subject resolution is review-required; lexical
+Dictionary observation remains independent and idempotent.
 
 Album/submission context, canonical Media metadata and MediaUsage presentation
 metadata remain separate owners. Article-scoped alt text, caption and title are

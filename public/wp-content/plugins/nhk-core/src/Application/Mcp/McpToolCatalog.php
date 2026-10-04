@@ -219,10 +219,12 @@ final class McpToolCatalog
                     'properties' => [
                         'client_file_id' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 191],
                         'ordinal' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 19],
-                        'name' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 500],
-                        'feature_requests' => ['type' => 'array', 'maxItems' => 20, 'items' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 500]],
+                        // Deprecated compatibility fields: historical packets
+                        // may be read, but the normal uploader never emits them.
+                        'name' => ['type' => 'string', 'maxLength' => 500, 'deprecated' => true],
+                        'feature_requests' => ['type' => 'array', 'maxItems' => 20, 'items' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 500], 'deprecated' => true],
                     ],
-                    'required' => ['client_file_id', 'ordinal', 'name', 'feature_requests'],
+                    'required' => ['client_file_id', 'ordinal'],
                     'additionalProperties' => false,
                 ]],
                 'media_ids' => ['type' => 'array', 'items' => self::uuidField()],

@@ -1260,14 +1260,21 @@ final class EditorialCaptureCoordinator
         $result = [];
         foreach ($inputs as $input) {
             if (!is_array($input)) continue;
-            $name = trim((string) ($input['name'] ?? ''));
-            if ($name === '') continue;
-            $result[] = [
+            $lineage = [
                 'client_file_id' => trim((string) ($input['client_file_id'] ?? '')),
                 'ordinal' => max(0, (int) ($input['ordinal'] ?? count($result))),
-                'name' => $name,
-                'feature_requests' => array_values(array_filter(array_map(static fn (mixed $value): string => trim((string) $value), (array) ($input['feature_requests'] ?? [])), static fn (string $value): bool => $value !== '')),
             ];
+            // Historical packets may still carry the retired semantic fields.
+            // Preserve them only for compatibility; new uploader packets never
+            // depend on or emit these fields.
+            if (array_key_exists('name', $input)) {
+                $name = trim((string) $input['name']);
+                if ($name !== '') $lineage['name'] = $name;
+            }
+            if (array_key_exists('feature_requests', $input)) {
+                $lineage['feature_requests'] = array_values(array_filter(array_map(static fn (mixed $value): string => trim((string) $value), (array) $input['feature_requests']), static fn (string $value): bool => $value !== ''));
+            }
+            $result[] = $lineage;
         }
         usort($result, static fn (array $left, array $right): int => [$left['ordinal'], $left['client_file_id']] <=> [$right['ordinal'], $right['client_file_id']]);
         return $result;

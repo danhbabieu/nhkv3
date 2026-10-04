@@ -306,13 +306,13 @@ creation alone is never `COMPLETE`.
 
 ### Editorial Capture and Semantic Enrichment
 
-The NHK image uploader sends one shared `text` description plus an additive
-`asset_inputs[]` packet. Each item is ordered and carries only
-`client_file_id`, `ordinal`, user-entered `name` and zero or more literal
-`feature_requests`. The packet is input context, not canonical Media metadata,
-Authority identity or Knowledge truth. The server preserves the packet on the
-same Capture and associates it with the verified Media asset by ordinal; it
-must not create one Capture or Article per item.
+The NHK image uploader sends one complete `text` USER_TEXT task description
+plus an additive `asset_inputs[]` packet. Each item carries only ordered
+physical lineage: `client_file_id` and `ordinal`. The packet is input
+context, not canonical Media metadata, Authority identity or Knowledge truth.
+The server preserves one Capture and associates the lineage with the verified
+Media asset by ordinal; it must not create one Capture or Article per item.
+The uploader does not semantically parse the task text.
 
 `nhk.capture.ingest` is the shared editorial boundary for one user submission.
 It persists one Capture identity and idempotency key, stores the raw editorial

@@ -20,15 +20,20 @@ capability and must not be presented as normal creation buttons.
 
 ## Required flow
 
-### Mobile Capture uploader input contract
+### Mobile Capture uploader input contract — current law
 
-The mobile-first uploader presents one or more images, then one full-width
-`Tên ảnh` and one full-width `Feature` input for each image, followed by one
-shared `Mô tả chung` textarea and one `TẢI LÊN` action. The client submits one
-Capture with an ordered `asset_inputs[]` packet. `name` remains user input for
-Media presentation/context; `feature_requests[]` is a bounded semantic target
-request that must pass canonical resolution and review independently per
-target. Neither field is a UUID or an automatic canonical fact.
+The mobile-first uploader presents image selection, preview/remove controls,
+one full-width `Mô tả nhiệm vụ` field and one `TẢI LÊN` action. The field is
+the complete raw USER_TEXT for one Capture and is never truncated at the Media
+transport boundary. The client submits one Capture with ordered physical
+lineage in `asset_inputs[]`: `client_file_id` and `ordinal` only.
+The uploader does not parse semantic names, Features or subjects.
+
+Physical filenames remain original-file provenance only. They must not become
+canonical Media names, WordPress attachment titles, semantic asset names,
+Features, Authority hints or Graph relations. Historical packets may still be
+read at the compatibility boundary, but new submissions must not depend on
+`name` or `feature_requests`.
 
 Admin composes a governed Media proposal and submits it through the existing
 Governance and Controlled Apply path. The proposal may carry asset metadata,
@@ -124,9 +129,11 @@ or migration task explicitly authorizes changes.
 
 ## Image widget fast commit and Article handoff
 
-The ChatGPT image widget keeps `Ngữ cảnh bộ ảnh` as a short contextual field
-(maximum 500 characters) for the existing safe physical naming boundary. The
-upload action stops after attachment and canonical Media read-back and returns
+The ChatGPT image widget carries the same full `Mô tả nhiệm vụ` USER_TEXT for
+Capture. It may send a separate bounded transport context where the physical
+ingest schema requires it, but that context is never copied into canonical
+Media metadata. The upload action stops after attachment and canonical Media
+read-back and returns
 an ordered batch/continuation context with per-item status, canonical Media
 IDs and `enrichment_status=NOT_RUN`; it does not start Capture or downstream
 research. A partial batch retains successful items and typed failed children.

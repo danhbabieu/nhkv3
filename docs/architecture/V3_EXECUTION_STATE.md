@@ -1,5 +1,24 @@
 # NHK V3 Execution State
 
+## Checkpoint — 2026-10-04 — Universal one-text image uploader contract
+
+CURRENT LAW: The normal image uploader exposes one semantic field,
+`Mô tả nhiệm vụ`. Its complete USER_TEXT enters the same Capture
+`text/raw_input` and Shared Semantic Core without the 500-character Media
+transport limit. `asset_inputs[]` carries ordered physical lineage only:
+`client_file_id` and `ordinal`.
+
+The uploader does not emit per-image `name` or `feature_requests`, and
+physical filenames remain `original_filename`/source provenance only. They
+must not become canonical Media names, attachment titles, semantic asset
+names, Features, Authority hints or Graph relations. Historical packets remain
+read-compatible only at the compatibility boundary when present.
+
+Dictionary lexical observation remains independent of semantic subject
+resolution and continues to run through the existing Capture path. This
+checkpoint supersedes older active-sounding uploader wording below; dated
+historical evidence remains unchanged.
+
 ## Checkpoint — 2026-10-04 — Dictionary storage and display staging acceptance closure
 
 RUNTIME: Fresh staging verification read back deployed commit

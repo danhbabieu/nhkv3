@@ -12099,18 +12099,13 @@ function normalizeSelectedFiles(value) {
     if (typeof reference.fileId !== "string" || reference.fileId === "") return [];
     if (typeof reference.fileName !== "string" || reference.fileName === "") return [];
     if (typeof reference.mimeType !== "string" || reference.mimeType === "") return [];
-    return [{ kind: "library", clientFileId: reference.fileId, fileId: reference.fileId, fileName: reference.fileName, mimeType: reference.mimeType, name: "", feature: "" }];
+    return [{ kind: "library", clientFileId: reference.fileId, fileId: reference.fileId, fileName: reference.fileName, mimeType: reference.mimeType }];
   });
-}
-function splitFeatureRequests(value) {
-  return value.split(/[\n,]/u).map((item) => item.trim()).filter(Boolean);
 }
 function buildCaptureAssetInputs(items) {
   return items.map((item, ordinal) => ({
     client_file_id: item.clientFileId,
     ordinal,
-    name: item.name.trim(),
-    feature_requests: splitFeatureRequests(item.feature)
   }));
 }
 function shouldProcessToolResultNotification(source) {
@@ -12618,7 +12613,7 @@ async function start() {
     return typeof host?.uploadFile === "function" && typeof host.getFileDownloadUrl === "function";
   }
   function updateUploadDisabled() {
-    upload.disabled = !connected || uploading || selected.length === 0 || !selected.every((item) => item.name.trim() !== "") || !supportsFileUpload();
+    upload.disabled = !connected || uploading || selected.length === 0 || !supportsFileUpload();
   }
   function renderSelection() {
     previews.replaceChildren();
@@ -12629,7 +12624,7 @@ async function start() {
       figure.dataset.clientFileId = item.clientFileId;
       if (file) {
         const image = document.createElement("img");
-        image.alt = item.name || file.name;
+        image.alt = file.name;
         image.src = URL.createObjectURL(file);
         figure.append(image);
       }
@@ -12637,21 +12632,6 @@ async function start() {
       label.className = "asset-label";
       label.textContent = `Ảnh ${ordinal + 1}`;
       figure.append(label);
-      const name = document.createElement("input");
-      name.type = "text";
-      name.className = "asset-name";
-      name.placeholder = "Tên ảnh";
-      name.value = item.name;
-      name.required = true;
-      name.dataset.field = "name";
-      figure.append(name);
-      const feature = document.createElement("input");
-      feature.type = "text";
-      feature.className = "asset-feature";
-      feature.placeholder = "Feature (nhiều mục cách nhau bằng dấu phẩy)";
-      feature.value = item.feature;
-      feature.dataset.field = "feature";
-      figure.append(feature);
       const remove = document.createElement("button");
       remove.type = "button";
       remove.className = "remove-asset";
@@ -12792,7 +12772,7 @@ async function start() {
       const diagnosticContext = { file_ordinal: outcome.ordinal, mime_type: outcome.mimeType, byte_size: outcome.file?.size, attempt_number: outcome.attempts };
       if (outcome.status === "HOST_UPLOADED") {
         recordDiagnostic("HOST_FILE_UPLOAD_DONE", "DONE", "HOST_FILE_UPLOAD_VERIFIED", void 0, diagnosticContext);
-        references.push({ download_url: outcome.downloadUrl, file_id: outcome.fileId, mime_type: outcome.mimeType, file_name: outcome.fileName, ordinal: outcome.ordinal, media: { title: item.name.trim() } });
+        references.push({ download_url: outcome.downloadUrl, file_id: outcome.fileId, mime_type: outcome.mimeType, file_name: outcome.fileName, ordinal: outcome.ordinal });
         recordDiagnostic("TRUSTED_FILE_REF_READY", "DONE", "TRUSTED_FILE_REFERENCE_READY", void 0, diagnosticContext);
       } else {
         recordDiagnostic("HOST_FILE_UPLOAD_FAILED", "ERROR", outcome.error.code, void 0, diagnosticContext);
@@ -12973,7 +12953,7 @@ async function start() {
     enrichmentStatus = "NOT_RUN";
     retryOperationKey = null;
     retryAttempt = 0;
-    selected = asFiles(input.files).filter((file) => IMAGE_TYPES.test(file.type)).map((file) => ({ kind: "local", clientFileId: `${file.name}:${file.size}:${file.lastModified}`, file, name: "", feature: "" }));
+    selected = asFiles(input.files).filter((file) => IMAGE_TYPES.test(file.type)).map((file) => ({ kind: "local", clientFileId: `${file.name}:${file.size}:${file.lastModified}`, file }));
     recordDiagnostic("FILE_SELECTED", "DONE", "LOCAL_FILE_SELECTED");
     recordDiagnostic("FILE_PREVIEW_READY", "DONE", "LOCAL_FILE_PREVIEW_READY");
     renderSelection();
@@ -13000,8 +12980,6 @@ async function start() {
     const figure = target.closest("figure");
     const item = selected.find((candidate) => candidate.clientFileId === figure?.dataset.clientFileId);
     if (!item || !target.dataset.field) return;
-    if (target.dataset.field === "name") item.name = target.value;
-    if (target.dataset.field === "feature") item.feature = target.value;
     updateUploadDisabled();
   });
   previews.addEventListener("click", (event) => {
@@ -13037,15 +13015,15 @@ else void boot();</script>
   </head>
   <body>
     <h2>Ảnh NHK</h2>
-    <p>Chọn một hoặc nhiều ảnh. Mỗi ảnh có tên và Feature riêng; mô tả chung áp dụng cho cả submission. Ảnh được tải trước; bài viết có thể tạo sau từ đúng Media vừa tải.</p>
+    <p>Chọn một hoặc nhiều ảnh và nhập mô tả nhiệm vụ cho toàn bộ submission. Ảnh được tải trước; bài viết có thể tạo sau từ đúng Media vừa tải.</p>
     <p>Trạng thái: <span id="state">CONNECTING</span></p>
     <input id="files" type="file" accept="image/jpeg,image/png,image/gif,image/webp" multiple disabled />
     <div id="actions">
       <button id="select" type="button" hidden disabled>Chọn ảnh từ thư viện ChatGPT</button>
       <button id="upload" type="button" disabled>TẢI LÊN</button>
     </div>
-    <label for="description">Mô tả chung</label>
-    <textarea id="description" maxlength="20000" placeholder="Mô tả chung cho toàn bộ ảnh…"></textarea>
+    <label for="description">Mô tả nhiệm vụ</label>
+    <textarea id="description" maxlength="20000" placeholder="Mô tả nhiệm vụ cho toàn bộ ảnh…"></textarea>
     <div id="summary" aria-live="polite">Chưa chọn ảnh.</div>
     <div id="previews"></div>
     <div id="status" role="status" aria-live="polite">ĐANG KẾT NỐI</div>
