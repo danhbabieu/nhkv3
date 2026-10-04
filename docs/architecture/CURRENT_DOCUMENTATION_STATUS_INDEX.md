@@ -66,6 +66,11 @@ Entry/Sense schema, migration or runtime change.
 
 ## 0.0.3 Dictionary Entry/Sense documentation checkpoint — 2026-10-03
 
+The Entry/Sense public detail implementation and original 29-Entry
+materialization are complete at the code/data checkpoint recorded in
+`V3_EXECUTION_STATE.md`. This index is not the current execution-state owner;
+follow the Dictionary handoff section there for the exact SHA and next action.
+
 ## 0.0.4 Dictionary enrichment audit operations — 2026-10-03
 
 `DICTIONARY_ENRICHMENT_AUDIT_OPERATIONS.md` documents the implemented bounded
@@ -77,10 +82,9 @@ Article enrichment remains owned by their existing Governance pipelines.
 Source/Evidence, Graph, Media/MediaUsage and Video retain their owners.
 
 **CURRENT IMPLEMENTATION:** Migration015 Concept/Label/Candidate/Mention remains
-the compatibility source. Additive Migration024 tables plus internal
-LexicalEntry/LexicalEntryForm read values, repository fallback and an
-Entry/Sense resolver exist; no rows are populated and Concept detail remains
-Concept-centric by `public_slug`. Duplicate Concept slugs are `AMBIGUOUS`.
+the compatibility source. Migration024 contains the original materialized
+29-Entry/29-Form/29-mapping set, with mapping-first public detail and
+`DictionaryDetailQuery`; duplicate Concept slugs remain `AMBIGUOUS`.
 Candidate actions remain `ATTACH`, `CREATE_DRAFT`, `AMBIGUOUS`, `REJECT`,
 `IGNORE` and `DO_NOT_SUGGEST`.
 
@@ -89,11 +93,10 @@ DictionaryConcept-as-LexicalSense`; old Concept UUIDs remain durable. The
 public target is `/tu-dien/{entry-slug}/`, with multi-Sense disambiguation and
 direct owner links where delegated.
 
-**IMPLEMENTATION GAP:** Entry/Form/Sense write lifecycle, preferred-wording
-ownership and synchronization, context-qualified sense filtering, Knowledge
-destination completeness, Entry-centric routes, and governed Dictionary Media
-binding writes are not implemented. No target Entry/Sense MCP operation is
-current or READY.
+**IMPLEMENTATION GAP:** Preferred-wording synchronization, context-qualified
+sense filtering, Knowledge destination completeness, and governed Dictionary
+Media binding writes remain incomplete. The enrichment audit/plan/apply
+capabilities are current; their live enrichment state is not yet applied.
 
 ## 0.1 Governed Conversational Authority — 2026-09-11
 

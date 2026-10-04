@@ -32,6 +32,85 @@ Audit never runs from public hub/detail/search requests and never mutates
 storage. The public projection remains bounded and may render a standalone
 lexical Entry when owner enrichment is absent.
 
+## Practical runbook
+
+The following sequence is the safe operational handoff. Each stage must stop
+on its stated condition; an unavailable provider is never converted to an
+empty result.
+
+### A. Audit
+
+- **Mode:** read-only; no Dictionary or owner data is mutated.
+- **Expected status:** bounded packet with explicit item and coverage status,
+  `read_only=true`, and `mutated=false`.
+- **Safe stop:** stop if deployed build, schema mode, exact scope or provider
+  availability is not verified.
+- **Failure behavior:** fail closed with an explicit runtime/infrastructure
+  error or blocked packet; do not continue as if the corpus were empty.
+
+### B. Plan
+
+- **Mode:** read-only deterministic planning; no mutation.
+- **Expected status:** plan fingerprint plus `READY`, `REVIEW_REQUIRED`,
+  `BLOCKED` or `NOOP` actions.
+- **Safe stop:** stop when evidence is not `EXACT_UNIQUE`, the snapshot is
+  stale, or a dependency is unavailable.
+- **Failure behavior:** retain the action as `REVIEW_REQUIRED`/`BLOCKED`; never
+  downgrade uncertainty to a best guess.
+
+### C. Review statuses
+
+- **Mode:** read-only review; no mutation.
+- **Expected status:** every action is explicitly accepted as `READY`, left
+  `REVIEW_REQUIRED`, retained as `BLOCKED` or recognized as `NOOP`.
+- **Safe stop:** do not approve label similarity, inferred identity or any
+  owner-pipeline write from this Dictionary plan.
+- **Failure behavior:** leave the action non-ready and record the reason.
+
+### D. Apply
+
+- **Mode:** mutating Dictionary lexical/mapping data only.
+- **Expected status:** exact fingerprint, current revision, idempotency key,
+  canonical mutation receipt and read-back.
+- **Safe stop:** stop on fingerprint drift, CAS conflict, unavailable storage,
+  missing capability, invalid target or read-back failure.
+- **Failure behavior:** fail closed; do not retry with a new plan or bypass
+  CAS/idempotency/audit/read-back.
+
+Apply must not mutate Graph, Knowledge, Media, Video, Article or Authority.
+Those systems can change only when their own canonical subsystem is invoked
+separately through its governed workflow.
+
+### E. Read-back
+
+- **Mode:** read-only canonical verification after Apply.
+- **Expected status:** exact Entry/Form/Sense revision and applied lexical or
+  mapping state returned by the canonical owner.
+- **Safe stop:** stop if read-back is unavailable, stale or differs from the
+  receipt.
+- **Failure behavior:** report indeterminate/failed verification; never claim
+  applied state from an acknowledgement alone.
+
+### F. Re-audit
+
+- **Mode:** read-only.
+- **Expected status:** fresh audit reflects only verified changes and keeps
+  unrelated owner coverage unchanged.
+- **Safe stop:** stop if build identity or audit snapshot is stale.
+- **Failure behavior:** preserve the prior state as unverified and do not
+  launch another Apply.
+
+### G. Public acceptance
+
+- **Mode:** read-only browser/public projection verification.
+- **Expected status:** deployed source revision is verified; public Forms,
+  Sense-qualified sections, SEO state and empty/unavailable states match the
+  canonical read-back.
+- **Safe stop:** stop if deployed SHA is unknown or pages expose stale/mixed
+  Sense data.
+- **Failure behavior:** classify as deployment/readiness or projection gap;
+  do not mutate an owner merely to fill the UI.
+
 ## Owner resolution
 
 Evidence is evaluated in this order:
@@ -97,3 +176,41 @@ Run the focused Dictionary and MCP suites, changed-file PHP lint, `git diff
 --check` and changed-scope secret review. Runtime/database unavailability must
 produce a deterministic plan or explicit unavailable status; it must never be
 reported as applied enrichment.
+
+## 29-Entry coverage matrix
+
+The audit export is expected to expose these columns without inventing counts:
+
+`TERM`, `ENTRY_ID`, `FORMS`, `SENSES`, `SEMANTIC_REFERENCE`, `OWNER`,
+`KNOWLEDGE`, `MEDIA`, `VIDEO`, `ARTICLE`, `BRAND`, `MODEL`, `SPECIMEN`,
+`MENTIONS`, `RELATED_TERMS`, `STATUS`, `NEXT_ACTION`.
+
+The status vocabulary is the runtime vocabulary: `COMPLETE`, `LEXICAL_GAP`,
+`OWNER_GAP`, `KNOWLEDGE_GAP`, `MEDIA_GAP`, `RELATION_GAP`, `MENTION_ONLY`,
+`STANDALONE_LEXICAL`, `AMBIGUOUS`, `BLOCKED`, plus action statuses
+`READY`, `REVIEW_REQUIRED`, `NOOP` where the plan exposes them.
+
+## Dependency order
+
+Enrichment proceeds only after stable identity, in this order:
+
+`P0 Durable lexical Forms → P1 Semantic Reference → P2 Canonical Knowledge →
+P3 Graph relationships → P4 Representative Media/gallery → P5 Video → P6
+Article → P7 Brand/Model/Specimen derived projections → P8 Related Terms →
+P9 Mention-only discovery`.
+
+Downstream presentation enrichment must not precede stable semantic identity.
+
+## Current search and public detail
+
+Current code supports search through durable Forms and the compatibility path
+for terms including `400`, `400 ngày`, `400-Day Clock`, `Anniversary clock` and
+`Jahresuhr/400`. Live behavior must be verified against the deployed source
+revision; no browser/live correctness claim is valid before deployed SHA
+read-back.
+
+The public hierarchy is `Entry → Forms → Sense(s) → semantic reference →
+canonical owner → owner projections`. Each Sense keeps its own definition,
+context, owner, Knowledge, Media, Video, Article, Graph, Brand/Model/Specimen,
+related-term and Mention projections. Semantic sections remain
+Sense-qualified; multi-Sense Entries never promote the first Sense.

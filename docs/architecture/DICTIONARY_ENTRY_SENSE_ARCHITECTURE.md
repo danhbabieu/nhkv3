@@ -13,9 +13,9 @@ This decision separates four facts that must never be presented as one:
 | Layer | Meaning for this decision |
 |---|---|
 | **CURRENT LAW** | Dictionary is lexical curation only. Authority owns canonical entities; Knowledge owns atomic claims; Source/Evidence owns provenance/support; Graph owns semantic relations; WordPress owns editorial posts; Media/Asset/Usage and Video retain their own boundaries. |
-| **CURRENT IMPLEMENTATION** | Migration015 remains the compatibility source. Additive Migration024 tables, `LexicalEntry`/`LexicalEntryForm` values, a read repository and an internal Entry/Sense resolver now exist in code. No Entry/Sense rows are populated, no Entry/Sense mutation MCP operation exists, and `DictionaryConcept` remains the durable Sense identity. |
+| **CURRENT IMPLEMENTATION** | Migration015 remains the compatibility source. Additive Migration024 tables, `LexicalEntry`/`LexicalEntryForm` values, mapping-first public detail composition, reverse Mention/related-term projections and the enrichment audit/plan/apply tooling exist. The original bounded materialization contains 29 public Entries, 29 Forms and 29 Entry↔Sense mappings; do not rerun it. `DictionaryConcept` remains the durable Sense identity. |
 | **APPROVED TARGET DESIGN** | `DictionaryConcept` retains its UUID and durable identity and plays the target semantic role of `LexicalSense`. The target model is `LexicalEntry → Forms → 1..N DictionaryConcept-as-LexicalSense`. `LexicalSense` is a design role for the current Concept, not a new runtime class/table. Candidate and Mention remain discovery/provenance objects. |
-| **IMPLEMENTATION GAP** | Durable Entry/Form/Sense write lifecycle, context-qualified sense filtering, multi-sense public rendering, review action distinctions, and Entry-centric public routing are not implemented or runtime-proven. Migration015 data has not been transformed. |
+| **IMPLEMENTATION GAP** | Full Entry/Form/Sense editorial write lifecycle, context-qualified sense filtering, review action distinctions, complete Knowledge destination lifecycle, and governed owner-specific enrichment remain incomplete or runtime-gated. Migration015 data has not been transformed. |
 
 All status statements in this document use those labels. “Target”, “should” and
 “recommended” are not claims that a runtime capability exists.
@@ -345,14 +345,16 @@ model: the current schema has no parent Entry, no multi-sense identity, and a
 mixed destination snapshot. Treating it as a perfect Sense now would erase
 ambiguity and create a second source of truth.
 
-## 11. Documentation-only acceptance checklist
+## 11. Documentation and implementation acceptance checklist
 
 - Current law, implementation, documented target and gap remain separately
   labeled.
 - `CURRENT LAW`, `CURRENT IMPLEMENTATION`, `APPROVED TARGET DESIGN` and
   `IMPLEMENTATION GAP` are not interchangeable.
-- No PHP/runtime/schema/data file is changed by this decision.
-- Entry/Sense is not listed as implemented MCP capability.
+- This design record does not authorize additional PHP/runtime/schema/data
+  changes; its implementation is recorded in `V3_EXECUTION_STATE.md`.
+- Entry/Sense enrichment capability names are recorded in the execution-state
+  handoff; they do not create a Dictionary Graph endpoint.
 - Dictionary remains outside Graph endpoints/predicates.
 - Article, Knowledge, Authority, Media, Video and Governance retain ownership.
 - Option A is the only recommended migration direction.
@@ -360,22 +362,25 @@ ambiguity and create a second source of truth.
   idempotency, revision binding, dry-run mapping and canonical read-back before
   semantic writes are considered.
 
-## 12. Code-side checkpoint — 2026-10-03
+## 12. Code-side checkpoint — 2026-10-04
 
-The first implementation slice is now `IMPLEMENTED_CODE_SIDE` and locally
-tested for additive structure and read resolution. Migration 024 adds Entry,
-Form and Entry→existing-Concept/Sense mapping tables without populating them;
-Migration015 remains unchanged. The repository can read durable target rows or
-derive a read-only one-Concept compatibility Entry from Migration015 data.
+The implementation is `IMPLEMENTED_CODE_SIDE` and locally tested for additive
+structure, read resolution, public detail composition and bounded enrichment
+planning. Migration 024 adds Entry, Form and Entry→existing-Concept/Sense
+mapping tables; the original bounded materialization populated 29 Entries, 29
+Forms and 29 mappings, while Migration015 remains unchanged. The repository
+can read durable target rows or derive a read-only one-Concept compatibility
+Entry from Migration015 data.
 The Entry/Sense resolver returns one resolved Sense only when unique, and
 returns ambiguity for multiple viable Senses. Destination URLs are
 revalidated and are never used as identity.
 
 Preferred-wording mutation ownership is intentionally not enabled: the
 existing Concept/Label writers remain the only durable writers until a
-CAS/read-back cutover is designed. Public Entry routes, Entry/Sense MCP
-mutations, complete Knowledge destination lifecycle, governed Dictionary
-Media binding and Video association remain `IMPLEMENTATION GAP`.
+CAS/read-back cutover is designed. Enrichment apply is limited to exact
+Dictionary lexical/mapping data and does not mutate owner systems. Complete
+Knowledge destination lifecycle, governed Dictionary Media binding and Video
+association remain `IMPLEMENTATION GAP`.
 
 ## 13. Materialization checkpoint — 2026-10-03
 

@@ -1,5 +1,114 @@
 # NHK V3 Execution State
 
+## Dictionary — Current Handoff / Resume Here
+
+**CURRENT HEAD:** `3978d08d86ca78a47b8e499744431442b4112c11`
+
+### CODE STATE
+
+- Entry/Sense public detail architecture is implemented.
+- Mapping-level `semantic_reference` is authoritative over the legacy Concept
+  destination snapshot.
+- Multi-Sense semantic projections are isolated per Sense.
+- `DictionaryDetailQuery` exists.
+- The hub remains lightweight.
+- Reverse Mention projection exists.
+- Governed related-term projection exists.
+- The SEO packet supports the current implemented states.
+- Enrichment audit / plan / apply tooling exists.
+
+### MCP / ADMIN CAPABILITIES
+
+The exact registered names are:
+
+- `nhk.dictionary.enrichment.audit`
+- `nhk.dictionary.enrichment.plan`
+- `nhk.dictionary.enrichment.apply`
+
+### DURABLE DATA STATE
+
+**29 public durable Entries HAVE ALREADY BEEN MATERIALIZED. DO NOT RUN ENTRY
+MATERIALIZATION AGAIN.**
+
+Known materialization state:
+
+- Entries: 29
+- Forms from original materialization: 29
+- Entry↔Sense mappings: 29
+- DRAFT Concepts remain untouched.
+- RETIRED Concepts remain untouched.
+
+Do not claim enrichment Forms or semantic-reference mutations unless a later
+canonical read-back proves they actually ran.
+
+### ENRICHMENT STATE
+
+Current verified state:
+
+- Enrichment Forms applied: 0.
+- Semantic references applied by enrichment tooling: 0.
+- No enrichment Graph mutation.
+- No Knowledge mutation.
+- No Media mutation.
+- No Video mutation.
+- No Article mutation.
+
+Tooling is ready; live/staging enrichment has not yet been applied.
+
+### 400-DAY REFERENCE CASE
+
+- Entry: `01a100e0-1803-7271-b244-04ae86c732b4`
+- Sense: `01a0ff0c-6687-798d-8f44-6761d242815a`
+- Canonical classification candidate: `01a0a868-2918-7dac-81dc-bfc25e710068`
+- Canonical name: `Đồng hồ 400 ngày`
+
+The mapping has **not** been attached by the new enrichment apply flow unless
+runtime read-back proves otherwise. Do not infer attachment from code support.
+
+### BASELINE TEST STATE
+
+The previously observed full-suite failures were proven pre-existing: the
+parent/current baseline comparison was established and 58/58 failures/errors
+were reproduced on the parent at that checkpoint. One known example is
+`FrontendContractTest`, which expected design-token version `1.3.3` while the
+actual stylesheet was `1.3.5`. These were not caused by Dictionary work.
+
+Do not fix unrelated baseline failures solely to unblock Dictionary. Future
+agents must compare any new failures against the current baseline when needed;
+this statement is not an eternal assertion about all future runs.
+
+### NEXT SAFE WORKFLOW
+
+1. Push latest `main` if it is not yet on `origin`.
+2. Deploy the exact HEAD.
+3. Verify deployed `source_revision`/build identity matches the expected SHA.
+4. Confirm Migration024/`ENTRY_SENSE_MODE` readiness.
+5. Run `nhk.dictionary.enrichment.audit` read-only.
+6. Export and review the 29-Entry coverage matrix.
+7. Run `nhk.dictionary.enrichment.plan`.
+8. Review `READY`, `REVIEW_REQUIRED`, `BLOCKED` and `NOOP`.
+9. Apply only deterministic `READY` items through canonical
+   `nhk.dictionary.enrichment.apply`.
+10. Read back.
+11. Re-run audit.
+12. Verify public Dictionary pages.
+13. Use `400 ngày` as the first exact acceptance case.
+
+### DO NOT
+
+- Rerun Entry materialization for the existing 29 Entries.
+- Use raw SQL for semantic references.
+- Bulk-map owners by label similarity.
+- Use AI, embeddings or keyword similarity as semantic identity.
+- Create DictionaryEntry or DictionarySense Graph endpoints.
+- Promote Mention to a Graph relation.
+- Promote transcript Mention to Video `about`.
+- Bind Media based on filename/OCR similarity.
+- Copy Knowledge into Dictionary storage.
+- Mutate Graph/Knowledge/Media/Video/Article merely to fill UI.
+- Bypass CAS, idempotency, audit or read-back.
+- Treat an unavailable provider as empty truth.
+
 # Checkpoint — 2026-10-03 — Dictionary enrichment audit/planning foundation (LOCAL / NO DATA MUTATION)
 
 IMPLEMENTED: Added bounded generic Entry/Sense enrichment audit, strong-evidence

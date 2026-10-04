@@ -10,22 +10,25 @@
 > Graph relation, that change must be proposed through the normal constitutional
 > and registry-governance process rather than inferred from this document.
 
-> **Entry/Sense status — 2026-10-03:** Migration015 remains the compatibility
-> source. An additive Migration024 schema plus internal read-only Entry/Form/
-> Concept-as-Sense code exists; it does not populate rows, expose Entry/Sense
-> MCP mutations, or authorize migration of existing rows. The approved target
-> and remaining gaps are documented in `DICTIONARY_ENTRY_SENSE_ARCHITECTURE.md`.
+> **Entry/Sense status — 2026-10-04:** Migration015 remains the compatibility
+> source. Migration024 Entry/Form/Entry→Sense rows have already been
+> materialized for 29 public durable Entries (29 Forms and 29 mappings from
+> the original materialization). Do not rerun materialization. The enrichment
+> audit/plan/apply tools exist, but enrichment Forms and semantic references
+> applied by that tooling remain 0 until canonical read-back proves otherwise.
+> Current execution state is owned by `V3_EXECUTION_STATE.md`; the approved
+> target and rationale remain in `DICTIONARY_ENTRY_SENSE_ARCHITECTURE.md`.
 
 This contract distinguishes `CURRENT LAW`, `CURRENT IMPLEMENTATION`,
 `APPROVED TARGET DESIGN` and `IMPLEMENTATION GAP`. They are not interchangeable.
 
-### Materialization boundary — 2026-10-03
+### Materialization boundary — 2026-10-04
 
-Migration024 is additive schema only and does not populate Entry, Form or
-Entry→Sense rows. Existing Concept data is materialized only through the
-Dictionary-owned planner/service runbook. The safe default is one existing
-Concept to one Entry while retaining the Concept UUID as Sense identity;
-many Concepts to one Entry is curator review only. Production is read-only.
+Migration024 is additive schema and the original bounded materialization has
+already populated 29 public Entries, 29 Forms and 29 Entry→Sense mappings.
+The safe default remains one existing Concept to one Entry while retaining the
+Concept UUID as Sense identity; many Concepts to one Entry is curator review
+only. Do not run materialization again. Production remains read-only.
 The MCP profile/plan operations are bounded diagnostics, while apply is
 internal/admin, exact-fingerprint, revision-bound, idempotent and read-back
 verified.

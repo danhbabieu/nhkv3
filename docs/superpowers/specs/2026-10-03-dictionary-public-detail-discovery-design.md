@@ -1,5 +1,16 @@
 # Dictionary Public Detail Discovery Design
 
+> **STATUS: IMPLEMENTED DESIGN RECORD**
+>
+> This file remains the architectural design record for the Dictionary public
+> detail work. Its historical “design only” language records the authorization
+> boundary at design time; implementation was completed after that design was
+> written. Do not use this file to determine current execution state. Read:
+> `docs/architecture/V3_EXECUTION_STATE.md`,
+> `docs/architecture/DICTIONARY_ENRICHMENT_AUDIT_OPERATIONS.md`, and the
+> **Dictionary — Current Handoff / Resume Here** section in the execution
+> state.
+
 ## Decision
 
 Build an Entry-centric public Dictionary detail projection. Dictionary remains
