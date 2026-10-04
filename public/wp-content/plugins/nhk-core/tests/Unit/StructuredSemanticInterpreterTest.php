@@ -136,6 +136,19 @@ final class StructuredSemanticInterpreterTest extends TestCase
         self::assertTrue($configuration[0]['resolver_eligible']);
     }
 
+    public function test_qualified_configuration_suppresses_weaker_contained_unit_spans(): void
+    {
+        $packet = (new StructuredSemanticInterpreter())->interpret([
+            'text' => 'máy 8 côn 8 búa',
+            'source_kind' => 'human_chat',
+            'metadata' => ['lexical_hints' => [['kind' => 'STRUCTURAL_UNIT', 'term' => 'côn'], ['kind' => 'STRUCTURAL_UNIT', 'term' => 'búa']]],
+        ])->toArray();
+
+        self::assertSame(['8 côn 8 búa'], array_column(array_filter($packet['semantic_query_seeds'], static fn (array $seed): bool => ($seed['category'] ?? '') === 'CONFIGURATION'), 'normalized_form'));
+        self::assertNotContains('côn', array_column($packet['semantic_query_seeds'], 'normalized_form'));
+        self::assertNotContains('búa', array_column($packet['semantic_query_seeds'], 'normalized_form'));
+    }
+
     public function test_unequal_multi_pair_configuration_does_not_expose_reduction_variant(): void
     {
         $packet = (new StructuredSemanticInterpreter())->interpret([

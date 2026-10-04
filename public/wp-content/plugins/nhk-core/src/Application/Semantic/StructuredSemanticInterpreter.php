@@ -57,6 +57,9 @@ final class StructuredSemanticInterpreter
         $proper = array_values(array_filter($lexical, static fn (array $span): bool => $span['origin'] === 'PROPER_NAME_SPAN'));
         $identifiers = array_values(array_filter($lexical, static fn (array $span): bool => in_array($span['origin'], ['IDENTIFIER_SPAN', 'TECHNICAL_PATTERN'], true)));
         $configuration = array_values(array_filter($lexical, static fn (array $span): bool => $span['origin'] === 'STRUCTURAL_CONFIGURATION'));
+        $lexical = $this->suppressContainedStructuralNoise($lexical, $configuration);
+        $proper = array_values(array_filter($lexical, static fn (array $span): bool => $span['origin'] === 'PROPER_NAME_SPAN'));
+        $identifiers = array_values(array_filter($lexical, static fn (array $span): bool => in_array($span['origin'], ['IDENTIFIER_SPAN', 'TECHNICAL_PATTERN'], true)));
         $technical = array_values(array_filter($lexical, static fn (array $span): bool => in_array($span['origin'], ['IDENTIFIER_SPAN', 'TECHNICAL_PATTERN', 'STRUCTURAL_CONFIGURATION'], true)));
 
         $ambiguous = $this->ambiguousTerms($value, $lexical);
@@ -278,6 +281,23 @@ final class StructuredSemanticInterpreter
         if (preg_match('/^(\d{1,3})\s+[\p{L}][\p{L}-]*\s+(\d{1,3})\s+[\p{L}][\p{L}-]*$/u', $normalized, $match) !== 1) return [];
         preg_match('/^(\d{1,3})\s+([\p{L}][\p{L}-]*)\s+(\d{1,3})\s+([\p{L}][\p{L}-]*)$/u', $normalized, $parts);
         return [implode(' ', [$parts[2], $parts[3], $parts[4]])];
+    }
+
+    /** @param list<array<string,mixed>> $lexical @param list<array<string,mixed>> $configurations @return list<array<string,mixed>> */
+    private function suppressContainedStructuralNoise(array $lexical, array $configurations): array
+    {
+        $qualified = array_values(array_filter($configurations, static fn (array $span): bool => ($span['evidence_status'] ?? '') === 'QUALIFIED' && ($span['resolver_eligible'] ?? false) === true));
+        if ($qualified === []) return $lexical;
+        return array_values(array_filter($lexical, static function (array $span) use ($qualified): bool {
+            if (($span['origin'] ?? '') === 'STRUCTURAL_CONFIGURATION' || in_array(($span['origin'] ?? ''), ['KNOWN_LABEL', 'PROPER_NAME_SPAN', 'MUSIC_NAME'], true)) return true;
+            $term = trim((string) ($span['normalized_term'] ?? ''));
+            if ($term === '') return true;
+            foreach ($qualified as $configuration) {
+                $container = ' ' . trim((string) ($configuration['normalized_term'] ?? '')) . ' ';
+                if (str_contains($container, ' ' . $term . ' ')) return false;
+            }
+            return true;
+        }));
     }
 
     private function queryCategory(string $origin): string
