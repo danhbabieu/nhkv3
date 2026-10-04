@@ -335,6 +335,7 @@ final class DictionarySeedPlannerTest extends TestCase
                 'normalized_form' => '8 côn 8 búa',
                 'category' => 'CONFIGURATION',
                 'locale' => 'vi-VN',
+                'lookup_variants' => ['côn 8 búa'],
             ]],
         ], ['source_family' => 'chat:configuration']);
 
@@ -343,7 +344,7 @@ final class DictionarySeedPlannerTest extends TestCase
         self::assertSame('RESOLVED', $item['resolution_status']);
         self::assertSame('11111111-1111-7111-8111-111111111111', $item['resolved_dictionary_concept_id']);
         self::assertSame('ADD_ALIAS_CANDIDATE', $item['suggested_action']);
-        self::assertContains('STRUCTURAL_CONFIGURATION_REUSE', $item['diagnostics']);
+        self::assertContains('STRUCTURAL_VARIANT_REUSED', $item['diagnostics']);
         self::assertNotSame('NEW_CONCEPT_CANDIDATE', $item['suggested_action']);
     }
 

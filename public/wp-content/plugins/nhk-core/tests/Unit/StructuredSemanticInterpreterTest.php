@@ -131,7 +131,7 @@ final class StructuredSemanticInterpreterTest extends TestCase
         ));
 
         self::assertCount(1, $configuration);
-        self::assertSame(['36/10'], $configuration[0]['lookup_variants']);
+        self::assertSame(['ngày 10 tháng'], $configuration[0]['lookup_variants']);
         self::assertSame('36 ngày 10 tháng', $configuration[0]['normalized_form']);
         self::assertTrue($configuration[0]['resolver_eligible']);
     }

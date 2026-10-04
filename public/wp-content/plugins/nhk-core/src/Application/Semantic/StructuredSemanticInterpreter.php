@@ -276,7 +276,8 @@ final class StructuredSemanticInterpreter
         if (($span['origin'] ?? '') !== 'STRUCTURAL_CONFIGURATION' || ($span['evidence_status'] ?? '') !== 'QUALIFIED' || ($span['resolver_eligible'] ?? false) !== true) return [];
         $normalized = $this->normalize((string) ($span['normalized_term'] ?? ''));
         if (preg_match('/^(\d{1,3})\s+[\p{L}][\p{L}-]*\s+(\d{1,3})\s+[\p{L}][\p{L}-]*$/u', $normalized, $match) !== 1) return [];
-        return [$match[1] . '/' . $match[2]];
+        preg_match('/^(\d{1,3})\s+([\p{L}][\p{L}-]*)\s+(\d{1,3})\s+([\p{L}][\p{L}-]*)$/u', $normalized, $parts);
+        return [implode(' ', [$parts[2], $parts[3], $parts[4]])];
     }
 
     private function queryCategory(string $origin): string
