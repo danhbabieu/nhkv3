@@ -123,6 +123,39 @@ final class DictionaryPlanningServiceTest extends TestCase
         self::assertCount(1, $mentionRepo->items);
     }
 
+    public function test_replay_of_same_capture_term_does_not_increase_candidate_or_mention_occurrence(): void
+    {
+        $candidateRepo = new class implements DictionaryCandidateRepository {
+            public int $writes = 0;
+            public function upsertObservation(DictionaryCandidate $candidate): DictionaryCandidate { $this->writes++; return $candidate; }
+            public function suppressed(string $normalizedTerm, string $contextHash): bool { return false; }
+            public function listForReview(int $limit = 100): array { return []; }
+            public function findById(string $candidateId): ?DictionaryCandidate { return null; }
+            public function saveDecision(DictionaryCandidate $candidate, int $expectedRevision): DictionaryCandidate { return $candidate; }
+        };
+        $mentionRepo = new class implements DictionaryMentionRepository {
+            public int $writes = 0;
+            private ?DictionaryMention $stored = null;
+            public function upsert(DictionaryMention $mention): DictionaryMention
+            {
+                $this->writes++;
+                return $this->stored ??= $mention;
+            }
+            public function listBySource(string $sourceKind, string $sourceId): array { return $this->stored === null ? [] : [$this->stored]; }
+        };
+        $resolver = new DictionaryResolver(static fn (): array => [], static fn (): array => [], static fn (): array => [], static fn (): array => [], static fn (): bool => false);
+        $service = new DictionaryPlanningService(new DictionaryTermDetector(), $resolver, $candidateRepo, $mentionRepo, new DictionaryLinkPlanner());
+
+        $first = $service->plan('Côn hoa thị được người sưu tầm nhắc đến.', 'CAPTURE', 'capture-1', ['domain' => 'clock'], ['Côn hoa thị']);
+        $second = $service->plan('Côn hoa thị được người sưu tầm nhắc đến.', 'CAPTURE', 'capture-1', ['domain' => 'clock'], ['Côn hoa thị']);
+
+        self::assertCount(1, $first['candidate_terms']);
+        self::assertCount(1, $second['candidate_terms']);
+        self::assertSame(1, $candidateRepo->writes);
+        self::assertSame(2, $mentionRepo->writes);
+        self::assertTrue($second['candidate_terms'][0]['replayed'] ?? false);
+    }
+
     public function test_ambiguous_term_is_persisted_for_review_and_never_linked(): void
     {
         $candidateRepo = new class implements DictionaryCandidateRepository {

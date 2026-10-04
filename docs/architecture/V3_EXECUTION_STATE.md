@@ -1,5 +1,46 @@
 # NHK V3 Execution State
 
+## Checkpoint — 2026-10-04 — Human/Chat lexical persistence boundary fix (LOCAL / NO DATA MUTATION)
+
+ROOT_CAUSE: `EditorialCaptureCoordinator` persisted the shared interpretation
+diagnostics but did not invoke the existing `DictionaryObservationRegistry`
+until downstream owner paths. A `KNOWLEDGE_DELTA` Capture could therefore
+reach `SUBJECT_CONFLICT_REVIEW_REQUIRED`/subject review before the shared
+Dictionary harvester had a chance to run, losing an otherwise valid lexical
+observation. The semantic subject gate was incorrectly acting as a lexical
+validity gate.
+
+IMPLEMENTATION: Immediately after shared `TextInputInterpreter` execution,
+the coordinator now calls the existing `DictionaryObservationRegistry` with
+source kind `CAPTURE`, the durable Capture UUID, raw Human/Chat text, bounded
+metadata context and lexical hints. The registry continues through the
+existing `DictionaryHarvester` → `DictionaryPlanningService` → Candidate/
+Mention repositories. The context contains Capture/source provenance but no
+synthetic semantic subject. Observation status is diagnostic and non-blocking;
+Knowledge, Authority, Relation, Evidence, Graph, Article, Media and Video
+writers remain downstream and unchanged. Replay uses the existing stable
+Capture source identity and planner/repository idempotency.
+
+REGRESSION COVERAGE: Added a coordinator test proving lexical observation is
+requested before an ambiguous semantic subject blocks the Capture. Added a
+Dictionary planner replay test proving the same Capture + term does not create
+a second Candidate write or occurrence while the Mention upsert is replayed.
+Existing Dictionary/interpreter tests cover resolved reuse, unknown private
+`NEEDS_REVIEW`, ambiguous review, observation-only suppression and non-semantic
+mutation boundaries.
+
+VERIFICATION: Focused Dictionary + Capture matrix passed 137 tests / 702
+assertions (with existing warnings/deprecations). Full Unit suite was rerun
+with 512MB memory: 3,009 tests / 18,104 assertions, 1 pre-existing error and
+11 pre-existing failures in unrelated WPDB/frontend/catalog/knowledge/media/
+remote-deployment tests; no failure was in the changed Capture/Dictionary
+tests. Changed-file PHP lint and `git diff --check` remain required before
+commit. No migration, materialization, enrichment apply, deployment or staging
+mutation was run.
+
+STATUS: `LEXICAL_CAPTURE_PERSISTENCE_BOUNDARY_FIXED / FOCUSED_GREEN /
+FULL_UNIT_BASELINE_FAILURES_UNRELATED / NO_DATA_MUTATION / COMMIT_PENDING`.
+
 ## Checkpoint — 2026-10-04 — Human/Chat lexical intake acceptance gap (STAGING RUNTIME / BOUNDED MUTATION ATTEMPT)
 
 RUNTIME: The deployed MCP runtime read back source revision

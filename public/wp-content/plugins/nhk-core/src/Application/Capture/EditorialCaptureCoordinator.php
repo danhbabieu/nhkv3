@@ -13,6 +13,7 @@ use NHK\Core\Domain\Governance\CommandCanonicalizer;
 use NHK\Core\Domain\Capture\CapturePurpose;
 use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Core\Application\Mcp\McpDocumentationRegistry;
+use NHK\Core\Application\Dictionary\DictionaryObservationRegistry;
 use NHK\Core\Application\Governance\StagingAcceptanceScopeVerifier;
 use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
 use NHK\Core\Domain\Knowledge\DependencyValidationException;
@@ -370,6 +371,20 @@ final class EditorialCaptureCoordinator
             $this->beginPhase('INTERPRETED');
             $interpretation = $this->interpreter->interpret($text, $assets, is_array($input['subject_hints'] ?? null) ? $input['subject_hints'] : [], is_array($input['metadata'] ?? null) ? $input['metadata'] : []);
             $diagnostics['interpretation'] = $this->withoutBody($interpretation);
+            // Lexical observations are an independent Capture concern. Persist
+            // them after shared interpretation, before any semantic subject
+            // gate can block Knowledge/Authority/Relation work. The Dictionary
+            // owner performs its own lexical filtering, resolution, reuse and
+            // idempotent Candidate/Mention persistence; this boundary never
+            // invents a semantic host for an unresolved term.
+            $dictionaryObservation = DictionaryObservationRegistry::observe(
+                'CAPTURE',
+                $record->captureId,
+                $text,
+                $this->dictionaryObservationContext($record, $input),
+                $this->dictionaryLexicalHints($input),
+            );
+            $diagnostics['dictionary_observation'] = $this->withoutBody($dictionaryObservation);
             $intentRouter = $this->contentIntentRouter ?? new ContentIntentRouter();
             $persistedIntent = is_array($record->context['content_intent'] ?? null)
                 ? $record->context['content_intent']
@@ -1049,6 +1064,29 @@ final class EditorialCaptureCoordinator
             $diagnostics['resume_hints'] = $partialCompletion['resume_hints'] ?? ['resume_children' => []];
             return $this->save($record, $record->stage, $assets, $diagnostics, $receipts, $this->activeReceiptPhase ?? $status, $record->articleId, $record->articleStateToken, $status);
         }
+    }
+
+    /** @param array<string,mixed> $input @return array<string,mixed> */
+    private function dictionaryObservationContext(CaptureRecord $record, array $input): array
+    {
+        $metadata = is_array($input['metadata'] ?? null) ? $input['metadata'] : [];
+        $context = [
+            'capture_id' => $record->captureId,
+            'source_surface' => 'HUMAN_CHAT',
+            'provenance' => ['capture_id' => $record->captureId, 'source' => 'CAPTURE'],
+        ];
+        foreach (['locale', 'lexical_locale', 'domain', 'usage_scope', 'region', 'community', 'scope', 'term_type'] as $key) {
+            if (array_key_exists($key, $metadata)) $context[$key] = $metadata[$key];
+        }
+        return $context;
+    }
+
+    /** @param array<string,mixed> $input @return list<string> */
+    private function dictionaryLexicalHints(array $input): array
+    {
+        $metadata = is_array($input['metadata'] ?? null) ? $input['metadata'] : [];
+        $hints = $metadata['lexical_hints'] ?? [];
+        return is_array($hints) ? array_values(array_filter($hints, 'is_string')) : [];
     }
 
     /** @param array<string,mixed> $input @return array<string,mixed> */
