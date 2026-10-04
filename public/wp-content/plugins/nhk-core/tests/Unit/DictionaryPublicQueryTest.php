@@ -45,7 +45,7 @@ final class DictionaryPublicQueryTest extends TestCase
         };
         $query = new DictionaryPublicQuery($repo, null, null, $entries);
 
-        foreach (['400', '400 ngày', '400-Day Clock', 'Anniversary clock'] as $term) {
+        foreach (['400', '400 ngày', '400-Day Clock', 'Anniversary clock', 'Jahresuhr/400'] as $term) {
             $items = $query->hub(500, $term)['items'];
             self::assertCount(1, $items, $term);
             self::assertSame('400 ngày', $items[0]['title'], $term);

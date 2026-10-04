@@ -208,6 +208,29 @@ final class DictionarySeedPlannerTest extends TestCase
         self::assertSame(1, $result['diagnostics']['next_seed_offset']);
     }
 
+    public function test_natural_language_known_spans_converge_without_new_duplicate_candidate(): void
+    {
+        $resolver = new DictionaryResolver(
+            static fn (string $term): array => in_array($term, ['400 ngày', 'anniversary clock'], true) ? [[
+                'concept_id' => '01a0ff0c-6687-798d-8f44-6761d242815a',
+                'preferred_label' => '400 ngày', 'destination_type' => 'dictionary', 'destination_id' => '01a0ff0c-6687-798d-8f44-6761d242815a',
+            ]] : [],
+            static fn (): array => [], static fn (): array => [], static fn (): array => [], static fn (): bool => false,
+        );
+
+        $packet = (new StructuredSemanticInterpreter())->interpret([
+            'text' => 'Đồng hồ 400 ngày, còn gọi là Anniversary clock.',
+            'source_kind' => 'article',
+            'metadata' => ['approved_labels' => ['400 ngày', 'Anniversary clock']],
+        ]);
+        $result = (new DictionarySeedPlanner($resolver))->plan($packet);
+
+        $known = array_values(array_filter($result['items'], static fn (array $item): bool => in_array($item['normalized_form'], ['400 ngày', 'anniversary clock'], true)));
+        self::assertCount(2, $known);
+        self::assertSame(['01a0ff0c-6687-798d-8f44-6761d242815a', '01a0ff0c-6687-798d-8f44-6761d242815a'], array_column($known, 'resolved_dictionary_concept_id'));
+        self::assertNotContains('NEW_CONCEPT_CANDIDATE', array_column($known, 'suggested_action'));
+    }
+
     public function test_seed_plan_exposes_canonical_reuse_and_action_without_creating_a_concept(): void
     {
         $resolver = new DictionaryResolver(
