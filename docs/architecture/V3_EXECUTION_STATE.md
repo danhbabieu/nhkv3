@@ -1,5 +1,33 @@
 # NHK V3 Execution State
 
+## Checkpoint — 2026-10-04 — Dictionary lexical-resolution parity (LOCAL / NO MUTATION)
+
+IMPLEMENTED: Approved exact labels now resolve by bounded lexical scope rather
+than arbitrary full-context metadata hashes; curation/provenance fields remain
+non-identity metadata and ambiguity is preserved. Shared interpretation emits
+at most one qualified structural lookup hint, suppresses weaker contained unit
+spans, and both Dictionary planning paths consume fallback only after primary
+`UNKNOWN`. Seed budgets count actual resolver invocations and preserve a
+deterministic cursor when fallback consumes the remaining budget. Public Entry
+hub/detail/profile slug derivation is bounded and collision fail-closed.
+
+400-DAY ACCEPTANCE: Local fixtures converge `400 ngày`, `400-Day Clock`,
+`Anniversary clock` and `Jahresuhr/400` on the existing Entry/Sense identity;
+the natural-language and `8 côn 8 búa` structural probes are covered by
+read-only tests. No live/staging read-back is claimed.
+
+DATA / MATERIALIZATION: No Dictionary materialization was rerun. No
+enrichment Form, semantic-reference, Graph, Knowledge, Media, Video or Article
+mutation was applied. The existing 29 durable Entries remain unchanged.
+
+RUNTIME AUTHORITY: A deployed build's documentation-bootstrap `source_revision`
+and verified build identity are authoritative for deployed runtime state. This
+file records dated implementation evidence only and is not a self-referential
+revision oracle.
+
+STATUS: `DICTIONARY_RESOLUTION_PARITY_LOCAL / 400_DAY_FIXTURES_GREEN /
+NO_DATA_MUTATION / UNDEPLOYED`.
+
 ## Checkpoint — 2026-10-04 — Dictionary Gate 0/1 route round-trip (LOCAL / NO MUTATION)
 
 BASELINE: Repository HEAD was `88cf710c` on
@@ -49,7 +77,11 @@ STATUS: `DICTIONARY_STRUCTURAL_LOOKUP_LOCAL / NO_DATA_MUTATION / UNDEPLOYED`.
 
 ## Dictionary — Current Handoff / Resume Here
 
-**CURRENT HEAD:** `3978d08d86ca78a47b8e499744431442b4112c11`
+**IMPLEMENTATION BASE CHECKPOINT:** `3978d08d86ca78a47b8e499744431442b4112c11`
+
+The deployed runtime revision is never inferred from this document. Use the
+fresh documentation-bootstrap `source_revision` / build identity for that
+fact.
 
 ### CODE STATE
 

@@ -44,8 +44,8 @@ final class McpDocumentationRegistry
         'knowledge' => ['path' => 'docs/architecture/06_KNOWLEDGE_SOURCE_MODEL.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'knowledge'],
         'universal-structured-semantic-intake' => ['path' => 'docs/architecture/UNIVERSAL_STRUCTURED_SEMANTIC_INTAKE_CONTRACT.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'knowledge'],
         'dictionary-lexical-knowledge' => ['path' => 'docs/architecture/DICTIONARY_LEXICAL_KNOWLEDGE_CONTRACT.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'knowledge'],
-        'dictionary-entry-sense' => ['path' => 'docs/architecture/DICTIONARY_ENTRY_SENSE_ARCHITECTURE.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'knowledge'],
-        'dictionary-enrichment-audit' => ['path' => 'docs/architecture/DICTIONARY_ENRICHMENT_AUDIT_OPERATIONS.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'knowledge'],
+        'dictionary-entry-sense-architecture' => ['path' => 'docs/architecture/DICTIONARY_ENTRY_SENSE_ARCHITECTURE.md', 'classification' => 'current_evidence', 'status' => 'ACTIVE', 'domain' => 'knowledge'],
+        'dictionary-enrichment-audit-operations' => ['path' => 'docs/architecture/DICTIONARY_ENRICHMENT_AUDIT_OPERATIONS.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'knowledge'],
         'living-knowledge' => ['path' => 'docs/architecture/GOVERNED_LIVING_KNOWLEDGE_DESIGN.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'knowledge'],
         'collector-profile' => ['path' => 'docs/architecture/COLLECTOR_PROFILE_CONTRACT.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'knowledge'],
         'graph' => ['path' => 'docs/architecture/11_GRAPH_CORE_CONTRACT.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'graph'],
@@ -68,6 +68,12 @@ final class McpDocumentationRegistry
         'sitemap-indexability' => ['path' => 'docs/seo/SITEMAP_INDEXABILITY_CONTRACT.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'seo'],
     ];
 
+    /** Compatibility names retained for clients while each path remains unique in the manifest. */
+    private const DOCUMENT_ALIASES = [
+        'dictionary-entry-sense' => 'dictionary-entry-sense-architecture',
+        'dictionary-enrichment-audit' => 'dictionary-enrichment-audit-operations',
+    ];
+
     public function __construct(private ?string $sourceRoot = null, private ?string $runtimeVersion = null, private ?\NHK\Core\Application\Runtime\SemanticWritePolicyResolver $semanticWritePolicy = null)
     {
         if ($this->sourceRoot !== null) $this->sourceRoot = rtrim($this->sourceRoot, DIRECTORY_SEPARATOR);
@@ -76,7 +82,7 @@ final class McpDocumentationRegistry
     }
 
     /** @return list<string> */
-    public static function documentKeys(): array { return array_keys(self::DOCUMENTS); }
+    public static function documentKeys(): array { return array_values(array_unique(array_merge(array_keys(self::DOCUMENTS), array_keys(self::DOCUMENT_ALIASES)))); }
 
     /** @return array<string,array{path:string,classification:string,status:string,domain:string}> */
     public static function documentDefinitions(): array { return self::DOCUMENTS; }
@@ -133,6 +139,7 @@ final class McpDocumentationRegistry
     /** @return array<string,mixed> */
     public function get(string $path, ?int $startLine = null, ?int $lineCount = null): array
     {
+        $path = self::DOCUMENT_ALIASES[$path] ?? $path;
         $context = $this->context();
         $entry = $this->entryForPath($path, $context['manifest']);
         $absolute = $this->resolveEntry($context['root'], $entry['path']);
