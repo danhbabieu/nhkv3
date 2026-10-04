@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Dictionary;
 
-use NHK\Core\Domain\Dictionary\{LexicalEntryForm};
+use NHK\Core\Domain\Dictionary\{LexicalEntry, LexicalEntryForm};
 
 /** Builds deterministic Dictionary-owned actions from an audit snapshot. */
 final class DictionaryEnrichmentPlan
@@ -41,6 +41,11 @@ final class DictionaryEnrichmentPlan
 
     public function fingerprint(array $actions): string { return hash('sha256', json_encode($this->sort($actions), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)); }
 
-    private function existingForms(string $entryId): array { if (!method_exists($this->entries, 'listForms')) return []; return (array) $this->entries->listForms($entryId); }
+    private function existingForms(string $entryId): array
+    {
+        if (!method_exists($this->entries, 'listForms') || !method_exists($this->entries, 'findById')) return [];
+        $entry = $this->entries->findById($entryId);
+        return $entry instanceof LexicalEntry ? (array) $this->entries->listForms($entry) : [];
+    }
     private function sort(mixed $value): mixed { if (!is_array($value)) return $value; if (!array_is_list($value)) ksort($value); foreach ($value as $key => $item) $value[$key] = $this->sort($item); return $value; }
 }

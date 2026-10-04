@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Dictionary\{DictionaryEnrichmentOwnerResolver, DictionaryEnrichmentPlan};
-use NHK\Core\Domain\Dictionary\DictionaryConcept;
+use NHK\Core\Domain\Dictionary\{DictionaryConcept, LexicalEntry};
 use PHPUnit\Framework\TestCase;
 
 final class DictionaryEnrichmentPlanTest extends TestCase
@@ -12,7 +12,8 @@ final class DictionaryEnrichmentPlanTest extends TestCase
     public function test_exact_unique_approved_label_becomes_form_action_and_duplicates_are_noop(): void
     {
         $plan = new DictionaryEnrichmentPlan(new class {
-            public function listForms(string $entryId): array { return [['form' => '400 ngày', 'kind' => 'PREFERRED']]; }
+            public function findById(string $entryId): ?LexicalEntry { return new LexicalEntry($entryId, '400 ngày', '400 ngày', DictionaryConcept::APPROVED, 'vi-VN'); }
+            public function listForms(LexicalEntry $entry): array { return [['form' => '400 ngày', 'kind' => 'PREFERRED']]; }
         }, new DictionaryEnrichmentOwnerResolver());
 
         $result = $plan->build(['items' => [[
