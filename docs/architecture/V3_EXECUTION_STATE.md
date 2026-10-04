@@ -1,5 +1,30 @@
 # NHK V3 Execution State
 
+## Checkpoint — 2026-10-04 — Dictionary storage and display staging acceptance closure
+
+RUNTIME: Fresh staging verification read back deployed commit
+`5294b44aa998614d37802b11c5c9dcb4b69f0893`. Dictionary storage/display
+acceptance is complete: 30 Entries, 0 duplicate Entries, 80 Forms, 0 lexical
+READY remaining, 3 AVAILABLE semantic references, 0 INVALID/STALE mappings,
+26 `NO_OWNER` Entries retained as lexical-only, and 1 `AMBIGUOUS` Entry
+(`côn`) retained for review without owner selection.
+
+ACCEPTANCE: The final 45 lexical Forms applied successfully. `400 ngày`
+completed owner, Forms and public projection read-back. Public/search behavior
+is working. No materialization rerun, owner-subsystem mutation, or production
+operation occurred.
+
+KNOWN RESIDUAL: `Selection cam` durably has `locale=vi-VN` while the approved
+lexical metadata is `locale=en`. This is a known P2 data-cleanup item only; it
+does not affect current storage/display acceptance. It is explicitly deferred
+from this closure: no data mutation, code/migration change, redesign, owner
+review, `NO_OWNER` processing or `côn` ambiguity resolution is authorized by
+this checkpoint.
+
+STATUS: `DICTIONARY_STORAGE_AND_DISPLAY_COMPLETE_ON_STAGING`
+
+KNOWN_P2_DATA_CLEANUP: `Selection cam locale vi-VN → en`
+
 ## Checkpoint — 2026-10-04 — Dictionary mixed-plan lexical closure (LOCAL / NO DATA MUTATION)
 
 ROOT_CAUSE: `enrichmentApply()` rejected the entire deterministic plan when its
