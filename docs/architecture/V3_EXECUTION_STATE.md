@@ -1,5 +1,39 @@
 # NHK V3 Execution State
 
+## Checkpoint — 2026-10-04 — Dictionary staging route/runtime and read-only enrichment audit
+
+DEPLOYED: Canonical staging deployment completed through the existing
+`scripts/nhk-deploy-verify` workflow. The route-fix revision was
+`5e84d3bb43cbb6231a126020bdc4242e06a24aa3`; the deployed follow-up revision
+is `320fc7d8ee0b0b96be0773e3da067fb883e4c6db`, with source/build/documentation
+identity read-back PASS. Migration current/target is 24/24 and
+`dictionary_entry_sense_schema_ready=true`.
+
+ROUTE: Deployed `/tu-dien/` → `/tu-dien/400-ngay/` round-trip PASS. Public
+detail returns HTTP 200, Entry `01a100e0-1803-7271-b244-04ae86c732b4`, Sense
+`01a0ff0c-6687-798d-8f44-6761d242815a`, durable Forms and lexical detail.
+
+AUDIT: Read-only MCP audit covered all 29 public Entries with
+`mutated=false`. Canonical resolver evidence produced 3 `EXACT_UNIQUE`, 1
+`AMBIGUOUS` and 25 `NO_OWNER` owner resolutions; all 29 semantic references
+remain `ABSENT`. The full deterministic plan contains 82 actions: 27 READY
+(3 semantic-reference actions and 24 approved Form actions), 29 NOOP and 26
+REVIEW_REQUIRED. The `400 ngày` canary is `EXACT_UNIQUE` to the existing
+classification owner `01a0a868-2918-7dac-81dc-bfc25e710068`, revision 2.
+
+MUTATION: No enrichment apply was executed in this checkpoint because the
+bounded staging mutation requires the explicit runtime approval gate for the
+exact plan/idempotency payload. No Graph, Knowledge, Media, Video or Article
+mutation occurred.
+
+VERIFICATION: Enrichment-plan type-contract fix was committed as `f3c3a434`;
+canonical-owner resolver wiring was committed as `320fc7d8`. Focused resolver,
+audit, plan and MCP contract tests pass 12 tests / 88 assertions; changed PHP
+lint and `git diff --check` pass. One unrelated pre-existing runtime contract
+test still errors on uninitialized `DictionaryRuntime::$normalizer`.
+
+STATUS: `STAGING_ROUTE_ACCEPTED / RUNTIME_READY / AUDIT_COMPLETE / APPLY_PENDING_EXPLICIT_GATE`.
+
 ## Checkpoint — 2026-10-04 — Dictionary lexical-resolution parity (LOCAL / NO MUTATION)
 
 IMPLEMENTED: Approved exact labels now resolve by bounded lexical scope rather
