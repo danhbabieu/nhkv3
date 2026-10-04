@@ -26,6 +26,39 @@ final class McpDocumentationRegistryTest extends TestCase
         self::assertContains('media', $keys);
         self::assertContains('visual-support-requirement', $keys);
         self::assertContains('mcp', $keys);
+        self::assertContains('dictionary-entry-sense', $keys);
+        self::assertContains('dictionary-enrichment-audit', $keys);
+    }
+
+    public function test_dictionary_entry_sense_documents_are_allowlisted_active_and_snapshot_verified(): void
+    {
+        $registry = new McpDocumentationRegistry();
+        $expected = [
+            'dictionary-entry-sense' => 'docs/architecture/DICTIONARY_ENTRY_SENSE_ARCHITECTURE.md',
+            'dictionary-enrichment-audit' => 'docs/architecture/DICTIONARY_ENRICHMENT_AUDIT_OPERATIONS.md',
+        ];
+
+        foreach ($expected as $key => $path) {
+            self::assertContains($path, McpDocumentationRegistry::documentPaths());
+            $byKey = $registry->get($key);
+            $byPath = $registry->get($path);
+            self::assertSame('ACTIVE', $byKey['status']);
+            self::assertSame($path, $byKey['path']);
+            self::assertSame($byKey['document_hash'], $byPath['document_hash']);
+            self::assertSame(hash_file('sha256', dirname(__DIR__, 6) . '/' . $path), $byKey['document_hash']);
+        }
+
+        $directory = sys_get_temp_dir() . '/nhk-docs-dictionary-' . bin2hex(random_bytes(5));
+        self::assertTrue(mkdir($directory, 0755, true));
+        try {
+            $manifest = McpDocumentationRegistry::buildSnapshot(dirname(__DIR__, 6), $directory, 'runtime-test', '2026-10-04T00:00:00+00:00');
+            $paths = array_column($manifest['files'], 'path');
+            self::assertContains($expected['dictionary-entry-sense'], $paths);
+            self::assertContains($expected['dictionary-enrichment-audit'], $paths);
+            self::assertSame($manifest['source_revision'], (new McpDocumentationRegistry($directory, 'runtime-test'))->bootstrap()['source_revision']);
+        } finally {
+            $this->removeDirectory($directory);
+        }
     }
 
     public function test_every_read_first_document_reference_is_allowlisted_and_retrievable(): void

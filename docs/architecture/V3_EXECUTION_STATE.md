@@ -1,5 +1,22 @@
 # NHK V3 Execution State
 
+## Checkpoint — 2026-10-04 — Dictionary structural lookup resolution (LOCAL / NO MUTATION)
+
+IMPLEMENTED: The shared interpreter now exposes at most one generic compact
+lookup variant for a qualified two-pair structural configuration. The
+Dictionary Seed planner resolves the original form first, consumes fallback
+lookups only after `UNKNOWN`, accounts for every resolver invocation against
+the declared budget, and preserves ambiguity and the original observation
+identity. The canonical documentation registry now allowlists the Entry/Sense
+architecture and enrichment audit documents.
+
+VERIFICATION: Focused interpreter/planner/documentation tests pass 50 tests /
+705 assertions; Dictionary corpus/detector/MCP contract tests pass 106 tests /
+1,130 assertions. No migration, semantic mutation, deployment or rerun of the
+29-Entry materialization was performed.
+
+STATUS: `DICTIONARY_STRUCTURAL_LOOKUP_LOCAL / NO_DATA_MUTATION / UNDEPLOYED`.
+
 ## Dictionary — Current Handoff / Resume Here
 
 **CURRENT HEAD:** `3978d08d86ca78a47b8e499744431442b4112c11`
