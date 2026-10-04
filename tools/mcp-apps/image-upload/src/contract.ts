@@ -38,7 +38,7 @@ export type WidgetUploadReference = {
 export function buildWidgetUploadArguments(operationKey: string, references: WidgetUploadReference[], userContext: string, retryingPartialBatch: boolean, attempt: number): Record<string, unknown> {
   return {
     idempotency_key: `${operationKey}${retryingPartialBatch ? `:retry:${attempt}` : ":media"}`,
-    metadata: userContext === "" ? {} : { description: userContext },
+    metadata: userContext === "" ? {} : { description: userContext.slice(0, 500) },
     items: references.map((reference) => ({
       client_file_id: reference.file_id,
       filename: reference.file_name,
@@ -186,7 +186,7 @@ export function normalizeSelectedFiles(value: unknown): SelectedImage[] {
     if (typeof reference.fileId !== "string" || reference.fileId === "") return [];
     if (typeof reference.fileName !== "string" || reference.fileName === "") return [];
     if (typeof reference.mimeType !== "string" || reference.mimeType === "") return [];
-    return [{ kind: "library", clientFileId: reference.fileId, fileId: reference.fileId, fileName: reference.fileName, mimeType: reference.mimeType, name: reference.fileName, feature: "" }];
+    return [{ kind: "library", clientFileId: reference.fileId, fileId: reference.fileId, fileName: reference.fileName, mimeType: reference.mimeType, name: "", feature: "" }];
   });
 }
 

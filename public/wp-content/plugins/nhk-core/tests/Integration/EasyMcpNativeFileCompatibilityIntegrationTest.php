@@ -195,7 +195,7 @@ final class EasyMcpNativeFileCompatibilityIntegrationTest extends TestCase
         $registryProperty->setAccessible(true);
         $registry = $registryProperty->getValue($plugin);
         self::assertInstanceOf(\Easy_MCP_AI\Resources\Resource_Registry::class, $registry);
-        self::assertNotNull($registry->get_resource('ui://nhk/image-upload/v3.html'));
+        self::assertNotNull($registry->get_resource('ui://nhk/image-upload/v4.html'));
         $serverProperty = new \ReflectionProperty(\Easy_MCP_AI\Plugin::class, 'server');
         $serverProperty->setAccessible(true);
         $server = $serverProperty->getValue($plugin);
@@ -228,27 +228,27 @@ final class EasyMcpNativeFileCompatibilityIntegrationTest extends TestCase
 
             $toolsWire = $this->wireBody($this->dispatchAuthenticatedWire($rawToken, 'tools/list', 400, null));
             $tools = array_column($toolsWire['result']['tools'] ?? [], null, 'name');
-            self::assertSame('ui://nhk/image-upload/v3.html', $tools['wp_ability_nhk_v3_media_upload_widget_open']['_meta']['ui']['resourceUri'] ?? null);
+            self::assertSame('ui://nhk/image-upload/v4.html', $tools['wp_ability_nhk_v3_media_upload_widget_open']['_meta']['ui']['resourceUri'] ?? null);
 
             $listResponse = $this->dispatchAuthenticatedWire($rawToken, 'resources/list', 401, null);
             $listWire = $this->wireBody($listResponse);
             self::assertSame('2.0', $listWire['jsonrpc']);
             self::assertSame(401, $listWire['id']);
             $resources = array_column($listWire['result']['resources'] ?? [], null, 'uri');
-            self::assertSame('text/html;profile=mcp-app', $resources['ui://nhk/image-upload/v3.html']['mimeType'] ?? null);
+            self::assertSame('text/html;profile=mcp-app', $resources['ui://nhk/image-upload/v4.html']['mimeType'] ?? null);
 
-            $readResponse = $this->dispatchAuthenticatedWire($rawToken, 'resources/read', 402, 'ui://nhk/image-upload/v3.html');
+            $readResponse = $this->dispatchAuthenticatedWire($rawToken, 'resources/read', 402, 'ui://nhk/image-upload/v4.html');
             $readWire = $this->wireBody($readResponse);
             self::assertSame('2.0', $readWire['jsonrpc']);
             self::assertSame(402, $readWire['id']);
             self::assertArrayNotHasKey('error', $readWire);
-            self::assertSame('ui://nhk/image-upload/v3.html', $readWire['result']['contents'][0]['uri']);
+            self::assertSame('ui://nhk/image-upload/v4.html', $readWire['result']['contents'][0]['uri']);
             self::assertSame('text/html;profile=mcp-app', $readWire['result']['contents'][0]['mimeType']);
             self::assertNotSame('', trim((string) ($readWire['result']['contents'][0]['text'] ?? '')));
             self::assertSame('complete', $preProjection['resultType'] ?? null, 'The priority-9 boundary must already contain Easy MCP native resource content.');
             self::assertSame(0, $preProjection['ttlMs'] ?? null);
             self::assertSame('private', $preProjection['cacheScope'] ?? null);
-            self::assertSame('ui://nhk/image-upload/v3.html', $preProjection['contents'][0]['uri'] ?? null);
+            self::assertSame('ui://nhk/image-upload/v4.html', $preProjection['contents'][0]['uri'] ?? null);
 
             $unknownResponse = $this->dispatchAuthenticatedWire($rawToken, 'resources/read', 403, 'ui://nhk/image-upload/unknown.html');
             $unknownWire = $this->wireBody($unknownResponse);
@@ -277,13 +277,13 @@ final class EasyMcpNativeFileCompatibilityIntegrationTest extends TestCase
         try {
             $listWire = $this->wireBody($this->dispatchAuthenticatedWire($rawToken, 'resources/list', 501, null, '2025-11-25'));
             $resources = array_column($listWire['result']['resources'] ?? [], null, 'uri');
-            self::assertSame('NHK image uploader', $resources['ui://nhk/image-upload/v3.html']['name'] ?? null);
-            self::assertSame('text/html;profile=mcp-app', $resources['ui://nhk/image-upload/v3.html']['mimeType'] ?? null);
+            self::assertSame('NHK image uploader', $resources['ui://nhk/image-upload/v4.html']['name'] ?? null);
+            self::assertSame('text/html;profile=mcp-app', $resources['ui://nhk/image-upload/v4.html']['mimeType'] ?? null);
 
-            $readWire = $this->wireBody($this->dispatchAuthenticatedWire($rawToken, 'resources/read', 502, 'ui://nhk/image-upload/v3.html', '2025-11-25'));
+            $readWire = $this->wireBody($this->dispatchAuthenticatedWire($rawToken, 'resources/read', 502, 'ui://nhk/image-upload/v4.html', '2025-11-25'));
             self::assertArrayNotHasKey('error', $readWire);
             self::assertArrayNotHasKey('resultType', $readWire['result']);
-            self::assertSame('ui://nhk/image-upload/v3.html', $readWire['result']['contents'][0]['uri']);
+            self::assertSame('ui://nhk/image-upload/v4.html', $readWire['result']['contents'][0]['uri']);
             self::assertNotSame('', trim((string) ($readWire['result']['contents'][0]['text'] ?? '')));
         } finally {
             $tokenManager->delete_token((int) ($token['id'] ?? 0));

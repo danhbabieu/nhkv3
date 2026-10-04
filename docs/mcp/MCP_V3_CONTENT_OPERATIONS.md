@@ -859,7 +859,7 @@ annotations, while its MCP transport accepts `application/json` only. NHK
 therefore keeps two independent compatibility gates: UI/resource projection
 supports Easy MCP 1.7.16, 1.7.17 and 1.7.18 for `tools/list`, MCP Apps
 metadata, `resources/list`, `resources/read` and
-`ui://nhk/image-upload/v3.html`; the legacy native multipart proxy supports
+`ui://nhk/image-upload/v4.html`; the legacy native multipart proxy supports
 only 1.7.16 and 1.7.17. Easy MCP 1.7.18 remains upstream-owned for native AI
 client file transport, so `shouldHandle()`, `interceptMultipartCapture()` and
 old `$_FILES` normalization are disabled for that version. Easy MCP remains
@@ -908,7 +908,7 @@ semantic identity.
 
 The MCP Apps image widget is a presentation/transport adapter, not a Media or
 Capture owner. `nhk.media.upload-widget.open` renders
-`ui://nhk/image-upload/v3.html`; the resource uses the ChatGPT host file APIs to
+`ui://nhk/image-upload/v4.html`; the resource uses the ChatGPT host file APIs to
 obtain a temporary `download_url` and `file_id`, then calls the internal
 `nhk.media.widget-upload` transport tool. Each item must be the structured
 provided-file object with `download_url` and `file_id` (plus optional

@@ -66,6 +66,26 @@ test("builds the widget request with only server-supported file reference fields
   });
 });
 
+test("bounds only Media upload metadata while preserving the full Capture context", () => {
+  const context = "x".repeat(500) + " — full Capture context";
+  const request = buildWidgetUploadArguments("operation-long", [{
+    download_url: "https://files.example/image",
+    file_id: "file-long",
+    mime_type: "image/jpeg",
+    file_name: "IMG_5920.jpeg",
+    ordinal: 0,
+    media: { title: "Côn hoa thị trên đồng hồ treo tường Junghans" },
+  }], context, false, 0);
+
+  assert.equal(request.metadata.description, context.slice(0, 500));
+  assert.equal(request.items[0].media.title, "Côn hoa thị trên đồng hồ treo tường Junghans");
+  assert.equal(context.length > 500, true);
+});
+
+test("newly selected local and library images have no semantic name", () => {
+  assert.equal(normalizeSelectedFiles([{ fileId: "file-1", fileName: "IMG_5920.jpeg", mimeType: "image/jpeg" }])[0].name, "");
+});
+
 test("preserves host identities and context when the Media boundary fails before processing", () => {
   const manifest = buildWidgetUploadFailureManifest([
     { download_url: "https://files.example/a", file_id: "file-a", mime_type: "image/jpeg", file_name: "a.jpg", ordinal: 0, media: { title: "Mặt trước" } },
@@ -246,8 +266,8 @@ test("normalizes ChatGPT library selections as authorized file references", () =
     { fileId: "file-one", fileName: "one.png", mimeType: "image/png" },
     { fileId: "file-two", fileName: "two.webp", mimeType: "image/webp" },
   ]), [
-    { kind: "library", clientFileId: "file-one", fileId: "file-one", fileName: "one.png", mimeType: "image/png", name: "one.png", feature: "" },
-    { kind: "library", clientFileId: "file-two", fileId: "file-two", fileName: "two.webp", mimeType: "image/webp", name: "two.webp", feature: "" },
+    { kind: "library", clientFileId: "file-one", fileId: "file-one", fileName: "one.png", mimeType: "image/png", name: "", feature: "" },
+    { kind: "library", clientFileId: "file-two", fileId: "file-two", fileName: "two.webp", mimeType: "image/webp", name: "", feature: "" },
   ]);
 });
 
@@ -286,7 +306,7 @@ test("maps one widget-upload result without exposing its signed URL", () => {
     stage: "MEDIA_READBACK_DONE",
     status: "DONE",
     code: "MEDIA_READBACK_VERIFIED",
-    uri: "ui://nhk/image-upload/v3.html",
+    uri: "ui://nhk/image-upload/v4.html",
     tool: "nhk.media.widget-upload",
     }]), {
     modelContent: {
@@ -307,7 +327,7 @@ test("maps one widget-upload result without exposing its signed URL", () => {
         stage: "MEDIA_READBACK_DONE",
         status: "DONE",
         code: "MEDIA_READBACK_VERIFIED",
-        uri: "ui://nhk/image-upload/v3.html",
+        uri: "ui://nhk/image-upload/v4.html",
         tool: "nhk.media.widget-upload",
       }],
     },
@@ -389,7 +409,7 @@ test("keeps diagnostic state typed and never persists signed URLs or raw errors"
     status: "ERROR",
     code: "SERVER_TOOL_ERROR",
     error: "https://files.openai.test/signed/secret?token=redacted",
-    uri: "ui://nhk/image-upload/v3.html",
+    uri: "ui://nhk/image-upload/v4.html",
     tool: "nhk.media.widget-upload",
   }]);
 

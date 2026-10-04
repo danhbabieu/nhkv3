@@ -3616,7 +3616,7 @@ the NHK projection.
 
 FIXED_BOUNDARY: At `rest_api_init` priority 11, NHK reflects only the already
 constructed Easy MCP plugin registry and registers a native `Base_Resource`
-whose URI is `ui://nhk/image-upload/v3.html`, MIME is
+whose URI is `ui://nhk/image-upload/v4.html`, MIME is
 `text/html;profile=mcp-app`, and `read()` returns the existing non-empty widget
 bundle. When that native 1.7.18 registration is active, NHK bypasses its
 resource response replacement at both WordPress response boundaries. The
@@ -3717,7 +3717,7 @@ Deployment and fresh authenticated v43 wire read-back remain pending.
 LIVE READ-BACK: The previously recorded `CHATGPT_RENDER_PASS` was false. At
 21:32 on source revision `76186f511fc9ab7ee016b2f938b64dcad2678b43`, the
 authenticated ChatGPT connector still showed `Error loading app` / `Failed to
-fetch template` for `ui://nhk/image-upload/v3.html`. No tool/widget, Media or
+fetch template` for `ui://nhk/image-upload/v4.html`. No tool/widget, Media or
 Capture mutation occurred.
 
 STATUS: `EASY_MCP_1_7_18_AUTHENTICATED_RESOURCE_WIRE_BOUNDARY_DEPLOYED / CHATGPT_RENDER_FAILED / SEMANTIC_BOUNDARY_PRESERVED`.
@@ -3746,7 +3746,7 @@ STATUS: `AUTHORITY_APPLY_SCOPE_RECOVERY_LOCAL_READY / DEPLOYMENT_PENDING / SEMAN
 # Checkpoint — 2026-09-22 — NHK Image Upload MCP App v3 cache-busting URI (LOCAL / NO SEMANTIC CHANGE)
 
 FIXED_BOUNDARY: Bumped the fixed MCP App resource URI from
-`ui://nhk/image-upload/v2.html` to `ui://nhk/image-upload/v3.html` across the
+`ui://nhk/image-upload/v2.html` to `ui://nhk/image-upload/v4.html` across the
 catalog metadata, Easy MCP projection, resources/list, resources/read, widget
 open result, bundled widget bootstrap and active MCP documentation. The
 bundled file path, tool names, Media ownership, Capture flow and upload
@@ -3775,7 +3775,7 @@ No Media/Capture semantic path changed.
 FIXED_BOUNDARY: UI/resource projection compatibility is explicit for 1.7.16,
 1.7.17 and 1.7.18; legacy native multipart proxy compatibility is explicit for
 1.7.16 and 1.7.17 only. 1.7.18 keeps tools/list metadata projection, exact
-`ui://nhk/image-upload/v3.html`, MCP App MIME, resources/list and resources/read
+`ui://nhk/image-upload/v4.html`, MCP App MIME, resources/list and resources/read
 while `shouldHandle()`, `interceptMultipartCapture()` and old `$_FILES`
 normalization remain disabled. No Media/Capture semantic path changed.
 

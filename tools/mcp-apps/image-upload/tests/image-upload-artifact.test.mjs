@@ -74,6 +74,16 @@ test("the View preserves shared description through Media and Capture without wi
   assert.doesNotMatch(view, /Tạo bài viết thất bại:\s*\$\{safeErrorMessage\(error\)\}/);
 });
 
+test("the View preserves full Capture context and requires descriptive names", async () => {
+  const view = await source();
+
+  assert.match(view, /selected = asFiles\(input\.files\)[\s\S]*?name: ""/);
+  assert.match(view, /selected\.every\(\(item\) => item\.name\.trim\(\) !== ""\)/);
+  assert.match(view, /text:\s*namingContext/);
+  assert.match(view, /buildWidgetUploadArguments/);
+  assert.doesNotMatch(view, /name: file\.name/);
+});
+
 test("upload controls are gated by the connected lifecycle", async () => {
   const html = await resource();
 

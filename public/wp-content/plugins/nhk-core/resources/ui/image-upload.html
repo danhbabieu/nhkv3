@@ -12013,7 +12013,7 @@ class l extends Protocol {
 function buildWidgetUploadArguments(operationKey, references, userContext, retryingPartialBatch, attempt) {
   return {
     idempotency_key: `${operationKey}${retryingPartialBatch ? `:retry:${attempt}` : ":media"}`,
-    metadata: userContext === "" ? {} : { description: userContext },
+    metadata: userContext === "" ? {} : { description: userContext.slice(0, 500) },
     items: references.map((reference) => ({
       client_file_id: reference.file_id,
       filename: reference.file_name,
@@ -12501,7 +12501,7 @@ const SERVER_TOOL_NAME = "wp_ability_nhk_v3_media_widget_upload";
 const CAPTURE_TOOL_NAME = "wp_ability_nhk_v3_capture_ingest";
 const MEDIA_GET_TOOL_NAME = "wp_ability_nhk_v3_media_get";
 const DOCUMENTATION_TOOL_NAME = "wp_ability_nhk_v3_documentation_bootstrap";
-const RESOURCE_URI = "ui://nhk/image-upload/v3.html";
+const RESOURCE_URI = "ui://nhk/image-upload/v4.html";
 const IMAGE_TYPES = /^(image\/jpeg|image\/png|image\/gif|image\/webp)$/;
 const HOST_UPLOAD_ERROR_MESSAGE = "Chưa tải được ảnh lên hệ thống. Bạn có thể thử lại.";
 const MEDIA_SAVED_ERROR_MESSAGE = "Ảnh đã được lưu, nhưng phần tạo bài viết chưa hoàn tất. Có thể thử lại mà không tải lại ảnh.";
@@ -12617,6 +12617,9 @@ async function start() {
   function supportsFileUpload() {
     return typeof host?.uploadFile === "function" && typeof host.getFileDownloadUrl === "function";
   }
+  function updateUploadDisabled() {
+    upload.disabled = !connected || uploading || selected.length === 0 || !selected.every((item) => item.name.trim() !== "") || !supportsFileUpload();
+  }
   function renderSelection() {
     previews.replaceChildren();
     selected.forEach((item, ordinal) => {
@@ -12661,13 +12664,7 @@ async function start() {
       previews.append(figure);
     });
     summary.textContent = selected.length ? `${selected.length} ảnh đã chọn.` : "Chưa chọn ảnh.";
-    updateUploadState();
-  }
-  function updateUploadState() {
-    const hasUnnamedImage = selected.some((item) => item.name.trim() === "");
-    const namingNotice = document.getElementById("name-requirement");
-    if (namingNotice) namingNotice.hidden = !hasUnnamedImage;
-    upload.disabled = !connected || uploading || selected.length === 0 || hasUnnamedImage || !supportsFileUpload();
+    updateUploadDisabled();
   }
   function renderUploads(items) {
     results.replaceChildren();
@@ -12842,7 +12839,7 @@ async function start() {
     const namingContext = context.value.trim();
     uploading = true;
     enrichmentStatus = "PENDING";
-    updateUploadState();
+    renderSelection();
     setState("UPLOADING", "Đang chuẩn bị bài viết từ Media đã tải…");
     const operationKey = retryOperationKey ?? createIdempotencyKey();
     submissionId = operationKey;
@@ -13005,7 +13002,7 @@ async function start() {
     if (!item || !target.dataset.field) return;
     if (target.dataset.field === "name") item.name = target.value;
     if (target.dataset.field === "feature") item.feature = target.value;
-    updateUploadState();
+    updateUploadDisabled();
   });
   previews.addEventListener("click", (event) => {
     const target = event.target;
@@ -13047,7 +13044,6 @@ else void boot();</script>
       <button id="select" type="button" hidden disabled>Chọn ảnh từ thư viện ChatGPT</button>
       <button id="upload" type="button" disabled>TẢI LÊN</button>
     </div>
-    <p id="name-requirement" class="failure" hidden>Mỗi ảnh cần một tên mô tả trước khi tải lên. Tên tệp vật lý chỉ là thông tin nguồn.</p>
     <label for="description">Mô tả chung</label>
     <textarea id="description" maxlength="20000" placeholder="Mô tả chung cho toàn bộ ảnh…"></textarea>
     <div id="summary" aria-live="polite">Chưa chọn ảnh.</div>

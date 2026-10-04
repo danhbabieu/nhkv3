@@ -11,7 +11,7 @@ const SERVER_TOOL_NAME = "wp_ability_nhk_v3_media_widget_upload";
 const CAPTURE_TOOL_NAME = "wp_ability_nhk_v3_capture_ingest";
 const MEDIA_GET_TOOL_NAME = "wp_ability_nhk_v3_media_get";
 const DOCUMENTATION_TOOL_NAME = "wp_ability_nhk_v3_documentation_bootstrap";
-const RESOURCE_URI = "ui://nhk/image-upload/v3.html";
+const RESOURCE_URI = "ui://nhk/image-upload/v4.html";
 const IMAGE_TYPES = /^(image\/jpeg|image\/png|image\/gif|image\/webp)$/;
 const IMAGE_ACCEPT = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 const STATES = ["CONNECTING", "READY", "UPLOADING", "SUCCESS", "PARTIAL", "ERROR"] as const;
@@ -157,6 +157,10 @@ async function start(): Promise<void> {
     return typeof host?.uploadFile === "function" && typeof host.getFileDownloadUrl === "function";
   }
 
+  function updateUploadDisabled(): void {
+    upload.disabled = !connected || uploading || selected.length === 0 || !selected.every((item) => item.name.trim() !== "") || !supportsFileUpload();
+  }
+
   function renderSelection(): void {
     previews.replaceChildren();
     selected.forEach((item, ordinal) => {
@@ -201,8 +205,7 @@ async function start(): Promise<void> {
       previews.append(figure);
     });
     summary.textContent = selected.length ? `${selected.length} ảnh đã chọn.` : "Chưa chọn ảnh.";
-    const disabled = !connected || uploading || selected.length === 0 || !supportsFileUpload();
-    upload.disabled = disabled;
+    updateUploadDisabled();
   }
 
   function renderUploads(items: UploadedItem[]): void {
@@ -538,7 +541,7 @@ async function start(): Promise<void> {
     retryAttempt = 0;
     selected = asFiles(input.files)
       .filter((file) => IMAGE_TYPES.test(file.type))
-      .map((file) => ({ kind: "local" as const, clientFileId: `${file.name}:${file.size}:${file.lastModified}`, file, name: file.name, feature: "" }));
+      .map((file) => ({ kind: "local" as const, clientFileId: `${file.name}:${file.size}:${file.lastModified}`, file, name: "", feature: "" }));
     recordDiagnostic("FILE_SELECTED", "DONE", "LOCAL_FILE_SELECTED");
     recordDiagnostic("FILE_PREVIEW_READY", "DONE", "LOCAL_FILE_PREVIEW_READY");
     renderSelection();
@@ -567,6 +570,7 @@ async function start(): Promise<void> {
     if (!item || !target.dataset.field) return;
     if (target.dataset.field === "name") item.name = target.value;
     if (target.dataset.field === "feature") item.feature = target.value;
+    updateUploadDisabled();
   });
   previews.addEventListener("click", (event) => {
     const target = event.target as HTMLElement;

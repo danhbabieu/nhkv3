@@ -21,7 +21,7 @@ final class McpAppDiagnosticsTest extends TestCase
                     'jsonrpc' => '2.0',
                     'id' => $index,
                     'method' => 'resources/read',
-                    'params' => ['uri' => 'ui://nhk/image-upload/v3.html'],
+                    'params' => ['uri' => 'ui://nhk/image-upload/v4.html'],
                     'credentials' => 'must-not-leak',
                 ],
                 [
@@ -29,7 +29,7 @@ final class McpAppDiagnosticsTest extends TestCase
                     'id' => $index,
                     'result' => [
                         'contents' => [[
-                            'uri' => 'ui://nhk/image-upload/v3.html',
+                            'uri' => 'ui://nhk/image-upload/v4.html',
                             'mimeType' => 'text/html;profile=mcp-app',
                             'text' => '<p>user content must not be stored</p>',
                         ]],
@@ -50,7 +50,7 @@ final class McpAppDiagnosticsTest extends TestCase
         self::assertSame(['contents', 'secret'], $events[19]['result_top_level_keys']);
         self::assertTrue($events[19]['result_contents_exists']);
         self::assertSame(1, $events[19]['contents_count']);
-        self::assertSame('ui://nhk/image-upload/v3.html', $events[19]['contents_0_uri']);
+        self::assertSame('ui://nhk/image-upload/v4.html', $events[19]['contents_0_uri']);
         self::assertSame('text/html;profile=mcp-app', $events[19]['contents_0_mime_type']);
         self::assertSame(strlen('<p>user content must not be stored</p>'), $events[19]['contents_0_text_byte_length']);
         self::assertArrayNotHasKey('credentials', $events[19]);

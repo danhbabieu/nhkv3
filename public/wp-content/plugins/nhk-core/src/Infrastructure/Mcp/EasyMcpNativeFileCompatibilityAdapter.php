@@ -70,7 +70,7 @@ final class EasyMcpNativeFileCompatibilityAdapter
         if (!$registry instanceof \Easy_MCP_AI\Resources\Resource_Registry) return;
 
         $registry->register(new class extends \Easy_MCP_AI\Resources\Base_Resource {
-            public function get_uri() { return 'ui://nhk/image-upload/v3.html'; }
+            public function get_uri() { return 'ui://nhk/image-upload/v4.html'; }
             public function get_name() { return 'NHK image uploader'; }
             public function get_description() { return 'NHK image uploader MCP App template.'; }
             public function get_mime_type() { return 'text/html;profile=mcp-app'; }
