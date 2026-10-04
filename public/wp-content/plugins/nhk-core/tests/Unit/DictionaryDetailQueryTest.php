@@ -95,4 +95,23 @@ final class DictionaryDetailQueryTest extends TestCase
         self::assertSame('400 ngày', $result['item']['title']);
         self::assertSame('/tu-dien/400-ng-ay/', $result['item']['url']);
     }
+
+    public function test_detail_fails_closed_when_fallback_slug_is_shared_by_two_entries(): void
+    {
+        $firstSense = new DictionaryConcept('sense-first', 'Côn máy', 'Máy', DictionaryConcept::APPROVED);
+        $secondSense = new DictionaryConcept('sense-second', 'Côn bút', 'Bút', DictionaryConcept::APPROVED);
+        $first = new LexicalEntry('entry-first', 'Côn máy', 'côn máy', DictionaryConcept::APPROVED, 'vi-VN', [], 1, [$firstSense->conceptId]);
+        $second = new LexicalEntry('entry-second', 'Côn máy', 'côn máy', DictionaryConcept::APPROVED, 'vi-VN', [], 1, [$secondSense->conceptId]);
+        $entries = new class($first, $second, $firstSense, $secondSense) {
+            public function __construct(private LexicalEntry $first, private LexicalEntry $second, private DictionaryConcept $firstSense, private DictionaryConcept $secondSense) {}
+            public function findByPublicSlug(string $slug): ?LexicalEntry { return null; }
+            public function listEntries(int $limit = 2000): array { return [$this->first, $this->second]; }
+            public function listSenses(LexicalEntry $entry): array { return [$entry->entryId === 'entry-first' ? $this->firstSense : $this->secondSense]; }
+            public function listForms(LexicalEntry $entry): array { return []; }
+        };
+
+        $result = (new DictionaryDetailQuery(new class { public function listLabels(string $id): array { return []; } }, $entries))->detail('c-on-m-ay');
+
+        self::assertSame('AMBIGUOUS', $result['status']);
+    }
 }

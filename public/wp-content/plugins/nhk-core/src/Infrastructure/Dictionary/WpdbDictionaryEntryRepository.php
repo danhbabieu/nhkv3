@@ -159,8 +159,9 @@ final class WpdbDictionaryEntryRepository implements DictionaryEntryRepository
     public function findByPublicSlug(string $slug): ?LexicalEntry
     {
         try {
-            $row = $this->database->get_row($this->database->prepare("SELECT * FROM {$this->entries} WHERE status=%s AND JSON_UNQUOTE(JSON_EXTRACT(context_json,'$.public_slug'))=%s ORDER BY id LIMIT 1", DictionaryConcept::APPROVED, trim($slug)), ARRAY_A);
-            return is_array($row) ? $this->hydrateEntry($row) : null;
+            $rows = $this->database->get_results($this->database->prepare("SELECT * FROM {$this->entries} WHERE status=%s AND JSON_UNQUOTE(JSON_EXTRACT(context_json,'$.public_slug'))=%s ORDER BY id LIMIT 2", DictionaryConcept::APPROVED, trim($slug)), ARRAY_A) ?: [];
+            if (count($rows) !== 1 || !is_array($rows[0])) return null;
+            return $this->hydrateEntry($rows[0]);
         } catch (\Throwable) { return null; }
     }
 
