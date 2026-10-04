@@ -48,6 +48,10 @@ final class McpAbilityRegistration
         'nhk-v3/evidence-ingest',
         'nhk-v3/proposal-create',
         'nhk-v3/dictionary-concept-create',
+        'nhk-v3/dictionary-entry-create-with-sense',
+        'nhk-v3/dictionary-entry-form-add',
+        'nhk-v3/dictionary-entry-sense-add',
+        'nhk-v3/dictionary-enrichment-apply',
         'nhk-v3/dictionary-concept-update',
         'nhk-v3/dictionary-concept-lifecycle',
         'nhk-v3/dictionary-label-save',
@@ -60,6 +64,8 @@ final class McpAbilityRegistration
     private const EASY_MCP_EXPLICIT_INTERNAL_READ_ONLY_ABILITIES = [
         'nhk-v3/knowledge-quality-audit',
         'nhk-v3/dictionary-seed-audit',
+        'nhk-v3/dictionary-enrichment-audit',
+        'nhk-v3/dictionary-enrichment-plan',
     ];
 
     public static function bootstrapRegistry(): void

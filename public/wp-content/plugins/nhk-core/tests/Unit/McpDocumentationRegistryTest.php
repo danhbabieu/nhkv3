@@ -18,6 +18,8 @@ final class McpDocumentationRegistryTest extends TestCase
         self::assertContains('authority', $keys);
         self::assertContains('entity-profile-clock-type', $keys);
         self::assertContains('knowledge', $keys);
+        self::assertContains('dictionary-entry-sense-architecture', $keys);
+        self::assertContains('dictionary-enrichment-audit-operations', $keys);
         self::assertContains('collector-profile', $keys);
         self::assertContains('graph', $keys);
         self::assertContains('governance', $keys);
@@ -60,6 +62,25 @@ final class McpDocumentationRegistryTest extends TestCase
             self::assertSame('ACTIVE', $document['status'], $path);
             self::assertNotSame('', trim((string) $document['content']), $path);
         }
+    }
+
+    public function test_dictionary_entry_sense_and_enrichment_operations_are_active_and_readable(): void
+    {
+        $registry = new McpDocumentationRegistry();
+
+        $architecture = $registry->get('dictionary-entry-sense-architecture');
+        self::assertSame('ACTIVE', $architecture['status']);
+        self::assertSame('knowledge', $architecture['domain']);
+        self::assertSame('current_evidence', $architecture['classification']);
+        self::assertStringContainsString('LexicalEntry', $architecture['content']);
+        self::assertStringContainsString('DictionaryConcept-as-LexicalSense', $architecture['content']);
+
+        $operations = $registry->get('dictionary-enrichment-audit-operations');
+        self::assertSame('ACTIVE', $operations['status']);
+        self::assertSame('knowledge', $operations['domain']);
+        self::assertSame('canonical_contract', $operations['classification']);
+        self::assertStringContainsString('nhk.dictionary.enrichment.audit', $operations['content']);
+        self::assertStringContainsString('nhk.dictionary.enrichment.apply', $operations['content']);
     }
 
     public function test_clock_type_entity_profile_contract_is_active_and_readable(): void

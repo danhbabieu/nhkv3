@@ -776,6 +776,16 @@ ONLY IF UNRESOLVED` over semantic query seeds and does not run a second parser.
 It preserves normalized deduplication, raw observed forms, source-family
 lineage and occurrence counts without treating frequency as authority.
 
+For a `CONFIGURATION` seed that already passed the shared structural-unit
+eligibility boundary, the observed form is resolved first. Only when that exact
+lookup is `UNKNOWN` may planning try a bounded syntax-derived lookup variant.
+The current generic shape is `N unitA N unitB → unitA N unitB` when the two
+cardinalities are equal. This is lookup-only: reuse still requires one exact
+canonical resolver result, while the observed wording remains an alias/Form
+candidate. Unequal cardinalities, ambiguity and unsupported shapes remain
+reviewable; no domain-specific vocabulary, fuzzy similarity or model memory may
+establish identity.
+
 The planner reports existing reuse/aliases, proper names, identifiers,
 configurations, technical/colloquial/phonetic observations, ambiguity,
 unresolved candidates, editorial/noise and suppression using existing runtime
@@ -787,27 +797,29 @@ privacy-safe pagination/filtering and aggregate counts with explicit
 `read_only=true`, `mutated=false` and unavailable handling. It is not in the
 public operator allowlist.
 
-## Entry/Sense runtime checkpoint — 2026-10-03
+## Entry/Sense runtime checkpoint — 2026-10-04
 
-Migration 024 is additive and introduces `nhk_dictionary_entries`,
-`nhk_dictionary_forms` and `nhk_dictionary_entry_senses`. It does not alter,
-populate, merge or rekey Migration015 tables. `DictionaryConcept` remains the
-durable compatibility Sense identity. The code-side repository reads explicit
-Entry/Form/Sense rows when present and otherwise derives a read-only
-one-Concept compatibility Entry; this derivation never writes a mapping.
+Migration 024 remains additive while Migration015 stays the compatibility
+source. The original bounded materialization has already produced 29 public
+Entries, 29 initial Forms and 29 Entry→existing-Concept/Sense mappings; do not
+run that materialization again. `DictionaryConcept` remains the durable Sense
+identity, and compatibility fallback remains read-only.
 
-`DictionaryEntrySenseResolver` implements the bounded read path
+`DictionaryEntrySenseResolver` keeps the bounded read path
 `normalized Form → Entry → approved Sense → revalidated owner route`. One
-viable Sense resolves; multiple viable Senses remain `AMBIGUOUS`; a stale or
-invalid owner route is not accepted as identity. No new Graph endpoint,
-predicate, Evidence store, Knowledge claim copy, Media relation or Video
-relation is introduced.
+viable Sense resolves; multiple viable Senses remain `AMBIGUOUS`; stale or
+invalid owner routes fail closed. Mapping-level `semantic_reference` is
+authoritative over the legacy destination snapshot. Dictionary still creates
+no Graph endpoint, predicate, Evidence store, Knowledge copy, Media relation or
+Video relation.
 
-This checkpoint is `IMPLEMENTED_CODE_SIDE / TESTED_LOCAL` for schema-readiness
-contracts and resolver behavior only. Entry preferred-wording writes, public
-Entry-centric route projection, Entry/Sense MCP mutations, full Knowledge
-destination approval/read-back, Dictionary Media binding and Video association
-remain `IMPLEMENTATION GAP`.
+The current source catalog and dispatch include guarded internal/admin Entry
+creation, Form addition, Sense attachment and enrichment audit/plan/apply
+operations. Connector exposure is a separate deployment/configuration fact and
+must be verified after release. Preferred-wording synchronization,
+context-qualified Sense filtering, complete Knowledge destination lifecycle,
+governed Dictionary Media binding and Video association remain
+`IMPLEMENTATION GAP`.
 
 All future source adapters enter Dictionary through the same
 `StructuredInterpretationPacket`: physical ingest → source adapter → Shared
