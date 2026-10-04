@@ -67,6 +67,44 @@ final class CaptureOwnerDag
         return array_keys($seen);
     }
 
+    /**
+     * Return the minimal topologically ordered set that must execute for the
+     * requested owner tracks. Verified independent tracks are reusable.
+     * @return list<string>
+     */
+    public function executionPlan(array $requestedOwners, array $outcomes): array
+    {
+        $needed = [];
+        $visit = function (string $owner) use (&$visit, &$needed, $outcomes): void {
+            if (isset($needed[$owner])) return;
+            $needed[$owner] = true;
+            foreach ($this->dependencies[$owner] ?? [] as $dependency) {
+                $status = $this->statusFor($dependency, $outcomes);
+                if (!$this->isReusable($status)) $visit($dependency);
+            }
+            if ($this->statusFor($owner, $outcomes) === 'REPLAN_REQUIRED') {
+                foreach ($this->dependencies[$owner] ?? [] as $dependency) $visit($dependency);
+            }
+        };
+        foreach ($requestedOwners as $owner) {
+            $owner = strtolower(trim((string) $owner));
+            if ($owner !== '' && array_key_exists($owner, $this->dependencies)) $visit($owner);
+        }
+        $ordered = [];
+        $append = function (string $owner) use (&$append, &$ordered, $needed): void {
+            if (!isset($needed[$owner]) || in_array($owner, $ordered, true)) return;
+            foreach ($this->dependencies[$owner] ?? [] as $dependency) $append($dependency);
+            $ordered[] = $owner;
+        };
+        foreach (array_keys($needed) as $owner) $append($owner);
+        return $ordered;
+    }
+
+    private function isReusable(string $status): bool
+    {
+        return $status === 'READ_BACK_VERIFIED';
+    }
+
     private function assertAcyclic(string $owner, array $visiting, array $visited): void
     {
         if (isset($visiting[$owner])) throw new \InvalidArgumentException('Capture owner dependency cycle detected.');

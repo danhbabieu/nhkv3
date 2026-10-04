@@ -158,15 +158,7 @@ final class DictionaryRuntime
             $this->concepts,
             $this->entries,
             fn (?string $type, ?string $id, ?string $url): ?string => $this->revalidateDelegatedDestination($type, $id, $url),
-            function (string $type, string $id): array {
-                if (!$this->types->has($type)) return [];
-                $entity = $this->authority->findByCanonicalId($id);
-                if (!$entity instanceof AuthorityEntity || !$entity->active() || $entity->entityType !== $type) return [];
-                $value = ['dossier' => null];
-                if (function_exists('apply_filters') && has_filter('nhk_v3_entity_detail_projection')) $value = apply_filters('nhk_v3_entity_detail_projection', $value, $entity);
-                if (is_array($value) && is_array($value['dossier'] ?? null)) return $value['dossier'];
-                return ['identity' => ['type' => $entity->entityType, 'id' => $entity->canonicalId, 'title' => $entity->canonicalName, 'url' => $this->routes->path($entity)]];
-            },
+            fn (string $type, string $id): array => $this->canonicalOwnerDossier($type, $id),
             fn (string $conceptId): array => $mentionProjection->forConcept($conceptId, 50),
             new DictionaryRelatedTermProjection($this->entries, function (string $type, string $id): array {
                 if (!$this->types->has($type)) return [];
@@ -185,6 +177,7 @@ final class DictionaryRuntime
                 return $candidates;
             }),
         );
+        $this->enrichmentCoverage = new DictionaryEnrichmentCoverage($this->coverageProviders());
         $this->publicQuery = new DictionaryPublicQuery(
             $this->concepts,
             static function (string $conceptId) use ($mediaProjection): ?array {
@@ -194,19 +187,37 @@ final class DictionaryRuntime
             fn (?string $type, ?string $id, ?string $url): ?string => $this->revalidateDelegatedDestination($type, $id, $url),
             $this->entries,
             fn (): bool => $this->entrySenseAvailable(),
-            function (string $type, string $id): array {
-                if (!$this->types->has($type)) return [];
-                $entity = $this->authority->findByCanonicalId($id);
-                if (!$entity instanceof \NHK\Core\Domain\Authority\AuthorityEntity || !$entity->active() || $entity->entityType !== $type) return [];
-                $value = ['dossier' => null];
-                if (function_exists('apply_filters') && has_filter('nhk_v3_entity_detail_projection')) {
-                    $value = apply_filters('nhk_v3_entity_detail_projection', $value, $entity);
-                    if (is_array($value) && is_array($value['dossier'] ?? null)) return $value['dossier'];
-                }
-                return ['identity' => ['type' => $entity->entityType, 'id' => $entity->canonicalId, 'title' => $entity->canonicalName, 'url' => $this->routes->path($entity)]];
-            },
+            fn (string $type, string $id): array => $this->canonicalOwnerDossier($type, $id),
             $detailQuery,
         );
+    }
+
+    private function canonicalOwnerDossier(string $type, string $id): array
+    {
+        if (!$this->types->has($type)) return [];
+        $entity = $this->authority->findByCanonicalId($id);
+        if (!$entity instanceof AuthorityEntity || !$entity->active() || $entity->entityType !== $type) return [];
+        $value = ['dossier' => null];
+        if (function_exists('apply_filters') && has_filter('nhk_v3_entity_detail_projection')) $value = apply_filters('nhk_v3_entity_detail_projection', $value, $entity);
+        if (is_array($value['dossier'] ?? null)) return $value['dossier'];
+        return ['identity' => ['type' => $entity->entityType, 'id' => $entity->canonicalId, 'title' => $entity->canonicalName, 'url' => $this->routes->path($entity)]];
+    }
+
+    /** @return array<string,callable> */
+    private function coverageProviders(): array
+    {
+        $packet = fn (string $type, string $id): array => $this->canonicalOwnerDossier($type, $id);
+        $items = static function (array $value, array $keys): array {
+            $items = [];
+            foreach ($keys as $key) foreach ((array) ($value[$key] ?? []) as $item) if (is_array($item)) $items[] = $item;
+            return $items;
+        };
+        return [
+            'knowledge' => function (string $type, string $id) use ($packet, $items): array { $value = $packet($type, $id); $rows = is_array($value['knowledge']['items'] ?? null) ? $value['knowledge']['items'] : []; return ['status' => $rows === [] ? 'AVAILABLE_EMPTY' : 'AVAILABLE_WITH_ITEMS', 'count' => count($rows), 'items' => $rows]; },
+            'media' => function (string $type, string $id) use ($packet, $items): array { $value = $packet($type, $id); $rows = []; if (is_array($value['primary_media'] ?? null)) $rows[] = $value['primary_media']; $rows = array_merge($rows, $items((array) ($value['relation_sections'] ?? []), ['media'])); return ['status' => $rows === [] ? 'AVAILABLE_EMPTY' : 'AVAILABLE_WITH_ITEMS', 'count' => count($rows), 'items' => $rows]; },
+            'video' => function (string $type, string $id) use ($packet, $items): array { $rows = $items($packet($type, $id)['relation_sections'] ?? [], ['videos']); return ['status' => $rows === [] ? 'AVAILABLE_EMPTY' : 'AVAILABLE_WITH_ITEMS', 'count' => count($rows), 'items' => $rows]; },
+            'articles' => function (string $type, string $id) use ($packet, $items): array { $rows = $items($packet($type, $id)['relation_sections'] ?? [], ['articles', 'wp_posts']); return ['status' => $rows === [] ? 'AVAILABLE_EMPTY' : 'AVAILABLE_WITH_ITEMS', 'count' => count($rows), 'items' => $rows]; },
+        ];
     }
 
     public function available(): bool

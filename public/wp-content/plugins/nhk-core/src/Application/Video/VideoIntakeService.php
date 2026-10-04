@@ -38,6 +38,9 @@ final class VideoIntakeService
         $chapters = (new VideoChapterParser())->parse((string) ($snapshot['source_description'] ?? ''), isset($snapshot['duration_seconds']) ? (int) $snapshot['duration_seconds'] : null);
         $existing = $this->videos->findByExternalReference($snapshot['platform'], $snapshot['external_video_id']);
         $videoId = $existing?->canonicalId ?? UuidCodec::newV7();
+        if ($existing instanceof \NHK\Core\Domain\Video\Video && $existing->active && $existing->hasValidPublicReference()) {
+            return $this->reuseExisting($existing, $snapshot, $attemptId, $attemptNo);
+        }
         $research = $this->researcher?->research(implode("\n", array_filter([$snapshot['source_title'] ?? '', $snapshot['source_description'] ?? '', $userHint]))) ?? ['resolved' => [], 'ambiguous' => [], 'missing' => []];
         $effectiveSubject = $resolvedSubject ?? $this->researchSubject($research, $intendedRelations);
         $relations = $intendedRelations;
@@ -170,6 +173,31 @@ final class VideoIntakeService
         $internalDiagnostics['attempt_id'] = $attemptId;
         $internalDiagnostics['attempt_no'] = $attemptNo;
         return new VideoIntakePreview($videoId, $existing === null ? 'ingest' : 'update', $existing?->revision ?? 0, $package, $warnings, $research['ambiguous'], $internalDiagnostics);
+    }
+
+    private function reuseExisting(\NHK\Core\Domain\Video\Video $video, array $source, string $attemptId, int $attemptNo): VideoIntakePreview
+    {
+        $metadata = is_array($video->metadata) ? $video->metadata : [];
+        $package = $metadata;
+        $package['source'] = array_merge(is_array($metadata['source'] ?? null) ? $metadata['source'] : [], $source, [
+            'identity_valid' => true,
+            'provenance' => ['kind' => 'YOUTUBE_SOURCE', 'locator' => $video->canonicalUrl],
+        ]);
+        $package['canonical_readback'] = [
+            'canonical_id' => $video->canonicalId,
+            'platform' => $video->platform,
+            'external_video_id' => $video->externalVideoId,
+            'revision' => $video->revision,
+            'active' => $video->active,
+        ];
+        $package['reuse'] = ['status' => 'REUSED_VERIFIED', 'editorial_generation' => 'NOT_REQUIRED'];
+        $package['content_quality'] = ['status' => 'CONTENT_COMPLETE', 'blockers' => [], 'source' => 'CANONICAL_OWNER_READBACK'];
+        $package['completeness'] = ['publishable' => true, 'blockers' => [], 'warnings' => []];
+        return new VideoIntakePreview($video->canonicalId, 'update', $video->revision, $package, [], [], [
+            'reuse' => 'EXACT_CANONICAL_EXTERNAL_IDENTITY',
+            'attempt_id' => $attemptId,
+            'attempt_no' => $attemptNo,
+        ]);
     }
 
     /** @return array<string,mixed> */

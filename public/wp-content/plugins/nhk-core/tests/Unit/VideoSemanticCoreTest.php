@@ -367,6 +367,44 @@ final class VideoSemanticCoreTest extends TestCase
         self::assertSame([], $preview->package['semantic_attachments'][0]['evidence_refs']);
     }
 
+    public function test_existing_active_video_is_reused_without_editorial_regeneration(): void
+    {
+        $videoId = '11111111-1111-4111-8111-111111111111';
+        $existing = Video::fromUrl('https://www.youtube.com/watch?v=P4KaHX3LBOw', 'Existing canonical title', [
+            'source' => ['platform' => 'youtube', 'external_video_id' => 'P4KaHX3LBOw', 'canonical_source_url' => 'https://www.youtube.com/watch?v=P4KaHX3LBOw'],
+            'editorial' => ['title' => 'Existing canonical title', 'summary' => 'Stored summary', 'body' => 'Stored body'],
+            'content_quality' => ['status' => 'CONTENT_NEEDS_REVIEW', 'blockers' => ['OLD_EDITORIAL_REVIEW']],
+            'semantic_attachments' => [],
+        ], null, $videoId);
+        $videos = new class($existing) implements VideoRepository {
+            public function __construct(private Video $video) {}
+            public function findByCanonicalId(string $id): ?Video { return $id === $this->video->canonicalId ? $this->video : null; }
+            public function findByExternalReference(string $platform, string $externalId): ?Video { return $platform === $this->video->platform && $externalId === $this->video->externalVideoId ? $this->video : null; }
+            public function create(Video $video): Video { throw new \LogicException('duplicate video creation'); }
+            public function update(Video $video, int $expectedRevision): Video { throw new \LogicException('existing video must be reused'); }
+            public function list(bool $includeRetired = false): array { return [$this->video]; }
+        };
+        $service = new VideoIntakeService(
+            new YouTubeSourceAdapter(static fn (object $identity): array => ['title' => 'Fresh source title', 'availability' => 'available', 'embeddable' => true]),
+            $videos,
+            new VideoHubClassifier(),
+            $this->planner(),
+            new VideoEditorialGenerator(),
+            new VideoCompletenessPolicy(),
+            new VideoSeoProjection(),
+        );
+
+        $preview = $service->preview('https://www.youtube.com/watch?v=P4KaHX3LBOw');
+
+        self::assertSame($videoId, $preview->videoId);
+        self::assertSame('update', $preview->operation);
+        self::assertSame('REUSED_VERIFIED', $preview->package['reuse']['status']);
+        self::assertSame('NOT_REQUIRED', $preview->package['reuse']['editorial_generation']);
+        self::assertSame('CONTENT_COMPLETE', $preview->package['content_quality']['status']);
+        self::assertSame($videoId, $preview->package['canonical_readback']['canonical_id']);
+        self::assertSame('Existing canonical title', $preview->package['editorial']['title']);
+    }
+
     public function test_classifier_uses_multi_signal_evidence_and_returns_one_primary_hub(): void
     {
         $classified = (new VideoHubClassifier())->classify([

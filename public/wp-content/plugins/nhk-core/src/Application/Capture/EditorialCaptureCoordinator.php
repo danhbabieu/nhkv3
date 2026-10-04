@@ -368,61 +368,45 @@ final class EditorialCaptureCoordinator
             if ($this->mediaBindingService !== null && strtoupper(trim((string) ($input['intent'] ?? ''))) === 'MEDIA_ENRICHMENT' && is_array($input['media_bindings'] ?? null) && $input['media_bindings'] !== [] && (array) ($input['media_operations'] ?? []) === []) {
                 return $this->runTypedMediaBindingFastPath($record, $input, $assets, $diagnostics, $receipts);
             }
-            $this->beginPhase('INTERPRETED');
-            $interpretation = $this->interpreter->interpret($text, $assets, is_array($input['subject_hints'] ?? null) ? $input['subject_hints'] : [], is_array($input['metadata'] ?? null) ? $input['metadata'] : []);
-            $diagnostics['interpretation'] = $this->withoutBody($interpretation);
-            // Lexical observations are an independent Capture concern. Persist
-            // them after shared interpretation, before any semantic subject
-            // gate can block Knowledge/Authority/Relation work. The Dictionary
-            // owner performs its own lexical filtering, resolution, reuse and
-            // idempotent Candidate/Mention persistence; this boundary never
-            // invents a semantic host for an unresolved term.
-            $dictionaryObservation = DictionaryObservationRegistry::observe(
-                'CAPTURE',
-                $record->captureId,
-                $text,
-                $this->dictionaryObservationContext($record, $input),
-                $this->dictionaryLexicalHints($input),
-            );
-            $diagnostics['dictionary_observation'] = $this->withoutBody($dictionaryObservation);
-            $intentRouter = $this->contentIntentRouter ?? new ContentIntentRouter();
+            $videoOnlyResume = $this->isVideoOnlyResume($input);
             $persistedIntent = is_array($record->context['content_intent'] ?? null)
                 ? $record->context['content_intent']
                 : (is_array($diagnostics['content_intent'] ?? null) ? $diagnostics['content_intent'] : []);
-            $intent = ($input['existing_capture_continuation'] ?? false) === true && trim((string) ($persistedIntent['intent'] ?? '')) !== ''
-                ? $intentRouter->reusePersisted($persistedIntent, $input, $assets)
-                : $intentRouter->route($input, $interpretation, $assets);
-            $diagnostics['content_intent'] = $intent;
-            if (($intent['intent_reused'] ?? false) === true) $diagnostics['capture_intent_reused'] = strtoupper((string) ($intent['intent'] ?? ''));
-            $stagingScope = null;
-            // An Article target is intentionally deferred until the native
-            // Article owner exists.  The staging guard must remain exact;
-            // only the orchestration point moves to the first canonical
-            // Article read-back.
-            $deferredArticleBindings = $this->hasDeferredArticleBindings($input);
-            if ($this->stagingScopeVerifier !== null && is_array($input['media_bindings'] ?? null) && $input['media_bindings'] !== [] && !$deferredArticleBindings) {
-                $scopeInput = $input;
-                $scopeInput['intent'] = strtoupper(trim((string) ($intent['intent'] ?? '')));
-                $stagingScope = $this->stagingScopeVerifier->forCapture($record, $scopeInput, $assets);
-                if ($stagingScope !== null) {
-                    $input['staging_acceptance'] = $stagingScope;
-                    $diagnostics['staging_acceptance'] = ['status' => 'verified', 'fingerprint' => (string) ($stagingScope['fingerprint'] ?? '')];
+            if ($videoOnlyResume && is_array($diagnostics['interpretation'] ?? null) && $persistedIntent !== []) {
+                // The requested Video child is independent of already
+                // verified interpretation and lexical preparation. Reuse the
+                // immutable receipts and diagnostics instead of appending new
+                // attempts for those phases.
+                $interpretation = $diagnostics['interpretation'];
+                $intent = $persistedIntent + ['intent_reused' => true];
+                $dictionaryObservation = is_array($diagnostics['dictionary_observation'] ?? null) ? $diagnostics['dictionary_observation'] : [];
+                $stagingScope = null;
+            } else {
+                $this->beginPhase('INTERPRETED');
+                $interpretation = $this->interpreter->interpret($text, $assets, is_array($input['subject_hints'] ?? null) ? $input['subject_hints'] : [], is_array($input['metadata'] ?? null) ? $input['metadata'] : []);
+                $diagnostics['interpretation'] = $this->withoutBody($interpretation);
+                $dictionaryObservation = DictionaryObservationRegistry::observe('CAPTURE', $record->captureId, $text, $this->dictionaryObservationContext($record, $input), $this->dictionaryLexicalHints($input));
+                $diagnostics['dictionary_observation'] = $this->withoutBody($dictionaryObservation);
+                $intentRouter = $this->contentIntentRouter ?? new ContentIntentRouter();
+                $intent = ($input['existing_capture_continuation'] ?? false) === true && trim((string) ($persistedIntent['intent'] ?? '')) !== ''
+                    ? $intentRouter->reusePersisted($persistedIntent, $input, $assets)
+                    : $intentRouter->route($input, $interpretation, $assets);
+                $diagnostics['content_intent'] = $intent;
+                if (($intent['intent_reused'] ?? false) === true) $diagnostics['capture_intent_reused'] = strtoupper((string) ($intent['intent'] ?? ''));
+                $stagingScope = null;
+                $deferredArticleBindings = $this->hasDeferredArticleBindings($input);
+                if ($this->stagingScopeVerifier !== null && is_array($input['media_bindings'] ?? null) && $input['media_bindings'] !== [] && !$deferredArticleBindings) {
+                    $scopeInput = $input;
+                    $scopeInput['intent'] = strtoupper(trim((string) ($intent['intent'] ?? '')));
+                    $stagingScope = $this->stagingScopeVerifier->forCapture($record, $scopeInput, $assets);
+                    if ($stagingScope !== null) {
+                        $input['staging_acceptance'] = $stagingScope;
+                        $diagnostics['staging_acceptance'] = ['status' => 'verified', 'fingerprint' => (string) ($stagingScope['fingerprint'] ?? '')];
+                    }
                 }
+                $record = $this->save($record, CaptureStage::INTERPRETED, $assets, $diagnostics, $receipts, 'INTERPRETED', $record->articleId, $record->articleStateToken, 'IN_PROGRESS', null, $record->context + ['content_intent' => $intent] + ($stagingScope !== null ? ['staging_acceptance' => $stagingScope] : []));
+                $receipts = $record->phaseReceipts;
             }
-            $record = $this->save(
-                $record,
-                CaptureStage::INTERPRETED,
-                $assets,
-                $diagnostics,
-                $receipts,
-                'INTERPRETED',
-                $record->articleId,
-                $record->articleStateToken,
-                'IN_PROGRESS',
-                null,
-                $record->context + ['content_intent' => $intent] + ($stagingScope !== null ? ['staging_acceptance' => $stagingScope] : []),
-            );
-            $receipts = $record->phaseReceipts;
             if (($intent['status'] ?? '') !== 'resolved') {
                 return $this->save($record, CaptureStage::INTERPRETED, $assets, $diagnostics, $receipts, 'INTERPRETED', $record->articleId, $record->articleStateToken, 'REVIEW_REQUIRED');
             }
@@ -456,7 +440,14 @@ final class EditorialCaptureCoordinator
             $videoInput = $isVideoIntent && is_array($input['video'] ?? null) ? $input['video'] : [];
             $persistedPacket = $this->persistedSubjectPacket($record);
             $preparationResult = null;
-            if ($this->contentPreparation !== null) {
+            if ($videoOnlyResume && is_array($record->context['content_preparation'] ?? null)) {
+                // Content preparation is not in the Video-only dependency
+                // closure. Its verified result remains bound to the original
+                // request/interpretation fingerprints and is reused as-is.
+                $preparationResult = ContentPreparationResult::fromArray($record->context['content_preparation']);
+                $minimumOwnerAdmitted = true;
+                $preparationCanContinue = true;
+            } elseif ($this->contentPreparation !== null) {
                 $storedPreparation = is_array($record->context['content_preparation'] ?? null) ? $record->context['content_preparation'] : [];
                 $storedResult = ContentPreparationResult::fromArray($storedPreparation);
                 $preparationContext = is_array($input['content_preparation'] ?? null) ? $input['content_preparation'] : [];
@@ -590,10 +581,11 @@ final class EditorialCaptureCoordinator
                 }
                 return $record;
             }
-            $this->beginPhase('SUBJECTS_RESOLVED');
-            $resolution = $preparationResult?->subjectResolutionPacket?->toResolution()
-                ?? $persistedPacket?->toResolution()
-                ?? $this->subjects->resolveSources($this->subjectResolutionSources($input, $interpretation, $videoInput));
+            $resolution = $videoOnlyResume && is_array($diagnostics['subjects'] ?? null)
+                ? $diagnostics['subjects']
+                : ($preparationResult?->subjectResolutionPacket?->toResolution()
+                    ?? $persistedPacket?->toResolution()
+                    ?? $this->subjects->resolveSources($this->subjectResolutionSources($input, $interpretation, $videoInput)));
             if ($isVideoIntent && $this->isVideoOnlyResume($input)) {
                 $locked = is_array($record->diagnostics['subjects'] ?? null) ? $record->diagnostics['subjects'] : [];
                 $lockedPrimary = is_array($locked['primary'] ?? null) ? $locked['primary'] : [];
@@ -609,7 +601,10 @@ final class EditorialCaptureCoordinator
             $diagnostics['subjects'] = $resolution;
             $subjectPacket = SubjectResolutionPacket::fromResolution($resolution);
             $diagnostics['subject_resolution_packet'] = $subjectPacket->toArray();
-            $record = $this->save($record, CaptureStage::SUBJECTS_RESOLVED, $assets, $diagnostics, $receipts, 'SUBJECTS_RESOLVED', $record->articleId, $record->articleStateToken, 'IN_PROGRESS', null, $record->context + ['subject_resolution_packet' => $subjectPacket->toArray()]);
+            if (!$videoOnlyResume) {
+                $this->beginPhase('SUBJECTS_RESOLVED');
+                $record = $this->save($record, CaptureStage::SUBJECTS_RESOLVED, $assets, $diagnostics, $receipts, 'SUBJECTS_RESOLVED', $record->articleId, $record->articleStateToken, 'IN_PROGRESS', null, $record->context + ['subject_resolution_packet' => $subjectPacket->toArray()]);
+            }
 
             $hasVideoAsset = $this->hasVideoAsset($assets);
             if ($isVideoIntent && is_callable($this->videoEnrichment) && $videoInput !== [] && !$hasVideoAsset) {

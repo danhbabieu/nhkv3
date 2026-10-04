@@ -40,7 +40,7 @@ final class DictionaryEnrichmentCoverage
     private function normalizePacket(array $packet): array
     {
         $status = strtoupper(trim((string) ($packet['status'] ?? 'UNAVAILABLE')));
-        if (!in_array($status, ['AVAILABLE', 'EMPTY', 'UNAVAILABLE', 'BLOCKED', 'AMBIGUOUS'], true)) $status = 'UNAVAILABLE';
+        if (!in_array($status, ['AVAILABLE', 'EMPTY', 'AVAILABLE_EMPTY', 'AVAILABLE_WITH_ITEMS', 'UNAVAILABLE', 'BLOCKED', 'AMBIGUOUS'], true)) $status = 'UNAVAILABLE';
         $items = is_array($packet['items'] ?? null) ? array_slice($packet['items'], 0, 20) : [];
         $out = $packet + ['count' => count($items), 'items' => $items];
         $out['status'] = $status;

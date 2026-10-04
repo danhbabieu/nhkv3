@@ -22461,3 +22461,22 @@ deployment or push occurred.
 
 STATUS: `DICTIONARY_ARCHITECTURE_CODE_COMPLETE / RUNTIME_ACCEPTANCE_PENDING /
 PRE_EXISTING_BROAD_UNIT_BASELINE / NO_DATA_MUTATION / LOCAL_CHECKPOINT_READY`.
+
+# Checkpoint — 2026-10-04 — Capture Video reuse, Dictionary audit consistency and partial retry closure
+
+IMPLEMENTED: Exact active canonical Video external identities are now reused
+with canonical read-back and the existing owner UUID/revision; reuse does not
+invoke new editorial generation or mint a duplicate owner. Dictionary
+enrichment audit coverage now resolves through the same canonical owner dossier
+composition used by public Entry/Sense projection, preserving explicit empty,
+unavailable, blocked and ambiguous states. Capture owner retry planning now
+selects the minimal dependency closure and reuses verified independent
+interpretation/content-preparation/subject phases for Video-only retries.
+
+VALIDATION: Focused Capture/DAG, Video lifecycle, Dictionary audit/coverage and
+continuation suites passed 119 tests / 537 assertions plus the focused Video
+and Dictionary slices; changed PHP lint and `git diff --check` passed. No
+schema migration or data mutation was performed. Runtime acceptance remains
+pending; no deployment or push occurred.
+
+STATUS: `CAPTURE_VIDEO_REUSE_AND_PARTIAL_RETRY_FIXED / DICTIONARY_AUDIT_PROVIDER_CONSISTENT / RUNTIME_ACCEPTANCE_PENDING / NO_DATA_MUTATION`.

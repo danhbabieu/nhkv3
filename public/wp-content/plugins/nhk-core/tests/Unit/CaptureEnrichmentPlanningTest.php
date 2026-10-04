@@ -113,4 +113,36 @@ final class CaptureEnrichmentPlanningTest extends TestCase
             'knowledge' => ['depends_on' => ['authority']],
         ]);
     }
+
+    public function test_requested_retry_selects_only_minimal_dependency_closure_and_reuses_verified_phases(): void
+    {
+        $dag = new CaptureOwnerDag([
+            'interpreted' => ['depends_on' => []],
+            'content_preparation' => ['depends_on' => ['interpreted']],
+            'video' => ['depends_on' => []],
+        ]);
+        $outcomes = [
+            'interpreted' => CaptureOwnerOutcome::fromArray(['owner' => 'interpreted', 'status' => 'READ_BACK_VERIFIED']),
+            'content_preparation' => CaptureOwnerOutcome::fromArray(['owner' => 'content_preparation', 'status' => 'READ_BACK_VERIFIED']),
+            'video' => CaptureOwnerOutcome::fromArray(['owner' => 'video', 'status' => 'FAILED_RETRYABLE']),
+        ];
+
+        self::assertSame(['video'], $dag->executionPlan(['video'], $outcomes));
+    }
+
+    public function test_changed_dependency_revision_replans_only_affected_closure(): void
+    {
+        $dag = new CaptureOwnerDag([
+            'interpreted' => ['depends_on' => []],
+            'content_preparation' => ['depends_on' => ['interpreted']],
+            'video' => ['depends_on' => ['content_preparation']],
+        ]);
+        $outcomes = [
+            'interpreted' => CaptureOwnerOutcome::fromArray(['owner' => 'interpreted', 'status' => 'READ_BACK_VERIFIED', 'readback_revision' => 4]),
+            'content_preparation' => CaptureOwnerOutcome::fromArray(['owner' => 'content_preparation', 'status' => 'READ_BACK_VERIFIED', 'dependency_revisions' => ['interpreted' => 3]]),
+            'video' => CaptureOwnerOutcome::fromArray(['owner' => 'video', 'status' => 'FAILED_RETRYABLE']),
+        ];
+
+        self::assertSame(['interpreted', 'content_preparation', 'video'], $dag->executionPlan(['video'], $outcomes));
+    }
 }
