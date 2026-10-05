@@ -159,23 +159,43 @@ final class GovernanceRuntimeFactory
             $plan['plan_fingerprint'] = $planFingerprint;
             return $stagingScopeVerifier->issueForAuthorityPlan($capture, $plan, [$binding['candidate_id']]);
         };
-        $eligibility->setStagingScopeVerifier(static function (\NHK\Core\Domain\Governance\Proposal $proposal) use ($stagingScopeVerifier, $environment, $authorityScopeResolver): bool|string {
+        $semanticDependencyScopeResolver = static function (\NHK\Core\Domain\Governance\Proposal $proposal) use ($captureRepository, $stagingScopeVerifier): ?array {
+            if (!in_array($proposal->entityType, ['source', 'knowledge', 'evidence'], true)) return null;
+            $captureId = trim((string) ($proposal->payload['capture_id'] ?? ''));
+            if ($captureId === '' || !\NHK\Core\Shared\Uuid\UuidCodec::isValid($captureId)) throw new \RuntimeException('STAGING_CAPTURE_REQUIRED');
+            $capture = $captureRepository->findById($captureId);
+            if (!$capture instanceof \NHK\Core\Domain\Capture\CaptureRecord) throw new \RuntimeException('STAGING_CAPTURE_NOT_FOUND');
+            $plan = [
+                'entity_type' => $proposal->entityType,
+                'operation' => $proposal->operation,
+                'subject_id' => $proposal->subjectId,
+                'target_uuid' => $proposal->targetUuid,
+                'expected_revision' => $proposal->expectedRevision,
+                'idempotency_key' => $proposal->idempotencyKey,
+                'payload' => $proposal->payload,
+            ];
+            return $stagingScopeVerifier->issueForCaptureDependencyPlan($capture, $plan);
+        };
+        $stagingScopeResolver = static function (\NHK\Core\Domain\Governance\Proposal $proposal) use ($authorityScopeResolver, $semanticDependencyScopeResolver): ?array {
+            return $authorityScopeResolver($proposal) ?? $semanticDependencyScopeResolver($proposal);
+        };
+        $eligibility->setStagingScopeVerifier(static function (\NHK\Core\Domain\Governance\Proposal $proposal) use ($stagingScopeVerifier, $environment, $stagingScopeResolver): bool|string {
             if (strtolower(trim($environment())) !== 'staging') return true;
             $scope = $proposal->payload['staging_acceptance'] ?? null;
             if (!is_array($scope)) {
-                try { $scope = $authorityScopeResolver($proposal); }
+                try { $scope = $stagingScopeResolver($proposal); }
                 catch (\Throwable $error) { return trim($error->getMessage()) ?: 'STAGING_SCOPE_REQUIRED'; }
             }
             return is_array($scope) ? ($stagingScopeVerifier->proposalFailureReason($scope, $proposal) ?? true) : 'STAGING_SCOPE_REQUIRED';
         });
-        $eligibility->setStagingScopeResolver($authorityScopeResolver);
+        $eligibility->setStagingScopeResolver($stagingScopeResolver);
         $eligibility->setStagingScopeDiagnosticProvider([$stagingScopeVerifier, 'proposalDescriptorDiagnostic']);
         $mediaBinding = new MediaBindingService($media, $assets, $usages, $authority, $types, new \NHK\Core\Infrastructure\Media\WpdbMediaBindingOperationRepository($wpdb), stagingGuard: new MediaBindingStagingGuard($environment, [$stagingScopeVerifier, 'verifyBindingRequest'], static fn (string $capability): bool => function_exists('current_user_can') && current_user_can($capability), targetNormalizer: new MediaTargetNormalizer($endpoints, $types, $authority)), capabilities: $mediaCapabilities, targetResolver: $mediaTargetResolver, targetNormalizer: new MediaTargetNormalizer($endpoints, $types, $authority), attachmentUrlResolver: $mediaAttachmentUrlResolver);
         $stagingGuard = new OperationScopedStagingGuard(
             $environment,
             static fn (string $capability): bool => function_exists('current_user_can') && current_user_can($capability),
             scopeVerifier: [$stagingScopeVerifier, 'proposalFailureReason'],
-            scopeResolver: $authorityScopeResolver,
+            scopeResolver: $stagingScopeResolver,
         );
         $controlledApply = new ControlledApplyService(
             $proposalRepository,

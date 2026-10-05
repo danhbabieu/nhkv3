@@ -90,6 +90,18 @@ final class GovernanceActionPortTest extends TestCase
         self::assertStringContainsString('new MediaBindingStagingAdmission(', $source);
     }
 
+    public function test_runtime_factory_resolves_semantic_dependency_scopes_without_changing_authority_scope_resolution(): void
+    {
+        $factory = file_get_contents(__DIR__ . '/../../src/Infrastructure/Governance/GovernanceRuntimeFactory.php');
+        self::assertIsString($factory);
+        self::assertStringContainsString('$semanticDependencyScopeResolver', $factory);
+        self::assertStringContainsString("['source', 'knowledge', 'evidence']", $factory);
+        self::assertStringContainsString('issueForCaptureDependencyPlan($capture, $plan)', $factory);
+        self::assertStringContainsString('$authorityScopeResolver($proposal)', $factory);
+        self::assertStringContainsString('$eligibility->setStagingScopeResolver($stagingScopeResolver);', $factory);
+        self::assertStringContainsString('scopeResolver: $stagingScopeResolver', $factory);
+    }
+
     public function test_runtime_factory_uses_the_shared_wordpress_attachment_bridge_for_controlled_apply(): void
     {
         $wpdb = new \stdClass();
