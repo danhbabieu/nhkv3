@@ -6,6 +6,7 @@ namespace NHK\Core\Infrastructure\Demo;
 use Closure;
 use NHK\Core\Application\Demo\DemoCutoverContext;
 use NHK\Core\Application\Demo\StageResult;
+use NHK\Core\Infrastructure\Migration\DictionaryLexicalRelationMigration025;
 
 /** Executes only the versioned NHK maintenance entrypoint over SSH. */
 final class RemoteRuntimeAdapter
@@ -119,7 +120,8 @@ final class RemoteRuntimeAdapter
             }
         }
         if ($operation === 'migration-up') {
-            if ((int) ($payload['current'] ?? 0) !== 24 || (int) ($payload['target'] ?? 0) !== 24) return StageResult::failed('MIGRATION_TARGET_NOT_REACHED');
+            $expectedTarget = DictionaryLexicalRelationMigration025::VERSION;
+            if ((int) ($payload['current'] ?? 0) !== $expectedTarget || (int) ($payload['target'] ?? 0) !== $expectedTarget) return StageResult::failed('MIGRATION_TARGET_NOT_REACHED');
             if (($payload['dictionary_entry_sense_schema_ready'] ?? false) !== true) return StageResult::failed('DICTIONARY_ENTRY_SENSE_SCHEMA_NOT_READY');
         }
         return StageResult::pass(
