@@ -19,6 +19,8 @@ use NHK\Core\Infrastructure\Migration\OwnerPublicationDecisionMigration013;
 use NHK\Core\Infrastructure\Migration\PublicIdentityMigration014;
 use NHK\Core\Infrastructure\Migration\DictionaryMigration015;
 use NHK\Core\Infrastructure\Migration\DictionaryEntrySenseMigration024;
+use NHK\Core\Infrastructure\Migration\GraphRelationContextMigration002;
+use NHK\Core\Infrastructure\Migration\DictionaryLexicalRelationMigration025;
 use NHK\Core\Infrastructure\Migration\ClaimProjectionMigration016;
 use NHK\Core\Infrastructure\Migration\{EditorialCaptureAddendumMigration018, EditorialCaptureMigration017, GovernanceSubjectBindingMigration020, MediaBindingOperationMigration022, MediaUsageMetadataMigration021, PresentationNavigationMigration023, VisualSupportRequirementMigration019};
 use NHK\Core\Infrastructure\Migration\MigrationDatabaseGuard;
@@ -2062,7 +2064,7 @@ final class Plugin {
     {
         global $wpdb;
         MigrationDatabaseGuard::assertUpAllowed((string) $wpdb->get_var('SELECT DATABASE()'), 'PENDING_MIGRATIONS');
-        update_option('nhk_core_migration_target', DictionaryEntrySenseMigration024::VERSION, false);
+        update_option('nhk_core_migration_target', DictionaryLexicalRelationMigration025::VERSION, false);
         if ((int) get_option('nhk_core_migration_current', 0) < ArticleIngestMigration010::VERSION) (new ArticleIngestMigration010())->up();
         if ((int) get_option('nhk_core_migration_current', 0) < ArticleMediaMigration011::VERSION) (new ArticleMediaMigration011())->up();
         if ((int) get_option('nhk_core_migration_current', 0) < MediaWordPressBridgeMigration012::VERSION) (new MediaWordPressBridgeMigration012())->up();
@@ -2079,12 +2081,15 @@ final class Plugin {
         if ((int) get_option('nhk_core_migration_current', 0) < PresentationNavigationMigration023::VERSION || !PresentationNavigationMigration023::schemaReady($wpdb)) (new PresentationNavigationMigration023())->up();
         if ((int) get_option('nhk_core_migration_current', 0) < DictionaryEntrySenseMigration024::VERSION || !DictionaryEntrySenseMigration024::schemaReady($wpdb)) (new DictionaryEntrySenseMigration024())->up();
         if (!DictionaryEntrySenseMigration024::schemaReady($wpdb)) throw new \RuntimeException('MIGRATION_SCHEMA_NOT_READY');
+        if (!GraphRelationContextMigration002::schemaReady($wpdb)) (new GraphRelationContextMigration002())->up();
+        if (!DictionaryLexicalRelationMigration025::schemaReady($wpdb)) (new DictionaryLexicalRelationMigration025())->up();
+        if (!GraphRelationContextMigration002::schemaReady($wpdb) || !DictionaryLexicalRelationMigration025::schemaReady($wpdb)) throw new \RuntimeException('MIGRATION_SCHEMA_NOT_READY');
     }
     public static function activate(): void {
         global $wpdb;
         MigrationDatabaseGuard::assertUpAllowed((string) $wpdb->get_var('SELECT DATABASE()'), 'PLUGIN_ACTIVATION_MIGRATIONS');
         add_option('nhk_core_migration_current', 0, '', false);
-        add_option('nhk_core_migration_target', DictionaryEntrySenseMigration024::VERSION, '', false);
+        add_option('nhk_core_migration_target', DictionaryLexicalRelationMigration025::VERSION, '', false);
         (new GraphMigration001())->up();
         (new AuthorityMigration002())->up();
         (new GovernanceMigration003())->up();

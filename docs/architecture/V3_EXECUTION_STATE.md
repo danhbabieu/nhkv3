@@ -22603,3 +22603,28 @@ for this checkpoint; implementation remains blocked until the planned schema,
 registry, Governance and test seams are separately implemented and verified.
 
 STATUS: `DICTIONARY_SEMANTIC_ENRICHMENT_CONTRACT_APPROVED / DOCUMENTATION_ONLY / NO_SCHEMA_OR_DATA_MUTATION / IMPLEMENTATION_NOT_STARTED`.
+
+# Checkpoint — 2026-10-05 — Semantic relation foundations Phase 1 (LOCAL / NO LIVE DATA)
+
+IMPLEMENTED: Added domain and policy seams for Graph-owned relation context,
+the bounded associated_with predicate and exact source/target whitelist, and
+Dictionary-owned lexical relations with Entry-level/Sense-level granularity
+rules. Added additive WPDB repository seams with idempotency, revision/CAS
+lifecycle methods and canonical read-back contracts. Added versioned additive
+migration classes 002 and 025 and wired them into pending migration discovery
+without modifying the existing Graph or Entry/Sense migration sources.
+
+VALIDATION: Focused Phase 1 plus affected Graph/MCP regression tests pass
+19 tests / 84 assertions. PHP lint and git diff --check pass. The complete
+NHK Unit suite was run: 3,065 tests, 18,372 assertions, with 1 pre-existing
+fixture TypeError and 8 pre-existing environment/expectation failures; these
+are outside this Phase 1 slice and are not reclassified as resolved. No
+integration migration was executed because the required WordPress integration
+environment was not authorized or available.
+
+NO LIVE DATA: No migration was run, no database was mutated, no Côn hoa thị
+data was populated, no staging or production operation was performed, and no
+deployment or push occurred. The migration classes are created but remain
+unexecuted.
+
+STATUS: `SEMANTIC_RELATION_FOUNDATIONS_IMPLEMENTED / FOCUSED_TESTS_GREEN / FULL_UNIT_BASELINE_PRE_EXISTING_FAILURES / NO_DATA_MUTATION / IMPLEMENTATION_CHECKPOINT_READY`.

@@ -5,11 +5,12 @@ use NHK\Core\Contracts\Graph\{AuditSink,GraphReader,GraphRepository};
 use NHK\Core\Domain\Graph\{EndpointTypeRegistry,GraphEdge,NodeReference,PredicateRegistry,RelationPolicy};
 use NHK\Core\Graph\Exception\{InvalidRelationSourceType,InvalidRelationTargetType};
 final class GraphService implements GraphReader {
-    public function __construct(private GraphRepository $repository, private EndpointTypeRegistry $endpoints, private PredicateRegistry $predicates, private AuditSink $audit, private ?ClassificationHierarchyPolicy $hierarchy = null, private ?ClassifiedAsPolicy $classifiedAs = null) {}
+    public function __construct(private GraphRepository $repository, private EndpointTypeRegistry $endpoints, private PredicateRegistry $predicates, private AuditSink $audit, private ?ClassificationHierarchyPolicy $hierarchy = null, private ?ClassifiedAsPolicy $classifiedAs = null, private ?SemanticEnrichmentRelationRegistry $semanticRelations = null) {}
     public function create(NodeReference $source, string $predicate, NodeReference $target): GraphEdge {
         $definition=$this->predicates->get($predicate); $source=$this->endpoints->assertExists($source); $target=$this->endpoints->assertExists($target);
         if ($definition->key === 'classified_as') ($this->classifiedAs ?? throw new \RuntimeException('CLASSIFIED_AS_POLICY_UNAVAILABLE'))->assertCandidate(['source_type' => $source->endpoint_type, 'scope' => $source->endpoint_type, 'target_type' => $target->endpoint_type, 'provenance' => 'EXPLICIT_USER_KNOWLEDGE']);
         RelationPolicy::assertCanCreate($definition->key, $source->endpoint_type, $target->endpoint_type);
+        if ($definition->key === 'associated_with' && !($this->semanticRelations ?? new SemanticEnrichmentRelationRegistry())->allows($source->endpoint_type, $definition->key, $target->endpoint_type)) throw new \NHK\Core\Graph\Exception\UnapprovedRelationPair('Associated relation pair is not approved.');
         if (!$definition->allows($source->endpoint_type,$target->endpoint_type)) { if(!in_array($source->endpoint_type,$definition->allowed_source_types,true)) throw new InvalidRelationSourceType('Invalid relation source type.'); throw new InvalidRelationTargetType('Invalid relation target type.'); }
         if (!$definition->allow_self_relation && $source->key()===$target->key()) throw new InvalidRelationTargetType('Self relation is not allowed.');
         if ($definition->key === 'subtype_of') ($this->hierarchy ?? throw new \RuntimeException('CLASSIFICATION_HIERARCHY_POLICY_UNAVAILABLE'))->assertCanCreate($source, $target);

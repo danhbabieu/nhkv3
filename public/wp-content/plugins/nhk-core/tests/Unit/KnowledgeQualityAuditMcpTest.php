@@ -110,7 +110,7 @@ final class KnowledgeQualityAuditMcpTest extends TestCase
 
     public function test_quality_audit_has_an_explicit_read_only_easy_mcp_opt_in(): void
     {
-        self::assertSame(['nhk-v3/knowledge-quality-audit', 'nhk-v3/dictionary-seed-audit'], McpAbilityRegistration::explicitInternalAdminReadOnlyAbilityAllowlist());
+        self::assertSame(['nhk-v3/knowledge-quality-audit', 'nhk-v3/dictionary-seed-audit', 'nhk-v3/dictionary-enrichment-audit', 'nhk-v3/dictionary-enrichment-plan'], McpAbilityRegistration::explicitInternalAdminReadOnlyAbilityAllowlist());
     }
 
     public function test_selected_internal_ability_discovers_and_invokes_audit_without_writes(): void
