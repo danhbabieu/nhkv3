@@ -11,6 +11,7 @@ use NHK\Core\Contracts\Knowledge\EvidenceRepository;
 use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository, MediaUsageRepository};
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Application\Governance\ProposalEligibilityService;
+use NHK\Core\Application\Governance\ProposalDiscoveryService;
 use NHK\Core\Application\Entity\EntityProfileAdminProjection;
 use NHK\Core\Application\Graph\GraphService;
 use NHK\Core\Application\Video\{VideoPublicContextSelector, VideoUrlPolicy};
@@ -37,6 +38,7 @@ final class AdminWorkbenchReadApi
         private ?MediaAssetRepository $assets = null,
         private ?MediaUsageRepository $usages = null,
         private ?EntityProfileAdminProjection $entityProjection = null,
+        private ?ProposalDiscoveryService $proposalDiscovery = null,
     ) {}
 
     public function register(): void
@@ -46,6 +48,14 @@ final class AdminWorkbenchReadApi
         register_rest_route('nhk/v1', '/admin/workbench/video/(?P<id>[0-9A-Fa-f-]{36})', ['methods' => 'GET', 'permission_callback' => fn (): bool => current_user_can('nhk_view_governance') || current_user_can('manage_options'), 'callback' => fn (\WP_REST_Request $request) => $this->video((string) $request['id'])]);
         register_rest_route('nhk/v1', '/admin/workbench/media/(?P<id>[0-9A-Fa-f-]{36})', ['methods' => 'GET', 'permission_callback' => fn (): bool => current_user_can('nhk_view_governance') || current_user_can('manage_options'), 'callback' => fn (\WP_REST_Request $request) => $this->media((string) $request['id'])]);
         register_rest_route('nhk/v1', '/admin/workbench/entity/(?P<id>[0-9A-Fa-f-]{36})', ['methods' => 'GET', 'permission_callback' => fn (): bool => current_user_can('nhk_view_governance') || current_user_can('manage_options'), 'callback' => fn (\WP_REST_Request $request) => $this->entity((string) $request['id'])]);
+        register_rest_route('nhk/v1', '/admin/workbench/proposals/discover', ['methods' => 'GET', 'permission_callback' => fn (): bool => current_user_can('nhk_view_governance') || current_user_can('manage_options'), 'args' => ['proposal_id' => ['type' => 'string'], 'capture_id' => ['type' => 'string'], 'entity_type' => ['type' => 'string'], 'entity_id' => ['type' => 'string'], 'idempotency_key' => ['type' => 'string'], 'limit' => ['type' => 'integer', 'default' => 20]], 'callback' => fn (\WP_REST_Request $request) => $this->proposalDiscover($request)]);
+    }
+
+    public function proposalDiscover(\WP_REST_Request|array $request): array|\WP_Error
+    {
+        if ($this->proposalDiscovery === null) return new \WP_Error('nhk_admin_proposal_discovery_unavailable', 'Proposal discovery chưa sẵn sàng.', ['status' => 503]);
+        $input = $request instanceof \WP_REST_Request ? $request->get_params() : $request;
+        try { return $this->proposalDiscovery->discover($input); } catch (\InvalidArgumentException $error) { return new \WP_Error('nhk_admin_proposal_discovery_selector_invalid', $error->getMessage(), ['status' => 400]); }
     }
 
     private function search(\WP_REST_Request $request): array|\WP_Error

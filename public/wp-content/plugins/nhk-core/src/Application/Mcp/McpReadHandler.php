@@ -25,6 +25,7 @@ use NHK\Core\Application\Graph\RelationBackfillService;
 use NHK\Core\Application\Presentation\LatestFirstOrder;
 use NHK\Core\Application\Capture\CaptureCurrentOutcomeReducer;
 use NHK\Core\Application\Graph\RelationshipReadService;
+use NHK\Core\Application\Governance\ProposalDiscoveryService;
 
 final class McpReadHandler
 {
@@ -49,7 +50,14 @@ final class McpReadHandler
         private ?MediaBindingOperationRepository $mediaBindingOperations = null,
         private ?CaptureRepository $captures = null,
         private ?RelationshipReadService $relationships = null,
+        private ?ProposalDiscoveryService $proposalDiscovery = null,
     ) { $this->delivery ??= PublicMediaAssetDelivery::fromEnvironment($assets, $media); }
+
+    public function proposalDiscover(array $input): array
+    {
+        if ($this->proposalDiscovery === null) return ['status' => 'unavailable', 'items' => [], 'count' => 0, 'limit' => 0];
+        return $this->proposalDiscovery->discover($input);
+    }
 
     public function entityGet(string $type, string $id): ?array
     {

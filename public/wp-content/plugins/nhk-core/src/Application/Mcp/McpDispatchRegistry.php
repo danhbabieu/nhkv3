@@ -107,6 +107,7 @@ final class McpDispatchRegistry
         'nhk.proposal.create' => 'nhk.proposal.create',
         'nhk.proposal.submit' => 'nhk.proposal.submit',
         'nhk.proposal.review' => 'nhk.proposal.review',
+        'nhk.proposal.discover' => 'nhk.proposal.discover',
         'nhk.proposal.approve' => 'nhk.proposal.approve',
         'nhk.proposal.reject' => 'nhk.proposal.reject',
         'nhk.proposal.eligibility' => 'nhk.proposal.eligibility',

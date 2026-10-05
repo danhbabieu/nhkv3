@@ -170,7 +170,7 @@ final class Plugin {
                 'evidence' => new \NHK\Core\Application\Graph\EvidenceRelationshipAdapter($evidence, $claims, $sources),
             ]);
             McpAbilityRegistration::registerDiagnosticsAbility();
-            McpAbilityRegistration::registerReadAbilities(new McpReadHandler($authority, $types, $media, $assets, $usages, $videos, $claims, $evidence, new MigrationStatus(), $sources, null, new McpSemanticContextResolver($authority, $types), $wordpressAttachments, $neighborhood, $canonicalInventory, $graphInventory, $relationBackfill, new WpdbMediaBindingOperationRepository($wpdb), $captureRepository, $relationshipRead));
+            McpAbilityRegistration::registerReadAbilities(new McpReadHandler($authority, $types, $media, $assets, $usages, $videos, $claims, $evidence, new MigrationStatus(), $sources, null, new McpSemanticContextResolver($authority, $types), $wordpressAttachments, $neighborhood, $canonicalInventory, $graphInventory, $relationBackfill, new WpdbMediaBindingOperationRepository($wpdb), $captureRepository, $relationshipRead, new \NHK\Core\Application\Governance\ProposalDiscoveryService(new \NHK\Core\Infrastructure\Governance\WpdbProposalRepository($wpdb))));
             McpAbilityRegistration::registerCapabilityGatedReadAbilities();
             McpAbilityRegistration::registerGovernedAbilities();
         });
@@ -354,7 +354,7 @@ final class Plugin {
             $proposalRepository = $governanceRuntime->proposals;
             $governance = $governanceRuntime->governance;
             $eligibility = $governanceRuntime->eligibility;
-            (new AdminWorkbenchReadApi($media, $videos, $claims, $authority, $sources, $evidence, $graphService, $proposalRepository, $eligibility, $assets, $usages, new EntityProfileAdminProjection()))->register();
+            (new AdminWorkbenchReadApi($media, $videos, $claims, $authority, $sources, $evidence, $graphService, $proposalRepository, $eligibility, $assets, $usages, new EntityProfileAdminProjection(), new \NHK\Core\Application\Governance\ProposalDiscoveryService($proposalRepository)))->register();
             $authorityService = new \NHK\Core\Application\Authority\AuthorityService($authority, $types, new \NHK\Core\Infrastructure\Authority\WpdbAuditSink(new \NHK\Core\Infrastructure\Governance\WpdbAuditSink($wpdb)));
             $mediaService = new MediaService($media, $assets, $usages);
             $mediaBindingOrigins = [];
@@ -657,7 +657,7 @@ final class Plugin {
                 'media_usage' => new \NHK\Core\Application\Graph\MediaUsageRelationshipAdapter($usages),
                 'evidence' => new \NHK\Core\Application\Graph\EvidenceRelationshipAdapter($evidence, $claims, $sources),
             ]);
-            $mcpRead = new McpReadHandler($authority, $types, $media, $assets, $usages, $videos, $claims, $evidence, new MigrationStatus(), $sources, null, new McpSemanticContextResolver($authority, $types), $wordpressAttachments, $mcpNeighborhood, $canonicalInventory, $graphInventory, $relationBackfill, null, $captureRepository, $relationshipRead);
+            $mcpRead = new McpReadHandler($authority, $types, $media, $assets, $usages, $videos, $claims, $evidence, new MigrationStatus(), $sources, null, new McpSemanticContextResolver($authority, $types), $wordpressAttachments, $mcpNeighborhood, $canonicalInventory, $graphInventory, $relationBackfill, null, $captureRepository, $relationshipRead, new \NHK\Core\Application\Governance\ProposalDiscoveryService($proposalRepository));
             // Relations are governed semantic children of Capture article
             // reconciliation (for example, a post --about--> classification
             // binding). Register the existing relation boundary alongside

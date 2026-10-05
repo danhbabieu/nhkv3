@@ -367,6 +367,7 @@ final class McpAbilityRegistration
     private const CAPABILITY_GATED_READ_TOOL_MAP = [
         'nhk.proposal.eligibility' => 'nhk-v3/proposal-eligibility',
         'nhk.proposal.review' => 'nhk-v3/proposal-review',
+        'nhk.proposal.discover' => 'nhk-v3/proposal-discover',
         'nhk.public-url.audit' => 'nhk-v3/public-url-audit',
         'nhk.knowledge.quality-audit' => 'nhk-v3/knowledge-quality-audit',
         'nhk.dictionary.seed-audit' => 'nhk-v3/dictionary-seed-audit',
@@ -874,7 +875,7 @@ final class McpAbilityRegistration
 
     private static function canRead(string $tool): bool
     {
-        $capability = in_array($tool, ['nhk.proposal.eligibility', 'nhk.proposal.review'], true) ? 'nhk_view_governance' : 'read';
+        $capability = in_array($tool, ['nhk.proposal.eligibility', 'nhk.proposal.review', 'nhk.proposal.discover'], true) ? 'nhk_view_governance' : 'read';
         return !function_exists('current_user_can') || current_user_can($capability);
     }
 
@@ -938,6 +939,7 @@ final class McpAbilityRegistration
             'nhk.proposal.eligibility' => 'NHK Proposal Eligibility',
             'nhk.proposal.apply' => 'NHK Proposal Apply',
             'nhk.proposal.review' => 'NHK Proposal Review',
+            'nhk.proposal.discover' => 'NHK Proposal Discovery',
         ][$tool] ?? 'NHK V3 Read';
     }
 }

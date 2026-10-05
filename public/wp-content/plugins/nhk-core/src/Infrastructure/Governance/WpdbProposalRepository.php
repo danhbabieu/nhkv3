@@ -3,12 +3,12 @@ declare(strict_types=1);
 
 namespace NHK\Core\Infrastructure\Governance;
 
-use NHK\Core\Contracts\Governance\{ApprovedRelationProposalRepository,PendingVideoProposalLookup,ProposalRepository};
+use NHK\Core\Contracts\Governance\{ApprovedRelationProposalRepository,PendingVideoProposalLookup,ProposalDiscoveryReader,ProposalRepository};
 use NHK\Core\Domain\Governance\{Proposal, ProposalState, ProposalSubjectBindingValidator};
 use NHK\Core\Governance\Exception\ProposalIdempotencyStaleBinding;
 use NHK\Core\Shared\Uuid\UuidCodec;
 
-final class WpdbProposalRepository implements ProposalRepository, ApprovedRelationProposalRepository, PendingVideoProposalLookup
+final class WpdbProposalRepository implements ProposalRepository, ApprovedRelationProposalRepository, PendingVideoProposalLookup, ProposalDiscoveryReader
 {
     public function __construct(private ?object $database = null) {}
     private function db(): object { global $wpdb; return $this->database ?? $wpdb; }
@@ -117,6 +117,41 @@ final class WpdbProposalRepository implements ProposalRepository, ApprovedRelati
         ));
     }
     public function find(string $id): ?Proposal { $db=$this->db(); return $this->hydrate($db->get_row($db->prepare('SELECT * FROM '.$this->table().' WHERE proposal_uuid=%s LIMIT 1',UuidCodec::toBinary($id)),ARRAY_A)); }
+    /** @return list<array<string,mixed>> */
+    public function discover(array $selectors, int $limit): array
+    {
+        $db = $this->db();
+        $where = [];
+        $params = [];
+        $limit = min(50, max(1, $limit));
+        if (isset($selectors['proposal_id'])) {
+            if (!UuidCodec::isValid((string) $selectors['proposal_id'])) return [];
+            $where[] = 'proposal_uuid=%s'; $params[] = UuidCodec::toBinary((string) $selectors['proposal_id']);
+        } elseif (isset($selectors['idempotency_key'])) {
+            $where[] = 'idempotency_key=%s'; $params[] = (string) $selectors['idempotency_key'];
+        } elseif (isset($selectors['capture_id'])) {
+            $where[] = "JSON_UNQUOTE(JSON_EXTRACT(command_json, '$.capture_id'))=%s"; $params[] = (string) $selectors['capture_id'];
+        } else {
+            $where[] = 'entity_type=%s'; $params[] = (string) $selectors['entity_type'];
+            $entityId = (string) $selectors['entity_id'];
+            $entityClauses = ['subject_id=%s']; $entityParams = [$entityId];
+            if (UuidCodec::isValid($entityId)) { $entityClauses[] = 'target_uuid=%s'; $entityParams[] = UuidCodec::toBinary($entityId); }
+            $where[] = '(' . implode(' OR ', $entityClauses) . ')'; $params = array_merge($params, $entityParams);
+        }
+        $query = 'SELECT proposal_uuid,entity_type,operation,state,command_json,subject_id,target_uuid,idempotency_key FROM '.$this->table().' WHERE '.implode(' AND ', $where).' ORDER BY id ASC LIMIT '.$limit;
+        $rows = $db->get_results($db->prepare($query, ...$params), ARRAY_A) ?: [];
+        $items = [];
+        foreach ($rows as $row) {
+            try { $payload = json_decode((string) ($row['command_json'] ?? ''), true, 512, JSON_THROW_ON_ERROR); } catch (\JsonException) { continue; }
+            if (!is_array($payload)) continue;
+            $stateValue = (int) ($row['state'] ?? 0); $states = ProposalState::cases();
+            if ($stateValue < 1 || $stateValue > count($states)) continue;
+            $target = (string) ($row['target_uuid'] ?? '');
+            $entityId = strlen($target) === 16 && strtolower(bin2hex($target)) !== str_repeat('0', 32) ? UuidCodec::fromBinary($target) : (trim((string) ($row['subject_id'] ?? '')) ?: null);
+            $items[] = ['proposal_id' => UuidCodec::fromBinary((string) $row['proposal_uuid']), 'entity_type' => (string) $row['entity_type'], 'operation' => (string) $row['operation'], 'state' => $states[$stateValue - 1]->value, 'capture_id' => $payload['capture_id'] ?? null, 'entity_id' => $entityId, 'idempotency_key' => $row['idempotency_key'] ?? null];
+        }
+        return $items;
+    }
     /** @return list<Proposal> */
     public function listRecent(int $limit = 50, ?ProposalState $state = null): array
     {
