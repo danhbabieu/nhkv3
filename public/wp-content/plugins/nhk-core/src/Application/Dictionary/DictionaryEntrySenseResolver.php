@@ -48,11 +48,11 @@ final class DictionaryEntrySenseResolver
                     $destinationType = trim((string) ($semanticReference['type'] ?? '')) ?: null;
                     $destinationId = trim((string) ($semanticReference['id'] ?? '')) ?: null;
                     if (!in_array($referenceStatus, ['AVAILABLE', 'PRESENT_VALID'], true) || $destinationType === null || $destinationId === null) {
-                        return ['status' => 'UNKNOWN', 'term' => $term, 'normalized_term' => $normalized, 'reason' => 'DICTIONARY_SEMANTIC_REFERENCE_INVALID'];
+                        return ['status' => 'UNKNOWN', 'term' => $term, 'normalized_term' => $normalized, 'entry_id' => $entry->entryId, 'sense_id' => $sense->conceptId, 'reason' => 'DICTIONARY_SEMANTIC_REFERENCE_INVALID'];
                     }
                 }
             } catch (\Throwable) {
-                return ['status' => 'UNKNOWN', 'term' => $term, 'normalized_term' => $normalized, 'reason' => 'DICTIONARY_SEMANTIC_REFERENCE_UNAVAILABLE'];
+                return ['status' => 'UNKNOWN', 'term' => $term, 'normalized_term' => $normalized, 'entry_id' => $entry->entryId, 'sense_id' => $sense->conceptId, 'reason' => 'DICTIONARY_SEMANTIC_REFERENCE_UNAVAILABLE'];
             }
         }
 
@@ -65,17 +65,18 @@ final class DictionaryEntrySenseResolver
         if ($destinationType !== null && $destinationId !== null && is_callable($this->destinationValidator)) {
             try {
                 $validated = ($this->destinationValidator)($destinationType, $destinationId, $sense->destinationUrl);
-                if ($validated === false) return ['status' => 'UNKNOWN', 'term' => $term, 'normalized_term' => $normalized, 'reason' => 'DICTIONARY_SEMANTIC_REFERENCE_INVALID'];
+                if ($validated === false) return ['status' => 'UNKNOWN', 'term' => $term, 'normalized_term' => $normalized, 'entry_id' => $entry->entryId, 'sense_id' => $sense->conceptId, 'reason' => 'DICTIONARY_SEMANTIC_REFERENCE_INVALID'];
+                if ($validated === null) return ['status' => 'UNKNOWN', 'term' => $term, 'normalized_term' => $normalized, 'entry_id' => $entry->entryId, 'sense_id' => $sense->conceptId, 'reason' => 'DICTIONARY_SEMANTIC_DESTINATION_UNAVAILABLE'];
                 $url = is_string($validated) && trim($validated) !== '' ? trim($validated) : null;
             } catch (\Throwable) {
-                $url = null;
+                return ['status' => 'UNKNOWN', 'term' => $term, 'normalized_term' => $normalized, 'entry_id' => $entry->entryId, 'sense_id' => $sense->conceptId, 'reason' => 'DICTIONARY_SEMANTIC_DESTINATION_UNAVAILABLE'];
             }
         }
 
         if ($destinationType === null || $destinationId === null) {
             $slug = trim((string) ($entry->context['public_slug'] ?? ''));
             if ($entry->status !== DictionaryConcept::APPROVED || $slug === '') {
-                return ['status' => 'UNKNOWN', 'term' => $term, 'normalized_term' => $normalized, 'reason' => 'DICTIONARY_ENTRY_PUBLIC_IDENTITY_MISSING'];
+                return ['status' => 'UNKNOWN', 'term' => $term, 'normalized_term' => $normalized, 'entry_id' => $entry->entryId, 'sense_id' => $sense->conceptId, 'reason' => 'DICTIONARY_ENTRY_PUBLIC_IDENTITY_MISSING'];
             }
             $destinationType = 'dictionary';
             $destinationId = $entry->entryId;

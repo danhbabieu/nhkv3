@@ -227,4 +227,53 @@ final class DictionaryDetailQueryTest extends TestCase
         self::assertSame('/ban-nhac/westminster/', $result['seo']['canonical']);
         self::assertFalse($result['seo']['sitemap']);
     }
+
+    public function test_delegated_component_entry_uses_persisted_owner_current_path_for_one_hop_redirect(): void
+    {
+        $sense = new DictionaryConcept('sense-component', 'Côn hoa thị', '', DictionaryConcept::APPROVED, 'component', 'component-1');
+        $entry = new LexicalEntry('entry-component', 'Côn hoa thị', 'côn hoa thị', DictionaryConcept::APPROVED, 'vi-VN', ['public_slug' => 'con-hoa-thi'], 1, [$sense->conceptId]);
+        $entries = new class($entry, $sense) {
+            public function __construct(private LexicalEntry $entry, private DictionaryConcept $sense) {}
+            public function findByPublicSlug(string $slug): LexicalEntry { return $this->entry; }
+            public function listSenses(LexicalEntry $entry): array { return [$this->sense]; }
+            public function listForms(LexicalEntry $entry): array { return []; }
+            public function semanticReference(string $entryId, string $senseId): array { return ['status' => 'AVAILABLE', 'type' => 'component', 'id' => 'component-1', 'source' => 'MAPPING']; }
+        };
+
+        $result = (new DictionaryDetailQuery(
+            new class { public function listLabels(string $id): array { return []; } },
+            $entries,
+            null,
+            static fn (): array => ['identity' => ['type' => 'component', 'id' => 'component-1', 'current_path' => '/linh-kien/con-hoa-thi/'], 'knowledge' => ['items' => []], 'relation_sections' => []],
+        ))->detail('con-hoa-thi');
+
+        self::assertSame('REDIRECT', $result['status']);
+        self::assertSame('/linh-kien/con-hoa-thi/', $result['destination_url']);
+        self::assertFalse($result['indexable']);
+        self::assertFalse($result['seo']['sitemap']);
+    }
+
+    public function test_delegated_component_entry_without_owner_current_path_fails_closed_without_dictionary_page(): void
+    {
+        $sense = new DictionaryConcept('sense-component-missing', 'Côn hoa thị', '', DictionaryConcept::APPROVED, 'component', 'component-missing');
+        $entry = new LexicalEntry('entry-component-missing', 'Côn hoa thị', 'côn hoa thị', DictionaryConcept::APPROVED, 'vi-VN', ['public_slug' => 'con-hoa-thi'], 1, [$sense->conceptId]);
+        $entries = new class($entry, $sense) {
+            public function __construct(private LexicalEntry $entry, private DictionaryConcept $sense) {}
+            public function findByPublicSlug(string $slug): LexicalEntry { return $this->entry; }
+            public function listSenses(LexicalEntry $entry): array { return [$this->sense]; }
+            public function listForms(LexicalEntry $entry): array { return []; }
+            public function semanticReference(string $entryId, string $senseId): array { return ['status' => 'AVAILABLE', 'type' => 'component', 'id' => 'component-missing', 'source' => 'MAPPING']; }
+        };
+
+        $result = (new DictionaryDetailQuery(
+            new class { public function listLabels(string $id): array { return []; } },
+            $entries,
+            null,
+            static fn (): array => ['identity' => ['type' => 'component', 'id' => 'component-missing'], 'knowledge' => ['items' => []], 'relation_sections' => []],
+        ))->detail('con-hoa-thi');
+
+        self::assertSame('INCOMPLETE', $result['status']);
+        self::assertNull($result['destination_url']);
+        self::assertFalse($result['indexable']);
+    }
 }

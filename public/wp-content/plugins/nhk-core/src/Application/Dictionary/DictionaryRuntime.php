@@ -406,7 +406,8 @@ final class DictionaryRuntime
 
     public function resolve(string $term, array $context = [], array $hints = []): array
     {
-        return $this->preview($term, 'MCP_RESOLVE', '', $context, $hints);
+        $preview = $this->preview($term, 'MCP_RESOLVE', '', $context, $hints);
+        return (new DictionaryMcpResolveProjection())->project($preview, $this->resolveEntrySense($term, $context));
     }
 
     public function resolveEntrySense(string $term, array $context = []): array
@@ -669,6 +670,7 @@ final class DictionaryRuntime
                 }
             }
             if ($durableEntryFound) return $rows;
+            return [];
         }
         foreach ($this->concepts->findApprovedByNormalizedLabel($term, $context) as $row) {
             if (!is_array($row)) continue;

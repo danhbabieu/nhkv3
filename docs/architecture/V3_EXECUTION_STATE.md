@@ -1,5 +1,36 @@
 # NHK V3 Execution State
 
+## Checkpoint — 2026-10-05 — Final live route parity and delegated Dictionary redirect
+
+ROOT_CAUSE: `nhk.dictionary.resolve` stopped at the legacy planning envelope;
+the live MCP projection never consumed the Entry/Sense resolver. That left
+standalone approved Entries projected with Concept identity and no persisted
+Entry URL. Delegated Dictionary detail SEO also ignored an owner identity's
+persisted `current_path`, so an owner-backed lexical route could fail closed
+instead of redirecting.
+
+IMPLEMENTATION: MCP resolve now reconciles the planning envelope with the
+Entry/Sense resolver, projecting standalone destinations as the canonical Entry
+ID plus its persisted `public_slug` route and preserving semantic owner
+delegation. Missing Entry public identity, invalid/unavailable semantic
+destinations, retired Entries and non-public Entries do not leak a public
+destination. Delegated Dictionary detail accepts the persisted owner
+`current_path`; the existing public route handler therefore emits one direct
+301 and never renders the delegated Dictionary page. No second route owner is
+created.
+
+REGRESSION COVERAGE: Preferred and alternate Forms, standalone Entry route
+parity, delegated Component owner URL, owner identity fail-closed behavior,
+missing Entry slug, retired Entry, direct redirect/no indexability, and the
+`400 ngày` delegated regression.
+
+VERIFICATION: Focused Dictionary suite passes 55 tests / 175 assertions;
+changed PHP files lint clean and `git diff --check` passes. No materialization,
+Entry/Sense mutation, semantic-owner mutation, schema change, deployment or
+production operation was performed.
+
+STATUS: `FINAL_DICTIONARY_ROUTE_RESOLVER_PARITY_FIXED_LOCAL / FOCUSED_GREEN / NO_DATA_MUTATION / COMMIT_PENDING`
+
 ## Checkpoint — 2026-10-05 — Final Dictionary resolver destination projection parity
 
 ROOT_CAUSE: The Entry/Sense resolver returned standalone Sense destination

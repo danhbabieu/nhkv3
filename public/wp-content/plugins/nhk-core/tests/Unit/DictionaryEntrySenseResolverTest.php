@@ -147,9 +147,9 @@ final class DictionaryEntrySenseResolverTest extends TestCase
 
         $result = (new DictionaryEntrySenseResolver($repo, static fn (): ?string => null))->resolve('x');
 
-        self::assertSame('RESOLVED', $result['status']);
-        self::assertNull($result['destination_url']);
-        self::assertSame('model-1', $result['destination_id']);
+        self::assertSame('UNKNOWN', $result['status']);
+        self::assertNull($result['destination_url'] ?? null);
+        self::assertSame('DICTIONARY_SEMANTIC_DESTINATION_UNAVAILABLE', $result['reason']);
     }
 
     public function test_context_selects_one_sense_and_missing_context_is_ambiguous(): void

@@ -42,7 +42,7 @@ final class DictionarySeoDecision
     private function ownerUrl(array $sense): ?string
     {
         $owner = is_array($sense['canonical_owner'] ?? null) ? $sense['canonical_owner'] : [];
-        $url = trim((string) ($owner['url'] ?? $owner['canonical_url'] ?? ''));
+        $url = trim((string) ($owner['url'] ?? $owner['canonical_url'] ?? $owner['current_path'] ?? ''));
         return $url !== '' ? $url : null;
     }
 }

@@ -17,6 +17,14 @@ final class DictionaryRuntimeContractTest extends TestCase
         self::assertStringContainsString('revalidateDelegatedDestination(', $source);
     }
 
+    public function test_mcp_resolve_projects_through_entry_sense_resolution(): void
+    {
+        $source = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/Dictionary/DictionaryRuntime.php');
+
+        self::assertStringContainsString('resolveEntrySense(', $source);
+        self::assertStringContainsString('DictionaryMcpResolveProjection', $source);
+    }
+
     public function test_public_auto_link_terms_come_only_from_approved_dictionary_labels(): void
     {
         $source = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/Dictionary/DictionaryRuntime.php');
