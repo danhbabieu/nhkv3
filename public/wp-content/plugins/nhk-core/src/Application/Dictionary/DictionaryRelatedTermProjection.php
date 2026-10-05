@@ -6,7 +6,7 @@ namespace NHK\Core\Application\Dictionary;
 /** Public, bounded related-term projection; it never infers lexical similarity. */
 final class DictionaryRelatedTermProjection
 {
-    public function __construct(private object $entries, private $graphResolver = null) {}
+    public function __construct(private object $entries, private $graphResolver = null, private ?object $lexicalRelations = null) {}
 
     /** @return list<array<string,mixed>> */
     public function forReference(string $currentEntryId, string $type, string $id, int $limit = 12): array
@@ -14,6 +14,19 @@ final class DictionaryRelatedTermProjection
         $limit = max(1, min(12, $limit));
         if (!method_exists($this->entries, 'findEntriesBySemanticReference')) return [];
         $items = [];
+        if ($this->lexicalRelations !== null && method_exists($this->lexicalRelations, 'listForEntry')) {
+            try {
+                foreach ((array) ($this->lexicalRelations->listForEntry($currentEntryId, 0, $limit, false)['items'] ?? []) as $relation) {
+                    $target = (string) ($relation->sourceEntryUuid ?? '') === $currentEntryId ? (string) ($relation->targetEntryUuid ?? '') : (string) ($relation->sourceEntryUuid ?? '');
+                    if ($target === '' || $target === $currentEntryId || !method_exists($this->entries, 'findById')) continue;
+                    $entry = $this->entries->findById($target);
+                    $slug = is_object($entry) ? $this->slug((string) (($entry->context['public_slug'] ?? '') ?: ($entry->preferredForm ?? ''))) : '';
+                    $title = is_object($entry) ? trim((string) ($entry->preferredForm ?? '')) : '';
+                    if ($slug === '' || $title === '') continue;
+                    $items[$target] = ['entry_id'=>$target,'title'=>$title,'url'=>'/tu-dien/'.$slug.'/','relation_kind'=>(string) ($relation->kind ?? 'RELATED'),'origin'=>'EXPLICIT_LEXICAL'];
+                }
+            } catch (\Throwable) {}
+        }
         $ownerCandidates = [['type' => $type, 'id' => $id, 'origin' => ['kind' => 'DIRECT', 'hop_count' => 0]]];
         if (is_callable($this->graphResolver)) {
             try {
@@ -35,10 +48,11 @@ final class DictionaryRelatedTermProjection
                 $title = trim((string) ($entry->preferredForm ?? ''));
                 if ($slug === '' || $title === '') continue;
                 $key = (string) ($entry->entryId ?? $slug);
+                if (isset($items[$key])) continue;
                 $items[$key] = ['entry_id' => $key, 'title' => $title, 'url' => '/tu-dien/' . $slug . '/', 'origin' => $owner['origin']];
             }
         }
-        uasort($items, static fn (array $a, array $b): int => [($a['origin']['kind'] ?? '') === 'DIRECT' ? 0 : 1, (int) ($a['origin']['hop_count'] ?? 99), (string) $a['title'], (string) $a['entry_id']] <=> [($b['origin']['kind'] ?? '') === 'DIRECT' ? 0 : 1, (int) ($b['origin']['hop_count'] ?? 99), (string) $b['title'], (string) $b['entry_id']]);
+        uasort($items, static fn (array $a, array $b): int => [(is_string($a['origin'] ?? null) ? 0 : (($a['origin']['kind'] ?? '') === 'DIRECT' ? 1 : 2)), (int) (($a['origin']['hop_count'] ?? 99)), (string) $a['title'], (string) $a['entry_id']] <=> [(is_string($b['origin'] ?? null) ? 0 : (($b['origin']['kind'] ?? '') === 'DIRECT' ? 1 : 2)), (int) (($b['origin']['hop_count'] ?? 99)), (string) $b['title'], (string) $b['entry_id']]);
         return array_slice(array_values($items), 0, $limit);
     }
 

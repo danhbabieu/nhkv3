@@ -73,6 +73,12 @@ final class McpContractTest extends TestCase
             'nhk.dictionary.materialization.profile',
             'nhk.dictionary.materialization.plan',
             'nhk.dictionary.materialization.apply',
+            'nhk.dictionary.semantic-relation.read',
+            'nhk.dictionary.semantic-relation.preview',
+            'nhk.dictionary.semantic-relation.apply',
+            'nhk.dictionary.lexical-relation.read',
+            'nhk.dictionary.lexical-relation.preview',
+            'nhk.dictionary.lexical-relation.apply',
             'nhk.search',
             'nhk.canonical.inventory',
             'nhk.graph.inventory',
@@ -574,6 +580,8 @@ final class McpContractTest extends TestCase
             'nhk-v3/dictionary-relation-handoff',
             'nhk-v3/dictionary-materialization-apply',
             'nhk-v3/dictionary-enrichment-apply',
+            'nhk-v3/dictionary-semantic-relation-apply',
+            'nhk-v3/dictionary-lexical-relation-apply',
         ], McpAbilityRegistration::governedAbilityNames());
         self::assertSame('nhk-v3/article-preflight', McpAbilityRegistration::abilityNameForTool('nhk.article.preflight'));
         self::assertSame('nhk-v3/article-ingest', McpAbilityRegistration::abilityNameForTool('nhk.article.ingest'));

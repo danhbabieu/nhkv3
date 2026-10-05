@@ -15,6 +15,7 @@ final class DictionaryDetailQuery
         private $semanticProjection = null,
         private $mentionProjection = null,
         private $relatedProjection = null,
+        private $enrichmentQuery = null,
     ) {}
 
     /** @return array<string,mixed> */
@@ -58,6 +59,7 @@ final class DictionaryDetailQuery
                 'videos' => $semantic['videos'],
                 'articles' => $semantic['articles'],
                 'semantic_relations' => $semantic['semantic_relations'],
+                'relation_facets' => $semantic['relation_facets'],
                 'derived_entities' => $semantic['derived_entities'],
                 'brands' => $semantic['derived_entities']['brands'],
                 'models' => $semantic['derived_entities']['models'],
@@ -117,7 +119,7 @@ final class DictionaryDetailQuery
     /** @return array<string,mixed> */
     private function projectSemantic(string $type, string $id, array $reference = []): array
     {
-        $empty = ['canonical_owner' => null, 'knowledge' => $this->bucket(), 'media' => $this->bucket(), 'videos' => $this->bucket(), 'articles' => $this->bucket(), 'semantic_relations' => $this->bucket(), 'derived_entities' => ['brands' => $this->bucket(), 'models' => $this->bucket(), 'specimens' => $this->bucket()], 'source_keys' => []];
+        $empty = ['canonical_owner' => null, 'knowledge' => $this->bucket(), 'media' => $this->bucket(), 'videos' => $this->bucket(), 'articles' => $this->bucket(), 'semantic_relations' => $this->bucket(), 'relation_facets' => [], 'derived_entities' => ['brands' => $this->bucket(), 'models' => $this->bucket(), 'specimens' => $this->bucket()], 'source_keys' => []];
         if ($type === '' || $id === '' || !in_array(strtoupper((string) ($reference['status'] ?? 'AVAILABLE')), ['AVAILABLE', 'AVAILABLE_WITH_ITEMS', 'PRESENT_VALID'], true)) return $empty;
         if (!is_callable($this->semanticProjection)) return $this->unavailableSemantic();
         try { $packet = ($this->semanticProjection)($type, $id); } catch (\Throwable) { return $this->unavailableSemantic(); }
@@ -126,10 +128,15 @@ final class DictionaryDetailQuery
         $knowledge = is_array($packet['knowledge'] ?? null) ? $packet['knowledge'] : [];
         $result = $empty;
         $result['canonical_owner'] = is_array($packet['identity'] ?? null) ? $packet['identity'] : null;
+        $result['relation_facets'] = is_array($packet['relation_facets'] ?? null) ? $packet['relation_facets'] : (is_object($this->enrichmentQuery) && method_exists($this->enrichmentQuery, 'forOwner') ? (array) $this->enrichmentQuery->forOwner($type, $id)['relation_facets'] ?? [] : []);
         $knowledgeItems = is_array($knowledge['items'] ?? null) ? $knowledge['items'] : $this->flattenFacets($knowledge['facets'] ?? []);
         $result['knowledge'] = $this->bucket(array_slice($knowledgeItems, 0, 6), count($knowledgeItems) > 6);
         $result['semantic_relations'] = $this->bucket($this->publicRelationItems($relations));
-        foreach (['brands', 'models', 'specimens'] as $name) $result['derived_entities'][$name] = $this->bucket(is_array($relations[$name] ?? null) ? $relations[$name] : []);
+        foreach (['brands', 'models', 'specimens'] as $name) {
+            $facet = is_array($result['relation_facets'][$name] ?? null) ? $result['relation_facets'][$name] : null;
+            if ($facet !== null && array_is_list($facet)) $facet = $this->bucket($facet);
+            $result['derived_entities'][$name] = $facet ?? $this->bucket(is_array($relations[$name] ?? null) ? $relations[$name] : []);
+        }
         $media = [];
         if (is_array($packet['primary_media'] ?? null)) $media[] = $packet['primary_media'];
         foreach ((array) ($packet['media_gallery'] ?? []) as $item) if (is_array($item)) $media[] = $item;
@@ -190,7 +197,7 @@ final class DictionaryDetailQuery
     private function unavailableSemantic(): array
     {
         $bucket = ['status' => 'UNAVAILABLE_IMPLEMENTATION_GAP', 'items' => []];
-        return ['canonical_owner' => null, 'knowledge' => $bucket, 'media' => $bucket, 'videos' => $bucket, 'articles' => $bucket, 'semantic_relations' => $bucket, 'derived_entities' => ['brands' => $bucket, 'models' => $bucket, 'specimens' => $bucket], 'source_keys' => []];
+        return ['canonical_owner' => null, 'knowledge' => $bucket, 'media' => $bucket, 'videos' => $bucket, 'articles' => $bucket, 'semantic_relations' => $bucket, 'relation_facets' => [], 'derived_entities' => ['brands' => $bucket, 'models' => $bucket, 'specimens' => $bucket], 'source_keys' => []];
     }
     private function labels(DictionaryConcept $sense): array { return array_values(array_filter(array_map(static fn (mixed $label): ?array => $label instanceof DictionaryLabel && $label->active ? ['label' => $label->label, 'kind' => $label->kind, 'locale' => $label->locale] : null, (array) $this->concepts->listLabels($sense->conceptId)), 'is_array')); }
     private function forms(LexicalEntry $entry): array { if (!method_exists($this->entries, 'listForms')) return [['form' => $entry->preferredForm, 'kind' => 'PREFERRED', 'locale' => $entry->locale]]; $out = []; foreach ((array) $this->entries->listForms($entry) as $form) { if (is_object($form) && trim((string) ($form->form ?? '')) !== '') $out[] = ['form' => $form->form, 'kind' => $form->kind ?? 'ALTERNATE', 'locale' => $form->locale ?? null]; elseif (is_array($form) && trim((string) ($form['form'] ?? '')) !== '') $out[] = ['form' => $form['form'], 'kind' => $form['kind'] ?? 'ALTERNATE', 'locale' => $form['locale'] ?? null]; } return $out !== [] ? $out : [['form' => $entry->preferredForm, 'kind' => 'PREFERRED', 'locale' => $entry->locale]]; }

@@ -22628,3 +22628,38 @@ deployment or push occurred. The migration classes are created but remain
 unexecuted.
 
 STATUS: `SEMANTIC_RELATION_FOUNDATIONS_IMPLEMENTED / FOCUSED_TESTS_GREEN / FULL_UNIT_BASELINE_PRE_EXISTING_FAILURES / NO_DATA_MUTATION / IMPLEMENTATION_CHECKPOINT_READY`.
+
+# Checkpoint — 2026-10-05 — Governed semantic enrichment projection Phase 2 (LOCAL / NO LIVE DATA)
+
+IMPLEMENTED: Added bounded semantic and lexical Governance adapters with
+deterministic preview fingerprints, registry binding, owner revision checks,
+exact endpoint/relation requirements, fail-closed drift diagnostics and
+canonical read-back seams. Added the Dictionary relation facet registry for
+brands, clock_types, configurations, movements, music, countries, models,
+variants, specimens and components; Classification facets require exact family
+matching. Added the bounded read-only semantic enrichment query with direct
+before-derived ordering, two-hop bound, dedupe, public-owner filtering,
+retired exclusion and per-facet truncation. Dictionary detail now exposes
+relation_facets while preserving legacy aliases, and explicit lexical terms
+precede derived semantic-context suggestions. MCP catalog, dispatch and
+ability boundaries now expose bounded semantic/lexical read, preview and
+Governance apply operations; no raw repository writer is exposed.
+
+VALIDATION: Phase 1 plus Phase 2 focused tests pass 71 tests / 892 assertions.
+Dictionary/Graph/Governance/Dossier/MCP Unit slice passes 999 tests / 9,685
+assertions. Full NHK Unit suite passes the new slice but retains 1 pre-existing
+fixture TypeError and 8 pre-existing unrelated environment/expectation failures
+(Knowledge/MCP expectation drift, missing local media fixtures and deployment
+environment behavior). PHP lint and git diff --check pass.
+
+NO LIVE DATA: No Côn hoa thị enrichment was populated. No migration was
+executed against development, integration, staging or production. No semantic
+owner, Graph edge, lexical relation, Entry/Sense mapping, Media, Video or
+Article data was mutated. No deployment or push occurred.
+
+KNOWN_GAPS: Runtime wiring for production Governance dependency injection and
+full live Graph/context transactional composition remains a follow-up seam;
+integration acceptance and cache invalidation require the authorized runtime
+environment. Existing full-suite baseline failures remain outside this phase.
+
+STATUS: `GOVERNED_SEMANTIC_ENRICHMENT_PROJECTION_IMPLEMENTED / FOCUSED_TESTS_GREEN / FULL_UNIT_BASELINE_PRE_EXISTING_FAILURES / NO_DATA_MUTATION / CANARY_NOT_POPULATED`.

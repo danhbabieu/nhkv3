@@ -8,7 +8,14 @@ use NHK\Core\Domain\Dictionary\{DictionaryCandidateState, DictionaryLabel};
 
 final class McpDictionaryHandler
 {
-    public function __construct(private DictionaryRuntime $runtime) {}
+    public function __construct(private DictionaryRuntime $runtime, private $semanticRelationGovernance = null, private $lexicalRelationGovernance = null) {}
+
+    public function semanticRelationRead(array $input = []): array { return $this->semanticRelationGovernance?->read($input) ?? ['status'=>'unavailable','reason'=>'SEMANTIC_RELATION_GOVERNANCE_UNAVAILABLE']; }
+    public function semanticRelationPreview(array $input): array { return $this->semanticRelationGovernance?->preview($input) ?? ['status'=>'unavailable','reason'=>'SEMANTIC_RELATION_GOVERNANCE_UNAVAILABLE']; }
+    public function semanticRelationApply(array $input): array { return $this->semanticRelationGovernance?->apply((array)($input['plan']??[]),(string)($input['approved_plan_fingerprint']??''),(string)($input['idempotency_key']??'')) ?? ['status'=>'unavailable','reason'=>'SEMANTIC_RELATION_GOVERNANCE_UNAVAILABLE']; }
+    public function lexicalRelationRead(array $input = []): array { return $this->lexicalRelationGovernance?->read($input) ?? ['status'=>'unavailable','reason'=>'LEXICAL_RELATION_GOVERNANCE_UNAVAILABLE']; }
+    public function lexicalRelationPreview(array $input): array { return $this->lexicalRelationGovernance?->preview($input) ?? ['status'=>'unavailable','reason'=>'LEXICAL_RELATION_GOVERNANCE_UNAVAILABLE']; }
+    public function lexicalRelationApply(array $input): array { return $this->lexicalRelationGovernance?->apply((array)($input['plan']??[]),(string)($input['approved_plan_fingerprint']??''),(string)($input['idempotency_key']??'')) ?? ['status'=>'unavailable','reason'=>'LEXICAL_RELATION_GOVERNANCE_UNAVAILABLE']; }
 
     public function search(string $query, int $limit = 50): array
     {

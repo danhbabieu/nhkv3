@@ -58,6 +58,8 @@ final class McpAbilityRegistration
         'nhk-v3/dictionary-candidate-review',
         'nhk-v3/dictionary-relation-handoff',
         'nhk-v3/dictionary-materialization-apply',
+        'nhk-v3/dictionary-semantic-relation-apply',
+        'nhk-v3/dictionary-lexical-relation-apply',
         self::MCP_APP_DIAGNOSTICS_ABILITY,
     ];
 
@@ -370,6 +372,10 @@ final class McpAbilityRegistration
         'nhk.dictionary.seed-audit' => 'nhk-v3/dictionary-seed-audit',
         'nhk.dictionary.enrichment.audit' => 'nhk-v3/dictionary-enrichment-audit',
         'nhk.dictionary.enrichment.plan' => 'nhk-v3/dictionary-enrichment-plan',
+        'nhk.dictionary.semantic-relation.read' => 'nhk-v3/dictionary-semantic-relation-read',
+        'nhk.dictionary.semantic-relation.preview' => 'nhk-v3/dictionary-semantic-relation-preview',
+        'nhk.dictionary.lexical-relation.read' => 'nhk-v3/dictionary-lexical-relation-read',
+        'nhk.dictionary.lexical-relation.preview' => 'nhk-v3/dictionary-lexical-relation-preview',
     ];
 
     /** @var array<string,string> */
@@ -418,6 +424,8 @@ final class McpAbilityRegistration
         'nhk.dictionary.relation.handoff' => 'nhk-v3/dictionary-relation-handoff',
         'nhk.dictionary.materialization.apply' => 'nhk-v3/dictionary-materialization-apply',
         'nhk.dictionary.enrichment.apply' => 'nhk-v3/dictionary-enrichment-apply',
+        'nhk.dictionary.semantic-relation.apply' => 'nhk-v3/dictionary-semantic-relation-apply',
+        'nhk.dictionary.lexical-relation.apply' => 'nhk-v3/dictionary-lexical-relation-apply',
     ];
 
     /**

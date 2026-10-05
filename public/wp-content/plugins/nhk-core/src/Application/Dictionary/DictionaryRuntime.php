@@ -8,7 +8,7 @@ use NHK\Core\Domain\Authority\{AuthorityEntity, CanonicalEntityTypeCatalog, Enti
 use NHK\Core\Domain\Dictionary\{DictionaryConcept, DictionaryLabel};
 use NHK\Core\Domain\Knowledge\KnowledgeClaim;
 use NHK\Core\Infrastructure\Authority\WpdbAuthorityRepository;
-use NHK\Core\Infrastructure\Dictionary\{WpdbDictionaryCandidateRepository, WpdbDictionaryConceptRepository, WpdbDictionaryMentionRepository, WpdbDictionaryEntryRepository};
+use NHK\Core\Infrastructure\Dictionary\{WpdbDictionaryCandidateRepository, WpdbDictionaryConceptRepository, WpdbDictionaryMentionRepository, WpdbDictionaryEntryRepository, WpdbDictionaryLexicalRelationRepository};
 use NHK\Core\Infrastructure\Knowledge\WpdbKnowledgeRepository;
 use NHK\Core\Infrastructure\Media\{WpdbMediaAssetRepository, WpdbMediaRepository, WpdbMediaUsageRepository};
 use NHK\Core\Infrastructure\Migration\{DictionaryMigration015, DictionaryEntrySenseMigration024};
@@ -175,7 +175,7 @@ final class DictionaryRuntime
                     if ($candidateId !== '' && $candidateType !== '') $candidates[] = ['type' => $candidateType, 'id' => $candidateId, 'origin' => $item['origin'] ?? ['kind' => 'DERIVED', 'hop_count' => 2]];
                 }
                 return $candidates;
-            }),
+            }, new WpdbDictionaryLexicalRelationRepository($database)),
         );
         $this->enrichmentCoverage = new DictionaryEnrichmentCoverage($this->coverageProviders());
         $this->publicQuery = new DictionaryPublicQuery(
