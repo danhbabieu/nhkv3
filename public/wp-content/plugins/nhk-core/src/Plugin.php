@@ -29,7 +29,7 @@ use NHK\Core\Application\Governance\{AuthorityStagingAdmission, CaptureChildRela
 use NHK\Core\Application\Runtime\SemanticWritePolicyResolver;
 use NHK\Core\Application\Mcp\{McpAbilityRegistration, McpArticleIngestHandler, McpDictionaryHandler, McpGovernanceHandler, McpReadHandler, McpSemanticContextResolver, McpToolCatalog, McpTransport, McpDocumentationRegistry};
 use NHK\Core\Application\Media\{ImageIngestEntrypoint, MediaBatchUploadService, MediaBindingService, MediaEnrichmentIntentCompiler, MediaTargetNormalizer};
-use NHK\Core\Application\Capture\{CaptureArticlePreflightHandoff, CaptureEditorialWriteGuard, CapturePhaseReceiptReducer, CaptureVideoProvenancePlanner, CaptureVideoPublicationVerifier, ClockTypeShadowClassifier, ContentPreparationOrchestrator, EditorialCaptureContinuationService, EditorialCaptureCoordinator, GovernedCaptureContinuationService, RelationProposalReconciliationService};
+use NHK\Core\Application\Capture\{CaptureArticlePreflightHandoff, CaptureEditorialWriteGuard, CapturePhaseReceiptReducer, CaptureSubjectBindingRecovery, CaptureVideoProvenancePlanner, CaptureVideoPublicationVerifier, ClockTypeShadowClassifier, ContentPreparationOrchestrator, EditorialCaptureContinuationService, EditorialCaptureCoordinator, GovernedCaptureContinuationService, RelationProposalReconciliationService};
 use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, ClaimReusePolicy, EditorialClaimRetrievalService, EditorialKnowledgeSelector, EditorialQualityGate, KnowledgeWriterPreviewService, ReaderJourneyPlanner, SharedEditorialComposer, SharedEnrichmentBoundary, SubjectResolutionService, TextInputInterpreter};
 use NHK\Core\Application\Article\{ArticleEditorialAdapter, ArticleIngestCoordinator, ArticleIngestPreflight, ArticleResearchPreflight, ArticleVerificationReader, SemanticProposalPlanner, OwnerPublicationApplicationService};
 use NHK\Core\Infrastructure\Http\ReadApi;
@@ -910,22 +910,28 @@ final class Plugin {
             $articleReceipts = new WpdbArticleOperationReceiptRepository($wpdb);
             $categoryGateway = new CategoryGateway(new WpCategoryStore());
             $editorialPosts = new WpEditorialPostStore($articleEditorial);
-            $canonicalPublicationContext = static function (\NHK\Core\Domain\Article\EditorialPostState $state, array $callerEvidence) use ($captureRepository, $articleResearch, $articlePreflightHandoff, $articleMedia): array {
+            $captureSubjectBinding = new CaptureSubjectBindingRecovery($captureRepository);
+            $canonicalPublicationContext = static function (\NHK\Core\Domain\Article\EditorialPostState $state, array $callerEvidence) use ($captureRepository, $captureSubjectBinding, $articleResearch, $articlePreflightHandoff, $articleMedia): array {
                 $capture = $captureRepository->findByArticleId($state->postId);
                 if ($capture === null) return $callerEvidence;
                 if ($capture->articleId !== $state->postId) throw new \RuntimeException('CAPTURE_ARTICLE_BINDING_UNAVAILABLE');
-                $persistedSubject = is_array($capture->diagnostics['subjects'] ?? null) ? $capture->diagnostics['subjects'] : [];
-                if ($persistedSubject === []) $persistedSubject = is_array($capture->context['subject_resolution'] ?? null) ? $capture->context['subject_resolution'] : [];
+                $subjectPacket = $captureSubjectBinding->packet($capture);
+                $resolution = is_array($callerEvidence['subject_resolution_packet'] ?? null)
+                    ? $callerEvidence['subject_resolution_packet']
+                    : (is_array($callerEvidence['subject_resolution'] ?? null) ? $callerEvidence['subject_resolution'] : (is_array($callerEvidence['details']['subject_resolution'] ?? null) ? $callerEvidence['details']['subject_resolution'] : []));
+                if ($subjectPacket !== null) $persistedSubject = $subjectPacket->toResolution();
+                elseif ($resolution !== []) {
+                    $subjectPacket = \NHK\Core\Domain\Capture\SubjectResolutionPacket::fromArray($resolution);
+                    $persistedSubject = $subjectPacket?->toResolution() ?? [];
+                } else $persistedSubject = [];
                 $primary = is_array($persistedSubject['primary'] ?? null) ? $persistedSubject['primary'] : [];
                 if (trim((string) ($primary['id'] ?? '')) === '' || trim((string) ($primary['type'] ?? '')) === '') throw new \RuntimeException('CAPTURE_SUBJECT_BINDING_UNAVAILABLE');
                 $contentIntent = is_array($capture->context['content_intent'] ?? null) ? $capture->context['content_intent'] : [];
                 $composition = is_array($capture->diagnostics['composition'] ?? null) ? $capture->diagnostics['composition'] : [];
-                $subjectPacket = is_array($capture->context['subject_resolution_packet'] ?? null)
-                    ? $capture->context['subject_resolution_packet']
-                    : (is_array($capture->diagnostics['subject_resolution_packet'] ?? null) ? $capture->diagnostics['subject_resolution_packet'] : []);
+                $subjectPacketArray = $subjectPacket?->toArray() ?? [];
                 $captureMediaIds = array_values(array_unique(array_filter(array_map(static fn (mixed $asset): string => is_array($asset) ? trim((string) ($asset['media_id'] ?? '')) : '', $capture->assets))));
                 $mediaReadback = $articleMedia->diagnoseForPost($state->postId, [
-                    'subject_resolution_packet' => $subjectPacket,
+                    'subject_resolution_packet' => $subjectPacketArray,
                     'subject_resolution' => $persistedSubject,
                     'subject_ids' => [$primary['id']],
                     'capture_id' => $capture->captureId,
@@ -938,7 +944,7 @@ final class Plugin {
                     'excerpt' => $state->excerpt,
                     'body' => $state->content,
                     'content_intent' => $contentIntent,
-                    'subject_resolution_packet' => $subjectPacket,
+                    'subject_resolution_packet' => $subjectPacketArray,
                     'claim_trace' => is_array($composition['claim_trace'] ?? null) ? $composition['claim_trace'] : [],
                 ]);
                 $semanticWriteBack = is_array($capture->diagnostics['semantic_write_back'] ?? null) ? $capture->diagnostics['semantic_write_back'] : [];
@@ -951,6 +957,8 @@ final class Plugin {
                 // Article identity is already durable. Publication checks for a
                 // new public collision; it must not re-run creation-time intent.
                 $canonical['duplicate_intent_handled'] = true;
+                $canonical['capture_subject_binding_verified'] = $captureSubjectBinding->packet($capture) !== null;
+                $canonical['subject_resolution_packet'] = $subjectPacketArray;
                 $canonical['canonical_publication_context'] = [
                     'capture_id' => $capture->captureId,
                     'capture_revision' => $capture->revision,
@@ -974,7 +982,7 @@ final class Plugin {
             // One generic recovery boundary for existing Capture-owned Articles.
             // The orchestrator plans and bounds work; existing owner adapters
             // remain responsible for every durable mutation.
-            add_filter('nhk_v3_article_reconciliation_orchestrator', static function (mixed $current) use ($articleEditorial, $captureRepository, $articleMedia, $canonicalPublicationContext, $draftGateway, $editorialPosts, $graphService, $articleCoordinator, $authority, $types): mixed {
+            add_filter('nhk_v3_article_reconciliation_orchestrator', static function (mixed $current) use ($articleEditorial, $captureRepository, $articleMedia, $canonicalPublicationContext, $draftGateway, $editorialPosts, $graphService, $articleCoordinator, $authority, $types, $captureSubjectBinding): mixed {
                 if ($current instanceof \NHK\Core\Application\Article\ArticleReconciliationOrchestrator) return $current;
                 return new \NHK\Core\Application\Article\ArticleReconciliationOrchestrator(
                     static function (array $input) use ($articleEditorial, $captureRepository, $authority, $types): array {
@@ -999,12 +1007,28 @@ final class Plugin {
                     },
                     static fn (array $state): array => is_object($state['capture'] ?? null) && is_array($state['capture']->context['content_intent'] ?? null) ? $state['capture']->context['content_intent'] : ['intent' => 'TEXT_ARTICLE'],
                     static function (array $state): array {
-                        return is_array($state['subject_resolution_packet'] ?? null) ? $state['subject_resolution_packet'] : [];
+                        $candidates = [];
+                        if (is_array($state['subject_resolution_packet'] ?? null)) $candidates[] = $state['subject_resolution_packet'];
+                        if (is_array($state['subject_resolution'] ?? null)) $candidates[] = $state['subject_resolution'];
+                        if (is_array($state['research_subject']['exact'] ?? null)) {
+                            $exact = $state['research_subject']['exact'];
+                            $exact['id'] = (string) ($exact['id'] ?? '');
+                            $exact['type'] = (string) ($exact['type'] ?? $exact['entity_type'] ?? '');
+                            $candidates[] = ['status' => 'resolved', 'primary' => $exact, 'subjects' => [$exact], 'resolved' => [$exact], 'primary_source' => 'article_research_subject'];
+                        }
+                        $fallback = null;
+                        foreach ($candidates as $candidate) {
+                            $packet = \NHK\Core\Domain\Capture\SubjectResolutionPacket::fromArray($candidate);
+                            if ($packet === null) continue;
+                            $fallback ??= $packet;
+                            if ($packet->status === 'resolved') return $packet->toArray();
+                        }
+                        return $fallback?->toArray() ?? [];
                     },
                     static function (array $state) use ($canonicalPublicationContext, $articleMedia, $graphService): array {
                         $owner = $state['state'] ?? null;
                         if (!$owner instanceof \NHK\Core\Domain\Article\EditorialPostState) return ['diagnostics' => ['WP_POST_UNAVAILABLE']];
-                        $evidence = $canonicalPublicationContext($owner, []);
+                        $evidence = $canonicalPublicationContext($owner, ['subject_resolution_packet' => is_array($state['subject_packet'] ?? null) ? $state['subject_packet'] : []]);
                         $mediaContext = is_array($state['media_context'] ?? null) ? $state['media_context'] : [];
                         if (($state['desired_media'] ?? []) !== []) $mediaContext['article_media'] = $state['desired_media'];
                         if (($state['subject_resolution_packet'] ?? []) !== []) $mediaContext['subject_resolution_packet'] = $state['subject_resolution_packet'];
@@ -1025,11 +1049,14 @@ final class Plugin {
                         }
                         return ['diagnostics' => array_values(array_unique(array_merge($gate->blockers, $mediaDiagnostics, $relationDiagnostics))), 'evidence' => $evidence, 'state_token' => $owner->token, 'media' => $media, 'about_edges' => $aboutEdges];
                     },
-                    static function (array $state, array $actions) use ($articleMedia, $editorialPosts, $captureRepository, $articleCoordinator): array {
+                    static function (array $state, array $actions) use ($articleMedia, $editorialPosts, $captureRepository, $captureSubjectBinding, $articleCoordinator): array {
                         $postId = (int) ($state['post_id'] ?? 0);
                         $capture = $state['capture'] ?? null;
                         $packet = is_array($state['subject_packet'] ?? null) ? $state['subject_packet'] : [];
                         foreach ($actions as $action) {
+                            if ($action->action === 'RESOLVE_PRIMARY_SUBJECT' && $capture instanceof \NHK\Core\Domain\Capture\CaptureRecord && $packet !== []) {
+                                $capture = $captureSubjectBinding->persist($capture, $postId, $packet);
+                            }
                             if ($action->action === 'SUPERSEDE_SUBJECT_PACKET' && $capture instanceof \NHK\Core\Domain\Capture\CaptureRecord && $packet !== []) {
                                 $old = is_array($capture->context['subject_resolution_packet'] ?? null) ? $capture->context['subject_resolution_packet'] : [];
                                 $history = is_array($capture->context['subject_resolution_packet_history'] ?? null) ? $capture->context['subject_resolution_packet_history'] : [];

@@ -29,7 +29,7 @@ final class ArticlePublicationGate
         if ($draft->postId < 1 || $draft->slug === '' || $draft->permalink === '') $blockers[] = 'PUBLIC_ROUTE_NOT_READY';
         $this->requireTrue($evidence, 'research_acceptable', 'RESEARCH_PREFLIGHT_BLOCKED', $blockers);
         $this->requireTrue($evidence, 'subject_resolved', 'SUBJECT_UNRESOLVED', $blockers);
-        if (($evidence['subject_persistence_status'] ?? '') === 'unattached_planning_candidate') {
+        if (($evidence['subject_persistence_status'] ?? '') === 'unattached_planning_candidate' && ($evidence['capture_subject_binding_verified'] ?? false) !== true) {
             $this->replaceBlocker($blockers, 'SUBJECT_UNRESOLVED', 'SUBJECT_NOT_PERSISTED');
         }
         $this->requireTrue($evidence, 'duplicate_intent_handled', 'DUPLICATE_INTENT_UNRESOLVED', $blockers);

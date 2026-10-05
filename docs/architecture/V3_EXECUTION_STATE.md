@@ -22887,3 +22887,26 @@ database mutation, staging acceptance, lexical change, deployment or production
 operation was performed.
 
 STATUS: `CAPTURE_BOUND_SEMANTIC_STAGING_PAYLOAD_PARITY_FIXED / FOCUSED_UNIT_PASS / TEST_DEPLOYMENT_READY / NO_DATA_MUTATION`.
+
+# Checkpoint — 2026-10-05 — Capture-owned Article publication context recovery (LOCAL / TEST MCP RECONCILE PENDING)
+
+ROOT_CAUSE: MIXED Capture authority planning created the existing native Article
+without persisting the canonical subject-resolution handoff. Article preflight
+could still resolve Odo, but publication and reconcile context reconstruction
+accepted only persisted Capture subject state and therefore failed closed.
+
+FIX: The bounded Article reconciliation owner now carries the canonical resolved
+subject packet into inspection, persists it through a Capture-owned recovery
+adapter for the exact existing Article/Capture pair, reads it back canonically,
+and lets publication consume the verified Capture binding. Governance and the
+native editorial publication boundary remain unchanged; no schema, ontology,
+Graph relation or data mutation was performed.
+
+REGRESSION COVERAGE: MIXED Capture ownership, exact Odo UUID resolution,
+idempotent Capture packet persistence/read-back, reconcile recovery and owner
+publication review are covered by focused Unit tests. The focused slice passes
+33 tests / 128 assertions; PHP lint and `git diff --check` pass. TEST MCP
+reconcile remains pending external runtime execution. No production or TEST
+database mutation was performed.
+
+STATUS: `CAPTURE_ARTICLE_PUBLICATION_CONTEXT_FIXED / FOCUSED_UNIT_PASS / TEST_MCP_RECONCILE_PENDING / NO_DATA_MUTATION`.

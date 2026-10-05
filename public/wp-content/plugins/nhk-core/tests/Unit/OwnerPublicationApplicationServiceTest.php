@@ -25,6 +25,29 @@ final class OwnerPublicationApplicationServiceTest extends TestCase
         self::assertSame(0, $posts->publishCalls);
     }
 
+    public function test_review_with_recovered_capture_context_does_not_return_publication_context_unavailable(): void
+    {
+        $posts = new OwnerPublicationFakeStore();
+        $service = new OwnerPublicationApplicationService(
+            $posts,
+            new OwnerPublicationFakeDecisionRepository(),
+            static fn (PublicationPrincipal $principal): bool => true,
+            null,
+            null,
+            static function (EditorialPostState $state, array $evidence): array {
+                $evidence['capture_subject_binding_verified'] = true;
+                $evidence['subject_persistence_status'] = 'unattached_planning_candidate';
+                return $evidence;
+            },
+        );
+
+        $result = $service->review(1, $posts->rows[1]->token, ownerPublicationEvidence(), 'recovered-context', new PublicationPrincipal('owner-1', 'mcp', 'turn-context'));
+
+        self::assertNotSame('SYSTEM_BLOCKED', $result['outcome']);
+        self::assertNotContains('PUBLICATION_CONTEXT_UNAVAILABLE', $result['diagnostics'] ?? []);
+        self::assertSame(0, $posts->publishCalls);
+    }
+
     public function test_review_then_authenticated_approval_publishes_with_exceptions(): void
     {
         $posts = new OwnerPublicationFakeStore(); $decisions = new OwnerPublicationFakeDecisionRepository();

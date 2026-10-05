@@ -4,6 +4,9 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Article\{ArticleBatchReconciliation, ArticleReconciliationOrchestrator, ArticleRemediationPlanner};
+use NHK\Core\Application\Capture\CaptureSubjectBindingRecovery;
+use NHK\Core\Contracts\Capture\CaptureRepository;
+use NHK\Core\Domain\Capture\CaptureRecord;
 use PHPUnit\Framework\TestCase;
 
 final class ArticleReconciliationOrchestratorTest extends TestCase
@@ -107,5 +110,53 @@ final class ArticleReconciliationOrchestratorTest extends TestCase
         self::assertTrue($action['auto_repair_safe']);
         self::assertContains('capture-child-admission', $action['dependencies']);
         self::assertContains('governed-proposal', $action['dependencies']);
+    }
+
+    public function test_mixed_capture_subject_binding_recovery_clears_reconcile_and_publication_context_blockers(): void
+    {
+        $repository = new class implements CaptureRepository {
+            /** @var array<string,CaptureRecord> */
+            public array $records = [];
+            public function findByIdempotencyKey(string $key): ?CaptureRecord { foreach ($this->records as $record) if ($record->idempotencyKey === $key) return $record; return null; }
+            public function findById(string $captureId): ?CaptureRecord { return $this->records[$captureId] ?? null; }
+            public function create(CaptureRecord $record): CaptureRecord { return $this->records[$record->captureId] = $record; }
+            public function save(CaptureRecord $record): CaptureRecord { return $this->records[$record->captureId] = $record; }
+        };
+        $capture = new CaptureRecord('01a10bdb-918d-7c6d-a94e-0dd4baa5f391', 'mixed-odo', hash('sha256', 'mixed-odo'), 'AUTHORITY_PLANNED', 'PLANNED', 753, 'article-token', [], ['purpose' => 'MIXED']);
+        $repository->create($capture);
+        $resolution = ['status' => 'resolved', 'primary' => ['id' => 'd2af7739-3d1b-4666-ad0a-aeda0758f4d8', 'type' => 'brand', 'stable_key' => 'nhk:brand:odo', 'name' => 'Odo', 'revision' => 1, 'match' => 'uuid_exact'], 'primary_source' => 'canonical_uuid'];
+        $recovery = new CaptureSubjectBindingRecovery($repository);
+        $reviewCalls = 0;
+        $orchestrator = new ArticleReconciliationOrchestrator(
+            static fn (array $input): array => ['post_id' => 753, 'capture' => $repository->findById($capture->captureId), 'subject_resolution_packet' => $input['subject_resolution_packet']],
+            static fn (array $state): array => ['intent' => 'TEXT_ARTICLE'],
+            static fn (array $state): array => $state['subject_resolution_packet'],
+            static function (array $state) use ($repository, $capture): array {
+                $current = $repository->findById($capture->captureId);
+                return $current?->context['subject_resolution_packet'] ?? null
+                    ? ['diagnostics' => [], 'evidence' => ['capture_subject_binding_verified' => true]]
+                    : ['diagnostics' => ['SUBJECT_NOT_PERSISTED']];
+            },
+            static function (array $state, array $actions) use ($repository, $recovery, $capture): array {
+                self::assertSame('RESOLVE_PRIMARY_SUBJECT', $actions[0]->action);
+                $current = $repository->findById($capture->captureId);
+                $repaired = $recovery->persist($current, 753, $state['subject_packet']);
+                return ['capture' => $repaired, 'subject_resolution_packet' => $state['subject_packet']];
+            },
+            static function (array $state) use (&$reviewCalls): array {
+                $reviewCalls++;
+                self::assertNotContains('PUBLICATION_CONTEXT_UNAVAILABLE', $state['inspection']['diagnostics'] ?? []);
+                return ['outcome' => 'PASS'];
+            },
+            static fn (array $state): array => ['status' => 'not_requested'],
+            static fn (array $state): array => ['status' => 'verified'],
+        );
+
+        $result = $orchestrator->reconcile(['post_id' => 753, 'subject_resolution_packet' => $resolution]);
+
+        self::assertSame('PASS', $result['status']);
+        self::assertSame(1, $reviewCalls);
+        self::assertSame('d2af7739-3d1b-4666-ad0a-aeda0758f4d8', $repository->findById($capture->captureId)?->context['subject_resolution_packet']['canonical_subject_id']);
+        self::assertNotContains('CAPTURE_SUBJECT_BINDING_UNAVAILABLE', $result['review']['blockers'] ?? []);
     }
 }
