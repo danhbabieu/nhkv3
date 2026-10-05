@@ -23,6 +23,16 @@ because the local WordPress database is currently unavailable.
 `NOT ASSESSED` is intentionally not a parity claim. Mandatory red items block
 the final parity declaration.
 
+## Semantic acceptance closeout — 2026-10-05
+
+The separate Capture-bound semantic acceptance phase is closed as GO on the
+authorized TEST runtime at source revision
+`06a3cecd3f7bec11e9118ef77a795a669057c71a`. Source/Knowledge/Evidence
+proposal eligibility, governed apply/read-back, Graph relation lifecycle,
+idempotent replay and cleanup retirement passed. This does not convert the
+historical V2 parity inventory into a full parity declaration, does not claim
+production acceptance and does not claim `Côn hoa thị` canary completion.
+
 | AREA | V2 | V3 | MIGRATED? | TESTED? | PARITY STATUS | NOTES |
 |---|---|---|---|---|---|---|
 | Homepage | Read-only route/behavior inventory recorded | HomePageQuery-driven responsive WordPress editorial discovery surface | N/A | PARTIAL | IN PROGRESS | Featured/latest/category/topics plus real Authority/Media/Video modules; visitor-facing homepage document/OpenGraph title and description are branded for NHK, custom Authority/Knowledge/Media/Video/Comparison archives retain route-specific title/description/canonical metadata without technical-description leakage, the theme has one warm NHK token source with legacy CSS rules removed, homepage sections/topics now hide when their destination is missing or malformed, default `Uncategorized` presentation is localized to `Chưa phân loại`, public editorial dates use Vietnamese month labels with ISO machine timestamps, a fresh desktop sweep across 14 public routes found expected H1/title, no overflow and no internal terminology, 390px/768px route metrics are overflow-free, and field-level V2 behavior reconciliation remains |

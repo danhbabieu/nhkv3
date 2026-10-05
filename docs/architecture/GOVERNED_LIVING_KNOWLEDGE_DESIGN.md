@@ -253,6 +253,17 @@ Semantic apply remains `Proposal → Human Approval → Eligibility → Controll
 Apply → canonical repository → audit → read-back`. Same-intent repeats are
 idempotent and produce no duplicate claim, Evidence or relation.
 
+### Capture-bound semantic lifecycle — TEST verified 2026-10-05
+
+The authorized TEST runtime verified the Capture-bound Source/Knowledge/Evidence
+proposal path and its governed cleanup. The minimal proposal carries
+`payload.capture_id`; signed Capture fingerprint/revision metadata is persisted
+and derived by the server. The semantic relation path passed `ADD → READ →
+idempotent replay → RETIRE → READ → REACTIVATE → READ`, with
+`GraphRelationContext` read-back and the canonical provenance
+`EXPLICIT_USER_KNOWLEDGE`. This closes the semantic pending-acceptance phase
+for TEST only; it does not broaden scope or authorize production mutation.
+
 ## Universal MCP post-ingest reconciliation — 2026-09-09
 
 When Living Knowledge is reached through MCP ingest, completion requires the

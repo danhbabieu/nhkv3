@@ -510,6 +510,21 @@ current `documentation_checkpoint` containing the bootstrap's manifest hash and
 documentation version; a redeploy makes it stale and fails closed with
 `DOCUMENTATION_CHECKPOINT_STALE`.
 
+### TEST semantic acceptance closeout — 2026-10-05
+
+The authorized TEST MCP path is live-verified for the Capture-bound semantic
+workflow: proposal discovery, Source/Knowledge/Evidence proposal eligibility,
+controlled apply, canonical read-back, semantic relation preview/apply/read,
+exact idempotent replay and cleanup controlled retirement. Minimal semantic
+proposals carry `payload.capture_id`; persisted Capture fingerprint/revision
+metadata is server-derived and bound by the signed staging packet. This does
+not broaden the operator surface or authorize direct writers.
+
+The verified relation lifecycle was `ADD → READ → idempotent replay → RETIRE →
+READ → REACTIVATE → READ`, including GraphRelationContext read-back. TEST-only
+synthetic records and the relation were retired after verification. Production
+and `Côn hoa thị` were not touched.
+
 
 ### Storage & Reuse Map — 2026-09-04
 
@@ -566,7 +581,7 @@ availability; local HTTP wire smoke remains an environment check.
 | `nhk.semantic.resolve` | Authority context | READ | No | N/A | No raw edge | READY; ambiguity fails closed |
 | `nhk.article.preflight` | Existing WP Post + semantic bundle | READ | No | N/A | Registry/Graph read only | READY; reconcile preflight |
 | `nhk.article.ingest` | Article operation receipt + governed semantic delta | WRITE | Yes | Receipt + semantic revisions | Controlled Apply only | READY for reconcile; create/update fail closed |
-| `nhk.capture.ingest` | Editorial Capture + bounded semantic enrichment | WRITE | Yes | Capture revision + Article draft token when Article intent requires it | Bounded neighborhood read; relation writes remain governed | PR1 intent routing implemented; guarded runtime acceptance remains pending |
+| `nhk.capture.ingest` | Editorial Capture + bounded semantic enrichment | WRITE | Yes | Capture revision + Article draft token when Article intent requires it | Bounded neighborhood read; relation writes remain governed | Capture-bound semantic eligibility/apply/replay/cleanup verified on TEST; production remains unverified |
 | `nhk.entity.get` | Authority | READ | No | N/A | No raw edge | READY for registered type + UUID |
 | `nhk.media.get` | Media + public assets + active MediaUsage read-back | READ | No | N/A | No raw edge | READY for active ready Media/public assets |
 | `nhk.media.binding.get` | Durable Media binding receipt | READ | No | N/A | No raw edge | READY; operation ID or idempotency key |

@@ -96,6 +96,22 @@ semantic Claim/Source/Evidence/Graph state still requires its normal Proposal,
 Governance and eligibility gates. No visual binding may be exposed as Evidence
 or Claim merely because its suitability review passed.
 
+## Capture-bound semantic eligibility parity — TEST verified 2026-10-05
+
+For staging `Source`, `Knowledge` and `Evidence` proposals, the client payload
+is intentionally minimal and carries `payload.capture_id`. The persisted
+Capture supplies the fingerprint and revision metadata used by the server-issued
+signed staging packet; callers must not duplicate or invent that authorization
+metadata. Eligibility and Controlled Apply use the same exact Capture-bound
+scope, dependency closure, capability, revision, expiry and idempotency checks.
+
+The authorized TEST acceptance verified proposal discovery, eligibility,
+controlled apply, canonical read-back and cleanup retirement. Source/Evidence
+retire operations use `source_evidence_reconciliation`; Knowledge retire uses
+`knowledge_delta`. These operation families remain governed and fail closed
+outside their admitted scope. No direct writer, generic WordPress writer,
+direct database write or Governance bypass is authorized.
+
 ### Phase 1 policy-owner clarification — 2026-09-21
 
 Governance policy/services own semantic legality, approvals, materiality,

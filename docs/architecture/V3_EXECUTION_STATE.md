@@ -27,7 +27,14 @@ assertions; the dictionary catalog selection passes 5 tests / 114 assertions.
 `git diff --check` passes. No migration, fixture mutation, deployment or
 production operation was performed.
 
-STATUS: `FINAL_BLOCKER_LEXICAL_MCP_READ_FIXED_SEMANTIC_FIXTURE_PATH_GUARDED / FOCUSED_GREEN / LIVE_ACCEPTANCE_PENDING`
+STATUS: `FINAL_BLOCKER_LEXICAL_MCP_READ_FIXED_SEMANTIC_FIXTURE_PATH_GUARDED / FOCUSED_GREEN / LIVE_ACCEPTANCE_SUPERSEDED_BY_TEST_GO`
+
+SUPERSEDING STATUS: The bounded TEST acceptance described by the final
+2026-10-05 checkpoint below passed proposal discovery, eligibility, controlled
+apply/read-back, semantic relation preview/apply/read, idempotent replay and
+cleanup retirement. The lexical connector schema is refreshed and no known
+lexical server-code blocker remains; lexical lifecycle acceptance was not
+rerun. Production and `Côn hoa thị` remain untouched.
 
 ## Checkpoint — 2026-10-05 — Phase 3B runtime acceptance gaps fixed locally
 
@@ -22934,3 +22941,51 @@ regressions are covered by the focused Unit slice. Focused validation passes
 pending. No TEST or production database mutation was performed.
 
 STATUS: `HISTORICAL_CAPTURE_SUBJECT_RECOVERY_FIXED / FOCUSED_UNIT_PASS / TEST_MCP_RETRY_PENDING / NO_DATA_MUTATION`.
+
+# Checkpoint — 2026-10-05 — Capture-bound semantic acceptance closed (TEST / GO)
+
+RUNTIME: The authorized TEST runtime was verified as `environment=staging`,
+site `https://demo.1945.vn`, semantic write policy `PROJECT_BUILD`, deployed
+`source_revision=06a3cecd3f7bec11e9118ef77a795a669057c71a`.
+
+STATUS: `SEMANTIC_PENDING_ACCEPTANCE_GO / SEMANTIC_LIFECYCLE_PASS /
+GRAPH_RELATION_CONTEXT_PASS / IDEMPOTENT_REPLAY_PASS /
+SYNTHETIC_CLEANUP_COMPLETE / LEXICAL_CONNECTOR_SCHEMA_REFRESHED /
+NO_KNOWN_LEXICAL_SERVER_CODE_BLOCKER / READY_FOR_CON_HOA_THI_CANARY_PLAN`.
+
+CAPTURE_BOUND_ELIGIBILITY: Synthetic Capture-bound Source, Knowledge and
+Evidence proposals were approved and all returned `ready=true` through TEST.
+Minimal proposals carried only `payload.capture_id`; persisted Capture
+fingerprint/revision values were server-derived authorization metadata. The
+accepted path returned none of `STAGING_SCOPE_REQUIRED`,
+`STAGING_CAPTURE_REQUIRED`, `STAGING_DEPENDENCY_SCOPE_MISMATCH` or
+`STAGING_SCOPE_NOT_ADMITTED`.
+
+GRAPH_RELATION_LIFECYCLE: Edge
+`01a10be1-9c72-7480-82ad-ba3511bb2c59` and GraphRelationContext
+`01a10be1-9c75-72a2-ba69-2db7f74bcbf8` passed `ADD → canonical READ → exact
+idempotent replay → RETIRE → canonical READ → REACTIVATE → canonical READ`.
+Replay returned `idempotent_replay=true`; final cleanup left both retired at
+revision `4`. Valid provenance was `EXPLICIT_USER_KNOWLEDGE`; no
+`SYNTHETIC_TEST_ONLY` enum was introduced.
+
+CLEANUP: Bootstrap Source `01a10bdd-597c-79ec-bebb-b810500418b9`, bootstrap
+Knowledge `01a10bdd-6a87-7101-acee-de5051ce49ad`, final Source
+`01a10bdf-15fc-78dc-af17-d4463cdb0fd9`, final Knowledge
+`01a10bdf-26ea-7d15-86b3-f7d8972d001e` and final Evidence
+`01a10bdf-38c4-74d9-99d0-b9801fa07e2e` were cleanup-retired at revision `2`.
+The pre-existing Capture and Movement `01a10a73-942f-7218-8655-73dc22b4fafb`
+were not deleted or retired, and audit/proposal history was not deleted.
+
+MCP/LEXICAL: TEST MCP verified proposal discovery, eligibility, controlled
+apply, semantic relation preview/apply/read, idempotent replay and cleanup
+retirement. The refreshed connector exposes `relation_uuid` and
+`idempotency_key` for lexical relation read, and `relation_uuid` and
+`expected_revision` for preview. Lexical lifecycle acceptance was not rerun;
+the known lexical server-code blocker is closed.
+
+BOUNDARIES: Production and `Côn hoa thị` were not touched. No deployment,
+migration, schema change, generic WordPress writer, direct database write,
+Governance bypass or lexical runtime-code change was part of this closeout.
+`READY_FOR_CON_HOA_THI_CANARY_PLAN` is planning readiness only, not canary
+completion or production authorization.

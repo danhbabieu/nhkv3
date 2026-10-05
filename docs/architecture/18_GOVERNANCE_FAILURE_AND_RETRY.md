@@ -35,6 +35,20 @@ proposal whose subject binding does not carry the canonical source UUID is
 invalid and must be rejected before apply; it must not be diagnosed as merge
 unavailability or allowed to mutate the source or target.
 
+## Capture-bound semantic acceptance closeout — TEST 2026-10-05
+
+The Capture-bound Source/Knowledge/Evidence staging path is live-verified on
+TEST. Minimal proposals carry `payload.capture_id`; Capture fingerprint and
+revision are persisted/server-derived scope metadata. Proposal eligibility,
+Controlled Apply, canonical read-back, exact idempotent replay and cleanup
+retirement all passed under the signed exact packet. Source/Evidence retire is
+bound to `source_evidence_reconciliation`; Knowledge retire is bound to
+`knowledge_delta`.
+
+This closes the prior eligibility-parity gap for the accepted TEST path. It
+does not authorize production semantic apply, a direct writer, deletion of
+audit/proposal history or a Côn hoa thị operation.
+
 ## Reconciliation, suitability and recovery boundary — 2026-09-19
 
 Reconciliation is a bounded read/plan/verify operation, not a generic repair

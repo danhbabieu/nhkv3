@@ -153,6 +153,20 @@ provenance class: `OBSERVED_FROM_MEDIA`, `EXPLICIT_USER_KNOWLEDGE`,
 image observation stay scoped to their subject/facet and cannot become a
 universal fact without supporting Source/Evidence of the same scope.
 
+## Capture-bound semantic acceptance — TEST verified 2026-10-05
+
+Capture-bound Source, Knowledge and Evidence proposal eligibility and the
+cleanup lifecycle are live-verified on the authorized TEST runtime. Minimal
+proposals carry `payload.capture_id`; Capture fingerprint/revision values are
+persisted and server-derived for the signed staging scope. The accepted path
+passed proposal discovery, `ready=true` eligibility, controlled apply,
+canonical read-back and retirement without a direct writer bypass. Source and
+Evidence retirement uses `source_evidence_reconciliation`; Knowledge
+retirement uses `knowledge_delta`.
+
+This is TEST acceptance evidence only. Production was not touched, and the
+pre-existing synthetic Capture/Movement were not deleted or retired.
+
 ## Editorial Capture Claim reuse — 2026-09-09
 
 Editorial Capture reuses the same canonical Knowledge owner rather than creating

@@ -245,6 +245,22 @@ The binding receipt stages are `VALIDATE`, `RESOLVE_MEDIA`, `RESOLVE_TARGET`,
 `PROJECTION_INVALIDATE`, `FINAL_READBACK`, and `COMPLETE`; retries never create a
 second Usage for the same idempotent request.
 
+## Capture-bound semantic acceptance closeout — TEST 2026-10-05
+
+The authorized TEST control-plane path verified Source/Knowledge/Evidence
+proposal discovery, eligibility, controlled apply and canonical read-back.
+Minimal proposals carry `payload.capture_id`; Capture fingerprint/revision
+authorization metadata is persisted and derived server-side in the signed
+exact staging packet. Source/Evidence retirement is bound to
+`source_evidence_reconciliation`, while Knowledge retirement is bound to
+`knowledge_delta`. Direct writers and Governance bypasses remain forbidden.
+
+The governed Graph relation path also passed preview/apply/read, exact
+idempotent replay and the `ADD → READ → RETIRE → READ → REACTIVATE → READ`
+lifecycle with GraphRelationContext read-back. Cleanup retirement completed for
+all acceptance-created synthetic records. This is TEST evidence only; no
+production or `Côn hoa thị` operation ran.
+
 ### Universal representative target URL — 2026-09-26
 
 Capture may normalize the registered Vietnamese command `Dùng ảnh <Media URL>
@@ -671,3 +687,8 @@ The current runtime capability remains unchanged by this documentation
 checkpoint. `RUNTIME_REGISTERED`, `TOOLS_LIST_EXPOSED`,
 `CONNECTOR_DISCOVERABLE`, `CALLABLE_DISPATCHED` and successful execution must
 continue to be reported separately.
+
+The lexical connector schema refresh is visible live for
+`nhk.dictionary.lexical_relation.read` (`relation_uuid`, `idempotency_key`) and
+`.preview` (`relation_uuid`, `expected_revision`). No known lexical server-code
+blocker remains; lexical lifecycle acceptance was not rerun.

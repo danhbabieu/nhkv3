@@ -9,6 +9,43 @@
 > If anything here conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`,
 > the Constitution controls.
 
+## 0.0.6 Semantic acceptance closeout — 2026-10-05
+
+The Capture-bound semantic staging acceptance is closed as **GO** on the
+authorized TEST runtime (`staging`, `https://demo.1945.vn`) at deployed
+`source_revision=06a3cecd3f7bec11e9118ef77a795a669057c71a` with
+`semantic_write_policy=PROJECT_BUILD`. Minimal Source, Knowledge and Evidence
+proposals carrying only `payload.capture_id` reached `ready=true`; persisted
+Capture fingerprint/revision values remained server-derived authorization
+metadata. The prior staging-scope failure vocabulary was not returned on the
+accepted path.
+
+The governed semantic relation lifecycle was live-verified for `ADD → READ →
+idempotent replay → RETIRE → READ → REACTIVATE → READ`, including its
+`GraphRelationContext` read-back. The accepted context provenance was
+`EXPLICIT_USER_KNOWLEDGE`, an existing canonical registry value. The synthetic
+edge, context and all acceptance-created Source/Knowledge/Evidence records were
+retired after verification; the pre-existing synthetic Capture and Movement
+were not deleted, retired or otherwise modified beyond the allowed relation
+target use. No audit/proposal history was deleted.
+
+The live TEST MCP path verified proposal discovery, eligibility, controlled
+apply, semantic relation preview/apply/read, idempotent replay and cleanup
+retirement. The connector schema refresh is visible for lexical relation read
+(`relation_uuid`, `idempotency_key`) and preview (`relation_uuid`,
+`expected_revision`); no lexical lifecycle was rerun, and no known lexical
+server-code blocker remains. Production and `Côn hoa thị` were not touched.
+
+Current semantic phase:
+
+`SEMANTIC_PENDING_ACCEPTANCE_GO / SEMANTIC_LIFECYCLE_PASS /
+GRAPH_RELATION_CONTEXT_PASS / IDEMPOTENT_REPLAY_PASS /
+SYNTHETIC_CLEANUP_COMPLETE / LEXICAL_CONNECTOR_SCHEMA_REFRESHED /
+NO_KNOWN_LEXICAL_SERVER_CODE_BLOCKER`
+
+Next planning state: `READY_FOR_CON_HOA_THI_CANARY_PLAN`. This is planning
+readiness only; it is not a canary, production or production-rollout GO.
+
 ## 0.0.1 Pre-master readiness — 2026-09-14
 
 The runtime documentation registry and immutable snapshot include all
@@ -120,6 +157,11 @@ subject-review gate prevented durable Candidate persistence. Treat this as a
 runtime gap to close, not as permission to discard lexical observations. Exact
 receipt is recorded in `V3_EXECUTION_STATE.md`.
 
+The later 2026-10-05 acceptance refreshed the connector schema and closed the
+known lexical server-code blocker. The lexical lifecycle itself was not rerun;
+the earlier probe remains historical evidence for that unrerun lifecycle and
+must not be read as a current connector-schema failure.
+
 ## 0.1 Governed Conversational Authority — 2026-09-11
 
 The current Capture boundary now has typed purposes `EDITORIAL`, `AUTHORITY`
@@ -147,7 +189,7 @@ policy and effective Governance state. Changed dependencies require
 `PLAN_REAPPROVAL_REQUIRED` before Proposal creation. The existing Governance
 queue and Controlled Apply remain the only semantic mutation owners.
 
-## 0.2 Runtime semantic-write policy — 2026-09-13
+## 0.2 Runtime semantic-write policy — 2026-09-13; TEST acceptance reaffirmed 2026-10-05
 
 The canonical operator route now resolves `READ_ONLY`, `PROJECT_BUILD` or
 `LOCKED_OPERATIONAL` from runtime configuration. Missing/invalid configuration
@@ -155,8 +197,10 @@ fails closed to `READ_ONLY`; production always rejects Project Build. The
 `PROJECT_BUILD` capability is `nhk_project_build_semantic` and only admits
 canonical Capture Authority planning; existing Governance capabilities remain
 independent. Project Build does not bypass Governance or expose compatibility
-writers. Current implementation is code/test-side only; staging has not been
-enabled and no semantic mutation has been performed.
+writers. The bounded TEST semantic acceptance subsequently exercised the
+Capture-bound Source/Knowledge/Evidence and relation Governance paths under
+the signed, exact server-issued scope. Production remains fail-closed and
+unchanged; no direct writer bypass is permitted.
 
 ## 0.3 Isolated V3 snapshot recovery — 2026-09-12
 

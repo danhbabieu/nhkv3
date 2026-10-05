@@ -204,15 +204,21 @@ MediaUsage binding says only that a Media is suitable to illustrate that
 feature in context. It does not assert `depicts`, `about`, Evidence or Claim,
 and it cannot broaden a specimen-scoped observation to a parent node.
 
-## Planned relation-context extension — 2026-10-05
+## GraphRelationContext lifecycle — TEST verified 2026-10-05
 
-The current edge remains identity/lifecycle-only. A future additive Graph-owned
-relation-context boundary, keyed uniquely by `edge_uuid`, will persist only
-source/target revisions, scope code, provenance class, canonical Evidence UUID
-references, approval/idempotency fingerprints and context lifecycle metadata.
-It will not copy target payload and will be transactionally bound to governed
-edge ADD/REPLACE/RETIRE/REACTIVATE. This is a planned schema/code seam, not a
-current runtime capability or migration authorization.
+The additive Graph-owned relation-context boundary is live-verified on the
+authorized TEST runtime for a governed semantic edge. It is keyed uniquely by
+`edge_uuid` and persists only source/target revisions, scope code, provenance
+class, canonical Evidence UUID references, approval/idempotency fingerprints
+and context lifecycle metadata. It does not copy target payload and remains
+transactionally bound to governed edge ADD/RETIRE/REACTIVATE.
+
+The verified lifecycle was `ADD → canonical READ → exact idempotent replay →
+RETIRE → canonical READ → REACTIVATE → canonical READ`, followed by cleanup
+retirement. The valid test provenance was `EXPLICIT_USER_KNOWLEDGE`; no
+`SYNTHETIC_TEST_ONLY` provenance enum exists. Broader predicate/facet exposure
+remains bounded by the existing registry and the Dictionary semantic-enrichment
+contract.
 
 The only approved new semantic predicate design is the bounded
 `associated_with` contract. Its whitelist, evidence/provenance/scope rules and

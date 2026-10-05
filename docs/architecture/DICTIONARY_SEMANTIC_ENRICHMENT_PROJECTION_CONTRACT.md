@@ -492,6 +492,21 @@ Implementation may begin only after:
 
 This contract authorizes none of the above runtime changes by itself.
 
+## 16.1 TEST semantic pending lifecycle verification — 2026-10-05
+
+The bounded semantic pending lifecycle is now live-verified on the authorized
+TEST runtime through the existing registered Governance path. Verification
+covered relation proposal discovery, eligibility, controlled apply, canonical
+read-back, exact idempotent replay, retirement, reactivation and final
+cleanup-retirement, including the GraphRelationContext lifecycle. The valid
+context provenance was `EXPLICIT_USER_KNOWLEDGE`.
+
+This closes the prior semantic pending-acceptance status for TEST only. It does
+not claim that the full Dictionary semantic-enrichment design is implemented,
+does not authorize migration or production/canary mutation, and does not claim
+lexical lifecycle acceptance. The existing registry, scope, provenance,
+Evidence, revision, idempotency and Governance boundaries remain mandatory.
+
 ## 17. Required implementation test plan
 
 ### Contract and registry tests

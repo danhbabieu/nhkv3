@@ -2,8 +2,19 @@
 
 > Operational release evidence only. This file does not amend the
 > Constitution, ACTIVE contracts, or the closed architectural program.
-> No deployment, public-identity reprojection, proposal apply or live data
-> mutation was performed by this workstream.
+> No deployment, public-identity reprojection or production data mutation was
+> performed by this release/cutover workstream. The separate bounded TEST
+> semantic acceptance closeout is recorded below and in `V3_EXECUTION_STATE.md`.
+
+## Semantic acceptance closeout — 2026-10-05
+
+The Capture-bound semantic acceptance is `GO` on TEST at deployed source
+revision `06a3cecd3f7bec11e9118ef77a795a669057c71a` under
+`PROJECT_BUILD`. Proposal discovery, eligibility, controlled apply, canonical
+read-back, semantic relation preview/apply/read, exact idempotent replay and
+cleanup retirement were verified. This closes only the semantic acceptance
+subphase; it is not production acceptance, a canary result or production
+rollout authorization.
 
 ## Intended release package
 

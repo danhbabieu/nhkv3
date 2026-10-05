@@ -301,7 +301,7 @@ owner, it may persist the Candidate with Capture/source provenance and defer the
 Mention. It must not create a fake Article or Knowledge record simply to host a
 lexical occurrence.
 
-**CURRENT RUNTIME GAP (2026-10-04):** a live Human/Chat acceptance probe
+**HISTORICAL RUNTIME GAP (2026-10-04):** a live Human/Chat acceptance probe
 identified qualified Dictionary delta candidates such as `côn hoa thị` and
 reused existing Junghans / wall-clock identities, but the
 `KNOWLEDGE_DELTA` Capture stopped at `SUBJECT_CONFLICT_REVIEW_REQUIRED`.
@@ -310,6 +310,19 @@ The attempted subject continuation returned
 Dictionary Candidate was added. This is an implementation gap against the law
 above, not desired behavior. See `V3_EXECUTION_STATE.md` for the runtime
 receipt.
+
+## Connector schema closeout — TEST verified 2026-10-05
+
+The live connector schema is refreshed and exposes the registered lexical
+relation fields:
+
+- `nhk.dictionary.lexical_relation.read`: `relation_uuid`, `idempotency_key`;
+- `nhk.dictionary.lexical_relation.preview`: `relation_uuid`,
+  `expected_revision`.
+
+No known lexical server-code blocker remains. Lexical lifecycle acceptance was
+not rerun as part of this closeout; this section records schema exposure and
+server-code status only, not a lexical lifecycle pass.
 
 ## 4. Resolution order
 
