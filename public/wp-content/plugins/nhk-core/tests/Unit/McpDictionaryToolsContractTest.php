@@ -35,6 +35,15 @@ final class McpDictionaryToolsContractTest extends TestCase
         self::assertSame(['plan', 'approved_plan_fingerprint', 'idempotency_key'], $tools['nhk.dictionary.materialization.apply']['inputSchema']['required']);
     }
 
+    public function test_lexical_relation_read_exposes_only_the_canonical_governance_read_keys(): void
+    {
+        $tool = array_column(McpToolCatalog::tools(), null, 'name')['nhk.dictionary.lexical-relation.read'];
+        self::assertSame(['relation_uuid', 'idempotency_key'], array_keys($tool['inputSchema']['properties']));
+        self::assertSame([], $tool['inputSchema']['required']);
+        self::assertArrayNotHasKey('entry_id', $tool['inputSchema']['properties']);
+        self::assertTrue(McpDispatchRegistry::hasHandler('nhk.dictionary.lexical-relation.read'));
+    }
+
     public function test_materialization_catalog_manifest_ability_and_policy_layers_cannot_drift(): void
     {
         $tools = array_column(McpToolCatalog::tools(), null, 'name');

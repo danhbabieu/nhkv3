@@ -1,5 +1,34 @@
 # NHK V3 Execution State
 
+## Checkpoint — 2026-10-05 — Final blocker closure: lexical MCP read parity / semantic fixture boundary
+
+ROOT_CAUSE: `nhk.dictionary.lexical-relation.read` advertised `entry_id`, but
+`DictionaryLexicalRelationGovernanceAdapter::read()` resolves only by
+`relation_uuid` and then `idempotency_key`. The MCP handler already forwarded
+its input unchanged, so the defect was catalog/schema parity rather than
+lexical storage or handler logic.
+
+IMPLEMENTATION: Replaced the misleading lexical read catalog field with
+`relation_uuid` and `idempotency_key`. Added a contract regression for the
+catalog/dispatch shape and an apply → separate MCP-handler read regression that
+proves lookup by both canonical selectors.
+
+SEMANTIC RUNTIME BOUNDARY: No fixture-specific production MCP writer was added.
+The guarded TEST-runtime acceptance path reuses the existing MCP
+`source.ingest`, `knowledge.ingest`, `evidence.ingest`, semantic relation
+preview/apply/read and proposal lifecycle tools. The existing
+`SemanticRelationFixtureIntegrationTest` remains the synthetic Source/Claim/
+Evidence setup/cleanup reference; exact runtime identity remains enforced by
+`TestDatabaseGuard`/`TestRuntimeIdentityPolicy`. Production exposes no fixture
+mutation shortcut and no schema or storage change was made.
+
+VALIDATION: Lexical MCP contract/regression selection passes 2 tests / 10
+assertions; the dictionary catalog selection passes 5 tests / 114 assertions.
+`git diff --check` passes. No migration, fixture mutation, deployment or
+production operation was performed.
+
+STATUS: `FINAL_BLOCKER_LEXICAL_MCP_READ_FIXED_SEMANTIC_FIXTURE_PATH_GUARDED / FOCUSED_GREEN / LIVE_ACCEPTANCE_PENDING`
+
 ## Checkpoint — 2026-10-05 — Phase 3B runtime acceptance gaps fixed locally
 
 ROOT_CAUSES: Lexical Governance apply used an in-memory fallback when its
