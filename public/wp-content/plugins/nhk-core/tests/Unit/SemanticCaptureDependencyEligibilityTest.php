@@ -122,12 +122,58 @@ final class SemanticCaptureDependencyEligibilityTest extends TestCase
         self::assertSame('TEST_RUNTIME_DATABASE_MISMATCH', $decision['reason']);
     }
 
+    public function test_wrong_expected_revision_remains_fail_closed_for_retirement(): void
+    {
+        [, $proposal, $scope, $verifier] = $this->retirementFixture('source');
+        $wrong = new Proposal(
+            $proposal->id,
+            $proposal->subjectId,
+            $proposal->operation,
+            $proposal->payload,
+            $proposal->contentFingerprint,
+            2,
+            $proposal->dependencyFingerprint,
+            $proposal->state,
+            idempotencyKey: $proposal->idempotencyKey,
+            targetUuid: $proposal->targetUuid,
+            entityType: $proposal->entityType,
+        );
+
+        self::assertSame('STAGING_DEPENDENCY_SCOPE_MISMATCH', $verifier->proposalFailureReason($scope, $wrong));
+    }
+
+    /** @dataProvider retirementTypeProvider */
+    public function test_minimal_capture_bound_retirement_proposals_are_admitted_and_eligible(string $entityType, string $expectedFamily): void
+    {
+        [$capture, $proposal, $scope, $verifier] = $this->retirementFixture($entityType);
+        $result = $this->eligibility($proposal, $verifier, static fn (): CaptureRecord => $capture)->check($proposal->id);
+
+        self::assertSame(['capture_id'], array_keys($proposal->payload));
+        self::assertSame($proposal->subjectId, $scope['subject_id']);
+        self::assertSame(1, $scope['expected_revision']);
+        self::assertSame($expectedFamily, $scope['operation_family']);
+        self::assertTrue($result->ready, json_encode($result->reasons, JSON_THROW_ON_ERROR));
+        self::assertNotContains('STAGING_SCOPE_NOT_ADMITTED', $result->reasons);
+        self::assertNotContains('STAGING_SCOPE_REQUIRED', $result->reasons);
+        self::assertNotContains('STAGING_CAPTURE_REQUIRED', $result->reasons);
+        self::assertSame([], $result->reasons);
+        self::assertNull($verifier->proposalFailureReason($scope, $proposal));
+    }
+
     /** @return iterable<string,array{0:string}> */
     public static function dependencyTypeProvider(): iterable
     {
         yield 'source' => ['source'];
         yield 'knowledge' => ['knowledge'];
         yield 'evidence' => ['evidence'];
+    }
+
+    /** @return iterable<string,array{0:string,1:string}> */
+    public static function retirementTypeProvider(): iterable
+    {
+        yield 'source' => ['source', 'source_evidence_reconciliation'];
+        yield 'evidence' => ['evidence', 'source_evidence_reconciliation'];
+        yield 'knowledge' => ['knowledge', 'knowledge_delta'];
     }
 
     /** @return array{0:CaptureRecord,1:Proposal,2:array<string,mixed>,3:StagingAcceptanceScopeVerifier} */
@@ -172,6 +218,56 @@ final class SemanticCaptureDependencyEligibilityTest extends TestCase
             'semantic-dependency',
             ProposalState::APPROVED,
             idempotencyKey: $plan['idempotency_key'],
+            entityType: $entityType,
+        );
+
+        return [$capture, $proposal, $scope, $verifier];
+    }
+
+    /** @return array{0:CaptureRecord,1:Proposal,2:array<string,mixed>,3:StagingAcceptanceScopeVerifier} */
+    private function retirementFixture(string $entityType): array
+    {
+        $captureId = UuidCodec::newV7();
+        $subjectId = UuidCodec::newV7();
+        $capture = new CaptureRecord(
+            $captureId,
+            'semantic-retirement-' . $entityType,
+            hash('sha256', 'capture-retirement-' . $entityType),
+            'SEMANTICS_RECONCILED',
+            'IN_PROGRESS',
+            context: ['content_intent' => ['intent' => 'KNOWLEDGE_DELTA']],
+            revision: 7,
+        );
+        $payload = ['capture_id' => $captureId];
+        $plan = [
+            'entity_type' => $entityType,
+            'operation' => 'retire',
+            'subject_id' => $subjectId,
+            'expected_revision' => 1,
+            'idempotency_key' => 'semantic-retirement-' . $entityType . '-' . $captureId,
+            'payload' => $payload,
+        ];
+        $admission = new CaptureDependencyStagingAdmission();
+        $verifier = new StagingAcceptanceScopeVerifier(
+            static fn (): string => 'staging',
+            'test-secret',
+            static function (array $scope, CaptureRecord $record, array $input, array $assets) use ($admission): bool {
+                return $admission(false, $scope, $record, $input, $assets);
+            },
+            can: static fn (): bool => true,
+        );
+        $scope = $verifier->issueForCaptureDependencyPlan($capture, $plan);
+        $proposal = new Proposal(
+            UuidCodec::newV7(),
+            $subjectId,
+            'retire',
+            $payload,
+            'semantic-retirement-content',
+            1,
+            'semantic-retirement-dependency',
+            ProposalState::APPROVED,
+            idempotencyKey: $plan['idempotency_key'],
+            targetUuid: $subjectId,
             entityType: $entityType,
         );
 
