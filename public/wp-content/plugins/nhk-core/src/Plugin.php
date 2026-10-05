@@ -1991,7 +1991,47 @@ final class Plugin {
                 new EditorialQualityGate(),
             );
             $knowledgeQualityAuditHandler = new \NHK\Core\Application\Mcp\KnowledgeQualityAuditHandler($knowledgeQualityAudit);
-            (new McpApi(new McpTransport($mcpRead, $mcpGovernance, static fn (string $capability): bool => current_user_can($capability), static fn (string $value): bool => in_array($value, $allowedOrigins, true), $articleHandler, $videoIntake, $wordpressAttachments, $categoryGateway, $draftGateway, new CanonicalDependencyValidator($claims, $sources, $evidence), $publicUrlMaintenance, $mediaBatchUpload, $documentation, $capture, $captureContinuation, $authorityCapture, static function (): bool { return (new MigrationStatus())->runtimeSchemaReady(); }, $imageIngest, semanticWritePolicy: $semanticWritePolicy, mediaBinding: $mediaBindingService, videoSourceRefresh: $videoSourceRefresh, knowledgeRepairPreview: $knowledgeRepairPreview, videoFrontendReconciliation: $videoFrontendReconciliation, knowledgeWriterPreview: $knowledgeWriterPreview, knowledgeQualityAudit: $knowledgeQualityAuditHandler, dictionarySeedAudit: $dictionarySeedAuditHandler, mediaTargetNormalizer: new \NHK\Core\Application\Media\MediaTargetNormalizer($endpoints, $types, $authority), mediaIntentCompiler: new MediaEnrichmentIntentCompiler($mediaBindingService, $usages, new MediaTargetNormalizer($endpoints, $types, $authority), new WordPressMediaTargetUrlResolver($publicRoutes, historicRoutes: new HistoricPublicRouteService($publicIdentityRepository))), dictionary: $dictionaryRuntime !== null ? new McpDictionaryHandler($dictionaryRuntime) : null), $recoveryBinding))->register();
+            $semanticRelationGovernance = null;
+            $lexicalRelationGovernance = null;
+            if ($dictionaryRuntime !== null) {
+                $semanticRegistry = new \NHK\Core\Application\Graph\SemanticEnrichmentRelationRegistry();
+                $semanticEndpointState = static function (string $type, string $id) use ($relationIntentEndpointState): array {
+                    $state = $relationIntentEndpointState(new \NHK\Core\Domain\Graph\NodeReference($type, $id));
+                    return is_array($state) ? ['exists' => true] + $state : ['exists' => false];
+                };
+                $semanticRelationGovernance = new \NHK\Core\Application\Graph\SemanticRelationGovernanceAdapter(
+                    $semanticRegistry->version(),
+                    $semanticRegistry->hash(),
+                    $semanticEndpointState,
+                    $relationState,
+                    $graphService,
+                    new \NHK\Core\Infrastructure\Graph\WpdbGraphRelationContextRepository($wpdb),
+                    new \NHK\Core\Infrastructure\Database\WpdbTransactionManager($wpdb),
+                    static function (array $result) use ($wpdb): void {
+                        $edgeUuid = trim((string) ($result['edge'] ?? ''));
+                        if ($edgeUuid === '') return;
+                        (new \NHK\Core\Application\Projection\ProjectionInvalidationService(new \NHK\Core\Infrastructure\Projection\WpdbProjectionDependencyIndex($wpdb), new \NHK\Core\Infrastructure\Projection\WpdbProjectionRevisionStore($wpdb)))->invalidateRelation($edgeUuid);
+                    },
+                );
+                $entryState = static function (string $entryId) use ($dictionaryRuntime): ?array {
+                    $entry = $dictionaryRuntime->entries()->findById($entryId);
+                    return $entry === null ? null : ['active' => $entry->status !== \NHK\Core\Domain\Dictionary\DictionaryConcept::RETIRED, 'revision' => $entry->revision];
+                };
+                $senseBelongs = static function (string $entryId, string $senseId) use ($dictionaryRuntime): bool {
+                    $entry = $dictionaryRuntime->entries()->findById($entryId);
+                    if ($entry === null) return false;
+                    foreach ($dictionaryRuntime->entries()->listSenses($entry) as $sense) if ($sense->conceptId === $senseId) return true;
+                    return false;
+                };
+                $lexicalRelationGovernance = new \NHK\Core\Application\Dictionary\DictionaryLexicalRelationGovernanceAdapter(
+                    new \NHK\Core\Infrastructure\Dictionary\WpdbDictionaryLexicalRelationRepository($wpdb),
+                    $entryState,
+                    $senseBelongs,
+                    new \NHK\Core\Infrastructure\Database\WpdbTransactionManager($wpdb),
+                );
+                $dictionaryRuntime->configureRelationGovernance($semanticRelationGovernance, $lexicalRelationGovernance, new \NHK\Core\Application\Dictionary\DictionaryRelationFacetRegistry());
+            }
+            (new McpApi(new McpTransport($mcpRead, $mcpGovernance, static fn (string $capability): bool => current_user_can($capability), static fn (string $value): bool => in_array($value, $allowedOrigins, true), $articleHandler, $videoIntake, $wordpressAttachments, $categoryGateway, $draftGateway, new CanonicalDependencyValidator($claims, $sources, $evidence), $publicUrlMaintenance, $mediaBatchUpload, $documentation, $capture, $captureContinuation, $authorityCapture, static function (): bool { return (new MigrationStatus())->runtimeSchemaReady(); }, $imageIngest, semanticWritePolicy: $semanticWritePolicy, mediaBinding: $mediaBindingService, videoSourceRefresh: $videoSourceRefresh, knowledgeRepairPreview: $knowledgeRepairPreview, videoFrontendReconciliation: $videoFrontendReconciliation, knowledgeWriterPreview: $knowledgeWriterPreview, knowledgeQualityAudit: $knowledgeQualityAuditHandler, dictionarySeedAudit: $dictionarySeedAuditHandler, mediaTargetNormalizer: new \NHK\Core\Application\Media\MediaTargetNormalizer($endpoints, $types, $authority), mediaIntentCompiler: new MediaEnrichmentIntentCompiler($mediaBindingService, $usages, new MediaTargetNormalizer($endpoints, $types, $authority), new WordPressMediaTargetUrlResolver($publicRoutes, historicRoutes: new HistoricPublicRouteService($publicIdentityRepository))), dictionary: $dictionaryRuntime !== null ? new McpDictionaryHandler($dictionaryRuntime, $semanticRelationGovernance, $lexicalRelationGovernance) : null), $recoveryBinding))->register();
             do_action('nhk_mcp_register_tools', McpToolCatalog::tools(), $mcpRead, $mcpGovernance);
         });
         add_action('admin_menu', [AdminPage::class, 'register']);

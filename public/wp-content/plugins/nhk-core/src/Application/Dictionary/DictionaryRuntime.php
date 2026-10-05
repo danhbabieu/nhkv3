@@ -15,6 +15,7 @@ use NHK\Core\Infrastructure\Migration\{DictionaryMigration015, DictionaryEntrySe
 use NHK\Core\Infrastructure\Video\WpdbVideoRepository;
 use NHK\Core\Infrastructure\Governance\WpdbAuditSink;
 use NHK\Core\Domain\Graph\PredicateRegistry;
+use NHK\Core\Application\Graph\SemanticRelationGovernanceAdapter;
 use NHK\Core\Application\Semantic\CanonicalAuthoritySubjectResolver;
 use NHK\Core\Application\Media\PublicMediaGalleryQuery;
 use NHK\Core\Application\Video\{VideoPublicContextSelector, VideoUrlPolicy};
@@ -37,6 +38,9 @@ final class DictionaryRuntime
     private DictionaryPublicQuery $publicQuery;
     private DictionaryEnrichmentCoverage $enrichmentCoverage;
     private ?array $detectionLabels = null;
+    private ?SemanticRelationGovernanceAdapter $semanticRelationGovernance = null;
+    private ?DictionaryLexicalRelationGovernanceAdapter $lexicalRelationGovernance = null;
+    private ?DictionaryRelationFacetRegistry $relationFacetRegistry = null;
 
     public function __construct(private object $database)
     {
@@ -385,6 +389,16 @@ final class DictionaryRuntime
         return $applied + ['read_only' => false, 'mutated' => ($applied['applied_count'] ?? 0) > 0, 'fingerprint' => $expected];
     }
     public function concepts(): WpdbDictionaryConceptRepository { return $this->concepts; }
+    public function entries(): WpdbDictionaryEntryRepository { return $this->entries; }
+    public function configureRelationGovernance(SemanticRelationGovernanceAdapter $semantic, DictionaryLexicalRelationGovernanceAdapter $lexical, DictionaryRelationFacetRegistry $facets): void
+    {
+        $this->semanticRelationGovernance = $semantic;
+        $this->lexicalRelationGovernance = $lexical;
+        $this->relationFacetRegistry = $facets;
+    }
+    public function semanticRelationGovernance(): ?SemanticRelationGovernanceAdapter { return $this->semanticRelationGovernance; }
+    public function lexicalRelationGovernance(): ?DictionaryLexicalRelationGovernanceAdapter { return $this->lexicalRelationGovernance; }
+    public function relationFacetRegistry(): ?DictionaryRelationFacetRegistry { return $this->relationFacetRegistry; }
     public function candidates(): WpdbDictionaryCandidateRepository { return $this->candidates; }
     public function mentions(): WpdbDictionaryMentionRepository { return $this->mentions; }
     public function seedPlanner(): DictionarySeedPlanner { return $this->seedPlanner; }

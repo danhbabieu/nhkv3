@@ -2,11 +2,12 @@
 declare(strict_types=1);
 namespace NHK\Core\Application\Graph;
 use NHK\Core\Application\Graph\SemanticEnrichmentRelationRegistry;
+use NHK\Core\Contracts\Shared\TransactionManager;
 use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Core\Domain\Graph\NodeReference;
 final class SemanticRelationGovernanceAdapter
 {
-    public function __construct(private string $registryVersion, private string $registryHash, private $endpointState, private $relationState, private $graph = null, private $contexts = null) {}
+    public function __construct(private string $registryVersion, private string $registryHash, private $endpointState, private $relationState, private $graph = null, private $contexts = null, private ?TransactionManager $transactions = null, private $invalidate = null) {}
     public function preview(array $input): array
     {
         $operation = strtoupper(trim((string) ($input['operation'] ?? '')));
@@ -30,6 +31,16 @@ final class SemanticRelationGovernanceAdapter
         $plan = ['operation'=>$operation,'source'=>$source,'target'=>$target,'predicate'=>$predicate,'edge_uuid'=>$input['edge_uuid'] ?? null,'expected_edge_revision'=>$input['expected_edge_revision'] ?? null,'source_revision'=>(int) ($sourceState['revision'] ?? 0),'target_revision'=>(int) ($targetState['revision'] ?? 0),'scope_code'=>$input['scope_code'] ?? $context['scope_code'],'provenance'=>$input['provenance'],'evidence_refs'=>$input['evidence_refs'],'idempotency_key'=>(string) ($input['idempotency_key'] ?? ''),'registry_version'=>$this->registryVersion,'registry_hash'=>$this->registryHash];
         $base['source_revision'] = $plan['source_revision']; $base['target_revision'] = $plan['target_revision']; $base['plan'] = $plan; $base['plan_fingerprint'] = $this->fingerprint($plan); $base['status']='READY'; return $base;
     }
+    public function read(array $input = []): array
+    {
+        if (!is_object($this->contexts) || !is_object($this->graph)) return ['status' => 'unavailable', 'reason' => 'GRAPH_RELATION_GOVERNANCE_UNAVAILABLE'];
+        $context = null;
+        if (trim((string) ($input['context_uuid'] ?? '')) !== '' && method_exists($this->contexts, 'findByContextUuid')) $context = $this->contexts->findByContextUuid((string) $input['context_uuid']);
+        if ($context === null && trim((string) ($input['edge_uuid'] ?? '')) !== '' && method_exists($this->contexts, 'findByEdgeUuid')) $context = $this->contexts->findByEdgeUuid((string) $input['edge_uuid']);
+        if ($context === null) return ['status' => 'not_found', 'reason' => 'GRAPH_RELATION_CONTEXT_NOT_FOUND'];
+        $edge = $this->graph->findByUuid($context->edgeUuid);
+        return ['status' => 'available', 'edge' => $edge === null ? null : ['edge_uuid' => $edge->edge_uuid, 'source' => ['type' => $edge->source->reference->endpoint_type, 'id' => $edge->source->reference->endpoint_key], 'predicate' => $edge->predicate, 'target' => ['type' => $edge->target->reference->endpoint_type, 'id' => $edge->target->reference->endpoint_key], 'state' => $edge->state->name, 'revision' => $edge->revision], 'context' => $context->toArray()];
+    }
     public function apply(array $plan, string $approvedFingerprint, string $idempotencyKey): array
     {
         if (!hash_equals((string) ($plan['plan_fingerprint'] ?? ''), $approvedFingerprint)) return ['status'=>'REPLAN_REQUIRED','blockers'=>['APPROVAL_FINGERPRINT_MISMATCH']];
@@ -42,6 +53,7 @@ final class SemanticRelationGovernanceAdapter
         $existing = method_exists($this->contexts, 'findByIdempotencyKey') ? $this->contexts->findByIdempotencyKey($idempotencyKey) : null;
         if ($existing !== null) return ['status'=>'READ_BACK_VERIFIED','operation'=>$plan['operation'],'edge'=>$this->graph->findByUuid($existing->edgeUuid)?->edge_uuid,'context'=>$existing->toArray(),'idempotent_replay'=>true];
         try {
+            $apply = function () use ($plan, $approvedFingerprint, $idempotencyKey, $source, $target): array {
             $operation = (string) $plan['operation'];
             if ($operation === 'ADD') {
                 $edge = $this->graph->create(new NodeReference($source['type'],$source['id']), (string) $plan['predicate'], new NodeReference($target['type'],$target['id']));
@@ -57,6 +69,10 @@ final class SemanticRelationGovernanceAdapter
             elseif ($operation === 'REACTIVATE') { $updated = $this->graph->reactivate($edgeUuid,(int)$plan['expected_edge_revision']); if ($context !== null) $context = $this->contexts->reactivate($context,(int)($plan['expected_context_revision'] ?? $context->revision)); }
             else { if ($context === null) return ['status'=>'FAILED_FINAL','blockers'=>['RELATION_CONTEXT_NOT_FOUND']]; $context = $this->contexts->update($context,(int)($plan['expected_context_revision'] ?? $context->revision)); $updated = $edge; }
             return ['status'=>'READ_BACK_VERIFIED','operation'=>$operation,'edge'=>$this->graph->findByUuid($updated->edge_uuid)?->edge_uuid,'context'=>$context?->toArray()];
+            };
+            $result = $this->transactions !== null ? $this->transactions->transactional($apply) : $apply();
+            if (($result['status'] ?? '') === 'READ_BACK_VERIFIED' && !($result['idempotent_replay'] ?? false) && is_callable($this->invalidate)) ($this->invalidate)($result);
+            return $result;
         } catch (\Throwable $error) { return ['status'=>'FAILED_FINAL','blockers'=>[$error->getMessage()]]; }
     }
     private function locator(mixed $value):?array { if (!is_array($value)) return null; $type=trim((string)($value['type']??''));$id=trim((string)($value['id']??'')); return $type!==''&&$id!==''?['type'=>$type,'id'=>$id]:null; }

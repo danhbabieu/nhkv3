@@ -5,6 +5,7 @@ namespace NHK\Core\Application\Graph;
 
 final class SemanticEnrichmentRelationRegistry
 {
+    public const VERSION = '1.0.0';
     /** @var array<string,true> */
     private const ASSOCIATED_PAIRS = [
         'component:brand' => true,
@@ -36,4 +37,7 @@ final class SemanticEnrichmentRelationRegistry
     {
         return array_map(static function (string $pair): array { [$source, $target] = explode(':', $pair, 2); return ['source' => $source, 'target' => $target]; }, array_keys(self::ASSOCIATED_PAIRS));
     }
+
+    public function version(): string { return self::VERSION; }
+    public function hash(): string { return hash('sha256', json_encode(['version' => self::VERSION, 'pairs' => self::ASSOCIATED_PAIRS], JSON_UNESCAPED_SLASHES)); }
 }

@@ -22663,3 +22663,34 @@ integration acceptance and cache invalidation require the authorized runtime
 environment. Existing full-suite baseline failures remain outside this phase.
 
 STATUS: `GOVERNED_SEMANTIC_ENRICHMENT_PROJECTION_IMPLEMENTED / FOCUSED_TESTS_GREEN / FULL_UNIT_BASELINE_PRE_EXISTING_FAILURES / NO_DATA_MUTATION / CANARY_NOT_POPULATED`.
+
+# Checkpoint — 2026-10-05 — Semantic enrichment transactional integration Phase 3 (LOCAL / NO LIVE DATA)
+
+IMPLEMENTED: Production composition now constructs the Graph-owned semantic
+relation context repository, Dictionary-owned lexical relation governance and
+bounded facet registry from the existing Dictionary/Graph runtime seam. MCP
+and Admin share the same configured DictionaryRuntime governance services.
+Semantic ADD/REPLACE/RETIRE/REACTIVATE execution accepts one transaction
+manager boundary for Graph edge plus relation context; lexical execution uses
+the same boundary without Graph or semantic_reference side effects. Read,
+preview, apply, idempotency replay, exact revision/CAS checks and canonical
+read-back remain fail-closed. A generic synthetic test fixture covers context
+failure rollback and lexical retry; no Côn hoa thị fixture or special-case was
+added.
+
+VALIDATION: Phase 3 focused transaction/runtime tests pass 2 tests / 8
+assertions; the affected Dictionary/Semantic relation slice passes 12 tests /
+124 assertions (PHPUnit deprecations only). PHP lint and git diff --check
+pass. The authorized integration database was not available in this local
+checkpoint, so migrations and live canary audit were not executed.
+
+NO LIVE DATA: No migration, database write, staging mutation, production
+mutation, deployment or push occurred. Côn hoa thị remains read-only and
+unpopulated.
+
+KNOWN_GAPS: The existing full Unit baseline remains 1 pre-existing TypeError
+and 8 unrelated failures recorded in the Phase 2 checkpoint. Integration
+database migration/read-back, production cache invalidation observation and
+canary read-only audit require the authorized WordPress integration runtime.
+
+STATUS: `SEMANTIC_ENRICHMENT_TRANSACTIONAL_RUNTIME_WIRED / FOCUSED_TESTS_GREEN / INTEGRATION_ENVIRONMENT_BLOCKER / NO_DATA_MUTATION / CANARY_NOT_POPULATED`.

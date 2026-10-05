@@ -15,7 +15,7 @@ final class McpDictionaryHandler
     public function semanticRelationApply(array $input): array { return $this->semanticRelationGovernance?->apply((array)($input['plan']??[]),(string)($input['approved_plan_fingerprint']??''),(string)($input['idempotency_key']??'')) ?? ['status'=>'unavailable','reason'=>'SEMANTIC_RELATION_GOVERNANCE_UNAVAILABLE']; }
     public function lexicalRelationRead(array $input = []): array { return $this->lexicalRelationGovernance?->read($input) ?? ['status'=>'unavailable','reason'=>'LEXICAL_RELATION_GOVERNANCE_UNAVAILABLE']; }
     public function lexicalRelationPreview(array $input): array { return $this->lexicalRelationGovernance?->preview($input) ?? ['status'=>'unavailable','reason'=>'LEXICAL_RELATION_GOVERNANCE_UNAVAILABLE']; }
-    public function lexicalRelationApply(array $input): array { return $this->lexicalRelationGovernance?->apply((array)($input['plan']??[]),(string)($input['approved_plan_fingerprint']??''),(string)($input['idempotency_key']??'')) ?? ['status'=>'unavailable','reason'=>'LEXICAL_RELATION_GOVERNANCE_UNAVAILABLE']; }
+    public function lexicalRelationApply(array $input): array { $result = $this->lexicalRelationGovernance?->apply((array)($input['plan']??[]),(string)($input['approved_plan_fingerprint']??''),(string)($input['idempotency_key']??'')) ?? ['status'=>'unavailable','reason'=>'LEXICAL_RELATION_GOVERNANCE_UNAVAILABLE']; if (($result['status'] ?? '') === 'READ_BACK_VERIFIED' && !($result['idempotent_replay'] ?? false)) $this->runtime->invalidateLabelCache(); return $result; }
 
     public function search(string $query, int $limit = 50): array
     {
