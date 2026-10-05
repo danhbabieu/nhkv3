@@ -149,13 +149,19 @@ final class StagingAcceptanceScope
 
         if (in_array($expectedFamily, ['source_evidence_reconciliation', 'knowledge_delta'], true)) {
             if (!hash_equals($captureId, (string) ($proposal->payload['capture_id'] ?? ''))
-                || !hash_equals((string) ($scope['capture_fingerprint'] ?? ''), (string) ($proposal->payload['capture_fingerprint'] ?? ''))
-                || (int) ($scope['capture_revision'] ?? 0) !== (int) ($proposal->payload['capture_revision'] ?? 0)
                 || (string) ($scope['entity_type'] ?? '') !== $proposal->entityType
                 || (string) ($scope['operation'] ?? '') !== $proposal->operation
                 || (string) ($scope['subject_id'] ?? '') !== $proposal->subjectId
                 || (int) ($scope['expected_revision'] ?? 0) !== (int) ($proposal->expectedRevision ?? 0)) {
                 throw new \RuntimeException('STAGING_DEPENDENCY_SCOPE_MISMATCH');
+            }
+            if (array_key_exists('capture_fingerprint', $proposal->payload)
+                && !hash_equals((string) ($scope['capture_fingerprint'] ?? ''), (string) $proposal->payload['capture_fingerprint'])) {
+                throw new \RuntimeException('STAGING_CAPTURE_FINGERPRINT_MISMATCH');
+            }
+            if (array_key_exists('capture_revision', $proposal->payload)
+                && (int) ($scope['capture_revision'] ?? 0) !== (int) $proposal->payload['capture_revision']) {
+                throw new \RuntimeException('STAGING_CAPTURE_REVISION_MISMATCH');
             }
             $descriptor = StagingOperationDescriptor::fromProposal($proposal, $scope);
             $payloadFingerprint = $descriptor->payloadFingerprint;

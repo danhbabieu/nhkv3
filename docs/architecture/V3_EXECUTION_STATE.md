@@ -22854,3 +22854,36 @@ bootstrap remains pending because the authorized TEST WordPress database was
 unavailable locally; no database, staging, production or canary mutation ran.
 
 STATUS: `SEMANTIC_STAGING_SCOPE_ELIGIBILITY_PARITY_FIXED / FOCUSED_UNIT_PASS / AUTHORIZED_TEST_RUNTIME_PENDING / NO_DATA_MUTATION`.
+
+# Checkpoint — 2026-10-05 — Capture-bound semantic staging payload parity (LOCAL / TEST DEPLOYMENT READY)
+
+ROOT_CAUSE: `StagingAcceptanceScopeVerifier::issueForCaptureDependencyPlan()`
+added persisted `capture_revision` to the semantic command before hashing,
+while `StagingAcceptanceScope::assertProposal()` required client proposals to
+repeat both `capture_fingerprint` and `capture_revision`. Minimal generic
+Source/Knowledge/Evidence proposals intentionally carry only `payload.capture_id`
+and their semantic command fields, so eligibility failed with
+`STAGING_DEPENDENCY_SCOPE_MISMATCH` despite the persisted Capture being valid.
+
+FIX: Dependency scope issuance now keeps Capture revision only as signed scope
+metadata. Shared semantic descriptor normalization excludes that metadata from
+Source/Knowledge/Evidence command fingerprints, and verification requires the
+Capture id, operation/entity/subject/revision bindings and signed semantic
+fingerprints without requiring duplicated Capture metadata in the proposal.
+If legacy duplicated Capture metadata is present, it must still match the
+signed scope; tampering remains fail-closed.
+
+REGRESSION COVERAGE: Minimal Capture-bound Source ingest, Knowledge ingest and
+Evidence ingest proposals pass `ready=true` through staging scope resolution
+with the authorized TEST identity tuple asserted. Negative coverage preserves
+missing/wrong/nonexistent Capture, signed-scope tampering, wrong entity binding,
+semantic payload fingerprint mismatch, optional metadata tampering and invalid
+TEST identity rejection. Focused governance/semantic Unit slice passes 121
+tests / 474 assertions; changed PHP files lint clean and `git diff --check`
+passes. Full Unit completes 3,120 tests with 35 pre-existing documentation/
+runtime errors and 13 unrelated failures. Guarded Integration remains blocked
+without `NHK_WP_TEST_PATH` and the authorized TEST runtime. No migration,
+database mutation, staging acceptance, lexical change, deployment or production
+operation was performed.
+
+STATUS: `CAPTURE_BOUND_SEMANTIC_STAGING_PAYLOAD_PARITY_FIXED / FOCUSED_UNIT_PASS / TEST_DEPLOYMENT_READY / NO_DATA_MUTATION`.

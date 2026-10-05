@@ -111,9 +111,9 @@ final readonly class StagingOperationDescriptor
     public static function normalizeSemanticPayload(array $payload, ?string $entityType = null): array
     {
         $normalized = self::withoutAuthorization($payload);
-        if (strtolower(trim((string) $entityType)) === 'video') {
+        if (in_array(strtolower(trim((string) $entityType)), ['source', 'knowledge', 'evidence', 'video'], true)) {
             unset($normalized['capture_revision']);
-            $normalized = self::withoutVideoRetrievalVolatility($normalized);
+            if (strtolower(trim((string) $entityType)) === 'video') $normalized = self::withoutVideoRetrievalVolatility($normalized);
         }
         return $normalized;
     }

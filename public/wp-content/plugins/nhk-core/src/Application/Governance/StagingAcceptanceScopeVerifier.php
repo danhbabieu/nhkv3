@@ -247,10 +247,9 @@ final class StagingAcceptanceScopeVerifier
         $this->requireCapability();
         if (!is_callable($this->admission)) throw new \RuntimeException('STAGING_SCOPE_ADMISSION_REQUIRED');
         // Parent provenance is server-derived from the persisted Capture. The
-        // caller supplies only the child command; Capture revision must be
-        // inside the signed child payload before its fingerprint is computed.
+        // caller supplies only the child command; Capture revision remains
+        // signed scope metadata and is not part of the child command hash.
         $plan['payload'] = is_array($plan['payload'] ?? null) ? $plan['payload'] : [];
-        $plan['payload']['capture_revision'] = $capture->revision;
         $descriptor = StagingOperationDescriptor::fromPlan($plan, $capture->captureId, $capture->requestFingerprint);
         if (!in_array($descriptor->entityType, ['source', 'knowledge', 'evidence'], true) || !in_array($descriptor->operation, ['ingest', 'create', 'update', 'retire'], true)) throw new \RuntimeException('STAGING_DEPENDENCY_OPERATION_INVALID');
         $family = $descriptor->operationFamily;
