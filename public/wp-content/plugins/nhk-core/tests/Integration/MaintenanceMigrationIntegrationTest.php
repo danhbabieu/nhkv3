@@ -29,7 +29,7 @@ final class MaintenanceMigrationIntegrationTest extends TestCase
         (new DictionaryMigration015())->up();
         update_option('nhk_core_migration_current', 15, false);
         update_option('nhk_core_migration_target', 15, false);
-        self::assertSame('nhk_v3_test', (string) $wpdb->get_var('SELECT DATABASE()'));
+        TestDatabaseGuard::assertAuthorizedRuntime();
     }
 
     protected function tearDown(): void

@@ -31,9 +31,7 @@ final class PublicSlugMigrationIntegrationTest extends TestCase
 
     protected function setUp(): void
     {
-        if (getenv('NHK_WP_TEST_PATH') !== 'public' || getenv('NHK_WP_TEST_DB') !== 'nhk_v3_test') {
-            self::markTestSkipped('ENVIRONMENT_BLOCKED: exact public/nhk_v3_test runtime is required.');
-        }
+        if (getenv('NHK_WP_TEST_PATH') !== 'public') self::markTestSkipped('ENVIRONMENT_BLOCKED: public WordPress runtime is required.');
         require_once rtrim((string) getenv('NHK_WP_TEST_PATH'), '/') . '/wp-load.php';
         TestDatabaseGuard::selectTestDatabase();
         TestDatabaseGuard::requireTestDatabase();

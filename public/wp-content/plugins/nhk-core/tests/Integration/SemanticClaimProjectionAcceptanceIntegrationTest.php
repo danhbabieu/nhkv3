@@ -259,7 +259,7 @@ final class SemanticClaimProjectionAcceptanceIntegrationTest extends TestCase
         $sourceId = UuidCodec::newV7();
         $evidenceIds = [UuidCodec::newV7(), UuidCodec::newV7(), UuidCodec::newV7()];
 
-        // This is a controlled fixture loader for nhk_v3_test only. It preserves
+        // This is a controlled fixture loader for the authorized test runtime only. It preserves
         // the approved Odo UUIDs/stable keys without touching a target runtime.
         $authority->create(new AuthorityEntity($brandId, 'brand', 'nhk:brand:odo', 'Odo', 1, [
             'aliases' => [], 'description' => 'Controlled Odo acceptance fixture', 'country' => 'France', 'founded_year' => 1,

@@ -2030,7 +2030,10 @@ configuration contract, schema compatibility và bootstrap verification. Compose
 dependency completeness là deployment invariant. Read-only preflight phải fail
 trước traffic nếu dependency, bootstrap, migration state, Authority hydration hoặc
 REST initialization không đạt. nhk_v3 chỉ được health/smoke/schema addition/
-UP migration; destructive integration chỉ được trên exact nhk_v3_test qua guard.
+UP migration; destructive integration chỉ được trên explicit allowlisted TEST
+RUNTIME identity qua guard: environment `staging`, database
+`erourxcg_nhkv3`, site `https://demo.1945.vn` và runtime identity `nhk-v3`.
+Production và mọi staging/database identity khác bị từ chối.
 
 ## 22. Frontend UX law
 

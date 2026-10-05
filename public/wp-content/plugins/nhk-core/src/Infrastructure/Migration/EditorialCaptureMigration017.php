@@ -28,7 +28,7 @@ final class EditorialCaptureMigration017
     public function down(bool $force = false): void
     {
         global $wpdb;
-        if ((string) $wpdb->get_var('SELECT DATABASE()') !== 'nhk_v3_test') throw new \RuntimeException('EDITORIAL_CAPTURE_MIGRATION_DOWN_REQUIRES_NHK_V3_TEST');
+        MigrationDatabaseGuard::assertDownAllowed('EDITORIAL_CAPTURE_MIGRATION');
         if (!$force && (int) $wpdb->get_var('SELECT COUNT(*) FROM ' . $wpdb->prefix . 'nhk_editorial_captures') > 0) throw new \RuntimeException('EDITORIAL_CAPTURE_MIGRATION_DOWN_REQUIRES_EMPTY_TABLE');
         $wpdb->query('DROP TABLE IF EXISTS ' . $wpdb->prefix . 'nhk_editorial_captures');
         update_option('nhk_core_migration_current', 16, false);

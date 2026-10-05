@@ -41,7 +41,8 @@ listed human-gated operations.
 Run dependency/autoload setup only when needed, PHP lint, relevant PHPUnit
  suites, migration tests for schema changes, prior-phase regression,
 `git diff --check`, secret review and final `git status`. Main DB checks must be
-non-destructive; destructive tests target only `nhk_v3_test`.
+non-destructive; destructive tests require the exact allowlisted TEST RUNTIME
+tuple: staging + `erourxcg_nhkv3` + `https://demo.1945.vn` + `nhk-v3`.
 
 ## Checkpoint record
 

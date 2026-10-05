@@ -13,6 +13,7 @@ use NHK\Core\Infrastructure\Governance\{NoOpApplyExecutionHook,WpdbApplyAttemptR
 use NHK\Core\Governance\Exception\ProposalIdempotencyConflict;
 use NHK\Core\Infrastructure\Migration\GovernanceMigration003;
 use NHK\Core\Shared\Uuid\UuidCodec;
+use NHK\Core\Shared\TestRuntimeIdentityPolicy;
 use NHK\Tests\Support\TestDatabaseGuard;
 use PHPUnit\Framework\TestCase;
 
@@ -52,7 +53,7 @@ final class P4ControlledApplyIntegrationTest extends TestCase
             $pid = pcntl_fork(); if ($pid === -1) self::fail('Unable to fork apply worker.');
             if ($pid === 0) {
                 global $wpdb;
-                $wpdb = new \wpdb(DB_USER, DB_PASSWORD, 'nhk_v3_test', DB_HOST); $wpdb->set_prefix($GLOBALS['table_prefix']); $wpdb->suppress_errors(true);
+                $wpdb = new \wpdb(DB_USER, DB_PASSWORD, TestRuntimeIdentityPolicy::DATABASE, DB_HOST); $wpdb->set_prefix($GLOBALS['table_prefix']); $wpdb->suppress_errors(true);
                 $hook = $holder ? new class($barrier, $release) implements ApplyExecutionHook { public function __construct(private string $barrier, private string $release) {} public function afterAttemptStarted(): void { file_put_contents($this->barrier, 'locked'); $deadline = microtime(true) + 10; while (!file_exists($this->release) && microtime(true) < $deadline) usleep(10000); if (!file_exists($this->release)) throw new \RuntimeException('CONCURRENCY_BARRIER_TIMEOUT'); } public function afterAuthorityMutation(): void {} public function beforeProposalApplied(): void {} public function beforeCommit(): void {} } : new NoOpApplyExecutionHook();
                 try { $result = (new ControlledApplyService(new WpdbProposalRepository(), new WpdbApplyAttemptRepository(), new WpdbTransactionManager(), fn(Proposal $p) => (new AuthorityService(new WpdbAuthorityRepository(), $types))->rename($p->targetUuid ?? $p->subjectId, 'After', 1), new WpdbAuditSink(), null, $hook))->apply($proposal->id); file_put_contents($files[$index], json_encode(['status' => 'ok', 'result' => $result])); } catch (\Throwable $e) { file_put_contents($files[$index], json_encode(['status' => 'error', 'error' => $e->getMessage()])); }
                 exit(0);
@@ -78,7 +79,7 @@ final class P4ControlledApplyIntegrationTest extends TestCase
         global $wpdb;
         $key = 'p4-idem-' . bin2hex(random_bytes(5)); $files = [tempnam(sys_get_temp_dir(), 'nhk-idem-'), tempnam(sys_get_temp_dir(), 'nhk-idem-')]; $pids = [];
         foreach (['Same', 'Same'] as $index => $name) {
-            $pid = pcntl_fork(); if ($pid === 0) { $wpdb = new \wpdb(DB_USER, DB_PASSWORD, 'nhk_v3_test', DB_HOST); $wpdb->set_prefix($GLOBALS['table_prefix']); $wpdb->suppress_errors(true); $p = new Proposal(UuidCodec::newV7(), 'brand', 'rename', ['name'=>$name], str_repeat('b', 64), 1, 'deps', ProposalState::DRAFT, '1', null, null, $key, 1, null, null, null, 'brand'); try { $out=(new GovernanceService(new WpdbProposalRepository(), new WpdbAuditSink(), new WpdbTransactionManager()))->create($p); file_put_contents($files[$index], json_encode(['status'=>'ok','id'=>$out->id])); } catch (\Throwable $e) { file_put_contents($files[$index], json_encode(['status'=>'error','error'=>$e->getMessage()])); } exit(0); } $pids[]=$pid;
+            $pid = pcntl_fork(); if ($pid === 0) { $wpdb = new \wpdb(DB_USER, DB_PASSWORD, TestRuntimeIdentityPolicy::DATABASE, DB_HOST); $wpdb->set_prefix($GLOBALS['table_prefix']); $wpdb->suppress_errors(true); $p = new Proposal(UuidCodec::newV7(), 'brand', 'rename', ['name'=>$name], str_repeat('b', 64), 1, 'deps', ProposalState::DRAFT, '1', null, null, $key, 1, null, null, null, 'brand'); try { $out=(new GovernanceService(new WpdbProposalRepository(), new WpdbAuditSink(), new WpdbTransactionManager()))->create($p); file_put_contents($files[$index], json_encode(['status'=>'ok','id'=>$out->id])); } catch (\Throwable $e) { file_put_contents($files[$index], json_encode(['status'=>'error','error'=>$e->getMessage()])); } exit(0); } $pids[]=$pid;
         }
         foreach ($pids as $pid) pcntl_waitpid($pid, $status);
         $same = array_map(static fn(string $f): array => json_decode((string) file_get_contents($f), true, 512, JSON_THROW_ON_ERROR), $files);

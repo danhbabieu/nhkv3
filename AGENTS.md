@@ -93,12 +93,16 @@ after the Constitution.
 
 
 
-- Development database is nhk_v3; integration database is nhk_v3_test.
+- Development database is `nhk_v3`. The authorized NHK V3 TEST RUNTIME is an
+  explicit identity tuple: `WP_ENVIRONMENT_TYPE=staging`, database
+  `erourxcg_nhkv3`, site/home URL `https://demo.1945.vn` and runtime/project
+  identity `nhk-v3`.
 - nhk_v3 permits health, smoke checks, schema inspection, non-destructive
   additions and UP migrations only. Never run DOWN, DROP, TRUNCATE or reset
   there.
-- Destructive integration operations are allowed only on exact nhk_v3_test,
-  guarded by TestDatabaseGuard.
+- Destructive integration operations are allowed only on that exact TEST
+  RUNTIME identity, guarded by TestDatabaseGuard. Environment-only or
+  arbitrary staging authorization is forbidden.
 - Never seed entities, backfill Graph edges, repair identity, assign public
   slugs or alter semantic records unless the separately governed contract and
   user-authorized task explicitly allow it.

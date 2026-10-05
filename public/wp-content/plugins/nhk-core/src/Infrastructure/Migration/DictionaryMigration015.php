@@ -37,7 +37,7 @@ final class DictionaryMigration015
     public function down(bool $force = false): void
     {
         global $wpdb;
-        if ((string) $wpdb->get_var('SELECT DATABASE()') !== 'nhk_v3_test') throw new \RuntimeException('DICTIONARY_MIGRATION_DOWN_REQUIRES_NHK_V3_TEST');
+        MigrationDatabaseGuard::assertDownAllowed('DICTIONARY_MIGRATION');
         if (!$force) throw new \RuntimeException('DICTIONARY_MIGRATION_DOWN_REQUIRES_FORCE');
         foreach (['nhk_dictionary_mentions', 'nhk_dictionary_candidates', 'nhk_dictionary_labels', 'nhk_dictionary_concepts'] as $table) $wpdb->query('DROP TABLE IF EXISTS ' . $wpdb->prefix . $table);
     }

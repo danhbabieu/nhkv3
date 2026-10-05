@@ -24,7 +24,7 @@ final class KnowledgeEvidenceMetadataMigration007
     public function down(): void
     {
         global $wpdb;
-        if ((string) $wpdb->get_var('SELECT DATABASE()') !== 'nhk_v3_test') throw new \RuntimeException('EVIDENCE_METADATA_MIGRATION_DOWN_REQUIRES_NHK_V3_TEST');
+        MigrationDatabaseGuard::assertDownAllowed('EVIDENCE_METADATA_MIGRATION');
         $wpdb->query("ALTER TABLE {$wpdb->prefix}nhk_evidence DROP COLUMN metadata_json");
         update_option('nhk_core_migration_current', 6, false);
         update_option('nhk_core_migration_target', self::VERSION, false);

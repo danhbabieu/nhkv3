@@ -4,7 +4,8 @@
 > Nếu mâu thuẫn với `docs/constitution/NHK_V3_CONSTITUTION.md`, Hiến pháp
 > kiểm soát.
 
-Status: `ACCEPTED / CLOSED` — all P4 test gates pass on `nhk_v3_test`, and
+Status: `ACCEPTED / CLOSED` — all P4 test gates pass on the authorized TEST
+RUNTIME (`staging / erourxcg_nhkv3 / https://demo.1945.vn / nhk-v3`), and
 Migration003 UP-only plus health 3/3 pass on `nhk_v3`.
 
 | ID | Acceptance | Test class / method | Level | Result |
@@ -25,7 +26,7 @@ Migration003 UP-only plus health 3/3 pass on `nhk_v3`.
 | P4-014 | Append-only audit and privacy | durable audit contract suite | UNIT/INTEGRATION | PASS |
 | P4-015 | Capability registration and authorization denial | `P4GovernanceAcceptanceIntegrationTest::test_capability_registration_denial_and_wordpress_editorial_bypass` | INTEGRATION | PASS |
 | P4-016 | WordPress editorial bypass | `P4GovernanceAcceptanceIntegrationTest::test_wp_post_editorial_write_does_not_require_governance` | INTEGRATION | PASS |
-| P4-017 | Full P4 integration, mandatory skipped = 0 | `NHK_WP_TEST_DB=nhk_v3_test NHK_WP_TEST_PATH=public composer test` | INTEGRATION | PASS — 56 tests, 167 assertions, 0 skipped |
+| P4-017 | Full P4 integration, mandatory skipped = 0 | `NHK_WP_TEST_PATH=public composer test` | INTEGRATION | PASS — 56 tests, 167 assertions, 0 skipped |
 | P4-018 | Main migration UP-only and health 3/3 | post-gate smoke | INTEGRATION | PASS — current 3, target 3, required false, graph/authority/governance ready |
 | P4-019 | P3 regression | existing P3 integration suite | INTEGRATION | PASS |
 | P4-020 | Final diff/secret review | release checklist | RELEASE | PASS — completed before checkpoint |

@@ -31,7 +31,7 @@ final class PublicIdentityMigration014
     public function down(bool $force=false): void
     {
         global $wpdb;
-        if ((string)$wpdb->get_var('SELECT DATABASE()')!=='nhk_v3_test') throw new \RuntimeException('PUBLIC_IDENTITY_MIGRATION_DOWN_REQUIRES_NHK_V3_TEST');
+        MigrationDatabaseGuard::assertDownAllowed('PUBLIC_IDENTITY_MIGRATION');
         if (!$force) throw new \RuntimeException('PUBLIC_IDENTITY_MIGRATION_DOWN_REQUIRES_FORCE');
         $wpdb->query('DROP TABLE IF EXISTS '.$wpdb->prefix.'nhk_public_identity_history');
         $wpdb->query('DROP TABLE IF EXISTS '.$wpdb->prefix.'nhk_public_identities');

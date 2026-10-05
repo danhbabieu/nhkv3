@@ -9,6 +9,7 @@ use NHK\Core\Domain\Authority\{EntityTypeDefinition, EntityTypeRegistry};
 use NHK\Core\Infrastructure\Authority\WpdbAuthorityRepository;
 use NHK\Core\Infrastructure\Migration\{AuthorityMigration002, GraphMigration001};
 use NHK\Tests\Support\TestDatabaseGuard;
+use NHK\Core\Shared\TestRuntimeIdentityPolicy;
 use PHPUnit\Framework\TestCase;
 
 final class StableKeyConcurrencyIntegrationTest extends TestCase
@@ -58,7 +59,7 @@ final class StableKeyConcurrencyIntegrationTest extends TestCase
             }
             if ($pid === 0) {
                 global $wpdb;
-                $wpdb = new \wpdb(DB_USER, DB_PASSWORD, 'nhk_v3_test', DB_HOST);
+                $wpdb = new \wpdb(DB_USER, DB_PASSWORD, TestRuntimeIdentityPolicy::DATABASE, DB_HOST);
                 $wpdb->set_prefix($GLOBALS['table_prefix']);
                 $wpdb->suppress_errors(true);
                 $types = new EntityTypeRegistry();

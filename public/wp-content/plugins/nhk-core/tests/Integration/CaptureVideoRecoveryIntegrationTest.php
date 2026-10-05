@@ -14,9 +14,7 @@ final class CaptureVideoRecoveryIntegrationTest extends TestCase
 
     protected function setUp(): void
     {
-        if (getenv('NHK_WP_TEST_PATH') !== 'public' || getenv('NHK_WP_TEST_DB') !== 'nhk_v3_test') {
-            self::fail('Capture recovery integration requires NHK_WP_TEST_PATH=public and NHK_WP_TEST_DB=nhk_v3_test.');
-        }
+        if (getenv('NHK_WP_TEST_PATH') !== 'public') self::fail('Capture recovery integration requires NHK_WP_TEST_PATH=public.');
         require_once rtrim((string) getenv('NHK_WP_TEST_PATH'), '/') . '/wp-load.php';
         TestDatabaseGuard::selectTestDatabase();
         TestDatabaseGuard::requireTestDatabase();

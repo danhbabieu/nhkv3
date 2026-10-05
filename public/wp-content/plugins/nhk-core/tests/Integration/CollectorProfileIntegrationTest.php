@@ -154,7 +154,7 @@ final class CollectorProfileIntegrationTest extends TestCase
 
     private function cleanupFixture(): void
     {
-        TestDatabaseGuard::assertDestructiveAllowed('nhk_v3_test');
+        TestDatabaseGuard::assertDestructiveAllowed(\NHK\Core\Shared\TestRuntimeIdentityPolicy::DATABASE);
         global $wpdb;
         $wpdb->query($wpdb->prepare('DELETE FROM ' . $wpdb->prefix . 'nhk_evidence WHERE source_uuid=%s OR claim_uuid IN (SELECT canonical_uuid FROM ' . $wpdb->prefix . 'nhk_knowledge_claims WHERE stable_key LIKE %s)', $this->sourceId !== null ? UuidCodec::toBinary($this->sourceId) : str_repeat("\0", 16), self::FIXTURE_PREFIX . '%'));
         $wpdb->query($wpdb->prepare('DELETE FROM ' . $wpdb->prefix . 'nhk_knowledge_claims WHERE stable_key LIKE %s', self::FIXTURE_PREFIX . '%'));

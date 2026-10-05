@@ -7,8 +7,10 @@
 
 - Workspace: `/Users/imac24-2125d/Developer/nhk-v3`
 - Development database: `nhk_v3`
-- Integration-test database: `nhk_v3_test`
-- Destructive integration operations are guarded by `TestDatabaseGuard` and must never target `nhk_v3`.
+- Authorized TEST RUNTIME: environment `staging`, database `erourxcg_nhkv3`,
+  site `https://demo.1945.vn`, runtime identity `nhk-v3`.
+- Destructive integration operations are guarded by `TestDatabaseGuard` and
+  must verify the complete identity tuple before mutation.
 
 ## Acceptance status
 
@@ -21,8 +23,9 @@ The final run must record real integration evidence for UUID `BINARY(16)` round-
 Acceptance evidence:
 
 - MySQL: `mysqld is alive` on `127.0.0.1:3306`; `wp db check` passes.
-- Test DB: `nhk_v3_test`; all destructive integration operations are guarded and isolated there.
-- Integration command: `NHK_WP_TEST_DB=nhk_v3_test NHK_WP_TEST_PATH=public composer test`.
+- Test runtime: `staging / erourxcg_nhkv3 / https://demo.1945.vn / nhk-v3`;
+  all destructive integration operations are guarded there.
+- Integration command: `NHK_WP_TEST_PATH=public composer test`.
 - Result: 37 tests, 100 assertions, 0 skipped.
 - Coverage includes migrations 001/002 up/idempotency/down/up, UUID binary persistence, stable-key idempotency and two-connection concurrency, optimistic locking, lifecycle/filtering, cursor pagination, endpoint resolution, and the Post→Authority graph vertical slice.
 - Main DB `nhk_v3` smoke/health: reachable; migration current 2, target 2; migration not required; graph and authority storage ready.

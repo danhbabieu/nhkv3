@@ -30,7 +30,7 @@ final class MediaMigration004
     public function down(bool $force = false): void
     {
         global $wpdb;
-        if ((string) $wpdb->get_var('SELECT DATABASE()') !== 'nhk_v3_test') throw new \RuntimeException('MEDIA_MIGRATION_DOWN_REQUIRES_NHK_V3_TEST');
+        MigrationDatabaseGuard::assertDownAllowed('MEDIA_MIGRATION');
         $p = $wpdb->prefix;
         foreach (['nhk_videos', 'nhk_media_usages', 'nhk_media_assets', 'nhk_media'] as $table) $wpdb->query("DROP TABLE IF EXISTS {$p}{$table}");
         update_option('nhk_core_migration_current', 3, false);

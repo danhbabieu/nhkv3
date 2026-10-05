@@ -66,7 +66,12 @@ if (!isset($wpdb) || !is_object($wpdb) || !defined('DB_NAME')) finish(['status' 
 $database = trim((string) $wpdb->get_var('SELECT DATABASE()'));
 $prefix = (string) ($wpdb->prefix ?? '');
 if ($database === '' || $prefix === '') finish(['status' => 'blocked', 'reason_code' => 'DATABASE_BINDING_UNAVAILABLE'], $options);
-if ($database === 'nhk_v3_test') finish(['status' => 'blocked', 'reason_code' => 'OPERATIONAL_TARGET_FORBIDDEN'], $options);
+if ($database === \NHK\Core\Shared\TestRuntimeIdentityPolicy::LEGACY_DATABASE
+    || ($database === \NHK\Core\Shared\TestRuntimeIdentityPolicy::DATABASE
+        && $actualEnvironment === \NHK\Core\Shared\TestRuntimeIdentityPolicy::ENVIRONMENT
+        && $actualSite === \NHK\Core\Shared\TestRuntimeIdentityPolicy::SITE_URL)) {
+    finish(['status' => 'blocked', 'reason_code' => 'OPERATIONAL_TARGET_FORBIDDEN'], $options);
+}
 $binding = hash('sha256', implode("\0", [$actualEnvironment, $actualSite, $database, $prefix]));
 if (!hash_equals($expectedBinding, $binding) || !hash_equals($previousBinding, $binding)) {
     finish(['status' => 'blocked', 'reason_code' => 'DATABASE_BINDING_MISMATCH', 'identity' => ['environment' => $actualEnvironment, 'site_url' => $actualSite, 'database_binding_id' => $binding]], $options);

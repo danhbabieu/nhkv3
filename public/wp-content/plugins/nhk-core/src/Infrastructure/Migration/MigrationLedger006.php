@@ -23,7 +23,7 @@ final class MigrationLedger006
     public function down(bool $force = false): void
     {
         global $wpdb;
-        if ((string) $wpdb->get_var('SELECT DATABASE()') !== 'nhk_v3_test') throw new \RuntimeException('MIGRATION_LEDGER_DOWN_REQUIRES_NHK_V3_TEST');
+        MigrationDatabaseGuard::assertDownAllowed('MIGRATION_LEDGER');
         if (!$force && (int) $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}nhk_migration_ledger") > 0) throw new \RuntimeException('MIGRATION_LEDGER_DOWN_REQUIRES_EMPTY_TABLE');
         $wpdb->query("DROP TABLE IF EXISTS {$wpdb->prefix}nhk_migration_ledger");
         update_option('nhk_core_migration_current', 5, false);

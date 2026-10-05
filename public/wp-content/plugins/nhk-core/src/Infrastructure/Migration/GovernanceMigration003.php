@@ -26,10 +26,7 @@ final class GovernanceMigration003
     public function down(bool $force = false): void
     {
         global $wpdb;
-        $database = (string) $wpdb->get_var('SELECT DATABASE()');
-        if ($database !== 'nhk_v3_test') {
-            throw new \RuntimeException('GOVERNANCE_MIGRATION_DOWN_REQUIRES_NHK_V3_TEST');
-        }
+        MigrationDatabaseGuard::assertDownAllowed('GOVERNANCE_MIGRATION');
         $p = $wpdb->prefix;
         foreach (['nhk_audit_events', 'nhk_apply_attempts', 'nhk_proposal_approvals', 'nhk_proposal_dependencies', 'nhk_proposals'] as $table) {
             $wpdb->query("DROP TABLE IF EXISTS {$p}{$table}");

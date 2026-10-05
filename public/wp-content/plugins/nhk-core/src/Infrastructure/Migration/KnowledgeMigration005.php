@@ -22,7 +22,7 @@ final class KnowledgeMigration005
     public function down(bool $force = false): void
     {
         global $wpdb;
-        if ((string) $wpdb->get_var('SELECT DATABASE()') !== 'nhk_v3_test') throw new \RuntimeException('KNOWLEDGE_MIGRATION_DOWN_REQUIRES_NHK_V3_TEST');
+        MigrationDatabaseGuard::assertDownAllowed('KNOWLEDGE_MIGRATION');
         $p = $wpdb->prefix;
         foreach (['nhk_evidence', 'nhk_sources', 'nhk_knowledge_claims'] as $table) $wpdb->query("DROP TABLE IF EXISTS {$p}{$table}");
         update_option('nhk_core_migration_current', 4, false);

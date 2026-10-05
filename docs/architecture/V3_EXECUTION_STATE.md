@@ -22717,3 +22717,30 @@ pre-existing unrelated failures under the 512M run; the default memory limit
 also blocks a large existing fixture.
 
 STATUS: `PHASE_3B_ENVIRONMENT_ACCEPTANCE_BLOCKED / TEST_DATABASE_UNAVAILABLE / NO_CODE_CHANGE / NO_DATA_MUTATION / CANARY_AUDIT_NOT_ATTEMPTED`.
+
+# Checkpoint — 2026-10-05 — TEST RUNTIME IDENTITY POLICY CORRECTION
+
+CURRENT LAW: The authorized NHK V3 TEST RUNTIME is one explicit identity
+tuple: `WP_ENVIRONMENT_TYPE=staging`, database `erourxcg_nhkv3`, site/home URL
+`https://demo.1945.vn`, and project/runtime identity `nhk-v3`. All fields are
+required and are checked together. Production, an unknown staging runtime, a
+wrong site, a wrong database, missing identity fields, and legacy
+`nhk_v3_test` are fail-closed. The legacy database remains only as a named
+negative-compatibility case; it is not authorized.
+
+IMPLEMENTED: `TestRuntimeIdentityPolicy` is now the shared allowlist used by
+the migration UP/DOWN guards, destructive integration guard, P4 acceptance
+bootstrap and V2 apply tool. Existing migration DOWN guards no longer compare
+only a database name. Integration tests no longer select or assume a second
+database; they bootstrap the current authorized runtime and verify canonical
+identity before mutation.
+
+VALIDATION: Runtime identity unit coverage proves authorized tuple, wrong site,
+wrong database, production, unknown staging, missing fields and legacy
+`nhk_v3_test` rejection. Migration and database guard focused coverage passes;
+Migration002/025, integration acceptance and canary mutation were not run.
+
+NO LIVE DATA: No migration, staging write, production write, canary mutation,
+deployment or push occurred in this checkpoint.
+
+STATUS: `TEST_RUNTIME_IDENTITY_POLICY_CORRECTED / FOCUSED_TESTS_PENDING_FINAL_VERIFICATION / NO_DATA_MUTATION / MIGRATIONS_NOT_RUN`.

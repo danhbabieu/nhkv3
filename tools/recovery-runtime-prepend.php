@@ -4,7 +4,8 @@ declare(strict_types=1);
 /**
  * Non-secret bootstrap for the isolated local recovery runtime.
  *
- * The tracked WordPress config selects the database from NHK_WP_TEST_DB. This
+ * The tracked WordPress config selects the database from the configured
+ * runtime identity. This
  * prepend supplies only the recovery identity before that config is loaded;
  * it contains no credentials and exposes no semantic writer.
  */

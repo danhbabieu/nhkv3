@@ -39,7 +39,7 @@ final class ArticleIngestPost55ReconciliationIntegrationTest extends TestCase
     {
         $reader = new WpEditorialStateReader();
         $before = $reader->read(55);
-        if ($before === null || $before->status !== 'publish') self::markTestSkipped('nhk_v3_test has no existing published Post 55 fixture.');
+        if ($before === null || $before->status !== 'publish') self::markTestSkipped('Authorized test runtime has no existing published Post 55 fixture.');
 
         global $wpdb;
         $types = new EntityTypeRegistry(); CanonicalEntityTypeCatalog::registerInto($types);

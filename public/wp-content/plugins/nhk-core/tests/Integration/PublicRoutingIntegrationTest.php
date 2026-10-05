@@ -32,7 +32,7 @@ final class PublicRoutingIntegrationTest extends TestCase
     {
         $post = get_post(55);
         if (!$post instanceof \WP_Post || $post->post_status !== 'publish' || $post->post_type !== 'post' || $post->post_name !== 'dong-ho-24-may-tron-ten-goi-54-thi-truong-viet-nam') {
-            self::markTestSkipped('nhk_v3_test does not contain the confirmed published Post 55 fixture.');
+            self::markTestSkipped('Authorized test runtime does not contain the confirmed published Post 55 fixture.');
         }
 
         $wp = $this->runRequest('/dong-ho-24-may-tron-ten-goi-54-thi-truong-viet-nam/');

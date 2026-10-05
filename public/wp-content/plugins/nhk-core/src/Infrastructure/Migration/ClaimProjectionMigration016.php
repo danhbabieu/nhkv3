@@ -32,7 +32,7 @@ final class ClaimProjectionMigration016
     public function down(bool $force = false): void
     {
         global $wpdb;
-        if ((string) $wpdb->get_var('SELECT DATABASE()') !== 'nhk_v3_test' || !$force) throw new \RuntimeException('CLAIM_PROJECTION_MIGRATION_DOWN_REQUIRES_TEST_FORCE');
+        MigrationDatabaseGuard::assertDownAllowed('CLAIM_PROJECTION_MIGRATION'); if (!$force) throw new \RuntimeException('CLAIM_PROJECTION_MIGRATION_DOWN_REQUIRES_TEST_FORCE');
         foreach (['nhk_claim_projection_dependencies', 'nhk_claim_projection_revisions'] as $suffix) $wpdb->query('DROP TABLE IF EXISTS ' . $wpdb->prefix . $suffix);
     }
 }

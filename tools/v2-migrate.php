@@ -10,6 +10,7 @@ require dirname(__DIR__) . '/vendor/autoload.php';
 use NHK\Core\Application\Migration\V2MigrationService;
 use NHK\Core\Infrastructure\Migration\MigrationLedger006;
 use NHK\Core\Infrastructure\Migration\ProjectionContextMigration009;
+use NHK\Core\Shared\TestRuntimeIdentityPolicy;
 
 $input = null;
 $limit = 100;
@@ -58,8 +59,15 @@ if (!isset($wpdb) || !is_object($wpdb)) {
     exit(3);
 }
 $database = (string) $wpdb->get_var('SELECT DATABASE()');
-if (!in_array($database, ['nhk_v3_test', 'nhk_v3'], true)) {
-    fwrite(STDERR, "Refusing apply on database {$database}; target must be nhk_v3_test or nhk_v3.\n");
+$identity = TestRuntimeIdentityPolicy::evaluate([
+    'environment' => defined('WP_ENVIRONMENT_TYPE') ? (string) WP_ENVIRONMENT_TYPE : getenv('WP_ENVIRONMENT_TYPE'),
+    'database' => $database,
+    'site_url' => function_exists('home_url') ? (string) home_url('/') : '',
+    'project' => class_exists('NHK\\Core\\Plugin') ? TestRuntimeIdentityPolicy::PROJECT : '',
+    'runtime_identity' => class_exists('NHK\\Core\\Plugin') ? TestRuntimeIdentityPolicy::PROJECT : '',
+]);
+if ($identity['allowed'] !== true) {
+    fwrite(STDERR, "Refusing apply on unverified test runtime (" . (string) ($identity['reason'] ?? 'identity_mismatch') . ").\n");
     exit(3);
 }
 (new MigrationLedger006())->up();

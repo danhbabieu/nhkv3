@@ -23,7 +23,7 @@ final class ArticleIngestMigration010
     public function down(bool $force = false): void
     {
         global $wpdb;
-        if ((string) $wpdb->get_var('SELECT DATABASE()') !== 'nhk_v3_test') throw new \RuntimeException('ARTICLE_INGEST_MIGRATION_DOWN_REQUIRES_NHK_V3_TEST');
+        MigrationDatabaseGuard::assertDownAllowed('ARTICLE_INGEST_MIGRATION');
         if (!$force && (int) $wpdb->get_var('SELECT COUNT(*) FROM ' . $wpdb->prefix . 'nhk_article_operations') > 0) throw new \RuntimeException('ARTICLE_INGEST_MIGRATION_DOWN_REQUIRES_EMPTY_TABLE');
         $wpdb->query('DROP TABLE IF EXISTS ' . $wpdb->prefix . 'nhk_article_operations');
         update_option('nhk_core_migration_current', 9, false);
