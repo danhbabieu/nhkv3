@@ -92,7 +92,7 @@ final class DictionaryDetailQuery
             if ($entry instanceof LexicalEntry) return [$entry];
         }
         $out = [];
-        foreach ((array) $this->entries->listEntries(2000) as $entry) if ($entry instanceof LexicalEntry && $this->slug((string) ($entry->context['public_slug'] ?? $entry->preferredForm)) === $slug) $out[] = $entry;
+        foreach ((array) $this->entries->listEntries(2000) as $entry) if ($entry instanceof LexicalEntry && $this->slug((string) ($entry->context['public_slug'] ?? '')) === $slug) $out[] = $entry;
         return $out;
     }
 

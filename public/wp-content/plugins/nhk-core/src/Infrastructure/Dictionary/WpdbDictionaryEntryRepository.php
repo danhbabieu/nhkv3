@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Core\Infrastructure\Dictionary;
 
+use NHK\Core\Application\Dictionary\DictionaryEntryPublicIdentityWriter;
 use NHK\Core\Contracts\Dictionary\{DictionaryConceptRepository, DictionaryEntryRepository};
 use NHK\Core\Domain\Dictionary\{DictionaryConcept, LexicalEntry, LexicalEntryForm};
 use NHK\Core\Shared\Uuid\UuidCodec;
@@ -165,6 +166,50 @@ final class WpdbDictionaryEntryRepository implements DictionaryEntryRepository
         } catch (\Throwable) { return null; }
     }
 
+    public function publicSlugTaken(string $slug, ?string $excludeEntryId = null): bool
+    {
+        $sql = "SELECT e.id FROM {$this->entries} e WHERE e.status<>%s AND JSON_UNQUOTE(JSON_EXTRACT(e.context_json,'$.public_slug'))=%s";
+        $args = [DictionaryConcept::RETIRED, trim($slug)];
+        if ($excludeEntryId !== null && UuidCodec::isValid($excludeEntryId)) {
+            $sql .= ' AND e.entry_uuid<>%s';
+            $args[] = UuidCodec::toBinary($excludeEntryId);
+        }
+        $sql .= ' LIMIT 1';
+        return $this->database->get_var($this->database->prepare($sql, ...$args)) !== null;
+    }
+
+    public function syncStatusForSense(string $senseId, string $status): ?LexicalEntry
+    {
+        if (!in_array($status, [DictionaryConcept::DRAFT, DictionaryConcept::APPROVED, DictionaryConcept::RETIRED], true)) throw new \InvalidArgumentException('DICTIONARY_ENTRY_STATUS_INVALID');
+        $entry = $this->findDurableForConcept($senseId);
+        if (!$entry instanceof LexicalEntry || $entry->status === $status) return $entry;
+        $ok = $this->database->query($this->database->prepare(
+            "UPDATE {$this->entries} SET status=%s,revision=revision+1,updated_at=%s WHERE entry_uuid=%s AND revision=%d",
+            $status, gmdate('Y-m-d H:i:s.u'), UuidCodec::toBinary($entry->entryId), $entry->revision,
+        ));
+        if ($ok !== 1) throw new \RuntimeException('DICTIONARY_ENTRY_REVISION_CONFLICT');
+        $updated = $this->findById($entry->entryId);
+        if (!$updated instanceof LexicalEntry || $updated->status !== $status) throw new \RuntimeException('DICTIONARY_ENTRY_READBACK_FAILED');
+        return $updated;
+    }
+
+    public function ensurePublicIdentityForSense(string $senseId): ?LexicalEntry
+    {
+        $entry = $this->findDurableForConcept($senseId);
+        if (!$entry instanceof LexicalEntry) return null;
+        $writer = new DictionaryEntryPublicIdentityWriter(fn (string $slug, ?string $entryId = null): bool => $this->publicSlugTaken($slug, $entryId));
+        $updated = $writer->assign($entry);
+        if ($updated->context === $entry->context) return $entry;
+        $ok = $this->database->query($this->database->prepare(
+            "UPDATE {$this->entries} SET context_json=%s,revision=revision+1,updated_at=%s WHERE entry_uuid=%s AND revision=%d",
+            $this->json($updated->context), gmdate('Y-m-d H:i:s.u'), UuidCodec::toBinary($entry->entryId), $entry->revision,
+        ));
+        if ($ok !== 1) throw new \RuntimeException('DICTIONARY_ENTRY_REVISION_CONFLICT');
+        $read = $this->findById($entry->entryId);
+        if (!$read instanceof LexicalEntry || trim((string) ($read->context['public_slug'] ?? '')) === '') throw new \RuntimeException('DICTIONARY_ENTRY_PUBLIC_IDENTITY_READBACK_FAILED');
+        return $read;
+    }
+
     /** @return list<LexicalEntry> */
     public function findEntriesBySemanticReference(string $type, string $id, int $limit = 13): array
     {
@@ -176,6 +221,8 @@ final class WpdbDictionaryEntryRepository implements DictionaryEntryRepository
 
     public function createWithSense(LexicalEntry $entry, DictionaryConcept $sense, array $context = []): array
     {
+        $writer = new DictionaryEntryPublicIdentityWriter(fn (string $slug, ?string $entryId = null): bool => $this->publicSlugTaken($slug, $entryId));
+        $entry = $writer->assign($entry);
         if ($this->findById($entry->entryId) instanceof LexicalEntry) throw new \RuntimeException('DICTIONARY_ENTRY_DUPLICATE');
         $existingSense = $this->concepts->findById($sense->conceptId);
         if ($existingSense instanceof DictionaryConcept) $sense = $existingSense;

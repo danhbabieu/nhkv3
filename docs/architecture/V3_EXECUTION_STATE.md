@@ -22989,3 +22989,42 @@ migration, schema change, generic WordPress writer, direct database write,
 Governance bypass or lexical runtime-code change was part of this closeout.
 `READY_FOR_CON_HOA_THI_CANARY_PLAN` is planning readiness only, not canary
 completion or production authorization.
+
+# Checkpoint — 2026-10-05 — Dictionary new-entry public projection gap fixed locally (NO DATA MUTATION)
+
+ROOT_CAUSE: `dictionary.entry.create-with-sense` persisted Entry/Sense data but
+did not own Entry public route identity. New Entries therefore remained without
+a persisted `context_json.public_slug`, and approval changed the Sense/Concept
+without synchronizing Entry public eligibility. Entry-first public reads and
+resolver rows consequently had no canonical route, while the older 29 Entries
+already carried durable route identity. Profile preview also matched only a
+Concept ID instead of the projected Sense ID.
+
+FIX: A single `DictionaryEntryPublicIdentityWriter` now applies the existing
+canonical slug policy at Entry creation and preferred-label activation. The
+repository persists the result with optimistic CAS and canonical read-back;
+collision resolution uses only meaningful Dictionary context qualifiers and
+fails closed when reconciliation is required. Concept lifecycle approval,
+retirement and reactivation synchronize the mapped Entry status through the
+same revision-bound repository boundary.
+
+PROJECTION: Approved Entry forms now participate in resolver/search lookup,
+resolver rows use the persisted Entry slug, profile preview matches projected
+Sense IDs, and all mutation paths invalidate the in-process label projection
+after a successful non-replay mutation. Reads no longer derive a Dictionary
+URL from a UUID or preferred label.
+
+REGRESSION COVERAGE: New approved Entry/Sense creation, preferred form
+materialization, persisted slug, Entry route/detail round-trip, exact search,
+resolver destination URL, public preview readiness, idempotent replay,
+deterministic collision handling and preservation of the existing `400-ngay`
+Entry are covered by the focused Dictionary Unit slice. Focused validation
+passes 49 tests / 144 assertions; changed PHP files lint clean and `git
+diff --check` passes.
+
+BOUNDARIES: Original 29-entry materialization was not rerun. Migration015,
+Authority, Graph, Knowledge, production and TEST runtime data were not
+mutated. MCP public read-back remains a separate read-only verification step.
+
+STATUS: `DICTIONARY_NEW_ENTRY_PUBLIC_PROJECTION_FIXED / FOCUSED_UNIT_PASS /
+MCP_PUBLIC_READBACK_PENDING / NO_DATA_MUTATION`.

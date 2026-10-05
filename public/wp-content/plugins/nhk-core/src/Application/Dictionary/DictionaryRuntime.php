@@ -485,8 +485,29 @@ final class DictionaryRuntime
             $concept = $this->concepts->findById($requestedConcept);
             if ($concept === null) $preview = ['status' => 'not_found'];
             else {
-                foreach ($publicItems as $item) if ((string) ($item['concept_id'] ?? '') === $requestedConcept) { $preview = ['status' => 'READY', 'item' => $item]; break; }
-                $preview ??= $this->publicQuery->detail((string) ($concept->context['public_slug'] ?? ''));
+                foreach ($publicItems as $item) {
+                    $senseMatch = false;
+                    foreach ((array) ($item['senses'] ?? []) as $sense) {
+                        if (is_array($sense) && (string) ($sense['sense_id'] ?? '') === $requestedConcept) {
+                            $senseMatch = true;
+                            break;
+                        }
+                    }
+                    if ((string) ($item['concept_id'] ?? '') === $requestedConcept || $senseMatch) {
+                        $preview = ['status' => 'READY', 'item' => $item];
+                        break;
+                    }
+                }
+                if ($preview === null && method_exists($this->entries, 'findDurableForConcept')) {
+                    $entry = $this->entries->findDurableForConcept($requestedConcept);
+                    $persistedSlug = $entry instanceof \NHK\Core\Domain\Dictionary\LexicalEntry
+                        ? trim((string) ($entry->context['public_slug'] ?? ''))
+                        : '';
+                    $preview = $persistedSlug !== ''
+                        ? $this->publicQuery->detail($persistedSlug)
+                        : ['status' => 'not_found'];
+                }
+                $preview ??= ['status' => 'not_found'];
             }
         } elseif (trim((string) ($slug ?? '')) !== '') {
             $preview = $this->publicQuery->detail((string) $slug);
@@ -508,6 +529,7 @@ final class DictionaryRuntime
     public function mutation(): DictionaryMutationService
     {
         $audit = new WpdbAuditSink($this->database);
+        $publicIdentityWriter = new DictionaryEntryPublicIdentityWriter(fn (string $slug, ?string $entryId = null): bool => $this->entries->publicSlugTaken($slug, $entryId));
         return new DictionaryMutationService(
             $this->concepts,
             null,
@@ -531,6 +553,8 @@ final class DictionaryRuntime
                 return $this->revalidateDelegatedDestination($type, $id, $url);
             },
             fn (): bool => $this->entrySenseAvailable(),
+            $publicIdentityWriter,
+            function (): void { $this->invalidateLabelCache(); },
         );
     }
 
@@ -566,6 +590,13 @@ final class DictionaryRuntime
             if (!$entity instanceof AuthorityEntity || !$entity->active()) continue;
             foreach ($this->entityForms($entity) as $form) $labels[$this->normalizer->normalize($form)] = $form;
         }
+        if ($this->entrySenseAvailable()) foreach ($this->entries->listEntries(2000) as $entry) {
+            if (!$entry instanceof \NHK\Core\Domain\Dictionary\LexicalEntry || $entry->status !== DictionaryConcept::APPROVED) continue;
+            foreach ($this->entries->listForms($entry) as $form) {
+                $text = is_object($form) ? (string) ($form->form ?? '') : (string) ($form['form'] ?? '');
+                if (trim($text) !== '') $labels[$this->normalizer->normalize($text)] = $text;
+            }
+        }
         return $this->detectionLabels = array_values(array_filter($labels));
     }
 
@@ -575,6 +606,46 @@ final class DictionaryRuntime
     private function approvedLabelRows(string $term, array $context): array
     {
         $rows = [];
+        if ($this->entrySenseAvailable() && method_exists($this->entries, 'findByForm')) {
+            foreach ((array) $this->entries->findByForm($term, $context) as $entry) {
+                if (!$entry instanceof \NHK\Core\Domain\Dictionary\LexicalEntry || $entry->status !== DictionaryConcept::APPROVED) continue;
+                $slug = trim((string) ($entry->context['public_slug'] ?? ''));
+                if ($slug === '') continue;
+                foreach ((array) $this->entries->listSenses($entry, $context) as $sense) {
+                    if (!$sense instanceof DictionaryConcept || !$sense->approved()) continue;
+                    $type = null;
+                    $id = null;
+                    $url = null;
+                    if (method_exists($this->entries, 'semanticReference')) {
+                        $reference = $this->entries->semanticReference($entry->entryId, $sense->conceptId);
+                        if (strtoupper((string) ($reference['status'] ?? 'ABSENT')) !== 'ABSENT') {
+                            $type = trim((string) ($reference['type'] ?? '')) ?: null;
+                            $id = trim((string) ($reference['id'] ?? '')) ?: null;
+                            if ($type !== null || $id !== null) {
+                                if ($type === null || $id === null || ($url = $this->revalidateDelegatedDestination($type, $id, null)) === null) continue;
+                            }
+                        }
+                    }
+                    if ($type === null || $id === null) {
+                        $type = 'dictionary';
+                        $id = $sense->conceptId;
+                        $url = '/tu-dien/' . $slug . '/';
+                    }
+                    $rows[] = [
+                        'concept_id' => $sense->conceptId,
+                        'preferred_label' => $sense->preferredLabel,
+                        'destination_type' => $type,
+                        'destination_id' => $id,
+                        'destination_url' => $url,
+                        'label' => $entry->preferredForm,
+                        'label_kind' => 'PREFERRED',
+                        'locale' => $entry->locale,
+                        'context' => $sense->context,
+                    ];
+                }
+            }
+            if ($rows !== []) return $rows;
+        }
         foreach ($this->concepts->findApprovedByNormalizedLabel($term, $context) as $row) {
             if (!is_array($row)) continue;
             $conceptId = trim((string) ($row['concept_id'] ?? ''));
@@ -592,7 +663,7 @@ final class DictionaryRuntime
 
             $concept = $this->concepts->findById($conceptId);
             if (!$concept instanceof DictionaryConcept || !$concept->approved()) continue;
-            $slug = $this->slug((string) ($concept->context['public_slug'] ?? ''));
+            $slug = trim((string) ($concept->context['public_slug'] ?? ''));
             $row['destination_type'] = 'dictionary';
             $row['destination_id'] = $concept->conceptId;
             $row['destination_url'] = $slug !== '' ? '/tu-dien/' . $slug . '/' : null;

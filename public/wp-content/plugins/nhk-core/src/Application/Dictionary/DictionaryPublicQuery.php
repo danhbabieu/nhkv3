@@ -46,7 +46,7 @@ final class DictionaryPublicQuery
         if ($this->entrySenseAvailable() && is_object($this->entries) && method_exists($this->entries, 'listEntries')) {
             $matches = [];
             foreach ((array) $this->entries->listEntries(2000) as $entry) {
-                if (!$entry instanceof LexicalEntry || $this->slug((string) ($entry->context['public_slug'] ?? $entry->preferredForm)) !== $slug) continue;
+                if (!$entry instanceof LexicalEntry || $this->slug((string) ($entry->context['public_slug'] ?? '')) !== $slug) continue;
                 $matches[] = $entry;
             }
             if (count($matches) > 1) return ['status' => 'AMBIGUOUS', 'slug' => $slug, 'match_count' => count($matches)];
@@ -75,7 +75,7 @@ final class DictionaryPublicQuery
     /** Lightweight Entry summary used by hub/search; no dossier, Graph or source reads. */
     private function entryHubItem(LexicalEntry $entry, array $senses): array
     {
-        $slug = $this->slug((string) ($entry->context['public_slug'] ?? $entry->preferredForm));
+        $slug = $this->slug((string) ($entry->context['public_slug'] ?? ''));
         if ($senses === [] || $slug === '') return ['eligible' => false, 'entry_id' => $entry->entryId];
         $forms = $this->entryForms($entry);
         $labels = [];
@@ -180,7 +180,7 @@ final class DictionaryPublicQuery
 
     private function entryItem(LexicalEntry $entry, array $senses): array
     {
-        $entrySlug = $this->slug((string) ($entry->context['public_slug'] ?? $entry->preferredForm));
+        $entrySlug = $this->slug((string) ($entry->context['public_slug'] ?? ''));
         $senseItems = [];
         foreach ($senses as $sense) {
             $item = $this->item($sense);
@@ -301,7 +301,7 @@ final class DictionaryPublicQuery
             $sharedOwner = false;
             foreach ($candidateSenses as $candidateSense) if ($candidateSense instanceof DictionaryConcept && $candidateSense->destinationType === $ownerType && $candidateSense->destinationId === $ownerId) { $sharedOwner = true; break; }
             if (!$sharedOwner) continue;
-            $slug = $this->slug((string) ($candidate->context['public_slug'] ?? $candidate->preferredForm));
+            $slug = $this->slug((string) ($candidate->context['public_slug'] ?? ''));
             if ($slug === '') continue;
             $items[] = ['entry_id' => $candidate->entryId, 'title' => $candidate->preferredForm, 'url' => '/tu-dien/' . $slug . '/'];
             if (count($items) >= $limit) break;

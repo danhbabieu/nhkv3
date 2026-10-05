@@ -26,6 +26,8 @@ final class DictionaryMutationService
         private $entryRepository = null,
         private $knowledgeValidator = null,
         private $entrySenseReady = null,
+        private $entryPublicIdentityWriter = null,
+        private $cacheInvalidator = null,
     ) {}
 
     public function updateConcept(string $conceptId, int $expectedRevision, string $preferredLabel, string $definition, array $context, string $idempotencyKey): array
@@ -58,7 +60,12 @@ final class DictionaryMutationService
                 $saved = $this->concepts->addLabel($label);
                 $this->concepts->updateConcept(new DictionaryConcept($current->conceptId, $current->preferredLabel, $current->definition, $current->status, $current->destinationType, $current->destinationId, $current->destinationUrl, $current->context, $current->revision), $expectedRevision);
             }
-            return ['label' => $saved, 'concept' => $this->concepts->findById($current->conceptId)];
+            $result = ['label' => $saved, 'concept' => $this->concepts->findById($current->conceptId)];
+            if ($label->kind === DictionaryLabel::PREFERRED && $label->active && is_object($this->entryRepository) && method_exists($this->entryRepository, 'ensurePublicIdentityForSense')) {
+                $entry = $this->entryRepository->ensurePublicIdentityForSense($current->conceptId);
+                if ($entry instanceof LexicalEntry) $result['entry'] = $entry;
+            }
+            return $result;
         });
     }
 
@@ -69,7 +76,13 @@ final class DictionaryMutationService
         $payload = ['operation' => 'set_status', 'concept_id' => $conceptId, 'expected_revision' => $expectedRevision, 'status' => $status];
         return $this->mutate($idempotencyKey, $payload, function () use ($current, $expectedRevision, $status): array {
             $updated = new DictionaryConcept($current->conceptId, $current->preferredLabel, $current->definition, $status, $current->destinationType, $current->destinationId, $current->destinationUrl, $current->context, $current->revision);
-            return ['concept' => $this->concepts->updateConcept($updated, $expectedRevision)];
+            $concept = $this->concepts->updateConcept($updated, $expectedRevision);
+            $result = ['concept' => $concept];
+            if (is_object($this->entryRepository) && method_exists($this->entryRepository, 'syncStatusForSense')) {
+                $entry = $this->entryRepository->syncStatusForSense($concept->conceptId, $status);
+                if ($entry instanceof LexicalEntry) $result['entry'] = $entry;
+            }
+            return $result;
         });
     }
 
@@ -92,6 +105,7 @@ final class DictionaryMutationService
         return $this->mutate($idempotencyKey, ['operation' => 'entry.create-with-sense'] + $payload, function () use ($preferredForm, $normalized, $definition, $context, $locale): array {
             $sense = new DictionaryConcept(UuidCodec::newV7(), $preferredForm, trim($definition), DictionaryConcept::DRAFT, null, null, null, $context, 1);
             $entry = new LexicalEntry(UuidCodec::newV7(), $preferredForm, $normalized, DictionaryConcept::DRAFT, $locale, $context, 1, [$sense->conceptId]);
+            if ($this->entryPublicIdentityWriter instanceof DictionaryEntryPublicIdentityWriter) $entry = $this->entryPublicIdentityWriter->assign($entry);
             $result = ($this->entryRepository)->createWithSense($entry, $sense, $context);
             if (!is_array($result) || !($result['entry'] ?? null) instanceof LexicalEntry || !($result['sense'] ?? null) instanceof DictionaryConcept) throw new \RuntimeException('DICTIONARY_ENTRY_READBACK_FAILED');
             return $result;
@@ -181,6 +195,7 @@ final class DictionaryMutationService
         }
         $result = $operation();
         if (is_callable($this->receiptWriter)) ($this->receiptWriter)($key, $fingerprint, $result + ['actor_user_id' => is_callable($this->actor) ? ($this->actor)() : null]);
+        if (is_callable($this->cacheInvalidator)) ($this->cacheInvalidator)();
         return $result;
     }
 

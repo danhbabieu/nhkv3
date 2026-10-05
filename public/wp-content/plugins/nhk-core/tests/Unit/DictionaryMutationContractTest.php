@@ -64,6 +64,46 @@ final class DictionaryMutationContractTest extends TestCase
         self::assertSame(3, $reactivated['concept']->revision);
     }
 
+    public function test_approving_a_sense_syncs_entry_public_eligibility_and_invalidates_only_once_on_replay(): void
+    {
+        $repo = new class implements DictionaryConceptRepository {
+            public DictionaryConcept $concept;
+            public function __construct() { $this->concept = new DictionaryConcept('concept-1', 'Kính rào', 'Nghĩa', DictionaryConcept::DRAFT, null, null, null, [], 1); }
+            public function findById(string $conceptId): ?DictionaryConcept { return $this->concept; }
+            public function findApprovedByNormalizedLabel(string $normalizedLabel, array $context = []): array { return []; }
+            public function listApproved(int $limit = 500): array { return []; }
+            public function listLabels(string $conceptId, bool $includeInactive = false): array { return []; }
+            public function createConcept(DictionaryConcept $concept): DictionaryConcept { return $concept; }
+            public function updateConcept(DictionaryConcept $concept, int $expectedRevision): DictionaryConcept { return $this->concept = new DictionaryConcept($concept->conceptId, $concept->preferredLabel, $concept->definition, $concept->status, null, null, null, $concept->context, $expectedRevision + 1); }
+            public function addLabel(DictionaryLabel $label): DictionaryLabel { return $label; }
+            public function saveLabel(DictionaryLabel $label, string $previousNormalizedLabel, int $expectedConceptRevision): DictionaryLabel { return $label; }
+        };
+        $entries = new class {
+            public LexicalEntry $entry;
+            public function __construct() { $this->entry = new LexicalEntry('entry-1', 'Kính rào', 'kính rào', DictionaryConcept::DRAFT, 'vi-VN', ['public_slug' => 'kinh-rao'], 1, ['concept-1']); }
+            public function syncStatusForSense(string $senseId, string $status): LexicalEntry
+            {
+                return $this->entry = new LexicalEntry($this->entry->entryId, $this->entry->preferredForm, $this->entry->normalizedPreferredForm, $status, $this->entry->locale, $this->entry->context, $this->entry->revision + 1, $this->entry->senseIds);
+            }
+        };
+        $receipts = [];
+        $invalidations = 0;
+        $service = new DictionaryMutationService(
+            $repo,
+            receiptReader: static function (string $key, string $fingerprint) use (&$receipts): ?array { return $receipts[$key] ?? null; },
+            receiptWriter: static function (string $key, string $fingerprint, array $result) use (&$receipts): void { $receipts[$key] = ['fingerprint' => $fingerprint, 'result' => $result]; },
+            entryRepository: $entries,
+            cacheInvalidator: static function () use (&$invalidations): void { $invalidations++; },
+        );
+
+        $first = $service->setConceptStatus('concept-1', 1, DictionaryConcept::APPROVED, 'approve-entry-1');
+        $replay = $service->setConceptStatus('concept-1', 1, DictionaryConcept::APPROVED, 'approve-entry-1');
+
+        self::assertSame(DictionaryConcept::APPROVED, $first['entry']->status);
+        self::assertSame($first['entry']->revision, $replay['entry']->revision);
+        self::assertSame(1, $invalidations);
+    }
+
     public function test_entry_lifecycle_requires_entry_repository_and_returns_read_back(): void
     {
         $repo = new class implements DictionaryConceptRepository {
@@ -84,6 +124,35 @@ final class DictionaryMutationContractTest extends TestCase
         self::assertInstanceOf(LexicalEntry::class, $result['entry']);
         self::assertInstanceOf(DictionaryConcept::class, $result['sense']);
         self::assertSame(1, $result['entry']->revision);
+    }
+
+    public function test_new_entry_creation_persists_one_canonical_public_slug_before_read_back(): void
+    {
+        $repo = new class implements DictionaryConceptRepository {
+            public function findById(string $conceptId): ?DictionaryConcept { return new DictionaryConcept($conceptId, 'Kính rào', 'Nghĩa', DictionaryConcept::DRAFT); }
+            public function findApprovedByNormalizedLabel(string $normalizedLabel, array $context = []): array { return []; }
+            public function listApproved(int $limit = 500): array { return []; }
+            public function listLabels(string $conceptId, bool $includeInactive = false): array { return []; }
+            public function createConcept(DictionaryConcept $concept): DictionaryConcept { return $concept; }
+            public function updateConcept(DictionaryConcept $concept, int $expectedRevision): DictionaryConcept { return $concept; }
+            public function addLabel(DictionaryLabel $label): DictionaryLabel { return $label; }
+            public function saveLabel(DictionaryLabel $label, string $previousNormalizedLabel, int $expectedConceptRevision): DictionaryLabel { return $label; }
+        };
+        $entries = new class {
+            public ?LexicalEntry $written = null;
+            public function createWithSense(LexicalEntry $entry, DictionaryConcept $sense, array $context): array
+            {
+                $this->written = $entry;
+                return ['entry' => $entry, 'sense' => $sense, 'forms' => []];
+            }
+        };
+        $writer = new \NHK\Core\Application\Dictionary\DictionaryEntryPublicIdentityWriter(static fn (string $slug, ?string $entryId = null): bool => false);
+        $service = new DictionaryMutationService($repo, entryRepository: $entries, entryPublicIdentityWriter: $writer);
+
+        $result = $service->createEntryWithSense('Kính rào', 'Nghĩa', [], 'entry-create-public-1');
+
+        self::assertSame('kinh-rao', $result['entry']->context['public_slug']);
+        self::assertSame('kinh-rao', $entries->written?->context['public_slug']);
     }
 
     public function test_entry_write_fails_closed_when_entry_sense_schema_is_unavailable(): void

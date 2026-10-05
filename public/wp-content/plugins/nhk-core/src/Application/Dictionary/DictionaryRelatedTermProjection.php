@@ -20,7 +20,7 @@ final class DictionaryRelatedTermProjection
                     $target = (string) ($relation->sourceEntryUuid ?? '') === $currentEntryId ? (string) ($relation->targetEntryUuid ?? '') : (string) ($relation->sourceEntryUuid ?? '');
                     if ($target === '' || $target === $currentEntryId || !method_exists($this->entries, 'findById')) continue;
                     $entry = $this->entries->findById($target);
-                    $slug = is_object($entry) ? $this->slug((string) (($entry->context['public_slug'] ?? '') ?: ($entry->preferredForm ?? ''))) : '';
+                    $slug = is_object($entry) ? $this->slug((string) ($entry->context['public_slug'] ?? '')) : '';
                     $title = is_object($entry) ? trim((string) ($entry->preferredForm ?? '')) : '';
                     if ($slug === '' || $title === '') continue;
                     $items[$target] = ['entry_id'=>$target,'title'=>$title,'url'=>'/tu-dien/'.$slug.'/','relation_kind'=>(string) ($relation->kind ?? 'RELATED'),'origin'=>'EXPLICIT_LEXICAL'];
@@ -44,7 +44,7 @@ final class DictionaryRelatedTermProjection
             try { $rows = $this->entries->findEntriesBySemanticReference($owner['type'], $owner['id'], $limit + 1); } catch (\Throwable) { continue; }
             foreach ((array) $rows as $entry) {
                 if (!is_object($entry) || (string) ($entry->entryId ?? '') === $currentEntryId) continue;
-                $slug = $this->slug((string) (($entry->context['public_slug'] ?? '') ?: ($entry->preferredForm ?? '')));
+                $slug = $this->slug((string) ($entry->context['public_slug'] ?? ''));
                 $title = trim((string) ($entry->preferredForm ?? ''));
                 if ($slug === '' || $title === '') continue;
                 $key = (string) ($entry->entryId ?? $slug);

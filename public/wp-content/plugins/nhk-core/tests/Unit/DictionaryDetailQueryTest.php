@@ -95,7 +95,7 @@ final class DictionaryDetailQueryTest extends TestCase
         self::assertSame('de-DE', $result['item']['forms'][0]['locale']);
     }
 
-    public function test_detail_resolves_the_same_fallback_slug_emitted_by_the_hub(): void
+    public function test_detail_does_not_derive_a_route_from_preferred_form_without_persisted_identity(): void
     {
         $sense = new DictionaryConcept('sense-fallback', '400 ngày', 'Định nghĩa', DictionaryConcept::APPROVED);
         $entry = new LexicalEntry('entry-fallback', '400 ngày', '400 ngày', DictionaryConcept::APPROVED, 'vi-VN', [], 1, [$sense->conceptId]);
@@ -110,12 +110,10 @@ final class DictionaryDetailQueryTest extends TestCase
 
         $result = (new DictionaryDetailQuery(new class { public function listLabels(string $id): array { return []; } }, $entries))->detail('400-ng-ay');
 
-        self::assertSame('READY', $result['status']);
-        self::assertSame('400 ngày', $result['item']['title']);
-        self::assertSame('/tu-dien/400-ng-ay/', $result['item']['url']);
+        self::assertSame('NOT_FOUND', $result['status']);
     }
 
-    public function test_detail_fails_closed_when_fallback_slug_is_shared_by_two_entries(): void
+    public function test_detail_does_not_resolve_shared_preferred_form_without_persisted_identity(): void
     {
         $firstSense = new DictionaryConcept('sense-first', 'Côn máy', 'Máy', DictionaryConcept::APPROVED);
         $secondSense = new DictionaryConcept('sense-second', 'Côn bút', 'Bút', DictionaryConcept::APPROVED);
@@ -131,7 +129,7 @@ final class DictionaryDetailQueryTest extends TestCase
 
         $result = (new DictionaryDetailQuery(new class { public function listLabels(string $id): array { return []; } }, $entries))->detail('c-on-m-ay');
 
-        self::assertSame('AMBIGUOUS', $result['status']);
+        self::assertSame('NOT_FOUND', $result['status']);
     }
 
     public function test_detail_adapts_canonical_facets_and_primary_gallery_media_without_relation_shortcuts(): void
