@@ -1,5 +1,38 @@
 # NHK V3 Execution State
 
+## Checkpoint — 2026-10-05 — Phase 3B runtime acceptance gaps fixed locally
+
+ROOT_CAUSES: Lexical Governance apply used an in-memory fallback when its
+canonical repository read-back missed the new relation; semantic Governance
+apply returned the saved edge/context without an independent paired read-back;
+semantic lifecycle preview required new Evidence instead of binding the exact
+existing relation context; and the lexical preview catalog omitted the
+adapter-required lifecycle selector fields.
+
+IMPLEMENTATION: Both relation adapters now use their configured canonical
+repositories for post-write and idempotent replay read-back, fail closed when
+the durable relation/context is missing, and allow the transaction manager to
+rollback the write. Semantic RETIRE/REACTIVATE preview binds the existing
+context and its revision/evidence/provenance without weakening ADD/REPLACE
+Evidence validation. The lexical MCP preview schema now exposes
+`relation_uuid` and `expected_revision` while preserving ADD compatibility.
+
+REGRESSION COVERAGE: Focused Phase 3B tests cover lexical ADD → READ →
+REPLACE → READ → RETIRE → READ → REACTIVATE → READ, exact fingerprint/replan
+behavior, idempotent replay, independent read-back failure and transaction
+rollback, semantic lifecycle context reuse without new Evidence, and MCP
+schema parity.
+
+VERIFICATION: Focused tests pass 10 tests / 42 assertions. Changed PHP files
+lint clean and `git diff --check` passes. The broader Dictionary/Graph/MCP unit
+selection has 28 pre-existing documentation-manifest errors and 7 unrelated
+documentation/runtime assertion failures in the current local environment;
+none is in the changed adapter/schema tests. No migration, fixture data
+mutation, deployment or live runtime acceptance rerun was performed.
+
+STATUS: `PHASE3B_RUNTIME_ACCEPTANCE_GAPS_FIXED_LOCAL / FOCUSED_GREEN /
+BROADER_BASELINE_DOC_MANIFEST_FAILURES / NO_DATA_MUTATION / COMMIT_PENDING`
+
 ## Checkpoint — 2026-10-04 — Universal one-text image uploader contract
 
 CURRENT LAW: The normal image uploader exposes one semantic field,

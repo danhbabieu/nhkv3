@@ -139,6 +139,17 @@ final class McpContractTest extends TestCase
         ], array_column(McpToolCatalog::tools(), 'name'));
     }
 
+    public function test_lexical_lifecycle_preview_exposes_exact_relation_and_revision_fields(): void
+    {
+        $tool = array_column(McpToolCatalog::tools(), null, 'name')['nhk.dictionary.lexical-relation.preview'];
+        self::assertArrayHasKey('relation_uuid', $tool['inputSchema']['properties']);
+        self::assertArrayHasKey('expected_revision', $tool['inputSchema']['properties']);
+        self::assertContains('string', (array) $tool['inputSchema']['properties']['relation_uuid']['type']);
+        self::assertSame('integer', $tool['inputSchema']['properties']['expected_revision']['type']);
+        self::assertContains('operation', $tool['inputSchema']['required']);
+        self::assertContains('source_entry_uuid', $tool['inputSchema']['required']);
+    }
+
     public function test_documentation_tools_are_read_only_and_allowlisted(): void
     {
         $tools = array_column(McpToolCatalog::tools(), null, 'name');

@@ -44,6 +44,21 @@ final class Phase2GovernanceAdapterTest extends TestCase
         unset($GLOBALS['phase2_source']);
     }
 
+    public function test_graph_lifecycle_preview_reuses_existing_context_without_new_evidence(): void
+    {
+        $edgeUuid = UuidCodec::newV7();
+        $context = new \NHK\Core\Domain\Graph\GraphRelationContext(UuidCodec::newV7(), $edgeUuid, 1, 1, 'dictionary', 'component', UuidCodec::newV7(), 'EXTERNAL_RESEARCH', [['evidence_id' => UuidCodec::newV7()]], str_repeat('a', 64), 'existing-context');
+        $contexts = new class($context) {
+            public function __construct(private object $context) {}
+            public function findByEdgeUuid(string $uuid): ?object { return $uuid === $this->context->edgeUuid ? $this->context : null; }
+        };
+        $adapter = new SemanticRelationGovernanceAdapter('1.1.0', 'registry-hash', static fn (string $type, string $id): array => ['active' => true, 'revision' => 1], static fn (array $plan): array => [], null, $contexts);
+        $preview = $adapter->preview(['operation' => 'RETIRE', 'source' => ['type' => 'component', 'id' => $context->scopeSubjectId], 'target' => ['type' => 'music', 'id' => UuidCodec::newV7()], 'predicate' => 'associated_with', 'scope_code' => 'dictionary', 'provenance' => '', 'evidence_refs' => [], 'edge_uuid' => $edgeUuid, 'expected_edge_revision' => 1, 'idempotency_key' => 'semantic-retire-existing']);
+
+        self::assertSame('READY', $preview['status']);
+        self::assertSame(1, $preview['plan']['expected_context_revision']);
+    }
+
     public function test_lexical_adapter_rejects_entry_level_broader_and_keeps_governance_boundary(): void
     {
         $adapter = new DictionaryLexicalRelationGovernanceAdapter(
@@ -86,5 +101,44 @@ final class Phase2GovernanceAdapterTest extends TestCase
         $changedPlan['provenance'] = ['source' => 'changed'];
         self::assertSame('REPLAN_REQUIRED', $adapter->apply($changedPlan, $plan['plan_fingerprint'], 'lexical-apply')['status']);
         self::assertSame('REPLAN_REQUIRED', $adapter->apply($plan['plan'], 'wrong-fingerprint', 'lexical-apply')['status']);
+    }
+
+    public function test_lexical_relation_full_lifecycle_reads_canonical_revision_after_each_transition(): void
+    {
+        $repo = new class implements \NHK\Core\Contracts\Dictionary\DictionaryLexicalRelationRepository {
+            public ?\NHK\Core\Domain\Dictionary\DictionaryLexicalRelation $saved = null;
+            public function create(\NHK\Core\Domain\Dictionary\DictionaryLexicalRelation $relation): \NHK\Core\Domain\Dictionary\DictionaryLexicalRelation { return $this->saved = $relation; }
+            public function findByUuid(string $uuid): ?\NHK\Core\Domain\Dictionary\DictionaryLexicalRelation { return $this->saved?->relationUuid === $uuid ? $this->saved : null; }
+            public function findByIdempotencyKey(string $key): ?\NHK\Core\Domain\Dictionary\DictionaryLexicalRelation { return null; }
+            public function update(\NHK\Core\Domain\Dictionary\DictionaryLexicalRelation $relation, int $expectedRevision): \NHK\Core\Domain\Dictionary\DictionaryLexicalRelation { return $this->saved = new \NHK\Core\Domain\Dictionary\DictionaryLexicalRelation($relation->relationUuid, $relation->sourceEntryUuid, $relation->sourceSenseUuid, $relation->targetEntryUuid, $relation->targetSenseUuid, $relation->kind, $relation->provenance, $relation->idempotencyKey, $relation->state, $expectedRevision + 1); }
+            public function retire(\NHK\Core\Domain\Dictionary\DictionaryLexicalRelation $relation, int $expectedRevision): \NHK\Core\Domain\Dictionary\DictionaryLexicalRelation { return $this->saved = $relation->retired($expectedRevision); }
+            public function reactivate(\NHK\Core\Domain\Dictionary\DictionaryLexicalRelation $relation, int $expectedRevision): \NHK\Core\Domain\Dictionary\DictionaryLexicalRelation { return $this->saved = $relation->reactivated($expectedRevision); }
+            public function listForEntry(string $entryUuid, int $afterId = 0, int $limit = 100, bool $includeRetired = false): array { return ['items' => [], 'next_cursor' => null]; }
+        };
+        $source = UuidCodec::newV7(); $target = UuidCodec::newV7();
+        $adapter = new DictionaryLexicalRelationGovernanceAdapter($repo, static fn (string $id): array => ['active' => true], static fn (string $entry, string $sense): bool => true);
+        $base = ['source_entry_uuid' => $source, 'target_entry_uuid' => $target, 'kind' => 'RELATED'];
+        $add = $adapter->preview($base + ['operation' => 'ADD', 'provenance' => ['source' => 'lifecycle'], 'idempotency_key' => 'lexical-lifecycle']);
+        $added = $adapter->apply($add['plan'], $add['plan_fingerprint'], 'lexical-lifecycle');
+        self::assertSame(1, $added['relation']['revision']);
+        $relation = $added['relation'];
+        self::assertSame('available', $adapter->read(['relation_uuid' => $relation['relation_uuid']])['status']);
+
+        $replace = $adapter->preview($base + ['operation' => 'REPLACE', 'relation_uuid' => $relation['relation_uuid'], 'expected_revision' => 1, 'provenance' => ['source' => 'replaced'], 'idempotency_key' => 'lexical-replace']);
+        $replaced = $adapter->apply($replace['plan'], $replace['plan_fingerprint'], 'lexical-replace');
+        self::assertSame(2, $replaced['relation']['revision']);
+        self::assertSame(['source' => 'replaced'], $adapter->read(['relation_uuid' => $relation['relation_uuid']])['relation']['provenance']);
+
+        $retire = $adapter->preview($base + ['operation' => 'RETIRE', 'relation_uuid' => $relation['relation_uuid'], 'expected_revision' => 2, 'idempotency_key' => 'lexical-retire']);
+        $retired = $adapter->apply($retire['plan'], $retire['plan_fingerprint'], 'lexical-retire');
+        self::assertSame('RETIRED', $retired['relation']['state']);
+        self::assertSame(3, $retired['relation']['revision']);
+        self::assertSame('RETIRED', $adapter->read(['relation_uuid' => $relation['relation_uuid']])['relation']['state']);
+
+        $reactivate = $adapter->preview($base + ['operation' => 'REACTIVATE', 'relation_uuid' => $relation['relation_uuid'], 'expected_revision' => 3, 'idempotency_key' => 'lexical-reactivate']);
+        $active = $adapter->apply($reactivate['plan'], $reactivate['plan_fingerprint'], 'lexical-reactivate');
+        self::assertSame('ACTIVE', $active['relation']['state']);
+        self::assertSame(4, $active['relation']['revision']);
+        self::assertSame('ACTIVE', $adapter->read(['relation_uuid' => $relation['relation_uuid']])['relation']['state']);
     }
 }

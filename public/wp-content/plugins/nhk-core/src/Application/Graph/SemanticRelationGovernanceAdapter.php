@@ -24,11 +24,25 @@ final class SemanticRelationGovernanceAdapter
         if (($sourceState['active'] ?? false) !== true || ($targetState['active'] ?? false) !== true) return $this->blocked($base,'OWNER_INACTIVE');
         $context = (array) ($input['context'] ?? []);
         if (trim((string) ($input['scope_code'] ?? $context['scope_code'] ?? '')) === '') return $this->blocked($base,'SCOPE_INVALID');
-        if (trim((string) ($input['provenance'] ?? '')) === '') return $this->blocked($base,'PROVENANCE_REQUIRED');
-        if (($input['evidence_refs'] ?? []) === []) return $this->blocked($base,'EVIDENCE_REQUIRED');
-        if (in_array($operation,['REPLACE','RETIRE','REACTIVATE'],true) && trim((string) ($input['edge_uuid'] ?? '')) === '') return $this->blocked($base,'EXACT_EDGE_REQUIRED');
-        if (in_array($operation,['REPLACE','RETIRE','REACTIVATE'],true) && (int) ($input['expected_edge_revision'] ?? 0) < 1) return $this->blocked($base,'STALE_EDGE_REVISION');
-        $plan = ['operation'=>$operation,'source'=>$source,'target'=>$target,'predicate'=>$predicate,'edge_uuid'=>$input['edge_uuid'] ?? null,'expected_edge_revision'=>$input['expected_edge_revision'] ?? null,'source_revision'=>(int) ($sourceState['revision'] ?? 0),'target_revision'=>(int) ($targetState['revision'] ?? 0),'scope_code'=>$input['scope_code'] ?? $context['scope_code'],'provenance'=>$input['provenance'],'evidence_refs'=>$input['evidence_refs'],'idempotency_key'=>(string) ($input['idempotency_key'] ?? ''),'registry_version'=>$this->registryVersion,'registry_hash'=>$this->registryHash];
+        $lifecycle = in_array($operation,['RETIRE','REACTIVATE'],true);
+        $existingContext = null;
+        if ($lifecycle) {
+            if (trim((string) ($input['edge_uuid'] ?? '')) === '') return $this->blocked($base,'EXACT_EDGE_REQUIRED');
+            if ((int) ($input['expected_edge_revision'] ?? 0) < 1) return $this->blocked($base,'STALE_EDGE_REVISION');
+            if (!is_object($this->contexts) || !method_exists($this->contexts, 'findByEdgeUuid') || ($existingContext = $this->contexts->findByEdgeUuid((string) $input['edge_uuid'])) === null) return $this->blocked($base,'RELATION_CONTEXT_NOT_FOUND');
+            $provenance = $existingContext->provenanceClass;
+            $evidenceRefs = $existingContext->evidenceRefs;
+            $scopeCode = $existingContext->scopeCode;
+        } else {
+            if (trim((string) ($input['provenance'] ?? '')) === '') return $this->blocked($base,'PROVENANCE_REQUIRED');
+            if (($input['evidence_refs'] ?? []) === []) return $this->blocked($base,'EVIDENCE_REQUIRED');
+            if (in_array($operation,['REPLACE'],true) && trim((string) ($input['edge_uuid'] ?? '')) === '') return $this->blocked($base,'EXACT_EDGE_REQUIRED');
+            if (in_array($operation,['REPLACE'],true) && (int) ($input['expected_edge_revision'] ?? 0) < 1) return $this->blocked($base,'STALE_EDGE_REVISION');
+            $provenance = $input['provenance'];
+            $evidenceRefs = $input['evidence_refs'];
+            $scopeCode = $input['scope_code'] ?? $context['scope_code'];
+        }
+        $plan = ['operation'=>$operation,'source'=>$source,'target'=>$target,'predicate'=>$predicate,'edge_uuid'=>$input['edge_uuid'] ?? null,'expected_edge_revision'=>$input['expected_edge_revision'] ?? null,'expected_context_revision'=>$existingContext?->revision,'source_revision'=>(int) ($sourceState['revision'] ?? 0),'target_revision'=>(int) ($targetState['revision'] ?? 0),'scope_code'=>$scopeCode,'provenance'=>$provenance,'evidence_refs'=>$evidenceRefs,'idempotency_key'=>(string) ($input['idempotency_key'] ?? ''),'registry_version'=>$this->registryVersion,'registry_hash'=>$this->registryHash];
         $base['source_revision'] = $plan['source_revision']; $base['target_revision'] = $plan['target_revision']; $base['plan'] = $plan; $base['plan_fingerprint'] = $this->fingerprint($plan); $base['status']='READY'; return $base;
     }
     public function read(array $input = []): array
@@ -51,15 +65,16 @@ final class SemanticRelationGovernanceAdapter
         if ($idempotencyKey !== (string) ($plan['idempotency_key'] ?? '')) return ['status'=>'BLOCKED','blockers'=>['IDEMPOTENCY_KEY_MISMATCH']];
         if (!is_object($this->graph) || !is_object($this->contexts)) return ['status'=>'FAILED_FINAL','blockers'=>['GRAPH_APPLIER_NOT_CONFIGURED']];
         $existing = method_exists($this->contexts, 'findByIdempotencyKey') ? $this->contexts->findByIdempotencyKey($idempotencyKey) : null;
-        if ($existing !== null) return ['status'=>'READ_BACK_VERIFIED','operation'=>$plan['operation'],'edge'=>$this->graph->findByUuid($existing->edgeUuid)?->edge_uuid,'context'=>$existing->toArray(),'idempotent_replay'=>true];
+        if ($existing !== null) { $read = $this->canonicalRead($existing->edgeUuid); return ['status'=>'READ_BACK_VERIFIED','operation'=>$plan['operation'],'edge'=>$read['edge']->edge_uuid,'context'=>$read['context']->toArray(),'idempotent_replay'=>true]; }
         try {
             $apply = function () use ($plan, $approvedFingerprint, $idempotencyKey, $source, $target): array {
             $operation = (string) $plan['operation'];
             if ($operation === 'ADD') {
                 $edge = $this->graph->create(new NodeReference($source['type'],$source['id']), (string) $plan['predicate'], new NodeReference($target['type'],$target['id']));
                 $context = \NHK\Core\Application\Graph\GraphRelationContextPolicy::create(['edge_uuid'=>$edge->edge_uuid,'source_revision'=>$plan['source_revision'],'target_revision'=>$plan['target_revision'],'scope_code'=>$plan['scope_code'],'scope_subject_type'=>$source['type'],'scope_subject_id'=>$source['id'],'provenance_class'=>$plan['provenance'],'evidence_refs'=>$plan['evidence_refs'],'approval_fingerprint'=>$approvedFingerprint,'idempotency_key'=>$idempotencyKey]);
-                $saved = $this->contexts->create($context);
-                return ['status'=>'READ_BACK_VERIFIED','operation'=>'ADD','edge'=>$this->graph->findByUuid($edge->edge_uuid)?->edge_uuid,'context'=>$saved->toArray()];
+                $this->contexts->create($context);
+                $read = $this->canonicalRead($edge->edge_uuid);
+                return ['status'=>'READ_BACK_VERIFIED','operation'=>'ADD','edge'=>$read['edge']->edge_uuid,'context'=>$read['context']->toArray()];
             }
             $edgeUuid = (string) ($plan['edge_uuid'] ?? '');
             $edge = $this->graph->findByUuid($edgeUuid);
@@ -68,7 +83,8 @@ final class SemanticRelationGovernanceAdapter
             if ($operation === 'RETIRE') { $updated = $this->graph->retire($edgeUuid,(int)$plan['expected_edge_revision']); if ($context !== null) $context = $this->contexts->retire($context,(int)($plan['expected_context_revision'] ?? $context->revision)); }
             elseif ($operation === 'REACTIVATE') { $updated = $this->graph->reactivate($edgeUuid,(int)$plan['expected_edge_revision']); if ($context !== null) $context = $this->contexts->reactivate($context,(int)($plan['expected_context_revision'] ?? $context->revision)); }
             else { if ($context === null) return ['status'=>'FAILED_FINAL','blockers'=>['RELATION_CONTEXT_NOT_FOUND']]; $context = $this->contexts->update($context,(int)($plan['expected_context_revision'] ?? $context->revision)); $updated = $edge; }
-            return ['status'=>'READ_BACK_VERIFIED','operation'=>$operation,'edge'=>$this->graph->findByUuid($updated->edge_uuid)?->edge_uuid,'context'=>$context?->toArray()];
+            $read = $this->canonicalRead($updated->edge_uuid);
+            return ['status'=>'READ_BACK_VERIFIED','operation'=>$operation,'edge'=>$read['edge']->edge_uuid,'context'=>$read['context']->toArray()];
             };
             $result = $this->transactions !== null ? $this->transactions->transactional($apply) : $apply();
             if (($result['status'] ?? '') === 'READ_BACK_VERIFIED' && !($result['idempotent_replay'] ?? false) && is_callable($this->invalidate)) ($this->invalidate)($result);
@@ -76,6 +92,7 @@ final class SemanticRelationGovernanceAdapter
         } catch (\Throwable $error) { return ['status'=>'FAILED_FINAL','blockers'=>[$error->getMessage()]]; }
     }
     private function locator(mixed $value):?array { if (!is_array($value)) return null; $type=trim((string)($value['type']??''));$id=trim((string)($value['id']??'')); return $type!==''&&$id!==''?['type'=>$type,'id'=>$id]:null; }
+    private function canonicalRead(string $edgeUuid): array { $edge=$this->graph->findByUuid($edgeUuid); $context=$this->contexts->findByEdgeUuid($edgeUuid); if($edge===null||$context===null) throw new \RuntimeException('GRAPH_RELATION_READ_BACK_FAILED'); return ['edge'=>$edge,'context'=>$context]; }
     private function blocked(array $base,string $code):array{$base['status']='BLOCKED';$base['blockers'][]=$code;return $base;}
     private function fingerprint(array $plan):string{return hash('sha256',json_encode($plan,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE));}
 }
