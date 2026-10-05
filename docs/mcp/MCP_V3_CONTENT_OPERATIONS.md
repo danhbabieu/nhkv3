@@ -1322,3 +1322,19 @@ php public/wp-content/plugins/nhk-core/bin/nhk-core-maintenance.php --operation=
 It delegates to Plugin::runPendingMigrations(), uses MigrationDatabaseGuard and
 verifies all three Migration024 tables before success. It is never run from a
 frontend request.
+
+## Dictionary semantic enrichment contract-first checkpoint — 2026-10-05
+
+The canonical design is
+`docs/architecture/DICTIONARY_SEMANTIC_ENRICHMENT_PROJECTION_CONTRACT.md`.
+This checkpoint changes no MCP tool, Ability, schema, predicate registry or
+runtime data. Future exposure must reuse the existing internal/admin
+Governance boundary and must fail closed unless the exact registry, capability,
+scope, Evidence, revision and idempotency packet is present.
+
+The future operation set is bounded to read/preview/propose/approve/apply,
+retire/reactivate and read-back for Graph semantic relations and Dictionary
+lexical relations. Public Dictionary reads use dynamic registered facets only;
+they never expose private Evidence, internal IDs or duplicated owner payload.
+Generic predicate writers, Dictionary Graph endpoints, hard-delete and
+`Côn hoa thị`-specific operations are prohibited.

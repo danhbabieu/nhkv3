@@ -916,3 +916,21 @@ so deployed/runtime counts and discovery are not claimed.
 ## 2026-10-03 Dictionary deploy/readiness correction
 
 Dictionary Entry/Sense runtime is schema-gated by DictionaryEntrySenseMigration024::schemaReady(). Code-before-schema releases fall back to Concept compatibility mode without querying Entry/Form/Sense tables; profile diagnostics expose the mode and migration current/target. The existing maintenance migration lifecycle fails closed unless all three Migration024 tables are verified after Plugin::runPendingMigrations().
+
+## Dictionary semantic enrichment contract-first design — 2026-10-05
+
+`DICTIONARY_SEMANTIC_ENRICHMENT_PROJECTION_CONTRACT.md` is the approved
+contract-first design for the next Dictionary enrichment slice. It preserves
+Dictionary lexical ownership, reuses Entry↔Sense `semantic_reference`, reuses
+Graph edges for semantic relations, plans a Graph-owned durable relation
+context, bounds `associated_with`, reuses Classification `family=country`,
+defines Dictionary-owned Entry/Sense lexical relations and defines dynamic
+bounded public facets.
+
+STATUS: `DOCUMENTATION_ONLY / IMPLEMENTATION_NOT_STARTED / NO_SCHEMA / NO_DATA_MUTATION`.
+
+The current executable predicate registry, Graph schema, MCP/Admin catalog and
+runtime data remain unchanged. Planned migrations, code seams, Governance
+packets, registry additions and tests are specified in the contract but are not
+created or authorized by this checkpoint. `Côn hoa thị` remains a read-only
+reference dataset and is not an authorization or implementation special case.

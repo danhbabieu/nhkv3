@@ -22567,3 +22567,39 @@ VALIDATION: Focused Media/widget/filename suite passed 27 tests / 135
 assertions. No schema, migration, database/data mutation, deployment or push.
 
 STATUS: `MEDIA_WIDGET_FILENAME_FALLBACK_FIXED / LOCAL_VERIFICATION_PENDING_COMMIT / NO_DATA_MUTATION`.
+
+# Checkpoint — 2026-10-05 — Dictionary semantic enrichment contract-first design (LOCAL / NO MUTATION)
+
+DOCUMENTATION-ONLY: Added the approved contract-first architecture for
+Dictionary semantic enrichment in
+`docs/architecture/DICTIONARY_SEMANTIC_ENRICHMENT_PROJECTION_CONTRACT.md` and
+cross-referenced it from the Dictionary lexical, Entry/Sense, Graph, Public
+Entity Dossier and MCP/Admin contracts.
+
+CURRENT LAW: Dictionary remains a lexical owner and is not a Graph endpoint;
+Entry↔Sense `semantic_reference` remains the sole semantic-reference boundary;
+semantic relations reuse Graph edges; a future Graph-owned relation-context
+boundary will hold durable provenance/Evidence/scope references without copied
+payload; `associated_with` is one bounded, whitelist-controlled predicate with
+strong-predicate precedence; Country is Classification `family=country`; and
+explicit lexical relations are Dictionary-owned with Entry-level versus
+Sense-level scope.
+
+PLANNED, NOT CREATED: one additive Graph relation-context migration/code seam;
+one predicate-registry forward migration for `associated_with`; one bounded
+Dictionary lexical-relation migration/code seam; dynamic facet registry and
+projection seam; Governance/MCP/Admin operation packets; and the associated
+contract/unit/integration tests. No schema, migration, PHP, TS, runtime data,
+staging, deployment or canary mutation was performed.
+
+CANARY LAW: `Côn hoa thị` remains a read-only reference dataset. The contract
+must represent its Component, Brand, Classification, configuration, Movement,
+Music, Media, Video, Article, Knowledge and related Dictionary terms through
+normal registries only; no canary-specific code, schema, predicate or data is
+authorized.
+
+VALIDATION: documentation cross-reference and consistency checks are pending
+for this checkpoint; implementation remains blocked until the planned schema,
+registry, Governance and test seams are separately implemented and verified.
+
+STATUS: `DICTIONARY_SEMANTIC_ENRICHMENT_CONTRACT_APPROVED / DOCUMENTATION_ONLY / NO_SCHEMA_OR_DATA_MUTATION / IMPLEMENTATION_NOT_STARTED`.

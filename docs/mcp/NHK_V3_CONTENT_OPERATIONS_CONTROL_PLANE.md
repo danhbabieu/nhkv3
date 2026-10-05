@@ -644,3 +644,30 @@ registration. The following are separate facts and must not be collapsed:
 `CALLABLE_DISPATCHED` and `ACTUAL_SUCCESSFUL_CALL`. A generated or test-derived
 conformance artifact may summarize the comparison, but it is not a new
 operation authority and does not replace fresh target-runtime discovery.
+
+## Dictionary semantic enrichment contract-first law — 2026-10-05
+
+The approved design is defined by
+`docs/architecture/DICTIONARY_SEMANTIC_ENRICHMENT_PROJECTION_CONTRACT.md`.
+It is not an executable capability until its registry, migrations, Governance
+handlers and tests are separately implemented and discovered at runtime.
+
+When implemented, MCP/Admin may expose only bounded read, preview, proposal,
+approval-queue, retire, reactivate and canonical read-back operations for:
+
+- Graph semantic relations using the registered bounded `associated_with`
+  predicate and existing stronger predicates;
+- Dictionary lexical relations using the registered five relation kinds;
+- dynamic facet/read-model inspection.
+
+All mutation packets must bind canonical source/target Entry/Sense or Graph
+identities, revisions, scope, provenance/evidence, registry hash, expiry and
+idempotency. Apply remains Proposal → Human Approval → Eligibility →
+Controlled Apply → repository CAS → canonical read-back. Direct SQL, generic
+predicate writers, Dictionary Graph endpoints, hard-delete and canary-specific
+operations are forbidden.
+
+The current runtime capability remains unchanged by this documentation
+checkpoint. `RUNTIME_REGISTERED`, `TOOLS_LIST_EXPOSED`,
+`CONNECTOR_DISCOVERABLE`, `CALLABLE_DISPATCHED` and successful execution must
+continue to be reported separately.

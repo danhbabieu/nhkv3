@@ -412,3 +412,17 @@ Knowledge, Source/Evidence, Graph, Candidate or Mention write is included.
 surfaces use Migration015 Concept compatibility mode while it is false; Entry,
 Form and Sense repositories are not queried. Entry/Sense mutations fail closed
 with `DICTIONARY_ENTRY_SENSE_SCHEMA_UNAVAILABLE`.
+
+## Current-law enrichment cross-reference — 2026-10-05
+
+Semantic enrichment and dynamic public relation facets follow
+[`DICTIONARY_SEMANTIC_ENRICHMENT_PROJECTION_CONTRACT.md`](DICTIONARY_SEMANTIC_ENRICHMENT_PROJECTION_CONTRACT.md).
+The existing Entry↔Sense `semantic_reference` remains the only semantic
+reference owner; no second reference table is permitted.
+
+Explicit lexical relations are Entry-level for `RELATED` and
+`SAME_TERM_FAMILY`, and Sense-level for `BROADER`, `NARROWER` and
+`NEAR_SYNONYM`. Missing required Sense scope fails closed. Lexical relations
+contain IDs and lifecycle/provenance metadata only, never copied owner or
+display payload. Semantic owner relations continue to use Graph and never use
+Dictionary as an endpoint.

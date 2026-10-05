@@ -913,3 +913,22 @@ Knowledge reuse → relation discovery → enrichment → Writer/read-back. A
 Dictionary match remains lexical discovery only; it is never semantic identity,
 Evidence, Knowledge or a Graph relation, and Graph reachability never proves
 applicability.
+
+## Current-law enrichment cross-reference — 2026-10-05
+
+Semantic enrichment, durable Graph relation context, explicit Dictionary
+lexical relations and bounded dynamic facets are defined by
+[`DICTIONARY_SEMANTIC_ENRICHMENT_PROJECTION_CONTRACT.md`](DICTIONARY_SEMANTIC_ENRICHMENT_PROJECTION_CONTRACT.md).
+Dictionary remains the lexical owner and does not become a Graph endpoint.
+
+Explicit related terms are Dictionary-owned relations, not Graph edges. The
+approved kinds are `RELATED`, `SAME_TERM_FAMILY`, `BROADER`, `NARROWER`
+and `NEAR_SYNONYM`. `RELATED` and `SAME_TERM_FAMILY` are Entry-level by
+default; the other kinds require Sense-level scope unless the Entry is proven
+single-Sense and unambiguous. Similarity, frequency, embeddings and
+co-occurrence create review candidates only.
+
+Relation rows contain IDs, relation kind, provenance/attestation, lifecycle,
+revision, idempotency and timestamps only. They never contain labels,
+definitions, titles, URLs, images or owner payload. ADD, REPLACE, RETIRE and
+REACTIVATE use CAS and canonical read-back; normal hard-delete is forbidden.

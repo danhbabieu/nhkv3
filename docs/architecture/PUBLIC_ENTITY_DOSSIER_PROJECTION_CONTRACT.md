@@ -258,3 +258,16 @@ are read dynamically and may serve multiple dossiers/sections through one
 canonical Media identity. Public dossier output selects only an eligible
 public-safe derivative; missing, PRIVATE, review, placeholder or unavailable
 Media is omitted. The binding is not Evidence, Claim or Graph truth.
+
+## Dictionary facet consumer law — 2026-10-05
+
+Dictionary detail may consume a registered, bounded facet packet assembled from
+direct or explicitly approved derived dossier relations. The packet retains
+target type, public identity, public URL, origin, hop count, predicates,
+`via_types`, availability and truncation state. Facet names are registry
+presentation keys, not persisted semantic fields.
+
+The consumer must not flatten arbitrary relation groups, infer classification
+family from display labels, recursively traverse descendants or persist a
+reverse Dictionary edge. Country facets accept only Classification targets
+with `family=country`; clock-type facets use the registered clock-type family.
