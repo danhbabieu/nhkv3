@@ -38,7 +38,7 @@ final class Phase3TransactionalIntegrationTest extends TestCase
             $transactions,
         );
         $preview = $adapter->preview(['operation' => 'ADD', 'source' => ['type' => 'component', 'id' => 'component-1'], 'target' => ['type' => 'brand', 'id' => 'brand-1'], 'predicate' => 'associated_with', 'scope_code' => 'dictionary', 'provenance' => 'EXPLICIT_USER_KNOWLEDGE', 'evidence_refs' => [['evidence_id' => '22222222-2222-7222-8222-222222222222']], 'idempotency_key' => 'phase3-semantic-1']);
-        $result = $adapter->apply($preview['plan'] + ['plan_fingerprint' => $preview['plan_fingerprint']], $preview['plan_fingerprint'], 'phase3-semantic-1');
+        $result = $adapter->apply($preview['plan'], $preview['plan_fingerprint'], 'phase3-semantic-1');
         self::assertSame('FAILED_FINAL', $result['status']);
         self::assertSame(1, $transactions->transactions);
         self::assertSame(1, $transactions->rollbacks);
@@ -60,7 +60,7 @@ final class Phase3TransactionalIntegrationTest extends TestCase
         };
         $adapter = new DictionaryLexicalRelationGovernanceAdapter($repository, static fn (string $id): array => ['active' => true], static fn (string $entry, string $sense): bool => true, $transactions);
         $preview = $adapter->preview(['operation' => 'ADD', 'source_entry_uuid' => '33333333-3333-7333-8333-333333333333', 'target_entry_uuid' => '44444444-4444-7444-8444-444444444444', 'kind' => 'RELATED', 'provenance' => ['source' => 'phase3-test'], 'idempotency_key' => 'phase3-lexical-1']);
-        $plan = $preview['plan'] + ['plan_fingerprint' => $preview['plan_fingerprint']];
+        $plan = $preview['plan'];
         $first = $adapter->apply($plan, $preview['plan_fingerprint'], 'phase3-lexical-1');
         $second = $adapter->apply($plan, $preview['plan_fingerprint'], 'phase3-lexical-1');
         self::assertSame('READ_BACK_VERIFIED', $first['status']);

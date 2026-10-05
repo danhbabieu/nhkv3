@@ -20,6 +20,7 @@ final class McpDocumentationRegistryTest extends TestCase
         self::assertContains('knowledge', $keys);
         self::assertContains('dictionary-entry-sense-architecture', $keys);
         self::assertContains('dictionary-enrichment-audit-operations', $keys);
+        self::assertContains('dictionary-semantic-enrichment-projection', $keys);
         self::assertContains('collector-profile', $keys);
         self::assertContains('graph', $keys);
         self::assertContains('governance', $keys);
@@ -28,6 +29,23 @@ final class McpDocumentationRegistryTest extends TestCase
         self::assertContains('mcp', $keys);
         self::assertContains('dictionary-entry-sense', $keys);
         self::assertContains('dictionary-enrichment-audit', $keys);
+    }
+
+    public function test_semantic_enrichment_contract_is_allowlisted_and_snapshot_verified(): void
+    {
+        $path = 'docs/architecture/DICTIONARY_SEMANTIC_ENRICHMENT_PROJECTION_CONTRACT.md';
+        self::assertContains($path, McpDocumentationRegistry::documentPaths());
+        $directory = sys_get_temp_dir() . '/nhk-docs-semantic-' . bin2hex(random_bytes(5));
+        self::assertTrue(mkdir($directory, 0755, true));
+        try {
+            $manifest = McpDocumentationRegistry::buildSnapshot(dirname(__DIR__, 6), $directory, 'runtime-test', '2026-10-04T00:00:00+00:00');
+            $entry = array_values(array_filter($manifest['files'], static fn (array $item): bool => ($item['path'] ?? '') === $path))[0] ?? null;
+            self::assertIsArray($entry);
+            self::assertSame(hash_file('sha256', dirname(__DIR__, 6) . '/' . $path), $entry['sha256']);
+            self::assertSame($path, (new McpDocumentationRegistry($directory, 'runtime-test'))->get($path)['path']);
+        } finally {
+            $this->removeDirectory($directory);
+        }
     }
 
     public function test_dictionary_entry_sense_documents_are_allowlisted_active_and_snapshot_verified(): void

@@ -33,8 +33,12 @@ final class Phase2GovernanceAdapterTest extends TestCase
         $GLOBALS['phase2_source'] = $source;
         $input = ['operation'=>'ADD','source'=>['type'=>'component','id'=>$source],'target'=>['type'=>'music','id'=>$target],'predicate'=>'associated_with','scope_code'=>'component_music_scope','provenance'=>'EXTERNAL_RESEARCH','evidence_refs'=>[['evidence_id'=>UuidCodec::newV7()]],'idempotency_key'=>'phase2-graph-apply'];
         $plan = $adapter->preview($input);
+        $changedPlan = $plan['plan'];
+        $changedPlan['scope_code'] = 'changed-scope';
+        self::assertSame('REPLAN_REQUIRED', $adapter->apply($changedPlan, $plan['plan_fingerprint'], 'phase2-graph-apply')['status']);
+        self::assertSame('REPLAN_REQUIRED', $adapter->apply($plan['plan'], 'wrong-fingerprint', 'phase2-graph-apply')['status']);
         $state['source_revision'] = 6;
-        $result = $adapter->apply($plan, $plan['plan_fingerprint'], 'phase2-graph-apply');
+        $result = $adapter->apply($plan['plan'], $plan['plan_fingerprint'], 'phase2-graph-apply');
         self::assertSame('REPLAN_REQUIRED', $result['status']);
         self::assertContains('STALE_SOURCE_REVISION', $result['blockers']);
         unset($GLOBALS['phase2_source']);
@@ -74,8 +78,13 @@ final class Phase2GovernanceAdapterTest extends TestCase
         };
         $adapter = new DictionaryLexicalRelationGovernanceAdapter($repo, static fn(string $id): array => ['active'=>true,'revision'=>1], static fn(string $entry,string $sense):bool=>true);
         $plan = $adapter->preview(['operation'=>'ADD','source_entry_uuid'=>UuidCodec::newV7(),'target_entry_uuid'=>UuidCodec::newV7(),'kind'=>'RELATED','provenance'=>['source'=>'CURATOR'],'idempotency_key'=>'lexical-apply']);
-        $result = $adapter->apply($plan['plan'] + ['plan_fingerprint'=>$plan['plan_fingerprint']], $plan['plan_fingerprint'], 'lexical-apply');
+        $result = $adapter->apply($plan['plan'], $plan['plan_fingerprint'], 'lexical-apply');
         self::assertSame('READ_BACK_VERIFIED', $result['status']);
         self::assertSame('RELATED', $result['relation']['relation_kind']);
+
+        $changedPlan = $plan['plan'];
+        $changedPlan['provenance'] = ['source' => 'changed'];
+        self::assertSame('REPLAN_REQUIRED', $adapter->apply($changedPlan, $plan['plan_fingerprint'], 'lexical-apply')['status']);
+        self::assertSame('REPLAN_REQUIRED', $adapter->apply($plan['plan'], 'wrong-fingerprint', 'lexical-apply')['status']);
     }
 }

@@ -43,7 +43,7 @@ final class SemanticRelationGovernanceAdapter
     }
     public function apply(array $plan, string $approvedFingerprint, string $idempotencyKey): array
     {
-        if (!hash_equals((string) ($plan['plan_fingerprint'] ?? ''), $approvedFingerprint)) return ['status'=>'REPLAN_REQUIRED','blockers'=>['APPROVAL_FINGERPRINT_MISMATCH']];
+        if (!hash_equals($this->fingerprint($plan), $approvedFingerprint)) return ['status'=>'REPLAN_REQUIRED','blockers'=>['APPROVAL_FINGERPRINT_MISMATCH']];
         if (($plan['registry_hash'] ?? '') !== $this->registryHash) return ['status'=>'REPLAN_REQUIRED','blockers'=>['REGISTRY_HASH_CHANGED']];
         $source = $plan['source']; $target = $plan['target']; $now = ($this->endpointState)($source['type'],$source['id']); $then = ($this->endpointState)($target['type'],$target['id']);
         if ((int) ($now['revision'] ?? 0) !== (int) ($plan['source_revision'] ?? 0)) return ['status'=>'REPLAN_REQUIRED','blockers'=>['STALE_SOURCE_REVISION']];
