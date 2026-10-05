@@ -142,6 +142,75 @@ lexical source. Knowledge Evidence supports or contradicts an atomic claim
 through the Source/Evidence lifecycle. An attestation may reference Evidence,
 but it is not Evidence merely because it has a source locator.
 
+### 3.4 Dictionary content operating law
+
+Operationally, one Dictionary item is one piece of content, not a custom
+semantic architecture. Normal operator intent remains simple:
+`term + definition/context + optional semantic-owner hint`, for example
+`Côn hoa thị`. The operator must not design a separate relation tree for each
+term. The shared system-wide relation structure is defined once by the
+canonical contracts and registries.
+
+```text
+Dictionary Content
+├── term
+├── definition
+├── context
+└── semantic_reference
+      ↓
+Canonical Owner
+      ↓
+Existing / progressively governed relations
+```
+
+The operating rules are:
+
+1. Entry/Sense remains the lexical owner. `semantic_reference` links the Sense
+   to an existing or separately governed canonical owner; it does not create a
+   second owner or a per-item schema/graph design.
+2. Authority, Knowledge, Graph, Media, Video and WordPress retain their own
+   canonical data and lifecycle. Dictionary does not copy their payloads or
+   relations into a second structure.
+3. Related context is discovered through the shared canonical relationship
+   registries and bounded read models. A new item may validly begin with only
+   `Entry → Sense → semantic_reference`; missing relations are not an error.
+4. Relations are enriched gradually and only when sufficient provenance/
+   evidence and the normal Governance lifecycle support them. Registry
+   capability alone is not a reason to create a relation. Suggestions remain
+   non-canonical until normal validation and Governance succeed.
+5. Existing relations retain their own lifecycle: create/add, read, retire and
+   reactivate where appropriate. Public Dictionary composition derives related
+   Brand, Movement, Music, Classification, Media, Video, Post and Knowledge
+   context from canonical owners rather than requiring those relationships at
+   initial term creation.
+
+For `Côn hoa thị`, the minimum valid state may therefore be:
+
+```yaml
+Entry: Côn hoa thị
+└── Sense
+    └── semantic_reference → Component: Côn hoa thị
+```
+
+Later independently governed evidence may enrich that canonical Component with
+relationships to Brand, Movement, Music, Classification, Media, Video,
+WordPress Post or Knowledge. Those relationships enrich the canonical owner;
+they are not part of the minimum Dictionary-entry creation contract.
+
+The preferred operator experience is:
+
+```text
+Add Dictionary content
+→ resolve/reuse semantic owner
+→ attach semantic_reference
+→ read existing relations
+→ progressively enrich when evidence becomes available
+```
+
+This preserves the long-term design intent of simple content intake with an
+increasingly intelligent semantic network, without exposing implementation
+complexity to the normal content-entry workflow.
+
 <!--
 The legacy wording below is intentionally retained as a compatibility note:
 the current owner reference may expose

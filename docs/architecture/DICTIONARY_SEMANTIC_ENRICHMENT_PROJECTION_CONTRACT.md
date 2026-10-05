@@ -61,6 +61,46 @@ identity and is never used to publish a link.
 No second semantic-reference table is permitted. Legacy Concept destination
 snapshots remain compatibility input only and never outrank a valid mapping.
 
+### 3.1 Dictionary content operating law
+
+A Dictionary item is operationally one piece of content, not a custom semantic
+architecture. Normal intake is `term + definition/context + optional
+semantic-owner hint`; the operator does not manually design a relation tree.
+The shared model is:
+
+```text
+Dictionary Content
+├── term
+├── definition
+├── context
+└── semantic_reference
+      ↓
+Canonical Owner
+      ↓
+Existing / progressively governed relations
+```
+
+Entry/Sense remains the lexical owner, while Authority, Knowledge, Graph,
+Media, Video and WordPress retain their canonical payloads and relationships.
+Dictionary reads related context through the shared registries and bounded read
+models; it does not copy those payloads or relations into a second structure.
+The minimum valid state may be only:
+
+```text
+Entry → Sense → semantic_reference → canonical owner
+```
+
+Missing relations are not an error. Enrichment may become denser over time,
+but a relation is added only with sufficient provenance/evidence and the normal
+Governance lifecycle. A technically permitted source/target pair is not enough;
+suggestions remain non-canonical until validation/Governance succeeds. Existing
+relations retain their own create/add, read, retire and reactivate lifecycle.
+
+Public Dictionary composition therefore derives Brand, Movement, Music,
+Classification, Media, Video, Post and Knowledge context from canonical owners.
+Those later relationships are enrichment of the canonical owner, not part of
+the minimum Dictionary-entry creation contract.
+
 ## 4. Semantic Graph relations
 
 Semantic enrichment reuses the existing Graph edge:
