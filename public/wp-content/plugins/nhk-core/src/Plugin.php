@@ -911,6 +911,12 @@ final class Plugin {
             $categoryGateway = new CategoryGateway(new WpCategoryStore());
             $editorialPosts = new WpEditorialPostStore($articleEditorial);
             $captureSubjectBinding = new CaptureSubjectBindingRecovery($captureRepository);
+            $captureAuthorityResolver = new \NHK\Core\Application\Semantic\CanonicalAuthoritySubjectResolver($authority, $types);
+            $captureSubjectResolver = new SubjectResolutionService(
+                $captureAuthorityResolver,
+                new \NHK\Core\Application\Semantic\CanonicalSubjectStructuralContextReader(new StructuralContextQuery($graphService, $authority), $authority),
+                [$captureAuthorityResolver, 'resolveComposite'],
+            );
             $canonicalPublicationContext = static function (\NHK\Core\Domain\Article\EditorialPostState $state, array $callerEvidence) use ($captureRepository, $captureSubjectBinding, $articleResearch, $articlePreflightHandoff, $articleMedia): array {
                 $capture = $captureRepository->findByArticleId($state->postId);
                 if ($capture === null) return $callerEvidence;
@@ -982,7 +988,7 @@ final class Plugin {
             // One generic recovery boundary for existing Capture-owned Articles.
             // The orchestrator plans and bounds work; existing owner adapters
             // remain responsible for every durable mutation.
-            add_filter('nhk_v3_article_reconciliation_orchestrator', static function (mixed $current) use ($articleEditorial, $captureRepository, $articleMedia, $canonicalPublicationContext, $draftGateway, $editorialPosts, $graphService, $articleCoordinator, $authority, $types, $captureSubjectBinding): mixed {
+            add_filter('nhk_v3_article_reconciliation_orchestrator', static function (mixed $current) use ($articleEditorial, $captureRepository, $articleMedia, $canonicalPublicationContext, $draftGateway, $editorialPosts, $graphService, $articleCoordinator, $authority, $types, $captureSubjectBinding, $captureSubjectResolver): mixed {
                 if ($current instanceof \NHK\Core\Application\Article\ArticleReconciliationOrchestrator) return $current;
                 return new \NHK\Core\Application\Article\ArticleReconciliationOrchestrator(
                     static function (array $input) use ($articleEditorial, $captureRepository, $authority, $types): array {
@@ -1006,7 +1012,7 @@ final class Plugin {
                         return ['post_id' => $postId, 'state' => $state, 'capture' => $capture, 'slug' => $state->slug, 'permalink' => $state->permalink, 'subject_resolution_packet' => $packet, 'desired_media' => $desiredMedia, 'media_context' => is_array($input['media_context'] ?? null) ? $input['media_context'] : []];
                     },
                     static fn (array $state): array => is_object($state['capture'] ?? null) && is_array($state['capture']->context['content_intent'] ?? null) ? $state['capture']->context['content_intent'] : ['intent' => 'TEXT_ARTICLE'],
-                    static function (array $state): array {
+                    static function (array $state) use ($captureSubjectBinding, $captureSubjectResolver): array {
                         $candidates = [];
                         if (is_array($state['subject_resolution_packet'] ?? null)) $candidates[] = $state['subject_resolution_packet'];
                         if (is_array($state['subject_resolution'] ?? null)) $candidates[] = $state['subject_resolution'];
@@ -1016,14 +1022,21 @@ final class Plugin {
                             $exact['type'] = (string) ($exact['type'] ?? $exact['entity_type'] ?? '');
                             $candidates[] = ['status' => 'resolved', 'primary' => $exact, 'subjects' => [$exact], 'resolved' => [$exact], 'primary_source' => 'article_research_subject'];
                         }
-                        $fallback = null;
+                        $capture = $state['capture'] ?? null;
+                        if ($capture instanceof \NHK\Core\Domain\Capture\CaptureRecord) {
+                            $packet = $captureSubjectBinding->resolve(
+                                $capture,
+                                $candidates,
+                                is_array($state['subject_hints'] ?? null) ? $state['subject_hints'] : [],
+                                static fn (array $hints): array => $captureSubjectResolver->resolve($hints),
+                            );
+                            if ($packet !== null) return $packet->toArray();
+                        }
                         foreach ($candidates as $candidate) {
                             $packet = \NHK\Core\Domain\Capture\SubjectResolutionPacket::fromArray($candidate);
-                            if ($packet === null) continue;
-                            $fallback ??= $packet;
-                            if ($packet->status === 'resolved') return $packet->toArray();
+                            if ($packet !== null) return $packet->toArray();
                         }
-                        return $fallback?->toArray() ?? [];
+                        return [];
                     },
                     static function (array $state) use ($canonicalPublicationContext, $articleMedia, $graphService): array {
                         $owner = $state['state'] ?? null;
@@ -1205,12 +1218,6 @@ final class Plugin {
                 }
             );
             $captureAddendumRepository = new WpdbCaptureAddendumRepository($wpdb);
-            $captureAuthorityResolver = new \NHK\Core\Application\Semantic\CanonicalAuthoritySubjectResolver($authority, $types);
-            $captureSubjectResolver = new SubjectResolutionService(
-                $captureAuthorityResolver,
-                new \NHK\Core\Application\Semantic\CanonicalSubjectStructuralContextReader(new StructuralContextQuery($graphService, $authority), $authority),
-                [$captureAuthorityResolver, 'resolveComposite']
-            );
             $clockTypeMembershipReader = new GraphClockTypeCanonicalMembershipReader($graphService, $authority);
             $clockTypeShadowClassifier = new ClockTypeShadowClassifier($authority, new \NHK\Core\Application\Entity\EntityProfileResolver(), $clockTypeMembershipReader);
             $captureNeighborhood = $mcpNeighborhood;

@@ -122,15 +122,19 @@ final class ArticleReconciliationOrchestratorTest extends TestCase
             public function create(CaptureRecord $record): CaptureRecord { return $this->records[$record->captureId] = $record; }
             public function save(CaptureRecord $record): CaptureRecord { return $this->records[$record->captureId] = $record; }
         };
-        $capture = new CaptureRecord('01a10bdb-918d-7c6d-a94e-0dd4baa5f391', 'mixed-odo', hash('sha256', 'mixed-odo'), 'AUTHORITY_PLANNED', 'PLANNED', 753, 'article-token', [], ['purpose' => 'MIXED']);
+        $capture = new CaptureRecord('01a10bdb-918d-7c6d-a94e-0dd4baa5f391', 'mixed-odo', hash('sha256', 'mixed-odo'), 'AUTHORITY_PLANNED', 'PLANNED', 753, 'article-token', [], ['purpose' => 'MIXED', 'subject_hints' => ['d2af7739-3d1b-4666-ad0a-aeda0758f4d8']]);
         $repository->create($capture);
         $resolution = ['status' => 'resolved', 'primary' => ['id' => 'd2af7739-3d1b-4666-ad0a-aeda0758f4d8', 'type' => 'brand', 'stable_key' => 'nhk:brand:odo', 'name' => 'Odo', 'revision' => 1, 'match' => 'uuid_exact'], 'primary_source' => 'canonical_uuid'];
         $recovery = new CaptureSubjectBindingRecovery($repository);
         $reviewCalls = 0;
         $orchestrator = new ArticleReconciliationOrchestrator(
-            static fn (array $input): array => ['post_id' => 753, 'capture' => $repository->findById($capture->captureId), 'subject_resolution_packet' => $input['subject_resolution_packet']],
+            static fn (array $input): array => ['post_id' => 753, 'capture' => $repository->findById($capture->captureId), 'subject_resolution_packet' => ['status' => 'unresolved']],
             static fn (array $state): array => ['intent' => 'TEXT_ARTICLE'],
-            static fn (array $state): array => $state['subject_resolution_packet'],
+            static function (array $state) use ($repository, $capture, $recovery, $resolution): array {
+                $current = $repository->findById($capture->captureId);
+                $packet = $recovery->resolve($current, [], [], static fn (array $hints): array => $resolution);
+                return $packet?->toArray() ?? [];
+            },
             static function (array $state) use ($repository, $capture): array {
                 $current = $repository->findById($capture->captureId);
                 return $current?->context['subject_resolution_packet'] ?? null
@@ -152,7 +156,7 @@ final class ArticleReconciliationOrchestratorTest extends TestCase
             static fn (array $state): array => ['status' => 'verified'],
         );
 
-        $result = $orchestrator->reconcile(['post_id' => 753, 'subject_resolution_packet' => $resolution]);
+        $result = $orchestrator->reconcile(['post_id' => 753]);
 
         self::assertSame('PASS', $result['status']);
         self::assertSame(1, $reviewCalls);

@@ -10,6 +10,35 @@ use PHPUnit\Framework\TestCase;
 
 final class CaptureSubjectBindingRecoveryTest extends TestCase
 {
+    public function test_historical_mixed_capture_resolves_from_existing_subject_context_before_persisting(): void
+    {
+        $repository = new CaptureSubjectBindingRecoveryRepository();
+        $capture = new CaptureRecord(
+            '01a10bdb-918d-7c6d-a94e-0dd4baa5f391',
+            'mixed-odo-context',
+            hash('sha256', 'mixed-odo-context'),
+            'AUTHORITY_PLANNED',
+            'PLANNED',
+            753,
+            'article-token',
+            [],
+            ['purpose' => 'MIXED', 'subject_hints' => ['d2af7739-3d1b-4666-ad0a-aeda0758f4d8']],
+        );
+        $repository->create($capture);
+
+        $recovery = new CaptureSubjectBindingRecovery($repository);
+        $packet = $recovery->resolve($capture, [], [], static function (array $hints): array {
+            self::assertSame(['d2af7739-3d1b-4666-ad0a-aeda0758f4d8'], $hints);
+            return ['status' => 'resolved', 'primary' => ['id' => $hints[0], 'type' => 'brand', 'stable_key' => 'nhk:brand:odo', 'name' => 'Odo', 'revision' => 1, 'match' => 'uuid_exact'], 'primary_source' => 'canonical_uuid'];
+        });
+
+        self::assertNotNull($packet);
+        self::assertSame('d2af7739-3d1b-4666-ad0a-aeda0758f4d8', $packet->canonicalSubjectId);
+        $repaired = $recovery->persist($capture, 753, $packet->toResolution());
+        self::assertSame('d2af7739-3d1b-4666-ad0a-aeda0758f4d8', $repository->findById($capture->captureId)?->context['subject_resolution_packet']['canonical_subject_id']);
+        self::assertSame(2, $repaired->revision);
+    }
+
     public function test_mixed_capture_owned_article_persists_exact_resolved_subject_binding_and_reads_it_back(): void
     {
         $repository = new CaptureSubjectBindingRecoveryRepository();

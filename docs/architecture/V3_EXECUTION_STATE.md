@@ -22910,3 +22910,27 @@ reconcile remains pending external runtime execution. No production or TEST
 database mutation was performed.
 
 STATUS: `CAPTURE_ARTICLE_PUBLICATION_CONTEXT_FIXED / FOCUSED_UNIT_PASS / TEST_MCP_RECONCILE_PENDING / NO_DATA_MUTATION`.
+
+# Checkpoint — 2026-10-05 — Historical MIXED Capture subject recovery (LOCAL / TEST MCP RETRY PENDING)
+
+ROOT_CAUSE: The previous Article reconciliation fix only persisted a packet
+after a resolved packet had already entered the orchestrator. A historical
+MIXED Capture with a null packet entered with an unresolved placeholder, so
+inspection failed with `CAPTURE_SUBJECT_BINDING_UNAVAILABLE` before the
+`RESOLVE_PRIMARY_SUBJECT` repair action could run.
+
+LIVE-PATH FIX: The existing Capture-owned reconciliation path now asks the
+registered canonical Capture subject resolver to recover from the historical
+Capture subject context, then persists the resolved packet through the same
+optimistic Capture repository boundary and verifies canonical read-back.
+Unresolved or ambiguous context remains fail-closed. No Article, Capture,
+semantic record, Graph relation, schema or publication bypass was added.
+
+REGRESSION COVERAGE: Existing MIXED Capture, Article 753, null packet and
+canonical Odo UUID context now recover through the bounded subject-binding
+path; packet persistence/read-back, reconciliation and publication-context
+regressions are covered by the focused Unit slice. Focused validation passes
+34 tests / 133 assertions; PHP lint passes. Live TEST MCP retry remains
+pending. No TEST or production database mutation was performed.
+
+STATUS: `HISTORICAL_CAPTURE_SUBJECT_RECOVERY_FIXED / FOCUSED_UNIT_PASS / TEST_MCP_RETRY_PENDING / NO_DATA_MUTATION`.

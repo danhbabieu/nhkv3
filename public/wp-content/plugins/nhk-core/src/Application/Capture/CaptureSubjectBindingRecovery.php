@@ -21,9 +21,43 @@ final class CaptureSubjectBindingRecovery
         ] as $candidate) {
             if (!is_array($candidate)) continue;
             $packet = SubjectResolutionPacket::fromArray($candidate);
-            if ($packet !== null) return $packet;
+            if ($packet?->status === 'resolved') return $packet;
         }
         return null;
+    }
+
+    /**
+     * Recover a resolved packet for a historical Capture from its existing
+     * subject context. This is read-only; persist() remains the write boundary.
+     *
+     * @param list<array<string,mixed>> $candidates
+     * @param list<string> $hints
+     * @param callable(list<string>):array<string,mixed> $resolver
+     */
+    public function resolve(CaptureRecord $capture, array $candidates, array $hints, callable $resolver): ?SubjectResolutionPacket
+    {
+        $existing = $this->packet($capture);
+        if ($existing !== null) return $existing;
+
+        $fallback = null;
+        foreach ($candidates as $candidate) {
+            $packet = SubjectResolutionPacket::fromArray($candidate);
+            if ($packet === null) continue;
+            $fallback ??= $packet;
+            if ($packet->status === 'resolved') return $packet;
+        }
+
+        $contextHints = array_merge(
+            $hints,
+            $this->hints($capture->context['subject_hints'] ?? []),
+            $this->hints($capture->context['planning_input']['subject_hints'] ?? []),
+        );
+        $contextHints = array_values(array_unique(array_filter(array_map('trim', $contextHints), static fn (string $hint): bool => $hint !== '')));
+        if ($contextHints === []) return $fallback;
+
+        $resolved = $resolver($contextHints);
+        $packet = SubjectResolutionPacket::fromArray($resolved);
+        return $packet?->status === 'resolved' ? $packet : $fallback;
     }
 
     public function persist(CaptureRecord $capture, int $articleId, array $resolution): CaptureRecord
@@ -60,5 +94,20 @@ final class CaptureSubjectBindingRecovery
         $readBackPacket = $readBack === null ? null : $this->packet($readBack);
         if ($readBack === null || $readBack->articleId !== $articleId || $readBackPacket?->canonicalSubjectId !== $packet->canonicalSubjectId || $readBackPacket?->entityType !== $packet->entityType || $readBackPacket?->revision !== $packet->revision) throw new \RuntimeException('CAPTURE_SUBJECT_BINDING_READBACK_UNAVAILABLE');
         return $readBack;
+    }
+
+    /** @return list<string> */
+    private function hints(mixed $value): array
+    {
+        if (is_string($value)) return [$value];
+        $hints = [];
+        foreach ((array) $value as $item) {
+            if (is_string($item)) $hints[] = $item;
+            elseif (is_array($item)) {
+                $hint = trim((string) ($item['id'] ?? $item['canonical_subject_id'] ?? $item['stable_key'] ?? $item['name'] ?? ''));
+                if ($hint !== '') $hints[] = $hint;
+            }
+        }
+        return $hints;
     }
 }
