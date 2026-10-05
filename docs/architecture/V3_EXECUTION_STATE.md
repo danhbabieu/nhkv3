@@ -22694,3 +22694,26 @@ database migration/read-back, production cache invalidation observation and
 canary read-only audit require the authorized WordPress integration runtime.
 
 STATUS: `SEMANTIC_ENRICHMENT_TRANSACTIONAL_RUNTIME_WIRED / FOCUSED_TESTS_GREEN / INTEGRATION_ENVIRONMENT_BLOCKER / NO_DATA_MUTATION / CANARY_NOT_POPULATED`.
+
+# Acceptance checkpoint — 2026-10-05 — Phase 3B environment acceptance
+
+TEST DATABASE: The repository-authorized integration target is exactly
+`nhk_v3_test`, selected by `AGENTS.md`, `TestDatabaseGuard`, the integration
+environment contract and the documented `NHK_WP_TEST_DB=nhk_v3_test`
+bootstrap. No staging or production target was selected.
+
+ENVIRONMENT BLOCKER: Read-only preflight could not connect to the local MySQL
+server through `/tmp/mysql.sock`; `mysqladmin ping` returned connection
+failure. The worktree also has no WordPress runtime configuration/credentials.
+The guarded Integration suite therefore could not bootstrap. No migration,
+fixture write, lifecycle acceptance, canary audit or other database mutation
+was attempted.
+
+VALIDATION: Phase 1 migration contracts, Phase 3 transaction tests, Graph
+relation context, bounded associated_with, Dictionary lexical relation/facet
+and relation handoff tests pass: 17 tests / 64 assertions. The previously
+recorded full Unit result remains 3,076 tests with 1 pre-existing error and 8
+pre-existing unrelated failures under the 512M run; the default memory limit
+also blocks a large existing fixture.
+
+STATUS: `PHASE_3B_ENVIRONMENT_ACCEPTANCE_BLOCKED / TEST_DATABASE_UNAVAILABLE / NO_CODE_CHANGE / NO_DATA_MUTATION / CANARY_AUDIT_NOT_ATTEMPTED`.
