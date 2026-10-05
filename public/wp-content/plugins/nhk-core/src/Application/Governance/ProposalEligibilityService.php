@@ -42,10 +42,13 @@ final class ProposalEligibilityService
         $authorityTypes = ['brand', 'model', 'variant', 'movement', 'music', 'component', 'classification', 'specimen', 'product'];
         $authorityScoped = in_array($proposal->entityType, $authorityTypes, true)
             && in_array($proposal->operation, ['create', 'ingest', 'update', 'rename', 'rekey', 'merge', 'retire', 'reactivate'], true);
-        $captureBound = array_key_exists('capture_id', $proposal->payload)
+        $semanticDependencyScoped = in_array($proposal->entityType, ['source', 'knowledge', 'evidence'], true)
+            && in_array($proposal->operation, ['create', 'ingest', 'update', 'retire'], true);
+        $captureBound = $semanticDependencyScoped
+            || array_key_exists('capture_id', $proposal->payload)
             || is_array($proposal->payload['project_build_audit'] ?? null)
             || $authorityScoped;
-        if ($this->stagingScopeVerifier !== null && (($proposal->entityType === 'video' && in_array($proposal->operation, ['ingest', 'update'], true)) || ($proposal->entityType === 'knowledge' && in_array($proposal->operation, ['update', 'retire'], true)) || $authorityScoped) && $captureBound) {
+        if ($this->stagingScopeVerifier !== null && (($proposal->entityType === 'video' && in_array($proposal->operation, ['ingest', 'update'], true)) || $semanticDependencyScoped || $authorityScoped) && $captureBound) {
             $scope = $proposal->payload['staging_acceptance'] ?? null;
             $scopeResolutionError = null;
             if (!is_array($scope) && is_callable($this->stagingScopeResolver)) {

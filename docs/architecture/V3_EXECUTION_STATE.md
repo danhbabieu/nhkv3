@@ -22833,3 +22833,24 @@ failures. The focused runtime-identity/migration guard tests remain green at
 17 tests / 22 assertions. No new regression was isolated.
 
 STATUS: `PHASE_3B_REAL_ACCEPTANCE_BLOCKED / AUTHORIZED_RUNTIME_UNAVAILABLE / MIGRATIONS_NOT_RUN / NO_DATA_MUTATION / CANARY_NOT_AUDITED`.
+
+# Checkpoint — 2026-10-05 — Semantic staging eligibility parity (LOCAL / TEST ACCEPTANCE PENDING)
+
+ROOT_CAUSE: Controlled Apply already enforced the signed Capture-derived
+staging packet, but ProposalEligibilityService did not pre-check Source,
+Knowledge Claim or Evidence create/ingest proposals. Those proposals could
+report `ready=true` and then fail closed in OperationScopedStagingGuard with
+`STAGING_SCOPE_REQUIRED`.
+
+FIX: Eligibility now treats Source/Knowledge/Evidence create, ingest, update
+and retire operations as staging-scoped semantic dependencies. Existing
+Capture-issued scope packets, Governance and production fail-closed policy are
+unchanged; no lexical code, schema, migration or fixture endpoint changed.
+
+VALIDATION: Red/green regression proves the original Source ingest gap and its
+guarded pre-apply block. Focused governance/semantic Unit slice passes 60 tests
+and 292 assertions. PHP lint and `git diff --check` pass. Guarded integration
+bootstrap remains pending because the authorized TEST WordPress database was
+unavailable locally; no database, staging, production or canary mutation ran.
+
+STATUS: `SEMANTIC_STAGING_SCOPE_ELIGIBILITY_PARITY_FIXED / FOCUSED_UNIT_PASS / AUTHORIZED_TEST_RUNTIME_PENDING / NO_DATA_MUTATION`.

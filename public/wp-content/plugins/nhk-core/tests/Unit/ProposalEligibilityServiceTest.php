@@ -120,6 +120,29 @@ final class ProposalEligibilityServiceTest extends TestCase
         self::assertTrue($service->check($proposal->id)->ready);
     }
 
+    public function test_source_ingest_without_capture_scope_is_blocked_before_controlled_apply(): void
+    {
+        $proposal = new Proposal(
+            self::ID,
+            'source',
+            'ingest',
+            ['stable_key' => 'test-source', 'title' => 'Test source'],
+            'source-content',
+            null,
+            'source-dependency',
+            ProposalState::APPROVED,
+            idempotencyKey: 'source-scope-required',
+            entityType: 'source',
+        );
+        $service = $this->service($proposal);
+        $service->setStagingScopeVerifier(static fn (Proposal $checked): string => 'STAGING_SCOPE_REQUIRED');
+
+        $result = $service->check($proposal->id);
+
+        self::assertFalse($result->ready);
+        self::assertContains('STAGING_SCOPE_REQUIRED', $result->reasons);
+    }
+
     public function test_explicit_video_subject_packet_is_authoritative_over_unresolved_title_hint(): void
     {
         $proposal = $this->proposal([
