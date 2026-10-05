@@ -22744,3 +22744,30 @@ NO LIVE DATA: No migration, staging write, production write, canary mutation,
 deployment or push occurred in this checkpoint.
 
 STATUS: `TEST_RUNTIME_IDENTITY_POLICY_CORRECTED / FOCUSED_TESTS_PENDING_FINAL_VERIFICATION / NO_DATA_MUTATION / MIGRATIONS_NOT_RUN`.
+
+# Acceptance checkpoint — 2026-10-05 — Phase 3B real acceptance attempt
+
+RUNTIME PREFLIGHT: BLOCKED before database access. This local worktree has no
+`public/wp-config.php`, no runtime credentials/autoload bootstrap and no
+connected SSH/server execution channel. The repository identity and local
+process therefore could not prove the authorized tuple
+`staging / erourxcg_nhkv3 / https://demo.1945.vn / nhk-v3`. No alternate local
+database was substituted.
+
+MIGRATIONS: `GraphRelationContextMigration002` and
+`DictionaryLexicalRelationMigration025` were not executed. Consequently first
+run, idempotent rerun, schema/index verification and live data-readability
+acceptance remain NOT RUN.
+
+TRANSACTIONAL/MCP/CANARY: Real semantic lifecycle, rollback, lexical lifecycle,
+end-to-end projection, MCP/Admin read-back, cache invalidation and Côn hoa thị
+read-only audit were not run because the fail-closed runtime preflight could
+not complete. No canary plan was generated from live data and no canary data
+was mutated.
+
+LOCAL VALIDATION: Full Unit with 512M completed with 3,083 tests and 18,649
+assertions, with 1 pre-existing TypeError and 6 pre-existing unrelated
+failures. The focused runtime-identity/migration guard tests remain green at
+17 tests / 22 assertions. No new regression was isolated.
+
+STATUS: `PHASE_3B_REAL_ACCEPTANCE_BLOCKED / AUTHORIZED_RUNTIME_UNAVAILABLE / MIGRATIONS_NOT_RUN / NO_DATA_MUTATION / CANARY_NOT_AUDITED`.
