@@ -606,12 +606,29 @@ final class DictionaryRuntime
     private function approvedLabelRows(string $term, array $context): array
     {
         $rows = [];
+        $durableEntryFound = false;
         if ($this->entrySenseAvailable() && method_exists($this->entries, 'findByForm')) {
             foreach ((array) $this->entries->findByForm($term, $context) as $entry) {
-                if (!$entry instanceof \NHK\Core\Domain\Dictionary\LexicalEntry || $entry->status !== DictionaryConcept::APPROVED) continue;
+                if (!$entry instanceof \NHK\Core\Domain\Dictionary\LexicalEntry) continue;
+                $senses = array_values(array_filter((array) $this->entries->listSenses($entry, $context), static fn (mixed $sense): bool => $sense instanceof DictionaryConcept));
+                $durable = false;
+                if (method_exists($this->entries, 'findDurableForConcept')) {
+                    foreach ($senses as $candidateSense) {
+                        $durableEntry = $this->entries->findDurableForConcept($candidateSense->conceptId);
+                        if ($durableEntry instanceof \NHK\Core\Domain\Dictionary\LexicalEntry && $durableEntry->entryId === $entry->entryId) {
+                            $durable = true;
+                            break;
+                        }
+                    }
+                } else {
+                    $durable = trim((string) ($entry->context['public_slug'] ?? '')) !== '';
+                }
+                if (!$durable) continue;
+                $durableEntryFound = true;
+                if ($entry->status !== DictionaryConcept::APPROVED) continue;
                 $slug = trim((string) ($entry->context['public_slug'] ?? ''));
                 if ($slug === '') continue;
-                foreach ((array) $this->entries->listSenses($entry, $context) as $sense) {
+                foreach ($senses as $sense) {
                     if (!$sense instanceof DictionaryConcept || !$sense->approved()) continue;
                     $type = null;
                     $id = null;
@@ -627,8 +644,15 @@ final class DictionaryRuntime
                         }
                     }
                     if ($type === null || $id === null) {
+                        $type = trim((string) ($sense->destinationType ?? '')) ?: null;
+                        $id = trim((string) ($sense->destinationId ?? '')) ?: null;
+                        if ($type !== null || $id !== null) {
+                            if ($type === null || $id === null || ($url = $this->revalidateDelegatedDestination($type, $id, $sense->destinationUrl)) === null) continue;
+                        }
+                    }
+                    if ($type === null || $id === null) {
                         $type = 'dictionary';
-                        $id = $sense->conceptId;
+                        $id = $entry->entryId;
                         $url = '/tu-dien/' . $slug . '/';
                     }
                     $rows[] = [
@@ -644,7 +668,7 @@ final class DictionaryRuntime
                     ];
                 }
             }
-            if ($rows !== []) return $rows;
+            if ($durableEntryFound) return $rows;
         }
         foreach ($this->concepts->findApprovedByNormalizedLabel($term, $context) as $row) {
             if (!is_array($row)) continue;

@@ -1,5 +1,30 @@
 # NHK V3 Execution State
 
+## Checkpoint — 2026-10-05 — Final Dictionary resolver destination projection parity
+
+ROOT_CAUSE: The Entry/Sense resolver returned standalone Sense destination
+fields without projecting the approved Entry's persisted `public_slug`. The
+MCP runtime path could also fall through to the legacy Concept projection when
+a durable Entry lacked public identity or was non-public.
+
+IMPLEMENTATION: Standalone approved Entries now resolve as
+`dictionary` → canonical Entry ID → `/tu-dien/{persisted-public-slug}/`.
+Mapping-level semantic references and legacy delegated owner routes retain
+precedence. Durable Entries without public identity, retired Entries and
+non-approved Entries fail closed; the compatibility Concept fallback remains
+available only when no durable Entry owns the Form.
+
+REGRESSION COVERAGE: Exact preferred and alternate Form resolution, persisted
+Entry route projection, delegated owner URL precedence, missing slug and
+retired Entry fail-closed behavior, and the `400 ngày` delegated regression.
+
+VERIFICATION: Focused Dictionary projection suite passes 52 tests / 157
+assertions; changed PHP files lint clean and `git diff --check` passes. No
+materialization, Entry/Sense mutation, semantic-owner mutation, schema change,
+deployment or production operation was performed.
+
+STATUS: `DICTIONARY_RESOLVER_DESTINATION_PROJECTION_PARITY_FIXED_LOCAL / FOCUSED_GREEN / NO_DATA_MUTATION`
+
 ## Checkpoint — 2026-10-05 — Final blocker closure: lexical MCP read parity / semantic fixture boundary
 
 ROOT_CAUSE: `nhk.dictionary.lexical-relation.read` advertised `entry_id`, but

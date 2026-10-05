@@ -18,7 +18,10 @@ final class DictionaryEntrySenseResolver
         $normalized = $this->normalizer->normalize($term);
         if ($normalized === '') return ['status' => 'UNKNOWN', 'term' => $term, 'normalized_term' => ''];
 
-        $entries = array_values(array_filter($this->entries->findByForm($normalized, $context), static fn (mixed $entry): bool => $entry instanceof LexicalEntry));
+        $entries = array_values(array_filter(
+            $this->entries->findByForm($normalized, $context),
+            static fn (mixed $entry): bool => $entry instanceof LexicalEntry && $entry->status === DictionaryConcept::APPROVED,
+        ));
         $senses = [];
         $rawSenseCount = 0;
         foreach ($entries as $entry) {
@@ -34,11 +37,50 @@ final class DictionaryEntrySenseResolver
         }
 
         [$entry, $sense] = array_values($senses)[0];
-        $url = null;
-        if ($sense->destinationType !== null && $sense->destinationId !== null && is_callable($this->destinationValidator)) {
-            try { $validated = ($this->destinationValidator)($sense->destinationType, $sense->destinationId, $sense->destinationUrl); if ($validated === false) return ['status' => 'UNKNOWN', 'term' => $term, 'normalized_term' => $normalized, 'reason' => 'DICTIONARY_SEMANTIC_REFERENCE_INVALID']; $url = is_string($validated) && trim($validated) !== '' ? trim($validated) : null; }
-            catch (\Throwable) { $url = null; }
+        $destinationType = null;
+        $destinationId = null;
+        $semanticReference = null;
+        if (method_exists($this->entries, 'semanticReference')) {
+            try {
+                $semanticReference = $this->entries->semanticReference($entry->entryId, $sense->conceptId);
+                $referenceStatus = strtoupper((string) ($semanticReference['status'] ?? 'ABSENT'));
+                if ($referenceStatus !== 'ABSENT') {
+                    $destinationType = trim((string) ($semanticReference['type'] ?? '')) ?: null;
+                    $destinationId = trim((string) ($semanticReference['id'] ?? '')) ?: null;
+                    if (!in_array($referenceStatus, ['AVAILABLE', 'PRESENT_VALID'], true) || $destinationType === null || $destinationId === null) {
+                        return ['status' => 'UNKNOWN', 'term' => $term, 'normalized_term' => $normalized, 'reason' => 'DICTIONARY_SEMANTIC_REFERENCE_INVALID'];
+                    }
+                }
+            } catch (\Throwable) {
+                return ['status' => 'UNKNOWN', 'term' => $term, 'normalized_term' => $normalized, 'reason' => 'DICTIONARY_SEMANTIC_REFERENCE_UNAVAILABLE'];
+            }
         }
-        return ['status' => 'RESOLVED', 'term' => $term, 'normalized_term' => $normalized, 'entry_id' => $entry->entryId, 'sense_id' => $sense->conceptId, 'preferred_label' => $sense->preferredLabel, 'destination_type' => $sense->destinationType, 'destination_id' => $sense->destinationId, 'destination_url' => $url, 'context' => $context];
+
+        if ($destinationType === null || $destinationId === null) {
+            $destinationType = trim((string) ($sense->destinationType ?? '')) ?: null;
+            $destinationId = trim((string) ($sense->destinationId ?? '')) ?: null;
+        }
+
+        $url = null;
+        if ($destinationType !== null && $destinationId !== null && is_callable($this->destinationValidator)) {
+            try {
+                $validated = ($this->destinationValidator)($destinationType, $destinationId, $sense->destinationUrl);
+                if ($validated === false) return ['status' => 'UNKNOWN', 'term' => $term, 'normalized_term' => $normalized, 'reason' => 'DICTIONARY_SEMANTIC_REFERENCE_INVALID'];
+                $url = is_string($validated) && trim($validated) !== '' ? trim($validated) : null;
+            } catch (\Throwable) {
+                $url = null;
+            }
+        }
+
+        if ($destinationType === null || $destinationId === null) {
+            $slug = trim((string) ($entry->context['public_slug'] ?? ''));
+            if ($entry->status !== DictionaryConcept::APPROVED || $slug === '') {
+                return ['status' => 'UNKNOWN', 'term' => $term, 'normalized_term' => $normalized, 'reason' => 'DICTIONARY_ENTRY_PUBLIC_IDENTITY_MISSING'];
+            }
+            $destinationType = 'dictionary';
+            $destinationId = $entry->entryId;
+            $url = '/tu-dien/' . $slug . '/';
+        }
+        return ['status' => 'RESOLVED', 'term' => $term, 'normalized_term' => $normalized, 'entry_id' => $entry->entryId, 'sense_id' => $sense->conceptId, 'preferred_label' => $sense->preferredLabel, 'destination_type' => $destinationType, 'destination_id' => $destinationId, 'destination_url' => $url, 'context' => $context];
     }
 }
