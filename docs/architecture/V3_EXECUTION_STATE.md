@@ -1,5 +1,93 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-06 — Universal Article media selection final verification
+
+ROOT_CAUSE: The Article media pipeline previously allowed technical ranking and
+historical reuse to outrun persisted canonical subject proof; the same unsafe
+Usage state could then reach persistence, SEO, publication evidence and public
+projections. The legacy inventory also had no bounded, mutation-free review
+path.
+
+IMPLEMENTATION: One shared semantic eligibility policy now gates automatic
+Article selection, with deterministic semantic-tier ranking and no fallback.
+Canonical Capture/Blueprint subject IDs and revisions flow through native
+WordPress reconciliation, Usage persistence readback, publication evidence,
+SEO and entity/frontend projections. Explicit pinned placement remains
+protected. A stable-UUID, cursor-bounded legacy audit emits only dry-run
+findings and expected-revision repair plans; it cannot apply repairs.
+
+REFERENCE ACCEPTANCE: The generic synthetic reference-equivalent cases pass
+through the existing coordinator, selector, SEO, dossier/gallery and audit
+paths. The reported live Articles were not mutated or read from an authorized
+runtime; no fixture-specific branch or production repair was added. The
+historical parity matrix remains non-normative evidence and no parity claim is
+made.
+
+VERIFICATION: Final relevant suite passes 109 tests / 369 assertions with 50
+PHPUnit deprecations and zero failures. Every changed PHP file lints clean;
+`git diff --check` is clean; targeted secret scan found no key/private-key
+patterns. Earlier full-suite baseline remains environment-limited: PHP 128M
+fatals in an existing materializer test, while PHP 512M completed with 33
+environment/integration errors and 29 unrelated unit failures. No schema
+change, data mutation, deployment, push or production operation occurred.
+
+STATUS: `ARTICLE_MEDIA_UNIVERSAL_SELECTION_FIXED_LOCAL / FINAL_FOCUSED_GREEN / READ_ONLY_REFERENCE_EQUIVALENT / NO_DATA_MUTATION / CODE_B626DFEA`
+
+# Checkpoint — 2026-10-06 — Read-only Article media legacy audit planner
+
+ROOT_CAUSE: Historical Article Usage rows can predate canonical subject-bound
+Blueprint evidence, leaving automatic media that must be reviewed without a
+safe, resumable inventory or a governed replacement recommendation.
+
+IMPLEMENTATION: Added `ArticleMediaUsageInventory` with a stable Usage-UUID
+cursor and bounded WordPress read-only implementation. Added
+`ArticleMediaLegacyAudit`, which reuses the shared selector and suitability
+policy, protects explicit pinned rows, reports missing scope/inactive/stale
+automatic rows, fingerprints bounded identifiers, and emits a replacement
+action only when an eligible candidate is proven. The Plugin exposes the
+planner through a read-only filter; it has no write or repair application path.
+
+REGRESSION COVERAGE: Five dry-run tests cover missing scope and invalid auto
+usage, explicit pinned protection, proven replacement, no-safe-media
+disposition, deterministic cursor/limit traversal, and zero repository
+mutation.
+
+VERIFICATION: Audit suite passes 5 tests / 24 assertions; audit and Plugin
+files lint clean and `git diff --check` passes. No legacy repair was applied,
+no data mutation, deployment or schema change was performed.
+
+STATUS: `ARTICLE_MEDIA_LEGACY_AUDIT_DRY_RUN_READY / FOCUSED_GREEN / NO_DATA_MUTATION / COMMIT_BFAABC9A`
+
+# Checkpoint — 2026-10-06 — Article media persistence and public readback gate
+
+ROOT_CAUSE: Persisted Article Usage rows were exposed to SEO, dossier and
+frontend projections without rechecking the governing subject Blueprint. A
+missing Blueprint therefore looked like valid automatic Article coverage, and
+the coordinator’s readback did not expose selection provenance or semantic
+verification.
+
+IMPLEMENTATION: Canonical Usage readback now returns Usage identity, endpoint,
+role, placement, revision, selection source/policy, semantic tier/suitability,
+status and bounded diagnostics; stale or unscoped automatic mandatory slots
+cannot remain complete. Article SEO and `EntityMediaProjection` revalidate
+system-selected Article media against the persisted Blueprint and revision,
+while explicit pinned placements remain visible. Frontend and dossier
+composition roots receive the shared Blueprint repository and suitability
+policy.
+
+REGRESSION COVERAGE: Readback rejects subject/revision drift; SEO fails closed
+without subject scope; wrong-subject automatic Article media is hidden from
+entity/dossier/gallery projection; explicit pinned media remains visible; the
+publication gate blocks semantically invalid Image Article media; and the
+composition/wiring suite verifies the shared dependencies.
+
+VERIFICATION: Focused persistence/publication/projection suite passes 102 tests
+ / 336 assertions; related dossier/readback coverage passes 9 tests / 65
+assertions; changed PHP files lint clean and `git diff --check` passes. No data
+mutation, deployment, schema change or production operation was performed.
+
+STATUS: `ARTICLE_MEDIA_PERSISTENCE_PUBLIC_READBACK_FIXED_LOCAL / FOCUSED_GREEN / NO_DATA_MUTATION / COMMIT_1B884797`
+
 # Checkpoint — 2026-10-06 — Canonical Article subject-bound reconciliation
 
 ROOT_CAUSE: WordPress Article reconciliation supplied only the post title to
