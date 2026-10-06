@@ -43,6 +43,89 @@ final class SemanticSuitabilityAndProjectionTest extends TestCase
         self::assertFalse($assessment['valid_for_completeness']);
     }
 
+    public function test_unscoped_ready_media_is_not_automatic_article_coverage(): void
+    {
+        $assessment = (new SemanticSuitabilityPolicy())->evaluateMedia(
+            new Media(self::MEDIA_ID, 'media.unscoped', 'Unscoped image', 'ready'),
+            [new \NHK\Core\Domain\Media\MediaAsset(
+                '018f5b74-5f0a-7d2e-9a93-c0e7d6dc3343', self::MEDIA_ID, 'original', 'media/unscoped', str_repeat('c', 64), 'image/jpeg', 100, 2400, 1600, 'PUBLIC'
+            )],
+            [],
+            'SYSTEM_AUTO',
+            'featured_primary',
+        );
+
+        self::assertFalse($assessment['auto_select']);
+        self::assertFalse($assessment['valid_for_completeness']);
+        self::assertNotSame(SemanticSuitabilityPolicy::COMPATIBLE, $assessment['suitability']);
+        self::assertSame('MEDIA_USAGE_SEMANTIC_MISMATCH', $assessment['diagnostic']);
+    }
+
+    public function test_visually_superior_unrelated_media_is_hard_rejected(): void
+    {
+        $assessment = (new SemanticSuitabilityPolicy())->evaluateMedia(
+            new Media(self::MEDIA_ID, 'media.unrelated', 'Unrelated large image', 'ready', ['subject_ids' => ['subject-other']]),
+            [new \NHK\Core\Domain\Media\MediaAsset(
+                '018f5b74-5f0a-7d2e-9a93-c0e7d6dc3344', self::MEDIA_ID, 'original', 'media/unrelated', str_repeat('d', 64), 'image/jpeg', 100, 6000, 4000, 'PUBLIC'
+            )],
+            ['subject_ids' => ['subject-target']],
+            'SYSTEM_AUTO',
+            'featured_primary',
+        );
+
+        self::assertSame(SemanticSuitabilityPolicy::INELIGIBLE, $assessment['suitability']);
+        self::assertFalse($assessment['auto_select']);
+        self::assertSame('persisted_subject_scope_mismatch', $assessment['basis']);
+    }
+
+    public function test_registered_structural_compatibility_is_distinguished_from_broad_ancestor_scope(): void
+    {
+        $policy = new SemanticSuitabilityPolicy();
+        $compatible = $policy->evaluate([
+            'availability' => SemanticSuitabilityPolicy::AVAILABLE,
+            'subject_ids' => ['model-parent'],
+            'compatibility_rule_registered' => true,
+            'relation_class' => 'REPRESENTATIVE_COMPATIBLE',
+            'relation_path' => ['variant_of'],
+            'role' => 'featured_primary',
+        ], ['subject_ids' => ['variant-child']]);
+        $broad = $policy->evaluate([
+            'availability' => SemanticSuitabilityPolicy::AVAILABLE,
+            'subject_ids' => ['brand-parent'],
+            'compatibility_rule_registered' => true,
+            'relation_class' => 'BROAD_ANCESTOR',
+            'relation_path' => ['variant_of', 'model_of'],
+            'role' => 'featured_primary',
+        ], ['subject_ids' => ['variant-child']]);
+
+        self::assertSame(SemanticSuitabilityPolicy::COMPATIBLE, $compatible['suitability']);
+        self::assertTrue($compatible['auto_select']);
+        self::assertSame(SemanticSuitabilityPolicy::INELIGIBLE, $broad['suitability']);
+        self::assertFalse($broad['auto_select']);
+    }
+
+    public function test_policy_exposes_deterministic_semantic_tier_and_rejection_reason(): void
+    {
+        $policy = new SemanticSuitabilityPolicy();
+        $exact = $policy->evaluate([
+            'availability' => SemanticSuitabilityPolicy::AVAILABLE,
+            'subject_ids' => ['subject-target'],
+            'role' => 'featured_primary',
+        ], ['subject_ids' => ['subject-target']]);
+        $unknown = $policy->evaluate([
+            'availability' => SemanticSuitabilityPolicy::AVAILABLE,
+            'role' => 'featured_primary',
+        ], ['subject_ids' => ['subject-target']]);
+
+        self::assertSame('EXACT_SUBJECT', $exact['semantic_tier']);
+        self::assertSame('EXACT', $exact['relationship_class']);
+        self::assertSame([], $exact['relation_path']);
+        self::assertTrue($exact['eligible']);
+        self::assertSame('UNKNOWN_SCOPE', $unknown['semantic_tier']);
+        self::assertFalse($unknown['eligible']);
+        self::assertSame('no_explainable_persisted_subject_basis', $unknown['basis']);
+    }
+
     public function test_usage_reconciliation_requires_suitability_before_planning_add(): void
     {
         $result = (new MediaUsageReconciler())->plan('wp_post', '1:1', [], [[

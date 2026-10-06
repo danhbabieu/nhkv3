@@ -50,32 +50,48 @@ final class SemanticSuitabilityPolicy
         ));
         $basis = '';
         $suitability = self::UNKNOWN;
+        $relationshipClass = 'UNKNOWN';
+        $semanticTier = 'UNKNOWN_SCOPE';
+        $relationPath = is_array($candidate['relation_path'] ?? null) ? array_values(array_map('strval', $candidate['relation_path'])) : [];
         if ($availability !== self::AVAILABLE) {
             $suitability = self::INELIGIBLE;
             $basis = 'availability_not_available';
+            $relationshipClass = 'UNAVAILABLE';
+            $semanticTier = 'UNAVAILABLE';
         } elseif ($expected !== [] && array_intersect($expected, $actual) !== []) {
             $suitability = self::EXACT;
             $basis = 'exact_canonical_subject_binding';
+            $relationshipClass = 'EXACT';
+            $semanticTier = 'EXACT_SUBJECT';
         } elseif (($candidate['compatibility_rule_registered'] ?? false) === true
             && in_array(strtoupper(trim((string) ($candidate['relation_class'] ?? ''))), ['IDENTITY_EQUIVALENT', 'REPRESENTATIVE_COMPATIBLE'], true)) {
             $suitability = self::COMPATIBLE;
             $basis = 'registered_compatibility_rule';
+            $relationshipClass = strtoupper(trim((string) ($candidate['relation_class'] ?? 'REPRESENTATIVE_COMPATIBLE')));
+            $semanticTier = 'REGISTERED_COMPATIBLE';
         } elseif ($expected !== [] && $actual !== []) {
             $suitability = self::INELIGIBLE;
             $basis = 'persisted_subject_scope_mismatch';
-        } elseif ($expected === [] && in_array($candidate['role'] ?? '', ['featured_primary', 'inline_primary', 'inline_supporting'], true)) {
+            $relationshipClass = 'UNRELATED';
+            $semanticTier = 'CONTRADICTORY_SCOPE';
+        } elseif ($expected === [] && in_array($candidate['role'] ?? '', ['featured_primary', 'inline_primary', 'inline_supporting'], true)
+            && ($candidate['article_explicit_media'] ?? false) !== true
+            && !(($candidate['selection_source'] ?? 'SYSTEM_AUTO') === 'USER_EXPLICIT' && ($candidate['current_capture_media'] ?? false) === true)) {
             // A generic Article may use editorial Media without claiming that
             // the asset proves a canonical semantic subject. Subject-bound
             // representative/entity reuse still requires explicit persisted
             // scope and is evaluated through the branches above.
-            $suitability = self::COMPATIBLE;
-            $basis = 'unscoped_article_media';
+            $basis = 'no_explainable_persisted_subject_basis';
+            $relationshipClass = 'UNKNOWN';
+            $semanticTier = 'UNKNOWN_SCOPE';
         } elseif ($expected === [] && ($candidate['article_explicit_media'] ?? false) === true) {
             // An explicit Article slot selection is valid editorial input when
             // there is no semantic target to validate. This does not grant
             // representative/entity reuse or create semantic scope proof.
             $suitability = self::COMPATIBLE;
             $basis = 'explicit_article_selection_without_semantic_target';
+            $relationshipClass = 'EXPLICIT_ARTICLE';
+            $semanticTier = 'EXPLICIT_ARTICLE';
         } elseif (($candidate['selection_source'] ?? 'SYSTEM_AUTO') === 'USER_EXPLICIT' && ($candidate['current_capture_media'] ?? false) === true) {
             // A Media supplied in the current Capture is publication-unit
             // provenance. It may satisfy the Article slot without inventing
@@ -83,18 +99,32 @@ final class SemanticSuitabilityPolicy
             // requires exact or registered compatible scope.
             $suitability = self::COMPATIBLE;
             $basis = 'current_capture_selection_provenance';
+            $relationshipClass = 'CURRENT_CAPTURE';
+            $semanticTier = 'CURRENT_CAPTURE';
         } elseif (($candidate['selection_source'] ?? 'SYSTEM_AUTO') === 'USER_EXPLICIT' && ($candidate['editorial_illustration'] ?? false) === true) {
             // An explicit illustration may be retained for editorial context,
             // but it is not semantic representative coverage.
             $suitability = self::REVIEW_REQUIRED;
             $basis = 'explicit_editorial_illustration_without_subject_binding';
+            $relationshipClass = 'EDITORIAL_ILLUSTRATION';
+            $semanticTier = 'EDITORIAL_REVIEW';
         } else {
             $basis = 'no_explainable_persisted_subject_basis';
         }
 
         $auto = $availability === self::AVAILABLE
             && in_array($suitability, [self::EXACT, self::COMPATIBLE], true)
-            && in_array($basis, ['exact_canonical_subject_binding', 'registered_compatibility_rule', 'current_capture_selection_provenance', 'explicit_article_selection_without_semantic_target', 'unscoped_article_media'], true);
+            && in_array($basis, ['exact_canonical_subject_binding', 'registered_compatibility_rule', 'current_capture_selection_provenance', 'explicit_article_selection_without_semantic_target'], true);
+        $scoreComponents = [
+            'semantic_tier' => match ($semanticTier) {
+                'EXACT_SUBJECT' => 500,
+                'REGISTERED_COMPATIBLE' => 400,
+                'CURRENT_CAPTURE' => 300,
+                'EXPLICIT_ARTICLE' => 200,
+                default => 0,
+            },
+            'relationship_class' => $relationshipClass,
+        ];
         return [
             'requirement' => $requirement,
             'availability' => $availability,
@@ -103,6 +133,11 @@ final class SemanticSuitabilityPolicy
             'auto_select' => $auto,
             'valid_for_completeness' => $auto,
             'diagnostic' => $auto ? null : ($suitability === self::INELIGIBLE ? 'MEDIA_CANDIDATE_INELIGIBLE' : 'MEDIA_USAGE_SEMANTIC_MISMATCH'),
+            'relationship_class' => $relationshipClass,
+            'relation_path' => $relationPath,
+            'semantic_tier' => $semanticTier,
+            'eligible' => $auto,
+            'score_components' => $scoreComponents,
         ];
     }
 

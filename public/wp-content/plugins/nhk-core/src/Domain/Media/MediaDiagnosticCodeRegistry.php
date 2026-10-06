@@ -27,6 +27,7 @@ final class MediaDiagnosticCodeRegistry
             'MEDIA_USAGE_STALE',
             'MEDIA_BINDING_BROKEN',
             'STALE_OR_INELIGIBLE_USAGE',
+            'NO_SEMANTICALLY_ELIGIBLE_MEDIA',
         ];
     }
 

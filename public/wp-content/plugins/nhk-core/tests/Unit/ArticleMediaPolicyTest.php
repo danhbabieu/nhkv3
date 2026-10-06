@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Tests\Unit;
 
-use NHK\Core\Application\Media\{ArticleMediaCoordinator, ArticleMediaSeoProjection, MediaBatchIngestService, MediaFilenameNormalizer, MediaIngestGateway, MediaService};
+use NHK\Core\Application\Media\{ArticleMediaCandidateSelector, ArticleMediaCoordinator, ArticleMediaSeoProjection, MediaBatchIngestService, MediaFilenameNormalizer, MediaIngestGateway, MediaService};
 use NHK\Core\Contracts\Media\{ArticleMediaBlueprintRepository, MediaAssetRepository, MediaRepository, MediaUsageUpdater, MutableMediaUsageRepository, WordPressArticleMediaAdapter};
 use NHK\Core\Domain\Media\{Media, MediaAsset, MediaException, MediaSeoBlueprint, MediaUsage};
 use NHK\Core\Shared\Uuid\UuidCodec;
@@ -660,15 +660,101 @@ final class ArticleMediaPolicyTest extends TestCase
     public function test_representative_candidate_tie_uses_stable_key_not_insertion_or_upload_recency(): void
     {
         [$media, $assets, $usages, $blueprints, $service] = $this->stores();
-        $later = $service->create('representative-z', 'Same subject', 'ready');
-        $first = $service->create('representative-a', 'Same subject', 'ready');
+        $later = $service->create('representative-z', 'Same subject', 'ready', ['subject_ids' => ['subject-target']]);
+        $first = $service->create('representative-a', 'Same subject', 'ready', ['subject_ids' => ['subject-target']]);
         foreach ([[$later, 'later'], [$first, 'first']] as [$item, $suffix]) {
             $service->addAsset($item->canonicalId, 'original', 'uploads/' . $suffix . '.jpg', hash('sha256', $suffix), 'image/jpeg', 10, 1200, 675, 'PUBLIC');
         }
 
-        $result = (new ArticleMediaCoordinator($service, $media, $assets, $usages, $blueprints, 1))->ensureForPost(901, ['subject' => 'Same subject']);
+        $result = (new ArticleMediaCoordinator($service, $media, $assets, $usages, $blueprints, 1))->ensureForPost(901, [
+            'subject' => 'Same subject',
+            'subject_ids' => ['subject-target'],
+            'subject_context' => ['subject' => 'Same subject', 'subject_ids' => ['subject-target']],
+        ]);
 
         self::assertSame($first->canonicalId, $result->slotMedia['featured_primary']);
+    }
+
+    public function test_selector_ranks_exact_subject_before_larger_unrelated_asset(): void
+    {
+        [$media, $assets, $usages, $blueprints, $service] = $this->stores();
+        $unrelated = $service->create('selector-unrelated', 'Large unrelated image', 'ready', ['subject_ids' => ['subject-other']]);
+        $exact = $service->create('selector-exact', 'Exact subject image', 'ready', ['subject_ids' => ['subject-target']]);
+        $service->addAsset($unrelated->canonicalId, 'original', 'uploads/selector-unrelated.jpg', hash('sha256', 'selector-unrelated'), 'image/jpeg', 10, 6000, 4000, 'PUBLIC');
+        $service->addAsset($exact->canonicalId, 'original', 'uploads/selector-exact.jpg', hash('sha256', 'selector-exact'), 'image/jpeg', 10, 1200, 675, 'PUBLIC');
+
+        $blueprint = MediaSeoBlueprint::forPost(902, 'featured_primary', [
+            'subject' => 'Target subject',
+            'subject_context' => ['subject' => 'Target subject', 'subject_ids' => ['subject-target']],
+        ]);
+        $result = (new ArticleMediaCandidateSelector($media, $assets, $usages, new \NHK\Core\Application\Media\SemanticSuitabilityPolicy()))->select($blueprint);
+
+        self::assertSame($exact->canonicalId, $result['media']?->canonicalId);
+        self::assertSame('EXACT_SUBJECT', $result['candidates'][0]['semantic_tier']);
+        self::assertSame($unrelated->canonicalId, $result['candidates'][1]['media_id']);
+        self::assertFalse($result['candidates'][1]['eligible']);
+    }
+
+    public function test_selector_rejects_same_brand_sibling_and_broad_ancestor_without_registered_rule(): void
+    {
+        [$media, $assets, $usages, $blueprints, $service] = $this->stores();
+        $sibling = $service->create('selector-sibling', 'Sibling image', 'ready', ['subject_ids' => ['variant-sibling']]);
+        $parent = $service->create('selector-parent', 'Parent image', 'ready', ['subject_ids' => ['model-parent']]);
+        foreach ([[$sibling, 'selector-sibling'], [$parent, 'selector-parent']] as [$item, $stem]) {
+            $service->addAsset($item->canonicalId, 'original', 'uploads/' . $stem . '.jpg', hash('sha256', $stem), 'image/jpeg', 10, 2400, 1600, 'PUBLIC');
+        }
+
+        $blueprint = MediaSeoBlueprint::forPost(903, 'featured_primary', [
+            'subject' => 'Target variant',
+            'subject_context' => ['subject' => 'Target variant', 'subject_ids' => ['variant-target']],
+        ]);
+        $result = (new ArticleMediaCandidateSelector($media, $assets, $usages, new \NHK\Core\Application\Media\SemanticSuitabilityPolicy()))->select($blueprint);
+
+        self::assertNull($result['media']);
+        self::assertSame('NO_SEMANTICALLY_ELIGIBLE_MEDIA', $result['diagnostics'][0]['code']);
+        self::assertSame([], array_filter($result['candidates'], static fn (array $candidate): bool => $candidate['eligible'] === true));
+    }
+
+    public function test_selector_is_independent_of_repository_insertion_order(): void
+    {
+        [$media, $assets, $usages, $blueprints, $service] = $this->stores();
+        $first = $service->create('selector-z', 'Exact subject Z', 'ready', ['subject_ids' => ['subject-target']]);
+        $second = $service->create('selector-a', 'Exact subject A', 'ready', ['subject_ids' => ['subject-target']]);
+        foreach ([[$first, 'selector-z'], [$second, 'selector-a']] as [$item, $stem]) $service->addAsset($item->canonicalId, 'original', 'uploads/' . $stem . '.jpg', hash('sha256', $stem), 'image/jpeg', 10, 1200, 675, 'PUBLIC');
+
+        $blueprint = MediaSeoBlueprint::forPost(904, 'featured_primary', ['subject_context' => ['subject_ids' => ['subject-target']]]);
+        $result = (new ArticleMediaCandidateSelector($media, $assets, $usages, new \NHK\Core\Application\Media\SemanticSuitabilityPolicy()))->select($blueprint);
+
+        self::assertSame('selector-a', $result['media']?->stableKey);
+    }
+
+    public function test_selector_scans_past_large_ineligible_prefix(): void
+    {
+        [$media, $assets, $usages, $blueprints, $service] = $this->stores();
+        foreach (range(1, 25) as $index) {
+            $item = $service->create('selector-prefix-' . $index, 'Unrelated ' . $index, 'ready', ['subject_ids' => ['subject-other-' . $index]]);
+            $service->addAsset($item->canonicalId, 'original', 'uploads/selector-prefix-' . $index . '.jpg', hash('sha256', 'selector-prefix-' . $index), 'image/jpeg', 10, 2400, 1600, 'PUBLIC');
+        }
+        $exact = $service->create('selector-after-prefix', 'Exact subject after prefix', 'ready', ['subject_ids' => ['subject-target']]);
+        $service->addAsset($exact->canonicalId, 'original', 'uploads/selector-after-prefix.jpg', hash('sha256', 'selector-after-prefix'), 'image/jpeg', 10, 1200, 675, 'PUBLIC');
+
+        $blueprint = MediaSeoBlueprint::forPost(905, 'featured_primary', ['subject_context' => ['subject_ids' => ['subject-target']]]);
+        $result = (new ArticleMediaCandidateSelector($media, $assets, $usages, new \NHK\Core\Application\Media\SemanticSuitabilityPolicy()))->select($blueprint);
+
+        self::assertSame($exact->canonicalId, $result['media']?->canonicalId);
+    }
+
+    public function test_selector_returns_no_media_when_all_candidates_are_ineligible(): void
+    {
+        [$media, $assets, $usages, $blueprints, $service] = $this->stores();
+        $unrelated = $service->create('selector-none', 'Unrelated only', 'ready', ['subject_ids' => ['subject-other']]);
+        $service->addAsset($unrelated->canonicalId, 'original', 'uploads/selector-none.jpg', hash('sha256', 'selector-none'), 'image/jpeg', 10, 1200, 675, 'PUBLIC');
+
+        $blueprint = MediaSeoBlueprint::forPost(906, 'featured_primary', ['subject_context' => ['subject_ids' => ['subject-target']]]);
+        $result = (new ArticleMediaCandidateSelector($media, $assets, $usages, new \NHK\Core\Application\Media\SemanticSuitabilityPolicy()))->select($blueprint);
+
+        self::assertNull($result['media']);
+        self::assertSame('NO_SEMANTICALLY_ELIGIBLE_MEDIA', $result['diagnostics'][0]['code']);
     }
 
     public function test_source_original_and_derivative_replay_under_one_media_identity(): void
