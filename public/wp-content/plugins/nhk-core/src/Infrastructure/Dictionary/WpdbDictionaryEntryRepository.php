@@ -240,6 +240,96 @@ final class WpdbDictionaryEntryRepository implements DictionaryEntryRepository, 
         return array_values(array_filter(array_map(fn (array $row): ?LexicalEntry => $this->hydrateEntry($row), $rows)));
     }
 
+    /**
+     * Read one bounded public archive batch. Sense, form and label hydration is
+     * batched so the public archive does not perform one query per entry.
+     *
+     * @return array{rows:list<array{kind:string,entry:LexicalEntry,senses:list<DictionaryConcept>,forms:list<LexicalEntryForm>,labels:array<string,list<\NHK\Core\Domain\Dictionary\DictionaryLabel>>}>,next_cursor:?string}
+     */
+    public function readArchiveCandidates(int $limit = 100, ?string $cursor = null, string $query = ''): array
+    {
+        $limit = max(1, min(500, $limit));
+        $after = $this->decodeArchiveCursor($cursor);
+        $where = "e.status=%s AND EXISTS (SELECT 1 FROM {$this->senses} es INNER JOIN {$this->conceptsTable()} ec ON ec.concept_uuid=es.concept_uuid WHERE es.entry_uuid=e.entry_uuid AND es.state=1 AND ec.status=%s)";
+        $args = [DictionaryConcept::APPROVED, DictionaryConcept::APPROVED];
+        if ($after !== null) {
+            $where .= ' AND (e.preferred_form>%s OR (e.preferred_form=%s AND e.id>%d))';
+            array_push($args, $after['label'], $after['label'], $after['id']);
+        }
+        $args[] = $limit + 1;
+        $rows = $this->database->get_results($this->database->prepare("SELECT e.* FROM {$this->entries} e WHERE {$where} ORDER BY e.preferred_form,e.id LIMIT %d", ...$args), ARRAY_A);
+        if (!is_array($rows)) throw new \RuntimeException('DICTIONARY_ARCHIVE_ENTRY_READ_FAILED');
+        $hasMore = count($rows) > $limit;
+        if ($hasMore) array_pop($rows);
+        if ($rows === []) return ['rows' => [], 'next_cursor' => null];
+
+        $entryIds = [];
+        $entryBinaries = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) continue;
+            try {
+                $entryId = UuidCodec::fromBinary($row['entry_uuid']);
+                $entryIds[$entryId] = true;
+                $entryBinaries[$entryId] = UuidCodec::toBinary($entryId);
+            } catch (\Throwable) { continue; }
+        }
+        if ($entryBinaries === []) return ['rows' => [], 'next_cursor' => null];
+        $placeholders = implode(',', array_fill(0, count($entryBinaries), '%s'));
+        $senseRows = $this->database->get_results($this->database->prepare("SELECT es.entry_uuid,es.concept_uuid FROM {$this->senses} es INNER JOIN {$this->conceptsTable()} ec ON ec.concept_uuid=es.concept_uuid WHERE es.entry_uuid IN ({$placeholders}) AND es.state=1 AND ec.status=%s ORDER BY es.entry_uuid,es.id", ...array_merge(array_values($entryBinaries), [DictionaryConcept::APPROVED])), ARRAY_A);
+        if (!is_array($senseRows)) throw new \RuntimeException('DICTIONARY_ARCHIVE_SENSE_READ_FAILED');
+        $senseIdsByEntry = array_fill_keys(array_keys($entryIds), []);
+        $conceptIds = [];
+        foreach ($senseRows as $senseRow) {
+            if (!is_array($senseRow)) continue;
+            try {
+                $entryId = UuidCodec::fromBinary($senseRow['entry_uuid']);
+                $conceptId = UuidCodec::fromBinary($senseRow['concept_uuid']);
+            } catch (\Throwable) { continue; }
+            $senseIdsByEntry[$entryId][] = $conceptId;
+            $conceptIds[$conceptId] = true;
+        }
+        $concepts = method_exists($this->concepts, 'findByIds') ? $this->concepts->findByIds(array_keys($conceptIds)) : [];
+        if (!method_exists($this->concepts, 'findByIds')) foreach (array_keys($conceptIds) as $conceptId) { $concept = $this->concepts->findById($conceptId); if ($concept instanceof DictionaryConcept) $concepts[$conceptId] = $concept; }
+        $labels = method_exists($this->concepts, 'listLabelsForConcepts') ? $this->concepts->listLabelsForConcepts(array_keys($conceptIds)) : [];
+        $forms = $this->listFormsForEntries(array_keys($entryIds));
+        $mapped = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) continue;
+            try { $entryId = UuidCodec::fromBinary($row['entry_uuid']); } catch (\Throwable) { continue; }
+            $senseIds = array_values(array_unique($senseIdsByEntry[$entryId] ?? []));
+            $entry = $this->hydrateEntry($row, $senseIds);
+            if (!$entry instanceof LexicalEntry) continue;
+            $senses = [];
+            foreach ($senseIds as $senseId) if (($concepts[$senseId] ?? null) instanceof DictionaryConcept && $concepts[$senseId]->approved()) $senses[] = $concepts[$senseId];
+            if ($senses === []) continue;
+            $mapped[] = ['kind' => 'ENTRY', 'entry' => $entry, 'senses' => $senses, 'forms' => $forms[$entryId] ?? [], 'labels' => $labels];
+        }
+        $last = $rows[array_key_last($rows)] ?? null;
+        return ['rows' => $mapped, 'next_cursor' => $hasMore && is_array($last) ? $this->encodeArchiveCursor((string) ($last['preferred_form'] ?? ''), (int) ($last['id'] ?? 0)) : null];
+    }
+
+    /** @return array<string,list<LexicalEntryForm>> */
+    public function listFormsForEntries(array $entryIds): array
+    {
+        $binaries = [];
+        foreach ($entryIds as $entryId) {
+            try { $binaries[(string) $entryId] = UuidCodec::toBinary((string) $entryId); } catch (\Throwable) { continue; }
+        }
+        if ($binaries === []) return [];
+        $placeholders = implode(',', array_fill(0, count($binaries), '%s'));
+        $rows = $this->database->get_results($this->database->prepare("SELECT * FROM {$this->forms} WHERE entry_uuid IN ({$placeholders}) AND state=1 ORDER BY entry_uuid,id", ...array_values($binaries)), ARRAY_A) ?: [];
+        $out = array_fill_keys(array_keys($binaries), []);
+        foreach ($rows as $row) {
+            if (!is_array($row)) continue;
+            try { $entryId = UuidCodec::fromBinary($row['entry_uuid']); } catch (\Throwable) { continue; }
+            $form = trim((string) ($row['form_text'] ?? ''));
+            $normalized = trim((string) ($row['normalized_form'] ?? ''));
+            if ($form === '' || $normalized === '') continue;
+            $out[$entryId][] = new LexicalEntryForm($entryId, $form, $normalized, (string) ($row['form_kind'] ?? LexicalEntryForm::ALTERNATE), ($row['locale'] ?? null) !== null ? (string) $row['locale'] : null, $this->decode((string) ($row['context_json'] ?? '{}')), true);
+        }
+        return $out;
+    }
+
     public function findByPublicSlug(string $slug): ?LexicalEntry
     {
         try {
@@ -406,17 +496,33 @@ final class WpdbDictionaryEntryRepository implements DictionaryEntryRepository, 
         return $form;
     }
 
-    private function hydrateEntry(array $row): ?LexicalEntry
+    private function hydrateEntry(array $row, ?array $senseIdsOverride = null): ?LexicalEntry
     {
         try {
             $entryId = UuidCodec::fromBinary($row['entry_uuid']);
-            $senseRows = $this->database->get_results($this->database->prepare("SELECT concept_uuid FROM {$this->senses} WHERE entry_uuid=%s AND state=1 ORDER BY id", UuidCodec::toBinary($entryId)), ARRAY_A) ?: [];
-            $senseIds = [];
-            foreach ($senseRows as $senseRow) {
-                try { $senseIds[] = UuidCodec::fromBinary($senseRow['concept_uuid']); } catch (\Throwable) { continue; }
+            $senseIds = $senseIdsOverride;
+            if ($senseIds === null) {
+                $senseRows = $this->database->get_results($this->database->prepare("SELECT concept_uuid FROM {$this->senses} WHERE entry_uuid=%s AND state=1 ORDER BY id", UuidCodec::toBinary($entryId)), ARRAY_A) ?: [];
+                $senseIds = [];
+                foreach ($senseRows as $senseRow) {
+                    try { $senseIds[] = UuidCodec::fromBinary($senseRow['concept_uuid']); } catch (\Throwable) { continue; }
+                }
             }
             return new LexicalEntry($entryId, (string) $row['preferred_form'], (string) $row['normalized_preferred_form'], (string) $row['status'], ($row['locale'] ?? null) !== null ? (string) $row['locale'] : null, $this->decode((string) ($row['context_json'] ?? '{}')), (int) ($row['revision'] ?? 1), array_values(array_unique($senseIds)));
         } catch (\Throwable) { return null; }
+    }
+
+    /** @return array{label:string,id:int}|null */
+    private function decodeArchiveCursor(?string $cursor): ?array
+    {
+        if ($cursor === null || $cursor === '') return null;
+        $value = json_decode((string) base64_decode($cursor, true), true);
+        return is_array($value) && isset($value['label'], $value['id']) ? ['label' => (string) $value['label'], 'id' => (int) $value['id']] : null;
+    }
+
+    private function encodeArchiveCursor(string $label, int $id): string
+    {
+        return base64_encode((string) json_encode(['label' => $label, 'id' => $id], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
     }
 
     private function conceptsTable(): string

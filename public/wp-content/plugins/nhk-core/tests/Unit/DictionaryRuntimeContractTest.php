@@ -32,7 +32,7 @@ final class DictionaryRuntimeContractTest extends TestCase
         preg_match('/public function publicTerms\(\): array\s*\{(?P<body>.*?)\n    \}/s', $source, $match);
         $body = (string) ($match['body'] ?? '');
 
-        self::assertStringContainsString('$this->publicQuery->hub(2000)', $body);
+        self::assertStringContainsString('$this->publicQuery->archive(', $body);
         self::assertStringNotContainsString('$this->types->all()', $body);
         self::assertStringNotContainsString('$this->authority->listByType', $body);
     }

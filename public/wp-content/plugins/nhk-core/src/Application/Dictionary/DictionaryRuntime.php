@@ -306,7 +306,15 @@ final class DictionaryRuntime
     public function publicTerms(): array
     {
         if (!$this->available()) return [];
-        return $this->publicTermsFromHubItems((array) ($this->publicQuery->hub(2000)['items'] ?? []));
+        $items = [];
+        $cursor = null;
+        do {
+            $page = $this->publicQuery->archive(['page_size' => 500, 'cursor' => $cursor]);
+            if (!in_array(($page['status'] ?? ''), ['AVAILABLE', 'EMPTY'], true)) return [];
+            foreach ((array) ($page['items'] ?? []) as $item) if (is_array($item)) $items[] = $item;
+            $cursor = ($page['pagination']['has_next'] ?? false) === true ? ($page['pagination']['next_cursor'] ?? null) : null;
+        } while ($cursor !== null);
+        return $this->publicTermsFromHubItems($items);
     }
 
     /** @param list<array<string,mixed>> $hubItems @return list<array{concept_id:string,label:string,url:string}> */
@@ -480,7 +488,7 @@ final class DictionaryRuntime
         $mentionRows = $this->database->get_results("SELECT source_kind,COUNT(*) AS total FROM {$prefix}nhk_dictionary_mentions GROUP BY source_kind", ARRAY_A) ?: [];
         $mentionCounts = [];
         foreach ($mentionRows as $row) $mentionCounts[(string) ($row['source_kind'] ?? '')] = (int) ($row['total'] ?? 0);
-        $hub = $this->publicQuery->hub(2000);
+        $hub = $this->publicQuery->archive(['page_size' => 500]);
         $publicItems = array_values(array_filter((array) ($hub['items'] ?? []), 'is_array'));
         $preview = null;
         $requestedConcept = trim((string) ($conceptId ?? ''));

@@ -76,6 +76,73 @@ final class WpdbDictionaryConceptRepository implements DictionaryConceptReposito
         return array_values(array_filter(array_map(fn (array $row): ?DictionaryLabel => $this->hydrateLabel($row, $conceptId), $rows)));
     }
 
+    /** @return array<string,DictionaryConcept> */
+    public function findByIds(array $conceptIds): array
+    {
+        $ids = [];
+        foreach ($conceptIds as $conceptId) {
+            try { $ids[(string) $conceptId] = UuidCodec::toBinary((string) $conceptId); } catch (\Throwable) { continue; }
+        }
+        if ($ids === []) return [];
+        $placeholders = implode(',', array_fill(0, count($ids), '%s'));
+        $rows = $this->database->get_results($this->database->prepare("SELECT * FROM {$this->concepts} WHERE concept_uuid IN ({$placeholders})", ...array_values($ids)), ARRAY_A) ?: [];
+        $out = [];
+        foreach ($rows as $row) {
+            $concept = is_array($row) ? $this->hydrateConcept($row) : null;
+            if ($concept instanceof DictionaryConcept) $out[$concept->conceptId] = $concept;
+        }
+        return $out;
+    }
+
+    /** @return array<string,list<DictionaryLabel>> */
+    public function listLabelsForConcepts(array $conceptIds, bool $includeInactive = false): array
+    {
+        $ids = [];
+        foreach ($conceptIds as $conceptId) {
+            try { $ids[(string) $conceptId] = UuidCodec::toBinary((string) $conceptId); } catch (\Throwable) { continue; }
+        }
+        if ($ids === []) return [];
+        $placeholders = implode(',', array_fill(0, count($ids), '%s'));
+        $sql = "SELECT * FROM {$this->labels} WHERE concept_uuid IN ({$placeholders})" . ($includeInactive ? '' : ' AND state=1') . ' ORDER BY concept_uuid,id';
+        $rows = $this->database->get_results($this->database->prepare($sql, ...array_values($ids)), ARRAY_A) ?: [];
+        $out = array_fill_keys(array_keys($ids), []);
+        foreach ($rows as $row) {
+            if (!is_array($row)) continue;
+            try { $conceptId = UuidCodec::fromBinary($row['concept_uuid']); } catch (\Throwable) { continue; }
+            $label = $this->hydrateLabel($row, $conceptId);
+            if ($label instanceof DictionaryLabel) $out[$conceptId][] = $label;
+        }
+        return $out;
+    }
+
+    /** @return array{rows:list<array{kind:string,concept:DictionaryConcept,labels:list<DictionaryLabel>}>,next_cursor:?string} */
+    public function readApprovedArchiveCandidates(int $limit = 100, ?string $cursor = null, string $query = ''): array
+    {
+        $limit = max(1, min(500, $limit));
+        $after = $this->decodeArchiveCursor($cursor);
+        $where = "c.status=%s AND NOT EXISTS (SELECT 1 FROM {$this->database->prefix}nhk_dictionary_entry_senses es INNER JOIN {$this->database->prefix}nhk_dictionary_entries de ON de.entry_uuid=es.entry_uuid WHERE es.concept_uuid=c.concept_uuid AND es.state=1)";
+        $args = [DictionaryConcept::APPROVED];
+        if ($after !== null) {
+            $where .= ' AND (c.preferred_label>%s OR (c.preferred_label=%s AND c.id>%d))';
+            array_push($args, $after['label'], $after['label'], $after['id']);
+        }
+        $args[] = $limit + 1;
+        $rows = $this->database->get_results($this->database->prepare("SELECT c.* FROM {$this->concepts} c WHERE {$where} ORDER BY c.preferred_label,c.id LIMIT %d", ...$args), ARRAY_A);
+        if (!is_array($rows)) throw new \RuntimeException('DICTIONARY_ARCHIVE_CONCEPT_READ_FAILED');
+        $hasMore = count($rows) > $limit;
+        if ($hasMore) array_pop($rows);
+        $concepts = [];
+        foreach ($rows as $row) {
+            $concept = is_array($row) ? $this->hydrateConcept($row) : null;
+            if ($concept instanceof DictionaryConcept) $concepts[] = ['concept' => $concept, 'id' => (int) ($row['id'] ?? 0)];
+        }
+        $labels = $this->listLabelsForConcepts(array_map(static fn (array $row): string => $row['concept']->conceptId, $concepts));
+        $mapped = [];
+        foreach ($concepts as $row) $mapped[] = ['kind' => 'CONCEPT', 'concept' => $row['concept'], 'labels' => $labels[$row['concept']->conceptId] ?? []];
+        $last = $concepts[array_key_last($concepts)] ?? null;
+        return ['rows' => $mapped, 'next_cursor' => $hasMore && is_array($last) ? $this->encodeArchiveCursor($last['concept']->preferredLabel, $last['id']) : null];
+    }
+
     public function createConcept(DictionaryConcept $concept): DictionaryConcept
     {
         $existing = $this->findById($concept->conceptId);
@@ -192,6 +259,19 @@ final class WpdbDictionaryConceptRepository implements DictionaryConceptReposito
     {
         try { $value = json_decode($json, true, 512, JSON_THROW_ON_ERROR); return is_array($value) ? $value : []; }
         catch (\Throwable) { return []; }
+    }
+
+    /** @return array{label:string,id:int}|null */
+    private function decodeArchiveCursor(?string $cursor): ?array
+    {
+        if ($cursor === null || $cursor === '') return null;
+        $value = json_decode((string) base64_decode($cursor, true), true);
+        return is_array($value) && isset($value['label'], $value['id']) ? ['label' => (string) $value['label'], 'id' => (int) $value['id']] : null;
+    }
+
+    private function encodeArchiveCursor(string $label, int $id): string
+    {
+        return base64_encode((string) json_encode(['label' => $label, 'id' => $id], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
     }
 
     private function contextHash(array $context): string

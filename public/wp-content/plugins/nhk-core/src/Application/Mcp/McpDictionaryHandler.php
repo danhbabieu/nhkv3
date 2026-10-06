@@ -22,7 +22,7 @@ final class McpDictionaryHandler
     {
         if (!$this->runtime->available()) return ['status' => 'unavailable', 'reason' => 'DICTIONARY_STORAGE_UNAVAILABLE'];
         $limit = max(1, min(500, $limit));
-        $items = array_values(array_filter((array) ($this->runtime->publicQuery()->hub(500, $query)['items'] ?? []), 'is_array'));
+        $items = array_values(array_filter((array) ($this->runtime->publicQuery()->archive(['query' => $query, 'page_size' => $limit])['items'] ?? []), 'is_array'));
         if (count($items) > $limit) $items = array_slice($items, 0, $limit);
         return ['status' => 'available', 'items' => $items, 'count' => count($items)];
     }

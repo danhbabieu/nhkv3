@@ -429,6 +429,136 @@ final class DictionaryPublicQueryTest extends TestCase
         self::assertSame('MAPPING', $reference['source']);
     }
 
+    public function test_archive_reports_exact_total_and_full_alphabet_counts_across_pages(): void
+    {
+        $labels = ['Áo', 'Dây tóc', 'Đồng hồ', '400 ngày', 'Ébauche'];
+        $senses = [];
+        $entriesList = [];
+        foreach ($labels as $index => $label) {
+            $sense = new DictionaryConcept('archive-sense-' . $index, $label, 'Định nghĩa ' . $label, DictionaryConcept::APPROVED, null, null, null, ['public_slug' => 'archive-' . $index]);
+            $senses[$sense->conceptId] = $sense;
+            $entriesList[] = new LexicalEntry('archive-entry-' . $index, $label, mb_strtolower($label, 'UTF-8'), DictionaryConcept::APPROVED, 'vi-VN', ['public_slug' => 'archive-' . $index], 1, [$sense->conceptId]);
+        }
+        $repo = $this->repository(array_values($senses), array_fill_keys(array_keys($senses), []));
+        $entries = new class($entriesList, $senses) {
+            public function __construct(private array $entries, private array $senses) {}
+            public function listEntries(int $limit = 500): array { return $this->entries; }
+            public function listSenses(LexicalEntry $entry, array $context = []): array { return [$this->senses[$entry->senseIds[0]]]; }
+            public function listForms(LexicalEntry $entry): array { return []; }
+        };
+
+        $query = new DictionaryPublicQuery($repo, null, null, $entries);
+        $first = $query->archive(['page_size' => 2]);
+        $second = $query->archive(['page_size' => 2, 'cursor' => $first['pagination']['next_cursor']]);
+
+        self::assertSame('AVAILABLE', $first['status']);
+        self::assertTrue($first['pagination']['total_exact']);
+        self::assertSame(5, $first['pagination']['total_count']);
+        self::assertSame(2, count($first['items']));
+        self::assertSame(29, count($first['alphabet']));
+        self::assertSame(5, $second['pagination']['total_count']);
+        self::assertSame([], array_intersect(array_column($first['items'], 'entry_id'), array_column($second['items'], 'entry_id')));
+        self::assertSame(1, array_values(array_filter($first['alphabet'], static fn (array $bucket): bool => $bucket['key'] === 'A'))[0]['count']);
+        self::assertSame(1, array_values(array_filter($first['alphabet'], static fn (array $bucket): bool => $bucket['key'] === 'Đ'))[0]['count']);
+        self::assertSame(1, array_values(array_filter($first['alphabet'], static fn (array $bucket): bool => $bucket['key'] === '0–9'))[0]['count']);
+    }
+
+    public function test_archive_normalizes_nfc_nfd_and_keeps_d_and_d_stroke_buckets_distinct(): void
+    {
+        $labels = ["A\u{0301}o", 'Dây', 'Đồng', '400 ngày', '時計'];
+        $senses = [];
+        $entriesList = [];
+        foreach ($labels as $index => $label) {
+            $sense = new DictionaryConcept('browse-sense-' . $index, $label, 'Định nghĩa', DictionaryConcept::APPROVED, null, null, null, ['public_slug' => 'browse-' . $index]);
+            $senses[$sense->conceptId] = $sense;
+            $entriesList[] = new LexicalEntry('browse-entry-' . $index, $label, mb_strtolower($label, 'UTF-8'), DictionaryConcept::APPROVED, 'vi-VN', ['public_slug' => 'browse-' . $index], 1, [$sense->conceptId]);
+        }
+        $repo = $this->repository(array_values($senses), array_fill_keys(array_keys($senses), []));
+        $entries = new class($entriesList, $senses) {
+            public function __construct(private array $entries, private array $senses) {}
+            public function listEntries(int $limit = 500): array { return $this->entries; }
+            public function listSenses(LexicalEntry $entry, array $context = []): array { return [$this->senses[$entry->senseIds[0]]]; }
+        };
+
+        $query = new DictionaryPublicQuery($repo, null, null, $entries);
+        $all = $query->archive(['page_size' => 20]);
+
+        self::assertSame(5, $all['pagination']['total_count']);
+        $counts = [];
+        foreach ($all['alphabet'] as $bucket) $counts[$bucket['key']] = $bucket['count'];
+        self::assertSame(1, $counts['A']);
+        self::assertSame(1, $counts['D']);
+        self::assertSame(1, $counts['Đ']);
+        self::assertSame(1, $counts['0–9']);
+        self::assertSame(1, $counts['#']);
+        self::assertCount(1, $query->archive(['initial' => 'D', 'page_size' => 20])['items']);
+        self::assertCount(1, $query->archive(['initial' => 'Đ', 'page_size' => 20])['items']);
+    }
+
+    public function test_archive_cursor_is_bound_to_query_and_initial(): void
+    {
+        $sense = new DictionaryConcept('cursor-sense', 'Côn', 'Định nghĩa', DictionaryConcept::APPROVED, null, null, null, ['public_slug' => 'con']);
+        $other = new DictionaryConcept('cursor-other-sense', 'Dây', 'Định nghĩa', DictionaryConcept::APPROVED, null, null, null, ['public_slug' => 'day']);
+        $repo = $this->repository([$sense, $other], ['cursor-sense' => [], 'cursor-other-sense' => []]);
+        $entries = new class($sense, $other) {
+            public function __construct(private DictionaryConcept $sense, private DictionaryConcept $other) {}
+            public function listEntries(int $limit = 500): array { return [new LexicalEntry('cursor-entry', 'Côn', 'côn', DictionaryConcept::APPROVED, 'vi-VN', ['public_slug' => 'con'], 1, [$this->sense->conceptId]), new LexicalEntry('cursor-other-entry', 'Dây', 'day', DictionaryConcept::APPROVED, 'vi-VN', ['public_slug' => 'day'], 1, [$this->other->conceptId])]; }
+            public function listSenses(LexicalEntry $entry, array $context = []): array { return [$entry->entryId === 'cursor-entry' ? $this->sense : $this->other]; }
+        };
+        $query = new DictionaryPublicQuery($repo, null, null, $entries);
+        $cursor = $query->archive(['page_size' => 1])['pagination']['next_cursor'];
+
+        self::assertSame('CONFLICT', $query->archive(['query' => 'khác', 'cursor' => $cursor])['status']);
+        self::assertSame('CONFLICT', $query->archive(['initial' => 'D', 'cursor' => $cursor])['status']);
+        self::assertSame('CONFLICT', $query->archive(['cursor' => 'not-a-valid-cursor'])['status']);
+    }
+
+    public function test_archive_keeps_runtime_failure_distinct_from_empty(): void
+    {
+        $repo = $this->repository([], []);
+        $entries = new class {
+            public function listEntries(int $limit = 500): array { throw new \RuntimeException('read failed'); }
+        };
+        $query = new DictionaryPublicQuery($repo, null, null, $entries, static fn (): bool => true);
+
+        self::assertSame('UNAVAILABLE', $query->archive(['page_size' => 20])['status']);
+        self::assertSame('EMPTY', (new DictionaryPublicQuery($repo, null, null, new class { public function listEntries(int $limit = 500): array { return []; } }, static fn (): bool => true))->archive(['page_size' => 20])['status']);
+    }
+
+    public function test_archive_batch_reader_avoids_entry_proportional_hydration_queries(): void
+    {
+        $sense = new DictionaryConcept('batch-sense', 'Côn', 'Định nghĩa', DictionaryConcept::APPROVED, null, null, null, ['public_slug' => 'con']);
+        $repo = new class($sense) implements DictionaryConceptRepository {
+            public function __construct(private DictionaryConcept $sense) {}
+            public function readApprovedArchiveCandidates(int $limit = 100, ?string $cursor = null, string $query = ''): array { return ['rows' => [], 'next_cursor' => null]; }
+            public function findById(string $conceptId): ?DictionaryConcept { return $conceptId === $this->sense->conceptId ? $this->sense : null; }
+            public function findApprovedByNormalizedLabel(string $normalizedLabel, array $context = []): array { return []; }
+            public function listApproved(int $limit = 500): array { return []; }
+            public function listLabels(string $conceptId, bool $includeInactive = false): array { throw new \LogicException('per-item label query'); }
+            public function createConcept(DictionaryConcept $concept): DictionaryConcept { return $concept; }
+            public function updateConcept(DictionaryConcept $concept, int $expectedRevision): DictionaryConcept { return $concept; }
+            public function addLabel(DictionaryLabel $label): DictionaryLabel { return $label; }
+            public function saveLabel(DictionaryLabel $label, string $previousNormalizedLabel, int $expectedConceptRevision): DictionaryLabel { return $label; }
+        };
+        $entries = new class($sense) {
+            public int $batches = 0;
+            public function __construct(private DictionaryConcept $sense) {}
+            public function readArchiveCandidates(int $limit = 100, ?string $cursor = null, string $query = ''): array
+            {
+                $this->batches++;
+                if ($this->batches > 1) return ['rows' => [], 'next_cursor' => null];
+                return ['rows' => [['kind' => 'ENTRY', 'entry' => new LexicalEntry('batch-entry', 'Côn', 'côn', DictionaryConcept::APPROVED, 'vi-VN', ['public_slug' => 'con'], 1, [$this->sense->conceptId]), 'senses' => [$this->sense], 'forms' => [], 'labels' => [$this->sense->conceptId => []]]], 'next_cursor' => 'batch-2'];
+            }
+            public function listForms(LexicalEntry $entry): array { throw new \LogicException('per-entry form query'); }
+        };
+
+        $result = (new DictionaryPublicQuery($repo, null, null, $entries))->archive(['page_size' => 20]);
+
+        self::assertSame('AVAILABLE', $result['status']);
+        self::assertSame(1, $result['pagination']['total_count']);
+        self::assertSame(2, $entries->batches);
+    }
+
     private function repository(array $concepts, array $labels): DictionaryConceptRepository
     {
         return new class($concepts, $labels) implements DictionaryConceptRepository {

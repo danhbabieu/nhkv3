@@ -43,8 +43,9 @@ final class PublicDictionaryRoutes
         } else {
             $query = isset($_GET['q']) && is_string($_GET['q']) ? sanitize_text_field(wp_unslash($_GET['q'])) : '';
             $initial = isset($_GET['initial']) && is_string($_GET['initial']) ? sanitize_text_field(wp_unslash($_GET['initial'])) : '';
-            $packet = $this->query->hub(500, $query, $initial);
-            if (($packet['status'] ?? '') !== 'AVAILABLE') {
+            $cursor = isset($_GET['cursor']) && is_string($_GET['cursor']) ? sanitize_text_field(wp_unslash($_GET['cursor'])) : null;
+            $packet = $this->query->archive(['query' => $query, 'initial' => $initial, 'page_size' => 500, 'cursor' => $cursor]);
+            if (!in_array(($packet['status'] ?? ''), ['AVAILABLE', 'EMPTY'], true)) {
                 $this->set404();
                 return get_404_template();
             }

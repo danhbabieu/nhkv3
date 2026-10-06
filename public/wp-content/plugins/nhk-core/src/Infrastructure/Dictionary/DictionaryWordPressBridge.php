@@ -63,7 +63,7 @@ final class DictionaryWordPressBridge
         if (!$this->runtime->available()) { $groups['_availability']['dictionary'] = 'UNAVAILABLE'; return $groups; }
         $term = trim($term);
         $items = [];
-        if ($term !== '') foreach ((array) ($this->runtime->publicQuery()->hub(2000)['items'] ?? []) as $item) {
+        if ($term !== '') foreach ((array) ($this->runtime->publicQuery()->archive(['query' => $term, 'page_size' => 500])['items'] ?? []) as $item) {
             if (!is_array($item) || empty($item['url'])) continue;
             $haystack = [(string) ($item['title'] ?? ''), (string) ($item['description'] ?? '')];
             foreach ((array) ($item['search_labels'] ?? $item['labels'] ?? []) as $label) if (is_array($label)) $haystack[] = (string) ($label['label'] ?? '');
@@ -80,7 +80,7 @@ final class DictionaryWordPressBridge
     {
         $modules['dictionary'] = [];
         if (!$this->runtime->available()) return $modules;
-        foreach ((array) ($this->runtime->publicQuery()->hub(12)['items'] ?? []) as $item) {
+        foreach ((array) ($this->runtime->publicQuery()->archive(['page_size' => 12])['items'] ?? []) as $item) {
             if (!is_array($item) || empty($item['url']) || trim((string) ($item['title'] ?? '')) === '') continue;
             $modules['dictionary'][] = [
                 'title' => (string) $item['title'],
@@ -102,7 +102,7 @@ final class DictionaryWordPressBridge
     {
         if (!$this->runtime->available() || trim($text) === '') return $value;
         $seen = [];
-        foreach ((array) ($this->runtime->publicQuery()->hub(1000)['items'] ?? []) as $item) {
+        foreach ((array) ($this->runtime->publicQuery()->archive(['page_size' => 500])['items'] ?? []) as $item) {
             if (!is_array($item) || empty($item['url'])) continue;
             $labels = [(string) ($item['title'] ?? '')];
             foreach ((array) ($item['search_labels'] ?? $item['labels'] ?? []) as $label) if (is_array($label)) $labels[] = (string) ($label['label'] ?? '');

@@ -1,5 +1,43 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-06 — Read-only Dictionary discovery hub inventory
+
+BASELINE: Fresh v57 documentation bootstrap/profile completed before coding.
+Build identity `b3308de0ef1f798979a2b67177ff2647afb4feb97d90668fa19ca4dc2955eb8e`,
+source revision `8882b51efcc3d418b1056cfb35a73d4b57cacf43`, documentation version
+`c74a11d3ac747ea7789f58c3015dd5dbc458fc2496033fd5c5134a412054fdc3`, runtime
+environment `staging`, Dictionary public hub `READY`, and Entry/Sense mode
+`READY`. No migration, deploy, semantic write or data mutation was performed.
+
+IMPLEMENTATION: Added the read-only `DictionaryPublicQuery::archive()` contract
+with bounded page size, query/initial filters, exact full-projection count,
+full eligible/deduped alphabet metadata, deterministic Vietnamese-aware ordering,
+NFC/NFD handling, D/Đ separation, opaque query/initial-bound cursor and distinct
+AVAILABLE/EMPTY/UNAVAILABLE/CONFLICT states. Added batch Entry/Sense/Form/Label
+readers and compatibility Concept reconciliation; owner-delegated terms use the
+revalidated final owner URL and do not create a competing Dictionary page.
+
+CONSUMERS: `/tu-dien/`, sitemap enumeration, MCP Dictionary search, homepage,
+contextual Dictionary lookup and auto-link term inventory now consume the same
+archive boundary. Sitemap follows all archive cursors instead of assuming
+`hub(2000)` is complete. No facet/recent/popular route or frontend redesign was
+added.
+
+REGRESSION_COVERAGE: Archive tests cover exact totals across pages, alphabet
+counts, A/D/Đ/numeric/foreign/NFC-NFD buckets, cursor binding and stale/invalid
+cursor behavior, runtime failure versus empty, and batch-reader protection from
+per-entry form/label hydration. Focused Dictionary suite passes 315 tests / 1,271
+assertions (warnings/deprecations only).
+
+VERIFICATION: Changed PHP files lint clean and `git diff --check` passes. The
+512MB full Unit run completes 3,336 tests with 1 unrelated Article repository
+double error and 4 unrelated Knowledge failures; the default 128MB run is also
+limited by the existing TrustedProvidedFileMaterializer memory fatal. No
+production/staging runtime acceptance or deployment was performed.
+
+STATUS: `DICTIONARY_ARCHIVE_INVENTORY_LOCAL / FOCUSED_GREEN /
+FULL_UNIT_BASELINE_LIMITED / NO_DATA_MUTATION / NO_DEPLOYMENT / COMMIT_PENDING`.
+
 # Checkpoint — 2026-10-06 — System-wide duplicate audit readers
 
 IMPLEMENTATION: Added bounded read-only WPDB page readers for Authority,

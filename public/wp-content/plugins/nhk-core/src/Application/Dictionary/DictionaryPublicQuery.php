@@ -10,12 +10,232 @@ use NHK\Core\Shared\Encoding\Utf8String;
 
 final class DictionaryPublicQuery
 {
-    public function __construct(private DictionaryConceptRepository $concepts, private $imageResolver = null, private $destinationValidator = null, private $entries = null, private $entrySenseReady = null, private $semanticProjection = null, private ?DictionaryDetailQuery $detailQuery = null) {}
+    private DictionaryLexicalBrowsePolicy $browsePolicy;
+
+    public function __construct(private DictionaryConceptRepository $concepts, private $imageResolver = null, private $destinationValidator = null, private $entries = null, private $entrySenseReady = null, private $semanticProjection = null, private ?DictionaryDetailQuery $detailQuery = null)
+    {
+        $this->browsePolicy = new DictionaryLexicalBrowsePolicy();
+    }
+
+    /**
+     * Complete read-only public archive projection. This is intentionally
+     * separate from the legacy hub signature so existing bounded consumers can
+     * migrate without creating a second eligibility or destination policy.
+     *
+     * @param array{query?:string,initial?:string,page_size?:int,cursor?:string|null} $request
+     * @return array<string,mixed>
+     */
+    public function archive(array $request = []): array
+    {
+        $query = $this->browsePolicy->searchKey((string) ($request['query'] ?? ''));
+        $initial = $this->browsePolicy->normalizeInitial(isset($request['initial']) ? (string) $request['initial'] : null);
+        $pageSize = max(1, min(500, (int) ($request['page_size'] ?? 24)));
+        if ($initial === null) return $this->archiveConflict('DICTIONARY_INITIAL_INVALID');
+
+        $cursor = null;
+        if (isset($request['cursor']) && trim((string) $request['cursor']) !== '') {
+            $cursor = $this->decodeArchiveCursor((string) $request['cursor'], $query, $initial);
+            if ($cursor === null) return $this->archiveConflict('DICTIONARY_CURSOR_INVALID');
+        }
+
+        $alphabet = $this->browsePolicy->emptyAlphabet();
+        $seen = [];
+        $selected = [];
+        $total = 0;
+        $remaining = 0;
+        $cursorSeen = $cursor === null;
+        try {
+            foreach ($this->archiveItemStream($query, $initial) as $item) {
+                $identity = (($item['destination_mode'] ?? '') === 'DELEGATED')
+                    ? 'delegated:' . $this->browsePolicy->searchKey((string) ($item['title'] ?? '')) . ':' . trim((string) ($item['url'] ?? ''))
+                    : 'entry:' . trim((string) ($item['entry_id'] ?? $item['concept_id'] ?? ''));
+                if ($identity === 'entry:' || isset($seen[$identity])) continue;
+                $seen[$identity] = true;
+                $item['_browse_sort_key'] = $this->browsePolicy->sortKey((string) ($item['title'] ?? ''));
+                $total++;
+                $bucket = $this->browsePolicy->initial((string) ($item['title'] ?? ''));
+                if ($bucket === '#' && array_filter($alphabet, static fn (array $metadata): bool => $metadata['key'] === '#') === []) $alphabet[] = ['key' => '#', 'label' => '#', 'count' => 0, 'available' => false];
+                foreach ($alphabet as &$metadata) if ($metadata['key'] === $bucket) { $metadata['count']++; $metadata['available'] = true; break; }
+                unset($metadata);
+                if ($cursor !== null) {
+                    $tuple = $this->archiveItemTuple($item);
+                    if ($tuple === $cursor['last']) { $cursorSeen = true; continue; }
+                    if (!$cursorSeen && $this->compareArchiveTuples($tuple, $cursor['last']) <= 0) continue;
+                }
+                $remaining++;
+                $selected[] = $item;
+                usort($selected, fn (array $left, array $right): int => $this->browsePolicy->compare($left, $right));
+                if (count($selected) > $pageSize) array_pop($selected);
+            }
+        } catch (\Throwable) {
+            return ['status' => 'UNAVAILABLE', 'canonical_url' => '/tu-dien/', 'items' => [], 'alphabet' => $this->browsePolicy->emptyAlphabet(), 'pagination' => ['page_size' => $pageSize, 'next_cursor' => null, 'has_next' => false, 'total_count' => null, 'total_exact' => false], 'warnings' => ['DICTIONARY_ARCHIVE_READ_FAILED']];
+        }
+        if (!$cursorSeen) return $this->archiveConflict('DICTIONARY_CURSOR_STALE');
+        $alphabet = array_values(array_filter($alphabet, static fn (array $metadata): bool => $metadata['key'] !== '#' || $metadata['count'] > 0));
+        usort($selected, fn (array $left, array $right): int => $this->browsePolicy->compare($left, $right));
+        $hasNext = $remaining > $pageSize;
+        $nextCursor = $hasNext && $selected !== [] ? $this->encodeArchiveCursor($query, $initial, $this->archiveItemTuple($selected[array_key_last($selected)])) : null;
+        $pagination = ['page_size' => $pageSize, 'next_cursor' => $nextCursor, 'has_next' => $hasNext, 'total_count' => $total, 'total_exact' => true];
+        return ['status' => $total === 0 ? 'EMPTY' : 'AVAILABLE', 'canonical_url' => '/tu-dien/', 'items' => $selected, 'alphabet' => $alphabet, 'pagination' => $pagination, 'count' => count($selected), 'total_count' => $total, 'query' => $query, 'initial' => $initial, 'warnings' => []];
+    }
+
+    /** @return \Generator<int,array<string,mixed>,void,void> */
+    private function archiveItemStream(string $query, string $initial): \Generator
+    {
+        $hasBatchReaders = $this->entrySenseAvailable() && is_object($this->entries) && method_exists($this->entries, 'readArchiveCandidates') && method_exists($this->concepts, 'readApprovedArchiveCandidates');
+        if (!$hasBatchReaders) {
+            foreach ($this->collectArchiveItems($query, $initial) as $item) yield $item;
+            return;
+        }
+        $cursor = null;
+        do {
+            $page = $this->entries->readArchiveCandidates(100, $cursor, $query);
+            foreach ((array) ($page['rows'] ?? []) as $row) {
+                $entry = $row['entry'] ?? null;
+                $senses = array_values(array_filter((array) ($row['senses'] ?? []), static fn (mixed $sense): bool => $sense instanceof DictionaryConcept && $sense->approved()));
+                if (!$entry instanceof LexicalEntry) continue;
+                $item = $this->entryHubItem($entry, $senses, is_array($row['forms'] ?? null) ? $row['forms'] : null, is_array($row['labels'] ?? null) ? $row['labels'] : []);
+                if (($item['eligible'] ?? false) !== true || trim((string) ($item['url'] ?? '')) === '') continue;
+                if (!$this->archiveMatches($item, $query, $initial)) continue;
+                yield $item;
+            }
+            $cursor = $page['next_cursor'] ?? null;
+        } while ($cursor !== null);
+
+        $cursor = null;
+        do {
+            $page = $this->concepts->readApprovedArchiveCandidates(100, $cursor, $query);
+            foreach ((array) ($page['rows'] ?? []) as $row) {
+                $concept = $row['concept'] ?? null;
+                if (!$concept instanceof DictionaryConcept || !$concept->approved()) continue;
+                $item = $this->item($concept, is_array($row['labels'] ?? null) ? $row['labels'] : null);
+                if (($item['eligible'] ?? false) !== true || trim((string) ($item['url'] ?? '')) === '') continue;
+                if (!$this->archiveMatches($item, $query, $initial)) continue;
+                yield $item;
+            }
+            $cursor = $page['next_cursor'] ?? null;
+        } while ($cursor !== null);
+    }
+
+    private function archiveMatches(array $item, string $query, string $initial): bool
+    {
+        if ($initial !== '' && $this->browsePolicy->initial((string) ($item['title'] ?? '')) !== $initial) return false;
+        return $query === '' || $this->filterAndRank([$item], $query, '') !== [];
+    }
+
+    /** @param array{sort_key:string,title:string,identity:string} $left @param array{sort_key:string,title:string,identity:string} $right */
+    private function compareArchiveTuples(array $left, array $right): int
+    {
+        $sort = strcmp($left['sort_key'], $right['sort_key']);
+        if ($sort !== 0) return $sort;
+        $title = strcmp($this->browsePolicy->searchKey($left['title']), $this->browsePolicy->searchKey($right['title']));
+        return $title !== 0 ? $title : strcmp($left['identity'], $right['identity']);
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function collectArchiveItems(string $query, string $initial): array
+    {
+        $items = [];
+        $coveredConceptIds = [];
+        $entryRows = [];
+        if ($this->entrySenseAvailable() && is_object($this->entries)) {
+            if (method_exists($this->entries, 'readArchiveCandidates')) {
+                $cursor = null;
+                do {
+                    $page = $this->entries->readArchiveCandidates(100, $cursor, $query);
+                    foreach ((array) ($page['rows'] ?? []) as $row) $entryRows[] = $row;
+                    $cursor = $page['next_cursor'] ?? null;
+                } while ($cursor !== null);
+            } elseif (method_exists($this->entries, 'listEntries')) {
+                foreach ((array) $this->entries->listEntries(2000) as $entry) {
+                    if (!$entry instanceof LexicalEntry) continue;
+                    $senses = array_values(array_filter((array) $this->entries->listSenses($entry), static fn (mixed $sense): bool => $sense instanceof DictionaryConcept && $sense->approved()));
+                    $entryRows[] = ['kind' => 'ENTRY', 'entry' => $entry, 'senses' => $senses];
+                }
+            }
+        }
+        foreach ($entryRows as $row) {
+            $entry = $row['entry'] ?? null;
+            if (!$entry instanceof LexicalEntry) continue;
+            $senses = array_values(array_filter((array) ($row['senses'] ?? []), static fn (mixed $sense): bool => $sense instanceof DictionaryConcept && $sense->approved()));
+            foreach ($senses as $sense) $coveredConceptIds[$sense->conceptId] = true;
+            $item = $this->entryHubItem($entry, $senses, is_array($row['forms'] ?? null) ? $row['forms'] : null, is_array($row['labels'] ?? null) ? $row['labels'] : []);
+            if (($item['eligible'] ?? false) !== true || trim((string) ($item['url'] ?? '')) === '') continue;
+            $items[] = $item;
+        }
+
+        $conceptRows = [];
+        if (method_exists($this->concepts, 'readApprovedArchiveCandidates')) {
+            $cursor = null;
+            do {
+                $page = $this->concepts->readApprovedArchiveCandidates(100, $cursor, $query);
+                foreach ((array) ($page['rows'] ?? []) as $row) $conceptRows[] = $row;
+                $cursor = $page['next_cursor'] ?? null;
+            } while ($cursor !== null);
+        } else {
+            foreach ((array) $this->concepts->listApproved(2000) as $concept) $conceptRows[] = ['kind' => 'CONCEPT', 'concept' => $concept];
+        }
+        foreach ($conceptRows as $row) {
+            $concept = $row['concept'] ?? null;
+            if (!$concept instanceof DictionaryConcept || !$concept->approved() || isset($coveredConceptIds[$concept->conceptId])) continue;
+            if (is_object($this->entries) && method_exists($this->entries, 'findDurableForConcept') && $this->entries->findDurableForConcept($concept->conceptId) instanceof LexicalEntry) continue;
+            $item = $this->item($concept, is_array($row['labels'] ?? null) ? $row['labels'] : null);
+            if (($item['eligible'] ?? false) !== true || trim((string) ($item['url'] ?? '')) === '') continue;
+            $items[] = $item;
+        }
+
+        $filtered = $this->filterAndRank($items, $query, '');
+        $deduped = [];
+        foreach ($filtered as $item) {
+            if ($initial !== '' && $this->browsePolicy->initial((string) ($item['title'] ?? '')) !== $initial) continue;
+            $item['_browse_sort_key'] = $this->browsePolicy->sortKey((string) ($item['title'] ?? ''));
+            $identity = (($item['destination_mode'] ?? '') === 'DELEGATED')
+                ? 'delegated:' . $this->browsePolicy->searchKey((string) ($item['title'] ?? '')) . ':' . trim((string) ($item['url'] ?? ''))
+                : 'entry:' . trim((string) ($item['entry_id'] ?? $item['concept_id'] ?? ''));
+            if (isset($deduped[$identity])) continue;
+            $deduped[$identity] = $item;
+        }
+        return array_values($deduped);
+    }
+
+    /** @return array{sort_key:string,title:string,identity:string} */
+    private function archiveItemTuple(array $item): array
+    {
+        return ['sort_key' => (string) ($item['_browse_sort_key'] ?? $this->browsePolicy->sortKey((string) ($item['title'] ?? ''))), 'title' => (string) ($item['title'] ?? ''), 'identity' => (string) ($item['entry_id'] ?? $item['concept_id'] ?? '')];
+    }
+
+    private function encodeArchiveCursor(string $query, string $initial, array $last): string
+    {
+        $payload = ['version' => 1, 'query' => $query, 'initial' => $initial, 'sort' => 'LEXICAL_ASC_V1', 'last' => $last];
+        $json = function_exists('wp_json_encode') ? wp_json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        return rtrim(strtr(base64_encode((string) $json), '+/', '-_'), '=');
+    }
+
+    /** @return array{last:array{sort_key:string,title:string,identity:string}}|null */
+    private function decodeArchiveCursor(string $cursor, string $query, string $initial): ?array
+    {
+        $encoded = strtr($cursor, '-_', '+/');
+        $encoded .= str_repeat('=', (4 - strlen($encoded) % 4) % 4);
+        $decoded = base64_decode($encoded, true);
+        if ($decoded === false || $decoded === '') return null;
+        $payload = json_decode($decoded, true);
+        if (!is_array($payload) || ($payload['version'] ?? null) !== 1 || ($payload['query'] ?? null) !== $query || ($payload['initial'] ?? null) !== $initial || ($payload['sort'] ?? null) !== 'LEXICAL_ASC_V1') return null;
+        $last = $payload['last'] ?? null;
+        return is_array($last) && isset($last['sort_key'], $last['title'], $last['identity']) ? ['last' => ['sort_key' => (string) $last['sort_key'], 'title' => (string) $last['title'], 'identity' => (string) $last['identity']]] : null;
+    }
+
+    private function archiveConflict(string $reason): array
+    {
+        return ['status' => 'CONFLICT', 'reason' => $reason, 'canonical_url' => '/tu-dien/', 'items' => [], 'alphabet' => $this->browsePolicy->emptyAlphabet(), 'pagination' => ['page_size' => 0, 'next_cursor' => null, 'has_next' => false, 'total_count' => null, 'total_exact' => false], 'warnings' => [$reason]];
+    }
 
     public function hub(int $limit = 500, string $query = '', string $initial = ''): array
     {
         $query = $this->normalize($query);
         $initial = $this->normalizeInitial($initial);
+        if ($this->entrySenseAvailable() && is_object($this->entries) && method_exists($this->entries, 'readArchiveCandidates') && method_exists($this->concepts, 'readApprovedArchiveCandidates')) {
+            return $this->archive(['query' => $query, 'initial' => $initial, 'page_size' => max(1, min(500, $limit))]);
+        }
         if ($this->entrySenseAvailable() && is_object($this->entries) && method_exists($this->entries, 'listEntries')) {
             $entryItems = [];
             $coveredConceptIds = [];
@@ -85,13 +305,13 @@ final class DictionaryPublicQuery
     }
 
     /** Lightweight Entry summary used by hub/search; no dossier, Graph or source reads. */
-    private function entryHubItem(LexicalEntry $entry, array $senses): array
+    private function entryHubItem(LexicalEntry $entry, array $senses, ?array $preloadedForms = null, array $preloadedLabels = []): array
     {
         $slug = $this->slug((string) ($entry->context['public_slug'] ?? ''));
         if ($senses === []) return ['eligible' => false, 'entry_id' => $entry->entryId];
-        $forms = $this->entryForms($entry);
+        $forms = $this->entryForms($entry, $preloadedForms);
         $labels = [];
-        foreach ($senses as $sense) foreach ($this->concepts->listLabels($sense->conceptId) as $label) {
+        foreach ($senses as $sense) foreach (($preloadedLabels[$sense->conceptId] ?? $this->concepts->listLabels($sense->conceptId)) as $label) {
             if ($label instanceof DictionaryLabel && $label->active) $labels[] = ['label' => $label->label, 'kind' => $label->kind, 'locale' => $label->locale];
         }
         $searchLabels = array_merge($labels, array_map(static fn (array $form): array => ['label' => $form['form']], $forms));
@@ -113,7 +333,7 @@ final class DictionaryPublicQuery
         }
         $url = $ownerUrl ?? ($slug !== '' ? '/tu-dien/' . $slug . '/' : null);
         if ($url === null) return ['eligible' => false, 'entry_id' => $entry->entryId];
-        return ['entry_id' => $entry->entryId, 'title' => $entry->preferredForm, 'description' => count($senses) === 1 ? $senses[0]->definition : '', 'term_type' => 'ENTRY', 'labels' => array_values(array_filter($labels, static fn (array $label): bool => ($label['kind'] ?? '') !== 'HIDDEN'),), 'search_labels' => $searchLabels, 'url' => $url, 'dedicated' => !$ownerBacked || count($senses) > 1, 'indexable' => !$ownerBacked, 'eligible' => true, 'forms' => $forms, 'senses' => array_map(static fn (DictionaryConcept $sense): array => ['sense_id' => $sense->conceptId, 'title' => $sense->preferredLabel, 'description' => $sense->definition, 'context' => $sense->context], $senses), 'image' => null];
+        return ['entry_id' => $entry->entryId, 'title' => $entry->preferredForm, 'description' => count($senses) === 1 ? $senses[0]->definition : '', 'term_type' => 'ENTRY', 'labels' => array_values(array_filter($labels, static fn (array $label): bool => ($label['kind'] ?? '') !== 'HIDDEN'),), 'search_labels' => $searchLabels, 'url' => $url, 'dedicated' => !$ownerBacked || count($senses) > 1, 'destination_mode' => $ownerBacked && $ownerUrl !== null ? 'DELEGATED' : 'DEDICATED', 'indexable' => !$ownerBacked, 'eligible' => true, 'forms' => $forms, 'senses' => array_map(static fn (DictionaryConcept $sense): array => ['sense_id' => $sense->conceptId, 'title' => $sense->preferredLabel, 'description' => $sense->definition, 'context' => $sense->context], $senses), 'image' => null];
     }
 
     /** Keep ambiguous compatibility inventory visible without selecting an owner. */
@@ -141,10 +361,10 @@ final class DictionaryPublicQuery
         return $items;
     }
 
-    private function item(DictionaryConcept $concept): array
+    private function item(DictionaryConcept $concept, ?array $preloadedLabels = null): array
     {
         $labels = [];
-        foreach ($this->concepts->listLabels($concept->conceptId) as $label) {
+        foreach (($preloadedLabels ?? $this->concepts->listLabels($concept->conceptId)) as $label) {
             if (!$label instanceof DictionaryLabel || !$label->active) continue;
             $labels[] = ['label' => $label->label, 'kind' => $label->kind, 'locale' => $label->locale, 'context' => $label->context];
         }
@@ -183,6 +403,7 @@ final class DictionaryPublicQuery
             'search_labels' => $labels,
             'url' => $eligible ? $url : null,
             'dedicated' => !$delegated,
+            'destination_mode' => $delegated ? 'DELEGATED' : 'DEDICATED',
             'destination_type' => $concept->destinationType,
             'destination_id' => $concept->destinationId,
             'image' => $image,
@@ -314,11 +535,11 @@ final class DictionaryPublicQuery
     }
 
     /** @return list<array<string,mixed>> */
-    private function entryForms(LexicalEntry $entry): array
+    private function entryForms(LexicalEntry $entry, ?array $preloadedForms = null): array
     {
         if (!is_object($this->entries) || !method_exists($this->entries, 'listForms')) return [['form' => $entry->preferredForm, 'kind' => 'PREFERRED', 'locale' => $entry->locale, 'context' => $entry->context]];
         $forms = [];
-        foreach ((array) $this->entries->listForms($entry) as $form) {
+        foreach ((array) ($preloadedForms ?? $this->entries->listForms($entry)) as $form) {
             if (is_object($form) && property_exists($form, 'form')) $forms[] = ['form' => (string) $form->form, 'kind' => (string) ($form->kind ?? 'ALTERNATE'), 'locale' => $form->locale ?? null, 'context' => is_array($form->context ?? null) ? $form->context : []];
             elseif (is_array($form) && trim((string) ($form['form'] ?? '')) !== '') $forms[] = ['form' => (string) $form['form'], 'kind' => (string) ($form['kind'] ?? 'ALTERNATE'), 'locale' => $form['locale'] ?? null, 'context' => is_array($form['context'] ?? null) ? $form['context'] : []];
         }
