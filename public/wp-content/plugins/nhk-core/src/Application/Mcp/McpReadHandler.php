@@ -26,6 +26,7 @@ use NHK\Core\Application\Presentation\LatestFirstOrder;
 use NHK\Core\Application\Capture\CaptureCurrentOutcomeReducer;
 use NHK\Core\Application\Graph\RelationshipReadService;
 use NHK\Core\Application\Governance\ProposalDiscoveryService;
+use NHK\Core\Application\Knowledge\PublicResearchSourceDisplayPolicy;
 
 final class McpReadHandler
 {
@@ -51,7 +52,8 @@ final class McpReadHandler
         private ?CaptureRepository $captures = null,
         private ?RelationshipReadService $relationships = null,
         private ?ProposalDiscoveryService $proposalDiscovery = null,
-    ) { $this->delivery ??= PublicMediaAssetDelivery::fromEnvironment($assets, $media); }
+        private ?PublicResearchSourceDisplayPolicy $sourceDisplayPolicy = null,
+    ) { $this->delivery ??= PublicMediaAssetDelivery::fromEnvironment($assets, $media); $this->sourceDisplayPolicy ??= new PublicResearchSourceDisplayPolicy(); }
 
     public function proposalDiscover(array $input): array
     {
@@ -387,11 +389,11 @@ final class McpReadHandler
     {
         if (!$this->ready('knowledge') || $this->sources === null || !UuidCodec::isValid($id)) return null;
         $source = $this->sources->findByCanonicalId($id);
-        if (!$source || !$source->active || !$source->isPublic()) return null;
-        $evidence = array_values(array_filter($this->evidence->listBySource($id), function (Evidence $item): bool {
+        if (!$source || !$source->active || !$source->isPublic() || !$this->sourceDisplayPolicy->allows($source)) return null;
+        $evidence = array_values(array_filter($this->evidence->listBySource($id), function (Evidence $item) use ($source): bool {
             if (!$item->active || !$item->isPublic()) return false;
             $claim = $this->claims->findByCanonicalId($item->claimId);
-            return $claim !== null && $claim->active && $claim->isPublic();
+            return $claim !== null && $claim->active && $claim->isPublic() && $this->sourceDisplayPolicy->allows($source);
         }));
         return ['id' => $source->canonicalId, 'stable_key' => $source->stableKey, 'title' => $source->title, 'type' => $source->sourceType, 'locator' => $source->locator, 'evidence' => array_map($this->publicEvidence(...), $evidence)];
     }
@@ -403,7 +405,7 @@ final class McpReadHandler
         if (!$item || !$item->active || !$item->isPublic()) return null;
         $claim = $this->claims->findByCanonicalId($item->claimId);
         $source = $this->sources->findByCanonicalId($item->sourceId);
-        if (!$claim || !$claim->active || !$claim->isPublic() || !$source || !$source->active || !$source->isPublic()) return null;
+        if (!$claim || !$claim->active || !$claim->isPublic() || !$source || !$source->active || !$source->isPublic() || !$this->sourceDisplayPolicy->allows($source)) return null;
         return $this->publicEvidence($item) + ['source_title' => $source->title, 'source_type' => $source->sourceType, 'source_locator' => $source->locator];
     }
 
@@ -485,5 +487,5 @@ final class McpReadHandler
     private function publicUsage(MediaUsage $usage): array { return ['id' => $usage->usageId, 'media_id' => $usage->mediaId, 'target_type' => $usage->endpointType, 'target_id' => $usage->endpointKey, 'role' => $usage->role, 'placement_key' => $usage->placementKey, 'sort_order' => $usage->sortOrder, 'active' => $usage->activeSlot !== 'retired', 'revision' => $usage->revision]; }
     private function evidence(Evidence $evidence): array { return ['id' => $evidence->canonicalId, 'claim_id' => $evidence->claimId, 'source_id' => $evidence->sourceId, 'relation' => $evidence->relation, 'excerpt' => $evidence->excerpt, 'locator' => $evidence->locator, 'metadata' => $evidence->metadata, 'active' => $evidence->active, 'revision' => $evidence->revision]; }
     private function publicEvidence(Evidence $evidence): array { return ['id' => $evidence->canonicalId, 'claim_id' => $evidence->claimId, 'source_id' => $evidence->sourceId, 'relation' => $evidence->relation, 'excerpt' => $evidence->excerpt, 'locator' => $evidence->locator]; }
-    private function publicEvidenceByClaim(string $claimId): array { return array_values(array_filter($this->evidence->listByClaim($claimId), function (Evidence $item): bool { if (!$item->active || !$item->isPublic() || $this->sources === null) return false; $source = $this->sources->findByCanonicalId($item->sourceId); $claim = $this->claims->findByCanonicalId($item->claimId); return $source !== null && $source->active && $source->isPublic() && $claim !== null && $claim->active && $claim->isPublic(); })); }
+    private function publicEvidenceByClaim(string $claimId): array { return array_values(array_filter($this->evidence->listByClaim($claimId), function (Evidence $item): bool { if (!$item->active || !$item->isPublic() || $this->sources === null) return false; $source = $this->sources->findByCanonicalId($item->sourceId); $claim = $this->claims->findByCanonicalId($item->claimId); return $source !== null && $source->active && $source->isPublic() && $this->sourceDisplayPolicy->allows($source) && $claim !== null && $claim->active && $claim->isPublic(); })); }
 }

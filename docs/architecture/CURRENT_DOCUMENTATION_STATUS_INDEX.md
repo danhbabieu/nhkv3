@@ -9,6 +9,17 @@
 > If anything here conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`,
 > the Constitution controls.
 
+## 0.0.7 Public research-source display law — 2026-10-06
+
+`PUBLIC_RESEARCH_SOURCE_DISPLAY_POLICY` is the current cross-cutting public
+display rule. It filters Vietnamese public websites and explicit Vietnamese
+source classifications from public citations/source cards while preserving
+internal provenance. The Component owner route for `Côn hoa thị` is
+`/linh-kien/con-hoa-thi/`; delegated Dictionary terms resolve to their
+canonical owner without a competing indexable page, and ambiguous terms fail
+closed. The dated read-only audit is
+`docs/audits/2026-10-06-con-hoa-thi-public-dossier-audit.md`.
+
 ## 0.0.6 Semantic acceptance closeout — 2026-10-05
 
 The Capture-bound semantic staging acceptance is closed as **GO** on the

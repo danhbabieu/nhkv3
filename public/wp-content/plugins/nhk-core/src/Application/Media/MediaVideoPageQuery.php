@@ -12,6 +12,7 @@ use NHK\Core\Domain\Video\Video;
 use NHK\Core\Shared\Migration\MigrationStatus;
 use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Core\Application\Video\{VideoFrontendProjection, VideoPublicContextSelector, VideoSeoProjection, VideoUrlPolicy};
+use NHK\Core\Application\Knowledge\PublicResearchSourceDisplayPolicy;
 use NHK\Core\Application\Video\VideoMediaPresentationResolver;
 use NHK\Core\Application\Presentation\LatestFirstOrder;
 
@@ -34,11 +35,13 @@ final class MediaVideoPageQuery
         private ?EvidenceRepository $evidence = null,
         private ?SourceRepository $sources = null,
         ?VideoMediaPresentationResolver $videoMediaPresentation = null,
+        private ?PublicResearchSourceDisplayPolicy $sourceDisplayPolicy = null,
     ) {
         $this->delivery ??= PublicMediaAssetDelivery::fromEnvironment($assets, $media);
         $this->gallery = $gallery ?? new PublicMediaGalleryQuery($media, $assets, $this->delivery, $usages, PublicMediaArticleLinkResolver::fromWordPress());
         $this->videoMediaPresentation = $videoMediaPresentation ?? new VideoMediaPresentationResolver($media, $assets, $usages);
         $this->frontendProjection = new VideoFrontendProjection(null, $this->videoMediaPresentation);
+        $this->sourceDisplayPolicy ??= new PublicResearchSourceDisplayPolicy();
     }
 
     public function mediaDetail(string $id): ?array
@@ -208,7 +211,7 @@ final class MediaVideoPageQuery
                     if ($evidence === null || !$evidence->active || !$evidence->isPublic()) continue;
                     $claim = $this->claims->findByCanonicalId($evidence->claimId);
                     $source = $this->sources->findByCanonicalId($evidence->sourceId);
-                    if ($claim === null || !$claim->active || !$claim->isPublic() || $source === null || !$source->active || !$source->isPublic()) continue;
+                    if ($claim === null || !$claim->active || !$claim->isPublic() || $source === null || !$source->active || !$source->isPublic() || !$this->sourceDisplayPolicy->allows($source)) continue;
                     $claims[$claim->canonicalId] = ['id' => $claim->canonicalId, 'text' => $claim->claimText, 'type' => $claim->claimType, 'evidence' => ['excerpt' => $evidence->excerpt, 'relation' => $evidence->relation, 'source' => $source->title, 'locator' => $evidence->locator ?? $source->locator]];
                 }
             }

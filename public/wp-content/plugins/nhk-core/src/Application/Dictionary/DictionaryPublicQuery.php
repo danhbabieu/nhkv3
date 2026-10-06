@@ -66,7 +66,7 @@ final class DictionaryPublicQuery
                 $item = $this->entryItem($entry, $senses);
                 $item['related_terms'] = $this->relatedTerms($entry, $senses[0] ?? null, 12);
                 if (($item['eligible'] ?? false) !== true) return ['status' => 'INCOMPLETE', 'reason' => 'DICTIONARY_ENTRY_NOT_PUBLIC'];
-                return ['status' => 'READY', 'item' => $item, 'labels' => $item['labels'], 'canonical_url' => $item['url'], 'indexable' => true];
+                return ['status' => 'READY', 'item' => $item, 'labels' => $item['labels'], 'canonical_url' => $item['url'], 'indexable' => (bool) ($item['indexable'] ?? false)];
             }
         }
         $matches = [];
@@ -242,14 +242,22 @@ final class DictionaryPublicQuery
             $senseItems[] = $senseItem;
         }
         if ($senseItems === []) return ['eligible' => false, 'entry_id' => $entry->entryId];
-        // An Entry owns the lexical discovery page even when its Sense points
-        // at a canonical owner. The owner is projected as semantic context;
-        // only the legacy Concept-only path redirects to an owner.
-        $delegated = false;
-        $url = $entrySlug !== '' ? '/tu-dien/' . $entrySlug . '/' : null;
-        $forms = $this->entryForms($entry);
         $first = $senseItems[0];
         $singleSense = count($senseItems) === 1;
+        $delegated = $singleSense && trim((string) ($first['destination_type'] ?? '')) !== '' && trim((string) ($first['destination_id'] ?? '')) !== '';
+        $url = $entrySlug !== '' ? '/tu-dien/' . $entrySlug . '/' : null;
+        if ($delegated) {
+            if (is_callable($this->destinationValidator)) {
+                try {
+                    $validated = ($this->destinationValidator)((string) $first['destination_type'], (string) $first['destination_id'], null);
+                    if (!is_string($validated) || trim($validated) === '') return ['eligible' => false, 'entry_id' => $entry->entryId];
+                    $url = trim($validated);
+                } catch (\Throwable) {
+                    return ['eligible' => false, 'entry_id' => $entry->entryId];
+                }
+            }
+        }
+        $forms = $this->entryForms($entry);
         return [
             'entry_id' => $entry->entryId,
             'title' => $entry->preferredForm,

@@ -1,5 +1,14 @@
 # NHK V3 Dictionary Semantic Enrichment and Projection Contract
 
+## Public source-display cross-reference — 2026-10-06
+
+All public semantic enrichment projections apply
+`PUBLIC_RESEARCH_SOURCE_DISPLAY_POLICY` after active/public Source and Evidence
+checks. Vietnamese sources may remain provenance but cannot appear in public
+citations. The Component owner route for `Côn hoa thị` is
+`/linh-kien/con-hoa-thi/`; delegated lexical entries resolve there without a
+competing indexable Dictionary page, while ambiguous terms remain fail-closed.
+
 > **APPROVED CONTRACT-FIRST DESIGN — 2026-10-05.**
 > This contract is subordinate to `docs/constitution/NHK_V3_CONSTITUTION.md`.
 > It defines the implementation boundary for Dictionary semantic enrichment.

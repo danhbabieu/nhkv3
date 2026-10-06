@@ -18,6 +18,16 @@ It does not create a new Authority type, Graph predicate, Knowledge type,
 Media role, Video type or semantic owner. It is a cross-cutting publication
 constraint over existing owners and projections.
 
+## Research-source display boundary — 2026-10-06
+
+The compliance surface also follows `PUBLIC_RESEARCH_SOURCE_DISPLAY_POLICY`.
+Public factual or promotional copy may cite only policy-eligible Sources after
+active/public Evidence validation. Vietnamese websites or Vietnamese-only
+support may remain internal provenance, but cannot be rendered as a public
+source card or citation. If no eligible same-scope support remains, the claim
+must be qualified, blocked or held for review; the system must not fabricate a
+replacement or broaden the claim's scope.
+
 ## Legal basis and policy intent
 
 NHK V3 must comply with applicable Vietnamese advertising law. In particular,

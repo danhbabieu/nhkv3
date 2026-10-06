@@ -6,6 +6,7 @@ namespace NHK\Core\Application\Projection;
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, SourceRepository};
 use NHK\Core\Domain\Graph\NodeReference;
 use NHK\Core\Domain\Projection\{ClaimProjectionScope, ProjectedClaim, ProjectionSection};
+use NHK\Core\Application\Knowledge\PublicResearchSourceDisplayPolicy;
 
 final class LiveLedgerProjectionBuilder
 {
@@ -28,7 +29,8 @@ final class LiveLedgerProjectionBuilder
         private ?EvidenceRepository $evidence = null,
         private ?SourceRepository $sources = null,
         private ?ProjectionInputHasher $hasher = null,
-    ) {}
+        private ?PublicResearchSourceDisplayPolicy $sourceDisplayPolicy = null,
+    ) { $this->sourceDisplayPolicy ??= new PublicResearchSourceDisplayPolicy(); }
 
     /** @return array<string,mixed> */
     public function build(NodeReference $node, array $options = []): array
@@ -58,7 +60,7 @@ final class LiveLedgerProjectionBuilder
             if ($this->evidence !== null && $this->sources !== null) try {
                 foreach ($this->evidence->listByClaim($claim->claim->canonicalId) as $evidence) {
                     $source = $this->sources->findByCanonicalId($evidence->sourceId);
-                    if ($source === null) continue;
+                    if ($source === null || !$evidence->active || !$evidence->isPublic() || !$source->active || !$source->isPublic() || !$this->sourceDisplayPolicy->allows($source)) continue;
                     $dependencies[] = ['kind' => 'evidence', 'id' => $evidence->canonicalId, 'section_key' => $claim->category, 'scope' => $claim->scope->scope, 'graph_distance' => $claim->scope->graphDistance, 'dependency_revision' => $evidence->revision];
                     $dependencies[] = ['kind' => 'source', 'id' => $source->canonicalId, 'section_key' => $claim->category, 'scope' => $claim->scope->scope, 'graph_distance' => $claim->scope->graphDistance, 'dependency_revision' => $source->revision];
                 }
@@ -83,7 +85,7 @@ final class LiveLedgerProjectionBuilder
             try {
                 foreach ($this->evidence->listByClaim($claim->claim->canonicalId) as $item) {
                     $source = $this->sources->findByCanonicalId($item->sourceId);
-                    if ($item->active && $item->isPublic() && $source !== null && $source->active && $source->isPublic()) { $evidenceCount++; $sourceIds[$source->canonicalId] = true; }
+                    if ($item->active && $item->isPublic() && $source !== null && $source->active && $source->isPublic() && $this->sourceDisplayPolicy->allows($source)) { $evidenceCount++; $sourceIds[$source->canonicalId] = true; }
                 }
             } catch (\Throwable $error) { throw new \RuntimeException('EVIDENCE_UNAVAILABLE', 0, $error); }
         }

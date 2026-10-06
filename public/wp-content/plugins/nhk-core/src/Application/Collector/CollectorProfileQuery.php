@@ -7,6 +7,7 @@ use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
 use NHK\Core\Domain\Authority\AuthorityEntity;
 use NHK\Core\Domain\Knowledge\{CollectorFacetRegistry, Evidence, KnowledgeClaim, Source};
+use NHK\Core\Application\Knowledge\PublicResearchSourceDisplayPolicy;
 
 /**
  * Read-only collector projection for one canonical Classification branch.
@@ -23,7 +24,8 @@ final class CollectorProfileQuery
         private SourceRepository $sources,
         private $relatedReader = null,
         private $branchClaimReader = null,
-    ) {}
+        private ?PublicResearchSourceDisplayPolicy $sourceDisplayPolicy = null,
+    ) { $this->sourceDisplayPolicy ??= new PublicResearchSourceDisplayPolicy(); }
 
     /** @return array<string,mixed> */
     public function build(string $classificationId, int $page = 1, int $perPage = 50, int $renderCap = 0): array
@@ -176,7 +178,7 @@ final class CollectorProfileQuery
         foreach ($this->evidence->listByClaim($claim->canonicalId) as $evidence) {
             if (!$evidence instanceof Evidence || !$evidence->active || !$evidence->isPublic()) continue;
             $source = $this->sources->findByCanonicalId($evidence->sourceId);
-            if ($source instanceof Source && $source->active && $source->isPublic()) $count++;
+            if ($source instanceof Source && $source->active && $source->isPublic() && $this->sourceDisplayPolicy->allows($source)) $count++;
         }
         return $count;
     }

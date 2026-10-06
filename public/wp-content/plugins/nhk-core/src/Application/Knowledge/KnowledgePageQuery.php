@@ -12,7 +12,7 @@ use NHK\Core\Application\Presentation\LatestFirstOrder;
 
 final class KnowledgePageQuery
 {
-    public function __construct(private KnowledgeRepository $claims, private EvidenceRepository $evidence, private SourceRepository $sources, private ?MigrationStatus $status = null) {}
+    public function __construct(private KnowledgeRepository $claims, private EvidenceRepository $evidence, private SourceRepository $sources, private ?MigrationStatus $status = null, private ?PublicResearchSourceDisplayPolicy $sourceDisplayPolicy = null) { $this->sourceDisplayPolicy ??= new PublicResearchSourceDisplayPolicy(); }
 
     public function detail(string $key): ?array
     {
@@ -20,11 +20,16 @@ final class KnowledgePageQuery
         if (preg_match('/^[0-9a-f-]{36}$/i', $key) === 1 && !UuidCodec::isValid($key)) return null;
         $claim = preg_match('/^[0-9a-f-]{36}$/i', $key) === 1 ? $this->claims->findByCanonicalId($key) : $this->claims->findByStableKey($key);
         if (!$claim || !$claim->active || !$claim->isPublic()) return null;
-        $evidence = array_values(array_filter($this->evidence->listByClaim($claim->canonicalId), function (Evidence $item): bool {
-            if (!$item->active || !$item->isPublic()) return false;
+        $policyBlocked = false;
+        $evidence = [];
+        foreach ($this->evidence->listByClaim($claim->canonicalId) as $item) {
+            if (!$item instanceof Evidence || !$item->active || !$item->isPublic()) continue;
             $source = $this->sources->findByCanonicalId($item->sourceId);
-            return $source !== null && $source->active && $source->isPublic();
-        }));
+            if ($source === null || !$source->active || !$source->isPublic()) continue;
+            if (!$this->sourceDisplayPolicy->allows($source)) { $policyBlocked = true; continue; }
+            $evidence[] = $item;
+        }
+        if ($evidence === [] && $policyBlocked) return null;
         return ['text' => $claim->claimText, 'type' => $claim->claimType, 'evidence' => array_map(function (Evidence $item): array { return $this->evidence($item, $this->sources->findByCanonicalId($item->sourceId)); }, $evidence)];
     }
 
@@ -32,12 +37,25 @@ final class KnowledgePageQuery
     public function archive(int $page = 1, int $perPage = 24): array
     {
         if (!$this->available()) return ['page' => 1, 'per_page' => $perPage, 'total' => 0, 'items' => []];
-        $claims = LatestFirstOrder::sort(array_values(array_filter($this->claims->list(), static fn (KnowledgeClaim $claim): bool => $claim->active && $claim->isPublic())), static fn (KnowledgeClaim $claim): ?string => null, static fn (KnowledgeClaim $claim): ?string => $claim->createdAt, static fn (KnowledgeClaim $claim): string => $claim->canonicalId);
+        $claims = LatestFirstOrder::sort(array_values(array_filter($this->claims->list(), fn (KnowledgeClaim $claim): bool => $claim->active && $claim->isPublic() && !$this->hasOnlyPolicyBlockedEvidence($claim))), static fn (KnowledgeClaim $claim): ?string => null, static fn (KnowledgeClaim $claim): ?string => $claim->createdAt, static fn (KnowledgeClaim $claim): string => $claim->canonicalId);
         $items = array_map(fn (KnowledgeClaim $claim): array => ['text' => $claim->claimText, 'type' => $claim->claimType], $claims);
         $page = max(1, $page); $perPage = min(100, max(1, $perPage));
         return ['page' => $page, 'per_page' => $perPage, 'total' => count($items), 'items' => array_slice($items, ($page - 1) * $perPage, $perPage)];
     }
 
     private function available(): bool { return !$this->status || $this->status->knowledgeStorageReady(); }
+    private function hasOnlyPolicyBlockedEvidence(KnowledgeClaim $claim): bool
+    {
+        $blocked = false;
+        $eligible = false;
+        foreach ($this->evidence->listByClaim($claim->canonicalId) as $item) {
+            if (!$item instanceof Evidence || !$item->active || !$item->isPublic()) continue;
+            $source = $this->sources->findByCanonicalId($item->sourceId);
+            if ($source === null || !$source->active || !$source->isPublic()) continue;
+            if ($this->sourceDisplayPolicy->allows($source)) $eligible = true;
+            else $blocked = true;
+        }
+        return $blocked && !$eligible;
+    }
     private function evidence(Evidence $item, ?Source $source = null): array { return ['source_title' => $source?->title, 'source_type' => $source?->sourceType, 'source_locator' => $source?->locator, 'relation' => $item->relation, 'excerpt' => $item->excerpt, 'locator' => $item->locator]; }
 }

@@ -15,10 +15,11 @@ use NHK\Core\Shared\Migration\MigrationStatus;
 use NHK\Core\Application\Media\PublicMediaAssetDelivery;
 use NHK\Core\Application\Entity\PublicRouteResolver;
 use NHK\Core\Application\Video\{VideoPublicContextSelector, VideoUrlPolicy};
+use NHK\Core\Application\Knowledge\PublicResearchSourceDisplayPolicy;
 
 final class ReadApi
 {
-    public function __construct(private MediaRepository $media, private MediaAssetRepository $assets, private MediaUsageRepository $usages, private VideoRepository $videos, private KnowledgeRepository $claims, private SourceRepository $sources, private EvidenceRepository $evidence, private ?MigrationStatus $status = null, private ?PublicMediaAssetDelivery $delivery = null) { $this->delivery ??= PublicMediaAssetDelivery::fromEnvironment($assets, $media); }
+    public function __construct(private MediaRepository $media, private MediaAssetRepository $assets, private MediaUsageRepository $usages, private VideoRepository $videos, private KnowledgeRepository $claims, private SourceRepository $sources, private EvidenceRepository $evidence, private ?MigrationStatus $status = null, private ?PublicMediaAssetDelivery $delivery = null, private ?PublicResearchSourceDisplayPolicy $sourceDisplayPolicy = null) { $this->delivery ??= PublicMediaAssetDelivery::fromEnvironment($assets, $media); $this->sourceDisplayPolicy ??= new PublicResearchSourceDisplayPolicy(); }
 
     public function register(): void
     {
@@ -60,13 +61,13 @@ final class ReadApi
     {
         if ($error = $this->unavailable(!$this->status || $this->status->knowledgeStorageReady(), 'knowledge')) return $error;
         $source = $this->sources->findByStableKey((string) $request['key']);
-        if (!$source || !$source->active || !$source->isPublic()) return new \WP_Error('nhk_source_not_found', 'Source was not found.', ['status' => 404]);
-        return ['title' => $source->title, 'type' => $source->sourceType, 'locator' => $source->locator, 'evidence' => array_map($this->evidence(...), array_values(array_filter($this->evidence->listBySource($source->canonicalId), function (Evidence $item): bool { if (!$item->active || !$item->isPublic()) return false; $claim = $this->claims->findByCanonicalId($item->claimId); return $claim !== null && $claim->active && $claim->isPublic(); })) )];
+        if (!$source || !$source->active || !$source->isPublic() || !$this->sourceDisplayPolicy->allows($source)) return new \WP_Error('nhk_source_not_found', 'Source was not found.', ['status' => 404]);
+        return ['title' => $source->title, 'type' => $source->sourceType, 'locator' => $source->locator, 'evidence' => array_map($this->evidence(...), array_values(array_filter($this->evidence->listBySource($source->canonicalId), function (Evidence $item) use ($source): bool { if (!$item->active || !$item->isPublic()) return false; $claim = $this->claims->findByCanonicalId($item->claimId); return $claim !== null && $claim->active && $claim->isPublic() && $this->sourceDisplayPolicy->allows($source); })) )];
     }
 
     private function asset(MediaAsset $asset): array { return ['kind' => $asset->kind, 'mime_type' => $asset->mimeType, 'byte_size' => $asset->byteSize, 'width' => $asset->width, 'height' => $asset->height]; }
     private function usage(MediaUsage $usage): array { return ['usage_id' => $usage->usageId, 'media_id' => $usage->mediaId, 'target_type' => $usage->endpointType, 'target_id' => $usage->endpointKey, 'role' => $usage->role, 'placement_key' => $usage->placementKey, 'sort_order' => $usage->sortOrder, 'active' => $usage->activeSlot !== 'retired', 'revision' => $usage->revision, 'alt' => $usage->altText, 'caption' => $usage->caption, 'selection_source' => $usage->selectionSource, 'selection_policy' => $usage->selectionPolicy, 'active_slot' => $usage->activeSlot]; }
     private function evidence(Evidence $evidence): array { return ['relation' => $evidence->relation, 'excerpt' => $evidence->excerpt, 'locator' => $evidence->locator]; }
-    private function publicEvidenceByClaim(string $claimId): array { return array_values(array_filter($this->evidence->listByClaim($claimId), function (Evidence $item): bool { if (!$item->active || !$item->isPublic()) return false; $source = $this->sources->findByCanonicalId($item->sourceId); return $source !== null && $source->active && $source->isPublic(); })); }
+    private function publicEvidenceByClaim(string $claimId): array { return array_values(array_filter($this->evidence->listByClaim($claimId), function (Evidence $item): bool { if (!$item->active || !$item->isPublic()) return false; $source = $this->sources->findByCanonicalId($item->sourceId); return $source !== null && $source->active && $source->isPublic() && $this->sourceDisplayPolicy->allows($source); })); }
     private function unavailable(bool $ready, string $domain): ?\WP_Error { return $ready ? null : new \WP_Error('nhk_storage_unavailable', ucfirst($domain) . ' storage is not ready.', ['status' => 503]); }
 }

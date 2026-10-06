@@ -6,7 +6,7 @@ namespace NHK\Core\Infrastructure\Frontend;
 use NHK\Core\Application\Collector\{CollectorCoverageAudit, CollectorProfileQuery};
 use NHK\Core\Application\Entity\{EntityMediaProjection, PublicEntityEligibilityPolicy, PublicIdentityContract, PublicRouteResolver, SemanticDossierCoverageAudit, SemanticDossierQuery};
 use NHK\Core\Application\Graph\{GraphService, PredicateTraversalPolicy, RelatedSemanticQuery, StructuralContextQuery};
-use NHK\Core\Application\Knowledge\{EntityKnowledgeProjection, KnowledgePageQuery};
+use NHK\Core\Application\Knowledge\{EntityKnowledgeProjection, KnowledgePageQuery, PublicResearchSourceDisplayPolicy};
 use NHK\Core\Application\Projection\{ClaimProjectionService, ClaimScopeResolver, GraphProjectionPolicy, LiveLedgerProjectionBuilder, ProjectionEventSubscriber, ProjectionInvalidationService};
 use NHK\Core\Application\Media\{PublicMediaAssetDelivery, PublicMediaArticleLinkResolver, PublicMediaGalleryQuery};
 use NHK\Core\Domain\Authority\{AuthorityEntity, CanonicalEntityTypeCatalog, EntityTypeRegistry};
@@ -33,6 +33,7 @@ final class FrontendSemanticBootstrap
         if (!isset($wpdb) || !is_object($wpdb) || !function_exists('add_filter')) return;
 
         $status = new MigrationStatus();
+        $sourceDisplayPolicy = new PublicResearchSourceDisplayPolicy();
         $types = new EntityTypeRegistry();
         CanonicalEntityTypeCatalog::registerInto($types);
         $authority = new WpdbAuthorityRepository($wpdb);
@@ -66,15 +67,15 @@ final class FrontendSemanticBootstrap
         $projectionSchema = new WpdbProjectionSchema($wpdb);
         $projectionStore = new WpdbProjectionRevisionStore($wpdb, $projectionSchema);
         $projectionDependencies = new WpdbProjectionDependencyIndex($wpdb, $projectionSchema);
-        $claimProjection = new ClaimProjectionService(new LiveLedgerProjectionBuilder($claimResolver, evidence: $evidence, sources: $sources), $projectionStore, dependencies: $projectionDependencies);
+        $claimProjection = new ClaimProjectionService(new LiveLedgerProjectionBuilder($claimResolver, evidence: $evidence, sources: $sources, sourceDisplayPolicy: $sourceDisplayPolicy), $projectionStore, dependencies: $projectionDependencies);
         (new ProjectionEventSubscriber(new ProjectionInvalidationService($projectionDependencies, $projectionStore, $claimProjection, static fn (string $claimId): array => $claimResolver->impactNodesForClaim($claimId), static fn (string $edgeUuid): array => $claimResolver->impactNodesForRelation($edgeUuid))))->register();
         $projectionAdmin = new ProjectionAdminApi($claimProjection);
         add_action('rest_api_init', [$projectionAdmin, 'register']);
 
         $gallery = new PublicMediaGalleryQuery($media, $assets, PublicMediaAssetDelivery::fromEnvironment($assets, $media), $usages, PublicMediaArticleLinkResolver::fromWordPress());
         $entityMedia = new EntityMediaProjection($media, $assets, $usages);
-        $entityKnowledge = new EntityKnowledgeProjection($claims, $evidence, $sources, $status);
-        $knowledgeArchive = new KnowledgePageQuery($claims, $evidence, $sources, $status);
+        $entityKnowledge = new EntityKnowledgeProjection($claims, $evidence, $sources, $status, $sourceDisplayPolicy);
+        $knowledgeArchive = new KnowledgePageQuery($claims, $evidence, $sources, $status, $sourceDisplayPolicy);
         $postProjector = static function(int $postId): ?array {
             if ($postId < 1 || !function_exists('get_post') || !function_exists('get_post_status') || !function_exists('get_permalink') || !function_exists('get_the_title')) return null;
             $post = get_post($postId);
@@ -107,6 +108,7 @@ final class FrontendSemanticBootstrap
             $sources,
             self::collectorRelatedReader($relatedQuery, $authority, $eligibility, $routes, $media, $usages, $videos),
             self::collectorBranchClaimReader($graph, $claims),
+            $sourceDisplayPolicy,
         );
         add_action('rest_api_init', [new CollectorProfileApi($collectorProfile), 'register']);
         $coverageAudit = new SemanticDossierCoverageAudit($types, $authority, static fn(AuthorityEntity $entity): array => $dossier->forEntity($entity));

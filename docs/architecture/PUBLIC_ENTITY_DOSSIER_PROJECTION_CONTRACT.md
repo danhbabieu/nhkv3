@@ -20,6 +20,18 @@ MediaUsage/MediaAsset, Graph relations, Video, and WordPress Article projection.
 The dossier is a projection only. Authority, Graph, Knowledge, Source, Evidence,
 Media, Video, and WordPress remain the owners of their respective truth.
 
+## Cross-cutting source display law — 2026-10-06
+
+`PUBLIC_RESEARCH_SOURCE_DISPLAY_POLICY` is applied after Source and Evidence
+active/public checks and before any reader-facing citation or source card is
+formatted. It preserves internal provenance but excludes Vietnamese public
+websites and explicitly Vietnamese source classifications. A policy-blocked
+claim is not presented as internationally evidenced; the projection may expose
+only an aggregate blocked diagnostic and must not expose private metadata or
+raw repository identifiers. Empty dossier sections are omitted. The Component
+route `/linh-kien/con-hoa-thi/` is resolved through the normal Authority route
+contract and the dossier remains a dynamic read projection, not a second owner.
+
 ## 2. Detail seam and performance boundary
 
 Entity detail enrichment uses the existing

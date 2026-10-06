@@ -64,6 +64,42 @@ final class KnowledgePageQueryTest extends TestCase
         self::assertArrayNotHasKey('stable_key', $publicClaim);
     }
 
+    public function test_claim_supported_only_by_policy_blocked_source_is_not_publicly_displayed(): void
+    {
+        $claim = new KnowledgeClaim(UuidCodec::newV7(), 'nhk:knowledge:blocked-only', 'Claim chỉ có nguồn Việt Nam.', 'fact');
+        $source = new Source(UuidCodec::newV7(), 'nhk:source:blocked-only', 'Nguồn Việt Nam', 'website', 'https://vangvong.com/reference', ['visibility' => 'PUBLIC']);
+        $evidence = new Evidence(UuidCodec::newV7(), $claim->canonicalId, $source->canonicalId, 'supports', 'Blocked excerpt', null, true, 1, ['visibility' => 'PUBLIC']);
+        $claims = new class($claim) implements KnowledgeRepository {
+            public function __construct(private KnowledgeClaim $claim) {}
+            public function findByCanonicalId(string $id): ?KnowledgeClaim { return $id === $this->claim->canonicalId ? $this->claim : null; }
+            public function findByStableKey(string $key): ?KnowledgeClaim { return $key === $this->claim->stableKey ? $this->claim : null; }
+            public function create(KnowledgeClaim $claim): KnowledgeClaim { return $claim; }
+            public function update(KnowledgeClaim $claim, int $expectedRevision): KnowledgeClaim { return $claim; }
+            public function list(bool $includeRetired = false): array { return [$this->claim]; }
+        };
+        $sources = new class($source) implements SourceRepository {
+            public function __construct(private Source $source) {}
+            public function findByCanonicalId(string $id): ?Source { return $id === $this->source->canonicalId ? $this->source : null; }
+            public function findByStableKey(string $key): ?Source { return $key === $this->source->stableKey ? $this->source : null; }
+            public function create(Source $source): Source { return $source; }
+            public function update(Source $source, int $expectedRevision): Source { return $source; }
+            public function list(bool $includeRetired = false): array { return [$this->source]; }
+        };
+        $evidenceRepository = new class($evidence) implements EvidenceRepository {
+            public function __construct(private Evidence $evidence) {}
+            public function findByCanonicalId(string $id): ?Evidence { return $id === $this->evidence->canonicalId ? $this->evidence : null; }
+            public function create(Evidence $evidence): Evidence { return $evidence; }
+            public function update(Evidence $evidence, int $expectedRevision): Evidence { return $evidence; }
+            public function listByClaim(string $claimId, bool $includeRetired = false): array { return $claimId === $this->evidence->claimId ? [$this->evidence] : []; }
+            public function listBySource(string $sourceId, bool $includeRetired = false): array { return $sourceId === $this->evidence->sourceId ? [$this->evidence] : []; }
+        };
+
+        $query = new KnowledgePageQuery($claims, $evidenceRepository, $sources);
+
+        self::assertNull($query->detail($claim->stableKey));
+        self::assertSame(0, $query->archive()['total']);
+    }
+
     public function test_inactive_claim_is_not_public(): void
     {
         $claim = new KnowledgeClaim(UuidCodec::newV7(), 'nhk:knowledge:retired-query-test', 'Retired claim.', 'fact', [], false);

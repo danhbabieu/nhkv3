@@ -156,6 +156,31 @@ final class DictionaryPublicQueryTest extends TestCase
         self::assertFalse($items[0]['indexable']);
     }
 
+    public function test_standalone_kim_cuong_entries_keep_dedicated_indexable_dictionary_routes(): void
+    {
+        $terms = ['Kính kim cương', 'Kính rào', 'ÔĐô 30 kim cương', 'ÔĐô 36 kim cương'];
+        $senses = [];
+        foreach ($terms as $index => $term) $senses[$index] = new DictionaryConcept('standalone-' . $index, $term, 'Định nghĩa độc lập.', DictionaryConcept::APPROVED, null, null, null, ['public_slug' => 'standalone-' . $index]);
+        $repo = $this->repository($senses, []);
+        $entries = new class($senses) {
+            public function __construct(private array $senses) {}
+            public function listEntries(int $limit = 500): array
+            {
+                return array_map(fn (DictionaryConcept $sense, int $index): LexicalEntry => new LexicalEntry('standalone-entry-' . $index, $sense->preferredLabel, 'standalone-' . $index, DictionaryConcept::APPROVED, 'vi-VN', ['public_slug' => 'standalone-' . $index], 1, [$sense->conceptId]), $this->senses, array_keys($this->senses));
+            }
+            public function listSenses(LexicalEntry $entry, array $context = []): array { foreach ($this->senses as $sense) if (in_array($sense->conceptId, $entry->senseIds, true)) return [$sense]; return []; }
+            public function listForms(LexicalEntry $entry): array { return []; }
+        };
+
+        $items = (new DictionaryPublicQuery($repo, null, null, $entries))->hub()['items'];
+
+        self::assertSame($terms, array_column($items, 'title'));
+        foreach ($items as $item) {
+            self::assertTrue($item['dedicated']);
+            self::assertTrue($item['indexable']);
+        }
+    }
+
     public function test_delegated_entry_hub_item_uses_validated_owner_route(): void
     {
         $sense = new DictionaryConcept('entry-component-sense', 'Côn hoa thị', '', DictionaryConcept::APPROVED, null, null, null, []);
@@ -174,6 +199,28 @@ final class DictionaryPublicQueryTest extends TestCase
         self::assertSame('/linh-kien/con-hoa-thi/', $item['url']);
         self::assertFalse($item['dedicated']);
         self::assertFalse($item['indexable']);
+    }
+
+    public function test_delegated_entry_detail_points_to_canonical_owner_without_competing_dictionary_page(): void
+    {
+        $sense = new DictionaryConcept('entry-component-detail-sense', 'Côn hoa thị', '', DictionaryConcept::APPROVED, null, null, null, []);
+        $repo = $this->repository([$sense], ['entry-component-detail-sense' => []]);
+        $entries = new class($sense) {
+            public function __construct(private DictionaryConcept $sense) {}
+            public function listEntries(int $limit = 2000): array { return [new LexicalEntry('entry-component-detail', 'Côn hoa thị', 'côn hoa thị', DictionaryConcept::APPROVED, 'vi-VN', ['public_slug' => 'con-hoa-thi'], 1, [$this->sense->conceptId])]; }
+            public function listSenses(LexicalEntry $entry, array $context = []): array { return [$this->sense]; }
+            public function listForms(LexicalEntry $entry): array { return []; }
+            public function semanticReference(string $entryId, string $senseId): array { return ['status' => 'AVAILABLE', 'type' => 'component', 'id' => 'component-1', 'source' => 'MAPPING']; }
+        };
+        $query = new DictionaryPublicQuery($repo, null, static fn (string $type, string $id, ?string $url): ?string => '/linh-kien/con-hoa-thi/', $entries);
+
+        $result = $query->detail('con-hoa-thi');
+
+        self::assertSame('READY', $result['status']);
+        self::assertSame('/linh-kien/con-hoa-thi/', $result['item']['url']);
+        self::assertFalse($result['item']['dedicated']);
+        self::assertFalse($result['item']['indexable']);
+        self::assertFalse($result['indexable']);
     }
 
     public function test_ambiguous_compatibility_terms_remain_visible_without_auto_selecting_owner(): void

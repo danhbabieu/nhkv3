@@ -23148,3 +23148,37 @@ migration, deployment or fixture mutation was performed.
 
 STATUS: `CAPTURE_SUBJECT_BINDING_CONTINUATION_FIXED / FOCUSED_UNIT_PASS /
 FULL_UNIT_RELEVANT_SLICE_PASS / NO_DATA_MUTATION / TEST_RUNTIME_NOT_USED`.
+
+## Public research-source display policy and Côn hoa thị audit — 2026-10-06
+
+`PUBLIC_RESEARCH_SOURCE_DISPLAY_POLICY` is now implemented as a stateless
+public read boundary. It distinguishes Source validity, retained provenance,
+active/public Evidence and public citation eligibility; Vietnamese public
+websites and explicit Vietnamese source classifications are omitted from
+public citations without deleting historical provenance. Claims supported only
+by excluded sources remain qualified/blocked/review-only until same-scope
+international support is governed.
+
+The Component owner remains `01a10c73-50dd-77bf-ac78-c0c4f66b2208`, stable key
+`nhk:component:con-hoa-thi`, route `/linh-kien/con-hoa-thi/`. The public text
+and Vang Vọng source were not mutated. International research supports bounded
+physical/configuration statements but does not prove literal equivalence of
+the Vietnamese term; no such equivalence was asserted. Delegated Dictionary
+projection resolves to the canonical owner without a competing indexable page;
+ambiguity remains fail-closed; the four kim cương terms remain standalone.
+
+The read-only continuation report is
+`docs/audits/2026-10-06-con-hoa-thi-public-dossier-audit.md`. The two supplied
+Entry IDs remain preserved and unresolved as a deterministic duplicate because
+live lineage read-back was unavailable. No Capture, Governance, WordPress,
+database or semantic mutation ran; no deployment or production cutover ran.
+
+Focused verification passed the policy/projection slice (20 tests / 113
+assertions) and dossier/dictionary slice (45 tests / 161 assertions), plus the
+policy unit slice (6 tests / 8 assertions) and blocked-only Knowledge read
+regression; the combined focused run is 72 tests / 284 assertions. `composer lint` passes. The full suite was rerun with a
+512 MB CLI limit and reached 3,363 tests / 19,104 assertions with 29 failures
+and 33 errors: the failures are existing fixture/snapshot mismatches and the
+errors are environment-gated or DB-double integration failures (including
+missing `NHK_WP_TEST_PATH`/authorized TEST runtime and missing `query()`). No
+failure occurred in the focused policy/dossier slice.

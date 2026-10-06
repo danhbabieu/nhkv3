@@ -1,5 +1,14 @@
 # NHK V3 Dictionary Lexical Knowledge Contract
 
+## Public research-source display cross-reference — 2026-10-06
+
+`PUBLIC_RESEARCH_SOURCE_DISPLAY_POLICY` governs public citations and source
+cards surfaced by Dictionary semantic projections. It does not delete lexical
+provenance. Delegated terms resolve to the canonical Authority owner, do not
+produce a competing indexable Dictionary page, and fail closed when owner
+selection is ambiguous. Standalone kim cương entries remain dedicated and
+indexable when their current eligibility contract passes.
+
 > **APPROVED SUBORDINATE CONTRACT — updated 2026-10-04.**
 > This contract is subordinate to `docs/constitution/NHK_V3_CONSTITUTION.md`.
 > It introduces a bounded lexical/curation layer. It does **not** create a new

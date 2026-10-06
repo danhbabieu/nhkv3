@@ -132,6 +132,31 @@ final class FrontendSemanticProjectionV2Test extends TestCase
         self::assertArrayNotHasKey('recognition', $result['facets']);
     }
 
+    public function test_entity_knowledge_projection_hides_vietnamese_sources_and_reports_blocked_only_claims(): void
+    {
+        $subjectId = UuidCodec::newV7();
+        $blockedSource = new Source(UuidCodec::newV7(), 'source-vn', 'Nguồn Việt Nam', 'website', 'https://vangvong.com/reference', ['visibility' => 'PUBLIC']);
+        $internationalSource = new Source(UuidCodec::newV7(), 'source-intl', 'Junghans Archive', 'archive', 'https://junghunsarchiv.de/en/catalogues', ['visibility' => 'PUBLIC']);
+        $blockedClaim = new KnowledgeClaim(UuidCodec::newV7(), 'claim-blocked', 'Claim chỉ có nguồn bị loại.', 'fact', ['metadata' => ['subject_id' => $subjectId, 'facet' => 'identity', 'scope' => 'entity']]);
+        $mixedClaim = new KnowledgeClaim(UuidCodec::newV7(), 'claim-mixed', 'Claim có nguồn quốc tế.', 'fact', ['metadata' => ['subject_id' => $subjectId, 'facet' => 'chronology', 'scope' => 'entity']]);
+        $blockedEvidence = new Evidence(UuidCodec::newV7(), $blockedClaim->canonicalId, $blockedSource->canonicalId, 'supports', 'Vietnamese excerpt', null, true, 1, ['visibility' => 'PUBLIC']);
+        $mixedBlockedEvidence = new Evidence(UuidCodec::newV7(), $mixedClaim->canonicalId, $blockedSource->canonicalId, 'supports', 'Blocked excerpt', null, true, 1, ['visibility' => 'PUBLIC']);
+        $mixedInternationalEvidence = new Evidence(UuidCodec::newV7(), $mixedClaim->canonicalId, $internationalSource->canonicalId, 'supports', 'International excerpt', null, true, 1, ['visibility' => 'PUBLIC']);
+
+        $result = (new EntityKnowledgeProjection(
+            $this->knowledgeRepository([$blockedClaim, $mixedClaim]),
+            $this->evidenceRepository([$blockedEvidence, $mixedBlockedEvidence, $mixedInternationalEvidence]),
+            $this->sourceRepository([$blockedSource, $internationalSource]),
+        ))->forSubject($subjectId);
+
+        self::assertCount(1, $result['facets']['chronology'] ?? []);
+        self::assertArrayNotHasKey('identity', $result['facets']);
+        self::assertSame(1, $result['coverage']['public_source_policy_blocked_claim_count']);
+        self::assertContains('PUBLIC_SOURCE_DISPLAY_POLICY_BLOCKED', $result['warnings']);
+        self::assertSame('Junghans Archive', $result['facets']['chronology'][0]['evidence'][0]['source_title']);
+        self::assertStringNotContainsString('vangvong.com', json_encode($result, JSON_THROW_ON_ERROR));
+    }
+
     private function mediaRepository(array $items): MediaRepository
     {
         return new class($items) implements MediaRepository {

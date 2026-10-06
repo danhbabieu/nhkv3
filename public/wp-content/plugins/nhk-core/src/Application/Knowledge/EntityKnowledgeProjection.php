@@ -15,7 +15,8 @@ final class EntityKnowledgeProjection
         private EvidenceRepository $evidence,
         private SourceRepository $sources,
         private ?MigrationStatus $status = null,
-    ) {}
+        private ?PublicResearchSourceDisplayPolicy $sourceDisplayPolicy = null,
+    ) { $this->sourceDisplayPolicy ??= new PublicResearchSourceDisplayPolicy(); }
 
     /** @return array<string,mixed> */
     public function forSubject(string $subjectId): array
@@ -26,6 +27,7 @@ final class EntityKnowledgeProjection
             'qualification_count' => 0,
             'contradiction_count' => 0,
             'specimen_observation_count' => 0,
+            'public_source_policy_blocked_claim_count' => 0,
         ];
         if ($this->status !== null && !$this->status->knowledgeStorageReady()) {
             return ['status' => 'UNAVAILABLE', 'facets' => [], 'claim_count' => 0, 'evidence_count' => 0, 'coverage' => $emptyCoverage, 'warnings' => ['KNOWLEDGE_UNAVAILABLE']];
@@ -43,7 +45,12 @@ final class EntityKnowledgeProjection
             $scope = (string) ($metadata['scope'] ?? '');
             if (!in_array($facet, KnowledgeFacetProfile::FACETS, true) || !in_array($scope, KnowledgeFacetProfile::SCOPES, true)) continue;
 
-            $citations = $this->publicEvidence($claim);
+            $evidenceResult = $this->publicEvidence($claim);
+            $citations = $evidenceResult['items'];
+            if ($citations === [] && $evidenceResult['policy_blocked']) {
+                $coverage['public_source_policy_blocked_claim_count']++;
+                continue;
+            }
             $evidenceCount += count($citations);
             $relations = array_values(array_unique(array_map(static fn(array $item): string => (string) ($item['relation'] ?? ''), $citations)));
             if ($citations === []) $coverage['unsourced_claim_count']++;
@@ -69,6 +76,7 @@ final class EntityKnowledgeProjection
         unset($items);
         $warnings = [];
         if ($coverage['unsourced_claim_count'] > 0) $warnings[] = 'PUBLIC_CLAIMS_WITHOUT_EVIDENCE';
+        if ($coverage['public_source_policy_blocked_claim_count'] > 0) $warnings[] = 'PUBLIC_SOURCE_DISPLAY_POLICY_BLOCKED';
         if ($coverage['contradiction_count'] > 0) $warnings[] = 'PUBLIC_CONTRADICTION_PRESENT';
         if ($claimCount > 0 && $coverage['specimen_observation_count'] === $claimCount) $warnings[] = 'SPECIMEN_OBSERVATION_SCOPE_ONLY';
 
@@ -82,14 +90,19 @@ final class EntityKnowledgeProjection
         ];
     }
 
-    /** @return list<array<string,mixed>> */
+    /** @return array{items:list<array<string,mixed>>,policy_blocked:bool} */
     private function publicEvidence(KnowledgeClaim $claim): array
     {
         $items = [];
+        $policyBlocked = false;
         foreach ($this->evidence->listByClaim($claim->canonicalId) as $evidence) {
             if (!$evidence instanceof Evidence || !$evidence->active || !$evidence->isPublic()) continue;
             $source = $this->sources->findByCanonicalId($evidence->sourceId);
             if (!$source instanceof Source || !$source->active || !$source->isPublic()) continue;
+            if (!$this->sourceDisplayPolicy->allows($source)) {
+                $policyBlocked = true;
+                continue;
+            }
             $items[] = [
                 'relation' => $evidence->relation,
                 'excerpt' => $evidence->excerpt,
@@ -99,6 +112,6 @@ final class EntityKnowledgeProjection
                 'source_locator' => $source->locator,
             ];
         }
-        return $items;
+        return ['items' => $items, 'policy_blocked' => $policyBlocked];
     }
 }

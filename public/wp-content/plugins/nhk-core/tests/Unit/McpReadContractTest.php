@@ -29,7 +29,9 @@ final class McpReadContractTest extends TestCase
         $mcpVideo = Video::fromUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'MCP video', ['private' => 'metadata']);
         $mcpClaim = new KnowledgeClaim(UuidCodec::newV7(), 'mcp-public-claim', 'MCP public claim', 'fact', ['metadata' => ['verification_status' => 'VERIFIED', 'private' => 'provenance']]);
         $mcpSource = new Source(UuidCodec::newV7(), 'mcp-public-source', 'MCP public source', 'website', null, ['visibility' => 'PUBLIC']);
+        $blockedSource = new Source(UuidCodec::newV7(), 'mcp-vietnamese-source', 'Vietnamese source', 'website', 'https://vangvong.com/reference', ['visibility' => 'PUBLIC']);
         $mcpEvidence = new Evidence(UuidCodec::newV7(), $mcpClaim->canonicalId, $mcpSource->canonicalId, 'supports', 'MCP public excerpt', null, true, 1, ['visibility' => 'PUBLIC', 'private' => 'metadata']);
+        $blockedEvidence = new Evidence(UuidCodec::newV7(), $mcpClaim->canonicalId, $blockedSource->canonicalId, 'supports', 'Blocked excerpt', null, true, 1, ['visibility' => 'PUBLIC']);
         $media = new class($mcpMedia) implements MediaRepository {
             public function __construct(private Media $item) {}
             public function findByCanonicalId(string $id): ?Media { return $id === $this->item->canonicalId ? $this->item : null; }
@@ -68,21 +70,21 @@ final class McpReadContractTest extends TestCase
             public function update(KnowledgeClaim $item, int $expectedRevision): KnowledgeClaim { return $item; }
             public function list(bool $includeRetired = false): array { return [$this->item]; }
         };
-        $evidence = new class($mcpEvidence) implements EvidenceRepository {
-            public function __construct(private Evidence $item) {}
-            public function findByCanonicalId(string $id): ?Evidence { return $id === $this->item->canonicalId ? $this->item : null; }
+        $evidence = new class([$mcpEvidence, $blockedEvidence]) implements EvidenceRepository {
+            public function __construct(private array $items) {}
+            public function findByCanonicalId(string $id): ?Evidence { foreach ($this->items as $item) if ($id === $item->canonicalId) return $item; return null; }
             public function create(Evidence $item): Evidence { return $item; }
             public function update(Evidence $item, int $revision): Evidence { return $item; }
-            public function listByClaim(string $id, bool $includeRetired = false): array { return $id === $this->item->claimId ? [$this->item] : []; }
-            public function listBySource(string $id, bool $includeRetired = false): array { return $id === $this->item->sourceId ? [$this->item] : []; }
+            public function listByClaim(string $id, bool $includeRetired = false): array { return array_values(array_filter($this->items, static fn (Evidence $item): bool => $id === $item->claimId)); }
+            public function listBySource(string $id, bool $includeRetired = false): array { return array_values(array_filter($this->items, static fn (Evidence $item): bool => $id === $item->sourceId)); }
         };
-        $sources = new class($mcpSource) implements SourceRepository {
-            public function __construct(private Source $item) {}
-            public function findByCanonicalId(string $id): ?Source { return $id === $this->item->canonicalId ? $this->item : null; }
+        $sources = new class([$mcpSource, $blockedSource]) implements SourceRepository {
+            public function __construct(private array $items) {}
+            public function findByCanonicalId(string $id): ?Source { foreach ($this->items as $item) if ($id === $item->canonicalId) return $item; return null; }
             public function findByStableKey(string $key): ?Source { return null; }
             public function create(Source $item): Source { return $item; }
             public function update(Source $item, int $expectedRevision): Source { return $item; }
-            public function list(bool $includeRetired = false): array { return [$this->item]; }
+            public function list(bool $includeRetired = false): array { return $this->items; }
         };
         $handler = new McpReadHandler($authorityRepository, $types, $media, $assets, $usages, $videos, $claims, $evidence, null, $sources);
         self::assertSame($entity->canonicalId, $handler->entityGet('brand', $entity->canonicalId)['id']);
@@ -112,6 +114,8 @@ final class McpReadContractTest extends TestCase
         self::assertArrayNotHasKey('active', $handler->sourceGet($mcpSource->canonicalId));
         self::assertArrayNotHasKey('revision', $handler->sourceGet($mcpSource->canonicalId));
         self::assertSame($mcpEvidence->canonicalId, $handler->evidenceGet($mcpEvidence->canonicalId)['id']);
+        self::assertNull($handler->sourceGet($blockedSource->canonicalId));
+        self::assertNull($handler->evidenceGet($blockedEvidence->canonicalId));
         self::assertArrayNotHasKey('metadata', $handler->evidenceGet($mcpEvidence->canonicalId));
         self::assertArrayNotHasKey('active', $handler->evidenceGet($mcpEvidence->canonicalId));
         self::assertArrayNotHasKey('revision', $handler->evidenceGet($mcpEvidence->canonicalId));

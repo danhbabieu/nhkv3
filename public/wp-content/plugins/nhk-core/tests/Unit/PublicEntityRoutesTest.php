@@ -5,6 +5,10 @@ namespace NHK\Tests\Unit;
 
 use NHK\Core\Infrastructure\Http\PublicEntityRoutes;
 use NHK\Core\Infrastructure\Http\LegacyUrlRedirects;
+use NHK\Core\Application\Authority\AuthorityService;
+use NHK\Core\Application\Entity\PublicRouteResolver;
+use NHK\Core\Domain\Authority\{CanonicalEntityTypeCatalog, EntityTypeRegistry};
+use NHK\Tests\Support\InMemoryAuthorityRepository;
 use PHPUnit\Framework\TestCase;
 
 final class PublicEntityRoutesTest extends TestCase
@@ -40,5 +44,15 @@ final class PublicEntityRoutesTest extends TestCase
     {
         self::assertSame('', PublicEntityRoutes::archiveQueryForPresentation('clock_type', 'pendulum'));
         self::assertSame('pendulum', PublicEntityRoutes::archiveQueryForPresentation('brand', 'pendulum'));
+    }
+
+    public function test_component_canonical_route_is_the_con_hoa_thi_public_destination(): void
+    {
+        $types = new EntityTypeRegistry();
+        CanonicalEntityTypeCatalog::registerInto($types);
+        $authority = new AuthorityService($repository = new InMemoryAuthorityRepository(), $types);
+        $component = $authority->create('component', 'con-hoa-thi', 'Côn hoa thị');
+
+        self::assertSame('/linh-kien/con-hoa-thi/', (new PublicRouteResolver($repository, $types))->path($component));
     }
 }

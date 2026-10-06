@@ -1,5 +1,15 @@
 # NHK V3 Dictionary Entry/Sense Architecture Decision
 
+## Public display cross-reference — 2026-10-06
+
+Dictionary public projections follow `PUBLIC_RESEARCH_SOURCE_DISPLAY_POLICY`
+for any source/evidence citation. Provenance remains retained internally;
+Vietnamese public sources are not rendered as source cards. A delegated
+Entry→Sense mapping discovers and resolves the canonical owner and must not
+create a competing indexable Dictionary detail page. Ambiguous ownership fails
+closed, and the four standalone kim cương terms remain eligible dedicated
+Dictionary entries under the current read law.
+
 > **DOCUMENTATION + READ-SLICE STATUS — 2026-10-03.** This document is subordinate to
 > `docs/constitution/NHK_V3_CONSTITUTION.md` and
 > `docs/architecture/DICTIONARY_LEXICAL_KNOWLEDGE_CONTRACT.md`.

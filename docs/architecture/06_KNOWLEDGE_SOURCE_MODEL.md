@@ -21,6 +21,21 @@ mutation, read-back verification and WordPress publish. A direct link write
 outside Governance/Controlled Apply is a `CONSTITUTION_CONFLICT`; future Article
 implementation must route the link through the approved governed boundary.
 
+## PUBLIC_RESEARCH_SOURCE_DISPLAY_POLICY — 2026-10-06
+
+This named cross-cutting law applies to public research, Knowledge citations,
+source cards, Entity dossiers, article research and generated factual
+summaries. A Source may remain valid and its historical provenance may remain
+retained while still being ineligible for public display. Active/public
+Evidence is separately required; only Evidence whose Source passes the policy
+may become a public citation. Vietnamese websites, explicit Vietnamese source
+classifications and the known `vangvong.com` publisher are excluded from public
+source display. International institutional, official archive, patent,
+catalogue and established specialist sources are preferred. A claim supported
+only by excluded sources is omitted from the evidenced public set and is
+qualified, blocked or review-only; no source, claim or provenance record is
+deleted or rewritten by this display law.
+
 ## Single entry point for new knowledge input — 2026-09-09
 
 Knowledge-only text is still a new submission and enters `nhk.capture.ingest`.

@@ -5,7 +5,7 @@ namespace NHK\Core\Infrastructure\Frontend;
 
 use NHK\Core\Application\Entity\{BrandDossierProjection, ClockTypeDossierProjection, EntityMediaProjection, PublicEntityEligibilityPolicy, PublicIdentityContract, PublicRouteResolver, SemanticDossierQuery};
 use NHK\Core\Application\Graph\{BrandAggregationQuery, ClockTypeDerivedRelationshipQuery, ClockTypeHierarchyProjection, GraphService, PredicateTraversalPolicy, RelatedSemanticQuery, StructuralContextQuery};
-use NHK\Core\Application\Knowledge\EntityKnowledgeProjection;
+use NHK\Core\Application\Knowledge\{EntityKnowledgeProjection, PublicResearchSourceDisplayPolicy};
 use NHK\Core\Application\Media\PublicMediaGalleryQuery;
 use NHK\Core\Domain\Authority\{AuthorityEntity, CanonicalEntityTypeCatalog, EntityTypeRegistry};
 use NHK\Core\Domain\Graph\{EndpointTypeRegistry, PredicateRegistry};
@@ -48,7 +48,7 @@ final class EntityDossierBootstrap
         $eligibility = new PublicEntityEligibilityPolicy($authority, $types, $routes, $contexts);
         $brandAggregation = new BrandAggregationQuery($graph, $authority, $types, $routes, $eligibility);
         $entityMedia = new EntityMediaProjection($media, $assets, $usages);
-        $entityKnowledge = new EntityKnowledgeProjection($claims, $evidence, $sources, new MigrationStatus());
+        $entityKnowledge = new EntityKnowledgeProjection($claims, $evidence, $sources, new MigrationStatus(), new PublicResearchSourceDisplayPolicy());
         $relations = new RelatedSemanticQuery($graph, new PredicateTraversalPolicy($predicates));
         $dossier = new SemanticDossierQuery(
             $authority,
