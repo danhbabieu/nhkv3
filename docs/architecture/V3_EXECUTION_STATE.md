@@ -23735,3 +23735,39 @@ lint and diff checks pass.
 STATUS: `EXISTING_DUPLICATE_AUDIT_READ_ONLY_IMPLEMENTED_LOCALLY /
 FOCUSED_GREEN / LIVE_ALL_OWNER_RUN_BLOCKED_BY_EXPLICIT_MODEL_GAPS /
 NO_DATA_MUTATION / COMMIT_PENDING`.
+
+# Checkpoint — 2026-10-06 — Capture retry current-outcome supersession
+
+ROOT_CAUSE: A retry reused persisted top-level `diagnostics.failure` while
+appending later phase receipts. That historical code could therefore be copied
+onto a current Article pre-create review and remain visible through retry/read
+projections, even after the producing phase had recovered.
+
+IMPLEMENTATION: `CapturePhaseReceiptReducer` now normalizes legacy, latest and
+append-only attempt shapes and exposes current versus superseded failure codes.
+`CaptureCurrentOutcomeReducer` now reconciles current blockers and diagnostics
+without deleting receipt history, preserves current owner/system blockers, and
+does not invent a failure record for completion-only blockers. The coordinator
+passes explicit current failure codes for current exception paths and
+reconciles diagnostics after receipt append. MCP `capture.get` now projects
+current effective blockers after canonical owner/usage reconciliation.
+
+REGRESSION COVERAGE: Added generic lifecycle coverage for retryable X → success,
+X → X, X → Y, later success, owner review and system blocked outcomes; legacy
+receipt normalization; same-Capture Article pre-create review; MCP projection;
+replay identity; and changed retry payload/fingerprint rejection. Focused
+lifecycle coverage passes 108 tests / 557 assertions. PHP lint reports no syntax
+errors; working-tree and index diff checks pass; the scoped secret scan found no
+matches.
+
+VERIFICATION: The default full suite was limited by the existing 128MB PHP
+memory ceiling in `TrustedProvidedFileMaterializerTest`. A verification rerun
+with `memory_limit=512M` completed 3,516 tests / 19,871 assertions with 33
+environment/infrastructure errors and 28 unrelated pre-existing unit or
+integration failures, including missing `NHK_WP_TEST_PATH`/authorized TEST
+runtime and unrelated repository/domain fixtures. The previously related
+Capture semantic failure was fixed and rerun green. No staging/production
+mutation, migration, deployment, push or external data write was performed.
+
+STATUS: `CAPTURE_RETRY_CURRENT_OUTCOME_FIXED_LOCALLY / FOCUSED_GREEN /
+FULL_SUITE_ENVIRONMENT_LIMITED / NO_DATA_MUTATION / NO_DEPLOYMENT`.
