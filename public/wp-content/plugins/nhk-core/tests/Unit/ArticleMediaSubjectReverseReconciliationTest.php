@@ -4,13 +4,19 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Media\{ArticleMediaCandidateSelector, ArticleMediaLegacyAudit, ArticleMediaSubjectReverseReconciliation, SemanticSuitabilityPolicy};
+use NHK\Core\Application\Governance\GovernanceService;
+use NHK\Core\Application\Mcp\{McpGovernanceHandler, McpReadHandler, McpTransport};
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Contracts\Graph\GraphReader;
+use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository};
 use NHK\Core\Contracts\Media\{ArticleMediaBlueprintCasRepository, ArticleMediaBlueprintRepository, ArticleMediaUsageInventory, MediaAssetRepository, MediaRepository, MediaUsageRepository};
+use NHK\Core\Contracts\Video\VideoRepository;
+use NHK\Core\Domain\Authority\EntityTypeRegistry;
 use NHK\Core\Domain\Authority\{AuthorityEntity, AuthorityState};
 use NHK\Core\Domain\Graph\{EdgeState, GraphEdge, GraphNode, NodeReference};
 use NHK\Core\Domain\Governance\{Proposal, ProposalState};
 use NHK\Core\Domain\Media\{Media, MediaAsset, MediaSeoBlueprint, MediaUsage};
+use NHK\Tests\Support\InMemoryProposalRepository;
 use PHPUnit\Framework\TestCase;
 
 final class ArticleMediaSubjectReverseReconciliationTest extends TestCase
@@ -35,6 +41,30 @@ final class ArticleMediaSubjectReverseReconciliationTest extends TestCase
         self::assertSame(2, $result->readback[0]['binding_revision']);
         self::assertSame($plan['dependency_fingerprint'], $result->readback[0]['subject_binding']['dependency_fingerprint']);
         self::assertSame('ARTICLE_MEDIA_SUBJECT_BOUND', $result->mutation['mutation_result']);
+    }
+
+    public function test_every_operation_emitted_by_the_subject_reconciliation_plan_passes_proposal_create_transport_validation(): void
+    {
+        $repository = $this->blueprints();
+        $repository->items['757:featured_primary'] = $this->blueprint(757);
+        $plan = $this->service($this->edge(), AuthorityState::ACTIVE, $repository)->plan('wp_post', '1:757');
+        $arguments = $plan['governed_operation']['arguments'];
+        $transport = new McpTransport(
+            $this->readHandler(),
+            new McpGovernanceHandler(new GovernanceService(new InMemoryProposalRepository())),
+            static fn (string $capability): bool => true,
+        );
+
+        $response = $transport->dispatch([
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'tools/call',
+            'params' => ['name' => 'nhk.proposal.create', 'arguments' => $arguments],
+        ]);
+
+        self::assertSame(200, $response['status']);
+        self::assertFalse($response['body']['result']['isError'] ?? false, (string) json_encode($response, JSON_UNESCAPED_UNICODE));
+        self::assertSame('subject_bind', $response['body']['result']['structuredContent']['operation']);
     }
 
     public function test_no_active_about_edge_is_missing_without_a_mutation_plan(): void
@@ -132,6 +162,20 @@ final class ArticleMediaSubjectReverseReconciliationTest extends TestCase
             public function findOutgoing(NodeReference $source, ?string $predicate = null, int $after = 0, int $limit = 50, bool $includeRetired = false, ?string $targetType = null): array { return ['items' => $this->edges, 'next_cursor' => null]; }
         };
         return new ArticleMediaSubjectReverseReconciliation($graph, $authority, $repository, static fn (NodeReference $reference): ?int => 17);
+    }
+
+    private function readHandler(): McpReadHandler
+    {
+        return new McpReadHandler(
+            $this->createMock(AuthorityRepository::class),
+            new EntityTypeRegistry(),
+            $this->createMock(MediaRepository::class),
+            $this->createMock(MediaAssetRepository::class),
+            $this->createMock(MediaUsageRepository::class),
+            $this->createMock(VideoRepository::class),
+            $this->createMock(KnowledgeRepository::class),
+            $this->createMock(EvidenceRepository::class),
+        );
     }
 
     private function authority(AuthorityState $state = AuthorityState::ACTIVE): object

@@ -6,6 +6,7 @@ namespace NHK\Tests\Unit;
 use NHK\Core\Application\Mcp\McpToolCatalog;
 use NHK\Core\Application\Mcp\McpAbilityRegistration;
 use NHK\Core\Application\Mcp\{McpDocumentationRegistry, McpGovernanceHandler, McpReadHandler, McpTransport, SingleEntryPointPolicy};
+use NHK\Core\Application\Governance\ControlledApplyOperationRegistry;
 use NHK\Core\Application\Media\ImageIngestEntrypoint;
 use NHK\Core\Application\Governance\GovernanceService;
 use NHK\Core\Contracts\Media\WordPressMediaAttachmentIngestor;
@@ -366,7 +367,21 @@ final class McpContractTest extends TestCase
             'collector_facet_update',
             'relation_retire',
             'relation_reactivate',
+            'subject_bind',
         ], $tools['nhk.proposal.create']['inputSchema']['properties']['operation']['enum']);
+    }
+
+    public function test_article_subject_bind_is_registered_and_projected_to_every_proposal_schema(): void
+    {
+        $tools = array_column(McpToolCatalog::tools(), null, 'name');
+        $catalogOperations = $tools['nhk.proposal.create']['inputSchema']['properties']['operation']['enum'];
+        $abilityOperations = McpAbilityRegistration::inputSchemaForTool('nhk.proposal.create')['properties']['operation']['enum'];
+        $articleOperations = $tools['nhk.article.ingest']['inputSchema']['properties']['semantic_bundle']['properties']['commands']['items']['properties']['operation']['enum'];
+
+        self::assertContains('subject_bind', $catalogOperations);
+        self::assertSame($catalogOperations, $abilityOperations);
+        self::assertSame($catalogOperations, $articleOperations);
+        self::assertTrue((new ControlledApplyOperationRegistry())->supports('wp_post', 'subject_bind'));
     }
 
     public function test_article_abilities_are_coordinated_and_phase_one_is_reconcile_only(): void
