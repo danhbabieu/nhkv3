@@ -4,11 +4,11 @@ declare(strict_types=1);
 namespace NHK\Core\Infrastructure\Dictionary;
 
 use NHK\Core\Application\Dictionary\DictionaryEntryPublicIdentityWriter;
-use NHK\Core\Contracts\Dictionary\{DictionaryConceptRepository, DictionaryEntryRepository};
+use NHK\Core\Contracts\Dictionary\{DictionaryConceptRepository, DictionaryDuplicateAuditReader, DictionaryEntryRepository};
 use NHK\Core\Domain\Dictionary\{DictionaryConcept, DictionaryPreCreateResolution, LexicalEntry, LexicalEntryForm};
 use NHK\Core\Shared\Uuid\UuidCodec;
 
-final class WpdbDictionaryEntryRepository implements DictionaryEntryRepository
+final class WpdbDictionaryEntryRepository implements DictionaryEntryRepository, DictionaryDuplicateAuditReader
 {
     private string $entries;
     private string $forms;
@@ -86,6 +86,46 @@ final class WpdbDictionaryEntryRepository implements DictionaryEntryRepository
             }
             return $forms;
         } catch (\Throwable) { return []; }
+    }
+
+    public function read(int $limit = 1000): array
+    {
+        $limit = max(1, min(10000, $limit));
+        try {
+            $rows = $this->database->get_results($this->database->prepare(
+                "SELECT e.entry_uuid,e.preferred_form,e.status AS entry_status,e.revision AS entry_revision,f.form_text,f.normalized_form,f.state,s.concept_uuid,s.context_json AS sense_context_json,s.semantic_reference_type,s.semantic_reference_id,s.state AS sense_state,c.status AS sense_status,c.revision AS sense_revision,c.context_json AS concept_context_json,c.destination_type,c.destination_id FROM {$this->entries} e INNER JOIN {$this->forms} f ON f.entry_uuid=e.entry_uuid INNER JOIN {$this->senses} s ON s.entry_uuid=e.entry_uuid INNER JOIN {$this->conceptsTable()} c ON c.concept_uuid=s.concept_uuid ORDER BY f.normalized_form,e.id,s.id LIMIT %d",
+                $limit,
+            ), ARRAY_A);
+            if (!is_array($rows)) throw new \RuntimeException('DICTIONARY_DUPLICATE_AUDIT_UNAVAILABLE');
+            $out = [];
+            foreach ($rows as $row) {
+                if (!is_array($row)) continue;
+                try {
+                    $entryId = UuidCodec::fromBinary($row['entry_uuid']);
+                    $senseId = UuidCodec::fromBinary($row['concept_uuid']);
+                } catch (\Throwable) {
+                    continue;
+                }
+                $senseContext = $this->decode((string) ($row['sense_context_json'] ?? '{}'));
+                $out[] = [
+                    'entry_id' => $entryId,
+                    'sense_id' => $senseId,
+                    'form_text' => (string) ($row['form_text'] ?? ''),
+                    'normalized_form' => (string) ($row['normalized_form'] ?? ''),
+                    'entry_status' => (string) ($row['entry_status'] ?? ''),
+                    'sense_status' => (string) ($row['sense_status'] ?? ''),
+                    'entry_revision' => (int) ($row['entry_revision'] ?? 0),
+                    'sense_revision' => (int) ($row['sense_revision'] ?? 0),
+                    'context' => $senseContext !== [] ? $senseContext : $this->decode((string) ($row['concept_context_json'] ?? '{}')),
+                    'destination_type' => ($row['semantic_reference_type'] ?? null) ?: (($row['destination_type'] ?? null) ?: null),
+                    'destination_id' => ($row['semantic_reference_id'] ?? null) ?: (($row['destination_id'] ?? null) ?: null),
+                    'state' => ((int) ($row['state'] ?? 0) === 1 && (int) ($row['sense_state'] ?? 0) === 1) ? 1 : 0,
+                ];
+            }
+            return $out;
+        } catch (\Throwable $e) {
+            throw new \RuntimeException('DICTIONARY_DUPLICATE_AUDIT_UNAVAILABLE', 0, $e);
+        }
     }
 
     /** @return array<string,mixed> */
@@ -323,6 +363,11 @@ final class WpdbDictionaryEntryRepository implements DictionaryEntryRepository
             }
             return new LexicalEntry($entryId, (string) $row['preferred_form'], (string) $row['normalized_preferred_form'], (string) $row['status'], ($row['locale'] ?? null) !== null ? (string) $row['locale'] : null, $this->decode((string) ($row['context_json'] ?? '{}')), (int) ($row['revision'] ?? 1), array_values(array_unique($senseIds)));
         } catch (\Throwable) { return null; }
+    }
+
+    private function conceptsTable(): string
+    {
+        return $this->database->prefix . 'nhk_dictionary_concepts';
     }
 
     private function insertSense(string $entryId, DictionaryConcept $sense, array $context, ?string $semanticType = null, ?string $semanticId = null, ?int $semanticRevision = null): void

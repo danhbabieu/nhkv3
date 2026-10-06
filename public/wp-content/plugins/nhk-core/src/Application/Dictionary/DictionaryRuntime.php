@@ -561,6 +561,11 @@ final class DictionaryRuntime
         );
     }
 
+    public function duplicateAudit(): DictionaryDuplicateCandidateAudit
+    {
+        return new DictionaryDuplicateCandidateAudit($this->entries);
+    }
+
     public function harvester(): DictionaryHarvester { return new DictionaryHarvester($this->planning); }
 
     public function relationHandoff(): DictionaryRelationHandoff
