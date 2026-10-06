@@ -7,6 +7,15 @@ use PHPUnit\Framework\TestCase;
 
 final class PluginBootWiringTest extends TestCase
 {
+    public function test_wordpress_reconciliation_does_not_use_title_as_automatic_subject_scope(): void
+    {
+        $plugin = (string) file_get_contents(__DIR__ . '/../../src/Plugin.php');
+
+        self::assertStringNotContainsString("ensureForPost(\$postId, ['subject' => (string) \$post->post_title, 'planned_title' => (string) \$post->post_title])", $plugin);
+        self::assertStringContainsString('subject_resolution_packet', $plugin);
+        self::assertStringContainsString('allow_unscoped_reuse', $plugin);
+    }
+
     public function test_public_entity_projection_dependencies_are_created_before_projection(): void
     {
         $plugin = (string) file_get_contents(__DIR__ . '/../../src/Plugin.php');

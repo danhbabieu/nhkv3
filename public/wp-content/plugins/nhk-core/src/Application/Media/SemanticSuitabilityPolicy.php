@@ -48,6 +48,11 @@ final class SemanticSuitabilityPolicy
                 $candidate['canonical_subject_uuid'] ?? null,
             ]),
         ));
+        $expectedRevision = trim((string) ($target['subject_revision'] ?? $target['canonical_subject_revision'] ?? ''));
+        $actualRevision = trim((string) ($candidate['subject_revision'] ?? $candidate['canonical_subject_revision'] ?? ''));
+        $explicitPlacement = ($candidate['article_explicit_media'] ?? false) === true
+            || (($candidate['selection_source'] ?? 'SYSTEM_AUTO') === 'USER_EXPLICIT' && ($candidate['current_capture_media'] ?? false) === true);
+        $revisionMismatch = $expectedRevision !== '' && $actualRevision !== $expectedRevision;
         $basis = '';
         $suitability = self::UNKNOWN;
         $relationshipClass = 'UNKNOWN';
@@ -58,11 +63,16 @@ final class SemanticSuitabilityPolicy
             $basis = 'availability_not_available';
             $relationshipClass = 'UNAVAILABLE';
             $semanticTier = 'UNAVAILABLE';
-        } elseif ($expected !== [] && array_intersect($expected, $actual) !== []) {
+        } elseif ($expected !== [] && array_intersect($expected, $actual) !== [] && (!$revisionMismatch || $explicitPlacement)) {
             $suitability = self::EXACT;
             $basis = 'exact_canonical_subject_binding';
             $relationshipClass = 'EXACT';
             $semanticTier = 'EXACT_SUBJECT';
+        } elseif ($expected !== [] && array_intersect($expected, $actual) !== [] && $revisionMismatch) {
+            $suitability = self::INELIGIBLE;
+            $basis = 'subject_revision_mismatch';
+            $relationshipClass = 'STALE';
+            $semanticTier = 'STALE_REVISION';
         } elseif (($candidate['compatibility_rule_registered'] ?? false) === true
             && in_array(strtoupper(trim((string) ($candidate['relation_class'] ?? ''))), ['IDENTITY_EQUIVALENT', 'REPRESENTATIVE_COMPATIBLE'], true)) {
             $suitability = self::COMPATIBLE;
@@ -174,6 +184,7 @@ final class SemanticSuitabilityPolicy
                     $metadata['canonical_subject_uuid'] ?? null,
                 ]),
             ),
+            'subject_revision' => (string) ($media->provenance['subject_revision'] ?? $metadata['subject_revision'] ?? ''),
         ];
     }
 

@@ -27,7 +27,7 @@ final class ArticleMediaCandidateSelector
             $assessment = $this->suitability->evaluateMedia(
                 $media,
                 $assets,
-                ['subject_ids' => $subjectIds, 'subject_context' => $blueprint->subjectContext],
+                ['subject_ids' => $subjectIds, 'subject_revision' => $this->subjectRevision($blueprint), 'subject_context' => $blueprint->subjectContext],
                 'SYSTEM_AUTO',
                 $blueprint->slot,
             );
@@ -83,6 +83,11 @@ final class ArticleMediaCandidateSelector
             if ($id !== '') $ids[$id] = true;
         }
         return array_keys($ids);
+    }
+
+    private function subjectRevision(MediaSeoBlueprint $blueprint): string
+    {
+        return trim((string) ($blueprint->subjectContext['subject_revision'] ?? $blueprint->subjectContext['canonical_subject_revision'] ?? ''));
     }
 
     /** @return array<string,int|string> */

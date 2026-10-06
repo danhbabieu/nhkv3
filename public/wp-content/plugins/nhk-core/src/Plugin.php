@@ -256,13 +256,14 @@ final class Plugin {
             $publicMediaService = new MediaService($publicMedia, $publicAssets, $publicUsages);
             $sharedAttachmentBridge = new WordPressMediaAttachmentBridge($wpdb, $publicMediaService, $publicMedia, $publicAssets);
             $attachmentBridge = $sharedAttachmentBridge;
+            $articleCaptureSubjectBinding = $captureRepository !== null ? new CaptureSubjectBindingRecovery($captureRepository) : null;
             $articleMedia = new ArticleMediaCoordinator($publicMediaService, $publicMedia, $publicAssets, $publicUsages, new \NHK\Core\Infrastructure\Media\WpdbArticleMediaBlueprintRepository($wpdb), null, $attachmentBridge);
             $articleSeo = new ArticleMediaSeoProjection($publicMedia, $publicAssets, $publicUsages, $attachmentBridge, null, new \NHK\Core\Infrastructure\Media\WpdbArticleMediaBlueprintRepository($wpdb));
             add_filter('nhk_v3_article_media_seo', static function (array $value, int $postId) use ($articleSeo): array { return $articleSeo->forPost((string) get_current_blog_id() . ':' . $postId); }, 10, 2);
             add_action('wp_sitemaps_init', static function (object $sitemaps) use ($articleSeo): void {
                 if (isset($sitemaps->registry) && is_object($sitemaps->registry) && method_exists($sitemaps->registry, 'add_provider')) $sitemaps->registry->add_provider('images', new WordPressImageSitemapProvider($articleSeo));
             });
-            $reconcilePostMedia = static function (int $postId, \WP_Post $post, bool $update) use ($articleMedia, $attachmentBridge): void {
+            $reconcilePostMedia = static function (int $postId, \WP_Post $post, bool $update) use ($articleMedia, $attachmentBridge, $captureRepository, $articleCaptureSubjectBinding): void {
                 if (CaptureEditorialWriteGuard::active()) return;
                 if ($attachmentBridge->isHandlingWrite()) return;
                 if ($post->post_type !== 'post' || wp_is_post_revision($postId) || wp_is_post_autosave($postId)) return;
@@ -271,7 +272,23 @@ final class Plugin {
                 // trashed post must never enter editorial/media enrichment.
                 if ($post->post_status === 'trash') return;
                 try {
-                    $articleMedia->ensureForPost($postId, ['subject' => (string) $post->post_title, 'planned_title' => (string) $post->post_title]);
+                    $context = ['subject' => (string) $post->post_title, 'planned_title' => (string) $post->post_title, 'allow_unscoped_reuse' => false];
+                    $capture = $captureRepository?->findByArticleId($postId);
+                    $packet = $capture instanceof CaptureRecord && $articleCaptureSubjectBinding !== null ? $articleCaptureSubjectBinding->packet($capture) : null;
+                    if ($capture instanceof CaptureRecord) {
+                        $context['capture_id'] = $capture->captureId;
+                        $context['capture_has_physical_assets'] = $capture->assets !== [];
+                        $context['capture_owned_media_ids'] = array_values(array_unique(array_filter(array_map(static fn (mixed $asset): string => is_array($asset) ? trim((string) ($asset['media_id'] ?? '')) : '', $capture->assets), static fn (string $id): bool => $id !== '')));
+                    }
+                    if ($packet !== null) {
+                        $context['subject_resolution_packet'] = $packet->toArray();
+                        $context['subject_resolution'] = $packet->toResolution();
+                        $context['subject_ids'] = [$packet->canonicalSubjectId];
+                        $context['subject_revision'] = $packet->revision;
+                        $context['subject_scope_locked'] = true;
+                        $context['allow_scoped_reuse'] = true;
+                    }
+                    $articleMedia->ensureForPost($postId, $context);
                 } catch (\Throwable $error) {
                     do_action('nhk_v3_article_media_failure', $postId, $error->getMessage(), $update);
                 }

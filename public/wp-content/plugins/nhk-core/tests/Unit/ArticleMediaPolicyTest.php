@@ -128,6 +128,70 @@ final class ArticleMediaPolicyTest extends TestCase
         self::assertNotContains($stale->canonicalId, array_map(static fn (MediaUsage $usage): string => $usage->mediaId, $currentUsages));
     }
 
+    public function test_title_only_reconciliation_does_not_reuse_global_ready_media(): void
+    {
+        [$media, $assets, $usages, $blueprints, $service] = $this->stores();
+        $unscoped = $service->create('title-only-global', 'Title-only global image', 'ready');
+        $service->addAsset($unscoped->canonicalId, 'original', 'uploads/title-only-global.jpg', hash('sha256', 'title-only-global'), 'image/jpeg', 10, 2400, 1600, 'PUBLIC');
+
+        $result = (new ArticleMediaCoordinator($service, $media, $assets, $usages, $blueprints, 1))->ensureForPost(640, ['subject' => 'Title-only Article']);
+
+        self::assertNotContains($unscoped->canonicalId, $result->slotMedia);
+        self::assertTrue($result->slots['featured_primary']['placeholder']);
+        self::assertContains('ARTICLE_MEDIA_FEATURED_MISSING', array_column($result->diagnostics, 'code'));
+    }
+
+    public function test_missing_capture_subject_binding_fails_closed_to_placeholder(): void
+    {
+        [$media, $assets, $usages, $blueprints, $service] = $this->stores();
+        $historical = $service->create('missing-capture-binding', 'Historical image', 'ready', ['subject_ids' => ['subject-other']]);
+        $service->addAsset($historical->canonicalId, 'original', 'uploads/missing-capture-binding.jpg', hash('sha256', 'missing-capture-binding'), 'image/jpeg', 10, 2400, 1600, 'PUBLIC');
+
+        $result = (new ArticleMediaCoordinator($service, $media, $assets, $usages, $blueprints, 1))->ensureForPost(641, [
+            'capture_id' => 'capture-without-packet',
+            'subject' => 'Unbound Article',
+            'capture_has_physical_assets' => false,
+        ]);
+
+        self::assertTrue($result->slots['featured_primary']['placeholder']);
+        self::assertNotContains($historical->canonicalId, $result->slotMedia);
+    }
+
+    public function test_existing_pinned_usage_is_not_replaced_by_automatic_selection(): void
+    {
+        [$media, $assets, $usages, $blueprints, $service] = $this->stores();
+        $pinned = $service->create('pinned-article-image', 'Pinned Article image', 'ready', ['subject_ids' => ['subject-pinned']]);
+        $service->addAsset($pinned->canonicalId, 'original', 'uploads/pinned-article-image.jpg', hash('sha256', 'pinned-article-image'), 'image/jpeg', 10, 1200, 675, 'PUBLIC');
+        $existing = $service->addUsage($pinned->canonicalId, 'wp_post', '1:642', 'featured_primary', 0, '', '', [], '', '', 'USER_EXPLICIT', 'PINNED');
+
+        $result = (new ArticleMediaCoordinator($service, $media, $assets, $usages, $blueprints, 1))->ensureForPost(642, [
+            'subject_ids' => ['subject-pinned'],
+            'subject_scope_locked' => true,
+        ]);
+        $readback = $usages->listByEndpoint('wp_post', '1:642', 'featured_primary')[0];
+
+        self::assertSame($pinned->canonicalId, $result->slotMedia['featured_primary']);
+        self::assertSame($existing->usageId, $readback->usageId);
+        self::assertSame('USER_EXPLICIT', $readback->selectionSource);
+        self::assertSame('PINNED', $readback->selectionPolicy);
+    }
+
+    public function test_subject_revision_change_invalidates_system_auto_usage(): void
+    {
+        [$media, $assets, $usages, $blueprints, $service] = $this->stores();
+        $stale = $service->create('subject-revision-stale', 'Stale revision image', 'ready', ['subject_ids' => ['subject-revision'], 'subject_revision' => 1]);
+        $service->addAsset($stale->canonicalId, 'original', 'uploads/subject-revision-stale.jpg', hash('sha256', 'subject-revision-stale'), 'image/jpeg', 10, 1200, 675, 'PUBLIC');
+        $service->addUsage($stale->canonicalId, 'wp_post', '1:643', 'featured_primary');
+
+        $result = (new ArticleMediaCoordinator($service, $media, $assets, $usages, $blueprints, 1))->diagnoseForPost(643, [
+            'subject_ids' => ['subject-revision'],
+            'subject_revision' => 2,
+        ]);
+
+        self::assertTrue($result->slots['featured_primary']['placeholder']);
+        self::assertFalse($result->slots['featured_primary']['valid_for_completeness']);
+    }
+
     public function test_incompatible_current_capture_selection_cannot_fall_back_to_historical_media(): void
     {
         [$media, $assets, $usages, $blueprints, $service] = $this->stores();
@@ -210,7 +274,7 @@ final class ArticleMediaPolicyTest extends TestCase
         $variantA = $service->create('variant-a-front', 'Variant A front', 'ready', ['metadata' => ['subject_id' => 'variant-a']]);
         $variantB = $service->create('variant-b-front', 'Variant B front', 'ready', ['metadata' => ['subject_id' => 'variant-b'], 'detail_type' => 'WHOLE_FRONT']);
         foreach ([[$variantA, 'variant-a'], [$variantB, 'variant-b']] as [$item, $stem]) {
-            $service->addAsset($item->canonicalId, 'original', 'uploads/' . $stem . '.webp', hash('sha256', $stem), 'image/webp', 10, 2400, 1600, 'PUBLIC');
+            $service->addAsset($item->canonicalId, 'original', 'uploads/' . $stem . '.webp', hash('sha256', $stem), 'image/webp', 10, 1200, 800, 'PUBLIC');
         }
         $service->addUsage($variantA->canonicalId, 'variant', 'variant-a', 'representative');
         foreach (range(1, 4) as $index) $service->addUsage($variantB->canonicalId, 'wp_post', '1:' . (700 + $index), 'inline_primary', 0, 'Historical sibling use');
@@ -862,11 +926,11 @@ final class ArticleMediaPolicyTest extends TestCase
                 $current = $this->items[$usage->usageId] ?? null;
                 if ($this->conflicts > 0) {
                     --$this->conflicts;
-                    if ($current instanceof MediaUsage) $this->items[$usage->usageId] = new MediaUsage($current->usageId, $current->mediaId, $current->endpointType, $current->endpointKey, $current->role, $current->sortOrder, $current->altText . ' refreshed', $current->caption, $current->keywordGroups, $current->title, $current->revision + 1, $current->placementKey);
+                    if ($current instanceof MediaUsage) $this->items[$usage->usageId] = new MediaUsage($current->usageId, $current->mediaId, $current->endpointType, $current->endpointKey, $current->role, $current->sortOrder, $current->altText . ' refreshed', $current->caption, $current->keywordGroups, $current->title, $current->revision + 1, $current->placementKey, $current->selectionSource, $current->selectionPolicy);
                     throw new MediaException('Media usage update conflict.');
                 }
                 $next = $usage->revision + 1;
-                return $this->items[$usage->usageId] = new MediaUsage($usage->usageId, $usage->mediaId, $usage->endpointType, $usage->endpointKey, $usage->role, $usage->sortOrder, $usage->altText, $usage->caption, $usage->keywordGroups, $usage->title, $next, $usage->placementKey);
+                return $this->items[$usage->usageId] = new MediaUsage($usage->usageId, $usage->mediaId, $usage->endpointType, $usage->endpointKey, $usage->role, $usage->sortOrder, $usage->altText, $usage->caption, $usage->keywordGroups, $usage->title, $next, $usage->placementKey, $usage->selectionSource, $usage->selectionPolicy);
             }
             public function removeByEndpointRole(string $type, string $key, string $role): int { $before = count($this->items); foreach ($this->items as $id => $usage) if ($usage->endpointType === $type && $usage->endpointKey === $key && $usage->role === $role) unset($this->items[$id]); return $before - count($this->items); }
         };

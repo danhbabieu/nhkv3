@@ -17,6 +17,7 @@ final class ArticleMediaCoordinator
         private ?int $blogId = null,
         private ?WordPressArticleMediaAdapter $wordpress = null,
         private ?SemanticSuitabilityPolicy $suitabilityPolicy = null,
+        private ?ArticleMediaCandidateSelector $candidateSelector = null,
     ) {}
 
     /** @param array<string,mixed> $context @param array<string,string|array<string,mixed>> $selectedMediaBySlot @param list<string|array<string,mixed>> $supportingMediaIds */
@@ -40,12 +41,10 @@ final class ArticleMediaCoordinator
         $singleRealImageException = ($context['single_real_image_exception'] ?? false) === true;
         $contentIntent = strtoupper(trim((string) ($context['content_intent']['intent'] ?? '')));
         $enforceDistinctMandatoryMedia = $contentIntent !== '' && !$singleRealImageException;
-        $allowHistoricalReuse = !$captureMediaContext
-            ? (($context['allow_unscoped_reuse'] ?? true) === true)
-            : ($subjectScopeLocked && (($context['allow_scoped_reuse'] ?? false) === true || ($context['allow_unscoped_reuse'] ?? false) === true));
-        $allowHistoricalSubjectReuse = !$captureMediaContext
-            ? $allowHistoricalReuse
-            : ($subjectScopeLocked && (($context['allow_scoped_reuse'] ?? false) === true || ($context['allow_unscoped_reuse'] ?? false) === true));
+        $allowHistoricalReuse = $subjectScopeLocked && (!$captureMediaContext
+            ? (($context['allow_scoped_reuse'] ?? true) === true || ($context['allow_unscoped_reuse'] ?? false) === true)
+            : (($context['allow_scoped_reuse'] ?? false) === true || ($context['allow_unscoped_reuse'] ?? false) === true));
+        $allowHistoricalSubjectReuse = $allowHistoricalReuse;
         $editorial = $this->wordpress?->read($postId);
         $selectedContextBySlot = [];
         foreach ($selectedMediaBySlot as $slot => $selection) {
@@ -81,21 +80,41 @@ final class ArticleMediaCoordinator
             $existing = $this->existingSlotMedia($endpointKey, $slot);
             $existingUsage = $this->existingSlotUsage($endpointKey, $slot);
             $candidateId = trim((string) ($selectedMediaBySlot[$slot] ?? ''));
+            $protectedExisting = $candidateId === ''
+                && $existing instanceof Media
+                && $existingUsage !== null
+                && $existingUsage->selectionSource === 'USER_EXPLICIT'
+                && $existingUsage->selectionPolicy === 'PINNED';
+            if ($protectedExisting) {
+                $candidateId = $existing->canonicalId;
+                $selectedContextBySlot[$slot] = [
+                    'selection_source' => 'USER_EXPLICIT',
+                    'selection_policy' => 'PINNED',
+                    'title' => $existingUsage->title,
+                    'alt_text' => $existingUsage->altText,
+                    'caption' => $existingUsage->caption,
+                    'sort_order' => $existingUsage->sortOrder,
+                ];
+            }
             // A compact slot map is legacy article input. Treat it as current
             // Capture intent only when the request carries Capture context;
             // otherwise an invalid historical slot may still be replaced by
             // an already-proven compatible Media during reconciliation.
-            $hasExplicitSelection = $candidateId !== '' && $captureMediaContext;
+            $hasExplicitSelection = ($candidateId !== '' && $captureMediaContext) || $protectedExisting;
             if ($slot === MediaUsageRoleRegistry::INLINE_PRIMARY && $enforceDistinctMandatoryMedia && $candidateId !== '' && $candidateId === ($slotMedia[MediaUsageRoleRegistry::FEATURED_PRIMARY] ?? '')) $candidateId = '';
             $candidateIsCaptureOwned = $candidateId !== '' && in_array($candidateId, $captureOwnedMediaIds, true);
-            $candidateRequiresScope = $subjectScopeLocked && !($captureMediaContext && $candidateIsCaptureOwned);
+            $candidateRequiresScope = $subjectScopeLocked && !($captureMediaContext && $candidateIsCaptureOwned) && !$protectedExisting;
             $candidate = $candidateId !== '' ? $this->usableMedia($candidateId, $blueprint, $candidateRequiresScope) : null;
             // An explicit but incompatible selection is a truth conflict, not
             // permission to substitute stale editorial history or a ranked
             // candidate. Historical reuse is only considered when the current
             // request did not select a Media for this slot.
             if ($candidate === null && !$hasExplicitSelection && $allowHistoricalSubjectReuse && $existing !== null && !in_array($existing->canonicalId, array_values($slotMedia), true)) $candidate = $this->usableMedia($existing->canonicalId, $blueprint, $subjectScopeLocked);
-            if ($candidate === null && !$hasExplicitSelection && $allowHistoricalSubjectReuse) $candidate = $this->findReusable($blueprint, array_values($slotMedia), $subjectScopeLocked, !$enforceDistinctMandatoryMedia);
+            if ($candidate === null && !$hasExplicitSelection && $allowHistoricalSubjectReuse) {
+                $selection = ($this->candidateSelector ??= new ArticleMediaCandidateSelector($this->media, $this->assets, $this->usages, $this->suitabilityPolicy ??= new SemanticSuitabilityPolicy()))->select($blueprint, array_values($slotMedia), !$enforceDistinctMandatoryMedia);
+                $candidate = $selection['media'] instanceof Media ? $selection['media'] : null;
+                foreach ((array) ($selection['diagnostics'] ?? []) as $diagnostic) $diagnostics[] = ['slot' => $slot] + $diagnostic;
+            }
             if ($candidate === null) $candidate = $this->placeholder($slot);
             // Repoint the endpoint usage through the normal CAS-aware boundary
             // even when the result is a placeholder. Keeping an ineligible
@@ -107,7 +126,7 @@ final class ArticleMediaCoordinator
             if ($candidate->isSystemPlaceholder() && $candidateId !== '') $diagnostics[] = ['code' => 'MEDIA_CANDIDATE_INELIGIBLE', 'slot' => $slot, 'media_id' => $candidateId, 'reason' => 'PERSISTED_SUBJECT_SCOPE_MISMATCH'];
             $assessment = $candidate->isSystemPlaceholder()
                 ? ['requirement' => $contentIntent === 'IMAGE_ARTICLE' ? SemanticSuitabilityPolicy::REQUIRED : SemanticSuitabilityPolicy::OPTIONAL, 'availability' => SemanticSuitabilityPolicy::MISSING, 'suitability' => SemanticSuitabilityPolicy::UNKNOWN, 'basis' => 'no_candidate', 'auto_select' => false, 'valid_for_completeness' => false, 'diagnostic' => 'MEDIA_OPTIONAL_MISSING']
-                : ($this->suitabilityPolicy ??= new SemanticSuitabilityPolicy())->evaluateMedia($candidate, $this->assets->listByMediaId($candidate->canonicalId), ['subject_ids' => $subjectIds, 'current_capture_media' => $candidateIsCaptureOwned, 'article_explicit_media' => (($selectedContextBySlot[$slot]['selection_source'] ?? '') === 'USER_EXPLICIT')], (string) ($selectedContextBySlot[$slot]['selection_source'] ?? 'SYSTEM_AUTO'), $slot);
+                : ($this->suitabilityPolicy ??= new SemanticSuitabilityPolicy())->evaluateMedia($candidate, $this->assets->listByMediaId($candidate->canonicalId), ['subject_ids' => $subjectIds, 'subject_revision' => (string) ($context['subject_revision'] ?? ''), 'current_capture_media' => $candidateIsCaptureOwned, 'article_explicit_media' => (($selectedContextBySlot[$slot]['selection_source'] ?? '') === 'USER_EXPLICIT')], (string) ($selectedContextBySlot[$slot]['selection_source'] ?? 'SYSTEM_AUTO'), $slot);
             $blueprint = MediaSeoBlueprint::forPost($postId, $slot, $context, $state);
             $this->blueprints->save($blueprint);
             $slotMedia[$slot] = $candidate->canonicalId;
@@ -117,7 +136,7 @@ final class ArticleMediaCoordinator
                 // not an effective slot and must never satisfy completeness.
                 $slotMedia[$slot] = '';
             }
-            $slots[$slot] = ['media_id' => $effective ? $candidate->canonicalId : '', 'persisted_media_id' => $candidate->isSystemPlaceholder() ? ($existing?->canonicalId) : $candidate->canonicalId, 'placeholder' => !$effective, 'state' => $effective ? MediaSeoStateRegistry::COMPLETE : ($slot === MediaUsageRoleRegistry::FEATURED_PRIMARY ? MediaSeoStateRegistry::INCOMPLETE_FEATURED : MediaSeoStateRegistry::INCOMPLETE_INLINE), 'suitability' => $assessment['suitability'], 'availability' => $assessment['availability'], 'valid_for_completeness' => $effective, 'placement_key' => $usage->placementKey, 'placement_anchor' => $usage->placementAnchor(), 'blueprint' => $blueprint->toArray()];
+            $slots[$slot] = ['media_id' => $effective ? $candidate->canonicalId : '', 'persisted_media_id' => $candidate->isSystemPlaceholder() ? ($existing?->canonicalId) : $candidate->canonicalId, 'placeholder' => !$effective, 'state' => $effective ? MediaSeoStateRegistry::COMPLETE : ($slot === MediaUsageRoleRegistry::FEATURED_PRIMARY ? MediaSeoStateRegistry::INCOMPLETE_FEATURED : MediaSeoStateRegistry::INCOMPLETE_INLINE), 'suitability' => $assessment['suitability'], 'availability' => $assessment['availability'], 'valid_for_completeness' => $effective, 'selection_source' => (string) ($selectedContextBySlot[$slot]['selection_source'] ?? ($existingUsage?->selectionSource ?? 'SYSTEM_AUTO')), 'selection_policy' => (string) ($selectedContextBySlot[$slot]['selection_policy'] ?? ($existingUsage?->selectionPolicy ?? 'AUTO')), 'placement_key' => $usage->placementKey, 'placement_anchor' => $usage->placementAnchor(), 'blueprint' => $blueprint->toArray()];
             if (!$effective && !$candidate->isSystemPlaceholder()) $diagnostics[] = ['code' => 'MEDIA_USAGE_SEMANTIC_MISMATCH', 'slot' => $slot, 'media_id' => $candidate->canonicalId];
         }
         $supportingPlacements = $this->normalizeSupportingPlacements($supportingMediaIds);
@@ -142,7 +161,7 @@ final class ArticleMediaCoordinator
         $desiredUsages = [];
         foreach ($slotMedia as $role => $mediaId) {
             if (trim((string) $mediaId) === '') continue;
-            $desiredUsages[] = ['role' => $role, 'media_id' => $mediaId, 'sort_order' => 0, 'placement_key' => (string) ($slots[$role]['placement_key'] ?? ''), 'alt_text' => (string) ($slots[$role]['blueprint']['planned_alt_intent'] ?? ''), 'title' => (string) ($slots[$role]['blueprint']['planned_title'] ?? ''), 'keyword_groups' => (array) ($slots[$role]['blueprint']['keyword_groups'] ?? []), 'selection_source' => in_array($mediaId, $captureOwnedMediaIds, true) ? 'USER_EXPLICIT' : 'SYSTEM_AUTO', 'selection_policy' => in_array($mediaId, $captureOwnedMediaIds, true) ? 'PINNED' : 'AUTO', 'current_capture_media' => in_array($mediaId, $captureOwnedMediaIds, true)];
+            $desiredUsages[] = ['role' => $role, 'media_id' => $mediaId, 'sort_order' => 0, 'placement_key' => (string) ($slots[$role]['placement_key'] ?? ''), 'alt_text' => (string) ($slots[$role]['blueprint']['planned_alt_intent'] ?? ''), 'title' => (string) ($slots[$role]['blueprint']['planned_title'] ?? ''), 'keyword_groups' => (array) ($slots[$role]['blueprint']['keyword_groups'] ?? []), 'selection_source' => (string) ($slots[$role]['selection_source'] ?? (in_array($mediaId, $captureOwnedMediaIds, true) ? 'USER_EXPLICIT' : 'SYSTEM_AUTO')), 'selection_policy' => (string) ($slots[$role]['selection_policy'] ?? (in_array($mediaId, $captureOwnedMediaIds, true) ? 'PINNED' : 'AUTO')), 'current_capture_media' => in_array($mediaId, $captureOwnedMediaIds, true), 'article_explicit_media' => (($slots[$role]['selection_source'] ?? '') === 'USER_EXPLICIT')];
         }
         foreach ($supportingPlacements as $placement) $desiredUsages[] = [
             'role' => MediaUsageRoleRegistry::INLINE_SUPPORTING,
@@ -164,7 +183,7 @@ final class ArticleMediaCoordinator
                 return ($this->suitabilityPolicy ??= new SemanticSuitabilityPolicy())->evaluateMedia(
                     $media,
                     $this->assets->listByMediaId($mediaId),
-                    ['subject_ids' => $subjectIds, 'current_capture_media' => ($spec['current_capture_media'] ?? false) === true],
+                    ['subject_ids' => $subjectIds, 'subject_revision' => (string) ($context['subject_revision'] ?? ''), 'current_capture_media' => ($spec['current_capture_media'] ?? false) === true, 'article_explicit_media' => ($spec['article_explicit_media'] ?? false) === true],
                     (string) ($spec['selection_source'] ?? 'SYSTEM_AUTO'),
                     $role,
                 );
@@ -257,12 +276,15 @@ final class ArticleMediaCoordinator
         $subjectContext = is_array($context['subject_context'] ?? null) ? $context['subject_context'] : [];
         if (trim((string) ($subjectContext['subject'] ?? '')) === '' && trim((string) ($context['subject'] ?? '')) !== '') $subjectContext['subject'] = (string) $context['subject'];
         $resolvedId = trim((string) ($primary['id'] ?? ''));
+        $resolvedRevision = max(0, (int) ($primary['revision'] ?? 0));
         $subjectIds = array_values(array_filter(array_map('strval', (array) ($context['subject_ids'] ?? [])), static fn (string $id): bool => trim($id) !== ''));
         if ($subjectIds === [] && ($resolution['status'] ?? '') === 'resolved' && $resolvedId !== '') $subjectIds = [$resolvedId];
         if ($subjectIds !== []) {
             $context['subject_ids'] = $subjectIds;
             $subjectContext['subject_ids'] = $subjectIds;
         }
+        if (($context['subject_revision'] ?? 0) === 0 && $resolvedRevision > 0) $context['subject_revision'] = $resolvedRevision;
+        if ($resolvedRevision > 0) $subjectContext['subject_revision'] = $resolvedRevision;
         if ($subjectContext !== []) $context['subject_context'] = $subjectContext;
         return $context;
     }
@@ -288,7 +310,7 @@ final class ArticleMediaCoordinator
             $candidate = $explicit !== null ? $this->media->findByCanonicalId($explicit['media_id']) : $existing;
             $captureOwned = $candidate instanceof Media && $explicit !== null;
             $selectionSource = $explicit['selection_source'] ?? ($existing instanceof Media && ($this->existingSlotUsage($endpointKey, $slot)?->selectionSource ?? '') === 'USER_EXPLICIT' ? 'USER_EXPLICIT' : 'SYSTEM_AUTO');
-            $assessment = $candidate instanceof Media ? ($this->suitabilityPolicy ??= new SemanticSuitabilityPolicy())->evaluateMedia($candidate, $this->assets->listByMediaId($candidate->canonicalId), ['subject_ids' => $subjectIds, 'current_capture_media' => $captureOwned, 'article_explicit_media' => $explicit !== null], $selectionSource, $slot) : ['valid_for_completeness' => false, 'suitability' => SemanticSuitabilityPolicy::UNKNOWN, 'availability' => SemanticSuitabilityPolicy::MISSING, 'diagnostic' => 'MEDIA_USAGE_INCOMPLETE'];
+            $assessment = $candidate instanceof Media ? ($this->suitabilityPolicy ??= new SemanticSuitabilityPolicy())->evaluateMedia($candidate, $this->assets->listByMediaId($candidate->canonicalId), ['subject_ids' => $subjectIds, 'subject_revision' => (string) ($context['subject_revision'] ?? ''), 'current_capture_media' => $captureOwned, 'article_explicit_media' => $explicit !== null || $selectionSource === 'USER_EXPLICIT'], $selectionSource, $slot) : ['valid_for_completeness' => false, 'suitability' => SemanticSuitabilityPolicy::UNKNOWN, 'availability' => SemanticSuitabilityPolicy::MISSING, 'diagnostic' => 'MEDIA_USAGE_INCOMPLETE'];
             $valid = ($assessment['valid_for_completeness'] ?? false) === true && $candidate instanceof Media && !$candidate->isSystemPlaceholder();
             $placeholder = !$valid;
             $id = $valid ? $candidate->canonicalId : '';
@@ -330,7 +352,7 @@ final class ArticleMediaCoordinator
         if ($media === null || !$media->active || $media->readiness !== 'ready' || $media->isSystemPlaceholder()) return null;
         if ($requireSubjectScope && !$this->matchesSubjectScope($media, $blueprint, true)) return null;
         if ($requireSubjectScope) {
-            $assessment = ($this->suitabilityPolicy ??= new SemanticSuitabilityPolicy())->evaluateMedia($media, $this->assets->listByMediaId($media->canonicalId), ['subject_ids' => $this->subjectIdsFromBlueprint($blueprint)]);
+            $assessment = ($this->suitabilityPolicy ??= new SemanticSuitabilityPolicy())->evaluateMedia($media, $this->assets->listByMediaId($media->canonicalId), ['subject_ids' => $this->subjectIdsFromBlueprint($blueprint), 'subject_revision' => (string) ($blueprint->subjectContext['subject_revision'] ?? '')]);
             if (($assessment['valid_for_completeness'] ?? false) !== true) return null;
         }
         return $this->assets->listByMediaId($media->canonicalId) === [] ? null : $media;
