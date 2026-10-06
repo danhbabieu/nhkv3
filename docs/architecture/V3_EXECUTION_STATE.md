@@ -1,5 +1,75 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-06 — System-wide duplicate audit readers
+
+IMPLEMENTATION: Added bounded read-only WPDB page readers for Authority,
+Knowledge, Source, Evidence, Graph, Article/Post, Media, MediaAsset,
+MediaUsage and Video, and wired them into the existing
+`SystemWideDuplicateAuditCoordinator`. Dictionary remains on its existing
+duplicate audit. Projections are owner-specific and limited to existing audit
+signals; no new semantic type, relation, identity rule or duplicate meaning
+was introduced.
+
+CURSOR_AND_BOUNDS: Readers use deterministic numeric database identity cursors
+(`id` or WordPress Post ID), clamp every page to 200 rows and include lifecycle
+state where the owner persists it. The coordinator carries at most 128 boundary
+rows and signs a versioned cursor with the existing WordPress server salt,
+binding owner, `include_retired`, scan policy/version, after-position and scanned
+count. Malformed, cross-owner, filter-mismatched or tampered cursors fail closed
+with `AUDIT_CURSOR_INVALID`. It stops after 5,000 scanned rows with `PARTIAL`
+and reports `COMPLETE` only when the reader exhausts its corpus. Article rows
+without proven semantic subject/intent/scope/lineage persistence return
+`BLOCKED/AUDIT_MODEL_GAP`; title equality is not an Article duplicate signal.
+
+SURFACE: Added the capability-gated read-only MCP tool
+`nhk.system-wide.duplicate-audit` with optional owner/cursor, bounded limit,
+owner status/counts/clusters/next cursor/completeness, and no apply or repair
+argument. No mutation service, Governance apply, ID allocation or unbounded
+list fallback is reachable from the audit dependency graph.
+
+REGRESSION_COVERAGE: Boundary tests cover active/retired duplicate pairs,
+legitimate distinct records, singleton boundaries, stable cursor/page limits,
+bounded safety `PARTIAL`, missing-reader `BLOCKED`, Article model-gap and
+title-only guards, cursor binding/tamper rejection, and read-only projection.
+
+VERIFICATION: Required focused duplicate-audit, prevention, WPDB reader and MCP
+contract suites pass: 73 tests / 919 assertions, with 52 existing PHPUnit
+deprecations. `composer lint` and `git diff --check` pass. Scoped secret review
+found no credentials or private keys. `LIVE_AUDIT_STATUS=NOT_RUN`,
+`LIVE_DUPLICATE_COUNTS=NOT_RUN`, and `CON_HOA_THI_LIVE_RESULT=NOT_RUN` because
+no authorized TEST read-only runtime was available in this task.
+
+DATA_SAFETY: No migration, deployment, staging/production write, merge,
+retire, delete, rekey or frontend change was performed.
+
+# Checkpoint — 2026-10-06 — Systemic UTF-8 producer fix
+
+ROOT_CAUSE: `TextInputInterpreter::userCandidate()` used PHP's byte-oriented
+`trim()` with the multibyte bullet `•` in its character list. When a candidate
+began with a curly quote, bytes shared with that bullet were removed and the
+candidate became invalid UTF-8 before persistence. Equivalent producer paths
+also used unsafe byte truncation fallbacks.
+
+IMPLEMENTATION: Added strict `Utf8String` char-counted helpers and kept
+`Utf8Contract` unchanged as the fail-closed validator. The interpretation
+boundary now validates input, segmentation fails loudly, and candidate trim is
+Unicode-safe. Equivalent semantic, editorial, SEO, video, MCP diagnostic and
+admin error-message producers now use the shared helper. No candidate-specific
+or phrase-specific repair was added.
+
+REGRESSION COVERAGE: Tests cover ASCII, Vietnamese diacritics, Đánh mượn,
+ÔĐô, búa, điểm giờ, Westminster, Sonodo, combining marks, curly quotes,
+en/em dashes, newlines, Markdown headings, the exact bullet-plus-curly-quote
+failure, Unicode truncation and malformed input rejection.
+
+DATA_SAFETY: No migration, semantic data mutation, staging/production
+mutation, deployment or push was performed.
+
+VERIFICATION: Focused semantic/capture/article/SEO coverage passed 107 tests /
+337 assertions, including a `php -n` no-mbstring fallback check. Full PHPUnit
+remains environment-limited with unrelated baseline Knowledge failures and
+WordPress/runtime prerequisite errors.
+
 # Checkpoint — 2026-10-06 — Article Media subject reverse reconciliation
 
 ROOT_CAUSE: Historical Article MediaUsage audit correctly consumed persisted

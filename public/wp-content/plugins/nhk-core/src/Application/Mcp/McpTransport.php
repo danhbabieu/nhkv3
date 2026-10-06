@@ -65,6 +65,7 @@ final class McpTransport
         private ?ArticleMediaLegacyAuditHandler $articleMediaLegacyAudit = null,
         private ?DictionaryDuplicateAuditHandler $dictionaryDuplicateAudit = null,
         private ?\NHK\Core\Application\Dictionary\DictionaryPreCreateResolver $dictionaryPreCreateResolver = null,
+        private ?SystemWideDuplicateAuditHandler $systemWideDuplicateAudit = null,
     ) {}
 
     /** @return array{status:int,body:?array} */
@@ -175,6 +176,7 @@ final class McpTransport
             'nhk.article.media-legacy-audit', 'nhk.article.media-legacy-repair-plan', 'nhk.article.media-subject-reconciliation-audit', 'nhk.article.media-subject-reconciliation-plan' => 'nhk_view_governance',
             'nhk.dictionary.seed-audit' => 'nhk_view_governance',
             'nhk.dictionary.duplicate-audit' => 'nhk_view_governance',
+            'nhk.system-wide.duplicate-audit' => 'nhk_view_governance',
             'nhk.dictionary.enrichment.audit', 'nhk.dictionary.enrichment.plan' => 'nhk_view_governance',
             'nhk.dictionary.enrichment.apply' => 'nhk_curate_dictionary',
             'nhk.dictionary.semantic-relation.read', 'nhk.dictionary.semantic-relation.preview', 'nhk.dictionary.lexical-relation.read', 'nhk.dictionary.lexical-relation.preview' => 'nhk_view_governance',
@@ -219,6 +221,7 @@ final class McpTransport
             'nhk.article.media-subject-reconciliation-plan' => $this->articleMediaLegacyAudit?->subjectPlan($arguments) ?? throw new \RuntimeException('ARTICLE_MEDIA_SUBJECT_RECONCILIATION_UNAVAILABLE'),
             'nhk.dictionary.seed-audit' => $this->dictionarySeedAudit?->audit($arguments) ?? throw new \RuntimeException('DICTIONARY_SEED_AUDIT_UNAVAILABLE'),
             'nhk.dictionary.duplicate-audit' => $this->dictionaryDuplicateAudit?->audit($arguments) ?? throw new \RuntimeException('DICTIONARY_DUPLICATE_AUDIT_UNAVAILABLE'),
+            'nhk.system-wide.duplicate-audit' => $this->systemWideDuplicateAudit?->audit($arguments) ?? throw new \RuntimeException('SYSTEM_WIDE_DUPLICATE_AUDIT_UNAVAILABLE'),
             'nhk.documentation.bootstrap', 'nhk.docs.bootstrap' => ($this->documentation ?? new McpDocumentationRegistry())->bootstrap(),
             'nhk.documentation.get' => ($this->documentation ?? new McpDocumentationRegistry())->get((string) ($arguments['path'] ?? ''), isset($arguments['start_line']) ? (int) $arguments['start_line'] : null, isset($arguments['line_count']) ? (int) $arguments['line_count'] : null),
             'nhk.documentation.list' => ($this->documentation ?? new McpDocumentationRegistry())->list(isset($arguments['status']) ? (string) $arguments['status'] : null, isset($arguments['domain']) ? (string) $arguments['domain'] : null, isset($arguments['path_prefix']) ? (string) $arguments['path_prefix'] : null),

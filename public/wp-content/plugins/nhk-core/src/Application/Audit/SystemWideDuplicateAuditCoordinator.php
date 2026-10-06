@@ -14,30 +14,44 @@ use NHK\Core\Contracts\Audit\DuplicateAuditPageReader;
  */
 final class SystemWideDuplicateAuditCoordinator
 {
+    private const MAX_SCAN_ROWS = 5000;
+    private const MAX_CARRY_ROWS = 128;
+    private const CURSOR_VERSION = 2;
+    private const CURSOR_POLICY = 'system-wide-duplicate-audit:v2';
     /** @var list<string> */
     public const OWNERS = ['Dictionary', 'Authority', 'Knowledge', 'Source', 'Evidence', 'Graph', 'Article', 'Media', 'MediaAsset', 'MediaUsage', 'Video'];
 
     /** @param array<string,mixed> $readers @param DictionaryDuplicateAuditAdapter|null $dictionaryAudit */
-    public function __construct(private array $readers = [], private ?DictionaryDuplicateAuditAdapter $dictionaryAudit = null) {}
+    public function __construct(
+        private array $readers = [],
+        private ?DictionaryDuplicateAuditAdapter $dictionaryAudit = null,
+        private ?string $cursorSigningSecret = null,
+    ) {}
 
     /** @return array<string,mixed> */
-    public function audit(int $limit = 100, array $cursors = [], bool $includeRetired = true): array
+    public function audit(int $limit = 100, array $cursors = [], bool $includeRetired = true, ?string $owner = null): array
     {
         $limit = max(1, min(200, $limit));
+        $ownerList = self::OWNERS;
+        if ($owner !== null) {
+            if (!in_array($owner, self::OWNERS, true)) return ['status' => 'BLOCKED', 'read_only' => true, 'mutated' => false, 'owners' => [], 'clusters' => [], 'reconciliation_candidates' => [], 'counts' => [], 'diagnostics' => ['code' => 'AUDIT_OWNER_UNSUPPORTED', 'owner_count' => 0]];
+            $ownerList = [$owner];
+        }
         $owners = [];
-        foreach (self::OWNERS as $owner) {
-            $cursor = isset($cursors[$owner]) ? (string) $cursors[$owner] : null;
-            $owners[$owner] = $owner === 'Dictionary' && $this->dictionaryAudit !== null
+        foreach ($ownerList as $ownerName) {
+            $cursor = isset($cursors[$ownerName]) ? (string) $cursors[$ownerName] : null;
+            $owners[$ownerName] = $ownerName === 'Dictionary' && $this->dictionaryAudit !== null
                 ? $this->dictionary($limit, $cursor)
-                : $this->auditOwner($owner, $limit, $cursor, $includeRetired);
-            $owners[$owner]['cursor_page_provenance'] = [
+                : $this->auditOwner($ownerName, $limit, $cursor, $includeRetired);
+            $owners[$ownerName]['cursor_page_provenance'] = [
                 'cursor' => $cursor,
-                'next_cursor' => $owners[$owner]['next_cursor'] ?? null,
+                'next_cursor' => $owners[$ownerName]['next_cursor'] ?? null,
                 'limit' => $limit,
                 'include_retired' => $includeRetired,
+                'scan_policy' => self::CURSOR_POLICY,
                 'bounded' => true,
                 'read_only' => true,
-            ] + (array) ($owners[$owner]['cursor_page_provenance'] ?? []);
+            ] + (array) ($owners[$ownerName]['cursor_page_provenance'] ?? []);
         }
 
         $clusters = [];
@@ -52,7 +66,7 @@ final class SystemWideDuplicateAuditCoordinator
             'clusters' => $clusters,
             'reconciliation_candidates' => $this->reconciliationCandidates($clusters),
             'counts' => $this->counts($owners, $clusters),
-            'diagnostics' => ['owner_count' => count(self::OWNERS), 'cross_owner_matching' => false, 'automatic_apply' => false],
+            'diagnostics' => ['owner_count' => count($ownerList), 'cross_owner_matching' => false, 'automatic_apply' => false],
         ];
     }
 
@@ -70,30 +84,48 @@ final class SystemWideDuplicateAuditCoordinator
             return $this->blocked('AUDIT_MODEL_GAP');
         }
         try {
-            $page = $this->page($reader, $cursor, $limit, $includeRetired);
+            $state = $this->decodeCursor($cursor, $owner, $includeRetired);
+            if ($state['scanned'] >= self::MAX_SCAN_ROWS) return $this->partialBound($state['carry'], $cursor);
+            if (method_exists($reader, 'setIncludeRetired')) $reader->setIncludeRetired($includeRetired);
+            $pageLimit = min($limit, self::MAX_SCAN_ROWS - $state['scanned']);
+            $page = $this->page($reader, $pageLimit, $state['after'], $includeRetired);
             $items = array_values(array_filter((array) ($page['items'] ?? []), static fn (mixed $item): bool => is_array($item) || is_object($item)));
+            $combined = $this->dedupeRows(array_merge($state['carry'], array_map(fn (mixed $item): array => $this->row($item), $items)));
+            $scanned = $state['scanned'] + count($items);
+            if ($owner === 'Article') {
+                $missing = $this->articleModelGap($combined);
+                if ($missing !== []) return $this->blocked('AUDIT_MODEL_GAP', ['missing_identity_fields' => $missing]);
+            }
             $clusters = match ($owner) {
-                'Authority' => $this->authority($items),
-                'Knowledge' => $this->knowledge($items),
-                'Source' => $this->source($items),
-                'Evidence' => $this->evidence($items),
-                'Graph' => $this->graph($items),
-                'Article' => $this->article($items),
-                'Media' => $this->media($items),
-                'MediaAsset' => $this->mediaAsset($items),
-                'MediaUsage' => $this->mediaUsage($items),
-                'Video' => $this->video($items),
+                'Authority' => $this->authority($combined),
+                'Knowledge' => $this->knowledge($combined),
+                'Source' => $this->source($combined),
+                'Evidence' => $this->evidence($combined),
+                'Graph' => $this->graph($combined),
+                'Article' => $this->article($combined),
+                'Media' => $this->media($combined),
+                'MediaAsset' => $this->mediaAsset($combined),
+                'MediaUsage' => $this->mediaUsage($combined),
+                'Video' => $this->video($combined),
                 default => [],
             };
             $next = isset($page['next_cursor']) && $page['next_cursor'] !== null ? (string) $page['next_cursor'] : null;
-            return ['status' => $next === null ? 'COMPLETE' : 'PARTIAL', 'clusters' => $this->withPage($clusters, $cursor, $next, $items), 'next_cursor' => $next, 'rows_read' => count($items), 'diagnostics' => (array) ($page['diagnostics'] ?? [])];
+            $boundReached = $next !== null && $scanned >= self::MAX_SCAN_ROWS;
+            $nextCursor = $boundReached ? null : ($next === null ? null : $this->encodeCursor($next, array_slice($combined, -self::MAX_CARRY_ROWS), $scanned, $owner, $includeRetired));
+            $diagnostics = (array) ($page['diagnostics'] ?? []);
+            if ($boundReached) $diagnostics[] = ['code' => 'AUDIT_MAX_SCAN_BOUND_REACHED', 'max_scan_rows' => self::MAX_SCAN_ROWS];
+            $complete = $next === null;
+            return ['status' => $complete ? 'COMPLETE' : 'PARTIAL', 'complete' => $complete, 'clusters' => $this->withPage($clusters, $cursor, $nextCursor, $items), 'next_cursor' => $nextCursor, 'rows_read' => count($items), 'diagnostics' => $diagnostics];
+        } catch (\InvalidArgumentException $error) {
+            if (str_starts_with($error->getMessage(), 'AUDIT_CURSOR_')) return $this->blocked('AUDIT_CURSOR_INVALID', ['reason' => 'AUDIT_CURSOR_INVALID']);
+            return $this->blocked('AUDIT_READER_UNAVAILABLE');
         } catch (\Throwable $error) {
             return $this->blocked('AUDIT_READER_UNAVAILABLE', ['message' => $error->getMessage()]);
         }
     }
 
     /** @return array<string,mixed> */
-    private function page(mixed $reader, ?string $cursor, int $limit, bool $includeRetired): array
+    private function page(mixed $reader, int $limit, ?string $cursor, bool $includeRetired): array
     {
         if ($reader instanceof DuplicateAuditPageReader) return $reader->page($cursor, $limit);
         if (is_callable($reader)) {
@@ -103,6 +135,69 @@ final class SystemWideDuplicateAuditCoordinator
         }
         if (method_exists($reader, 'page')) return $reader->page($cursor, $limit, $includeRetired);
         return $reader->readPage($limit, $cursor, $includeRetired);
+    }
+
+    /** @return array{after:?string,carry:list<array<string,mixed>>,scanned:int} */
+    private function decodeCursor(?string $cursor, string $owner, bool $includeRetired): array
+    {
+        $raw = trim((string) ($cursor ?? ''));
+        if ($raw === '') return ['after' => null, 'carry' => [], 'scanned' => 0];
+        $encoded = strtr($raw, '-_', '+/');
+        $encoded .= str_repeat('=', (4 - strlen($encoded) % 4) % 4);
+        $bytes = base64_decode($encoded, true);
+        if (!is_string($bytes)) throw new \InvalidArgumentException('AUDIT_CURSOR_INVALID');
+        try { $decoded = json_decode($bytes, true, 512, JSON_THROW_ON_ERROR); } catch (\Throwable) { throw new \InvalidArgumentException('AUDIT_CURSOR_INVALID'); }
+        if (!is_array($decoded) || !is_array($decoded['payload'] ?? null) || !is_string($decoded['signature'] ?? null)) throw new \InvalidArgumentException('AUDIT_CURSOR_INVALID');
+        $payload = $decoded['payload'];
+        $canonical = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+        $signature = hash_hmac('sha256', $canonical, $this->cursorSecret());
+        if (!hash_equals($signature, $decoded['signature'])) throw new \InvalidArgumentException('AUDIT_CURSOR_INVALID');
+        if (($payload['v'] ?? null) !== self::CURSOR_VERSION || ($payload['policy'] ?? null) !== self::CURSOR_POLICY || ($payload['owner'] ?? null) !== $owner || !is_bool($payload['include_retired'] ?? null) || $payload['include_retired'] !== $includeRetired) throw new \InvalidArgumentException('AUDIT_CURSOR_INVALID');
+        $after = $payload['after'] ?? null;
+        if ($after !== null && (!is_string($after) || $after === '' || strlen($after) > 512)) throw new \InvalidArgumentException('AUDIT_CURSOR_INVALID');
+        $scanned = $payload['scanned'] ?? null;
+        if (!is_int($scanned) || $scanned < 0 || $scanned > self::MAX_SCAN_ROWS) throw new \InvalidArgumentException('AUDIT_CURSOR_INVALID');
+        $carry = $payload['carry'] ?? null;
+        if (!is_array($carry) || count($carry) > self::MAX_CARRY_ROWS || array_filter($carry, static fn (mixed $row): bool => !is_array($row)) !== []) throw new \InvalidArgumentException('AUDIT_CURSOR_INVALID');
+        return ['after' => $after, 'carry' => array_values($carry), 'scanned' => $scanned];
+    }
+
+    /** @param list<array<string,mixed>> $carry */
+    private function encodeCursor(string $after, array $carry, int $scanned, string $owner, bool $includeRetired): string
+    {
+        $payload = ['v' => self::CURSOR_VERSION, 'policy' => self::CURSOR_POLICY, 'owner' => $owner, 'include_retired' => $includeRetired, 'after' => $after, 'carry' => array_slice($carry, -self::MAX_CARRY_ROWS), 'scanned' => $scanned];
+        $canonical = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+        $envelope = ['payload' => $payload, 'signature' => hash_hmac('sha256', $canonical, $this->cursorSecret())];
+        return rtrim(strtr(base64_encode((string) json_encode($envelope, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)), '+/', '-_'), '=');
+    }
+
+    private function cursorSecret(): string
+    {
+        $secret = trim((string) ($this->cursorSigningSecret ?? ''));
+        if ($secret !== '') return $secret;
+        if (function_exists('wp_salt')) {
+            $secret = trim((string) wp_salt('auth'));
+            if ($secret !== '') return $secret;
+        }
+        throw new \InvalidArgumentException('AUDIT_CURSOR_SIGNING_UNAVAILABLE');
+    }
+
+    /** @param list<array<string,mixed>> $rows */
+    private function dedupeRows(array $rows): array
+    {
+        $out = [];
+        foreach ($rows as $row) {
+            $id = $this->id($row);
+            $key = $id !== '' ? $id : hash('sha256', (string) json_encode($row));
+            $out[$key] = $row;
+        }
+        return array_values($out);
+    }
+
+    /** @param list<array<string,mixed>> $carry @return array<string,mixed> */
+    private function partialBound(array $carry, ?string $cursor): array
+    {
+        return ['status' => 'PARTIAL', 'complete' => false, 'clusters' => [], 'next_cursor' => null, 'rows_read' => 0, 'diagnostics' => ['code' => 'AUDIT_MAX_SCAN_BOUND_REACHED', 'max_scan_rows' => self::MAX_SCAN_ROWS, 'cursor' => $cursor]];
     }
 
     /** @param list<mixed> $items @return list<array<string,mixed>> */
@@ -182,13 +277,28 @@ final class SystemWideDuplicateAuditCoordinator
     /** @param list<mixed> $items @return list<array<string,mixed>> */
     private function article(array $items): array
     {
-        $groups = $this->group($items, function (array $row): string { $subjects = (array) ($row['subject_ids'] ?? [$row['subject_id'] ?? '']); sort($subjects, SORT_STRING); return implode('|', [implode(',', array_filter(array_map('strval', $subjects))), $this->normalized($this->text($row, ['intent', 'title_intent', 'topic']))]); });
+        $groups = $this->group($items, function (array $row): string { $subjects = (array) ($row['subject_ids'] ?? [$row['subject_id'] ?? '']); sort($subjects, SORT_STRING); return implode('|', [implode(',', array_filter(array_map('strval', $subjects))), $this->normalized($this->text($row, ['intent', 'title_intent'])), $this->normalized($this->text($row, ['scope']))]); });
         $clusters = [];
         foreach ($groups as $key => $rows) if ($key !== '' && count($this->ids($rows)) > 1) {
             $continuation = count(array_unique(array_map(fn (array $row): string => strtoupper($this->text($row, ['content_kind', 'article_kind'])), $rows))) > 1 && count(array_filter($rows, fn (array $row): bool => strtoupper($this->text($row, ['content_kind', 'article_kind'])) === 'CONTINUATION')) > 0;
             $clusters[] = $this->cluster('Article', $key, $rows, $continuation ? 'LEGITIMATE_DISTINCT' : 'HIGH_CONFIDENCE_EQUIVALENT', $continuation ? 'HIGH' : 'MEDIUM', ['same_subject_and_intent'], $continuation ? ['continuation_article'] : [], ['title or subject alone is insufficient; overlap reader supplied same subject and intent'], $continuation ? 'KEEP_DISTINCT_CONTINUATION;REVIEW_SCOPE' : 'REVIEW_ARTICLE_RESEARCH_OVERLAP;DO_NOT_HIDE_OR_DELETE');
         }
         return $clusters;
+    }
+
+    /** @param list<array<string,mixed>> $rows @return list<string> */
+    private function articleModelGap(array $rows): array
+    {
+        $missing = [];
+        foreach ($rows as $row) {
+            if (($row['semantic_identity_available'] ?? false) !== true) $missing[] = 'semantic_identity';
+            $subjects = $row['subject_ids'] ?? null;
+            if (!is_array($subjects) || array_values(array_filter($subjects, static fn (mixed $value): bool => is_scalar($value) && trim((string) $value) !== '')) === []) $missing[] = 'canonical_subject';
+            if ($this->text($row, ['intent', 'title_intent']) === '') $missing[] = 'editorial_intent';
+            if ($this->text($row, ['scope']) === '') $missing[] = 'scope';
+            if (!array_key_exists('continuation_lineage', $row) && !array_key_exists('lineage', $row)) $missing[] = 'lineage';
+        }
+        return array_values(array_unique($missing));
     }
 
     /** @param list<mixed> $items @return list<array<string,mixed>> */
@@ -286,7 +396,7 @@ final class SystemWideDuplicateAuditCoordinator
     }
 
     /** @return array<string,mixed> */
-    private function blocked(string $code, array $diagnostics = []): array { return ['status' => 'BLOCKED', 'clusters' => [], 'next_cursor' => null, 'rows_read' => 0, 'diagnostics' => array_merge(['code' => $code, 'read_only' => true], $diagnostics)]; }
+    private function blocked(string $code, array $diagnostics = []): array { return ['status' => 'BLOCKED', 'complete' => false, 'clusters' => [], 'next_cursor' => null, 'rows_read' => 0, 'diagnostics' => array_merge(['code' => $code, 'reason' => $code, 'read_only' => true], $diagnostics)]; }
     /** @param list<array<string,mixed>> $rows */
     private function ids(array $rows): array { return array_values(array_unique(array_filter(array_map(fn (array $row): string => $this->id($row), $rows), static fn (string $id): bool => $id !== ''))); }
     /** @param array<string,mixed> $row */

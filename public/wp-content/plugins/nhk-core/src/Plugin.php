@@ -28,6 +28,7 @@ use NHK\Core\Application\Governance\GovernanceCapabilities;
 use NHK\Core\Application\Governance\{AuthorityStagingAdmission, CaptureChildRelationStagingAdmission, CaptureDependencyStagingAdmission, MediaBindingStagingAdmission, MediaMetadataStagingAdmission, VideoStagingAdmission};
 use NHK\Core\Application\Runtime\SemanticWritePolicyResolver;
 use NHK\Core\Application\Mcp\{ArticleMediaLegacyAuditHandler, McpAbilityRegistration, McpArticleIngestHandler, McpDictionaryHandler, McpGovernanceHandler, McpReadHandler, McpSemanticContextResolver, McpToolCatalog, McpTransport, McpDocumentationRegistry};
+use NHK\Core\Application\Mcp\SystemWideDuplicateAuditHandler;
 use NHK\Core\Application\Media\{ImageIngestEntrypoint, MediaBatchUploadService, MediaBindingService, MediaEnrichmentIntentCompiler, MediaTargetNormalizer};
 use NHK\Core\Application\Capture\{CaptureArticlePreflightHandoff, CaptureEditorialWriteGuard, CapturePhaseReceiptReducer, CaptureSubjectBindingRecovery, CaptureVideoProvenancePlanner, CaptureVideoPublicationVerifier, ClockTypeShadowClassifier, ContentPreparationOrchestrator, EditorialCaptureContinuationService, EditorialCaptureCoordinator, GovernedCaptureContinuationService, RelationProposalReconciliationService};
 use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, ClaimReusePolicy, EditorialClaimRetrievalService, EditorialKnowledgeSelector, EditorialQualityGate, KnowledgeWriterPreviewService, ReaderJourneyPlanner, SharedEditorialComposer, SharedEnrichmentBoundary, SubjectResolutionService, TextInputInterpreter};
@@ -65,6 +66,8 @@ use NHK\Core\Domain\Authority\{CanonicalEntityTypeCatalog, EntityTypeRegistry};
 use NHK\Core\Domain\Capture\CaptureRecord;
 use NHK\Core\Infrastructure\Authority\WpdbAuthorityRepository;
 use NHK\Core\Infrastructure\Audit\WpdbClockTypeClassificationAuditFactory;
+use NHK\Core\Infrastructure\Audit\WpdbDuplicateAuditPageReader;
+use NHK\Core\Application\Audit\{DictionaryDuplicateAuditAdapter, SystemWideDuplicateAuditCoordinator};
 use NHK\Core\Application\Graph\{BrandAggregationQuery, GraphService, PredicateTraversalPolicy, RelatedSemanticQuery, SemanticNeighborhoodQuery, StructuralContextQuery, RelationshipReadService};
 use NHK\Core\Application\Graph\{LegacyRelationPlanner, RelationBackfillCandidate, RelationBackfillService};
 use NHK\Core\Application\Inventory\{CanonicalInventoryService, GraphInventoryService};
@@ -403,6 +406,7 @@ final class Plugin {
             $dictionaryRuntime = DictionaryBootstrap::runtime();
             $dictionarySeedAuditHandler = null;
             $dictionaryDuplicateAuditHandler = null;
+            $systemWideDuplicateAuditHandler = null;
             if ($dictionaryRuntime !== null) {
                 $dictionaryCorpus = new \NHK\Core\Application\Dictionary\DictionarySeedCorpusAuditCoordinator(
                     ['KNOWLEDGE' => new \NHK\Core\Application\Dictionary\KnowledgeDictionaryCorpusReader($claims), 'ARTICLE' => new \NHK\Core\Infrastructure\Article\WpArticleDictionaryCorpusReader($wpdb)],
@@ -413,6 +417,19 @@ final class Plugin {
                 $dictionarySeedAuditHandler = new \NHK\Core\Application\Mcp\DictionarySeedAuditHandler($dictionaryRuntime->seedPlanner(), corpus: $dictionaryCorpus);
                 $dictionaryDuplicateAuditHandler = new \NHK\Core\Application\Mcp\DictionaryDuplicateAuditHandler($dictionaryRuntime);
             }
+            $systemWideReaders = [];
+            foreach (SystemWideDuplicateAuditCoordinator::OWNERS as $auditOwner) {
+                if ($auditOwner === 'Dictionary') continue;
+                $systemWideReaders[$auditOwner] = new WpdbDuplicateAuditPageReader($wpdb, $auditOwner);
+            }
+            $systemWideDictionary = $dictionaryRuntime?->duplicateAudit();
+            $systemWideCoordinator = new SystemWideDuplicateAuditCoordinator(
+                $systemWideReaders,
+                $systemWideDictionary instanceof \NHK\Core\Application\Dictionary\DictionaryDuplicateCandidateAudit
+                    ? new DictionaryDuplicateAuditAdapter($systemWideDictionary)
+                    : null,
+            );
+            $systemWideDuplicateAuditHandler = new SystemWideDuplicateAuditHandler($systemWideCoordinator);
             $collectorBranchReader = static function (string $classificationId) use ($authority, $claims, $graphService): array {
                 $classification = $authority->findByCanonicalId($classificationId);
                 if (!$classification instanceof \NHK\Core\Domain\Authority\AuthorityEntity || $classification->entityType !== 'classification' || !$classification->active()) return ['status' => 'unavailable', 'reason' => 'CLASSIFICATION_NOT_AVAILABLE'];
@@ -2135,7 +2152,7 @@ final class Plugin {
                 );
                 $dictionaryRuntime->configureRelationGovernance($semanticRelationGovernance, $lexicalRelationGovernance, new \NHK\Core\Application\Dictionary\DictionaryRelationFacetRegistry());
             }
-            (new McpApi(new McpTransport($mcpRead, $mcpGovernance, static fn (string $capability): bool => current_user_can($capability), static fn (string $value): bool => in_array($value, $allowedOrigins, true), $articleHandler, $videoIntake, $wordpressAttachments, $categoryGateway, $draftGateway, new CanonicalDependencyValidator($claims, $sources, $evidence), $publicUrlMaintenance, $mediaBatchUpload, $documentation, $capture, $captureContinuation, $authorityCapture, static function (): bool { return (new MigrationStatus())->runtimeSchemaReady(); }, $imageIngest, semanticWritePolicy: $semanticWritePolicy, mediaBinding: $mediaBindingService, videoSourceRefresh: $videoSourceRefresh, knowledgeRepairPreview: $knowledgeRepairPreview, videoFrontendReconciliation: $videoFrontendReconciliation, knowledgeWriterPreview: $knowledgeWriterPreview, knowledgeQualityAudit: $knowledgeQualityAuditHandler, dictionarySeedAudit: $dictionarySeedAuditHandler, dictionaryDuplicateAudit: $dictionaryDuplicateAuditHandler, dictionaryPreCreateResolver: $dictionaryRuntime?->preCreateResolver(), articleMediaLegacyAudit: $articleMediaLegacyAuditHandler, mediaTargetNormalizer: new \NHK\Core\Application\Media\MediaTargetNormalizer($endpoints, $types, $authority), mediaIntentCompiler: new MediaEnrichmentIntentCompiler($mediaBindingService, $usages, new MediaTargetNormalizer($endpoints, $types, $authority), new WordPressMediaTargetUrlResolver($publicRoutes, historicRoutes: new HistoricPublicRouteService($publicIdentityRepository))), dictionary: $dictionaryRuntime !== null ? new McpDictionaryHandler($dictionaryRuntime, $semanticRelationGovernance, $lexicalRelationGovernance) : null), $recoveryBinding))->register();
+            (new McpApi(new McpTransport($mcpRead, $mcpGovernance, static fn (string $capability): bool => current_user_can($capability), static fn (string $value): bool => in_array($value, $allowedOrigins, true), $articleHandler, $videoIntake, $wordpressAttachments, $categoryGateway, $draftGateway, new CanonicalDependencyValidator($claims, $sources, $evidence), $publicUrlMaintenance, $mediaBatchUpload, $documentation, $capture, $captureContinuation, $authorityCapture, static function (): bool { return (new MigrationStatus())->runtimeSchemaReady(); }, $imageIngest, semanticWritePolicy: $semanticWritePolicy, mediaBinding: $mediaBindingService, videoSourceRefresh: $videoSourceRefresh, knowledgeRepairPreview: $knowledgeRepairPreview, videoFrontendReconciliation: $videoFrontendReconciliation, knowledgeWriterPreview: $knowledgeWriterPreview, knowledgeQualityAudit: $knowledgeQualityAuditHandler, dictionarySeedAudit: $dictionarySeedAuditHandler, dictionaryDuplicateAudit: $dictionaryDuplicateAuditHandler, dictionaryPreCreateResolver: $dictionaryRuntime?->preCreateResolver(), articleMediaLegacyAudit: $articleMediaLegacyAuditHandler, systemWideDuplicateAudit: $systemWideDuplicateAuditHandler, mediaTargetNormalizer: new \NHK\Core\Application\Media\MediaTargetNormalizer($endpoints, $types, $authority), mediaIntentCompiler: new MediaEnrichmentIntentCompiler($mediaBindingService, $usages, new MediaTargetNormalizer($endpoints, $types, $authority), new WordPressMediaTargetUrlResolver($publicRoutes, historicRoutes: new HistoricPublicRouteService($publicIdentityRepository))), dictionary: $dictionaryRuntime !== null ? new McpDictionaryHandler($dictionaryRuntime, $semanticRelationGovernance, $lexicalRelationGovernance) : null), $recoveryBinding))->register();
             do_action('nhk_mcp_register_tools', McpToolCatalog::tools(), $mcpRead, $mcpGovernance);
         });
         add_action('admin_menu', [AdminPage::class, 'register']);

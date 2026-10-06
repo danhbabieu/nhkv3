@@ -133,6 +133,12 @@ final class McpToolCatalog
                 'limit' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 10000],
                 'cursor' => ['type' => 'string', 'maxLength' => 512],
             ], []),
+            self::tool('nhk.system-wide.duplicate-audit', 'Read-only bounded duplicate audit across canonical owners. It never merges, retires, deletes, rekeys or applies reconciliation candidates.', [
+                'owner' => ['type' => 'string', 'enum' => \NHK\Core\Application\Audit\SystemWideDuplicateAuditCoordinator::OWNERS],
+                'cursor' => ['type' => 'string', 'maxLength' => 4096],
+                'limit' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 200],
+                'include_retired' => ['type' => 'boolean'],
+            ], []),
             self::tool('nhk.article.ingest', 'Resume governed reconciliation or a bounded update of an existing Article using the same idempotency key.', self::articleProperties(true), ['idempotency_key', 'intent'], true),
             self::tool('nhk.capture.ingest', 'Capture new editorial input or continue one existing Capture; classify intent before creating an Article, preserve canonical owners, reconcile typed MediaUsage bindings even without an Article, resolve bounded semantic context when required and return the current read-back.', [
                 'idempotency_key' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 191],

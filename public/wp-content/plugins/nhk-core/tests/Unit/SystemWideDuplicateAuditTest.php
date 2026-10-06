@@ -77,10 +77,59 @@ final class SystemWideDuplicateAuditTest extends TestCase
         $reader = new class implements DuplicateAuditPageReader {
             public function page(?string $after, int $limit): array { return ['items' => [['canonical_id' => 'a-1', 'stable_key' => 'same']], 'next_cursor' => 'a-1']; }
         };
-        $result = (new SystemWideDuplicateAuditCoordinator(['Authority' => $reader]))->audit(1);
+        $result = $this->coordinator(['Authority' => $reader])->audit(1, [], true, 'Authority');
         self::assertSame('PARTIAL', $result['owners']['Authority']['status']);
-        self::assertSame('a-1', $result['owners']['Authority']['next_cursor']);
-        self::assertSame('a-1', $result['owners']['Authority']['cursor_page_provenance']['next_cursor']);
+        self::assertNotSame('a-1', $result['owners']['Authority']['next_cursor']);
+        self::assertNotEmpty($result['owners']['Authority']['next_cursor']);
+        self::assertSame($result['owners']['Authority']['next_cursor'], $result['owners']['Authority']['cursor_page_provenance']['next_cursor']);
+    }
+
+    public function test_duplicate_cluster_crosses_page_boundary_without_losing_retired_state(): void
+    {
+        $reader = new BoundaryAuditPage([
+            [['canonical_id' => 'a-1', 'stable_key' => 'same', 'entity_type' => 'component', 'canonical_name' => 'Côn', 'state' => 'RETIRED', 'revision' => 1]],
+            [['canonical_id' => 'a-2', 'stable_key' => 'same', 'entity_type' => 'component', 'canonical_name' => 'Côn', 'state' => 'ACTIVE', 'revision' => 2]],
+        ]);
+        $coordinator = $this->coordinator(['Authority' => $reader]);
+
+        $first = $coordinator->audit(1);
+        self::assertSame('PARTIAL', $first['owners']['Authority']['status']);
+        self::assertSame([], $first['owners']['Authority']['clusters']);
+
+        $second = $coordinator->audit(1, ['Authority' => $first['owners']['Authority']['next_cursor']]);
+        self::assertSame('COMPLETE', $second['owners']['Authority']['status']);
+        self::assertSame(['a-1', 'a-2'], $second['owners']['Authority']['clusters'][0]['canonical_ids']);
+        $states = $second['owners']['Authority']['clusters'][0]['active_states'];
+        sort($states);
+        self::assertSame(['ACTIVE', 'RETIRED'], $states);
+    }
+
+    public function test_page_boundary_keeps_distinct_records_and_singletons_distinct(): void
+    {
+        $reader = new BoundaryAuditPage([
+            [['canonical_id' => 'a-1', 'stable_key' => 'first', 'entity_type' => 'component', 'canonical_name' => 'Một']],
+            [['canonical_id' => 'a-2', 'stable_key' => 'second', 'entity_type' => 'component', 'canonical_name' => 'Hai']],
+        ]);
+        $coordinator = $this->coordinator(['Authority' => $reader]);
+        $first = $coordinator->audit(1);
+        $second = $coordinator->audit(1, ['Authority' => $first['owners']['Authority']['next_cursor']]);
+        self::assertSame([], $second['owners']['Authority']['clusters']);
+        self::assertSame('COMPLETE', $second['owners']['Authority']['status']);
+    }
+
+    public function test_partial_safety_bound_never_reports_complete(): void
+    {
+        $reader = new RepeatingBoundedAuditPage();
+        $coordinator = $this->coordinator(['Authority' => $reader]);
+        $cursor = null;
+        $result = [];
+        for ($page = 0; $page < 25; $page++) {
+            $result = $coordinator->audit(200, $cursor === null ? [] : ['Authority' => $cursor]);
+            $cursor = $result['owners']['Authority']['next_cursor'];
+        }
+        self::assertSame('PARTIAL', $result['owners']['Authority']['status']);
+        self::assertFalse($result['owners']['Authority']['complete']);
+        self::assertSame('AUDIT_MAX_SCAN_BOUND_REACHED', $result['owners']['Authority']['diagnostics'][0]['code']);
     }
 
     public function test_source_uses_locator_and_does_not_require_same_title(): void
@@ -114,10 +163,78 @@ final class SystemWideDuplicateAuditTest extends TestCase
     public function test_article_does_not_deduplicate_continuation_articles(): void
     {
         $result = $this->audit('Article', [
-            ['canonical_id' => 'p-1', 'subject_ids' => ['a'], 'intent' => 'history', 'content_kind' => 'TEXT_ARTICLE'],
-            ['canonical_id' => 'p-2', 'subject_ids' => ['a'], 'intent' => 'history', 'content_kind' => 'CONTINUATION'],
+            ['canonical_id' => 'p-1', 'subject_ids' => ['a'], 'intent' => 'history', 'scope' => 'variant', 'continuation_lineage' => [], 'semantic_identity_available' => true, 'content_kind' => 'TEXT_ARTICLE'],
+            ['canonical_id' => 'p-2', 'subject_ids' => ['a'], 'intent' => 'history', 'scope' => 'variant', 'continuation_lineage' => ['p-1'], 'semantic_identity_available' => true, 'content_kind' => 'CONTINUATION'],
         ]);
         self::assertSame('LEGITIMATE_DISTINCT', $result['owners']['Article']['clusters'][0]['classification']);
+    }
+
+    public function test_article_rows_without_semantic_identity_are_blocked_as_model_gap(): void
+    {
+        $result = $this->audit('Article', [
+            ['canonical_id' => 'p-1', 'title' => 'Same title'],
+            ['canonical_id' => 'p-2', 'title' => 'Same title'],
+        ]);
+
+        self::assertSame('BLOCKED', $result['owners']['Article']['status']);
+        self::assertSame('AUDIT_MODEL_GAP', $result['owners']['Article']['diagnostics']['code']);
+        self::assertSame('AUDIT_MODEL_GAP', $result['owners']['Article']['diagnostics']['reason']);
+        self::assertSame([], $result['owners']['Article']['clusters']);
+    }
+
+    public function test_article_title_equality_alone_never_becomes_duplicate(): void
+    {
+        $result = $this->audit('Article', [
+            ['canonical_id' => 'p-1', 'title' => 'Same title', 'subject_ids' => ['a'], 'intent' => 'history', 'scope' => 'variant', 'continuation_lineage' => [], 'semantic_identity_available' => true],
+            ['canonical_id' => 'p-2', 'title' => 'Same title', 'subject_ids' => ['b'], 'intent' => 'history', 'scope' => 'variant', 'continuation_lineage' => [], 'semantic_identity_available' => true],
+        ]);
+
+        self::assertSame('COMPLETE', $result['owners']['Article']['status']);
+        self::assertSame([], $result['owners']['Article']['clusters']);
+    }
+
+    public function test_malformed_cursor_is_rejected_deterministically(): void
+    {
+        $result = $this->coordinator(['Authority' => new AuditPage([])])->audit(1, ['Authority' => 'not-a-cursor'], true, 'Authority');
+
+        self::assertSame('BLOCKED', $result['owners']['Authority']['status']);
+        self::assertSame('AUDIT_CURSOR_INVALID', $result['owners']['Authority']['diagnostics']['code']);
+    }
+
+    public function test_cursor_is_bound_to_owner_and_include_retired(): void
+    {
+        $reader = new BoundaryAuditPage([
+            [['canonical_id' => 'a-1', 'stable_key' => 'same']],
+            [['canonical_id' => 'a-2', 'stable_key' => 'same']],
+        ]);
+        $coordinator = $this->coordinator(['Authority' => $reader, 'Knowledge' => $reader]);
+        $first = $coordinator->audit(1, [], true, 'Authority');
+        $cursor = $first['owners']['Authority']['next_cursor'];
+
+        $crossOwner = $coordinator->audit(1, ['Knowledge' => $cursor], true, 'Knowledge');
+        self::assertSame('AUDIT_CURSOR_INVALID', $crossOwner['owners']['Knowledge']['diagnostics']['code']);
+
+        $changedFilter = $coordinator->audit(1, ['Authority' => $cursor], false, 'Authority');
+        self::assertSame('AUDIT_CURSOR_INVALID', $changedFilter['owners']['Authority']['diagnostics']['code']);
+    }
+
+    public function test_cursor_carry_and_scanned_count_tampering_are_rejected(): void
+    {
+        $reader = new BoundaryAuditPage([
+            [['canonical_id' => 'a-1', 'stable_key' => 'same']],
+            [['canonical_id' => 'a-2', 'stable_key' => 'same']],
+        ]);
+        $coordinator = $this->coordinator(['Authority' => $reader]);
+        $cursor = $coordinator->audit(1, [], true, 'Authority')['owners']['Authority']['next_cursor'];
+        $decoded = json_decode((string) base64_decode(strtr($cursor, '-_', '+/'), true), true);
+        $decoded['payload']['carry'][0]['canonical_id'] = 'attacker-id';
+        $decoded['payload']['scanned'] = 4999;
+        $tampered = rtrim(strtr(base64_encode((string) json_encode($decoded)), '+/', '-_'), '=');
+
+        $result = $coordinator->audit(1, ['Authority' => $tampered], true, 'Authority');
+
+        self::assertSame('BLOCKED', $result['owners']['Authority']['status']);
+        self::assertSame('AUDIT_CURSOR_INVALID', $result['owners']['Authority']['diagnostics']['code']);
     }
 
     public function test_media_asset_keeps_parent_and_binary_boundary(): void
@@ -164,7 +281,13 @@ final class SystemWideDuplicateAuditTest extends TestCase
     /** @param list<array<string,mixed>> $items @return array<string,mixed> */
     private function audit(string $owner, array $items): array
     {
-        return (new SystemWideDuplicateAuditCoordinator([$owner => new AuditPage($items)]))->audit(50);
+        return $this->coordinator([$owner => new AuditPage($items)])->audit(50, [], true, $owner);
+    }
+
+    /** @param array<string,mixed> $readers */
+    private function coordinator(array $readers = []): SystemWideDuplicateAuditCoordinator
+    {
+        return new SystemWideDuplicateAuditCoordinator($readers, null, 'unit-test-cursor-secret');
     }
 }
 
@@ -173,4 +296,27 @@ final class AuditPage implements DuplicateAuditPageReader
     /** @param list<array<string,mixed>> $items */
     public function __construct(private array $items) {}
     public function page(?string $after, int $limit): array { return ['items' => array_slice($this->items, 0, $limit), 'next_cursor' => null]; }
+}
+
+final class BoundaryAuditPage implements DuplicateAuditPageReader
+{
+    /** @param list<list<array<string,mixed>>> $pages */
+    public function __construct(private array $pages) {}
+
+    public function page(?string $after, int $limit): array
+    {
+        $index = $after === null ? 0 : 1;
+        $items = $this->pages[$index] ?? [];
+        return ['items' => array_slice($items, 0, $limit), 'next_cursor' => $index === 0 ? 'boundary-1' : null];
+    }
+}
+
+final class RepeatingBoundedAuditPage implements DuplicateAuditPageReader
+{
+    public function page(?string $after, int $limit): array
+    {
+        $items = [];
+        for ($i = 1; $i <= $limit; $i++) $items[] = ['canonical_id' => 'row-' . $i, 'stable_key' => 'row-' . $i];
+        return ['items' => $items, 'next_cursor' => 'more'];
+    }
 }

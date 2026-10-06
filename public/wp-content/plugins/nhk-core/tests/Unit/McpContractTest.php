@@ -100,6 +100,7 @@ final class McpContractTest extends TestCase
             'nhk.knowledge.quality-audit',
             'nhk.dictionary.seed-audit',
             'nhk.dictionary.duplicate-audit',
+            'nhk.system-wide.duplicate-audit',
             'nhk.article.ingest',
             'nhk.capture.ingest',
             'nhk.capture.get',

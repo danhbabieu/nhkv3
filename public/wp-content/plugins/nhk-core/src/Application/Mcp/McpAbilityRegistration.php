@@ -383,6 +383,7 @@ final class McpAbilityRegistration
         'nhk.dictionary.seed-audit' => 'nhk-v3/dictionary-seed-audit',
         'nhk.dictionary.enrichment.audit' => 'nhk-v3/dictionary-enrichment-audit',
         'nhk.dictionary.duplicate-audit' => 'nhk-v3/dictionary-duplicate-audit',
+        'nhk.system-wide.duplicate-audit' => 'nhk-v3/system-wide-duplicate-audit',
         'nhk.dictionary.enrichment.plan' => 'nhk-v3/dictionary-enrichment-plan',
         'nhk.dictionary.semantic-relation.read' => 'nhk-v3/dictionary-semantic-relation-read',
         'nhk.dictionary.semantic-relation.preview' => 'nhk-v3/dictionary-semantic-relation-preview',
