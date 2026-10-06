@@ -24,7 +24,10 @@ final class DictionaryDetailQuery
         $slug = $this->slug($slug);
         if ($slug === '') return ['status' => 'NOT_FOUND'];
         $matches = $this->resolveEntries($slug);
-        if (count($matches) !== 1) return ['status' => count($matches) > 1 ? 'AMBIGUOUS' : 'NOT_FOUND', 'slug' => $slug];
+        if (count($matches) !== 1) {
+            if (count($matches) > 1) return ['status' => 'AMBIGUOUS', 'slug' => $slug];
+            return $this->compatibilityRedirect($slug);
+        }
         $entry = $matches[0];
         $senses = array_values(array_filter((array) $this->entries->listSenses($entry), static fn (mixed $sense): bool => $sense instanceof DictionaryConcept && $sense->approved()));
         if ($senses === []) return ['status' => 'INCOMPLETE', 'reason' => 'DICTIONARY_ENTRY_NOT_PUBLIC'];
@@ -82,6 +85,38 @@ final class DictionaryDetailQuery
         $seo = $this->seo($item, $sensePackets);
         $pageStatus = $seo['state'] === 'REDIRECT' ? 'REDIRECT' : ($seo['state'] === 'BLOCKED' ? 'INCOMPLETE' : 'READY');
         return ['status' => $pageStatus, 'item' => $item, 'labels' => $item['labels'], 'canonical_url' => $seo['canonical'], 'destination_url' => $seo['state'] === 'REDIRECT' ? $seo['canonical'] : null, 'seo' => $seo, 'indexable' => $seo['state'] === 'INDEXABLE'];
+    }
+
+    /** Consume persisted legacy Dictionary slugs only to preserve owner redirects. */
+    private function compatibilityRedirect(string $slug): array
+    {
+        if (!method_exists($this->concepts, 'listApproved')) return ['status' => 'NOT_FOUND', 'slug' => $slug];
+        $matches = [];
+        foreach ((array) $this->concepts->listApproved(2000) as $concept) {
+            if (!$concept instanceof DictionaryConcept || !$concept->approved()) continue;
+            if ($this->slug((string) ($concept->context['public_slug'] ?? '')) === $slug) $matches[] = $concept;
+        }
+        if (count($matches) > 1) return ['status' => 'AMBIGUOUS', 'slug' => $slug, 'match_count' => count($matches)];
+        if ($matches === []) return ['status' => 'NOT_FOUND', 'slug' => $slug];
+        $concept = $matches[0];
+        if (method_exists($this->entries, 'findDurableForConcept')) {
+            try {
+                if ($this->entries->findDurableForConcept($concept->conceptId) instanceof LexicalEntry) return ['status' => 'NOT_FOUND', 'slug' => $slug];
+            } catch (\Throwable) {
+                return ['status' => 'INCOMPLETE', 'reason' => 'DICTIONARY_ENTRY_READ_FAILED', 'slug' => $slug];
+            }
+        }
+        $type = trim((string) $concept->destinationType);
+        $id = trim((string) $concept->destinationId);
+        if ($type === '' || $id === '') return ['status' => 'NOT_FOUND', 'slug' => $slug];
+        if (!is_callable($this->destinationValidator)) return ['status' => 'INCOMPLETE', 'reason' => 'CANONICAL_DESTINATION_NOT_READY', 'slug' => $slug];
+        try {
+            $destination = ($this->destinationValidator)($type, $id, null);
+            if (!is_string($destination) || trim($destination) === '') return ['status' => 'INCOMPLETE', 'reason' => 'CANONICAL_DESTINATION_NOT_READY', 'slug' => $slug];
+            return ['status' => 'REDIRECT', 'destination_url' => trim($destination), 'canonical_url' => trim($destination), 'indexable' => false, 'slug' => $slug, 'concept_id' => $concept->conceptId];
+        } catch (\Throwable) {
+            return ['status' => 'INCOMPLETE', 'reason' => 'CANONICAL_DESTINATION_NOT_READY', 'slug' => $slug];
+        }
     }
 
     /** @return list<LexicalEntry> */

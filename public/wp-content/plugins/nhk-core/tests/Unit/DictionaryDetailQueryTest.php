@@ -228,6 +228,45 @@ final class DictionaryDetailQueryTest extends TestCase
         self::assertFalse($result['seo']['sitemap']);
     }
 
+    public function test_persisted_compatibility_dictionary_slug_redirects_directly_to_owner(): void
+    {
+        $concept = new DictionaryConcept('compat-component', 'Côn hoa thị', '', DictionaryConcept::APPROVED, 'component', 'component-1', '/legacy/con-hoa-thi/', ['public_slug' => 'con-hoa-thi']);
+        $concepts = new class($concept) {
+            public function __construct(private DictionaryConcept $concept) {}
+            public function listApproved(int $limit = 2000): array { return [$this->concept]; }
+            public function listLabels(string $id): array { return []; }
+        };
+        $entries = new class {
+            public function listEntries(int $limit = 2000): array { return []; }
+            public function findDurableForConcept(string $conceptId): ?LexicalEntry { return null; }
+        };
+
+        $result = (new DictionaryDetailQuery($concepts, $entries, static fn (string $type, string $id, ?string $url): ?string => '/linh-kien/con-hoa-thi/'))->detail('con-hoa-thi');
+
+        self::assertSame('REDIRECT', $result['status']);
+        self::assertSame('/linh-kien/con-hoa-thi/', $result['destination_url']);
+    }
+
+    public function test_retired_durable_entry_blocks_legacy_compatibility_redirect(): void
+    {
+        $concept = new DictionaryConcept('retired-sense', 'Thuật ngữ cũ', '', DictionaryConcept::APPROVED, 'component', 'component-1', '/legacy/thuat-ngu-cu/', ['public_slug' => 'thuat-ngu-cu']);
+        $retired = new LexicalEntry('retired-entry', 'Thuật ngữ cũ', 'thuat-ngu-cu', DictionaryConcept::RETIRED, 'vi-VN', ['public_slug' => 'thuat-ngu-cu'], 2, [$concept->conceptId]);
+        $concepts = new class($concept) {
+            public function __construct(private DictionaryConcept $concept) {}
+            public function listApproved(int $limit = 2000): array { return [$this->concept]; }
+            public function listLabels(string $id): array { return []; }
+        };
+        $entries = new class($retired) {
+            public function __construct(private LexicalEntry $retired) {}
+            public function listEntries(int $limit = 2000): array { return []; }
+            public function findDurableForConcept(string $conceptId): ?LexicalEntry { return $this->retired; }
+        };
+
+        $result = (new DictionaryDetailQuery($concepts, $entries, static fn (): string => '/linh-kien/thuat-ngu-cu/'))->detail('thuat-ngu-cu');
+
+        self::assertSame('NOT_FOUND', $result['status']);
+    }
+
     public function test_delegated_component_entry_uses_persisted_owner_current_path_for_one_hop_redirect(): void
     {
         $sense = new DictionaryConcept('sense-component', 'Côn hoa thị', '', DictionaryConcept::APPROVED, 'component', 'component-1');

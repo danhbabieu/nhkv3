@@ -20,15 +20,9 @@ final class McpDictionaryHandler
     public function search(string $query, int $limit = 50): array
     {
         if (!$this->runtime->available()) return ['status' => 'unavailable', 'reason' => 'DICTIONARY_STORAGE_UNAVAILABLE'];
-        $lower = static fn (string $value): string => function_exists('mb_strtolower') ? mb_strtolower($value) : strtolower($value);
-        $contains = static fn (string $haystack, string $needle): bool => (function_exists('mb_strpos') ? mb_strpos($haystack, $needle) : strpos($haystack, $needle)) !== false;
-        $q = $lower(trim($query)); $items = [];
-        foreach (($this->runtime->publicQuery()->hub(max(1, min(500, $limit * 4)))['items'] ?? []) as $item) {
-            if (!is_array($item)) continue;
-            $haystack = $lower((string) ($item['title'] ?? '') . ' ' . implode(' ', array_map(static fn (array $label): string => (string) ($label['label'] ?? ''), array_filter((array) ($item['labels'] ?? []), 'is_array'))));
-            if ($q === '' || $contains($haystack, $q)) $items[] = $item;
-            if (count($items) >= $limit) break;
-        }
+        $limit = max(1, min(500, $limit));
+        $items = array_values(array_filter((array) ($this->runtime->publicQuery()->hub(500, $query)['items'] ?? []), 'is_array'));
+        if (count($items) > $limit) $items = array_slice($items, 0, $limit);
         return ['status' => 'available', 'items' => $items, 'count' => count($items)];
     }
 

@@ -1,5 +1,35 @@
 # NHK V3 Execution State
 
+## Checkpoint — 2026-10-06 — Broad Dictionary public projection regression
+
+ROOT_CAUSE: EntrySense availability switched `DictionaryPublicQuery::hub()`
+from the compatibility Concept projection to an Entry-only projection. Approved
+delegated and ambiguous Concepts without a public durable Entry were therefore
+omitted from the shared hub consumed by Dictionary search, homepage cards and
+lexical cards. The Entry hub projection also retained the Dictionary URL for a
+single delegated Entry instead of the validated owner URL. Persisted legacy
+delegated Dictionary slugs were not consumed by the Entry-centric detail path.
+
+IMPLEMENTATION: The public hub now merges approved compatibility Concepts not
+covered by a durable Entry, skips retired/non-public durable ownership, keeps
+ambiguous compatibility inventory visible without selecting an owner, and
+projects validated owner URLs for single delegated Entries. MCP Dictionary
+search and WordPress lexical matching now consume the hub's complete search
+labels, including Forms. Persisted delegated compatibility slugs redirect
+directly to the validated owner URL; missing owner identity fails closed.
+
+REGRESSION COVERAGE: Delegated compatibility visibility and owner projection,
+delegated Entry owner projection, ambiguous compatibility visibility without
+auto-selection, persisted compatibility redirect, retired Entry suppression,
+preferred/alternate Forms, and the existing `400 ngày` behavior.
+
+VERIFICATION: Focused Dictionary projection suite passes 50 tests / 147
+assertions; changed PHP files lint clean and `git diff --check` passes. No
+materialization, Entry/Sense mutation, semantic-owner mutation, schema change,
+deployment or production operation was performed.
+
+STATUS: `BROAD_DICTIONARY_PUBLIC_PROJECTION_FIXED_LOCAL / FOCUSED_GREEN / NO_DATA_MUTATION / COMMIT_PENDING`
+
 ## Checkpoint — 2026-10-05 — Final live route parity and delegated Dictionary redirect
 
 ROOT_CAUSE: `nhk.dictionary.resolve` stopped at the legacy planning envelope;

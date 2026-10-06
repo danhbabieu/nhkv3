@@ -140,6 +140,72 @@ final class DictionaryPublicQueryTest extends TestCase
         self::assertFalse($packet['items'][0]['indexable']);
     }
 
+    public function test_entry_mode_keeps_delegated_compatibility_term_and_projects_owner_route(): void
+    {
+        $concept = new DictionaryConcept('compat-component', 'Côn hoa thị', 'Thuật ngữ linh kiện.', DictionaryConcept::APPROVED, 'component', 'component-1', '/legacy/con-hoa-thi/', ['public_slug' => 'con-hoa-thi']);
+        $repo = $this->repository([$concept], ['compat-component' => []]);
+        $entries = new class {
+            public function listEntries(int $limit = 500): array { return []; }
+        };
+        $query = new DictionaryPublicQuery($repo, null, static fn (string $type, string $id, ?string $url): ?string => '/linh-kien/con-hoa-thi/', $entries);
+
+        $items = $query->hub()['items'];
+
+        self::assertCount(1, $items);
+        self::assertSame('/linh-kien/con-hoa-thi/', $items[0]['url']);
+        self::assertFalse($items[0]['indexable']);
+    }
+
+    public function test_delegated_entry_hub_item_uses_validated_owner_route(): void
+    {
+        $sense = new DictionaryConcept('entry-component-sense', 'Côn hoa thị', '', DictionaryConcept::APPROVED, null, null, null, []);
+        $repo = $this->repository([$sense], ['entry-component-sense' => []]);
+        $entries = new class($sense) {
+            public function __construct(private DictionaryConcept $sense) {}
+            public function listEntries(int $limit = 500): array { return [new LexicalEntry('entry-component', 'Côn hoa thị', 'côn hoa thị', DictionaryConcept::APPROVED, 'vi-VN', ['public_slug' => 'con-hoa-thi'], 1, [$this->sense->conceptId])]; }
+            public function listSenses(LexicalEntry $entry, array $context = []): array { return [$this->sense]; }
+            public function listForms(LexicalEntry $entry): array { return []; }
+            public function semanticReference(string $entryId, string $senseId): array { return ['status' => 'AVAILABLE', 'type' => 'component', 'id' => 'component-1', 'source' => 'MAPPING']; }
+        };
+        $query = new DictionaryPublicQuery($repo, null, static fn (string $type, string $id, ?string $url): ?string => '/linh-kien/con-hoa-thi/', $entries);
+
+        $item = $query->hub()['items'][0];
+
+        self::assertSame('/linh-kien/con-hoa-thi/', $item['url']);
+        self::assertFalse($item['dedicated']);
+        self::assertFalse($item['indexable']);
+    }
+
+    public function test_ambiguous_compatibility_terms_remain_visible_without_auto_selecting_owner(): void
+    {
+        $first = new DictionaryConcept('vach-cam-component', 'Vách cam', 'Nghĩa linh kiện.', DictionaryConcept::APPROVED, 'component', 'component-1', '/linh-kien/vach-cam/', []);
+        $second = new DictionaryConcept('vach-cam-classification', 'Vách cam', 'Nghĩa phân loại.', DictionaryConcept::APPROVED, 'classification', 'classification-1', '/phan-loai/vach-cam/', []);
+        $repo = $this->repository([$first, $second], ['vach-cam-component' => [], 'vach-cam-classification' => []]);
+        $entries = new class {
+            public function listEntries(int $limit = 500): array { return []; }
+        };
+
+        $items = (new DictionaryPublicQuery($repo, null, null, $entries))->hub(500, 'Vách cam')['items'];
+
+        self::assertCount(2, $items);
+        self::assertSame([null, null], array_column($items, 'url'));
+        self::assertSame([true, true], array_column($items, 'ambiguous'));
+    }
+
+    public function test_retired_durable_entry_is_not_reintroduced_by_compatibility_projection(): void
+    {
+        $concept = new DictionaryConcept('retired-sense', 'Thuật ngữ cũ', 'Không còn công khai.', DictionaryConcept::APPROVED, null, null, null, ['public_slug' => 'thuat-ngu-cu']);
+        $retired = new LexicalEntry('retired-entry', 'Thuật ngữ cũ', 'thuat-ngu-cu', DictionaryConcept::RETIRED, 'vi-VN', ['public_slug' => 'thuat-ngu-cu'], 2, [$concept->conceptId]);
+        $repo = $this->repository([$concept], ['retired-sense' => []]);
+        $entries = new class($retired) {
+            public function __construct(private LexicalEntry $retired) {}
+            public function listEntries(int $limit = 500): array { return []; }
+            public function findDurableForConcept(string $conceptId): ?LexicalEntry { return $this->retired; }
+        };
+
+        self::assertSame(0, (new DictionaryPublicQuery($repo, null, null, $entries))->hub()['count']);
+    }
+
     public function test_entry_hub_and_detail_render_multiple_senses_without_collapsing_them(): void
     {
         $first = new DictionaryConcept('11111111-1111-7111-8111-111111111111', 'Côn máy', 'Nghĩa máy', DictionaryConcept::APPROVED, 'model', '22222222-2222-7222-8222-222222222222', '/dong-ho/may/', ['domain' => 'máy']);

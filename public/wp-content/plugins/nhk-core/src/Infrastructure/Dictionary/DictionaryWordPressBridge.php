@@ -66,7 +66,7 @@ final class DictionaryWordPressBridge
         if ($term !== '') foreach ((array) ($this->runtime->publicQuery()->hub(2000)['items'] ?? []) as $item) {
             if (!is_array($item) || empty($item['url'])) continue;
             $haystack = [(string) ($item['title'] ?? ''), (string) ($item['description'] ?? '')];
-            foreach ((array) ($item['labels'] ?? []) as $label) if (is_array($label)) $haystack[] = (string) ($label['label'] ?? '');
+            foreach ((array) ($item['search_labels'] ?? $item['labels'] ?? []) as $label) if (is_array($label)) $haystack[] = (string) ($label['label'] ?? '');
             if (!$this->matches($term, $haystack)) continue;
             $items[] = ['type' => 'dictionary', 'title' => (string) $item['title'], 'url' => (string) $item['url'], 'description' => (string) ($item['description'] ?? ''), 'term_type' => (string) ($item['term_type'] ?? '')];
         }
@@ -105,7 +105,7 @@ final class DictionaryWordPressBridge
         foreach ((array) ($this->runtime->publicQuery()->hub(1000)['items'] ?? []) as $item) {
             if (!is_array($item) || empty($item['url'])) continue;
             $labels = [(string) ($item['title'] ?? '')];
-            foreach ((array) ($item['labels'] ?? []) as $label) if (is_array($label)) $labels[] = (string) ($label['label'] ?? '');
+            foreach ((array) ($item['search_labels'] ?? $item['labels'] ?? []) as $label) if (is_array($label)) $labels[] = (string) ($label['label'] ?? '');
             $matched = false;
             foreach ($labels as $label) {
                 $label = trim($label);

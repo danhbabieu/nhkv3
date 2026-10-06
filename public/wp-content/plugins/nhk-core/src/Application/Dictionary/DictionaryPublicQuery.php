@@ -17,14 +17,25 @@ final class DictionaryPublicQuery
         $initial = $this->normalizeInitial($initial);
         if ($this->entrySenseAvailable() && is_object($this->entries) && method_exists($this->entries, 'listEntries')) {
             $entryItems = [];
+            $coveredConceptIds = [];
             foreach ((array) $this->entries->listEntries($limit) as $entry) {
                 if (!$entry instanceof LexicalEntry) continue;
-                $senses = array_values(array_filter((array) $this->entries->listSenses($entry), static fn (mixed $sense): bool => $sense instanceof DictionaryConcept && $sense->approved()));
+                $allSenses = array_values(array_filter((array) $this->entries->listSenses($entry), static fn (mixed $sense): bool => $sense instanceof DictionaryConcept));
+                foreach ($allSenses as $sense) $coveredConceptIds[$sense->conceptId] = true;
+                $senses = array_values(array_filter($allSenses, static fn (DictionaryConcept $sense): bool => $sense->approved()));
                 $item = $this->entryHubItem($entry, $senses);
                 if (($item['eligible'] ?? false) === true) $entryItems[] = $item;
             }
-            $entryItems = $this->filterAndRank($entryItems, $query, $initial);
-            return ['status' => 'AVAILABLE', 'items' => $entryItems, 'count' => count($entryItems), 'total_count' => count($entryItems), 'query' => $query, 'initial' => $initial, 'canonical_url' => '/tu-dien/', 'warnings' => []];
+            $compatibilityItems = [];
+            foreach ($this->concepts->listApproved($limit) as $concept) {
+                if (!$concept instanceof DictionaryConcept || !$concept->approved() || isset($coveredConceptIds[$concept->conceptId])) continue;
+                if (method_exists($this->entries, 'findDurableForConcept') && $this->entries->findDurableForConcept($concept->conceptId) instanceof LexicalEntry) continue;
+                $item = $this->item($concept);
+                if (($item['eligible'] ?? false) === true) $compatibilityItems[] = $item;
+            }
+            $items = $this->markAmbiguousCompatibilityItems(array_merge($entryItems, $compatibilityItems));
+            $items = $this->filterAndRank($items, $query, $initial);
+            return ['status' => 'AVAILABLE', 'items' => $items, 'count' => count($items), 'total_count' => count($items), 'query' => $query, 'initial' => $initial, 'canonical_url' => '/tu-dien/', 'warnings' => []];
         }
         $items = [];
         $warnings = [];
@@ -76,7 +87,7 @@ final class DictionaryPublicQuery
     private function entryHubItem(LexicalEntry $entry, array $senses): array
     {
         $slug = $this->slug((string) ($entry->context['public_slug'] ?? ''));
-        if ($senses === [] || $slug === '') return ['eligible' => false, 'entry_id' => $entry->entryId];
+        if ($senses === []) return ['eligible' => false, 'entry_id' => $entry->entryId];
         $forms = $this->entryForms($entry);
         $labels = [];
         foreach ($senses as $sense) foreach ($this->concepts->listLabels($sense->conceptId) as $label) {
@@ -84,10 +95,49 @@ final class DictionaryPublicQuery
         }
         $searchLabels = array_merge($labels, array_map(static fn (array $form): array => ['label' => $form['form']], $forms));
         $ownerBacked = false;
-        if (count($senses) === 1 && method_exists($this->entries, 'semanticReference')) {
-            try { $ownerBacked = in_array(strtoupper((string) (($this->entries->semanticReference($entry->entryId, $senses[0]->conceptId)['status'] ?? ''))), ['AVAILABLE', 'AVAILABLE_WITH_ITEMS', 'PRESENT_VALID'], true); } catch (\Throwable) { $ownerBacked = false; }
+        $ownerUrl = null;
+        foreach ($senses as $sense) {
+            [$semanticType, $semanticId, $reference] = $this->senseSemanticReference($entry, $sense);
+            if ($semanticType === null || $semanticId === null) continue;
+            $ownerBacked = true;
+            if (count($senses) !== 1) continue;
+            if (!is_callable($this->destinationValidator)) continue;
+            try {
+                $validated = ($this->destinationValidator)($semanticType, $semanticId, null);
+                if (is_string($validated) && trim($validated) !== '') $ownerUrl = trim($validated);
+                else return ['eligible' => false, 'entry_id' => $entry->entryId];
+            } catch (\Throwable) {
+                return ['eligible' => false, 'entry_id' => $entry->entryId];
+            }
         }
-        return ['entry_id' => $entry->entryId, 'title' => $entry->preferredForm, 'description' => count($senses) === 1 ? $senses[0]->definition : '', 'term_type' => 'ENTRY', 'labels' => array_values(array_filter($labels, static fn (array $label): bool => ($label['kind'] ?? '') !== 'HIDDEN'),), 'search_labels' => $searchLabels, 'url' => '/tu-dien/' . $slug . '/', 'dedicated' => true, 'indexable' => !$ownerBacked, 'eligible' => true, 'forms' => $forms, 'senses' => array_map(static fn (DictionaryConcept $sense): array => ['sense_id' => $sense->conceptId, 'title' => $sense->preferredLabel, 'description' => $sense->definition, 'context' => $sense->context], $senses), 'image' => null];
+        $url = $ownerUrl ?? ($slug !== '' ? '/tu-dien/' . $slug . '/' : null);
+        if ($url === null) return ['eligible' => false, 'entry_id' => $entry->entryId];
+        return ['entry_id' => $entry->entryId, 'title' => $entry->preferredForm, 'description' => count($senses) === 1 ? $senses[0]->definition : '', 'term_type' => 'ENTRY', 'labels' => array_values(array_filter($labels, static fn (array $label): bool => ($label['kind'] ?? '') !== 'HIDDEN'),), 'search_labels' => $searchLabels, 'url' => $url, 'dedicated' => !$ownerBacked || count($senses) > 1, 'indexable' => !$ownerBacked, 'eligible' => true, 'forms' => $forms, 'senses' => array_map(static fn (DictionaryConcept $sense): array => ['sense_id' => $sense->conceptId, 'title' => $sense->preferredLabel, 'description' => $sense->definition, 'context' => $sense->context], $senses), 'image' => null];
+    }
+
+    /** Keep ambiguous compatibility inventory visible without selecting an owner. */
+    private function markAmbiguousCompatibilityItems(array $items): array
+    {
+        $groups = [];
+        foreach ($items as $index => $item) {
+            if (($item['term_type'] ?? '') === 'ENTRY' || !is_array($item)) continue;
+            $key = $this->normalize((string) ($item['title'] ?? ''));
+            if ($key === '') continue;
+            $groups[$key][] = $index;
+        }
+        foreach ($groups as $indexes) {
+            $destinations = [];
+            foreach ($indexes as $index) $destinations[(string) ($items[$index]['destination_type'] ?? '') . ':' . (string) ($items[$index]['destination_id'] ?? '')] = true;
+            if (count($destinations) < 2) continue;
+            foreach ($indexes as $index) {
+                $items[$index]['url'] = null;
+                $items[$index]['eligible'] = true;
+                $items[$index]['indexable'] = false;
+                $items[$index]['ambiguous'] = true;
+                $items[$index]['destination_candidates'] = array_keys($destinations);
+            }
+        }
+        return $items;
     }
 
     private function item(DictionaryConcept $concept): array
