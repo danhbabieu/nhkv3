@@ -92,7 +92,38 @@ final class PluginBootWiringTest extends TestCase
         $plugin = (string) file_get_contents(__DIR__ . '/../../src/Plugin.php');
 
         self::assertStringContainsString(
-            'add_action(\'rest_api_init\', static function () use (&$sharedAttachmentBridge, &$captureRepository, $claimOwnerUrl, &$homeSemanticQuery): void {',
+            'add_action(\'rest_api_init\', static function () use (&$sharedAttachmentBridge, &$captureRepository, $claimOwnerUrl, &$homeSemanticQuery, $publicSourceDisplayPolicy, $publicUsages, $articleLegacyAudit): void {',
+            $plugin,
+        );
+    }
+
+    public function test_rest_bootstrap_captures_initialized_public_and_legacy_media_dependencies(): void
+    {
+        $plugin = (string) file_get_contents(__DIR__ . '/../../src/Plugin.php');
+        $restRegistration = strpos($plugin, "add_action('rest_api_init', static function ()");
+        $restUseList = strpos($plugin, 'static function () use (', $restRegistration);
+
+        self::assertNotFalse($restRegistration);
+        self::assertNotFalse($restUseList);
+        self::assertStringContainsString('$publicSourceDisplayPolicy', substr($plugin, $restUseList, 260));
+        self::assertStringContainsString('$publicUsages', substr($plugin, $restUseList, 260));
+        self::assertStringContainsString('$articleLegacyAudit', substr($plugin, $restUseList, 260));
+        self::assertLessThan($restUseList, strpos($plugin, '$publicSourceDisplayPolicy = new PublicResearchSourceDisplayPolicy();'));
+        self::assertLessThan($restUseList, strpos($plugin, '$publicUsages = new WpdbMediaUsageRepository($wpdb);'));
+        self::assertLessThan($restUseList, strpos($plugin, '$articleLegacyAudit = new ArticleMediaLegacyAudit('));
+        self::assertStringContainsString(
+            'new ArticleMediaLegacyRepairPlan($articleLegacyAudit, $publicUsages)',
+            substr($plugin, $restUseList),
+        );
+    }
+
+    public function test_article_legacy_runtime_factory_uses_the_public_usage_repository_instance(): void
+    {
+        $plugin = (string) file_get_contents(__DIR__ . '/../../src/Plugin.php');
+
+        self::assertSame(1, substr_count($plugin, '$articleLegacyAudit = new ArticleMediaLegacyAudit('));
+        self::assertStringContainsString(
+            '$articleMediaLegacyAuditHandler = new ArticleMediaLegacyAuditHandler($articleLegacyAudit, new ArticleMediaLegacyRepairPlan($articleLegacyAudit, $publicUsages));',
             $plugin,
         );
     }

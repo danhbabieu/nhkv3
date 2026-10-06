@@ -196,6 +196,13 @@ final class Plugin {
         }
         $sharedAttachmentBridge = null;
         $claimOwnerUrl = static fn (\NHK\Core\Domain\Knowledge\KnowledgeClaim $claim): ?string => null;
+        // These services are composed once for the public/runtime boundary and
+        // are also consumed by the later REST registration closure. Initialize
+        // the optional repository-backed values before closure capture so a
+        // database-less bootstrap remains warning-free and fail-closed.
+        $publicSourceDisplayPolicy = new PublicResearchSourceDisplayPolicy();
+        $publicUsages = null;
+        $articleLegacyAudit = null;
         if (isset($wpdb) && is_object($wpdb)) {
             $publicTypes = new EntityTypeRegistry();
             CanonicalEntityTypeCatalog::registerInto($publicTypes);
@@ -205,7 +212,6 @@ final class Plugin {
             $publicEndpoints = new EndpointTypeRegistry();
             CoreEndpointResolverRegistrar::register($publicEndpoints, $publicTypes, $publicAuthority, $publicMedia, $publicVideos);
             $publicStatus = new MigrationStatus();
-            $publicSourceDisplayPolicy = new PublicResearchSourceDisplayPolicy();
             $publicGraph = new GraphService(new WpdbGraphRepository($wpdb), $publicEndpoints, new PredicateRegistry(), new WpdbAuditSink());
             $clockTypeAudit = WpdbClockTypeClassificationAuditFactory::create($publicGraph, $wpdb);
             add_filter('nhk_v3_clock_type_classification_audit', static fn (mixed $current): mixed => $current ?? $clockTypeAudit, 10, 1);
@@ -314,7 +320,7 @@ final class Plugin {
             if ($publicMediaDelivery !== null) (new PublicMediaAssetRoutes($publicMediaDelivery))->register();
             (new PublicKnowledgeRoutes(new KnowledgePageQuery($publicClaims, $publicEvidence, $publicSources, $publicStatus, $publicSourceDisplayPolicy)))->register();
         }
-        add_action('rest_api_init', static function () use (&$sharedAttachmentBridge, &$captureRepository, $claimOwnerUrl, &$homeSemanticQuery): void {
+        add_action('rest_api_init', static function () use (&$sharedAttachmentBridge, &$captureRepository, $claimOwnerUrl, &$homeSemanticQuery, $publicSourceDisplayPolicy, $publicUsages, $articleLegacyAudit): void {
             (new HealthCheck(new MigrationStatus()))->register_routes();
             global $wpdb;
             if (!isset($wpdb) || !is_object($wpdb)) return;

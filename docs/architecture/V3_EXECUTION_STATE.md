@@ -1,5 +1,41 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-06 — Plugin REST bootstrap dependency wiring regression fixed locally
+
+ROOT_CAUSE: The `rest_api_init` composition closure referenced the canonical
+public source-display policy without capturing it. The Article Media legacy
+audit and public MediaUsage repository were composed in the earlier `$wpdb`
+block but were also referenced inside that closure without capture. The
+Article Media legacy MCP factory added by commit `8d64249c` therefore reached
+undefined variables during REST registration, allowing PHP warnings to corrupt
+the WordPress REST index response.
+
+FIX: The public source-display policy is initialized before optional database
+composition; optional repository-backed dependencies are initialized to null
+for database-less fail-closed bootstrap; and the REST closure explicitly
+captures `$publicSourceDisplayPolicy`, `$publicUsages` and `$articleLegacyAudit`.
+The Article Media legacy handler and repair-plan factory now consume the same
+canonical instances created by the public composition boundary. No OAuth,
+semantic eligibility, schema, migration or data path was changed.
+
+REGRESSION COVERAGE: Plugin composition tests verify initialization order,
+closure capture and canonical Usage/audit factory wiring. The WordPress
+integration path asserts warning-free `wp_abilities_api_init`/`rest_api_init`
+bootstrap and a JSON REST index. The Article Media legacy audit/repair-plan
+catalog, dispatch, manifest and Easy MCP exposure tests remain green.
+
+VERIFICATION: Focused Plugin/MCP/Article Media exposure coverage passes 160
+tests / 4,864 assertions; Composer PHP lint passes. The runtime-gated
+WordPress integration file is skipped in this checkout because
+`NHK_WP_TEST_PATH` and `wp-config.php` are unavailable. The default full suite
+still hits the known 128MB materializer fatal; the 512MB run completes with
+34 environment/double errors and 27 unrelated baseline failures. No data
+mutation, deployment or push was performed.
+
+STATUS: `PLUGIN_BOOTSTRAP_DEPENDENCY_WIRING_FIXED_LOCAL / FOCUSED_GREEN /
+FULL_SUITE_BASELINE_LIMITED / RUNTIME_INTEGRATION_UNAVAILABLE /
+NO_DATA_MUTATION / COMMIT_PENDING`.
+
 # Checkpoint — 2026-10-06 — Article Media legacy audit + governed repair operational surface
 
 ROOT_CAUSE: The universal Article media semantic selection fix and its

@@ -176,6 +176,30 @@ final class EasyMcpNativeFileCompatibilityIntegrationTest extends TestCase
         self::assertSame([], $errors, (string) wp_json_encode($errors));
     }
 
+    public function test_wordpress_rest_index_returns_json_after_plugin_bootstrap(): void
+    {
+        $errors = [];
+        set_error_handler(static function (int $severity, string $message, string $file, int $line) use (&$errors): bool {
+            if ($severity === E_WARNING || $severity === E_NOTICE || $severity === E_USER_WARNING || $severity === E_USER_NOTICE) {
+                $errors[] = [$message, $file, $line];
+                return true;
+            }
+            return false;
+        });
+
+        try {
+            $response = rest_do_request(new \WP_REST_Request('GET', '/'));
+        } finally {
+            restore_error_handler();
+        }
+
+        self::assertSame([], $errors, (string) wp_json_encode($errors));
+        self::assertSame(200, $response->get_status(), (string) wp_json_encode($response->get_data()));
+        self::assertIsArray($response->get_data());
+        $contentType = (string) ($response->get_headers()['Content-Type'] ?? $response->get_headers()['content-type'] ?? '');
+        if ($contentType !== '') self::assertStringStartsWith('application/json', $contentType);
+    }
+
     public function test_easy_mcp_1718_authenticated_rest_wire_uses_native_resource_registry_before_nhk_filter(): void
     {
         if (!defined('EASY_MCP_AI_VERSION') || EASY_MCP_AI_VERSION !== '1.7.18') {
