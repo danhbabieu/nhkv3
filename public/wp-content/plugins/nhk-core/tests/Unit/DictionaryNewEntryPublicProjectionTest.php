@@ -7,9 +7,9 @@ namespace NHK\Core\Application\Dictionary {
 
 namespace NHK\Tests\Unit {
 
-use NHK\Core\Application\Dictionary\{DictionaryMutationService, DictionaryPublicQuery, DictionaryResolver, DictionaryRuntime, DictionaryTermNormalizer};
+use NHK\Core\Application\Dictionary\{DictionaryMutationService, DictionaryPreCreateResolver, DictionaryPublicQuery, DictionaryResolver, DictionaryRuntime, DictionaryTermNormalizer};
 use NHK\Core\Domain\Dictionary\{DictionaryConcept, DictionaryLabel, LexicalEntry, LexicalEntryForm};
-use NHK\Core\Contracts\Dictionary\DictionaryConceptRepository;
+use NHK\Core\Contracts\Dictionary\{DictionaryConceptRepository, DictionaryEntryRepository};
 use NHK\Core\Infrastructure\Dictionary\{WpdbDictionaryConceptRepository, WpdbDictionaryEntryRepository};
 use NHK\Core\Shared\Uuid\UuidCodec;
 use PHPUnit\Framework\TestCase;
@@ -39,7 +39,7 @@ final class DictionaryNewEntryPublicProjectionTest extends TestCase
             public function addLabel(DictionaryLabel $label): DictionaryLabel { return $label; }
             public function saveLabel(DictionaryLabel $label, string $previousNormalizedLabel, int $expectedConceptRevision): DictionaryLabel { return $label; }
         };
-        $entries = new class($oldSense) {
+        $entries = new class($oldSense) implements DictionaryEntryRepository {
             /** @var array<string,LexicalEntry> */
             public array $items;
             public int $writes = 0;
@@ -55,6 +55,9 @@ final class DictionaryNewEntryPublicProjectionTest extends TestCase
             public function listForms(LexicalEntry $entry): array { return [new LexicalEntryForm($entry->entryId, $entry->preferredForm, $entry->normalizedPreferredForm, LexicalEntryForm::PREFERRED, $entry->locale)]; }
             public function findByPublicSlug(string $slug): ?LexicalEntry { foreach ($this->items as $entry) if (($entry->context['public_slug'] ?? '') === $slug && $entry->status === DictionaryConcept::APPROVED) return $entry; return null; }
             public function findByForm(string $normalizedForm, array $context = []): array { return array_values(array_filter($this->items, static fn (LexicalEntry $entry): bool => $entry->status === DictionaryConcept::APPROVED && $entry->normalizedPreferredForm === $normalizedForm)); }
+            public function findForConcept(string $conceptId): ?LexicalEntry { foreach ($this->items as $entry) if (in_array($conceptId, $entry->senseIds, true)) return $entry; return null; }
+            public function addForm(LexicalEntryForm $form): LexicalEntryForm { return $form; }
+            public function createWithSenseResolved(LexicalEntry $entry, DictionaryConcept $sense, array $context, \NHK\Core\Domain\Dictionary\DictionaryPreCreateResolution $resolution): array { return $this->createWithSense($entry, $sense, $context); }
             public function publicSlugTaken(string $slug, ?string $entryId = null): bool { foreach ($this->items as $entry) if ($entry->entryId !== $entryId && ($entry->context['public_slug'] ?? '') === $slug) return true; return false; }
         };
         $receipts = [];
@@ -65,6 +68,7 @@ final class DictionaryNewEntryPublicProjectionTest extends TestCase
             receiptWriter: static function (string $key, string $fingerprint, array $result) use (&$receipts): void { $receipts[$key] = ['fingerprint' => $fingerprint, 'result' => $result]; },
             entryRepository: $entries,
             entryPublicIdentityWriter: $writer,
+            preCreateResolver: new DictionaryPreCreateResolver($entries),
         );
 
         $created = $service->createEntryWithSense('Kính rào', 'Nghĩa', [], 'brand-new-entry-1');

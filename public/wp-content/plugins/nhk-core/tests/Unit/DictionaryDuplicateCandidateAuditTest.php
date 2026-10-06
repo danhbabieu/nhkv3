@@ -63,4 +63,40 @@ final class DictionaryDuplicateCandidateAuditTest extends TestCase
         self::assertSame('unavailable', $result['status']);
         self::assertSame('DICTIONARY_DUPLICATE_AUDIT_UNAVAILABLE', $result['reason']);
     }
+
+    public function test_audit_deduplicates_entry_form_sense_and_classifies_homographs(): void
+    {
+        $row = ['entry_id' => 'entry-1', 'sense_id' => 'sense-1', 'form_text' => 'Côn', 'normalized_form' => 'côn', 'entry_status' => 'APPROVED', 'sense_status' => 'APPROVED', 'entry_revision' => 1, 'sense_revision' => 1, 'context' => ['domain' => 'machine'], 'destination_type' => null, 'destination_id' => null, 'state' => 1];
+        $reader = new class($row) implements DictionaryDuplicateAuditReader {
+            public function __construct(private array $row) {}
+            public function read(int $limit = 1000): array
+            {
+                return [$this->row, $this->row, array_replace($this->row, ['entry_id' => 'entry-2', 'sense_id' => 'sense-2', 'context' => ['domain' => 'pen']])];
+            }
+        };
+
+        $result = (new DictionaryDuplicateCandidateAudit($reader))->run();
+
+        self::assertSame(2, $result['clusters'][0]['candidate_count']);
+        self::assertContains('DUPLICATE_ENTRY_CANDIDATE', $result['clusters'][0]['reasons']);
+        self::assertContains('CONTEXTUAL_HOMOGRAPH', $result['clusters'][0]['reasons']);
+    }
+
+    public function test_audit_classifies_multiple_senses_on_one_entry(): void
+    {
+        $reader = new class implements DictionaryDuplicateAuditReader {
+            public function read(int $limit = 1000): array
+            {
+                return [
+                    ['entry_id' => 'entry-1', 'sense_id' => 'sense-1', 'form_id' => 'form-1', 'form_text' => 'Côn', 'normalized_form' => 'côn', 'entry_status' => 'APPROVED', 'sense_status' => 'APPROVED', 'context' => ['domain' => 'machine'], 'state' => 1],
+                    ['entry_id' => 'entry-1', 'sense_id' => 'sense-2', 'form_id' => 'form-1', 'form_text' => 'Côn', 'normalized_form' => 'côn', 'entry_status' => 'APPROVED', 'sense_status' => 'APPROVED', 'context' => ['domain' => 'machine'], 'state' => 1],
+                ];
+            }
+        };
+
+        $result = (new DictionaryDuplicateCandidateAudit($reader))->run();
+
+        self::assertContains('MULTI_SENSE_SINGLE_ENTRY', $result['clusters'][0]['reasons']);
+        self::assertNotContains('DUPLICATE_ENTRY_CANDIDATE', $result['clusters'][0]['reasons']);
+    }
 }

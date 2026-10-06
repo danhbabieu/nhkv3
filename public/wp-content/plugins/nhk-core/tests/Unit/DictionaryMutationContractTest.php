@@ -6,7 +6,7 @@ namespace NHK\Tests\Unit;
 use NHK\Core\Application\Dictionary\DictionaryMutationService;
 use NHK\Core\Application\Dictionary\DictionaryPreCreateResolver;
 use NHK\Core\Contracts\Dictionary\{DictionaryConceptRepository, DictionaryEntryRepository};
-use NHK\Core\Domain\Dictionary\{DictionaryConcept, DictionaryLabel};
+use NHK\Core\Domain\Dictionary\{DictionaryConcept, DictionaryLabel, DictionaryPreCreateResolution};
 use NHK\Core\Domain\Dictionary\{LexicalEntry, LexicalEntryForm};
 use PHPUnit\Framework\TestCase;
 
@@ -120,11 +120,18 @@ final class DictionaryMutationContractTest extends TestCase
         $entries = new class {
             public function createWithSense(LexicalEntry $entry, DictionaryConcept $sense, array $context): array { return ['entry' => $entry, 'sense' => $sense, 'forms' => []]; }
         };
-        $service = new \NHK\Core\Application\Dictionary\DictionaryMutationService($repo, entryRepository: $entries);
+        $service = new \NHK\Core\Application\Dictionary\DictionaryMutationService($repo, entryRepository: $entries, preCreateResolver: new DictionaryPreCreateResolver($this->entryRepository()));
         $result = $service->createEntryWithSense('Côn', 'Nghĩa', [], 'entry-create-1');
         self::assertInstanceOf(LexicalEntry::class, $result['entry']);
         self::assertInstanceOf(DictionaryConcept::class, $result['sense']);
         self::assertSame(1, $result['entry']->revision);
+    }
+
+    public function test_direct_dictionary_create_fails_closed_without_a_pre_create_resolver(): void
+    {
+        $repo = $this->conceptRepository();
+        $this->expectExceptionMessage('PRE_CREATE_RESOLUTION_REQUIRED');
+        (new DictionaryMutationService($repo))->createDraft('Côn hoa thị', 'Nghĩa', [], 'direct-create-bypass');
     }
 
     public function test_new_entry_creation_persists_one_canonical_public_slug_before_read_back(): void
@@ -148,7 +155,7 @@ final class DictionaryMutationContractTest extends TestCase
             }
         };
         $writer = new \NHK\Core\Application\Dictionary\DictionaryEntryPublicIdentityWriter(static fn (string $slug, ?string $entryId = null): bool => false);
-        $service = new DictionaryMutationService($repo, entryRepository: $entries, entryPublicIdentityWriter: $writer);
+        $service = new DictionaryMutationService($repo, entryRepository: $entries, entryPublicIdentityWriter: $writer, preCreateResolver: new DictionaryPreCreateResolver($this->entryRepository()));
 
         $result = $service->createEntryWithSense('Kính rào', 'Nghĩa', [], 'entry-create-public-1');
 
@@ -189,7 +196,7 @@ final class DictionaryMutationContractTest extends TestCase
         };
         $entries = new class { public int $writes = 0; public function addFormToEntry(string $id, int $revision, LexicalEntryForm $form): array { $this->writes++; return []; } };
         $service = new \NHK\Core\Application\Dictionary\DictionaryMutationService($repo, entryRepository: $entries);
-        $this->expectExceptionMessage('DICTIONARY_ENTRY_FORM_COLLISION');
+        $this->expectExceptionMessage('PRE_CREATE_RESOLUTION_REQUIRED');
         $service->addFormToEntry('22222222-2222-7222-8222-222222222222', 1, 'CÔN', ['normalized_form' => 'con'], 'form-1');
     }
 
@@ -214,7 +221,7 @@ final class DictionaryMutationContractTest extends TestCase
                 return ['entry' => new LexicalEntry($id, 'Côn', 'con', DictionaryConcept::DRAFT, 'vi-VN', [], $revision + 1), 'form' => $form];
             }
         };
-        $service = new DictionaryMutationService($repo, entryRepository: $entries);
+        $service = new DictionaryMutationService($repo, entryRepository: $entries, preCreateResolver: new DictionaryPreCreateResolver($this->formPreCreateRepository()));
 
         foreach ([['Selection cam', 'en'], ['Jaquemart', 'fr'], ['Jahresuhr/400', 'de'], ['400 ngày', 'vi-VN']] as [$form, $locale]) {
             $service->addFormToEntry('entry-' . $locale, 1, $form, [], 'form-' . $locale, LexicalEntryForm::ALTERNATE, $locale);
@@ -313,6 +320,22 @@ final class DictionaryMutationContractTest extends TestCase
         self::assertSame(1, $entries->createWrites);
     }
 
+    public function test_create_new_rechecks_any_new_active_normalized_form_and_forces_replan(): void
+    {
+        $entries = new class implements DictionaryEntryRepository {
+            public function findByForm(string $normalizedForm, array $context = []): array { return []; }
+            public function findForConcept(string $conceptId): ?LexicalEntry { return null; }
+            public function listSenses(LexicalEntry $entry, array $context = []): array { return []; }
+            public function addForm(LexicalEntryForm $form): LexicalEntryForm { return $form; }
+            public function createWithSenseResolved(LexicalEntry $entry, DictionaryConcept $sense, array $context, DictionaryPreCreateResolution $resolution): array { throw new \RuntimeException('DICTIONARY_PRE_CREATE_STALE'); }
+            public function createWithSense(LexicalEntry $entry, DictionaryConcept $sense, array $context): array { throw new \LogicException('resolved write required'); }
+        };
+        $service = new DictionaryMutationService($this->conceptRepository(), entryRepository: $entries, preCreateResolver: new DictionaryPreCreateResolver($entries));
+
+        $this->expectExceptionMessage('DICTIONARY_PRE_CREATE_STALE');
+        $service->createEntryWithSense('Kính rào', 'Nghĩa', [], 'stale-create-race');
+    }
+
     public function test_duplicate_form_and_sense_enrichment_reuse_without_repository_write(): void
     {
         $sense = new DictionaryConcept('sense-form', 'Côn', 'Nghĩa', DictionaryConcept::APPROVED, null, null, null, [], 1);
@@ -361,6 +384,17 @@ final class DictionaryMutationContractTest extends TestCase
             public function updateConcept(DictionaryConcept $concept, int $expectedRevision): DictionaryConcept { return $this->concepts[$concept->conceptId] = $concept; }
             public function addLabel(DictionaryLabel $label): DictionaryLabel { return $label; }
             public function saveLabel(DictionaryLabel $label, string $previousNormalizedLabel, int $expectedConceptRevision): DictionaryLabel { return $label; }
+        };
+    }
+
+    private function formPreCreateRepository(): DictionaryEntryRepository
+    {
+        return new class implements DictionaryEntryRepository {
+            public function findByForm(string $normalizedForm, array $context = []): array { return []; }
+            public function findForConcept(string $conceptId): ?LexicalEntry { return null; }
+            public function listSenses(LexicalEntry $entry, array $context = []): array { return []; }
+            public function addForm(LexicalEntryForm $form): LexicalEntryForm { return $form; }
+            public function findById(string $id): ?LexicalEntry { return new LexicalEntry($id, 'Côn', 'côn', DictionaryConcept::DRAFT, 'vi-VN', [], 1); }
         };
     }
 

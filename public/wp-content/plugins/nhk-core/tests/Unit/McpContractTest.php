@@ -96,6 +96,7 @@ final class McpContractTest extends TestCase
             'nhk.knowledge.writer.preview',
             'nhk.knowledge.quality-audit',
             'nhk.dictionary.seed-audit',
+            'nhk.dictionary.duplicate-audit',
             'nhk.article.ingest',
             'nhk.capture.ingest',
             'nhk.capture.get',
@@ -224,6 +225,24 @@ final class McpContractTest extends TestCase
         self::assertSame(200, $response['status']);
         self::assertTrue($response['body']['result']['isError']);
         self::assertSame('DOCUMENTATION_CHECKPOINT_STALE', $response['body']['result']['structuredContent']['error']['code']);
+    }
+
+    public function test_capture_ingest_create_capable_lexical_plan_cannot_bypass_pre_create_gate(): void
+    {
+        $transport = new McpTransport($this->readHandler(), new McpGovernanceHandler(new GovernanceService(new InMemoryProposalRepository())), static fn (string $capability): bool => true);
+        $documentation = (new McpDocumentationRegistry())->bootstrap();
+        $response = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 88, 'method' => 'tools/call', 'params' => [
+            'name' => 'nhk.capture.ingest',
+            'arguments' => [
+                'idempotency_key' => 'capture-lexical-gate',
+                'documentation_checkpoint' => ['manifest_hash' => $documentation['manifest_hash'], 'documentation_version' => $documentation['documentation_version']],
+                'dictionary_owner_plan' => ['operation' => 'CREATE', 'term' => 'Kính rào', 'context' => []],
+            ],
+        ]]);
+
+        self::assertSame(200, $response['status'], json_encode($response, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        self::assertTrue($response['body']['result']['isError']);
+        self::assertSame('PRE_CREATE_RESOLUTION_REQUIRED', $response['body']['result']['structuredContent']['error']['code']);
     }
 
     public function test_capture_writes_fail_closed_when_required_runtime_schema_is_stale(): void

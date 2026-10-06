@@ -14,6 +14,7 @@ use NHK\Core\Domain\Capture\CapturePurpose;
 use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Core\Application\Mcp\McpDocumentationRegistry;
 use NHK\Core\Application\Dictionary\DictionaryObservationRegistry;
+use NHK\Core\Application\Dictionary\DictionaryPreCreateResolver;
 use NHK\Core\Domain\Dictionary\DictionaryPreCreateResolution;
 use NHK\Core\Application\Governance\StagingAcceptanceScopeVerifier;
 use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
@@ -65,6 +66,7 @@ final class EditorialCaptureCoordinator
         private ?\NHK\Core\Application\Media\CaptureFeatureBindingCoordinator $featureBindings = null,
         private ?CaptureSubjectBindingRecovery $subjectBinding = null,
         private ?CaptureDictionaryCreatePrecondition $dictionaryCreatePrecondition = null,
+        private ?DictionaryPreCreateResolver $dictionaryPreCreateResolver = null,
     ) { $this->completion = $completion ?? new CompletionCoordinator(); }
 
     /** @param array<string,mixed> $input */
@@ -731,18 +733,29 @@ final class EditorialCaptureCoordinator
                 $diagnostics,
                 $receipts,
             );
-            if (trim((string) ($input['dictionary_create_operation'] ?? '')) !== '') {
-                $packet = $diagnostics['dictionary_pre_create_resolution'] ?? null;
-                if (!is_array($packet)) throw new \RuntimeException('CAPTURE_DICTIONARY_PRE_CREATE_PACKET_REQUIRED');
-                $resolution = DictionaryPreCreateResolution::fromDecision(
-                    (string) ($packet['action'] ?? ''),
-                    (string) ($packet['normalized_form'] ?? ''),
-                    (array) ($packet['context'] ?? []),
-                    (array) ($packet['candidates'] ?? []),
-                    (array) ($packet['dependency_revisions'] ?? []),
-                    (array) ($packet['diagnostics'] ?? []),
-                );
-                ($this->dictionaryCreatePrecondition ?? new CaptureDictionaryCreatePrecondition())->assert($planningEnvelope, $resolution, (string) $input['dictionary_create_operation']);
+            $lexicalPlan = is_array($input['dictionary_owner_plan'] ?? null) ? $input['dictionary_owner_plan'] : [];
+            $dictionaryOperation = strtoupper(trim((string) ($lexicalPlan['operation'] ?? '')));
+            if (in_array($dictionaryOperation, ['CREATE', 'ADD_FORM', 'ADD_SENSE', 'ENRICH'], true)) {
+                if (!$this->dictionaryPreCreateResolver instanceof DictionaryPreCreateResolver) throw new \RuntimeException('PRE_CREATE_RESOLUTION_REQUIRED');
+                $dictionaryContext = is_array($lexicalPlan['context'] ?? null) ? $lexicalPlan['context'] : [];
+                $resolution = match ($dictionaryOperation) {
+                    'CREATE', 'ENRICH' => $this->dictionaryPreCreateResolver->resolveEntryCreate((string) ($lexicalPlan['term'] ?? $lexicalPlan['preferred_form'] ?? ''), $dictionaryContext, isset($lexicalPlan['semantic_type']) ? (string) $lexicalPlan['semantic_type'] : null, isset($lexicalPlan['semantic_id']) ? (string) $lexicalPlan['semantic_id'] : null),
+                    'ADD_FORM' => $this->dictionaryPreCreateResolver->resolveFormAddition((string) ($lexicalPlan['entry_id'] ?? ''), (string) ($lexicalPlan['form'] ?? $lexicalPlan['term'] ?? ''), $dictionaryContext),
+                    'ADD_SENSE' => $this->dictionaryPreCreateResolver->resolveSenseAddition((string) ($lexicalPlan['entry_id'] ?? ''), (string) ($lexicalPlan['sense_id'] ?? $lexicalPlan['concept_id'] ?? ''), $dictionaryContext),
+                };
+                $diagnostics['dictionary_pre_create_resolution'] = $resolution->toArray() + [
+                    'operation' => $dictionaryOperation,
+                    'request_fingerprint' => $record->requestFingerprint,
+                    'resolution_fingerprint' => $resolution->fingerprint(),
+                    'dependency_revisions' => $resolution->dependencyRevisions,
+                ];
+                $planningEnvelope = CaptureEnrichmentPlanningEnvelope::fromState($record->captureId, $record->requestFingerprint, $input, $interpretation, $assets, $diagnostics, $receipts);
+                ($this->dictionaryCreatePrecondition ?? new CaptureDictionaryCreatePrecondition())->assert($planningEnvelope, $resolution, match ($dictionaryOperation) {
+                    'CREATE' => 'CREATE_ENTRY_WITH_SENSE',
+                    'ADD_FORM' => 'ADD_FORM_TO_ENTRY',
+                    'ADD_SENSE' => 'ADD_SENSE_TO_ENTRY',
+                    default => 'ENRICH_EXISTING',
+                });
             }
             $planningEnvelopeArray = $planningEnvelope->toArray();
             $diagnostics['enrichment_planning_envelope'] = [

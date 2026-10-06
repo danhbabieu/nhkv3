@@ -9,22 +9,36 @@ final class DictionaryDuplicateCandidateAudit
 {
     public function __construct(private DictionaryDuplicateAuditReader $reader) {}
 
-    public function run(int $limit = 1000): array
+    public function run(int $limit = 1000, ?string $cursor = null): array
     {
         $limit = max(1, min(10000, $limit));
         try {
-            $rows = $this->reader->read($limit);
+            if (method_exists($this->reader, 'readPage')) {
+                $page = $this->reader->readPage($limit, $cursor);
+                $rows = is_array($page['rows'] ?? null) ? $page['rows'] : [];
+                $nextCursor = isset($page['next_cursor']) ? (string) $page['next_cursor'] : null;
+                $complete = $nextCursor === null;
+            } else {
+                $rows = $this->reader->read($limit);
+                $nextCursor = null;
+                $complete = true;
+            }
             if (!is_array($rows)) return ['status' => 'unavailable', 'reason' => 'DICTIONARY_DUPLICATE_AUDIT_UNAVAILABLE', 'clusters' => []];
         } catch (\Throwable) {
             return ['status' => 'unavailable', 'reason' => 'DICTIONARY_DUPLICATE_AUDIT_UNAVAILABLE', 'clusters' => []];
         }
 
         $groups = [];
+        $seen = [];
         foreach ($rows as $row) {
             if (!is_array($row)) continue;
             $normalized = trim((string) ($row['normalized_form'] ?? ''));
             if ($normalized === '') continue;
-            $groups[$normalized][] = $this->candidate($row);
+            $candidate = $this->candidate($row);
+            $identity = implode('|', [$candidate['entry_id'], $candidate['form_id'], $candidate['sense_id']]);
+            if (isset($seen[$identity])) continue;
+            $seen[$identity] = true;
+            $groups[$normalized][] = $candidate;
         }
 
         $clusters = [];
@@ -41,13 +55,14 @@ final class DictionaryDuplicateCandidateAudit
             ];
         }
         usort($clusters, static fn (array $left, array $right): int => strcmp($left['cluster_key'], $right['cluster_key']));
-        return ['status' => 'available', 'clusters' => $clusters, 'count' => count($clusters), 'rows_read' => count($rows), 'read_only' => true];
+        return ['status' => 'available', 'clusters' => $clusters, 'count' => count($clusters), 'rows_read' => count($rows), 'read_only' => true, 'complete' => $complete, 'next_cursor' => $nextCursor];
     }
 
     private function candidate(array $row): array
     {
         return [
             'entry_id' => trim((string) ($row['entry_id'] ?? '')),
+            'form_id' => trim((string) ($row['form_id'] ?? (($row['normalized_form'] ?? '') . ':' . ($row['form_text'] ?? '')))),
             'sense_id' => trim((string) ($row['sense_id'] ?? '')),
             'form_text' => trim((string) ($row['form_text'] ?? '')),
             'normalized_form' => trim((string) ($row['normalized_form'] ?? '')),
@@ -65,11 +80,15 @@ final class DictionaryDuplicateCandidateAudit
     private function reasons(array $candidates): array
     {
         $reasons = ['EXACT_NORMALIZED_FORM_COLLISION'];
+        $entryIds = array_values(array_unique(array_map(static fn (array $candidate): string => $candidate['entry_id'], $candidates)));
+        $senseIds = array_values(array_unique(array_map(static fn (array $candidate): string => $candidate['sense_id'], $candidates)));
+        if (count($entryIds) > 1) $reasons[] = 'DUPLICATE_ENTRY_CANDIDATE';
+        if (count($entryIds) === 1 && count($senseIds) > 1) $reasons[] = 'MULTI_SENSE_SINGLE_ENTRY';
         $contexts = array_values(array_unique(array_map(fn (array $candidate): string => $this->canonical($candidate['context']), $candidates)));
-        if (count($contexts) > 1) $reasons[] = 'DIVERGENT_CONTEXT';
+        if (count($contexts) > 1) { $reasons[] = 'DIVERGENT_CONTEXT'; $reasons[] = 'CONTEXTUAL_HOMOGRAPH'; }
         $owners = array_values(array_unique(array_filter(array_map(static fn (array $candidate): string => ($candidate['destination_type'] ?? '') . ':' . ($candidate['destination_id'] ?? ''), $candidates), static fn (string $owner): bool => $owner !== ':')));
         if (count($owners) === 1) $reasons[] = 'SAME_SEMANTIC_OWNER';
-        if (count(array_unique(array_map(static fn (array $candidate): string => $candidate['sense_id'], $candidates))) > 1) $reasons[] = 'MULTIPLE_SENSES';
+        if (count($senseIds) > 1) $reasons[] = 'MULTIPLE_SENSES';
         foreach ($candidates as $candidate) {
             if ($candidate['state'] !== 1 || $candidate['entry_status'] !== 'APPROVED' || $candidate['sense_status'] !== 'APPROVED') {
                 $reasons[] = 'INACTIVE_CANDIDATE';

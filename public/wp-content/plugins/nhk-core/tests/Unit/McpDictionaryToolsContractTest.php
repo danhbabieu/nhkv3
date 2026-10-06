@@ -4,14 +4,27 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Mcp\{McpAbilityRegistration, McpCapabilityManifest, McpDispatchRegistry, McpToolCatalog, SingleEntryPointPolicy};
+use NHK\Core\Application\Mcp\McpDictionaryHandler;
+use NHK\Core\Application\Dictionary\{DictionaryMutationService, DictionaryRuntime};
+use NHK\Core\Contracts\Dictionary\DictionaryConceptRepository;
 use PHPUnit\Framework\TestCase;
 
 final class McpDictionaryToolsContractTest extends TestCase
 {
+    public function test_mcp_dictionary_concept_create_cannot_reach_mutation_without_resolution(): void
+    {
+        $concepts = $this->createMock(DictionaryConceptRepository::class);
+        $mutation = new DictionaryMutationService($concepts);
+        $runtime = (new \ReflectionClass(DictionaryRuntime::class))->newInstanceWithoutConstructor();
+
+        $this->expectExceptionMessage('PRE_CREATE_RESOLUTION_REQUIRED');
+        (new McpDictionaryHandler($runtime, null, null, $mutation))->createConcept(['preferred_label' => 'Côn hoa thị', 'idempotency_key' => 'mcp-direct-create']);
+    }
+
     public function test_dictionary_tools_have_catalog_dispatch_and_strict_mutation_fields(): void
     {
         $tools = array_column(McpToolCatalog::tools(), null, 'name');
-        foreach (['nhk.dictionary.search', 'nhk.dictionary.resolve', 'nhk.dictionary.concept.get', 'nhk.dictionary.candidate.list', 'nhk.dictionary.candidate.get', 'nhk.dictionary.mentions.list', 'nhk.dictionary.concept.create', 'nhk.dictionary.entry.create-with-sense', 'nhk.dictionary.entry.form.add', 'nhk.dictionary.entry.sense.add', 'nhk.dictionary.concept.update', 'nhk.dictionary.concept.lifecycle', 'nhk.dictionary.label.save', 'nhk.dictionary.candidate.review', 'nhk.dictionary.relation.handoff', 'nhk.dictionary.backfill.dry_run', 'nhk.dictionary.profile', 'nhk.dictionary.enrichment.audit', 'nhk.dictionary.enrichment.plan', 'nhk.dictionary.enrichment.apply', 'nhk.dictionary.materialization.profile', 'nhk.dictionary.materialization.plan', 'nhk.dictionary.materialization.apply'] as $name) {
+        foreach (['nhk.dictionary.search', 'nhk.dictionary.resolve', 'nhk.dictionary.concept.get', 'nhk.dictionary.candidate.list', 'nhk.dictionary.candidate.get', 'nhk.dictionary.mentions.list', 'nhk.dictionary.concept.create', 'nhk.dictionary.entry.create-with-sense', 'nhk.dictionary.entry.form.add', 'nhk.dictionary.entry.sense.add', 'nhk.dictionary.concept.update', 'nhk.dictionary.concept.lifecycle', 'nhk.dictionary.label.save', 'nhk.dictionary.candidate.review', 'nhk.dictionary.relation.handoff', 'nhk.dictionary.backfill.dry_run', 'nhk.dictionary.profile', 'nhk.dictionary.enrichment.audit', 'nhk.dictionary.enrichment.plan', 'nhk.dictionary.enrichment.apply', 'nhk.dictionary.materialization.profile', 'nhk.dictionary.materialization.plan', 'nhk.dictionary.materialization.apply', 'nhk.dictionary.duplicate-audit'] as $name) {
             self::assertArrayHasKey($name, $tools);
             self::assertTrue(McpDispatchRegistry::hasHandler($name));
         }
@@ -20,6 +33,9 @@ final class McpDictionaryToolsContractTest extends TestCase
         self::assertContains('expected_revision', $tools['nhk.dictionary.concept.update']['inputSchema']['required']);
         self::assertArrayNotHasKey('nhk.dictionary.concept.delete', $tools);
         self::assertSame('read', $tools['nhk.dictionary.enrichment.audit']['kind']);
+        self::assertSame('read', $tools['nhk.dictionary.duplicate-audit']['kind']);
+        self::assertSame(['limit', 'cursor'], array_keys($tools['nhk.dictionary.duplicate-audit']['inputSchema']['properties']));
+        self::assertSame([], $tools['nhk.dictionary.duplicate-audit']['inputSchema']['required']);
         self::assertSame('mutation', $tools['nhk.dictionary.enrichment.apply']['kind']);
         self::assertContains('approved_plan_fingerprint', $tools['nhk.dictionary.enrichment.apply']['inputSchema']['required']);
         self::assertSame('read', $tools['nhk.dictionary.materialization.profile']['kind']);

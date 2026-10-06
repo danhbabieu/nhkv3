@@ -10,7 +10,8 @@ final class DictionaryPreCreateResolver
 {
     private DictionaryTermNormalizer $normalizer;
 
-    public function __construct(private DictionaryEntryRepository $entries, ?DictionaryTermNormalizer $normalizer = null)
+    /** @param callable(string,array):bool|null $suppressionLookup */
+    public function __construct(private DictionaryEntryRepository $entries, ?DictionaryTermNormalizer $normalizer = null, private $suppressionLookup = null)
     {
         $this->normalizer = $normalizer ?? new DictionaryTermNormalizer();
     }
@@ -19,13 +20,19 @@ final class DictionaryPreCreateResolver
     {
         $normalized = $this->requiredNormalized($preferredForm);
         try {
-            $entries = $this->entries->findByForm($normalized, $context);
+            $entries = method_exists($this->entries, 'findPreCreateCandidates')
+                ? $this->entries->findPreCreateCandidates($normalized, $context)
+                : $this->entries->findByForm($normalized, $context);
             if (!is_array($entries)) return $this->review($normalized, $context, [], [], 'DICTIONARY_PRE_CREATE_DEPENDENCY_UNAVAILABLE');
+            if (is_callable($this->suppressionLookup) && (bool) ($this->suppressionLookup)($normalized, $context)) {
+                return $this->review($normalized, $context, [], [], 'SUPPRESSED_CANDIDATE');
+            }
 
             $candidates = [];
             $revisions = [];
             $retired = [];
             $contextMismatch = [];
+            $mappingIssues = [];
             foreach ($entries as $entry) {
                 if (!$entry instanceof LexicalEntry) continue;
                 $allSenses = $this->entries->listSenses($entry, []);
@@ -43,6 +50,10 @@ final class DictionaryPreCreateResolver
                     if (!$sense instanceof DictionaryConcept) continue;
                     $this->recordRevision($revisions, 'sense:' . $sense->conceptId, $sense->revision);
                     $candidate = $this->entryCandidate($entry, $sense, 'ACTIVE');
+                    if (in_array((string) ($candidate['semantic_reference']['status'] ?? ''), ['INVALID', 'UNAVAILABLE_IMPLEMENTATION_GAP'], true)) {
+                        $mappingIssues[] = $candidate;
+                        continue;
+                    }
                     if ($sense->status === DictionaryConcept::RETIRED) {
                         $candidate['status'] = 'RETIRED_SENSE';
                         $retired[] = $candidate;
@@ -53,15 +64,17 @@ final class DictionaryPreCreateResolver
             }
 
             if ($candidates === []) {
+                if ($mappingIssues !== []) return $this->review($normalized, $context, $mappingIssues, $revisions, 'SEMANTIC_REFERENCE_UNAVAILABLE');
                 if ($retired !== []) return $this->review($normalized, $context, $retired, $revisions, 'RETIRED_CANDIDATE');
                 if ($contextMismatch !== []) return $this->review($normalized, $context, $contextMismatch, $revisions, 'CONTEXT_MISMATCH');
                 return DictionaryPreCreateResolution::fromDecision(DictionaryPreCreateResolution::CREATE_NEW, $normalized, $context, [], $revisions, ['reason' => 'NO_APPLICABLE_CANDIDATE']);
             }
+            if ($mappingIssues !== []) return $this->review($normalized, $context, array_merge($candidates, $mappingIssues), $revisions, 'SEMANTIC_REFERENCE_UNAVAILABLE');
 
             if ($semanticType !== null || $semanticId !== null) {
                 $ownerMatched = array_values(array_filter($candidates, fn (array $candidate): bool => $this->ownerMatches($candidate, $semanticType, $semanticId)));
                 if ($ownerMatched !== []) $candidates = $ownerMatched;
-                elseif ($context !== []) return $this->review($normalized, $context, $candidates, $revisions, 'SEMANTIC_OWNER_CONTEXT_CONFLICT');
+                else return $this->review($normalized, $context, $candidates, $revisions, 'SEMANTIC_OWNER_CONFLICT');
             }
 
             $entryIds = array_values(array_unique(array_map(static fn (array $candidate): string => $candidate['entry_id'], $candidates)));
@@ -135,6 +148,8 @@ final class DictionaryPreCreateResolver
 
     private function entryCandidate(LexicalEntry $entry, ?DictionaryConcept $sense, string $status): array
     {
+        $mapping = $sense !== null ? $this->semanticReference($entry, $sense) : ['status' => 'ABSENT', 'source' => 'NONE'];
+        $mappingAvailable = ($mapping['status'] ?? '') === 'AVAILABLE';
         return [
             'entry_id' => $entry->entryId,
             'sense_id' => $sense?->conceptId,
@@ -143,9 +158,21 @@ final class DictionaryPreCreateResolver
             'status' => $status,
             'preferred_form' => $entry->preferredForm,
             'context' => $sense?->context ?? $entry->context,
-            'destination_type' => $sense?->destinationType,
-            'destination_id' => $sense?->destinationId,
+            'destination_type' => $mappingAvailable ? ($mapping['type'] ?? null) : $sense?->destinationType,
+            'destination_id' => $mappingAvailable ? ($mapping['id'] ?? null) : $sense?->destinationId,
+            'semantic_reference' => $mapping,
         ];
+    }
+
+    /** Mapping is authoritative; legacy Concept destination is an explicit fallback only. */
+    private function semanticReference(LexicalEntry $entry, DictionaryConcept $sense): array
+    {
+        if (!method_exists($this->entries, 'semanticReference')) return ['status' => 'ABSENT', 'source' => 'LEGACY_FALLBACK'];
+        $reference = $this->entries->semanticReference($entry->entryId, $sense->conceptId);
+        if (!is_array($reference)) return ['status' => 'UNAVAILABLE_IMPLEMENTATION_GAP', 'source' => 'MAPPING'];
+        if (($reference['status'] ?? '') === 'AVAILABLE') return $reference + ['source' => 'MAPPING'];
+        if (in_array(($reference['status'] ?? ''), ['INVALID', 'UNAVAILABLE_IMPLEMENTATION_GAP'], true)) return $reference;
+        return $reference + ['source' => 'LEGACY_FALLBACK'];
     }
 
     private function ownerMatches(array $candidate, ?string $type, ?string $id): bool

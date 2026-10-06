@@ -112,6 +112,52 @@ final class DictionaryPreCreateResolverTest extends TestCase
         self::assertSame(DictionaryPreCreateResolution::REVIEW_REQUIRED, $result->action);
     }
 
+    public function test_mapping_owner_is_authoritative_over_legacy_concept_destination(): void
+    {
+        $sense = $this->sense('sense-1', 'Côn', ['domain' => 'clock'], 'classification', 'legacy-owner');
+        $entry = $this->entry('entry-1', 'Côn', [$sense->conceptId]);
+        $repo = new class($entry, $sense) implements DictionaryEntryRepository {
+            public function __construct(private LexicalEntry $entry, private DictionaryConcept $sense) {}
+            public function findByForm(string $form, array $context = []): array { return [$this->entry]; }
+            public function findForConcept(string $id): ?LexicalEntry { return $this->entry; }
+            public function listSenses(LexicalEntry $entry, array $context = []): array { return [$this->sense]; }
+            public function addForm(LexicalEntryForm $form): LexicalEntryForm { return $form; }
+            public function semanticReference(string $entryId, string $senseId): array { return ['status' => 'AVAILABLE', 'source' => 'MAPPING', 'type' => 'classification', 'id' => 'mapped-owner', 'revision' => 4]; }
+        };
+
+        $result = (new DictionaryPreCreateResolver($repo))->resolveEntryCreate('Côn', ['domain' => 'clock'], 'classification', 'mapped-owner');
+
+        self::assertSame(DictionaryPreCreateResolution::REUSE_EXISTING, $result->action);
+        self::assertSame('MAPPING', $result->candidates[0]['semantic_reference']['source']);
+    }
+
+    public function test_owner_mismatch_requires_review_even_without_context(): void
+    {
+        $sense = $this->sense('sense-1', 'Côn', [], 'classification', 'other-owner');
+        $entry = $this->entry('entry-1', 'Côn', [$sense->conceptId]);
+
+        $result = (new DictionaryPreCreateResolver($this->repository([$entry], [$sense])))->resolveEntryCreate('Côn', [], 'classification', 'requested-owner');
+
+        self::assertSame(DictionaryPreCreateResolution::REVIEW_REQUIRED, $result->action);
+        self::assertSame('SEMANTIC_OWNER_CONFLICT', $result->diagnostics['reason']);
+    }
+
+    public function test_same_mapping_owner_reuses_existing_entry(): void
+    {
+        $sense = $this->sense('sense-1', 'Côn', [], 'classification', 'legacy-owner');
+        $entry = $this->entry('entry-1', 'Côn', [$sense->conceptId]);
+        $repo = new class($entry, $sense) implements DictionaryEntryRepository {
+            public function __construct(private LexicalEntry $entry, private DictionaryConcept $sense) {}
+            public function findByForm(string $form, array $context = []): array { return [$this->entry]; }
+            public function findForConcept(string $id): ?LexicalEntry { return $this->entry; }
+            public function listSenses(LexicalEntry $entry, array $context = []): array { return [$this->sense]; }
+            public function addForm(LexicalEntryForm $form): LexicalEntryForm { return $form; }
+            public function semanticReference(string $entryId, string $senseId): array { return ['status' => 'AVAILABLE', 'source' => 'MAPPING', 'type' => 'classification', 'id' => 'mapped-owner', 'revision' => 4]; }
+        };
+
+        self::assertSame(DictionaryPreCreateResolution::REUSE_EXISTING, (new DictionaryPreCreateResolver($repo))->resolveEntryCreate('Côn', [], 'classification', 'mapped-owner')->action);
+    }
+
     public function test_unavailable_dependency_returns_review_instead_of_create(): void
     {
         $repo = $this->repository([], [], [], true);

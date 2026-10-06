@@ -23443,3 +23443,48 @@ and 33 errors: the failures are existing fixture/snapshot mismatches and the
 errors are environment-gated or DB-double integration failures (including
 missing `NHK_WP_TEST_PATH`/authorized TEST runtime and missing `query()`). No
 failure occurred in the focused policy/dossier slice.
+
+# Checkpoint — 2026-10-06 — Pre-create resolution/reuse-before-create hardening (LOCAL / NO DATA MUTATION)
+
+SCOPE: The review fixes harden the Dictionary create boundary only. No Côn hoa
+thị record was repaired, merged or retired; no migration, deployment,
+production/staging mutation, frontend dedupe or generic WordPress write ran.
+
+CAPTURE GATE: `nhk.capture.ingest` now derives Dictionary mutation intent from
+the server-owned lexical owner plan. CREATE, ADD_FORM, ADD_SENSE and ENRICH
+require a fresh `DictionaryPreCreateResolution`; the packet binds operation,
+resolution fingerprint, request fingerprint and dependency revisions. Missing,
+stale, ambiguous or resolver-less state fails closed with
+`PRE_CREATE_RESOLUTION_REQUIRED`/review diagnostics. The actual capture input
+shape is covered by `McpContractTest`.
+
+CREATE BYPASSES: `DictionaryMutationService::createDraft`, direct MCP concept
+create and Entry materialization no longer fall back to an unguarded create.
+Low-level repository primitives remain repository-only and transaction-guarded.
+Mapping-first semantic reference, explicit legacy fallback, owner-conflict
+review, curated-label resolution, WPDB draft/retired collision visibility,
+suppression review and transaction-time CREATE_NEW/ADD_FORM/ADD_SENSE race
+checks are covered by focused tests.
+
+DUPLICATE AUDIT: `nhk.dictionary.duplicate-audit` is a bounded, read-only,
+internal MCP path: McpTransport → DictionaryDuplicateAuditHandler →
+DictionaryRuntime::duplicateAudit() → WPDB `readPage`. Results deduplicate
+Entry/Form/Sense identity and classify duplicate-entry candidates,
+multi-sense-single-entry and contextual homographs. Cursor pagination is
+implemented. The authorized TEST runtime canary was not run because the local
+runtime did not provide the required identity/database; therefore the two
+historical Côn hoa thị Entry IDs remain unverified at runtime and untouched.
+
+VERIFICATION: Focused pre-create/audit/MCP/materialization/repository tests pass
+110 tests / 1,094 assertions (one PHPUnit deprecation). Changed PHP files lint
+clean and `git diff --check` passes. Exact full-suite comparison with base
+`8d64249c`, same CLI memory/configuration: base 3,428 tests / 19,337 assertions
+with 49 errors / 43 failures / 24 warnings / 51 deprecations / 59 PHPUnit
+deprecations / 124 skipped; current 3,444 tests / 19,527 assertions with 33
+errors / 27 failures / 23 warnings / 51 deprecations / 59 PHPUnit
+deprecations / 125 skipped. Current failure/error identities are a subset of
+the base run; remaining failures are pre-existing fixture/snapshot or missing
+authorized TEST/DB-double environment failures.
+
+STATUS: `PRE_CREATE_HARDENING_FIXED_LOCALLY / FOCUSED_PASS /
+TEST_RUNTIME_CANARY_BLOCKED / NO_DATA_MUTATION`.

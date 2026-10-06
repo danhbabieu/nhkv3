@@ -23,6 +23,15 @@ final class CaptureDictionaryCreatePrecondition
         };
         if ($resolution->action !== $requiredAction || !$this->same((string) ($packet['action'] ?? ''), $resolution->action)) throw new \RuntimeException('CAPTURE_DICTIONARY_PRE_CREATE_ACTION_MISMATCH');
         if (!$this->same((string) ($packet['fingerprint'] ?? ''), $resolution->fingerprint())) throw new \RuntimeException('CAPTURE_DICTIONARY_PRE_CREATE_PACKET_STALE');
+        $packetOperation = match ($operation) {
+            'CREATE_ENTRY_WITH_SENSE', 'CREATE_DRAFT' => 'CREATE',
+            'ADD_FORM_TO_ENTRY' => 'ADD_FORM',
+            'ADD_SENSE_TO_ENTRY' => 'ADD_SENSE',
+            'ENRICH_EXISTING' => 'ENRICH',
+            'REUSE_EXISTING' => 'REUSE',
+            default => '',
+        };
+        if ($packetOperation === '' || !$this->same((string) ($packet['operation'] ?? ''), $packetOperation) || !$this->same((string) ($packet['resolution_fingerprint'] ?? $packet['fingerprint'] ?? ''), $resolution->fingerprint())) throw new \RuntimeException('CAPTURE_DICTIONARY_PRE_CREATE_PACKET_STALE');
         if (!$this->same((string) ($track['request_fingerprint'] ?? ''), $envelope->requestFingerprint)) throw new \RuntimeException('CAPTURE_DICTIONARY_PRE_CREATE_PACKET_STALE');
         if (!array_key_exists('expected_revision', $track)) throw new \RuntimeException('CAPTURE_DICTIONARY_PRE_CREATE_PACKET_STALE');
         if (!$this->same((array) ($track['dependency_revisions'] ?? []), $resolution->dependencyRevisions)) throw new \RuntimeException('CAPTURE_DICTIONARY_PRE_CREATE_PACKET_STALE');

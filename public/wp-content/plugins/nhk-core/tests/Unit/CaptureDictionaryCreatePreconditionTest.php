@@ -63,7 +63,7 @@ final class CaptureDictionaryCreatePreconditionTest extends TestCase
     {
         $requestFingerprint = hash('sha256', 'capture-request');
         $track = ['status' => 'READ_BACK_VERIFIED', 'expected_revision' => 0, 'dependency_revisions' => [], 'depends_on' => [], 'request_fingerprint' => $requestFingerprint];
-        if ($packet !== null) $track['pre_create_resolution'] = $packet;
+        if ($packet !== null) $track['pre_create_resolution'] = $packet + ['operation' => 'CREATE', 'resolution_fingerprint' => (string) ($packet['fingerprint'] ?? '')];
         return CaptureEnrichmentPlanningEnvelope::fromArray([
             'capture_id' => 'capture-dictionary-1',
             'request_fingerprint' => $requestFingerprint,

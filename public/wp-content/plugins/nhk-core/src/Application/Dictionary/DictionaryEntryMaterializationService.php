@@ -24,6 +24,7 @@ final class DictionaryEntryMaterializationService
         private $receiptWriter = null,
         private $auditWriter = null,
         private $entrySenseReady = null,
+        private ?DictionaryPreCreateResolver $preCreateResolver = null,
     ) {}
 
     public function apply(array $plan, string $approvedFingerprint, string $idempotencyKey): array
@@ -37,6 +38,7 @@ final class DictionaryEntryMaterializationService
         if (!method_exists($this->entries, 'createWithSense')) {
             throw new \RuntimeException('DICTIONARY_ENTRY_REPOSITORY_UNAVAILABLE');
         }
+        if (!$this->preCreateResolver instanceof DictionaryPreCreateResolver) throw new \RuntimeException('PRE_CREATE_RESOLUTION_REQUIRED');
         $key = trim($idempotencyKey);
         if ($key === '') throw new \InvalidArgumentException('DICTIONARY_IDEMPOTENCY_KEY_REQUIRED');
         $fingerprint = hash('sha256', $this->json(['plan' => $approvedFingerprint, 'items' => $plan['items'] ?? []]));
@@ -73,7 +75,10 @@ final class DictionaryEntryMaterializationService
                 1,
                 [$concept->conceptId],
             );
-            $read = $this->entries->createWithSense($entry, $concept, $concept->context);
+            $resolution = $this->preCreateResolver->resolveEntryCreate($entry->preferredForm, $concept->context);
+            if ($resolution->action !== \NHK\Core\Domain\Dictionary\DictionaryPreCreateResolution::CREATE_NEW) throw new \RuntimeException('DICTIONARY_PRE_CREATE_REVIEW_REQUIRED');
+            if (!method_exists($this->entries, 'createWithSenseResolved')) throw new \RuntimeException('PRE_CREATE_RESOLUTION_REQUIRED');
+            $read = $this->entries->createWithSenseResolved($entry, $concept, $concept->context, $resolution);
             if (!is_array($read) || !($read['entry'] ?? null) instanceof LexicalEntry) throw new \RuntimeException('DICTIONARY_ENTRY_READBACK_FAILED');
             $results[] = ['concept_id' => $concept->conceptId, 'concept_revision' => $concept->revision, 'entry_id' => $entry->entryId, 'sense_id' => $concept->conceptId, 'form' => $entry->preferredForm, 'status' => 'MATERIALIZED'];
         }

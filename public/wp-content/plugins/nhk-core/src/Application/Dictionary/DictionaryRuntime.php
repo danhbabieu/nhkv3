@@ -130,7 +130,7 @@ final class DictionaryRuntime
                 $entity = $this->authority->findByCanonicalId($id);
                 return $entity instanceof AuthorityEntity && $entity->entityType === $type && $entity->active();
             },
-            new DictionaryPreCreateResolver($this->entries, $this->normalizer),
+            $this->preCreateResolver(),
         );
         $mediaProjection = new EntityMediaProjection(new WpdbMediaRepository($database), new WpdbMediaAssetRepository($database), new WpdbMediaUsageRepository($database));
         $mentionGallery = new PublicMediaGalleryQuery(new WpdbMediaRepository($database), new WpdbMediaAssetRepository($database));
@@ -442,6 +442,7 @@ final class DictionaryRuntime
                 $audit->recordEvent('DictionaryEntryMaterializationItem', 'dictionary_materialization', (string) ($event['concept_id'] ?? ''), function_exists('get_current_user_id') ? (int) get_current_user_id() : null, $event);
             },
             fn (): bool => $this->entrySenseAvailable(),
+            $this->preCreateResolver(),
         );
     }
 
@@ -557,7 +558,16 @@ final class DictionaryRuntime
             fn (): bool => $this->entrySenseAvailable(),
             $publicIdentityWriter,
             function (): void { $this->invalidateLabelCache(); },
-            new DictionaryPreCreateResolver($this->entries),
+            $this->preCreateResolver(),
+        );
+    }
+
+    public function preCreateResolver(): DictionaryPreCreateResolver
+    {
+        return new DictionaryPreCreateResolver(
+            $this->entries,
+            $this->normalizer,
+            fn (string $term, array $context): bool => $this->candidates->suppressed($term, $this->contextHash($context)),
         );
     }
 

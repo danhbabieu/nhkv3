@@ -67,6 +67,7 @@ final class McpDispatchRegistry
         'nhk.knowledge.writer.preview' => 'nhk.knowledge.writer.preview',
         'nhk.knowledge.quality-audit' => 'nhk.knowledge.quality-audit',
         'nhk.dictionary.seed-audit' => 'nhk.dictionary.seed-audit',
+        'nhk.dictionary.duplicate-audit' => 'nhk.dictionary.duplicate-audit',
         'nhk.article.ingest' => 'nhk.article.ingest',
         'nhk.capture.ingest' => 'nhk.capture.ingest',
         'nhk.capture.get' => 'nhk.capture.get',

@@ -121,6 +121,10 @@ final class McpToolCatalog
                 'limit' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 100],
                 'offset' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 10000],
             ], []),
+            self::tool('nhk.dictionary.duplicate-audit', 'Read-only bounded audit of duplicate Dictionary Entry/Form/Sense identities. It never merges, retires or repairs records.', [
+                'limit' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 10000],
+                'cursor' => ['type' => 'string', 'maxLength' => 512],
+            ], []),
             self::tool('nhk.article.ingest', 'Resume governed reconciliation or a bounded update of an existing Article using the same idempotency key.', self::articleProperties(true), ['idempotency_key', 'intent'], true),
             self::tool('nhk.capture.ingest', 'Capture new editorial input or continue one existing Capture; classify intent before creating an Article, preserve canonical owners, reconcile typed MediaUsage bindings even without an Article, resolve bounded semantic context when required and return the current read-back.', [
                 'idempotency_key' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 191],
@@ -144,6 +148,23 @@ final class McpToolCatalog
                 ],
                 'purpose' => ['type' => 'string', 'enum' => ['EDITORIAL', 'AUTHORITY', 'MIXED']],
                 'intent' => ['type' => 'string', 'enum' => ContentIntent::values()],
+                'dictionary_owner_plan' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'operation' => ['type' => 'string', 'enum' => ['CREATE', 'ADD_FORM', 'ADD_SENSE', 'ENRICH']],
+                        'term' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 255],
+                        'preferred_form' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 255],
+                        'form' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 255],
+                        'entry_id' => self::uuidField(),
+                        'sense_id' => self::uuidField(),
+                        'concept_id' => self::uuidField(),
+                        'semantic_type' => ['type' => 'string', 'maxLength' => 64],
+                        'semantic_id' => self::uuidField(true),
+                        'context' => ['type' => 'object'],
+                    ],
+                    'required' => ['operation'],
+                    'additionalProperties' => false,
+                ],
                 'dry_run' => ['type' => 'boolean'],
                 'relationship_operations' => [
                     'type' => 'array', 'minItems' => 1, 'maxItems' => 50,

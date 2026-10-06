@@ -61,6 +61,8 @@ final class McpTransport
         private ?McpDictionaryHandler $dictionary = null,
         private ?DictionarySeedAuditHandler $dictionarySeedAudit = null,
         private ?ArticleMediaLegacyAuditHandler $articleMediaLegacyAudit = null,
+        private ?DictionaryDuplicateAuditHandler $dictionaryDuplicateAudit = null,
+        private ?\NHK\Core\Application\Dictionary\DictionaryPreCreateResolver $dictionaryPreCreateResolver = null,
     ) {}
 
     /** @return array{status:int,body:?array} */
@@ -164,6 +166,7 @@ final class McpTransport
             'nhk.knowledge.quality-audit' => 'nhk_view_governance',
             'nhk.article.media-legacy-audit', 'nhk.article.media-legacy-repair-plan' => 'nhk_view_governance',
             'nhk.dictionary.seed-audit' => 'nhk_view_governance',
+            'nhk.dictionary.duplicate-audit' => 'nhk_view_governance',
             'nhk.dictionary.enrichment.audit', 'nhk.dictionary.enrichment.plan' => 'nhk_view_governance',
             'nhk.dictionary.enrichment.apply' => 'nhk_curate_dictionary',
             'nhk.dictionary.semantic-relation.read', 'nhk.dictionary.semantic-relation.preview', 'nhk.dictionary.lexical-relation.read', 'nhk.dictionary.lexical-relation.preview' => 'nhk_view_governance',
@@ -196,6 +199,7 @@ final class McpTransport
         if ($name === 'nhk.capture.ingest') {
             $arguments = RelationshipOwnerContract::normalizeCapture($arguments);
             RelationshipOwnerContract::assertCaptureOperations($arguments);
+            $this->assertDictionaryOwnerPlan($arguments);
             if (($arguments['dry_run'] ?? false) !== true) $arguments = RelationshipOwnerContract::routeMediaCompatibility($arguments);
         }
         $result = match ($dispatch) {
@@ -204,6 +208,7 @@ final class McpTransport
             'nhk.article.media-legacy-audit' => $this->articleMediaLegacyAudit?->audit($arguments) ?? throw new \RuntimeException('ARTICLE_MEDIA_LEGACY_AUDIT_UNAVAILABLE'),
             'nhk.article.media-legacy-repair-plan' => $this->articleMediaLegacyAudit?->repairPlan($arguments) ?? throw new \RuntimeException('ARTICLE_MEDIA_LEGACY_REPAIR_PLAN_UNAVAILABLE'),
             'nhk.dictionary.seed-audit' => $this->dictionarySeedAudit?->audit($arguments) ?? throw new \RuntimeException('DICTIONARY_SEED_AUDIT_UNAVAILABLE'),
+            'nhk.dictionary.duplicate-audit' => $this->dictionaryDuplicateAudit?->audit($arguments) ?? throw new \RuntimeException('DICTIONARY_DUPLICATE_AUDIT_UNAVAILABLE'),
             'nhk.documentation.bootstrap', 'nhk.docs.bootstrap' => ($this->documentation ?? new McpDocumentationRegistry())->bootstrap(),
             'nhk.documentation.get' => ($this->documentation ?? new McpDocumentationRegistry())->get((string) ($arguments['path'] ?? ''), isset($arguments['start_line']) ? (int) $arguments['start_line'] : null, isset($arguments['line_count']) ? (int) $arguments['line_count'] : null),
             'nhk.documentation.list' => ($this->documentation ?? new McpDocumentationRegistry())->list(isset($arguments['status']) ? (string) $arguments['status'] : null, isset($arguments['domain']) ? (string) $arguments['domain'] : null, isset($arguments['path_prefix']) ? (string) $arguments['path_prefix'] : null),
@@ -594,6 +599,16 @@ final class McpTransport
             return $this->captureContinuation->execute($arguments);
         }
         return $this->capture->execute($arguments)->toArray();
+    }
+
+    private function assertDictionaryOwnerPlan(array $arguments): void
+    {
+        $plan = is_array($arguments['dictionary_owner_plan'] ?? null) ? $arguments['dictionary_owner_plan'] : [];
+        $operation = strtoupper(trim((string) ($plan['operation'] ?? '')));
+        if (!in_array($operation, ['CREATE', 'ADD_FORM', 'ADD_SENSE', 'ENRICH'], true)) return;
+        if (!$this->dictionaryPreCreateResolver instanceof \NHK\Core\Application\Dictionary\DictionaryPreCreateResolver) {
+            throw new \RuntimeException('PRE_CREATE_RESOLUTION_REQUIRED');
+        }
     }
 
     /** @param array<string,mixed> $arguments */

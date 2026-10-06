@@ -36,6 +36,16 @@ final class WpdbDictionaryEntryRepository implements DictionaryEntryRepository, 
         return $out;
     }
 
+    /** Read every non-deleted lexical collision for pre-create decisions, including DRAFT and RETIRED entries. */
+    public function findPreCreateCandidates(string $normalizedForm, array $context = []): array
+    {
+        $rows = $this->database->get_results($this->database->prepare(
+            "SELECT DISTINCT e.* FROM {$this->entries} e INNER JOIN {$this->forms} f ON f.entry_uuid=e.entry_uuid WHERE f.normalized_form=%s ORDER BY e.id",
+            $normalizedForm,
+        ), ARRAY_A) ?: [];
+        return array_values(array_filter(array_map(fn (array $row): ?LexicalEntry => $this->hydrateEntry($row), $rows)));
+    }
+
     public function findForConcept(string $conceptId): ?LexicalEntry
     {
         try {
@@ -93,7 +103,7 @@ final class WpdbDictionaryEntryRepository implements DictionaryEntryRepository, 
         $limit = max(1, min(10000, $limit));
         try {
             $rows = $this->database->get_results($this->database->prepare(
-                "SELECT e.entry_uuid,e.preferred_form,e.status AS entry_status,e.revision AS entry_revision,f.form_text,f.normalized_form,f.state,s.concept_uuid,s.context_json AS sense_context_json,s.semantic_reference_type,s.semantic_reference_id,s.state AS sense_state,c.status AS sense_status,c.revision AS sense_revision,c.context_json AS concept_context_json,c.destination_type,c.destination_id FROM {$this->entries} e INNER JOIN {$this->forms} f ON f.entry_uuid=e.entry_uuid INNER JOIN {$this->senses} s ON s.entry_uuid=e.entry_uuid INNER JOIN {$this->conceptsTable()} c ON c.concept_uuid=s.concept_uuid ORDER BY f.normalized_form,e.id,s.id LIMIT %d",
+                "SELECT e.entry_uuid,e.preferred_form,e.status AS entry_status,e.revision AS entry_revision,f.id AS form_id,f.form_text,f.normalized_form,f.state,s.concept_uuid,s.context_json AS sense_context_json,s.semantic_reference_type,s.semantic_reference_id,s.state AS sense_state,c.status AS sense_status,c.revision AS sense_revision,c.context_json AS concept_context_json,c.destination_type,c.destination_id FROM {$this->entries} e INNER JOIN {$this->forms} f ON f.entry_uuid=e.entry_uuid INNER JOIN {$this->senses} s ON s.entry_uuid=e.entry_uuid INNER JOIN {$this->conceptsTable()} c ON c.concept_uuid=s.concept_uuid ORDER BY f.normalized_form,e.id,s.id LIMIT %d",
                 $limit,
             ), ARRAY_A);
             if (!is_array($rows)) throw new \RuntimeException('DICTIONARY_DUPLICATE_AUDIT_UNAVAILABLE');
@@ -109,6 +119,7 @@ final class WpdbDictionaryEntryRepository implements DictionaryEntryRepository, 
                 $senseContext = $this->decode((string) ($row['sense_context_json'] ?? '{}'));
                 $out[] = [
                     'entry_id' => $entryId,
+                    'form_id' => (string) ($row['form_id'] ?? ''),
                     'sense_id' => $senseId,
                     'form_text' => (string) ($row['form_text'] ?? ''),
                     'normalized_form' => (string) ($row['normalized_form'] ?? ''),
@@ -126,6 +137,38 @@ final class WpdbDictionaryEntryRepository implements DictionaryEntryRepository, 
         } catch (\Throwable $e) {
             throw new \RuntimeException('DICTIONARY_DUPLICATE_AUDIT_UNAVAILABLE', 0, $e);
         }
+    }
+
+    /** @return array{rows:list<array<string,mixed>>,next_cursor:?string} */
+    public function readPage(int $limit = 1000, ?string $cursor = null): array
+    {
+        $limit = max(1, min(10000, $limit));
+        $after = $cursor !== null ? base64_decode($cursor, true) : '';
+        if (!is_string($after)) $after = '';
+        $where = $after !== '' ? " WHERE f.normalized_form>%s" : '';
+        $args = $after !== '' ? [$after] : [];
+        $args[] = $limit + 1;
+        $sql = "SELECT e.entry_uuid,e.preferred_form,e.status AS entry_status,e.revision AS entry_revision,f.id AS form_id,f.form_text,f.normalized_form,f.state,s.concept_uuid,s.context_json AS sense_context_json,s.semantic_reference_type,s.semantic_reference_id,s.state AS sense_state,c.status AS sense_status,c.revision AS sense_revision,c.context_json AS concept_context_json,c.destination_type,c.destination_id FROM {$this->entries} e INNER JOIN {$this->forms} f ON f.entry_uuid=e.entry_uuid INNER JOIN {$this->senses} s ON s.entry_uuid=e.entry_uuid INNER JOIN {$this->conceptsTable()} c ON c.concept_uuid=s.concept_uuid{$where} ORDER BY f.normalized_form,e.id,s.id LIMIT %d";
+        $rows = $this->database->get_results($this->database->prepare($sql, ...$args), ARRAY_A);
+        if (!is_array($rows)) throw new \RuntimeException('DICTIONARY_DUPLICATE_AUDIT_UNAVAILABLE');
+        $hasMore = count($rows) > $limit;
+        if ($hasMore) array_pop($rows);
+        $mapped = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) continue;
+            try { $entryId = UuidCodec::fromBinary($row['entry_uuid']); $senseId = UuidCodec::fromBinary($row['concept_uuid']); } catch (\Throwable) { continue; }
+            $senseContext = $this->decode((string) ($row['sense_context_json'] ?? '{}'));
+            $mapped[] = [
+                'entry_id' => $entryId, 'form_id' => (string) ($row['form_id'] ?? ''), 'sense_id' => $senseId, 'form_text' => (string) ($row['form_text'] ?? ''), 'normalized_form' => (string) ($row['normalized_form'] ?? ''),
+                'entry_status' => (string) ($row['entry_status'] ?? ''), 'sense_status' => (string) ($row['sense_status'] ?? ''), 'entry_revision' => (int) ($row['entry_revision'] ?? 0), 'sense_revision' => (int) ($row['sense_revision'] ?? 0),
+                'context' => $senseContext !== [] ? $senseContext : $this->decode((string) ($row['concept_context_json'] ?? '{}')),
+                'destination_type' => ($row['semantic_reference_type'] ?? null) ?: (($row['destination_type'] ?? null) ?: null),
+                'destination_id' => ($row['semantic_reference_id'] ?? null) ?: (($row['destination_id'] ?? null) ?: null),
+                'state' => ((int) ($row['state'] ?? 0) === 1 && (int) ($row['sense_state'] ?? 0) === 1) ? 1 : 0,
+            ];
+        }
+        $next = $hasMore && $mapped !== [] ? base64_encode((string) ($mapped[count($mapped) - 1]['normalized_form'] ?? '')) : null;
+        return ['rows' => $mapped, 'next_cursor' => $next];
     }
 
     /** @return array<string,mixed> */
@@ -274,9 +317,8 @@ final class WpdbDictionaryEntryRepository implements DictionaryEntryRepository, 
         if (!$resolution->canCreate()) throw new \RuntimeException('DICTIONARY_PRE_CREATE_STALE');
         $contextHash = hash('sha256', $this->json($this->sort($context)));
         $rows = $this->database->get_results($this->database->prepare(
-            "SELECT f.id FROM {$this->forms} f INNER JOIN {$this->entries} e ON e.entry_uuid=f.entry_uuid WHERE f.normalized_form=%s AND f.context_hash=%s AND f.state=1 AND e.status<>%s LIMIT 1 FOR UPDATE",
+            "SELECT f.id FROM {$this->forms} f INNER JOIN {$this->entries} e ON e.entry_uuid=f.entry_uuid WHERE f.normalized_form=%s AND f.state=1 AND e.status<>%s LIMIT 1 FOR UPDATE",
             $resolution->normalizedForm,
-            $contextHash,
             DictionaryConcept::RETIRED,
         ), ARRAY_A) ?: [];
         if ($rows !== []) throw new \RuntimeException('DICTIONARY_PRE_CREATE_STALE');
@@ -315,14 +357,20 @@ final class WpdbDictionaryEntryRepository implements DictionaryEntryRepository, 
         if (!$entry instanceof LexicalEntry) throw new \RuntimeException('DICTIONARY_ENTRY_NOT_FOUND');
         if ($entry->revision !== $expectedRevision) throw new \RuntimeException('DICTIONARY_ENTRY_REVISION_CONFLICT');
         $hash = hash('sha256', $this->json($this->sort($form->context)));
-        $duplicate = $this->database->get_var($this->database->prepare("SELECT id FROM {$this->forms} WHERE entry_uuid=%s AND normalized_form=%s AND context_hash=%s LIMIT 1", UuidCodec::toBinary($entryId), $form->normalizedForm, $hash));
-        if ($duplicate !== null) return ['entry' => $entry, 'form' => $form, 'duplicate' => true];
-        $this->addForm($form);
-        $ok = $this->database->query($this->database->prepare("UPDATE {$this->entries} SET revision=revision+1,updated_at=%s WHERE entry_uuid=%s AND revision=%d", gmdate('Y-m-d H:i:s.u'), UuidCodec::toBinary($entryId), $expectedRevision));
-        if ($ok !== 1) throw new \RuntimeException('DICTIONARY_ENTRY_REVISION_CONFLICT');
-        $updated = $this->findById($entryId);
-        if (!$updated instanceof LexicalEntry) throw new \RuntimeException('DICTIONARY_ENTRY_READBACK_FAILED');
-        return ['entry' => $updated, 'form' => $form];
+        $this->database->query('START TRANSACTION');
+        try {
+            $duplicate = $this->database->get_var($this->database->prepare("SELECT id FROM {$this->forms} WHERE entry_uuid=%s AND normalized_form=%s AND context_hash=%s LIMIT 1 FOR UPDATE", UuidCodec::toBinary($entryId), $form->normalizedForm, $hash));
+            if ($duplicate !== null) { $this->database->query('COMMIT'); return ['entry' => $entry, 'form' => $form, 'duplicate' => true]; }
+            $collision = $this->database->get_var($this->database->prepare("SELECT id FROM {$this->forms} WHERE entry_uuid<>%s AND normalized_form=%s AND state=1 LIMIT 1 FOR UPDATE", UuidCodec::toBinary($entryId), $form->normalizedForm));
+            if ($collision !== null) throw new \RuntimeException('DICTIONARY_PRE_CREATE_STALE');
+            $this->addForm($form);
+            $ok = $this->database->query($this->database->prepare("UPDATE {$this->entries} SET revision=revision+1,updated_at=%s WHERE entry_uuid=%s AND revision=%d", gmdate('Y-m-d H:i:s.u'), UuidCodec::toBinary($entryId), $expectedRevision));
+            if ($ok !== 1) throw new \RuntimeException('DICTIONARY_ENTRY_REVISION_CONFLICT');
+            $updated = $this->findById($entryId);
+            if (!$updated instanceof LexicalEntry) throw new \RuntimeException('DICTIONARY_ENTRY_READBACK_FAILED');
+            $this->database->query('COMMIT');
+            return ['entry' => $updated, 'form' => $form];
+        } catch (\Throwable $e) { $this->database->query('ROLLBACK'); throw $e; }
     }
 
     public function addSenseToEntry(string $entryId, int $expectedRevision, DictionaryConcept $sense, array $context = [], ?string $semanticType = null, ?string $semanticId = null, ?int $semanticRevision = null): array
@@ -330,15 +378,21 @@ final class WpdbDictionaryEntryRepository implements DictionaryEntryRepository, 
         $entry = $this->findById($entryId);
         if (!$entry instanceof LexicalEntry) throw new \RuntimeException('DICTIONARY_ENTRY_NOT_FOUND');
         if ($entry->revision !== $expectedRevision) throw new \RuntimeException('DICTIONARY_ENTRY_REVISION_CONFLICT');
-        $duplicate = $this->database->get_var($this->database->prepare("SELECT id FROM {$this->senses} WHERE entry_uuid=%s AND concept_uuid=%s LIMIT 1", UuidCodec::toBinary($entryId), UuidCodec::toBinary($sense->conceptId)));
-        if ($duplicate !== null) return ['entry' => $entry, 'sense' => $sense, 'duplicate' => true];
-        if ($this->concepts->findById($sense->conceptId) === null) $this->concepts->createConcept($sense);
-        $this->insertSense($entryId, $sense, $context, $semanticType, $semanticId, $semanticRevision);
-        $ok = $this->database->query($this->database->prepare("UPDATE {$this->entries} SET revision=revision+1,updated_at=%s WHERE entry_uuid=%s AND revision=%d", gmdate('Y-m-d H:i:s.u'), UuidCodec::toBinary($entryId), $expectedRevision));
-        if ($ok !== 1) throw new \RuntimeException('DICTIONARY_ENTRY_REVISION_CONFLICT');
-        $updated = $this->findById($entryId);
-        if (!$updated instanceof LexicalEntry) throw new \RuntimeException('DICTIONARY_ENTRY_READBACK_FAILED');
-        return ['entry' => $updated, 'sense' => $sense];
+        $this->database->query('START TRANSACTION');
+        try {
+            $duplicate = $this->database->get_var($this->database->prepare("SELECT id FROM {$this->senses} WHERE entry_uuid=%s AND concept_uuid=%s AND state=1 LIMIT 1 FOR UPDATE", UuidCodec::toBinary($entryId), UuidCodec::toBinary($sense->conceptId)));
+            if ($duplicate !== null) { $this->database->query('COMMIT'); return ['entry' => $entry, 'sense' => $sense, 'duplicate' => true]; }
+            $mapped = $this->database->get_var($this->database->prepare("SELECT id FROM {$this->senses} WHERE concept_uuid=%s AND state=1 LIMIT 1 FOR UPDATE", UuidCodec::toBinary($sense->conceptId)));
+            if ($mapped !== null) throw new \RuntimeException('DICTIONARY_PRE_CREATE_STALE');
+            if ($this->concepts->findById($sense->conceptId) === null) $this->concepts->createConcept($sense);
+            $this->insertSense($entryId, $sense, $context, $semanticType, $semanticId, $semanticRevision);
+            $ok = $this->database->query($this->database->prepare("UPDATE {$this->entries} SET revision=revision+1,updated_at=%s WHERE entry_uuid=%s AND revision=%d", gmdate('Y-m-d H:i:s.u'), UuidCodec::toBinary($entryId), $expectedRevision));
+            if ($ok !== 1) throw new \RuntimeException('DICTIONARY_ENTRY_REVISION_CONFLICT');
+            $updated = $this->findById($entryId);
+            if (!$updated instanceof LexicalEntry) throw new \RuntimeException('DICTIONARY_ENTRY_READBACK_FAILED');
+            $this->database->query('COMMIT');
+            return ['entry' => $updated, 'sense' => $sense];
+        } catch (\Throwable $e) { $this->database->query('ROLLBACK'); throw $e; }
     }
 
     public function addForm(LexicalEntryForm $form): LexicalEntryForm

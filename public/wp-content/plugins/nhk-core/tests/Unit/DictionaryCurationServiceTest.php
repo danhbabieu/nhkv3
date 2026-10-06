@@ -16,7 +16,7 @@ final class DictionaryCurationServiceTest extends TestCase
         $hash = hash('sha256', '{}');
         $candidate = new DictionaryCandidate('candidate-1', 'vai bò', $hash, ['Vai bò'], DictionaryCandidateState::NEEDS_REVIEW, ['usage_scope' => ['Vietnam']], [], 3, 'a', 'b', 1);
         [$candidateRepo, $conceptRepo] = $this->repositories($candidate);
-        $service = new DictionaryCurationService($candidateRepo, $conceptRepo, static fn (): string => 'concept-1');
+        $service = new DictionaryCurationService($candidateRepo, $conceptRepo, static fn (): string => 'concept-1', null, null, new DictionaryPreCreateResolver($this->entryRepository([], [])));
 
         $result = $service->createDraftFromCandidate('candidate-1', 1, 'Vai bò', 'Tên gọi dân gian tại Việt Nam.', ['public_slug' => 'vai-bo', 'term_type' => 'COLLOQUIAL']);
 
@@ -49,6 +49,20 @@ final class DictionaryCurationServiceTest extends TestCase
         $service = new DictionaryCurationService($candidateRepo, $conceptRepo, null, null, null, new DictionaryPreCreateResolver($entries));
 
         $result = $service->createDraftFromCandidate('candidate-existing', 1, 'Côn hoa thị', 'Không tạo lại');
+
+        self::assertSame('REUSE_EXISTING', $result['resolution']['action']);
+        self::assertSame(0, $conceptRepo->creates);
+    }
+
+    public function test_curated_preferred_label_reuses_existing_entry_when_raw_candidate_is_a_typo(): void
+    {
+        $candidate = new DictionaryCandidate('candidate-typo', 'côn hoa thj', hash('sha256', '{"domain":"clock"}'), ['Côn hoa thj'], DictionaryCandidateState::NEEDS_REVIEW, ['domain' => 'clock'], [], 1, 'a', 'b', 1);
+        [$candidateRepo, $conceptRepo] = $this->repositories($candidate);
+        $sense = new DictionaryConcept('sense-existing', 'Côn hoa thị', 'Nghĩa', DictionaryConcept::APPROVED, null, null, null, ['domain' => 'clock'], 2);
+        $entry = new LexicalEntry('entry-existing', 'Côn hoa thị', 'côn hoa thị', DictionaryConcept::APPROVED, 'vi-VN', [], 3, [$sense->conceptId]);
+        $service = new DictionaryCurationService($candidateRepo, $conceptRepo, null, null, null, new DictionaryPreCreateResolver($this->entryRepository([$entry], [$sense])));
+
+        $result = $service->createDraftFromCandidate('candidate-typo', 1, 'Côn hoa thị', 'Không tạo lại');
 
         self::assertSame('REUSE_EXISTING', $result['resolution']['action']);
         self::assertSame(0, $conceptRepo->creates);

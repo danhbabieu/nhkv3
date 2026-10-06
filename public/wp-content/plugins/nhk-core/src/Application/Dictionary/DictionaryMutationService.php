@@ -43,12 +43,18 @@ final class DictionaryMutationService
 
     public function createDraft(string $preferredLabel, string $definition, array $context, string $idempotencyKey): array
     {
+        if (!$this->preCreateResolver instanceof DictionaryPreCreateResolver) throw new \RuntimeException('PRE_CREATE_RESOLUTION_REQUIRED');
         $payload = ['operation' => 'create', 'preferred_label' => trim($preferredLabel), 'definition' => trim($definition), 'context' => $this->sort($context)];
-        return $this->mutate($idempotencyKey, $payload, function () use ($preferredLabel, $definition, $context): array {
+        $operation = function (?DictionaryPreCreateResolution $resolution = null) use ($preferredLabel, $definition, $context): array {
+            if (!$resolution instanceof DictionaryPreCreateResolution || !$resolution->canCreate()) {
+                if ($resolution?->action === DictionaryPreCreateResolution::REUSE_EXISTING) return $this->reuseExistingResolution($resolution);
+                throw new \RuntimeException('PRE_CREATE_RESOLUTION_REQUIRED');
+            }
             $concept = $this->concepts->createConcept(new DictionaryConcept(UuidCodec::newV7(), trim($preferredLabel), trim($definition), DictionaryConcept::DRAFT, null, null, null, $context, 1));
             $label = $this->concepts->addLabel(new DictionaryLabel($concept->conceptId, $concept->preferredLabel, (new DictionaryTermNormalizer())->normalize($concept->preferredLabel), DictionaryLabel::PREFERRED, 'vi-VN', $context));
-            return ['concept' => $concept, 'label' => $label];
-        });
+            return ['concept' => $concept, 'label' => $label, 'resolution' => $resolution->toArray()];
+        };
+        return $this->mutateResolved($idempotencyKey, $payload, fn (): DictionaryPreCreateResolution => $this->preCreateResolver->resolveEntryCreate($preferredLabel, $context), $operation);
     }
 
     public function saveLabel(string $conceptId, int $expectedRevision, string $previousNormalizedLabel, DictionaryLabel $label, string $idempotencyKey): array
@@ -115,7 +121,7 @@ final class DictionaryMutationService
             if (!is_array($result) || !($result['entry'] ?? null) instanceof LexicalEntry || !($result['sense'] ?? null) instanceof DictionaryConcept) throw new \RuntimeException('DICTIONARY_ENTRY_READBACK_FAILED');
             return $result;
         };
-        if (!$this->preCreateResolver instanceof DictionaryPreCreateResolver) return $this->mutate($idempotencyKey, ['operation' => 'entry.create-with-sense'] + $payload, fn (): array => $operation());
+        if (!$this->preCreateResolver instanceof DictionaryPreCreateResolver) throw new \RuntimeException('PRE_CREATE_RESOLUTION_REQUIRED');
         return $this->mutateResolved($idempotencyKey, ['operation' => 'entry.create-with-sense'] + $payload, fn (): DictionaryPreCreateResolution => $this->preCreateResolver->resolveEntryCreate($preferredForm, $context), $operation);
     }
 
@@ -139,7 +145,7 @@ final class DictionaryMutationService
             if (!is_array($saved) || !($saved['entry'] ?? null) instanceof LexicalEntry) throw new \RuntimeException('DICTIONARY_ENTRY_READBACK_FAILED');
             return $saved;
         };
-        if (!$this->preCreateResolver instanceof DictionaryPreCreateResolver) return $this->mutate($idempotencyKey, $payload, fn (): array => $operation());
+        if (!$this->preCreateResolver instanceof DictionaryPreCreateResolver) throw new \RuntimeException('PRE_CREATE_RESOLUTION_REQUIRED');
         return $this->mutateResolved($idempotencyKey, $payload, fn (): DictionaryPreCreateResolution => $this->preCreateResolver->resolveFormAddition($entryId, $form, $context), $operation);
     }
 
@@ -160,7 +166,7 @@ final class DictionaryMutationService
             if ($resolution instanceof DictionaryPreCreateResolution && $resolution->action !== DictionaryPreCreateResolution::ADD_SENSE_TO_ENTRY) throw new \RuntimeException('DICTIONARY_PRE_CREATE_REVIEW_REQUIRED');
             return ($this->entryRepository)->addSenseToEntry($entryId, $expectedRevision, $sense, $context, $semanticType, $semanticId, $semanticRevision);
         };
-        if (!$this->preCreateResolver instanceof DictionaryPreCreateResolver) return $this->mutate($idempotencyKey, $payload, fn (): array => ($this->entryRepository)->addSenseToEntry($entryId, $expectedRevision, $sense, $context, $semanticType, $semanticId, $semanticRevision));
+        if (!$this->preCreateResolver instanceof DictionaryPreCreateResolver) throw new \RuntimeException('PRE_CREATE_RESOLUTION_REQUIRED');
         return $this->mutateResolved($idempotencyKey, $payload, fn (): DictionaryPreCreateResolution => $this->preCreateResolver->resolveSenseAddition($entryId, $conceptId, $context), $operation);
     }
 

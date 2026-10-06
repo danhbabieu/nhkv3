@@ -69,6 +69,7 @@ final class McpAbilityRegistration
         'nhk-v3/article-media-legacy-audit',
         'nhk-v3/article-media-legacy-repair-plan',
         'nhk-v3/dictionary-seed-audit',
+        'nhk-v3/dictionary-duplicate-audit',
         'nhk-v3/dictionary-enrichment-audit',
         'nhk-v3/dictionary-enrichment-plan',
     ];
@@ -376,6 +377,7 @@ final class McpAbilityRegistration
         'nhk.article.media-legacy-repair-plan' => 'nhk-v3/article-media-legacy-repair-plan',
         'nhk.dictionary.seed-audit' => 'nhk-v3/dictionary-seed-audit',
         'nhk.dictionary.enrichment.audit' => 'nhk-v3/dictionary-enrichment-audit',
+        'nhk.dictionary.duplicate-audit' => 'nhk-v3/dictionary-duplicate-audit',
         'nhk.dictionary.enrichment.plan' => 'nhk-v3/dictionary-enrichment-plan',
         'nhk.dictionary.semantic-relation.read' => 'nhk-v3/dictionary-semantic-relation-read',
         'nhk.dictionary.semantic-relation.preview' => 'nhk-v3/dictionary-semantic-relation-preview',

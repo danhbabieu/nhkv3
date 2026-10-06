@@ -4,11 +4,12 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Mcp;
 
 use NHK\Core\Application\Dictionary\DictionaryRuntime;
+use NHK\Core\Application\Dictionary\DictionaryMutationService;
 use NHK\Core\Domain\Dictionary\{DictionaryCandidateState, DictionaryLabel};
 
 final class McpDictionaryHandler
 {
-    public function __construct(private DictionaryRuntime $runtime, private $semanticRelationGovernance = null, private $lexicalRelationGovernance = null) {}
+    public function __construct(private DictionaryRuntime $runtime, private $semanticRelationGovernance = null, private $lexicalRelationGovernance = null, private ?DictionaryMutationService $mutationOverride = null) {}
 
     public function semanticRelationRead(array $input = []): array { return $this->semanticRelationGovernance?->read($input) ?? ['status'=>'unavailable','reason'=>'SEMANTIC_RELATION_GOVERNANCE_UNAVAILABLE']; }
     public function semanticRelationPreview(array $input): array { return $this->semanticRelationGovernance?->preview($input) ?? ['status'=>'unavailable','reason'=>'SEMANTIC_RELATION_GOVERNANCE_UNAVAILABLE']; }
@@ -73,7 +74,7 @@ final class McpDictionaryHandler
     public function materializationPlan(array $input): array { return $this->runtime->materializationPlanner()->plan($input); }
     public function materializationApply(array $input): array { return $this->runtime->materializationService()->apply((array) ($input['plan'] ?? []), (string) ($input['approved_plan_fingerprint'] ?? ''), (string) ($input['idempotency_key'] ?? '')); }
 
-    public function createConcept(array $input): array { return $this->runtime->mutation()->createDraft((string) ($input['preferred_label'] ?? ''), (string) ($input['definition'] ?? ''), (array) ($input['context'] ?? []), (string) ($input['idempotency_key'] ?? '')); }
+    public function createConcept(array $input): array { return ($this->mutationOverride ?? $this->runtime->mutation())->createDraft((string) ($input['preferred_label'] ?? ''), (string) ($input['definition'] ?? ''), (array) ($input['context'] ?? []), (string) ($input['idempotency_key'] ?? '')); }
     public function createEntryWithSense(array $input): array { return $this->runtime->mutation()->createEntryWithSense((string) ($input['preferred_form'] ?? ''), (string) ($input['definition'] ?? ''), (array) ($input['context'] ?? []), (string) ($input['idempotency_key'] ?? '')); }
     public function addFormToEntry(array $input): array { return $this->runtime->mutation()->addFormToEntry((string) $input['entry_id'], (int) $input['expected_revision'], (string) $input['form'], (array) ($input['context'] ?? []), (string) $input['idempotency_key'], (string) ($input['kind'] ?? 'ALTERNATE'), isset($input['locale']) ? (string) $input['locale'] : null); }
     public function addSenseToEntry(array $input): array { return $this->runtime->mutation()->addSenseToEntry((string) $input['entry_id'], (int) $input['expected_revision'], (string) $input['concept_id'], (array) ($input['context'] ?? []), (string) $input['idempotency_key']); }

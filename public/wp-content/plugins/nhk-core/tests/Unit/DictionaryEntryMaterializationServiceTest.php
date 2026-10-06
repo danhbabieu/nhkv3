@@ -4,8 +4,9 @@ declare(strict_types=1);
 namespace NHKTests\Unit;
 
 use NHK\Core\Application\Dictionary\DictionaryEntryMaterializationService;
-use NHK\Core\Contracts\Dictionary\DictionaryConceptRepository;
-use NHK\Core\Domain\Dictionary\{DictionaryConcept, DictionaryLabel, LexicalEntry};
+use NHK\Core\Application\Dictionary\DictionaryPreCreateResolver;
+use NHK\Core\Contracts\Dictionary\{DictionaryConceptRepository, DictionaryEntryRepository};
+use NHK\Core\Domain\Dictionary\{DictionaryConcept, DictionaryLabel, DictionaryPreCreateResolution, LexicalEntry, LexicalEntryForm};
 use PHPUnit\Framework\TestCase;
 
 final class DictionaryEntryMaterializationServiceTest extends TestCase
@@ -24,15 +25,22 @@ final class DictionaryEntryMaterializationServiceTest extends TestCase
             public function addLabel(DictionaryLabel $l): DictionaryLabel { throw new \LogicException('no label writes'); }
             public function saveLabel(DictionaryLabel $l, string $p, int $r): DictionaryLabel { throw new \LogicException('no label writes'); }
         };
-        $entries = new class($concept) {
+        $entries = new class($concept) implements DictionaryEntryRepository {
             public int $writes = 0;
             public function __construct(private DictionaryConcept $concept) {}
             public function findForConcept(string $id): ?LexicalEntry { return null; }
+            public function findByForm(string $normalizedForm, array $context = []): array { return []; }
+            public function listSenses(LexicalEntry $entry, array $context = []): array { return []; }
+            public function addForm(LexicalEntryForm $form): LexicalEntryForm { return $form; }
             public function createWithSense(LexicalEntry $entry, DictionaryConcept $sense, array $context): array
             {
                 if ($this->concept->conceptId !== $sense->conceptId) throw new \LogicException('unexpected sense');
                 $this->writes++;
                 return ['entry' => $entry, 'sense' => $sense, 'forms' => []];
+            }
+            public function createWithSenseResolved(LexicalEntry $entry, DictionaryConcept $sense, array $context, DictionaryPreCreateResolution $resolution): array
+            {
+                return $this->createWithSense($entry, $sense, $context);
             }
         };
         $receipts = [];
@@ -43,6 +51,8 @@ final class DictionaryEntryMaterializationServiceTest extends TestCase
             static function (string $key, string $fingerprint) use (&$receipts): ?array { return $receipts[$key] ?? null; },
             static function (string $key, string $fingerprint, array $result) use (&$receipts): void { $receipts[$key] = ['fingerprint' => $fingerprint, 'result' => $result]; },
             static function (array $event) use (&$audits): void { $audits[] = $event; },
+            null,
+            new DictionaryPreCreateResolver($entries),
         );
         $plan = ['status' => 'READY', 'items' => [[
             'concept_id' => $concept->conceptId,
@@ -80,8 +90,16 @@ final class DictionaryEntryMaterializationServiceTest extends TestCase
             public function addLabel(DictionaryLabel $l): DictionaryLabel { return $l; }
             public function saveLabel(DictionaryLabel $l, string $p, int $r): DictionaryLabel { return $l; }
         };
-        $entries = new class { public int $writes = 0; public function createWithSense(LexicalEntry $e, DictionaryConcept $s, array $c): array { $this->writes++; return []; } };
-        $service = new DictionaryEntryMaterializationService($concepts, $entries);
+        $entries = new class implements DictionaryEntryRepository {
+            public int $writes = 0;
+            public function findByForm(string $normalizedForm, array $context = []): array { return []; }
+            public function findForConcept(string $conceptId): ?LexicalEntry { return null; }
+            public function listSenses(LexicalEntry $entry, array $context = []): array { return []; }
+            public function addForm(LexicalEntryForm $form): LexicalEntryForm { return $form; }
+            public function createWithSense(LexicalEntry $e, DictionaryConcept $s, array $c): array { $this->writes++; return []; }
+            public function createWithSenseResolved(LexicalEntry $e, DictionaryConcept $s, array $c, DictionaryPreCreateResolution $resolution): array { return $this->createWithSense($e, $s, $c); }
+        };
+        $service = new DictionaryEntryMaterializationService($concepts, $entries, null, null, null, null, new DictionaryPreCreateResolver($entries));
         $plan = ['status' => 'READY', 'items' => [['concept_id' => $concept->conceptId, 'concept_revision' => 4, 'eligibility' => 'READY', 'classification' => 'UNMAPPED_CONCEPT', 'proposed_operation' => 'CREATE_ENTRY_AND_MAP_EXISTING_SENSE', 'form' => ['text' => 'Côn', 'normalized_form' => 'côn']]], 'fingerprint' => 'fp'];
 
         $this->expectExceptionMessage('PLAN_REAPPROVAL_REQUIRED');

@@ -402,6 +402,7 @@ final class Plugin {
             add_filter('nhk_v3_knowledge_quality_audit_coordinator', static fn (mixed $current): mixed => $current ?? $knowledgeQualityAudit, 10, 1);
             $dictionaryRuntime = DictionaryBootstrap::runtime();
             $dictionarySeedAuditHandler = null;
+            $dictionaryDuplicateAuditHandler = null;
             if ($dictionaryRuntime !== null) {
                 $dictionaryCorpus = new \NHK\Core\Application\Dictionary\DictionarySeedCorpusAuditCoordinator(
                     ['KNOWLEDGE' => new \NHK\Core\Application\Dictionary\KnowledgeDictionaryCorpusReader($claims), 'ARTICLE' => new \NHK\Core\Infrastructure\Article\WpArticleDictionaryCorpusReader($wpdb)],
@@ -410,6 +411,7 @@ final class Plugin {
                     $dictionaryRuntime->candidateRepository(),
                 );
                 $dictionarySeedAuditHandler = new \NHK\Core\Application\Mcp\DictionarySeedAuditHandler($dictionaryRuntime->seedPlanner(), corpus: $dictionaryCorpus);
+                $dictionaryDuplicateAuditHandler = new \NHK\Core\Application\Mcp\DictionaryDuplicateAuditHandler($dictionaryRuntime);
             }
             $collectorBranchReader = static function (string $classificationId) use ($authority, $claims, $graphService): array {
                 $classification = $authority->findByCanonicalId($classificationId);
@@ -2021,6 +2023,7 @@ final class Plugin {
                 $sharedEnrichment,
                 $captureFeatureBindings,
                 subjectBinding: $captureSubjectBinding,
+                dictionaryPreCreateResolver: $dictionaryRuntime?->preCreateResolver(),
             );
             $captureContinuation = new EditorialCaptureContinuationService($captureRepository, $captureAddendumRepository, $capture, static function (array $input) use ($imageIngest, $existingMediaResolver): array {
                 $mediaIds = is_array($input['media_ids'] ?? null) ? array_values($input['media_ids']) : [];
@@ -2092,7 +2095,7 @@ final class Plugin {
                 );
                 $dictionaryRuntime->configureRelationGovernance($semanticRelationGovernance, $lexicalRelationGovernance, new \NHK\Core\Application\Dictionary\DictionaryRelationFacetRegistry());
             }
-            (new McpApi(new McpTransport($mcpRead, $mcpGovernance, static fn (string $capability): bool => current_user_can($capability), static fn (string $value): bool => in_array($value, $allowedOrigins, true), $articleHandler, $videoIntake, $wordpressAttachments, $categoryGateway, $draftGateway, new CanonicalDependencyValidator($claims, $sources, $evidence), $publicUrlMaintenance, $mediaBatchUpload, $documentation, $capture, $captureContinuation, $authorityCapture, static function (): bool { return (new MigrationStatus())->runtimeSchemaReady(); }, $imageIngest, semanticWritePolicy: $semanticWritePolicy, mediaBinding: $mediaBindingService, videoSourceRefresh: $videoSourceRefresh, knowledgeRepairPreview: $knowledgeRepairPreview, videoFrontendReconciliation: $videoFrontendReconciliation, knowledgeWriterPreview: $knowledgeWriterPreview, knowledgeQualityAudit: $knowledgeQualityAuditHandler, dictionarySeedAudit: $dictionarySeedAuditHandler, articleMediaLegacyAudit: $articleMediaLegacyAuditHandler, mediaTargetNormalizer: new \NHK\Core\Application\Media\MediaTargetNormalizer($endpoints, $types, $authority), mediaIntentCompiler: new MediaEnrichmentIntentCompiler($mediaBindingService, $usages, new MediaTargetNormalizer($endpoints, $types, $authority), new WordPressMediaTargetUrlResolver($publicRoutes, historicRoutes: new HistoricPublicRouteService($publicIdentityRepository))), dictionary: $dictionaryRuntime !== null ? new McpDictionaryHandler($dictionaryRuntime, $semanticRelationGovernance, $lexicalRelationGovernance) : null), $recoveryBinding))->register();
+            (new McpApi(new McpTransport($mcpRead, $mcpGovernance, static fn (string $capability): bool => current_user_can($capability), static fn (string $value): bool => in_array($value, $allowedOrigins, true), $articleHandler, $videoIntake, $wordpressAttachments, $categoryGateway, $draftGateway, new CanonicalDependencyValidator($claims, $sources, $evidence), $publicUrlMaintenance, $mediaBatchUpload, $documentation, $capture, $captureContinuation, $authorityCapture, static function (): bool { return (new MigrationStatus())->runtimeSchemaReady(); }, $imageIngest, semanticWritePolicy: $semanticWritePolicy, mediaBinding: $mediaBindingService, videoSourceRefresh: $videoSourceRefresh, knowledgeRepairPreview: $knowledgeRepairPreview, videoFrontendReconciliation: $videoFrontendReconciliation, knowledgeWriterPreview: $knowledgeWriterPreview, knowledgeQualityAudit: $knowledgeQualityAuditHandler, dictionarySeedAudit: $dictionarySeedAuditHandler, dictionaryDuplicateAudit: $dictionaryDuplicateAuditHandler, dictionaryPreCreateResolver: $dictionaryRuntime?->preCreateResolver(), articleMediaLegacyAudit: $articleMediaLegacyAuditHandler, mediaTargetNormalizer: new \NHK\Core\Application\Media\MediaTargetNormalizer($endpoints, $types, $authority), mediaIntentCompiler: new MediaEnrichmentIntentCompiler($mediaBindingService, $usages, new MediaTargetNormalizer($endpoints, $types, $authority), new WordPressMediaTargetUrlResolver($publicRoutes, historicRoutes: new HistoricPublicRouteService($publicIdentityRepository))), dictionary: $dictionaryRuntime !== null ? new McpDictionaryHandler($dictionaryRuntime, $semanticRelationGovernance, $lexicalRelationGovernance) : null), $recoveryBinding))->register();
             do_action('nhk_mcp_register_tools', McpToolCatalog::tools(), $mcpRead, $mcpGovernance);
         });
         add_action('admin_menu', [AdminPage::class, 'register']);

@@ -23,15 +23,17 @@ final class DictionaryCurationService
         if ($candidate->suppressed()) throw new \RuntimeException('DICTIONARY_CANDIDATE_SUPPRESSED');
         $preferredLabel = trim($preferredLabel);
         if ($preferredLabel === '') throw new \InvalidArgumentException('DICTIONARY_PREFERRED_LABEL_REQUIRED');
+        if (!$this->preCreateResolver instanceof DictionaryPreCreateResolver) throw new \RuntimeException('PRE_CREATE_RESOLUTION_REQUIRED');
         $resolution = null;
-        if ($this->preCreateResolver instanceof DictionaryPreCreateResolver) {
-            $probe = trim((string) ($candidate->rawForms[0] ?? $preferredLabel));
-            $resolution = $this->preCreateResolver->resolveEntryCreate($probe, array_merge($candidate->context, $context));
-            if ($resolution->action === DictionaryPreCreateResolution::REUSE_EXISTING) {
-                $updated = $this->withState($candidate, DictionaryCandidateState::RESOLVED_EXISTING, ['resolution' => $resolution->toArray()]);
-                return ['resolution' => $resolution->toArray(), 'candidate' => $this->candidates->saveDecision($updated, $expectedRevision)];
+        $probes = array_values(array_unique(array_filter(array_merge([$preferredLabel, $candidate->normalizedTerm], $candidate->rawForms), static fn ($probe): bool => trim((string) $probe) !== '')));
+        foreach ($probes as $probe) {
+            $probeResolution = $this->preCreateResolver->resolveEntryCreate((string) $probe, array_merge($candidate->context, $context));
+            if ($probeResolution->action === DictionaryPreCreateResolution::REUSE_EXISTING) {
+                $updated = $this->withState($candidate, DictionaryCandidateState::RESOLVED_EXISTING, ['resolution' => $probeResolution->toArray(), 'probes' => $probes]);
+                return ['resolution' => $probeResolution->toArray(), 'candidate' => $this->candidates->saveDecision($updated, $expectedRevision)];
             }
-            if (!$resolution->canCreate()) throw new \RuntimeException('DICTIONARY_PRE_CREATE_REVIEW_REQUIRED');
+            if (!$probeResolution->canCreate()) throw new \RuntimeException('DICTIONARY_PRE_CREATE_REVIEW_REQUIRED');
+            $resolution ??= $probeResolution;
         }
         $concept = new DictionaryConcept($this->id(), $preferredLabel, trim($definition), DictionaryConcept::DRAFT, null, null, null, array_merge($candidate->context, $context));
         $concept = $this->concepts->createConcept($concept);
