@@ -556,6 +556,7 @@ final class DictionaryRuntime
             fn (): bool => $this->entrySenseAvailable(),
             $publicIdentityWriter,
             function (): void { $this->invalidateLabelCache(); },
+            new DictionaryPreCreateResolver($this->entries),
         );
     }
 

@@ -4,7 +4,8 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Dictionary\DictionaryMutationService;
-use NHK\Core\Contracts\Dictionary\DictionaryConceptRepository;
+use NHK\Core\Application\Dictionary\DictionaryPreCreateResolver;
+use NHK\Core\Contracts\Dictionary\{DictionaryConceptRepository, DictionaryEntryRepository};
 use NHK\Core\Domain\Dictionary\{DictionaryConcept, DictionaryLabel};
 use NHK\Core\Domain\Dictionary\{LexicalEntry, LexicalEntryForm};
 use PHPUnit\Framework\TestCase;
@@ -270,5 +271,115 @@ final class DictionaryMutationContractTest extends TestCase
         self::assertSame($first['semantic_reference'], $replay['semantic_reference']);
         self::assertSame(5, $replay['entry_revision']);
         self::assertSame(1, $entries->calls);
+    }
+
+    public function test_precreate_resolution_reuses_exact_entry_without_repository_write(): void
+    {
+        $sense = new DictionaryConcept('sense-existing', 'Côn hoa thị', 'Nghĩa', DictionaryConcept::APPROVED, null, null, null, [], 2);
+        $entry = new LexicalEntry('entry-existing', 'Côn hoa thị', 'côn hoa thị', DictionaryConcept::APPROVED, 'vi-VN', [], 3, [$sense->conceptId]);
+        $concepts = $this->conceptRepository([$sense]);
+        $entries = $this->entryRepository([$entry], [$sense]);
+        $service = new DictionaryMutationService($concepts, entryRepository: $entries, preCreateResolver: new DictionaryPreCreateResolver($entries));
+
+        $result = $service->createEntryWithSense('Côn hoa thị', 'Không tạo lại', [], 'entry-reuse-1');
+
+        self::assertSame('entry-existing', $result['entry']->entryId);
+        self::assertSame('sense-existing', $result['sense']->conceptId);
+        self::assertSame('REUSE_EXISTING', $result['resolution']['action']);
+        self::assertSame(0, $entries->createWrites);
+    }
+
+    public function test_precreate_resolution_rejects_ambiguous_entry_creation(): void
+    {
+        $firstSense = new DictionaryConcept('sense-one', 'Côn', 'Máy', DictionaryConcept::APPROVED, null, null, null, ['domain' => 'máy'], 1);
+        $secondSense = new DictionaryConcept('sense-two', 'Côn', 'Bút', DictionaryConcept::APPROVED, null, null, null, ['domain' => 'bút'], 1);
+        $entry = new LexicalEntry('entry-ambiguous', 'Côn', 'côn', DictionaryConcept::APPROVED, 'vi-VN', [], 2, [$firstSense->conceptId, $secondSense->conceptId]);
+        $entries = $this->entryRepository([$entry], [$firstSense, $secondSense]);
+        $service = new DictionaryMutationService($this->conceptRepository([$firstSense, $secondSense]), entryRepository: $entries, preCreateResolver: new DictionaryPreCreateResolver($entries));
+
+        $this->expectExceptionMessage('DICTIONARY_PRE_CREATE_REVIEW_REQUIRED');
+        $service->createEntryWithSense('Côn', 'Không rõ nghĩa', [], 'entry-ambiguous-1');
+    }
+
+    public function test_precreate_resolution_allows_one_new_entry_and_records_resolution(): void
+    {
+        $entries = $this->entryRepository();
+        $service = new DictionaryMutationService($this->conceptRepository(), entryRepository: $entries, preCreateResolver: new DictionaryPreCreateResolver($entries));
+
+        $result = $service->createEntryWithSense('Kính rào', 'Nghĩa mới', [], 'entry-new-1');
+
+        self::assertSame('CREATE_NEW', $result['resolution']['action']);
+        self::assertNotSame('', $result['resolution']['fingerprint']);
+        self::assertSame(1, $entries->createWrites);
+    }
+
+    public function test_duplicate_form_and_sense_enrichment_reuse_without_repository_write(): void
+    {
+        $sense = new DictionaryConcept('sense-form', 'Côn', 'Nghĩa', DictionaryConcept::APPROVED, null, null, null, [], 1);
+        $entry = new LexicalEntry('entry-form', 'Côn', 'côn', DictionaryConcept::APPROVED, 'vi-VN', [], 2, [$sense->conceptId]);
+        $entries = $this->entryRepository([$entry], [$sense]);
+        $service = new DictionaryMutationService($this->conceptRepository([$sense]), entryRepository: $entries, preCreateResolver: new DictionaryPreCreateResolver($entries));
+
+        $form = $service->addFormToEntry('entry-form', 2, 'Côn', [], 'form-reuse-1');
+        $mappedSense = $service->addSenseToEntry('entry-form', 2, 'sense-form', [], 'sense-reuse-1');
+
+        self::assertTrue($form['duplicate']);
+        self::assertTrue($mappedSense['duplicate']);
+        self::assertSame(0, $entries->formWrites);
+        self::assertSame(0, $entries->senseWrites);
+    }
+
+    public function test_same_key_replay_returns_recorded_result_before_live_resolution_changes(): void
+    {
+        $entries = $this->entryRepository();
+        $receipts = [];
+        $service = new DictionaryMutationService(
+            $this->conceptRepository(),
+            receiptReader: static function (string $key, string $fingerprint) use (&$receipts): ?array { return $receipts[$key] ?? null; },
+            receiptWriter: static function (string $key, string $fingerprint, array $result) use (&$receipts): void { $receipts[$key] = ['fingerprint' => $fingerprint, 'result' => $result]; },
+            entryRepository: $entries,
+            preCreateResolver: new DictionaryPreCreateResolver($entries),
+        );
+
+        $first = $service->createEntryWithSense('Kính rào', 'Nghĩa mới', [], 'entry-replay-1');
+        $entries->entries[] = $first['entry'];
+        $replay = $service->createEntryWithSense('Kính rào', 'Nghĩa mới', [], 'entry-replay-1');
+
+        self::assertSame($first['entry']->entryId, $replay['entry']->entryId);
+        self::assertSame(1, $entries->createWrites);
+    }
+
+    private function conceptRepository(array $concepts = []): DictionaryConceptRepository
+    {
+        return new class($concepts) implements DictionaryConceptRepository {
+            public function __construct(array $concepts) { $this->concepts = []; foreach ($concepts as $concept) if ($concept instanceof DictionaryConcept) $this->concepts[$concept->conceptId] = $concept; }
+            public function findById(string $conceptId): ?DictionaryConcept { return $this->concepts[$conceptId] ?? null; }
+            public function findApprovedByNormalizedLabel(string $normalizedLabel, array $context = []): array { return []; }
+            public function listApproved(int $limit = 500): array { return array_values($this->concepts); }
+            public function listLabels(string $conceptId, bool $includeInactive = false): array { return []; }
+            public function createConcept(DictionaryConcept $concept): DictionaryConcept { return $this->concepts[$concept->conceptId] = $concept; }
+            public function updateConcept(DictionaryConcept $concept, int $expectedRevision): DictionaryConcept { return $this->concepts[$concept->conceptId] = $concept; }
+            public function addLabel(DictionaryLabel $label): DictionaryLabel { return $label; }
+            public function saveLabel(DictionaryLabel $label, string $previousNormalizedLabel, int $expectedConceptRevision): DictionaryLabel { return $label; }
+        };
+    }
+
+    private function entryRepository(array $entries = [], array $senses = []): DictionaryEntryRepository
+    {
+        return new class($entries, $senses) implements DictionaryEntryRepository {
+            public int $createWrites = 0;
+            public int $formWrites = 0;
+            public int $senseWrites = 0;
+            public function __construct(public array $entries, private array $senses) {}
+            public function findByForm(string $normalizedForm, array $context = []): array { return array_values(array_filter($this->entries, static fn (LexicalEntry $entry): bool => $entry->normalizedPreferredForm === $normalizedForm)); }
+            public function findForConcept(string $conceptId): ?LexicalEntry { foreach ($this->entries as $entry) if (in_array($conceptId, $entry->senseIds, true)) return $entry; return null; }
+            public function listSenses(LexicalEntry $entry, array $context = []): array { return array_values(array_filter($this->senses, static fn (DictionaryConcept $sense): bool => in_array($sense->conceptId, $entry->senseIds, true) && self::contextMatches($sense, $context))); }
+            public function addForm(LexicalEntryForm $form): LexicalEntryForm { return $form; }
+            public function findById(string $entryId): ?LexicalEntry { foreach ($this->entries as $entry) if ($entry->entryId === $entryId) return $entry; return null; }
+            public function createWithSense(LexicalEntry $entry, DictionaryConcept $sense, array $context): array { $this->createWrites++; $this->entries[] = $entry; $this->senses[$sense->conceptId] = $sense; return ['entry' => $entry, 'sense' => $sense, 'forms' => []]; }
+            public function addFormToEntry(string $entryId, int $expectedRevision, LexicalEntryForm $form): array { $this->formWrites++; return ['entry' => $this->findById($entryId), 'form' => $form]; }
+            public function addSenseToEntry(string $entryId, int $expectedRevision, DictionaryConcept $sense, array $context = [], ?string $semanticType = null, ?string $semanticId = null, ?int $semanticRevision = null): array { $this->senseWrites++; return ['entry' => $this->findById($entryId), 'sense' => $sense]; }
+            private static function contextMatches(DictionaryConcept $sense, array $context): bool { foreach ($context as $key => $value) if ($value !== null && $value !== '' && ($sense->context[$key] ?? null) !== $value) return false; return true; }
+        };
     }
 }
