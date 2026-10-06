@@ -5,6 +5,7 @@ namespace NHK\Core\Application\Semantic;
 
 use NHK\Core\Application\Compliance\{PublicClaimCopyPolicy, PublicEditorialCopyGuard};
 use NHK\Core\Domain\Seo\SeoReadinessResult;
+use NHK\Core\Shared\Encoding\Utf8Contract;
 
 /** One deterministic quality gate shared by all transient editorial projections. */
 final class EditorialQualityGate
@@ -130,13 +131,13 @@ final class EditorialQualityGate
         $visual = array_merge($pack->visualSupport, $plan->visualSupport, (array) ($draft->diagnostics['visual_support'] ?? []));
         foreach ($visual as $item) if (is_array($item) && (strtoupper((string) ($item['status'] ?? '')) === 'UNRESOLVED' || (strtoupper((string) ($item['status'] ?? '')) === 'UNAVAILABLE' && ($item['required'] ?? true) === true) || strtolower((string) ($item['support'] ?? '')) === 'representative')) { $add('visual_support', 'BLOCK', 'VISUAL_SUPPORT_UNRESOLVED'); break; }
 
-        $deferredVideoIdentity = $allowDeferredSeoIdentity
-            && $profile === 'video'
+        $deferredOwnerIdentity = $allowDeferredSeoIdentity
+            && in_array($profile, ['article', 'video'], true)
             && $seo->canonicalUrl === null
             && $seo->blockers !== []
             && array_diff($seo->blockers, ['MISSING_PUBLIC_IDENTITY', 'AMBIGUOUS_CANONICAL_SUBJECT']) === [];
         if (!in_array($seo->readiness, [SeoReadinessResult::READY, SeoReadinessResult::NOT_APPLICABLE], true)) {
-            if ($deferredVideoIdentity) $add('seo_readiness', 'INFO', 'VIDEO_PUBLIC_IDENTITY_DEFERRED_UNTIL_OWNER_CREATION');
+            if ($deferredOwnerIdentity) $add('seo_readiness', 'INFO', strtoupper($profile) . '_PUBLIC_IDENTITY_DEFERRED_UNTIL_OWNER_CREATION');
             else $add('seo_readiness', 'BLOCK', 'SEO_NOT_READY');
         }
         if ($topic !== '' && !$this->containsTopic($seo->title . ' ' . $seo->h1 . ' ' . $seo->topicFocus, $topic)) $add('seo_readiness', 'WARN', 'SEO_TOPIC_MISMATCH');
@@ -163,7 +164,24 @@ final class EditorialQualityGate
         $dimensions['publication_quality'] = $this->aggregateDimension($dimensions, ['public_language', 'visual_support', 'seo_readiness', 'internal_link_quality', 'public_claim_compliance', 'public_readiness']);
         foreach ($dimensions as &$dimension) $dimension['reasons'] = array_values(array_unique(array_slice($dimension['reasons'], 0, 10)));
         unset($dimension);
-        return new EditorialQualityReport($readiness, $profile, $dimensions, $blockers, $warnings, $informational, ['gate' => 'shared_editorial_quality', 'opaque_score' => false, 'quality_findings' => $qualityFindings, 'evaluation' => ['round' => $round, 'package_fingerprint' => $packageFingerprint ?? $this->packageFingerprint($draft, $seo), 'attempt_id' => $attemptId, 'attempt_no' => $attemptNo]]);
+        $structured = [];
+        $ruleMeta = [
+            'SEO_NOT_READY' => ['field' => 'seo_plan', 'section' => 'seo', 'remediation' => 'RESOLVE_PUBLIC_IDENTITY_OR_COMPLETE_OWNER_READBACK'],
+            'DUPLICATE_KNOWLEDGE_DOMINATION' => ['field' => 'knowledge_selection', 'section' => 'research', 'remediation' => 'REBALANCE_CANONICAL_KNOWLEDGE_SELECTION'],
+            'MALFORMED_SENTENCE_JOIN' => ['field' => 'body', 'section' => 'editorial_body', 'remediation' => 'NORMALIZE_SENTENCE_BOUNDARIES'],
+        ];
+        foreach (array_unique(array_merge($blockers, $warnings, $informational)) as $code) {
+            if (!isset($ruleMeta[$code])) continue;
+            $structured[] = [
+                'code' => $code,
+                'affected_section' => $ruleMeta[$code]['section'],
+                'field' => $ruleMeta[$code]['field'],
+                'reason' => $code,
+                'blocking' => in_array($code, $blockers, true),
+                'remediation_class' => $ruleMeta[$code]['remediation'],
+            ];
+        }
+        return new EditorialQualityReport($readiness, $profile, $dimensions, $blockers, $warnings, $informational, ['gate' => 'shared_editorial_quality', 'opaque_score' => false, 'quality_findings' => $qualityFindings, 'structured_diagnostics' => $structured, 'evaluation' => ['round' => $round, 'package_fingerprint' => $packageFingerprint ?? $this->packageFingerprint($draft, $seo), 'attempt_id' => $attemptId, 'attempt_no' => $attemptNo]]);
     }
 
     /** @param array<string,array<string,mixed>> $dimensions @param list<string> $names @return array<string,mixed> */
@@ -280,7 +298,7 @@ final class EditorialQualityGate
     private function hasMalformedJoin(string $body): bool
     {
         return preg_match('/(?:\.\.\.|\b(?:đồng hồ|Odo\s+\d+)\b)[ \t]+(?:Video|Hình ảnh|Nội dung)\s+là/iu', $body) === 1
-            || preg_match('/[.!?][ \t]+[a-zà-ỹ]/u', $body) === 1;
+            || preg_match('/[.!?][ \t]+(?:là|và|nhưng|để|khi|trong|một)\b/iu', $body) === 1;
     }
 
     private function hasGenericFiller(string $body): bool
@@ -339,7 +357,7 @@ final class EditorialQualityGate
 
     private function packageFingerprint(EditorialDraft $draft, SemanticSeoPlan $seo): string
     {
-        return hash('sha256', (string) json_encode(['title' => $draft->title, 'summary' => $draft->summary, 'body' => $draft->body, 'seo_title' => $seo->title, 'seo_description' => $seo->metaDescription], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        return hash('sha256', Utf8Contract::encode(['title' => $draft->title, 'summary' => $draft->summary, 'body' => $draft->body, 'seo_title' => $seo->title, 'seo_description' => $seo->metaDescription], 'editorial.quality', 'package_fingerprint'));
     }
 
     /** @param array<string,array<string,mixed>> $selected @return array<string,string> */

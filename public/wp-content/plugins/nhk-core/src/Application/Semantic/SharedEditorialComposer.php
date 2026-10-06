@@ -17,10 +17,11 @@ final class SharedEditorialComposer
         $guard = $this->publicCopyGuard ?? new PublicEditorialCopyGuard();
         // Capture keeps raw instructions for orchestration, but only typed
         // editorial copy may enter public Article prose.
+        $articleComposition = $plan->profile === 'article';
         $input = $this->normalizeInput((string) (array_key_exists('editorial_copy', $plan->inputContext)
             ? $plan->inputContext['editorial_copy']
-            : ($plan->inputContext['raw_input'] ?? $plan->inputContext['text'] ?? '')));
-        $title = $this->title($plan->topic, $input);
+            : ($plan->inputContext['raw_input'] ?? $plan->inputContext['text'] ?? '')), $articleComposition);
+        $title = $this->title($plan->topic, $input, $articleComposition ? (string) ($plan->inputContext['title'] ?? '') : '');
         $paragraphs = [];
         $opening = $input !== '' ? $input : $this->normalizeSentence($plan->topic);
         if ($opening !== '') $paragraphs[] = $opening;
@@ -71,12 +72,12 @@ final class SharedEditorialComposer
             if ($realized !== []) $paragraphs[] = implode(' ', $realized);
         }
 
-        $body = implode("\n\n", array_map(fn (string $paragraph): string => $this->normalizeParagraph($paragraph), $paragraphs));
+        $body = implode("\n\n", array_map(fn (string $paragraph): string => $this->normalizeParagraph($paragraph, $articleComposition), $paragraphs));
         $guard->assertSafe($title);
         $guard->assertSafe($body);
         $status = $traceFailure ? 'review' : ($trace === [] ? ($input !== '' ? 'sparse_input' : 'review') : 'available');
         $novelty = $this->informationGain($claimTexts, $plan->inputContext);
-        return new EditorialDraft($status, $plan->profile, $title, $this->summary($paragraphs[0]), $body, $trace, [
+        return new EditorialDraft($status, $plan->profile, $title, $this->summary($paragraphs[0], $articleComposition ? (string) ($plan->inputContext['excerpt'] ?? '') : ''), $body, $trace, [
             'mode' => $trace === [] ? ($input !== '' ? 'sparse_input' : 'no_selected_knowledge') : 'selected_knowledge',
             'information_gain' => $novelty,
             'visual_support' => $plan->visualSupport,
@@ -103,14 +104,28 @@ final class SharedEditorialComposer
         return $prefix . $this->lowerFirst($sentence);
     }
 
-    private function normalizeInput(string $input): string
+    private function normalizeInput(string $input, bool $preserveMarkdown = false): string
     {
+        $input = trim(str_replace(["\r\n", "\r"], "\n", $input));
+        if ($input === '') return '';
+        if ($preserveMarkdown && preg_match('/^\s*#{1,6}\s+/m', $input) === 1) {
+            $lines = array_map(function (string $line): string {
+                $line = trim($line);
+                if ($line === '') return '';
+                if (preg_match('/^#{1,6}\s+/', $line) === 1) return (string) (preg_replace('/[ \t]+/u', ' ', $line) ?? $line);
+                return $this->normalizeSentence((string) (preg_replace('/[ \t]+/u', ' ', $line) ?? $line));
+            }, explode("\n", $input));
+            return trim(implode("\n", $lines));
+        }
         $input = trim((string) (preg_replace('/\s+/u', ' ', $input) ?? $input));
-        return $input === '' ? '' : $this->normalizeSentence($input);
+        return $this->normalizeSentence($input);
     }
 
-    private function normalizeParagraph(string $paragraph): string
+    private function normalizeParagraph(string $paragraph, bool $preserveMarkdown = false): string
     {
+        if ($preserveMarkdown && preg_match('/^\s*#{1,6}\s+/m', $paragraph) === 1) {
+            return trim(implode("\n", array_map(static fn (string $line): string => trim((string) (preg_replace('/[ \t]+/u', ' ', $line) ?? $line)), explode("\n", $paragraph))));
+        }
         return trim((string) (preg_replace('/\s+/u', ' ', $paragraph) ?? $paragraph));
     }
 
@@ -142,15 +157,16 @@ final class SharedEditorialComposer
         return trim((string) (preg_replace('/[^\p{L}\p{N}]+/u', ' ', $text) ?? $text));
     }
 
-    private function title(string $topic, string $input): string
+    private function title(string $topic, string $input, string $explicitTitle = ''): string
     {
-        $value = trim($topic !== '' ? $topic : $input);
+        $value = trim($explicitTitle !== '' ? $explicitTitle : ($topic !== '' ? $topic : $input));
         return function_exists('mb_substr') ? mb_substr($value, 0, 120) : substr($value, 0, 120);
     }
 
-    private function summary(string $first): string
+    private function summary(string $first, string $explicitExcerpt = ''): string
     {
-        return function_exists('mb_substr') ? mb_substr(trim($first), 0, 180) : substr(trim($first), 0, 180);
+        $value = trim($explicitExcerpt !== '' ? $explicitExcerpt : $first);
+        return function_exists('mb_substr') ? mb_substr($value, 0, 180) : substr($value, 0, 180);
     }
 
     private function informationGain(array $claimTexts, array $input): float

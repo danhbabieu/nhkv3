@@ -67,6 +67,24 @@ final class ArticleEditorialAdapterTest extends TestCase
         self::assertSame('article', $result['profile']);
     }
 
+    public function test_capture_can_defer_article_seo_identity_until_native_post_readback(): void
+    {
+        $adapter = $this->adapter([]);
+        $result = $adapter->prepare([
+            'title' => '“Đánh mượn” — Odo 24',
+            'excerpt' => 'Mô tả cách bộ máy sử dụng côn và búa.',
+            'raw_input' => "# Cấu tạo\n\nĐánh mượn côn và búa tại Westminster.",
+            'subject_resolution' => ['primary' => ['id' => self::SUBJECT, 'type' => 'model']],
+            'allow_deferred_seo_identity' => true,
+        ]);
+
+        self::assertNotContains('SEO_NOT_READY', $result['quality_report']->blockers);
+        self::assertSame('“Đánh mượn” — Odo 24', $result['draft']->title);
+        self::assertSame('Mô tả cách bộ máy sử dụng côn và búa.', $result['draft']->summary);
+        self::assertStringContainsString('# Cấu tạo', $result['draft']->body);
+        self::assertContains('ARTICLE_PUBLIC_IDENTITY_DEFERRED_UNTIL_OWNER_CREATION', $result['quality_report']->informational);
+    }
+
     public function test_prepared_context_blocks_unselected_video_knowledge_from_article_composer(): void
     {
         $adapter = $this->adapter([

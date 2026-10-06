@@ -668,6 +668,15 @@ final class Plugin {
                     'content_intent' => $context['content_intent'] ?? [],
                     'subject_resolution_packet' => $packet,
                 ]);
+                if (!$research->readyForDraft) {
+                    return [
+                        'status' => 'REVIEW_REQUIRED',
+                        'decision' => 'RESEARCH_PREFLIGHT_BLOCKED',
+                        'overlap' => $research->overlap,
+                        'research' => $research->toArray(),
+                        'diagnostics' => ['research_preflight_blockers' => $research->blockers],
+                    ];
+                }
                 $overlap = strtoupper(trim((string) ($research->overlap['classification'] ?? 'UNCERTAIN')));
                 $decision = match ($overlap) {
                     'NO_OVERLAP', 'COMPLEMENTARY_CONTENT' => 'CREATE_DIFFERENTIATED_ARTICLE',

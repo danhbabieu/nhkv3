@@ -51,13 +51,14 @@ final class ArticleEditorialAdapter
             ? trim((string) ($context['editorial_copy'] ?? $context['interpretation']['article_intent'] ?? ''))
             : trim((string) ($context['raw_input'] ?? $context['text'] ?? ''));
         $topic = $typedInput
-            ? trim((string) ($context['topic'] ?? $subject['name'] ?? $subject['canonical_name'] ?? $context['title'] ?? $editorialCopy))
+            ? trim((string) ($context['topic'] ?? $context['title'] ?? $subject['name'] ?? $subject['canonical_name'] ?? $editorialCopy))
             : trim((string) ($context['topic'] ?? $context['raw_input'] ?? $context['title'] ?? ''));
         $inputContext = [
             'raw_input' => $editorialCopy,
             'editorial_copy' => $editorialCopy,
             'non_semantic_context' => is_array($context['non_semantic_context'] ?? null) ? $context['non_semantic_context'] : (is_array($context['interpretation']['non_semantic_context'] ?? null) ? $context['interpretation']['non_semantic_context'] : []),
             'title' => trim((string) ($context['title'] ?? '')),
+            'excerpt' => trim((string) ($context['excerpt'] ?? '')),
             'observations' => is_array($context['observations'] ?? null) ? $context['observations'] : [],
         ];
         $profile = ['profile' => 'article', 'result_limit' => 50];
@@ -71,6 +72,32 @@ final class ArticleEditorialAdapter
         ]);
         $retrieved = is_array($shared['content']['retrieval'] ?? null) ? $shared['content']['retrieval'] : $this->retrieval->retrieve($subject, $topic, (array) ($context['hints'] ?? []), $profile);
         $pack = $shared['content']['pack'] ?? $this->selector->select($retrieved, $topic, $subject, $profile, $inputContext);
+        if ($pack instanceof \NHK\Core\Application\Semantic\EditorialContextPack) {
+            // Shared enrichment may return a compact envelope. Preserve the
+            // Article-owned title/excerpt as transient composition context;
+            // it is not semantic truth and is never persisted here.
+            $pack = new \NHK\Core\Application\Semantic\EditorialContextPack(
+                $pack->status,
+                $pack->primarySubject,
+                $pack->topic,
+                $pack->profile,
+                $pack->retrievalStatus,
+                $pack->selectedClaims,
+                $pack->excludedCandidates,
+                array_replace($pack->inputContext, $inputContext),
+                $pack->visualSupport,
+                $pack->blockers,
+                $pack->diagnostics,
+                $pack->packRevision,
+                $pack->grounding,
+                $pack->readerFacts,
+                $pack->supportingContext,
+                $pack->specimenContext,
+                $pack->controlProvenance,
+                $pack->knowledgeUnits,
+                $pack->coverageAspects,
+            );
+        }
         $plan = $this->journey->plan($pack);
         if (($context['defer_composition'] ?? false) === true) {
             return [
@@ -95,7 +122,8 @@ final class ArticleEditorialAdapter
             'competing_pages' => is_array($context['competing_pages'] ?? null) ? $context['competing_pages'] : [],
             'structured_data' => ['type' => 'Article'],
         ]);
-        $quality = $this->quality->evaluate($pack, $plan, $draft, $seo);
+        $deferSeoIdentity = ($context['allow_deferred_seo_identity'] ?? false) === true;
+        $quality = $this->quality->evaluate($pack, $plan, $draft, $seo, $deferSeoIdentity);
 
         return [
             'status' => $quality->readiness,
@@ -106,6 +134,7 @@ final class ArticleEditorialAdapter
             'draft' => $draft,
             'seo_plan' => $seo,
             'quality_report' => $quality,
+            'seo_identity_deferred' => $deferSeoIdentity,
             'shared_enrichment' => $shared['content'] ?? ['status' => 'NOT_REQUESTED'],
             'shared_result' => $shared,
         ];

@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Capture;
 
 use NHK\Core\Application\Completion\CompletionCoordinator;
-use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, SharedEnrichmentBoundary, SubjectResolutionService, TextInputInterpreter};
+use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, EditorialContentProjection, SharedEnrichmentBoundary, SubjectResolutionService, TextInputInterpreter};
 use NHK\Core\Application\Article\ArticleEditorialAdapter;
 use NHK\Core\Contracts\Capture\CaptureRepository;
 use NHK\Core\Contracts\Media\MediaBindingPort;
@@ -21,6 +21,7 @@ use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
 use NHK\Core\Domain\Knowledge\DependencyValidationException;
 use NHK\Core\Governance\Exception\{GovernanceException, ProposalIdempotencyConflict, ProposalIdempotencyStaleBinding, ProposalSubjectBindingInvalid};
 use NHK\Core\Domain\Video\VideoRelationEvidenceRequired;
+use NHK\Core\Shared\Encoding\{Utf8Contract, Utf8SerializationException, Utf8ValidationException};
 
 /**
  * Shared Capture orchestration. Input/media adapters are injected at the edge;
@@ -75,6 +76,7 @@ final class EditorialCaptureCoordinator
     public function execute(array $input): CaptureRecord
     {
         $input = $this->normalizeEditorialInput($input);
+        Utf8Contract::assertValid($input, 'mcp.capture.ingest', 'arguments');
         if (CapturePurposePolicy::resolve($input) !== CapturePurpose::EDITORIAL) throw new \InvalidArgumentException('AUTHORITY_CAPTURE_REQUIRES_AUTHORITY_OWNER');
         $key = trim((string) ($input['idempotency_key'] ?? ''));
         if ($key === '') throw new \InvalidArgumentException('Capture idempotency key is required.');
@@ -128,6 +130,7 @@ final class EditorialCaptureCoordinator
     {
         $this->documentation?->assertCheckpoint((array) ($input['documentation_checkpoint'] ?? []));
         $input = $this->normalizeEditorialInput($this->rehydrateRetryInput($record, $input));
+        Utf8Contract::assertValid($input, 'mcp.capture.retry', 'arguments');
         return $this->run($record, $input);
     }
 
@@ -724,7 +727,7 @@ final class EditorialCaptureCoordinator
             $diagnostics['visual_support'] = ['status' => $visualRequirements === [] && $visualDiagnostics === [] ? 'not_requested' : 'optional_enrichment', 'requirements' => $visualRequirements, 'diagnostics' => $visualDiagnostics];
 
             $inputMetadata = is_array($input['metadata'] ?? null) ? $input['metadata'] : [];
-            $semanticContext = ['capture_id' => $record->captureId, 'article_id' => $record->articleId, 'article_endpoint_key' => $record->articleId !== null ? ((function_exists('get_current_blog_id') ? (int) get_current_blog_id() : 1) . ':' . (int) $record->articleId) : '', 'raw_input' => $text, 'editorial_copy' => (string) ($interpretation['article_intent'] ?? ''), 'non_semantic_context' => is_array($interpretation['non_semantic_context'] ?? null) ? $interpretation['non_semantic_context'] : [], 'continuation_delta_text' => trim((string) ($input['continuation_delta_text'] ?? '')), 'assets' => $assets, 'media_bindings' => is_array($input['media_bindings'] ?? null) ? $input['media_bindings'] : [], 'media_operations' => is_array($input['media_operations'] ?? null) ? $input['media_operations'] : [], 'interpretation' => $interpretation, 'subject_resolution' => $resolution, 'subject_resolution_packet' => $subjectPacket->toArray(), 'content_intent' => $intent, 'visual_opportunities' => $visualOpportunities, 'visual_support' => $diagnostics['visual_support'], 'visual_context' => is_array($input['visual_context'] ?? null) ? $input['visual_context'] : [], 'observations' => is_array($input['observations'] ?? null) ? $input['observations'] : [], 'components' => is_array($input['components'] ?? $record->context['components'] ?? null) ? ($input['components'] ?? $record->context['components']) : [], 'provenance_packets' => is_array($inputMetadata['provenance_packets'] ?? null) ? $inputMetadata['provenance_packets'] : [], 'existing_capture_continuation' => ($input['existing_capture_continuation'] ?? false) === true, 'continuation_idempotency_key' => (string) ($input['continuation_idempotency_key'] ?? ''), 'governance' => is_array($input['governance'] ?? null) ? $input['governance'] : [], 'prior_diagnostics' => $diagnostics, 'phase_receipts' => $receipts];
+            $semanticContext = ['capture_id' => $record->captureId, 'article_id' => $record->articleId, 'article_endpoint_key' => $record->articleId !== null ? ((function_exists('get_current_blog_id') ? (int) get_current_blog_id() : 1) . ':' . (int) $record->articleId) : '', 'raw_input' => $text, 'editorial_copy' => (string) ($interpretation['article_intent'] ?? ''), 'non_semantic_context' => is_array($interpretation['non_semantic_context'] ?? null) ? $interpretation['non_semantic_context'] : [], 'title' => trim((string) ($input['title'] ?? $record->context['title'] ?? '')), 'excerpt' => trim((string) ($input['excerpt'] ?? $record->context['excerpt'] ?? '')), 'topic' => trim((string) ($input['topic'] ?? $input['title'] ?? '')), 'continuation_delta_text' => trim((string) ($input['continuation_delta_text'] ?? '')), 'assets' => $assets, 'media_bindings' => is_array($input['media_bindings'] ?? null) ? $input['media_bindings'] : [], 'media_operations' => is_array($input['media_operations'] ?? null) ? $input['media_operations'] : [], 'interpretation' => $interpretation, 'subject_resolution' => $resolution, 'subject_resolution_packet' => $subjectPacket->toArray(), 'content_intent' => $intent, 'visual_opportunities' => $visualOpportunities, 'visual_support' => $diagnostics['visual_support'], 'visual_context' => is_array($input['visual_context'] ?? null) ? $input['visual_context'] : [], 'observations' => is_array($input['observations'] ?? null) ? $input['observations'] : [], 'components' => is_array($input['components'] ?? $record->context['components'] ?? null) ? ($input['components'] ?? $record->context['components']) : [], 'provenance_packets' => is_array($inputMetadata['provenance_packets'] ?? null) ? $inputMetadata['provenance_packets'] : [], 'existing_capture_continuation' => ($input['existing_capture_continuation'] ?? false) === true, 'continuation_idempotency_key' => (string) ($input['continuation_idempotency_key'] ?? ''), 'governance' => is_array($input['governance'] ?? null) ? $input['governance'] : [], 'prior_diagnostics' => $diagnostics, 'phase_receipts' => $receipts];
             $sharedEnrichment = $this->buildSharedEnrichment($record, $input, $intent, $resolution, $text, $interpretation, $preparationResult);
             if ($sharedEnrichment !== null) {
                 $semanticContext['shared_enrichment'] = $sharedEnrichment;
@@ -825,10 +828,15 @@ final class EditorialCaptureCoordinator
                             'public_identity' => [
                                 'canonical_url' => $permalink,
                                 'canonical_identity' => $permalink !== '',
-                                'public_eligible' => $permalink !== '',
+                                // Absence of a native Post is deferred owner
+                                // identity, not a public-ineligibility veto.
+                                'public_eligible' => true,
                             ],
+                            'allow_deferred_seo_identity' => $record->articleId === null,
                         ]);
                         $retrieved = (array) ($sharedEditorial['retrieval'] ?? []);
+                    } catch (Utf8ValidationException|Utf8SerializationException $error) {
+                        throw $error;
                     } catch (\Throwable $error) {
                         $sharedEditorial = ['status' => 'FALLBACK', 'failure_code' => 'SHARED_EDITORIAL_UNAVAILABLE', 'error' => $error->getMessage()];
                         $retrieved = $this->claims->retrieve($semanticContext);
@@ -847,6 +855,7 @@ final class EditorialCaptureCoordinator
                         'quality_readiness' => is_object($quality) ? (string) ($quality->readiness ?? '') : '',
                         'quality_blockers' => is_object($quality) ? array_values((array) ($quality->blockers ?? [])) : [],
                         'quality_warnings' => is_object($quality) ? array_values((array) ($quality->warnings ?? [])) : [],
+                        'seo_identity_deferred' => ($sharedEditorial['seo_identity_deferred'] ?? false) === true,
                     ];
                 }
                 $record = $this->save($record, CaptureStage::KNOWLEDGE_RETRIEVED, $assets, $diagnostics, $receipts, 'KNOWLEDGE_RETRIEVED', $record->articleId, $record->articleStateToken);
@@ -905,7 +914,7 @@ final class EditorialCaptureCoordinator
                 $this->beginPhase('COMPOSED');
                 $sharedDraft = is_array($sharedEditorial ?? null) ? ($sharedEditorial['draft'] ?? null) : null;
                 $composition = is_object($sharedDraft)
-                    ? ['title' => $sharedDraft->title, 'excerpt' => $sharedDraft->summary, 'content' => $sharedDraft->body, 'claim_trace' => $sharedDraft->claimTrace, 'research_snapshot' => ['source' => 'shared_editorial_pipeline', 'profile' => $sharedDraft->profile], 'managed_sections' => [], 'seo_projection' => is_object($sharedEditorial['seo_plan'] ?? null) ? $sharedEditorial['seo_plan']->toArray() : []]
+                    ? ['title' => $sharedDraft->title, 'excerpt' => $sharedDraft->summary, 'content' => EditorialContentProjection::toWordPressBlocks($sharedDraft->body), 'claim_trace' => $sharedDraft->claimTrace, 'research_snapshot' => ['source' => 'shared_editorial_pipeline', 'profile' => $sharedDraft->profile], 'managed_sections' => [], 'seo_projection' => is_object($sharedEditorial['seo_plan'] ?? null) ? $sharedEditorial['seo_plan']->toArray() : []]
                     : $this->composer->compose($text, $semanticContext['observations'], $retrieved['selected_claims'] ?? [], ['title' => (string) ($input['title'] ?? ''), 'excerpt' => (string) ($input['excerpt'] ?? ''), 'editorial_copy' => (string) ($interpretation['article_intent'] ?? ''), 'non_semantic_context' => is_array($interpretation['non_semantic_context'] ?? null) ? $interpretation['non_semantic_context'] : [], 'subject_resolution' => $resolution, 'asset_count' => count($assets), 'assets' => $assets, 'visual_opportunities' => $visualOpportunities]);
                 $draft = ($this->draftCreator)([
                     'capture_id' => $record->captureId,
@@ -1020,7 +1029,10 @@ final class EditorialCaptureCoordinator
                             'governed_enrichment_readback' => $preparationResult?->enrichment ?? [],
                         ],
                         'defer_composition' => false,
+                        'allow_deferred_seo_identity' => $record->articleId === null,
                     ]);
+                } catch (Utf8ValidationException|Utf8SerializationException $error) {
+                    throw $error;
                 } catch (\Throwable) {
                     $sharedEditorial = null;
                     $diagnostics['shared_editorial'] = ['status' => 'FALLBACK', 'failure_code' => 'SHARED_EDITORIAL_COMPOSITION_UNAVAILABLE'];
@@ -1126,6 +1138,9 @@ final class EditorialCaptureCoordinator
             $failureCode = $this->failureCode($error);
             $status = $this->failureStatus($failureCode);
             $diagnostics['failure'] = ['code' => $failureCode, 'message' => $error->getMessage(), 'classification' => $status];
+            if ($error instanceof Utf8ValidationException || $error instanceof Utf8SerializationException) {
+                $diagnostics['utf8'] = ['status' => 'INVALID', 'code' => 'CAPTURE_UTF8_INVALID', 'producer' => $error->producer, 'field' => $error->path, 'remediation_class' => 'FIX_UPSTREAM_ENCODER_OR_STORAGE'];
+            }
             if ($error instanceof \NHK\Core\Domain\Video\VideoException && $error->diagnostics !== []) {
                 $diagnostics['editorial_failure_diagnostics'] = $error->diagnostics;
             }
@@ -1757,6 +1772,7 @@ final class EditorialCaptureCoordinator
         $failureCode = trim((string) ($diagnostics['failure']['code'] ?? ($semanticDiagnostics['blockers'][0] ?? '')));
         if ($failureCode !== '' && $receiptStatus !== 'COMPLETED') $attempt['failure_code'] = $failureCode;
         $receipts = CapturePhaseReceiptReducer::append($receipts, $receiptStage, $attempt);
+        Utf8Contract::assertValid(['assets' => $assets, 'context' => $nextContext, 'diagnostics' => $diagnostics, 'phase_receipts' => $receipts], 'capture.persistence');
         return $this->captures->save(new CaptureRecord($record->captureId, $record->idempotencyKey, $record->requestFingerprint, $stage, $status, $articleId ?? $record->articleId, $token ?? $record->articleStateToken, $assets, $nextContext, $diagnostics, $receipts, $record->revision + 1, $record->createdAt, gmdate('Y-m-d H:i:s.u')));
     }
 
@@ -1877,6 +1893,7 @@ final class EditorialCaptureCoordinator
         if ($error instanceof ProposalIdempotencyConflict) return 'PROPOSAL_IDEMPOTENCY_CONFLICT';
         if ($error instanceof ProposalIdempotencyStaleBinding) return 'IDEMPOTENCY_STALE_BINDING';
         if ($error instanceof VideoRelationEvidenceRequired) return VideoRelationEvidenceRequired::ERROR_CODE;
+        if ($error instanceof Utf8ValidationException || $error instanceof Utf8SerializationException) return 'CAPTURE_UTF8_INVALID';
         if ($error instanceof GovernanceException) return 'CAPTURE_GOVERNANCE_CONTRACT_FAILURE';
         $message = strtoupper(trim($error->getMessage()));
         return $message !== '' ? preg_replace('/[^A-Z0-9_:-]+/', '_', $message) ?? 'CAPTURE_FAILED' : 'CAPTURE_FAILED';

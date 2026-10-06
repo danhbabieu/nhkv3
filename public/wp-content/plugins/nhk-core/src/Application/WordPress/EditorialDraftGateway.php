@@ -11,6 +11,7 @@ use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Core\Contracts\Article\{OwnerPublicationService, PublicationPrincipal};
 use NHK\Core\Application\Capture\CaptureEditorialWriteGuard;
 use NHK\Core\Application\Semantic\{ManagedArticleSectionConflict, ManagedArticleSectionParser};
+use NHK\Core\Shared\Encoding\Utf8Contract;
 
 final class EditorialDraftGateway
 {
@@ -19,8 +20,9 @@ final class EditorialDraftGateway
     /** @param array<string,mixed> $input */
     public function create(array $input): array
     {
+        Utf8Contract::assertValid($input, 'article.draft.create', 'input');
         $key = trim((string) ($input['idempotency_key'] ?? '')); if ($key === '') throw new \InvalidArgumentException('Editorial draft idempotency key is required.');
-        $fingerprintInput = $input; unset($fingerprintInput['operation_id']); $fingerprint = hash('sha256', json_encode($fingerprintInput, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
+        $fingerprintInput = $input; unset($fingerprintInput['operation_id']); $fingerprint = hash('sha256', Utf8Contract::encode($fingerprintInput, 'article.draft.create', 'fingerprint_input'));
         $existing = $this->receipts->findByIdempotencyKey($key);
         if ($existing !== null) { if (!hash_equals($existing->requestFingerprint, $fingerprint)) return ['ok' => false, 'reason' => 'IDEMPOTENCY_CONFLICT', 'receipt' => $existing->toArray()]; return $this->result($existing, $existing->wpPostId === null ? null : $this->posts->read($existing->wpPostId)); }
         $research = is_array($input['research'] ?? null) ? $input['research'] : [];

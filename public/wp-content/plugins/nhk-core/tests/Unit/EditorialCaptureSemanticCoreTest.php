@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Capture\EditorialCaptureCoordinator;
+use NHK\Core\Application\Article\ArticleEditorialAdapter;
 use NHK\Core\Application\Semantic\{ArticleComposer, CanonicalAuthoritySubjectResolver, ClaimRetrievalEngine, SubjectResolutionService, TextInputInterpreter};
 use NHK\Core\Domain\Authority\{AuthorityEntity, AuthorityState, EntityTypeRegistry, CanonicalEntityTypeCatalog};
 use NHK\Tests\Support\InMemoryAuthorityRepository;
@@ -14,6 +15,59 @@ use PHPUnit\Framework\TestCase;
 
 final class EditorialCaptureSemanticCoreTest extends TestCase
 {
+    public function test_text_article_fixture_preserves_unicode_heading_and_retries_without_duplicate_native_draft(): void
+    {
+        $repository = new InMemoryCaptureRepository();
+        $draftCalls = 0;
+        $draft = [];
+        $subject = ['id' => '984658bf-19a6-4daa-a220-2a6c13af81ed', 'type' => 'model', 'name' => 'Odo 24', 'revision' => 1, 'match' => 'uuid_exact'];
+        $adapter = ArticleEditorialAdapter::fromEngine(new ClaimRetrievalEngine(
+            static fn (array $subject): array => ['status' => 'available', 'items' => []],
+            static fn (array $subject, array $neighborhood): array => [],
+        ));
+        $coordinator = new EditorialCaptureCoordinator(
+            $repository,
+            static fn (array $input): array => ['items' => []],
+            static function (array $input) use (&$draftCalls, &$draft): array {
+                $draftCalls++;
+                $draft = $input;
+                return ['post_id' => 824, 'state_token' => 'state-824', 'post' => ['post_id' => 824, 'title' => $input['title'], 'excerpt' => $input['excerpt'], 'content' => $input['content']]];
+            },
+            new TextInputInterpreter(),
+            new SubjectResolutionService(static fn (string $hint): array => $hint === '984658bf-19a6-4daa-a220-2a6c13af81ed' ? [$subject] : []),
+            new ClaimRetrievalEngine(static fn (array $subject): array => ['status' => 'available', 'items' => []], static fn (array $subject, array $neighborhood): array => []),
+            static fn (array $context): array => ['status' => 'PLANNED', 'writes' => []],
+            new ArticleComposer(),
+            static fn (array $context): array => ['status' => 'RECONCILED'],
+            static fn (array $context): array => ['eligible' => false, 'blockers' => ['OWNER_PUBLICATION_REQUIRED']],
+            static fn (array $context): array => ['status' => 'verified'],
+            articleEditorialAdapter: $adapter,
+            articlePreCreateResolver: static fn (array $context): array => ['status' => 'CREATE_DIFFERENTIATED_ARTICLE', 'decision' => 'CREATE_DIFFERENTIATED_ARTICLE'],
+            articlePreCreateRequired: true,
+        );
+        $input = [
+            'idempotency_key' => 'odo-24-danh-muon-fixture',
+            'intent' => 'TEXT_ARTICLE',
+            'subject_hints' => [$subject['id']],
+            'title' => '“Đánh mượn” — Odo 24',
+            'excerpt' => 'Mô tả cách bộ máy sử dụng côn và búa.',
+            'text' => "# Cấu tạo\n\n“Đánh mượn” mô tả cách bộ máy sử dụng côn và búa tại Westminster với 6 côn.",
+        ];
+
+        $first = $coordinator->execute($input);
+        $retry = $coordinator->execute($input);
+
+        self::assertSame(824, $first->articleId, json_encode($first->toArray(), JSON_UNESCAPED_UNICODE));
+        self::assertSame($first->captureId, $retry->captureId);
+        self::assertSame(1, $draftCalls);
+        self::assertSame($input['title'], $draft['title']);
+        self::assertSame($input['excerpt'], $draft['excerpt']);
+        self::assertStringContainsString('<!-- wp:heading {"level":1} -->', $draft['content']);
+        self::assertStringContainsString('<h1>Cấu tạo</h1>', $draft['content']);
+        self::assertStringContainsString('“Đánh mượn” mô tả cách bộ máy sử dụng côn và búa', $draft['content']);
+        self::assertArrayNotHasKey('failure', $first->diagnostics);
+    }
+
     public function test_instruction_is_not_composed_when_typed_editorial_context_is_present(): void
     {
         $result = (new ArticleComposer())->compose(

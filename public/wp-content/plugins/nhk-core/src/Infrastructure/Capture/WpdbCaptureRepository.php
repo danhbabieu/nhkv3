@@ -6,6 +6,7 @@ namespace NHK\Core\Infrastructure\Capture;
 use NHK\Core\Contracts\Capture\CaptureRepository;
 use NHK\Core\Domain\Capture\CaptureRecord;
 use NHK\Core\Shared\Uuid\UuidCodec;
+use NHK\Core\Shared\Encoding\Utf8Contract;
 
 final class WpdbCaptureRepository implements CaptureRepository
 {
@@ -94,7 +95,7 @@ final class WpdbCaptureRepository implements CaptureRepository
     private function table(): string { return $this->wpdb->prefix . 'nhk_editorial_captures'; }
 
     /** @param array<mixed> $value */
-    private function encode(array $value): string { return json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR); }
+    private function encode(array $value): string { return Utf8Contract::encode($value, 'capture.persistence'); }
 
     /** @param array<string,mixed> $row */
     private function hydrate(array $row): CaptureRecord
@@ -121,7 +122,6 @@ final class WpdbCaptureRepository implements CaptureRepository
     /** @return array<string,mixed> */
     private function decode(string $json): array
     {
-        $value = json_decode($json, true);
-        return is_array($value) ? $value : [];
+        return Utf8Contract::decodeArray($json, 'capture.readback');
     }
 }

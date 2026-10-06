@@ -21,6 +21,8 @@ use NHK\Core\Application\Graph\RelationshipOwnerContract;
 use NHK\Core\Application\Runtime\{SemanticWritePolicyResolver, SemanticWritePolicyViolation};
 use NHK\Core\Domain\Knowledge\DependencyValidationException;
 use NHK\Core\Infrastructure\Mcp\ChatGptMcpGatewayException;
+use NHK\Core\Shared\Encoding\Utf8SerializationException;
+use NHK\Core\Shared\Encoding\Utf8ValidationException;
 
 final class McpTransport
 {
@@ -127,6 +129,12 @@ final class McpTransport
             return $this->error($id, -32602, $error->getMessage(), 400);
         } catch (DependencyValidationException $error) {
             return ['status' => 200, 'body' => ['jsonrpc' => '2.0', 'id' => $id, 'result' => ['isError' => true, 'structuredContent' => ['error' => $error->toStructuredError()], 'content' => [['type' => 'text', 'text' => $error->getMessage()]]]]];
+        } catch (Utf8ValidationException|Utf8SerializationException $error) {
+            return ['status' => 200, 'body' => ['jsonrpc' => '2.0', 'id' => $id, 'result' => [
+                'isError' => true,
+                'structuredContent' => ['error' => ['code' => 'MCP_UTF8_SERIALIZATION_FAILED', 'producer' => $error->producer, 'field' => $error->path, 'remediation_class' => 'FIX_UPSTREAM_ENCODER_OR_STORAGE']],
+                'content' => [['type' => 'text', 'text' => 'MCP_UTF8_SERIALIZATION_FAILED']],
+            ]]];
         } catch (\Throwable $error) {
             return ['status' => 200, 'body' => ['jsonrpc' => '2.0', 'id' => $id, 'result' => ['isError' => true, 'structuredContent' => ['error' => ['code' => $error->getMessage()]], 'content' => [['type' => 'text', 'text' => $error->getMessage()]]]]];
         }
@@ -306,7 +314,7 @@ final class McpTransport
             'nhk.relation.backfill.apply' => $this->governance->relationBatchApply((array) ($arguments['candidates'] ?? []), (bool) ($arguments['approval_confirmed'] ?? false)),
         };
         $result = $this->normalizeMutationResult($name, $arguments, ($definition['kind'] ?? '') === 'mutation', $result);
-        $text = json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+        $text = \NHK\Core\Shared\Encoding\Utf8Contract::encode($result, 'mcp.result.packet', 'result');
         return ['content' => [['type' => 'text', 'text' => $text]], 'structuredContent' => $result, 'isError' => false];
     }
 

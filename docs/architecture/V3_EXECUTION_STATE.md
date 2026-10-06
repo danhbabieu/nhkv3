@@ -23598,3 +23598,43 @@ POST-CHECK CORRECTION: `KnowledgeService::cite()` now resolves Claim + Source +
 relation + support identity before allocating a new Evidence UUID. Explicit
 `citeWithId()` replay IDs remain supported; auto-generated IDs are created only
 after `CREATE_NEW`. The Knowledge regression slice was rerun successfully.
+
+# Checkpoint — 2026-10-06 — Capture → Article runtime @v57 boundary hardening
+
+ROOT_CAUSE: The production Capture path evaluated shared Article SEO before a
+native WordPress Post existed, while explicitly passing `public_eligible=false`;
+this converted deferred owner identity into a generic `SEO_NOT_READY` block.
+Separately, invalid UTF-8 reached JSON persistence/result serialization and was
+reported as a generic JSON/MCP failure. The shared composer also discarded
+Markdown line structure and ignored explicit Article title/excerpt context.
+
+IMPLEMENTATION: Added one recursive UTF-8 contract for Capture input/retry,
+Capture persistence/read-back, native WordPress fields, draft fingerprints and
+MCP result packets. Invalid data now fails closed with bounded producer/field
+diagnostics and a retryable Capture code; no replacement-character or
+transliteration workaround is used. Article pre-create now honors research
+`ready_for_draft`; deferred Article identity is an explicit, explainable
+quality diagnostic until native Post read-back. Quality diagnostics for SEO,
+duplicate knowledge domination and malformed sentence joins expose affected
+section/field, reason, blocking status and remediation class. Shared composition
+preserves explicit title/excerpt and Markdown headings; Capture projects the
+shared body through the canonical WordPress block projection before native draft
+creation.
+
+REGRESSION COVERAGE: Added the Odo 24 TEST fixture (`984658bf-19a6-4daa-a220-2a6c13af81ed`)
+with Vietnamese Unicode, smart punctuation, Westminster/6 côn and Markdown.
+It proves one native draft, exact Unicode title/excerpt/body read-back shape,
+pre-draft SEO deferral and idempotent replay without a duplicate Post. Added a
+nested UTF-8 round-trip/matrix test and invalid-byte producer/field diagnostics.
+Focused Article/Capture/quality/UTF-8/retry coverage passes 139 tests / 478
+assertions. Changed PHP files lint clean and `git diff --check` passes.
+
+VERIFICATION: The configured full suite was also run with a 512MB CLI memory
+limit. It completed with environment-gated WordPress/TEST-runtime errors and
+pre-existing unrelated unit failures; the default 128MB invocation still hits
+the existing materializer memory fatal. No staging/production mutation,
+migration, deployment or push was performed.
+
+STATUS: `CAPTURE_ARTICLE_UTF8_AND_QUALITY_BOUNDARIES_FIXED_LOCALLY /
+FOCUSED_GREEN / FULL_SUITE_ENVIRONMENT_LIMITED / NO_DATA_MUTATION /
+NO_DEPLOYMENT / COMMIT_PENDING`.

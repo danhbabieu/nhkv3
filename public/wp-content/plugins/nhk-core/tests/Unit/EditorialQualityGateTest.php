@@ -52,6 +52,8 @@ final class EditorialQualityGateTest extends TestCase
         self::assertContains('VISIBLE_PLANNING_LABEL', $report->warnings);
         self::assertContains('MALFORMED_SENTENCE_JOIN', $report->warnings);
         self::assertContains('GENERIC_EDITORIAL_FILLER', $report->warnings);
+        $malformed = array_values(array_filter($report->diagnostics['structured_diagnostics'], static fn (array $finding): bool => ($finding['code'] ?? '') === 'MALFORMED_SENTENCE_JOIN'));
+        self::assertSame(['affected_section' => 'editorial_body', 'field' => 'body', 'reason' => 'MALFORMED_SENTENCE_JOIN', 'blocking' => false, 'remediation_class' => 'NORMALIZE_SENTENCE_BOUNDARIES'], array_intersect_key($malformed[0], array_flip(['affected_section', 'field', 'reason', 'blocking', 'remediation_class'])));
     }
 
     public function test_stale_revision_and_ineligible_claim_usage_block_public_readiness(): void
