@@ -30,13 +30,18 @@ final class WpdbArticleMediaUsageInventory implements ArticleMediaUsageInventory
         }
         $args[] = $limit + 1;
         $rows = $this->database->get_results($this->database->prepare("SELECT u.*, m.canonical_uuid AS media_uuid FROM {$this->table} u INNER JOIN {$this->mediaTable} m ON m.id=u.media_id WHERE {$where} ORDER BY u.usage_uuid LIMIT %d", ...$args), ARRAY_A);
+        $rows = is_array($rows) ? array_values($rows) : [];
         $items = [];
-        foreach (array_slice(is_array($rows) ? $rows : [], 0, $limit) as $row) {
+        foreach (array_slice($rows, 0, $limit) as $row) {
             $usage = $this->hydrate($row);
             if ($usage !== null) $items[] = $usage;
         }
-        $hasMore = is_array($rows) && count($rows) > $limit;
-        return ['items' => $items, 'next_cursor' => $hasMore && $items !== [] ? $items[array_key_last($items)]->usageId : null];
+        $hasMore = count($rows) > $limit;
+        $nextCursor = null;
+        if ($hasMore && isset($rows[$limit - 1]['usage_uuid'])) {
+            try { $nextCursor = UuidCodec::fromBinary((string) $rows[$limit - 1]['usage_uuid']); } catch (\Throwable) { $nextCursor = null; }
+        }
+        return ['items' => $items, 'next_cursor' => $nextCursor];
     }
 
     private function hydrate(array $row): ?MediaUsage
