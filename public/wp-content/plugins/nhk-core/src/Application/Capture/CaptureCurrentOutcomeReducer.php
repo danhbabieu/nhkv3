@@ -8,6 +8,67 @@ use NHK\Core\Domain\Capture\CaptureRecord;
 /** Derives current retry truth from latest phase outcomes and completion evidence. */
 final class CaptureCurrentOutcomeReducer
 {
+    /** @param array<string,mixed> $diagnostics @param array<string,mixed> $phaseReceipts @return list<string> */
+    public static function currentBlockers(array $diagnostics, array $phaseReceipts): array
+    {
+        $current = CapturePhaseReceiptReducer::currentFailureCodes($phaseReceipts);
+        $superseded = CapturePhaseReceiptReducer::supersededFailureCodes($phaseReceipts);
+        $blockers = $current;
+
+        $completion = is_array($diagnostics['completion'] ?? null) ? $diagnostics['completion'] : [];
+        $candidates = array_merge(
+            [(string) (($diagnostics['failure']['code'] ?? '') ?: '')],
+            array_map('strval', (array) ($completion['blockers'] ?? [])),
+        );
+        foreach ($candidates as $candidate) {
+            $candidate = trim($candidate);
+            if ($candidate === '') continue;
+            if (in_array($candidate, $superseded, true) && !in_array($candidate, $current, true)) continue;
+            $blockers[] = $candidate;
+        }
+
+        return array_values(array_unique($blockers));
+    }
+
+    /** @param array<string,mixed> $diagnostics @param array<string,mixed> $phaseReceipts @return array<string,mixed> */
+    public static function reconcileDiagnostics(array $diagnostics, array $phaseReceipts): array
+    {
+        $current = self::currentBlockers($diagnostics, $phaseReceipts);
+        $superseded = CapturePhaseReceiptReducer::supersededFailureCodes($phaseReceipts);
+        $history = is_array($diagnostics['failure_history'] ?? null) ? array_values(array_filter($diagnostics['failure_history'], 'is_array')) : [];
+        $historyCodes = array_values(array_filter(array_map(
+            static fn (array $item): string => trim((string) ($item['code'] ?? '')),
+            $history,
+        ), static fn (string $code): bool => $code !== ''));
+        $completion = is_array($diagnostics['completion'] ?? null) ? $diagnostics['completion'] : [];
+        $topLevelCodes = array_merge(
+            [(string) (($diagnostics['failure']['code'] ?? '') ?: '')],
+            array_map('strval', (array) ($completion['blockers'] ?? [])),
+        );
+        foreach ($topLevelCodes as $code) {
+            $code = trim($code);
+            if ($code === '' || !in_array($code, $superseded, true) || in_array($code, $current, true) || in_array($code, $historyCodes, true)) continue;
+            $history[] = ['code' => $code, 'reason' => 'SUPERSEDED_BY_LATEST_PHASE_OUTCOME'];
+            $historyCodes[] = $code;
+        }
+
+        if ($current !== []) {
+            $completion['blockers'] = $current;
+            $diagnostics['completion'] = $completion;
+            $failure = is_array($diagnostics['failure'] ?? null) ? $diagnostics['failure'] : [];
+            $failure['code'] = $current[0];
+            $diagnostics['failure'] = $failure;
+        } else {
+            $completion['blockers'] = [];
+            $diagnostics['completion'] = $completion;
+            $failureCode = trim((string) (($diagnostics['failure']['code'] ?? '') ?: ''));
+            if ($failureCode !== '' && in_array($failureCode, $superseded, true)) unset($diagnostics['failure']);
+        }
+        if ($history !== []) $diagnostics['failure_history'] = $history;
+
+        return $diagnostics;
+    }
+
     /**
      * Single retry policy consumed by both the read model and retry executor.
      * The read model may report the decision, but never grants execution.
@@ -28,7 +89,7 @@ final class CaptureCurrentOutcomeReducer
         if (!in_array(strtoupper(trim((string) ($completion['status'] ?? ''))), ['PARTIAL', 'REVIEW_REQUIRED'], true)) {
             return ['eligible' => false, 'reason' => 'CAPTURE_RETRY_NOT_ALLOWED'];
         }
-        $completionBlockers = array_values(array_map('strval', (array) ($completion['blockers'] ?? [])));
+        $completionBlockers = self::currentBlockers($capture->diagnostics, $capture->phaseReceipts);
         if (in_array('CATEGORY_UNRESOLVED', $completionBlockers, true) || self::failureCode($capture) === 'CATEGORY_UNRESOLVED') {
             return ['eligible' => false, 'reason' => 'CAPTURE_RETRY_NOT_ALLOWED'];
         }
@@ -105,21 +166,6 @@ final class CaptureCurrentOutcomeReducer
 
     public static function failureCode(CaptureRecord $capture): ?string
     {
-        foreach ($capture->phaseReceipts as $receipt) {
-            if (!is_array($receipt)) continue;
-            $latest = is_array($receipt['latest'] ?? null) ? $receipt['latest'] : $receipt;
-            $status = strtoupper(trim((string) ($latest['status'] ?? '')));
-            $result = strtoupper(trim((string) ($latest['result'] ?? '')));
-            if (in_array($status, ['FAILED', 'BLOCKED', 'REVIEW_REQUIRED'], true) || str_contains($result, 'FAILED')) {
-                $code = trim((string) ($latest['failure_code'] ?? ''));
-                if ($code !== '') return $code;
-            }
-        }
-        // Append-only receipts retain historical attempts, but only the
-        // latest attempt in each phase can represent the current outcome.
-        // A completed current attempt therefore clears an older failure code.
-        $completion = is_array($capture->diagnostics['completion'] ?? null) ? $capture->diagnostics['completion'] : [];
-        $blockers = array_values(array_filter(array_map('strval', (array) ($completion['blockers'] ?? [])), static fn (string $code): bool => trim($code) !== ''));
-        return $blockers[0] ?? null;
+        return self::currentBlockers($capture->diagnostics, $capture->phaseReceipts)[0] ?? null;
     }
 }

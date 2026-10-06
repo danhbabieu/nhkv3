@@ -3,13 +3,121 @@ declare(strict_types=1);
 
 namespace NHK\Tests\Unit;
 
-use NHK\Core\Application\Capture\{CaptureCurrentOutcomeReducer, CaptureDecisionDependencyFingerprint};
+use NHK\Core\Application\Capture\{CaptureCurrentOutcomeReducer, CaptureDecisionDependencyFingerprint, CapturePhaseReceiptReducer};
 use NHK\Core\Domain\Capture\{CaptureRecord, CaptureStage};
 use NHK\Core\Shared\Uuid\UuidCodec;
 use PHPUnit\Framework\TestCase;
 
 final class CaptureCurrentOutcomeReducerTest extends TestCase
 {
+    public function test_failed_retryable_x_then_success_makes_x_historical_only(): void
+    {
+        $receipts = CapturePhaseReceiptReducer::append([], 'PHASE_X', [
+            'status' => 'FAILED', 'result' => 'FAILED_RETRYABLE', 'failure_code' => 'ERROR_X',
+        ]);
+        $receipts = CapturePhaseReceiptReducer::append($receipts, 'PHASE_X', [
+            'status' => 'COMPLETED', 'result' => 'RECOVERED',
+        ]);
+        $diagnostics = ['failure' => ['code' => 'ERROR_X'], 'completion' => ['blockers' => ['ERROR_X']]];
+        $capture = $this->capture($diagnostics, $receipts);
+
+        self::assertSame([], CaptureCurrentOutcomeReducer::currentBlockers($diagnostics, $receipts));
+        self::assertNull(CaptureCurrentOutcomeReducer::failureCode($capture));
+
+        $reconciled = CaptureCurrentOutcomeReducer::reconcileDiagnostics($diagnostics, $receipts);
+        self::assertSame([], $reconciled['completion']['blockers']);
+        self::assertSame('ERROR_X', $reconciled['failure_history'][0]['code']);
+    }
+
+    public function test_failed_retryable_x_then_x_keeps_x_current(): void
+    {
+        $receipts = CapturePhaseReceiptReducer::append([], 'PHASE_X', [
+            'status' => 'FAILED', 'result' => 'FAILED_RETRYABLE', 'failure_code' => 'ERROR_X',
+        ]);
+        $receipts = CapturePhaseReceiptReducer::append($receipts, 'PHASE_X', [
+            'status' => 'FAILED', 'result' => 'FAILED_RETRYABLE', 'failure_code' => 'ERROR_X',
+        ]);
+        $diagnostics = ['failure' => ['code' => 'ERROR_X'], 'completion' => ['blockers' => ['ERROR_X']]];
+        $capture = $this->capture($diagnostics, $receipts);
+
+        self::assertSame(['ERROR_X'], CaptureCurrentOutcomeReducer::currentBlockers($diagnostics, $receipts));
+        self::assertSame('ERROR_X', CaptureCurrentOutcomeReducer::failureCode($capture));
+        self::assertArrayNotHasKey('failure_history', CaptureCurrentOutcomeReducer::reconcileDiagnostics($diagnostics, $receipts));
+    }
+
+    public function test_failed_retryable_x_then_y_uses_y_current_and_preserves_x_history(): void
+    {
+        $receipts = CapturePhaseReceiptReducer::append([], 'PHASE_X', [
+            'status' => 'FAILED', 'result' => 'FAILED_RETRYABLE', 'failure_code' => 'ERROR_X',
+        ]);
+        $receipts = CapturePhaseReceiptReducer::append($receipts, 'PHASE_X', [
+            'status' => 'FAILED', 'result' => 'FAILED_RETRYABLE', 'failure_code' => 'ERROR_Y',
+        ]);
+        $diagnostics = ['failure' => ['code' => 'ERROR_X'], 'completion' => ['blockers' => ['ERROR_X']]];
+        $capture = $this->capture($diagnostics, $receipts);
+
+        self::assertSame(['ERROR_Y'], CaptureCurrentOutcomeReducer::currentBlockers($diagnostics, $receipts));
+        self::assertSame('ERROR_Y', CaptureCurrentOutcomeReducer::failureCode($capture));
+
+        $reconciled = CaptureCurrentOutcomeReducer::reconcileDiagnostics($diagnostics, $receipts);
+        self::assertSame(['ERROR_Y'], $reconciled['completion']['blockers']);
+        self::assertSame('ERROR_X', $reconciled['failure_history'][0]['code']);
+    }
+
+    public function test_later_successful_phase_does_not_resurrect_superseded_failure(): void
+    {
+        $receipts = CapturePhaseReceiptReducer::append([], 'PHASE_X', [
+            'status' => 'FAILED', 'result' => 'FAILED_RETRYABLE', 'failure_code' => 'ERROR_X',
+        ]);
+        $receipts = CapturePhaseReceiptReducer::append($receipts, 'PHASE_X', [
+            'status' => 'COMPLETED', 'result' => 'RECOVERED',
+        ]);
+        $receipts = CapturePhaseReceiptReducer::append($receipts, 'PHASE_Y', [
+            'status' => 'COMPLETED', 'result' => 'VERIFIED',
+        ]);
+        $diagnostics = ['failure' => ['code' => 'ERROR_X'], 'completion' => ['blockers' => ['ERROR_X']]];
+        $capture = $this->capture($diagnostics, $receipts);
+
+        self::assertSame([], CaptureCurrentOutcomeReducer::currentBlockers($diagnostics, $receipts));
+        self::assertNull(CaptureCurrentOutcomeReducer::failureCode($capture));
+    }
+
+    public function test_current_owner_review_remains_blocking_after_historical_failure_is_superseded(): void
+    {
+        $receipts = CapturePhaseReceiptReducer::append([], 'PHASE_X', [
+            'status' => 'FAILED', 'result' => 'FAILED_RETRYABLE', 'failure_code' => 'ERROR_X',
+        ]);
+        $receipts = CapturePhaseReceiptReducer::append($receipts, 'PHASE_X', [
+            'status' => 'COMPLETED', 'result' => 'RECOVERED',
+        ]);
+        $receipts = CapturePhaseReceiptReducer::append($receipts, 'OWNER_REVIEW', [
+            'status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'failure_code' => 'OWNER_REVIEW_REQUIRED',
+        ]);
+        $diagnostics = ['failure' => ['code' => 'ERROR_X'], 'completion' => ['blockers' => ['ERROR_X', 'OWNER_REVIEW_REQUIRED']]];
+        $capture = $this->capture($diagnostics, $receipts);
+
+        self::assertSame(['OWNER_REVIEW_REQUIRED'], CaptureCurrentOutcomeReducer::currentBlockers($diagnostics, $receipts));
+        self::assertSame('OWNER_REVIEW_REQUIRED', CaptureCurrentOutcomeReducer::failureCode($capture));
+    }
+
+    public function test_current_system_blocked_failure_remains_authoritative(): void
+    {
+        $receipts = CapturePhaseReceiptReducer::append([], 'PHASE_X', [
+            'status' => 'FAILED', 'result' => 'FAILED_RETRYABLE', 'failure_code' => 'ERROR_X',
+        ]);
+        $receipts = CapturePhaseReceiptReducer::append($receipts, 'PHASE_X', [
+            'status' => 'COMPLETED', 'result' => 'RECOVERED',
+        ]);
+        $receipts = CapturePhaseReceiptReducer::append($receipts, 'SYSTEM_GATE', [
+            'status' => 'BLOCKED', 'result' => 'BLOCKED', 'failure_code' => 'SYSTEM_BLOCKED',
+        ]);
+        $diagnostics = ['failure' => ['code' => 'ERROR_X'], 'completion' => ['blockers' => ['ERROR_X', 'SYSTEM_BLOCKED']]];
+        $capture = $this->capture($diagnostics, $receipts);
+
+        self::assertSame(['SYSTEM_BLOCKED'], CaptureCurrentOutcomeReducer::currentBlockers($diagnostics, $receipts));
+        self::assertSame('SYSTEM_BLOCKED', CaptureCurrentOutcomeReducer::failureCode($capture));
+    }
+
     public function test_verified_latest_phase_clears_historical_failure_from_current_code(): void
     {
         $capture = new CaptureRecord(
@@ -125,6 +233,16 @@ final class CaptureCurrentOutcomeReducerTest extends TestCase
                 'completion' => ['status' => 'REVIEW_REQUIRED', 'blockers' => [], 'resume_hints' => []],
             ], $diagnosticParts),
             ['CONTENT_PREPARATION' => ['status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'latest' => ['status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'failure_code' => 'VIDEO_EDITORIAL_QUALITY_BLOCKED']]],
+        );
+    }
+
+    /** @param array<string,mixed> $diagnostics @param array<string,mixed> $receipts */
+    private function capture(array $diagnostics, array $receipts): CaptureRecord
+    {
+        return new CaptureRecord(
+            UuidCodec::newV7(), 'current-state', hash('sha256', 'current-state'),
+            CaptureStage::SEMANTICS_RECONCILED->value, 'PARTIAL', null, null, [], [],
+            $diagnostics, $receipts,
         );
     }
 }

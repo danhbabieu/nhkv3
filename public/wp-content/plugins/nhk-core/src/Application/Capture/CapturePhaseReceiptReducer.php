@@ -24,7 +24,9 @@ final class CapturePhaseReceiptReducer
         }
 
         if ($receipt === []) return [];
-        $latest = self::legacyAttempt($receipt, 1);
+        $latest = is_array($receipt['latest'] ?? null)
+            ? self::legacyAttempt($receipt['latest'], 1)
+            : self::legacyAttempt($receipt, 1);
         $latest['current_outcome'] = 'CURRENT';
         return $latest;
     }
