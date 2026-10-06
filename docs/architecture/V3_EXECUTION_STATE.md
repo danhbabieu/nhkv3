@@ -1,5 +1,29 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-06 — System-wide duplicate audit cursor transport bound
+
+ROOT_CAUSE: The signed duplicate-audit cursor embedded up to 128 complete carry
+rows, producing transport values far above MCP `maxLength=4096` for live owner
+pages. Duplicate semantics, owner rules and scan policy were unchanged.
+
+FIX: Cursor version/policy advanced to v3. The signed cursor now contains only
+owner, `include_retired`, scan policy, reader position, scanned count and a
+deterministic SHA-256 state key. Carry rows remain server-side in the object
+cache/transient continuation state, with an in-process fallback for tests.
+Missing, malformed, overlong or tampered cursors fail closed as
+`AUDIT_CURSOR_INVALID`; generated cursors enforce the 4096-byte bound.
+
+REGRESSION_COVERAGE: Focused duplicate-audit, prevention and WPDB reader suites
+pass 31 tests / 326 assertions. Coverage proves page 1 → page 2 continuation,
+cross-page duplicate detection, tampered cursor rejection, all bounded
+non-Article owners continuing through the 5,000-row safety bound, and cursor
+length <= 4096.
+
+DATA_SAFETY: No semantic records, owner rules, duplicate meanings, migrations,
+deployments or external runtime data were mutated.
+
+STATUS: `SYSTEM_WIDE_DUPLICATE_AUDIT_CURSOR_FIXED_LOCAL / FOCUSED_GREEN / NO_DATA_MUTATION / COMMIT_PENDING`.
+
 # Checkpoint — 2026-10-06 — Read-only Dictionary discovery hub inventory
 
 BASELINE: Fresh v57 documentation bootstrap/profile completed before coding.

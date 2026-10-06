@@ -104,6 +104,52 @@ final class SystemWideDuplicateAuditTest extends TestCase
         self::assertSame(['ACTIVE', 'RETIRED'], $states);
     }
 
+    public function test_cursor_stays_within_mcp_transport_limit_when_carry_is_large(): void
+    {
+        $rows = [];
+        for ($i = 1; $i <= 128; $i++) {
+            $rows[] = [
+                'canonical_id' => 'a-' . $i,
+                'stable_key' => 'shared-key',
+                'entity_type' => 'component',
+                'canonical_name' => str_repeat('Côn ', 24) . $i,
+                'family' => 'clock',
+                'state' => 'ACTIVE',
+                'revision' => $i,
+            ];
+        }
+        $reader = new class($rows) implements DuplicateAuditPageReader {
+            public function __construct(private array $rows) {}
+            public function page(?string $after, int $limit): array
+            {
+                return ['items' => array_slice($this->rows, 0, $limit), 'next_cursor' => 'more'];
+            }
+        };
+
+        $result = $this->coordinator(['Authority' => $reader])->audit(128, [], true, 'Authority');
+        $cursor = $result['owners']['Authority']['next_cursor'];
+
+        self::assertIsString($cursor);
+        self::assertLessThanOrEqual(4096, strlen($cursor));
+    }
+
+    public function test_every_bounded_non_article_owner_can_resume_a_partial_cursor(): void
+    {
+        foreach (['Authority', 'Knowledge', 'Source', 'Evidence', 'Graph', 'Media', 'MediaAsset', 'MediaUsage', 'Video'] as $owner) {
+            $reader = new RepeatingBoundedAuditPage();
+            $coordinator = $this->coordinator([$owner => $reader]);
+            $cursor = null;
+            $result = [];
+            for ($page = 0; $page < 25; $page++) {
+                $result = $coordinator->audit(200, $cursor === null ? [] : [$owner => $cursor], true, $owner);
+                self::assertNotSame('BLOCKED', $result['owners'][$owner]['status'], $owner);
+                $cursor = $result['owners'][$owner]['next_cursor'];
+            }
+            self::assertSame('PARTIAL', $result['owners'][$owner]['status'], $owner);
+            self::assertLessThanOrEqual(4096, strlen((string) $cursor), $owner);
+        }
+    }
+
     public function test_page_boundary_keeps_distinct_records_and_singletons_distinct(): void
     {
         $reader = new BoundaryAuditPage([

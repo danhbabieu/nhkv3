@@ -16,8 +16,12 @@ final class SystemWideDuplicateAuditCoordinator
 {
     private const MAX_SCAN_ROWS = 5000;
     private const MAX_CARRY_ROWS = 128;
-    private const CURSOR_VERSION = 2;
-    private const CURSOR_POLICY = 'system-wide-duplicate-audit:v2';
+    private const MAX_CURSOR_LENGTH = 4096;
+    private const CURSOR_STATE_TTL = 900;
+    private const CURSOR_VERSION = 3;
+    private const CURSOR_POLICY = 'system-wide-duplicate-audit:v3';
+    /** @var array<string,list<array<string,mixed>>> */
+    private static array $cursorStates = [];
     /** @var list<string> */
     public const OWNERS = ['Dictionary', 'Authority', 'Knowledge', 'Source', 'Evidence', 'Graph', 'Article', 'Media', 'MediaAsset', 'MediaUsage', 'Video'];
 
@@ -142,6 +146,7 @@ final class SystemWideDuplicateAuditCoordinator
     {
         $raw = trim((string) ($cursor ?? ''));
         if ($raw === '') return ['after' => null, 'carry' => [], 'scanned' => 0];
+        if (strlen($raw) > self::MAX_CURSOR_LENGTH) throw new \InvalidArgumentException('AUDIT_CURSOR_INVALID');
         $encoded = strtr($raw, '-_', '+/');
         $encoded .= str_repeat('=', (4 - strlen($encoded) % 4) % 4);
         $bytes = base64_decode($encoded, true);
@@ -157,18 +162,49 @@ final class SystemWideDuplicateAuditCoordinator
         if ($after !== null && (!is_string($after) || $after === '' || strlen($after) > 512)) throw new \InvalidArgumentException('AUDIT_CURSOR_INVALID');
         $scanned = $payload['scanned'] ?? null;
         if (!is_int($scanned) || $scanned < 0 || $scanned > self::MAX_SCAN_ROWS) throw new \InvalidArgumentException('AUDIT_CURSOR_INVALID');
-        $carry = $payload['carry'] ?? null;
-        if (!is_array($carry) || count($carry) > self::MAX_CARRY_ROWS || array_filter($carry, static fn (mixed $row): bool => !is_array($row)) !== []) throw new \InvalidArgumentException('AUDIT_CURSOR_INVALID');
+        $stateKey = $payload['state_key'] ?? null;
+        if (!is_string($stateKey) || !preg_match('/^[a-f0-9]{64}$/', $stateKey)) throw new \InvalidArgumentException('AUDIT_CURSOR_INVALID');
+        $carry = $this->loadCursorState($stateKey);
+        if ($carry === null || count($carry) > self::MAX_CARRY_ROWS || array_filter($carry, static fn (mixed $row): bool => !is_array($row)) !== []) throw new \InvalidArgumentException('AUDIT_CURSOR_INVALID');
         return ['after' => $after, 'carry' => array_values($carry), 'scanned' => $scanned];
     }
 
     /** @param list<array<string,mixed>> $carry */
     private function encodeCursor(string $after, array $carry, int $scanned, string $owner, bool $includeRetired): string
     {
-        $payload = ['v' => self::CURSOR_VERSION, 'policy' => self::CURSOR_POLICY, 'owner' => $owner, 'include_retired' => $includeRetired, 'after' => $after, 'carry' => array_slice($carry, -self::MAX_CARRY_ROWS), 'scanned' => $scanned];
+        $carry = array_slice($carry, -self::MAX_CARRY_ROWS);
+        $stateKey = $this->storeCursorState($carry);
+        $payload = ['v' => self::CURSOR_VERSION, 'policy' => self::CURSOR_POLICY, 'owner' => $owner, 'include_retired' => $includeRetired, 'after' => $after, 'state_key' => $stateKey, 'scanned' => $scanned];
         $canonical = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
         $envelope = ['payload' => $payload, 'signature' => hash_hmac('sha256', $canonical, $this->cursorSecret())];
-        return rtrim(strtr(base64_encode((string) json_encode($envelope, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)), '+/', '-_'), '=');
+        $cursor = rtrim(strtr(base64_encode((string) json_encode($envelope, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)), '+/', '-_'), '=');
+        if (strlen($cursor) > self::MAX_CURSOR_LENGTH) throw new \InvalidArgumentException('AUDIT_CURSOR_INVALID');
+        return $cursor;
+    }
+
+    /** @param list<array<string,mixed>> $carry */
+    private function storeCursorState(array $carry): string
+    {
+        $stateKey = hash('sha256', (string) json_encode($carry, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
+        self::$cursorStates[$stateKey] = $carry;
+        if (function_exists('wp_cache_set')) wp_cache_set($stateKey, $carry, 'nhk_system_wide_duplicate_audit', self::CURSOR_STATE_TTL);
+        if (function_exists('set_transient')) set_transient('nhk_swda_' . $stateKey, $carry, self::CURSOR_STATE_TTL);
+        return $stateKey;
+    }
+
+    /** @return list<array<string,mixed>>|null */
+    private function loadCursorState(string $stateKey): ?array
+    {
+        $carry = self::$cursorStates[$stateKey] ?? null;
+        if ($carry === null && function_exists('wp_cache_get')) {
+            $cached = wp_cache_get($stateKey, 'nhk_system_wide_duplicate_audit');
+            $carry = is_array($cached) ? $cached : null;
+        }
+        if ($carry === null && function_exists('get_transient')) {
+            $cached = get_transient('nhk_swda_' . $stateKey);
+            $carry = is_array($cached) ? $cached : null;
+        }
+        return is_array($carry) ? array_values($carry) : null;
     }
 
     private function cursorSecret(): string
