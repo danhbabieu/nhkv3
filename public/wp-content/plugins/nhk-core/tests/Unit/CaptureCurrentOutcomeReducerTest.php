@@ -170,6 +170,102 @@ final class CaptureCurrentOutcomeReducerTest extends TestCase
         self::assertNull(CaptureCurrentOutcomeReducer::failureCode($capture));
     }
 
+    public function test_legacy_retryable_failure_is_superseded_by_later_successful_phases(): void
+    {
+        $receipts = [
+            'INTERPRETED' => ['status' => 'COMPLETED', 'result' => 'COMPLETED', 'current_outcome' => 'CURRENT'],
+            'CONTENT_PREPARATION' => ['status' => 'COMPLETED', 'result' => 'COMPLETED', 'current_outcome' => 'CURRENT'],
+            'FAILED_RETRYABLE' => ['status' => 'FAILED', 'result' => 'FAILED_RETRYABLE', 'failure_code' => 'CAPTURE_UTF8_INVALID', 'current_outcome' => 'CURRENT'],
+            'MEDIA_ADOPTED' => ['status' => 'COMPLETED', 'result' => 'COMPLETED', 'current_outcome' => 'CURRENT'],
+            'SUBJECTS_RESOLVED' => ['status' => 'COMPLETED', 'result' => 'COMPLETED', 'current_outcome' => 'CURRENT'],
+            'ENRICHMENT_PLANNING_ENVELOPE' => ['status' => 'COMPLETED', 'result' => 'COMPLETED', 'current_outcome' => 'CURRENT'],
+            'SEMANTICS_RECONCILED_FINAL' => ['status' => 'COMPLETED', 'result' => 'COMPLETED', 'current_outcome' => 'CURRENT'],
+        ];
+        $diagnostics = [
+            'failure' => ['code' => 'CAPTURE_UTF8_INVALID', 'classification' => 'FAILED_RETRYABLE'],
+            'completion' => ['status' => 'REVIEW_REQUIRED', 'blockers' => ['CAPTURE_UTF8_INVALID']],
+        ];
+        $capture = $this->capture($diagnostics, $receipts, 'REVIEW_REQUIRED');
+
+        self::assertSame([], CaptureCurrentOutcomeReducer::currentBlockers($diagnostics, $receipts));
+        self::assertNull(CaptureCurrentOutcomeReducer::failureCode($capture));
+        self::assertSame(['eligible' => true, 'reason' => 'STALE_REVIEW_REEVALUATABLE'], CaptureCurrentOutcomeReducer::retryEligibility($capture));
+        self::assertContains('CAPTURE_UTF8_INVALID', array_column(CaptureCurrentOutcomeReducer::reconcileDiagnostics($diagnostics, $receipts)['failure_history'], 'code'));
+    }
+
+    public function test_legacy_article_pre_create_review_is_reevaluable_after_failure_is_superseded(): void
+    {
+        $receipts = [
+            'ARTICLE_PRE_CREATE_REVIEW' => ['status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'failure_code' => 'LEGACY_FAILURE', 'current_outcome' => 'CURRENT'],
+            'INTERPRETED' => ['status' => 'COMPLETED', 'result' => 'COMPLETED', 'current_outcome' => 'CURRENT'],
+        ];
+        $diagnostics = ['failure' => ['code' => 'LEGACY_FAILURE'], 'completion' => ['status' => 'REVIEW_REQUIRED', 'blockers' => ['LEGACY_FAILURE']]];
+        $capture = $this->capture($diagnostics, $receipts, 'REVIEW_REQUIRED');
+
+        self::assertSame([], CaptureCurrentOutcomeReducer::currentBlockers($diagnostics, $receipts));
+        self::assertSame(['eligible' => true, 'reason' => 'STALE_REVIEW_REEVALUATABLE'], CaptureCurrentOutcomeReducer::retryEligibility($capture));
+    }
+
+    public function test_legacy_retryable_failure_without_recovery_remains_current(): void
+    {
+        $receipts = ['PHASE_X' => ['status' => 'FAILED', 'result' => 'FAILED_RETRYABLE', 'failure_code' => 'ERROR_X', 'current_outcome' => 'CURRENT']];
+        $diagnostics = ['failure' => ['code' => 'ERROR_X'], 'completion' => ['status' => 'PARTIAL', 'blockers' => ['ERROR_X']]];
+        $capture = $this->capture($diagnostics, $receipts);
+
+        self::assertSame(['ERROR_X'], CaptureCurrentOutcomeReducer::currentBlockers($diagnostics, $receipts));
+        self::assertSame('ERROR_X', CaptureCurrentOutcomeReducer::failureCode($capture));
+    }
+
+    public function test_legacy_retryable_failure_is_historical_when_followed_by_another_failure(): void
+    {
+        $receipts = [
+            'PHASE_X' => ['status' => 'FAILED', 'result' => 'FAILED_RETRYABLE', 'failure_code' => 'ERROR_X', 'current_outcome' => 'CURRENT'],
+            'PHASE_Y' => ['status' => 'FAILED', 'result' => 'FAILED_RETRYABLE', 'failure_code' => 'ERROR_Y', 'current_outcome' => 'CURRENT'],
+        ];
+        $diagnostics = ['failure' => ['code' => 'ERROR_X'], 'completion' => ['status' => 'PARTIAL', 'blockers' => ['ERROR_X']]];
+        $capture = $this->capture($diagnostics, $receipts);
+
+        self::assertSame(['ERROR_Y'], CaptureCurrentOutcomeReducer::currentBlockers($diagnostics, $receipts));
+        self::assertSame('ERROR_Y', CaptureCurrentOutcomeReducer::failureCode($capture));
+    }
+
+    public function test_legacy_retryable_failure_does_not_override_owner_or_system_blocker(): void
+    {
+        foreach (['OWNER_REVIEW_REQUIRED' => 'REVIEW_REQUIRED', 'SYSTEM_BLOCKED' => 'BLOCKED'] as $code => $status) {
+            $receipts = [
+                'PHASE_X' => ['status' => 'FAILED', 'result' => 'FAILED_RETRYABLE', 'failure_code' => 'ERROR_X', 'current_outcome' => 'CURRENT'],
+                'CURRENT_GATE' => ['status' => $status, 'result' => $status, 'failure_code' => $code, 'current_outcome' => 'CURRENT'],
+            ];
+            $diagnostics = ['failure' => ['code' => 'ERROR_X'], 'completion' => ['status' => 'REVIEW_REQUIRED', 'blockers' => ['ERROR_X', $code]]];
+            $capture = $this->capture($diagnostics, $receipts);
+
+            self::assertSame([$code], CaptureCurrentOutcomeReducer::currentBlockers($diagnostics, $receipts));
+            self::assertSame($code, CaptureCurrentOutcomeReducer::failureCode($capture));
+        }
+    }
+
+    public function test_legacy_non_retryable_and_governance_failures_remain_current_after_later_success(): void
+    {
+        foreach (['NON_RETRYABLE' => 'FAILED', 'CAPTURE_GOVERNANCE_FAILED' => 'FAILED_RETRYABLE'] as $code => $result) {
+            $receipts = [
+                'PHASE_X' => ['status' => 'FAILED', 'result' => $result, 'failure_code' => $code, 'current_outcome' => 'CURRENT'],
+                'PHASE_Y' => ['status' => 'COMPLETED', 'result' => 'COMPLETED', 'current_outcome' => 'CURRENT'],
+            ];
+            $diagnostics = ['failure' => ['code' => $code], 'completion' => ['status' => 'PARTIAL', 'blockers' => [$code]]];
+            $capture = $this->capture($diagnostics, $receipts);
+
+            self::assertSame([$code], CaptureCurrentOutcomeReducer::currentBlockers($diagnostics, $receipts));
+            self::assertSame($code, CaptureCurrentOutcomeReducer::failureCode($capture));
+        }
+
+        $receipts = [
+            'PHASE_X' => ['status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'failure_code' => 'HUMAN_REVIEW_REQUIRED', 'current_outcome' => 'CURRENT'],
+            'PHASE_Y' => ['status' => 'COMPLETED', 'result' => 'COMPLETED', 'current_outcome' => 'CURRENT'],
+        ];
+        $capture = $this->capture(['failure' => ['code' => 'HUMAN_REVIEW_REQUIRED'], 'completion' => ['status' => 'REVIEW_REQUIRED', 'blockers' => ['HUMAN_REVIEW_REQUIRED']]], $receipts);
+        self::assertSame(['HUMAN_REVIEW_REQUIRED'], CaptureCurrentOutcomeReducer::currentBlockers($capture->diagnostics, $receipts));
+    }
+
     public function test_unresolved_video_category_is_not_retryable_when_only_owner_is_missing(): void
     {
         $capture = new CaptureRecord(
@@ -247,11 +343,11 @@ final class CaptureCurrentOutcomeReducerTest extends TestCase
     }
 
     /** @param array<string,mixed> $diagnostics @param array<string,mixed> $receipts */
-    private function capture(array $diagnostics, array $receipts): CaptureRecord
+    private function capture(array $diagnostics, array $receipts, string $status = 'PARTIAL'): CaptureRecord
     {
         return new CaptureRecord(
             UuidCodec::newV7(), 'current-state', hash('sha256', 'current-state'),
-            CaptureStage::SEMANTICS_RECONCILED->value, 'PARTIAL', null, null, [], [],
+            CaptureStage::SEMANTICS_RECONCILED->value, $status, null, null, [], [],
             $diagnostics, $receipts,
         );
     }

@@ -54,6 +54,39 @@ final class McpCaptureReadContractTest extends TestCase
         self::assertSame('RECOVERED', $record->phaseReceipts['PHASE_X']['latest']['result']);
     }
 
+    public function test_capture_get_uses_effective_legacy_state_for_retry_eligibility(): void
+    {
+        $id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+        $record = new CaptureRecord(
+            $id, 'legacy-capture-get', hash('sha256', 'legacy-capture-get'), 'SEMANTICS_RECONCILED', 'REVIEW_REQUIRED', null, null, [],
+            ['content_intent' => ['intent' => 'TEXT_ARTICLE']],
+            ['failure' => ['code' => 'CAPTURE_UTF8_INVALID'], 'completion' => ['status' => 'REVIEW_REQUIRED', 'blockers' => ['CAPTURE_UTF8_INVALID']]],
+            [
+                'FAILED_RETRYABLE' => ['status' => 'FAILED', 'result' => 'FAILED_RETRYABLE', 'failure_code' => 'CAPTURE_UTF8_INVALID', 'current_outcome' => 'CURRENT'],
+                'INTERPRETED' => ['status' => 'COMPLETED', 'result' => 'COMPLETED', 'current_outcome' => 'CURRENT'],
+                'CONTENT_PREPARATION' => ['status' => 'COMPLETED', 'result' => 'COMPLETED', 'current_outcome' => 'CURRENT'],
+            ],
+        );
+        $captures = new class($record) implements CaptureRepository {
+            public function __construct(private CaptureRecord $record) {}
+            public function findByIdempotencyKey(string $key): ?CaptureRecord { return null; }
+            public function findById(string $captureId): ?CaptureRecord { return $captureId === $this->record->captureId ? $this->record : null; }
+            public function create(CaptureRecord $record): CaptureRecord { return $record; }
+            public function save(CaptureRecord $record): CaptureRecord { return $record; }
+        };
+        $read = new McpReadHandler(
+            $this->createMock(AuthorityRepository::class), new EntityTypeRegistry(),
+            $this->createMock(MediaRepository::class), $this->createMock(MediaAssetRepository::class), $this->createMock(MediaUsageRepository::class),
+            $this->createMock(VideoRepository::class), $this->createMock(KnowledgeRepository::class), $this->createMock(EvidenceRepository::class),
+            captures: $captures,
+        );
+
+        $projection = $read->captureGet($id);
+
+        self::assertSame([], $projection['blockers']);
+        self::assertSame(['eligible' => true, 'reason' => 'STALE_REVIEW_REEVALUATABLE', 'capture_id' => $id], $projection['retry']);
+    }
+
     public function test_capture_readback_reconciles_current_post_and_media_usage_over_stale_receipt(): void
     {
         $id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';

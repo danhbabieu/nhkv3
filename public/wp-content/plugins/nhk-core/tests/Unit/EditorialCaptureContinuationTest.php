@@ -118,6 +118,35 @@ final class EditorialCaptureContinuationTest extends TestCase
         self::assertSame($capture->idempotencyKey, $events['continuation_idempotency_key']);
     }
 
+    public function test_capture_ingest_retry_uses_effective_legacy_state_before_reentering_coordinator(): void
+    {
+        $captures = new ContinuationCaptureRepository();
+        $addenda = new ContinuationAddendumRepository();
+        $capture = new CaptureRecord(
+            UuidCodec::newV7(), 'legacy-ingest-retry', hash('sha256', 'legacy-ingest-retry'), CaptureStage::SEMANTICS_RECONCILED->value,
+            'REVIEW_REQUIRED', 342, 'state-342', [],
+            ['raw_input' => 'Legacy text.', 'content_intent' => ['intent' => 'TEXT_ARTICLE', 'article_required' => true]],
+            ['failure' => ['code' => 'CAPTURE_UTF8_INVALID'], 'completion' => ['status' => 'REVIEW_REQUIRED', 'blockers' => ['CAPTURE_UTF8_INVALID']]],
+            [
+                'FAILED_RETRYABLE' => ['status' => 'FAILED', 'result' => 'FAILED_RETRYABLE', 'failure_code' => 'CAPTURE_UTF8_INVALID', 'current_outcome' => 'CURRENT'],
+                'INTERPRETED' => ['status' => 'COMPLETED', 'result' => 'COMPLETED', 'current_outcome' => 'CURRENT'],
+                'CONTENT_PREPARATION' => ['status' => 'COMPLETED', 'result' => 'COMPLETED', 'current_outcome' => 'CURRENT'],
+            ],
+        );
+        $captures->create($capture);
+        $events = [];
+        $service = new EditorialCaptureContinuationService($captures, $addenda, $this->coordinator($captures, $events));
+
+        $result = $service->retry([
+            'capture_id' => $capture->captureId,
+            'idempotency_key' => $capture->idempotencyKey,
+            'resume_mode' => 'RETRY',
+        ]);
+
+        self::assertSame(1, $events['semantic'] ?? 0);
+        self::assertSame($capture->captureId, $result['capture']['capture_id']);
+    }
+
     public function test_capture_retry_rejects_changed_request_fingerprint(): void
     {
         $captures = new ContinuationCaptureRepository();

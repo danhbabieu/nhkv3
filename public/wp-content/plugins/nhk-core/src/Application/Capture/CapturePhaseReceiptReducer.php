@@ -35,11 +35,12 @@ final class CapturePhaseReceiptReducer
     public static function currentFailureCodes(array $receipts): array
     {
         $codes = [];
-        foreach ($receipts as $receipt) {
+        foreach (array_values($receipts) as $position => $receipt) {
             if (!is_array($receipt)) continue;
             $latest = self::latest($receipt);
             $code = trim((string) ($latest['failure_code'] ?? ''));
             if ($code === '' || !self::isFailureOutcome($latest)) continue;
+            if (self::legacyFailureWasSuperseded($receipts, $position, $latest, (string) array_keys($receipts)[$position])) continue;
             $codes[] = $code;
         }
         return array_values(array_unique($codes));
@@ -49,7 +50,7 @@ final class CapturePhaseReceiptReducer
     public static function supersededFailureCodes(array $receipts): array
     {
         $codes = [];
-        foreach ($receipts as $receipt) {
+        foreach (array_values($receipts) as $position => $receipt) {
             if (!is_array($receipt)) continue;
             $attempts = is_array($receipt['attempts'] ?? null)
                 ? array_values(array_filter($receipt['attempts'], 'is_array'))
@@ -66,8 +67,43 @@ final class CapturePhaseReceiptReducer
                 $code = trim((string) $code);
                 if ($code !== '') $codes[] = $code;
             }
+            if (self::legacyFailureWasSuperseded($receipts, $position, $latest, (string) array_keys($receipts)[$position])) {
+                $code = trim((string) ($latest['failure_code'] ?? ''));
+                if ($code !== '') $codes[] = $code;
+            }
         }
         return array_values(array_unique($codes));
+    }
+
+    /**
+     * Legacy rows predate append-only attempts and persisted CURRENT on each
+     * phase. A later phase outcome is the effective successor; the old row is
+     * retained for audit but cannot remain a current retryable blocker.
+     *
+     * @param array<string,mixed> $receipts
+     * @param array<string,mixed> $latest
+     */
+    private static function legacyFailureWasSuperseded(array $receipts, int $position, array $latest, string $phase): bool
+    {
+        $receipt = array_values($receipts)[$position] ?? null;
+        if (!is_array($receipt) || is_array($receipt['attempts'] ?? null) && $receipt['attempts'] !== []) return false;
+        $code = strtoupper(trim((string) ($latest['failure_code'] ?? '')));
+        if ($code === '' || in_array($code, ['OWNER_REVIEW_REQUIRED', 'SYSTEM_BLOCKED'], true) || str_contains($code, 'GOVERNANCE')) return false;
+
+        $status = strtoupper(trim((string) ($latest['status'] ?? '')));
+        $result = strtoupper(trim((string) ($latest['result'] ?? '')));
+        $retryable = $result === 'FAILED_RETRYABLE' || strtoupper(trim((string) ($latest['classification'] ?? ''))) === 'FAILED_RETRYABLE';
+        $staleArticleReview = strtoupper(trim($phase)) === 'ARTICLE_PRE_CREATE_REVIEW'
+            && $status === 'REVIEW_REQUIRED'
+            && $result === 'REVIEW_REQUIRED';
+        if (!$retryable && !$staleArticleReview) return false;
+
+        $later = array_values($receipts);
+        foreach (array_slice($later, $position + 1) as $successor) {
+            if (!is_array($successor) || self::latest($successor) === []) continue;
+            return true;
+        }
+        return false;
     }
 
     /** @param array<string,mixed> $receipts @param array<string,mixed> $attempt @return array<string,mixed> */
