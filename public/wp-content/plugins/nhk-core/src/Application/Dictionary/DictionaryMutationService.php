@@ -109,7 +109,9 @@ final class DictionaryMutationService
             $sense = new DictionaryConcept(UuidCodec::newV7(), $preferredForm, trim($definition), DictionaryConcept::DRAFT, null, null, null, $context, 1);
             $entry = new LexicalEntry(UuidCodec::newV7(), $preferredForm, $normalized, DictionaryConcept::DRAFT, $locale, $context, 1, [$sense->conceptId]);
             if ($this->entryPublicIdentityWriter instanceof DictionaryEntryPublicIdentityWriter) $entry = $this->entryPublicIdentityWriter->assign($entry);
-            $result = ($this->entryRepository)->createWithSense($entry, $sense, $context);
+            $result = $resolution instanceof DictionaryPreCreateResolution && method_exists($this->entryRepository, 'createWithSenseResolved')
+                ? ($this->entryRepository)->createWithSenseResolved($entry, $sense, $context, $resolution)
+                : ($this->entryRepository)->createWithSense($entry, $sense, $context);
             if (!is_array($result) || !($result['entry'] ?? null) instanceof LexicalEntry || !($result['sense'] ?? null) instanceof DictionaryConcept) throw new \RuntimeException('DICTIONARY_ENTRY_READBACK_FAILED');
             return $result;
         };

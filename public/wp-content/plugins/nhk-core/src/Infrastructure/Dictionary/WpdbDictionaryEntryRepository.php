@@ -5,7 +5,7 @@ namespace NHK\Core\Infrastructure\Dictionary;
 
 use NHK\Core\Application\Dictionary\DictionaryEntryPublicIdentityWriter;
 use NHK\Core\Contracts\Dictionary\{DictionaryConceptRepository, DictionaryEntryRepository};
-use NHK\Core\Domain\Dictionary\{DictionaryConcept, LexicalEntry, LexicalEntryForm};
+use NHK\Core\Domain\Dictionary\{DictionaryConcept, DictionaryPreCreateResolution, LexicalEntry, LexicalEntryForm};
 use NHK\Core\Shared\Uuid\UuidCodec;
 
 final class WpdbDictionaryEntryRepository implements DictionaryEntryRepository
@@ -221,6 +221,29 @@ final class WpdbDictionaryEntryRepository implements DictionaryEntryRepository
 
     public function createWithSense(LexicalEntry $entry, DictionaryConcept $sense, array $context = []): array
     {
+        return $this->createWithSenseInternal($entry, $sense, $context, null);
+    }
+
+    public function createWithSenseResolved(LexicalEntry $entry, DictionaryConcept $sense, array $context, DictionaryPreCreateResolution $resolution): array
+    {
+        return $this->createWithSenseInternal($entry, $sense, $context, $resolution);
+    }
+
+    public function assertPreCreateStillValid(DictionaryPreCreateResolution $resolution, array $context = []): void
+    {
+        if (!$resolution->canCreate()) throw new \RuntimeException('DICTIONARY_PRE_CREATE_STALE');
+        $contextHash = hash('sha256', $this->json($this->sort($context)));
+        $rows = $this->database->get_results($this->database->prepare(
+            "SELECT f.id FROM {$this->forms} f INNER JOIN {$this->entries} e ON e.entry_uuid=f.entry_uuid WHERE f.normalized_form=%s AND f.context_hash=%s AND f.state=1 AND e.status<>%s LIMIT 1 FOR UPDATE",
+            $resolution->normalizedForm,
+            $contextHash,
+            DictionaryConcept::RETIRED,
+        ), ARRAY_A) ?: [];
+        if ($rows !== []) throw new \RuntimeException('DICTIONARY_PRE_CREATE_STALE');
+    }
+
+    private function createWithSenseInternal(LexicalEntry $entry, DictionaryConcept $sense, array $context, ?DictionaryPreCreateResolution $resolution): array
+    {
         $writer = new DictionaryEntryPublicIdentityWriter(fn (string $slug, ?string $entryId = null): bool => $this->publicSlugTaken($slug, $entryId));
         $entry = $writer->assign($entry);
         if ($this->findById($entry->entryId) instanceof LexicalEntry) throw new \RuntimeException('DICTIONARY_ENTRY_DUPLICATE');
@@ -229,6 +252,7 @@ final class WpdbDictionaryEntryRepository implements DictionaryEntryRepository
         $now = gmdate('Y-m-d H:i:s.u');
         $this->database->query('START TRANSACTION');
         try {
+            if ($resolution instanceof DictionaryPreCreateResolution) $this->assertPreCreateStillValid($resolution, $context);
             $insert = $this->database->query($this->database->prepare("INSERT INTO {$this->entries} (entry_uuid,preferred_form,normalized_preferred_form,status,locale,context_json,revision,created_at,updated_at) VALUES (%s,%s,%s,%s,%s,%s,%d,%s,%s)", UuidCodec::toBinary($entry->entryId), $entry->preferredForm, $entry->normalizedPreferredForm, $entry->status, $entry->locale, $this->json($entry->context), $entry->revision, $now, $now));
             if ($insert === false) throw new \RuntimeException('DICTIONARY_ENTRY_CREATE_FAILED');
             if (!$existingSense instanceof DictionaryConcept) $this->concepts->createConcept($sense);
