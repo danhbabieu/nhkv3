@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHKTests\Unit;
 
 use NHK\Core\Application\Capture\{CaptureEnrichmentPlanningEnvelope, CaptureOwnerOutcome, CaptureOwnerDag};
+use NHK\Core\Domain\Dictionary\DictionaryPreCreateResolution;
 use PHPUnit\Framework\TestCase;
 
 final class CaptureEnrichmentPlanningTest extends TestCase
@@ -144,5 +145,21 @@ final class CaptureEnrichmentPlanningTest extends TestCase
         ];
 
         self::assertSame(['interpreted', 'content_preparation', 'video'], $dag->executionPlan(['video'], $outcomes));
+    }
+
+    public function test_dictionary_precreate_packet_round_trips_inside_lexical_owner_track(): void
+    {
+        $resolution = DictionaryPreCreateResolution::fromDecision(DictionaryPreCreateResolution::CREATE_NEW, 'kính rào', ['domain' => 'clock'], [], [], ['reason' => 'NO_APPLICABLE_CANDIDATE']);
+        $envelope = CaptureEnrichmentPlanningEnvelope::fromState(
+            'capture-dictionary-envelope',
+            hash('sha256', 'request'),
+            [],
+            [],
+            [],
+            ['dictionary_observation' => ['status' => 'observed'], 'dictionary_pre_create_resolution' => $resolution->toArray()],
+        );
+
+        self::assertSame($resolution->fingerprint(), $envelope->ownerTracks['lexical']['pre_create_resolution']['fingerprint']);
+        self::assertNotSame('', $envelope->fingerprint());
     }
 }

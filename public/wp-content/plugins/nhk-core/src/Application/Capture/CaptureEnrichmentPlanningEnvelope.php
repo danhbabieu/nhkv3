@@ -99,6 +99,13 @@ final readonly class CaptureEnrichmentPlanningEnvelope
             if ($owner === 'article' && !in_array(strtoupper(trim((string) ($intent['intent'] ?? ''))), ['TEXT_ARTICLE', 'IMAGE_ARTICLE'], true)) $track['status'] = 'NOT_APPLICABLE';
         }
         unset($track);
+        $preCreateResolution = $diagnostics['dictionary_pre_create_resolution'] ?? null;
+        if (is_array($preCreateResolution)) {
+            $tracks['lexical']['pre_create_resolution'] = $preCreateResolution;
+            $tracks['lexical']['request_fingerprint'] = $requestFingerprint;
+            $tracks['lexical']['expected_revision'] = (int) ($preCreateResolution['expected_revision'] ?? $tracks['lexical']['expected_revision'] ?? 0);
+            $tracks['lexical']['dependency_revisions'] = (array) ($preCreateResolution['dependency_revisions'] ?? $tracks['lexical']['dependency_revisions'] ?? []);
+        }
         $completion = is_array($diagnostics['completion'] ?? null) ? $diagnostics['completion'] : [];
         return self::fromArray([
             'capture_id' => $captureId,

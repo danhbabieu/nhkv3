@@ -14,6 +14,7 @@ use NHK\Core\Domain\Capture\CapturePurpose;
 use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Core\Application\Mcp\McpDocumentationRegistry;
 use NHK\Core\Application\Dictionary\DictionaryObservationRegistry;
+use NHK\Core\Domain\Dictionary\DictionaryPreCreateResolution;
 use NHK\Core\Application\Governance\StagingAcceptanceScopeVerifier;
 use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
 use NHK\Core\Domain\Knowledge\DependencyValidationException;
@@ -63,6 +64,7 @@ final class EditorialCaptureCoordinator
         private ?SharedEnrichmentBoundary $sharedEnrichment = null,
         private ?\NHK\Core\Application\Media\CaptureFeatureBindingCoordinator $featureBindings = null,
         private ?CaptureSubjectBindingRecovery $subjectBinding = null,
+        private ?CaptureDictionaryCreatePrecondition $dictionaryCreatePrecondition = null,
     ) { $this->completion = $completion ?? new CompletionCoordinator(); }
 
     /** @param array<string,mixed> $input */
@@ -729,6 +731,19 @@ final class EditorialCaptureCoordinator
                 $diagnostics,
                 $receipts,
             );
+            if (trim((string) ($input['dictionary_create_operation'] ?? '')) !== '') {
+                $packet = $diagnostics['dictionary_pre_create_resolution'] ?? null;
+                if (!is_array($packet)) throw new \RuntimeException('CAPTURE_DICTIONARY_PRE_CREATE_PACKET_REQUIRED');
+                $resolution = DictionaryPreCreateResolution::fromDecision(
+                    (string) ($packet['action'] ?? ''),
+                    (string) ($packet['normalized_form'] ?? ''),
+                    (array) ($packet['context'] ?? []),
+                    (array) ($packet['candidates'] ?? []),
+                    (array) ($packet['dependency_revisions'] ?? []),
+                    (array) ($packet['diagnostics'] ?? []),
+                );
+                ($this->dictionaryCreatePrecondition ?? new CaptureDictionaryCreatePrecondition())->assert($planningEnvelope, $resolution, (string) $input['dictionary_create_operation']);
+            }
             $planningEnvelopeArray = $planningEnvelope->toArray();
             $diagnostics['enrichment_planning_envelope'] = [
                 'version' => $planningEnvelope->version,
