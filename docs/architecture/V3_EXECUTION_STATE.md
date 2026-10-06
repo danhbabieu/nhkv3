@@ -1,5 +1,34 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-06 — Canonical Article subject-bound reconciliation
+
+ROOT_CAUSE: WordPress Article reconciliation supplied only the post title to
+the media coordinator, allowed historical unscoped reuse, and rewrote active
+explicit/pinned usage metadata as automatic selection. Existing automatic
+media also lacked subject-revision validation, so stale subject bindings could
+remain eligible.
+
+IMPLEMENTATION: The WordPress lifecycle path now consumes the persisted
+Capture subject-resolution packet when available and remains fail-closed when
+no canonical subject binding exists. `ArticleMediaCoordinator` uses the shared
+candidate selector for automatic reuse, preserves active `USER_EXPLICIT` /
+`PINNED` usage identity and provenance, carries subject revision through
+evaluation, and rejects stale automatic bindings. Capture-owned explicit media
+continues through the governed explicit-placement path.
+
+REGRESSION COVERAGE: Title-only reconciliation does not reuse global ready
+media; missing Capture subject binding produces placeholders; active pinned
+usage is not replaced; subject-revision drift invalidates automatic usage;
+generic sibling history cannot outrank an exact subject; and WordPress
+reconciliation no longer uses title as automatic subject scope.
+
+VERIFICATION: Focused Article Media and Plugin boot suite passes 67 tests /
+227 assertions; changed PHP files lint clean and `git diff --check` passes.
+No data mutation, deployment, schema change or production operation was
+performed.
+
+STATUS: `ARTICLE_MEDIA_CANONICAL_SUBJECT_RECONCILIATION_FIXED_LOCAL / FOCUSED_GREEN / NO_DATA_MUTATION / COMMIT_AD357D3A`
+
 # Checkpoint — 2026-10-06 — Universal Article media semantic eligibility boundary
 
 ROOT_CAUSE: Automatic Article media policy accepted ready media with an empty
