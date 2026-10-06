@@ -18,6 +18,11 @@ final class CaptureCurrentOutcomeReducer
     {
         if ($capture->status === 'FAILED_RETRYABLE') return ['eligible' => true, 'reason' => null];
         if (in_array($capture->stage, ['READY_FOR_PUBLICATION', 'PUBLISHED'], true)) return ['eligible' => false, 'reason' => 'CAPTURE_RETRY_NOT_ALLOWED'];
+        if (in_array($capture->status, ['APPLIED', 'REVIEW_REQUIRED'], true)
+            && is_array($input['subject_reconciliation'] ?? null)
+            && ($input['subject_reconciliation']['confirmed'] ?? false) === true) {
+            return ['eligible' => true, 'reason' => null];
+        }
 
         $completion = is_array($capture->diagnostics['completion'] ?? null) ? $capture->diagnostics['completion'] : [];
         if (!in_array(strtoupper(trim((string) ($completion['status'] ?? ''))), ['PARTIAL', 'REVIEW_REQUIRED'], true)) {

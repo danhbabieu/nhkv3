@@ -15,7 +15,7 @@ use NHK\Core\Application\Knowledge\KnowledgeRepairPreviewService;
 use NHK\Core\Application\Mcp\KnowledgeQualityAuditHandler;
 use NHK\Core\Application\Semantic\KnowledgeWriterPreviewService;
 use NHK\Core\Application\PublicIdentity\PublicUrlMaintenanceService;
-use NHK\Core\Application\Capture\{AuthorityCaptureService, EditorialCaptureContinuationService, EditorialCaptureCoordinator, PlanReapprovalRequired};
+use NHK\Core\Application\Capture\{AuthorityCaptureService, CaptureAuthorityContinuationPolicy, EditorialCaptureContinuationService, EditorialCaptureCoordinator, PlanReapprovalRequired};
 use NHK\Core\Application\Capture\MutationOutcomeClassifier;
 use NHK\Core\Application\Graph\RelationshipOwnerContract;
 use NHK\Core\Application\Runtime\{SemanticWritePolicyResolver, SemanticWritePolicyViolation};
@@ -570,21 +570,13 @@ final class McpTransport
             $arguments['files'] = $files;
             $arguments['_nhk_native_multipart'] = true;
         }
-        $intent = is_array($arguments['authority_intent'] ?? null) ? $arguments['authority_intent'] : [];
-        $declaredPurpose = strtoupper(trim((string) ($arguments['purpose'] ?? '')));
-        // Subject reconciliation is an existing editorial Capture retry. It
-        // must retain the Capture continuation boundary even when a client
-        // echoes the persisted MIXED purpose; otherwise the request is
-        // misclassified as an Authority approval packet and fails with
-        // AUTHORITY_CONTINUATION_REQUIRED before the persisted subject state
-        // can be validated.
-        $subjectReconciliationContinuation = isset($arguments['capture_id'])
-            && strtoupper(trim((string) ($arguments['resume_mode'] ?? ''))) === 'RETRY'
-            && is_array($arguments['subject_reconciliation'] ?? null);
-        $authorityPacket = !$subjectReconciliationContinuation
-            && (in_array($declaredPurpose, ['AUTHORITY', 'MIXED'], true)
-            || in_array((string) ($intent['mode'] ?? ''), ['PLAN', 'APPLY_APPROVED_PLAN'], true)
-            || $relationshipOnly);
+        // Existing Capture routing is delta-sensitive. A historical MIXED
+        // purpose does not itself authorize a new Authority mutation.
+        $continuationClass = CaptureAuthorityContinuationPolicy::classify($arguments);
+        $authorityPacket = in_array($continuationClass, [
+            CaptureAuthorityContinuationPolicy::AUTHORITY_MUTATION,
+            CaptureAuthorityContinuationPolicy::AUTHORITY_REPLAY,
+        ], true);
         if ($authorityPacket) {
             $this->assertAuthoritySemanticWriteAllowed();
             if ($this->authorityCapture === null) throw new \RuntimeException('AUTHORITY_CAPTURE_UNAVAILABLE');

@@ -23114,3 +23114,37 @@ mutated. MCP public read-back remains a separate read-only verification step.
 
 STATUS: `DICTIONARY_NEW_ENTRY_PUBLIC_PROJECTION_FIXED / FOCUSED_UNIT_PASS /
 MCP_PUBLIC_READBACK_PENDING / NO_DATA_MUTATION`.
+
+# Checkpoint — 2026-10-06 — Generic Capture subject binding and content continuation (LOCAL / NO DATA MUTATION)
+
+ROOT_CAUSE: Existing Capture continuation routing treated the historical
+`MIXED` purpose as a new Authority packet, so content continuation after an
+already-applied Authority phase failed with `AUTHORITY_APPROVAL_PACKET_REQUIRED`.
+Subject reconciliation also had multiple manual persistence paths and
+publication context could promote a transient caller packet when the
+Capture-owned binding was absent.
+
+ARCHITECTURAL_FIX: A delta-sensitive Capture continuation policy now separates
+editorial continuation, genuine Authority mutation and exact Authority replay.
+The Capture subject binding owner validates the registered canonical resolver
+when available, rejects conflicting bindings, uses optimistic Capture
+revision/CAS, persists the authoritative packet, and verifies canonical
+read-back. Continuation/coordinator reconciliation uses that owner boundary;
+publication context no longer promotes transient subject evidence. Missing
+bindings become explicit publication/reconciliation blockers, while safe
+subject repair remains routed through the existing bounded owner action.
+
+REGRESSION COVERAGE: Generic tests cover applied Authority plus confirmed
+subject binding persistence/read-back, no-delta content continuation, genuine
+Authority delta routing, exact replay classification, idempotent replay,
+conflict, invalid canonical resolution, stale revision, read-back failure,
+applied Capture retry admission and explicit publication blocking. The
+focused Capture/Article/Authority slice passes 122 tests / 580 assertions;
+PHP lint and `git diff --check` pass. The complete Unit suite reaches 3,178
+tests under a temporary 512 MB CLI memory limit; it reports one unrelated
+receipt-repository type error and four unrelated Knowledge/MCP assertion
+failures from the current worktree. No production/Test database, publication,
+migration, deployment or fixture mutation was performed.
+
+STATUS: `CAPTURE_SUBJECT_BINDING_CONTINUATION_FIXED / FOCUSED_UNIT_PASS /
+FULL_UNIT_RELEVANT_SLICE_PASS / NO_DATA_MUTATION / TEST_RUNTIME_NOT_USED`.

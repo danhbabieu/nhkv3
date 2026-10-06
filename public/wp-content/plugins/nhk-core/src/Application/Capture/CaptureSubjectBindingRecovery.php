@@ -3,13 +3,14 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Capture;
 
+use NHK\Core\Application\Semantic\SubjectResolutionService;
 use NHK\Core\Contracts\Capture\CaptureRepository;
 use NHK\Core\Domain\Capture\{CaptureRecord, SubjectResolutionPacket};
 
-/** Persists only the Capture-owned subject handoff for an existing Article. */
+/** Persists the Capture-owned subject handoff and verifies canonical read-back. */
 final class CaptureSubjectBindingRecovery
 {
-    public function __construct(private CaptureRepository $captures) {}
+    public function __construct(private CaptureRepository $captures, private ?SubjectResolutionService $subjects = null) {}
 
     public function packet(CaptureRecord $capture): ?SubjectResolutionPacket
     {
@@ -60,13 +61,22 @@ final class CaptureSubjectBindingRecovery
         return $packet?->status === 'resolved' ? $packet : $fallback;
     }
 
-    public function persist(CaptureRecord $capture, int $articleId, array $resolution): CaptureRecord
+    /** @param array<string,mixed> $metadata */
+    public function persist(CaptureRecord $capture, int $articleId, array $resolution, array $metadata = []): CaptureRecord
     {
-        if ($articleId < 1 || $capture->articleId !== $articleId) throw new \RuntimeException('CAPTURE_ARTICLE_BINDING_UNAVAILABLE');
+        if ($articleId > 0 && $capture->articleId !== $articleId) throw new \RuntimeException('CAPTURE_ARTICLE_BINDING_UNAVAILABLE');
+        if ($articleId < 1 && $capture->articleId !== null) throw new \RuntimeException('CAPTURE_ARTICLE_BINDING_UNAVAILABLE');
         $packet = SubjectResolutionPacket::fromArray($resolution);
         if ($packet === null || $packet->status !== 'resolved') throw new \RuntimeException('CAPTURE_SUBJECT_BINDING_UNAVAILABLE');
+        $packet = $this->canonicalPacket($packet);
         $existing = $this->packet($capture);
-        if ($existing !== null) return $capture;
+        if ($existing !== null) {
+            if (!$this->sameBinding($existing, $packet)) throw new \RuntimeException('CAPTURE_SUBJECT_BINDING_CONFLICT');
+            $readBack = $this->captures->findById($capture->captureId);
+            $readBackPacket = $readBack === null ? null : $this->packet($readBack);
+            if ($readBack === null || $readBackPacket === null || !$this->sameBinding($readBackPacket, $packet)) throw new \RuntimeException('CAPTURE_SUBJECT_BINDING_READBACK_UNAVAILABLE');
+            return $readBack;
+        }
 
         $packetArray = $packet->toArray();
         $context = $capture->context;
@@ -74,6 +84,7 @@ final class CaptureSubjectBindingRecovery
         $diagnostics = $capture->diagnostics;
         $diagnostics['subject_resolution_packet'] = $packetArray;
         $diagnostics['subjects'] = $packet->toResolution();
+        if ($metadata !== []) $diagnostics['subject_reconciliation'] = $metadata;
         $this->captures->save(new CaptureRecord(
             $capture->captureId,
             $capture->idempotencyKey,
@@ -92,8 +103,90 @@ final class CaptureSubjectBindingRecovery
         ));
         $readBack = $this->captures->findById($capture->captureId);
         $readBackPacket = $readBack === null ? null : $this->packet($readBack);
-        if ($readBack === null || $readBack->articleId !== $articleId || $readBackPacket?->canonicalSubjectId !== $packet->canonicalSubjectId || $readBackPacket?->entityType !== $packet->entityType || $readBackPacket?->revision !== $packet->revision) throw new \RuntimeException('CAPTURE_SUBJECT_BINDING_READBACK_UNAVAILABLE');
+        if ($readBack === null || ($articleId > 0 && $readBack->articleId !== $articleId) || ($articleId < 1 && $readBack->articleId !== null) || $readBackPacket?->canonicalSubjectId !== $packet->canonicalSubjectId || $readBackPacket?->entityType !== $packet->entityType || $readBackPacket?->revision !== $packet->revision) throw new \RuntimeException('CAPTURE_SUBJECT_BINDING_READBACK_UNAVAILABLE');
         return $readBack;
+    }
+
+    /** @param array<string,mixed> $resolution */
+    public function supersede(CaptureRecord $capture, int $articleId, array $resolution): CaptureRecord
+    {
+        if ($articleId < 1 || $capture->articleId !== $articleId) throw new \RuntimeException('CAPTURE_ARTICLE_BINDING_UNAVAILABLE');
+        $packet = SubjectResolutionPacket::fromArray($resolution);
+        if ($packet === null || $packet->status !== 'resolved') throw new \RuntimeException('CAPTURE_SUBJECT_BINDING_UNAVAILABLE');
+        $packet = $this->canonicalPacket($packet);
+        $existing = $this->packet($capture);
+        if ($existing !== null && $this->sameBinding($existing, $packet)) return $this->persist($capture, $articleId, $packet->toResolution());
+
+        $packetArray = $packet->toArray();
+        $history = is_array($capture->context['subject_resolution_packet_history'] ?? null) ? $capture->context['subject_resolution_packet_history'] : [];
+        if ($existing !== null && $history === []) $history[] = $existing->toArray();
+        $context = $capture->context;
+        $context['subject_resolution_packet'] = $packetArray;
+        $context['subject_resolution_packet_history'] = $history;
+        $diagnostics = $capture->diagnostics;
+        $diagnostics['subject_resolution_packet'] = $packetArray;
+        $diagnostics['subjects'] = $packet->toResolution();
+        $diagnostics['subject_packet_supersession'] = ['previous' => $existing?->toArray(), 'current' => $packetArray];
+        $this->captures->save(new CaptureRecord(
+            $capture->captureId,
+            $capture->idempotencyKey,
+            $capture->requestFingerprint,
+            $capture->stage,
+            $capture->status,
+            $capture->articleId,
+            $capture->articleStateToken,
+            $capture->assets,
+            $context,
+            $diagnostics,
+            $capture->phaseReceipts,
+            $capture->revision + 1,
+            $capture->createdAt,
+            gmdate('Y-m-d H:i:s.u'),
+        ));
+        $readBack = $this->captures->findById($capture->captureId);
+        $readBackPacket = $readBack === null ? null : $this->packet($readBack);
+        if ($readBack === null || $readBack->articleId !== $articleId || $readBackPacket === null || !$this->sameBinding($readBackPacket, $packet)) throw new \RuntimeException('CAPTURE_SUBJECT_BINDING_READBACK_UNAVAILABLE');
+        return $readBack;
+    }
+
+    private function sameBinding(SubjectResolutionPacket $left, SubjectResolutionPacket $right): bool
+    {
+        return $left->canonicalSubjectId === $right->canonicalSubjectId
+            && $left->entityType === $right->entityType
+            && $left->stableKey === $right->stableKey
+            && $left->canonicalName === $right->canonicalName
+            && $left->revision === $right->revision;
+    }
+
+    private function canonicalPacket(SubjectResolutionPacket $packet): SubjectResolutionPacket
+    {
+        if ($this->subjects === null) return $packet;
+        $resolution = $this->subjects->resolveSources(['canonical_uuid' => [$packet->canonicalSubjectId]]);
+        $primary = is_array($resolution['primary'] ?? null) ? $resolution['primary'] : [];
+        if (($resolution['status'] ?? '') !== 'resolved'
+            || trim((string) ($primary['id'] ?? '')) !== $packet->canonicalSubjectId
+            || trim((string) ($primary['type'] ?? '')) !== $packet->entityType) {
+            $code = ($resolution['status'] ?? '') === 'ambiguous'
+                ? 'CAPTURE_SUBJECT_BINDING_AMBIGUOUS'
+                : 'CAPTURE_SUBJECT_BINDING_UNAVAILABLE';
+            throw new \RuntimeException($code);
+        }
+
+        try {
+            return new SubjectResolutionPacket(
+                'resolved',
+                $packet->canonicalSubjectId,
+                $packet->entityType,
+                trim((string) ($primary['stable_key'] ?? $packet->stableKey)),
+                trim((string) ($primary['name'] ?? $packet->canonicalName)),
+                max(1, (int) ($primary['revision'] ?? $packet->revision)),
+                trim((string) ($primary['match'] ?? $packet->matchReason)),
+                $packet->diagnostics + ['canonical_readback_verified' => true],
+                $packet->primarySource !== '' ? $packet->primarySource : (string) ($resolution['primary_source'] ?? ''),
+            );
+        } catch (\Throwable $error) {
+            throw new \RuntimeException('CAPTURE_SUBJECT_BINDING_UNAVAILABLE', 0, $error);
+        }
     }
 
     /** @return list<string> */

@@ -112,6 +112,15 @@ final class ArticleReconciliationOrchestratorTest extends TestCase
         self::assertContains('governed-proposal', $action['dependencies']);
     }
 
+    public function test_capture_binding_unavailable_routes_to_bounded_subject_repair(): void
+    {
+        $action = (new ArticleRemediationPlanner())->plan(['subject_packet' => ['status' => 'resolved']], ['CAPTURE_SUBJECT_BINDING_UNAVAILABLE'])[0]->toArray();
+
+        self::assertSame('graph', $action['owner']);
+        self::assertSame('RESOLVE_PRIMARY_SUBJECT', $action['action']);
+        self::assertTrue($action['auto_repair_safe']);
+    }
+
     public function test_mixed_capture_subject_binding_recovery_clears_reconcile_and_publication_context_blockers(): void
     {
         $repository = new class implements CaptureRepository {

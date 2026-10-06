@@ -31,6 +31,8 @@ final class ArticlePublicationGate
         $this->requireTrue($evidence, 'subject_resolved', 'SUBJECT_UNRESOLVED', $blockers);
         if (($evidence['subject_persistence_status'] ?? '') === 'unattached_planning_candidate' && ($evidence['capture_subject_binding_verified'] ?? false) !== true) {
             $this->replaceBlocker($blockers, 'SUBJECT_UNRESOLVED', 'SUBJECT_NOT_PERSISTED');
+        } elseif (($evidence['capture_subject_binding_verified'] ?? true) !== true && in_array((string) ($evidence['subject_persistence_status'] ?? ''), ['capture_binding_unavailable', 'capture_binding_readback_unavailable'], true)) {
+            $this->replaceBlocker($blockers, 'SUBJECT_UNRESOLVED', (string) ($evidence['subject_persistence_status'] ?? '') === 'capture_binding_readback_unavailable' ? 'CAPTURE_SUBJECT_BINDING_READBACK_UNAVAILABLE' : 'CAPTURE_SUBJECT_BINDING_UNAVAILABLE');
         }
         $this->requireTrue($evidence, 'duplicate_intent_handled', 'DUPLICATE_INTENT_UNRESOLVED', $blockers);
         $this->requireTrue($evidence, 'category_resolved', 'CATEGORY_UNRESOLVED', $blockers);

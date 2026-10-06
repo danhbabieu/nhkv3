@@ -89,6 +89,20 @@ final class ArticlePublicationGateTest extends TestCase
         self::assertContains('ARTICLE_MEDIA_INLINE_MISSING', $result->warnings);
     }
 
+    public function test_missing_capture_binding_is_an_explicit_publication_blocker(): void
+    {
+        $evidence = $this->evidence();
+        $evidence['subject_resolved'] = false;
+        $evidence['capture_subject_binding_verified'] = false;
+        $evidence['subject_persistence_status'] = 'capture_binding_unavailable';
+
+        $result = (new ArticlePublicationGate())->check($this->draft(), $evidence, $this->draft()->token);
+
+        self::assertFalse($result->eligible);
+        self::assertContains('CAPTURE_SUBJECT_BINDING_UNAVAILABLE', $result->blockers);
+        self::assertNotContains('SUBJECT_UNRESOLVED', $result->blockers);
+    }
+
     public function test_capture_bound_subject_context_is_sufficient_for_publication_context_after_repair(): void
     {
         $evidence = $this->evidence();

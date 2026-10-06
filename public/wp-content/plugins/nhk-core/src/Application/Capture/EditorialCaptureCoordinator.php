@@ -62,6 +62,7 @@ final class EditorialCaptureCoordinator
         private ?ContentPreparationOrchestrator $contentPreparation = null,
         private ?SharedEnrichmentBoundary $sharedEnrichment = null,
         private ?\NHK\Core\Application\Media\CaptureFeatureBindingCoordinator $featureBindings = null,
+        private ?CaptureSubjectBindingRecovery $subjectBinding = null,
     ) { $this->completion = $completion ?? new CompletionCoordinator(); }
 
     /** @param array<string,mixed> $input */
@@ -488,6 +489,19 @@ final class EditorialCaptureCoordinator
                 $diagnostics['subjects'] = $preflightResolution;
                 $diagnostics['failure_code'] = 'SUBJECT_CONFLICT_REVIEW_REQUIRED';
                 return $this->save($record, CaptureStage::INTERPRETED, $assets, $diagnostics, $receipts, 'SUBJECT_CONFLICT_REVIEW_REQUIRED', $record->articleId, $record->articleStateToken, 'REVIEW_REQUIRED');
+            }
+            if (($preflightResolution['status'] ?? '') === 'resolved' && $this->subjectBinding !== null) {
+                $reconciliation = is_array($input['subject_reconciliation'] ?? null) ? $input['subject_reconciliation'] : [];
+                $metadata = ($reconciliation['confirmed'] ?? false) === true
+                    ? ['status' => 'CONFIRMED', 'candidate_uuid' => (string) ($reconciliation['candidate_uuid'] ?? ''), 'source' => (string) ($reconciliation['source'] ?? $reconciliation['authority'] ?? 'USER_CONFIRMED_SUBJECT_RECONCILIATION')]
+                    : [];
+                $record = $this->subjectBinding->persist($record, (int) ($record->articleId ?? 0), $preflightResolution, $metadata);
+                $assets = $record->assets;
+                $diagnostics = $record->diagnostics;
+                $receipts = $record->phaseReceipts;
+                $persistedPacket = $this->subjectBinding->packet($record);
+                if ($persistedPacket === null) throw new \RuntimeException('CAPTURE_SUBJECT_BINDING_READBACK_UNAVAILABLE');
+                $preflightResolution = $persistedPacket->toResolution();
             }
             if (!array_key_exists('media_adoption', $diagnostics) || ($followupItems !== [] && ($input['asset_followup_replay'] ?? false) !== true)) {
                 $this->beginPhase('MEDIA_ADOPTED');

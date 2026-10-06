@@ -79,7 +79,7 @@ use NHK\Core\Application\Video\{VideoCompletenessPolicy, VideoEditorialAdapter, 
 use NHK\Core\Application\Home\HomeSemanticQuery;
 use NHK\Core\Application\Presentation\{ClockTypeNavigationProjection, NavigationTreeProjector};
 use NHK\Core\Application\Search\SearchSemanticQuery;
-use NHK\Core\Application\Knowledge\{EntityKnowledgeProjection, KnowledgePageQuery};
+use NHK\Core\Application\Knowledge\{EntityKnowledgeProjection, KnowledgePageQuery, PublicResearchSourceDisplayPolicy};
 use NHK\Core\Application\Knowledge\KnowledgeService;
 use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
 use NHK\Core\Application\Collector\{CollectorFacetMaintenanceExecutor, CollectorFacetMaintenanceService};
@@ -154,6 +154,7 @@ final class Plugin {
             $claims = new WpdbKnowledgeRepository($wpdb);
             $sources = new WpdbSourceRepository($wpdb);
             $evidence = new WpdbEvidenceRepository($wpdb);
+            $sourceDisplayPolicy = new PublicResearchSourceDisplayPolicy();
             $attachmentBridge = new WordPressMediaAttachmentBridge($wpdb, new MediaService($media, $assets, $usages), $media, $assets);
             $wordpressAttachments = new WordPressMediaAttachmentIngestor($attachmentBridge);
             $graphEndpoints = new EndpointTypeRegistry();
@@ -170,7 +171,7 @@ final class Plugin {
                 'evidence' => new \NHK\Core\Application\Graph\EvidenceRelationshipAdapter($evidence, $claims, $sources),
             ]);
             McpAbilityRegistration::registerDiagnosticsAbility();
-            McpAbilityRegistration::registerReadAbilities(new McpReadHandler($authority, $types, $media, $assets, $usages, $videos, $claims, $evidence, new MigrationStatus(), $sources, null, new McpSemanticContextResolver($authority, $types), $wordpressAttachments, $neighborhood, $canonicalInventory, $graphInventory, $relationBackfill, new WpdbMediaBindingOperationRepository($wpdb), $captureRepository, $relationshipRead, new \NHK\Core\Application\Governance\ProposalDiscoveryService(new \NHK\Core\Infrastructure\Governance\WpdbProposalRepository($wpdb))));
+            McpAbilityRegistration::registerReadAbilities(new McpReadHandler($authority, $types, $media, $assets, $usages, $videos, $claims, $evidence, new MigrationStatus(), $sources, null, new McpSemanticContextResolver($authority, $types), $wordpressAttachments, $neighborhood, $canonicalInventory, $graphInventory, $relationBackfill, new WpdbMediaBindingOperationRepository($wpdb), $captureRepository, $relationshipRead, new \NHK\Core\Application\Governance\ProposalDiscoveryService(new \NHK\Core\Infrastructure\Governance\WpdbProposalRepository($wpdb)), $sourceDisplayPolicy));
             McpAbilityRegistration::registerCapabilityGatedReadAbilities();
             McpAbilityRegistration::registerGovernedAbilities();
         });
@@ -204,6 +205,7 @@ final class Plugin {
             $publicEndpoints = new EndpointTypeRegistry();
             CoreEndpointResolverRegistrar::register($publicEndpoints, $publicTypes, $publicAuthority, $publicMedia, $publicVideos);
             $publicStatus = new MigrationStatus();
+            $publicSourceDisplayPolicy = new PublicResearchSourceDisplayPolicy();
             $publicGraph = new GraphService(new WpdbGraphRepository($wpdb), $publicEndpoints, new PredicateRegistry(), new WpdbAuditSink());
             $clockTypeAudit = WpdbClockTypeClassificationAuditFactory::create($publicGraph, $wpdb);
             add_filter('nhk_v3_clock_type_classification_audit', static fn (mixed $current): mixed => $current ?? $clockTypeAudit, 10, 1);
@@ -216,7 +218,7 @@ final class Plugin {
             $publicClaims = new WpdbKnowledgeRepository($wpdb);
             $publicSources = new WpdbSourceRepository($wpdb);
             $publicEvidence = new WpdbEvidenceRepository($wpdb);
-            $publicKnowledge = new EntityKnowledgeProjection($publicClaims, $publicEvidence, $publicSources, $publicStatus);
+            $publicKnowledge = new EntityKnowledgeProjection($publicClaims, $publicEvidence, $publicSources, $publicStatus, $publicSourceDisplayPolicy);
             $navigationProjection = new ClockTypeNavigationProjection(new NavigationTreeProjector(new WpdbNavigationRepository($wpdb, static function (\NHK\Core\Domain\PresentationNavigation\NavigationNode $node) use ($publicAuthority): bool {
                 $entity = $publicAuthority->findByCanonicalId($node->canonicalUuid);
                 return $entity !== null && $entity->entityType === 'classification' && $entity->active() && (($entity->payload['family'] ?? null) === 'clock_type');
@@ -287,18 +289,18 @@ final class Plugin {
             add_action('rest_after_insert_attachment', static function (\WP_Post $post, \WP_REST_Request $request, bool $creating) use ($adoptAttachment): void {
                 $adoptAttachment((int) $post->ID);
             }, 20, 3);
-            (new PublicMediaVideoRoutes(new MediaVideoPageQuery($publicMedia, $publicAssets, $publicUsages, $publicVideos, $publicStatus, null, $publicRelated, null, $publicClaims, $publicEvidence, $publicSources), $historicPublicRouteService))->register();
+            (new PublicMediaVideoRoutes(new MediaVideoPageQuery($publicMedia, $publicAssets, $publicUsages, $publicVideos, $publicStatus, null, $publicRelated, null, $publicClaims, $publicEvidence, $publicSources, null, $publicSourceDisplayPolicy), $historicPublicRouteService))->register();
             (new PublicVideoSitemapRoutes($publicVideos, $publicStatus))->register();
             $publicMediaDelivery = \NHK\Core\Application\Media\PublicMediaAssetDelivery::fromEnvironment($publicAssets, $publicMedia);
             if ($publicMediaDelivery !== null) (new PublicMediaAssetRoutes($publicMediaDelivery))->register();
-            (new PublicKnowledgeRoutes(new KnowledgePageQuery($publicClaims, $publicEvidence, $publicSources, $publicStatus)))->register();
+            (new PublicKnowledgeRoutes(new KnowledgePageQuery($publicClaims, $publicEvidence, $publicSources, $publicStatus, $publicSourceDisplayPolicy)))->register();
         }
         add_action('rest_api_init', static function () use (&$sharedAttachmentBridge, &$captureRepository, $claimOwnerUrl, &$homeSemanticQuery): void {
             (new HealthCheck(new MigrationStatus()))->register_routes();
             global $wpdb;
             if (!isset($wpdb) || !is_object($wpdb)) return;
             $media = new WpdbMediaRepository($wpdb); $assets = new WpdbMediaAssetRepository($wpdb); $usages = new WpdbMediaUsageRepository($wpdb); $videos = new WpdbVideoRepository($wpdb); $claims = new WpdbKnowledgeRepository($wpdb); $sources = new WpdbSourceRepository($wpdb); $evidence = new WpdbEvidenceRepository($wpdb); $authority = new WpdbAuthorityRepository($wpdb);
-            (new ReadApi($media, $assets, $usages, $videos, $claims, $sources, $evidence, new MigrationStatus()))->register();
+            (new ReadApi($media, $assets, $usages, $videos, $claims, $sources, $evidence, new MigrationStatus(), null, $publicSourceDisplayPolicy))->register();
             $types = new EntityTypeRegistry();
             CanonicalEntityTypeCatalog::registerInto($types);
             $endpoints = new EndpointTypeRegistry(); CoreEndpointResolverRegistrar::register($endpoints, $types, $authority, $media, $videos, $claims, $sources, $evidence); $graphRepository = new WpdbGraphRepository($wpdb); $predicates = new PredicateRegistry(); $classifiedAsPolicy = new \NHK\Core\Application\Graph\ClassifiedAsPolicy(); $graphService = new GraphService($graphRepository, $endpoints, $predicates, new WpdbAuditSink(), new \NHK\Core\Application\Graph\ClassificationHierarchyPolicy($authority, $graphRepository), $classifiedAsPolicy);
@@ -343,7 +345,7 @@ final class Plugin {
                     return ($representative['media_id'] ?? '') === $mediaId ? ['status' => 'verified', 'media_id' => $mediaId, 'route' => $publicRoutes->path($owner)] : ['status' => 'stale', 'media_id' => $mediaId];
                 },
             );
-            $publicCollection = new PublicEntityCollectionQuery($authority, $types, new PublicIdentityContract($types), $publicEligibility, $publicRoutes, new BrandAggregationQuery($graphService, $authority, $types, $publicRoutes, $publicEligibility), static fn (): bool => $publicStatus->authorityStorageReady(), $entityMediaProjection, new EntityKnowledgeProjection($claims, $evidence, $sources, $publicStatus));
+            $publicCollection = new PublicEntityCollectionQuery($authority, $types, new PublicIdentityContract($types), $publicEligibility, $publicRoutes, new BrandAggregationQuery($graphService, $authority, $types, $publicRoutes, $publicEligibility), static fn (): bool => $publicStatus->authorityStorageReady(), $entityMediaProjection, new EntityKnowledgeProjection($claims, $evidence, $sources, $publicStatus, $publicSourceDisplayPolicy));
             $governanceRuntime = GovernanceRuntimeFactory::fromWordPress($wpdb, $sharedAttachmentBridge);
             $stagingScopeVerifier = $governanceRuntime->stagingScopeVerifier ?? new \NHK\Core\Application\Governance\StagingAcceptanceScopeVerifier(
                 static function (): string { return defined('WP_ENVIRONMENT_TYPE') ? strtolower((string) constant('WP_ENVIRONMENT_TYPE')) : (function_exists('wp_get_environment_type') ? strtolower((string) wp_get_environment_type()) : strtolower((string) (getenv('WP_ENVIRONMENT_TYPE') ?: 'unknown'))); },
@@ -657,7 +659,7 @@ final class Plugin {
                 'media_usage' => new \NHK\Core\Application\Graph\MediaUsageRelationshipAdapter($usages),
                 'evidence' => new \NHK\Core\Application\Graph\EvidenceRelationshipAdapter($evidence, $claims, $sources),
             ]);
-            $mcpRead = new McpReadHandler($authority, $types, $media, $assets, $usages, $videos, $claims, $evidence, new MigrationStatus(), $sources, null, new McpSemanticContextResolver($authority, $types), $wordpressAttachments, $mcpNeighborhood, $canonicalInventory, $graphInventory, $relationBackfill, null, $captureRepository, $relationshipRead, new \NHK\Core\Application\Governance\ProposalDiscoveryService($proposalRepository));
+            $mcpRead = new McpReadHandler($authority, $types, $media, $assets, $usages, $videos, $claims, $evidence, new MigrationStatus(), $sources, null, new McpSemanticContextResolver($authority, $types), $wordpressAttachments, $mcpNeighborhood, $canonicalInventory, $graphInventory, $relationBackfill, null, $captureRepository, $relationshipRead, new \NHK\Core\Application\Governance\ProposalDiscoveryService($proposalRepository), new PublicResearchSourceDisplayPolicy());
             // Relations are governed semantic children of Capture article
             // reconciliation (for example, a post --about--> classification
             // binding). Register the existing relation boundary alongside
@@ -910,26 +912,34 @@ final class Plugin {
             $articleReceipts = new WpdbArticleOperationReceiptRepository($wpdb);
             $categoryGateway = new CategoryGateway(new WpCategoryStore());
             $editorialPosts = new WpEditorialPostStore($articleEditorial);
-            $captureSubjectBinding = new CaptureSubjectBindingRecovery($captureRepository);
             $captureAuthorityResolver = new \NHK\Core\Application\Semantic\CanonicalAuthoritySubjectResolver($authority, $types);
             $captureSubjectResolver = new SubjectResolutionService(
                 $captureAuthorityResolver,
                 new \NHK\Core\Application\Semantic\CanonicalSubjectStructuralContextReader(new StructuralContextQuery($graphService, $authority), $authority),
                 [$captureAuthorityResolver, 'resolveComposite'],
             );
+            $captureSubjectBinding = new CaptureSubjectBindingRecovery($captureRepository, $captureSubjectResolver);
             $canonicalPublicationContext = static function (\NHK\Core\Domain\Article\EditorialPostState $state, array $callerEvidence) use ($captureRepository, $captureSubjectBinding, $articleResearch, $articlePreflightHandoff, $articleMedia): array {
                 $capture = $captureRepository->findByArticleId($state->postId);
                 if ($capture === null) return $callerEvidence;
                 if ($capture->articleId !== $state->postId) throw new \RuntimeException('CAPTURE_ARTICLE_BINDING_UNAVAILABLE');
                 $subjectPacket = $captureSubjectBinding->packet($capture);
-                $resolution = is_array($callerEvidence['subject_resolution_packet'] ?? null)
-                    ? $callerEvidence['subject_resolution_packet']
-                    : (is_array($callerEvidence['subject_resolution'] ?? null) ? $callerEvidence['subject_resolution'] : (is_array($callerEvidence['details']['subject_resolution'] ?? null) ? $callerEvidence['details']['subject_resolution'] : []));
-                if ($subjectPacket !== null) $persistedSubject = $subjectPacket->toResolution();
-                elseif ($resolution !== []) {
-                    $subjectPacket = \NHK\Core\Domain\Capture\SubjectResolutionPacket::fromArray($resolution);
-                    $persistedSubject = $subjectPacket?->toResolution() ?? [];
-                } else $persistedSubject = [];
+                if ($subjectPacket === null) {
+                    return array_replace($callerEvidence, [
+                        'subject_resolved' => false,
+                        'capture_subject_binding_verified' => false,
+                        'subject_persistence_status' => 'capture_binding_unavailable',
+                        'subject_resolution_packet' => [],
+                        'subject_resolution' => [],
+                        'diagnostics' => array_values(array_unique(array_merge((array) ($callerEvidence['diagnostics'] ?? []), ['CAPTURE_SUBJECT_BINDING_UNAVAILABLE']))),
+                        'canonical_publication_context' => [
+                            'capture_id' => $capture->captureId,
+                            'capture_revision' => $capture->revision,
+                            'article_state_token' => $state->token,
+                        ],
+                    ]);
+                }
+                $persistedSubject = $subjectPacket->toResolution();
                 $primary = is_array($persistedSubject['primary'] ?? null) ? $persistedSubject['primary'] : [];
                 if (trim((string) ($primary['id'] ?? '')) === '' || trim((string) ($primary['type'] ?? '')) === '') throw new \RuntimeException('CAPTURE_SUBJECT_BINDING_UNAVAILABLE');
                 $contentIntent = is_array($capture->context['content_intent'] ?? null) ? $capture->context['content_intent'] : [];
@@ -1071,17 +1081,7 @@ final class Plugin {
                                 $capture = $captureSubjectBinding->persist($capture, $postId, $packet);
                             }
                             if ($action->action === 'SUPERSEDE_SUBJECT_PACKET' && $capture instanceof \NHK\Core\Domain\Capture\CaptureRecord && $packet !== []) {
-                                $old = is_array($capture->context['subject_resolution_packet'] ?? null) ? $capture->context['subject_resolution_packet'] : [];
-                                $history = is_array($capture->context['subject_resolution_packet_history'] ?? null) ? $capture->context['subject_resolution_packet_history'] : [];
-                                if ($old !== [] && $history === []) $history[] = $old;
-                                $context = $capture->context;
-                                $context['subject_resolution_packet'] = $packet;
-                                $context['subject_resolution_packet_history'] = $history;
-                                $diagnostics = $capture->diagnostics;
-                                $diagnostics['subject_resolution_packet'] = $packet;
-                                $diagnostics['subjects'] = ['status' => 'resolved', 'primary' => ['id' => (string) ($packet['canonical_subject_id'] ?? $packet['id'] ?? ''), 'type' => (string) ($packet['entity_type'] ?? $packet['type'] ?? ''), 'stable_key' => (string) ($packet['stable_key'] ?? ''), 'name' => (string) ($packet['canonical_name'] ?? $packet['name'] ?? ''), 'revision' => (int) ($packet['revision'] ?? 1)]];
-                                $diagnostics['subject_packet_supersession'] = ['previous' => $old, 'current' => $packet];
-                                $capture = $captureRepository->save(new \NHK\Core\Domain\Capture\CaptureRecord($capture->captureId, $capture->idempotencyKey, $capture->requestFingerprint, $capture->stage, $capture->status, $capture->articleId, $capture->articleStateToken, $capture->assets, $context, $diagnostics, $capture->phaseReceipts, $capture->revision + 1, $capture->createdAt, gmdate('Y-m-d H:i:s.u')));
+                                $capture = $captureSubjectBinding->supersede($capture, $postId, $packet);
                             }
                             if ($action->action === 'CONVERGE_PRIMARY_ABOUT' && $capture instanceof \NHK\Core\Domain\Capture\CaptureRecord) {
                                 $sourceKey = (string) ($state['state']->endpointKey ?? '');
@@ -1267,7 +1267,7 @@ final class Plugin {
             $captureGovernance->setVideoEditorialResume($videoEditorialResume);
             $videoIntake = new VideoIntakeService(new YouTubeSourceAdapter($youtubeClient), $videos, new VideoHubClassifier(), $videoRelationCandidates, new VideoEditorialGenerator(), new VideoCompletenessPolicy(), new VideoSeoProjection(), new VideoInternalSemanticResearcher($authority, $types), $videoKnowledgeEnrichment, $videoEditorialAdapter);
             $videoSourceRefresh = new VideoSourceRefreshCommand($videos, $governance, $youtubeClient, $stagingScopeVerifier);
-            $videoFrontendReader = new MediaVideoPageQuery($media, $assets, $usages, $videos, new MigrationStatus(), null, null, null, $claims, $evidence, $sources);
+            $videoFrontendReader = new MediaVideoPageQuery($media, $assets, $usages, $videos, new MigrationStatus(), null, null, null, $claims, $evidence, $sources, null, new PublicResearchSourceDisplayPolicy());
             $videoPublicationVerifier = new CaptureVideoPublicationVerifier(
                 $videos,
                 $publicIdentityService,
@@ -1995,12 +1995,13 @@ final class Plugin {
                 $contentPreparation,
                 $sharedEnrichment,
                 $captureFeatureBindings,
+                subjectBinding: $captureSubjectBinding,
             );
             $captureContinuation = new EditorialCaptureContinuationService($captureRepository, $captureAddendumRepository, $capture, static function (array $input) use ($imageIngest, $existingMediaResolver): array {
                 $mediaIds = is_array($input['media_ids'] ?? null) ? array_values($input['media_ids']) : [];
                 if ($mediaIds !== []) return ['status' => 'verified', 'items' => $existingMediaResolver->resolve($mediaIds), 'reused' => true];
                 return $imageIngest->ingest((string) ($input['idempotency_key'] ?? '') . ':assets', is_array($input['metadata'] ?? null) ? $input['metadata'] : [], $input['files'] ?? [], is_array($input['items'] ?? null) ? $input['items'] : [], (bool) ($input['_nhk_native_multipart'] ?? false));
-            });
+            }, $captureSubjectBinding);
             $origin = static function (string $value): string { $parts = wp_parse_url($value); if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) return ''; return strtolower((string) $parts['scheme']) . '://' . strtolower((string) $parts['host']) . (isset($parts['port']) ? ':' . (int) $parts['port'] : ''); };
             $allowedOrigins = array_values(array_filter(array_unique([$origin((string) site_url()), $origin((string) home_url())])));
             $videoFrontendReconciliation = new \NHK\Core\Application\Video\VideoFrontendReconciliationService(

@@ -11,8 +11,13 @@ use NHK\Core\Shared\Uuid\UuidCodec;
 /** Continues one existing Capture/Post with an idempotent text or asset addendum. */
 final class EditorialCaptureContinuationService
 {
+    private CaptureSubjectBindingRecovery $subjectBinding;
+
     /** @param callable(array<string,mixed>):array|null $assetIngest */
-    public function __construct(private CaptureRepository $captures, private CaptureAddendumRepository $addenda, private EditorialCaptureCoordinator $coordinator, private $assetIngest = null) {}
+    public function __construct(private CaptureRepository $captures, private CaptureAddendumRepository $addenda, private EditorialCaptureCoordinator $coordinator, private $assetIngest = null, ?CaptureSubjectBindingRecovery $subjectBinding = null)
+    {
+        $this->subjectBinding = $subjectBinding ?? new CaptureSubjectBindingRecovery($captures);
+    }
 
     /** @return array{capture:array<string,mixed>,retry:array<string,mixed>} */
     public function retry(array $input): array
@@ -288,13 +293,14 @@ final class EditorialCaptureContinuationService
             }
             return [$capture, null];
         }
-        if (!in_array($capture->status, ['FAILED_RETRYABLE', 'REVIEW_REQUIRED'], true)) return [$capture, 'CAPTURE_SUBJECT_RECONCILIATION_STATUS_NOT_ALLOWED'];
+        if (!in_array($capture->status, ['FAILED_RETRYABLE', 'REVIEW_REQUIRED', 'APPLIED'], true)
+            && $capture->stage !== CaptureStage::AUTHORITY_APPLIED->value) return [$capture, 'CAPTURE_SUBJECT_RECONCILIATION_STATUS_NOT_ALLOWED'];
         $intent = strtoupper(trim((string) (($capture->context['content_intent']['intent'] ?? ''))));
         if (!in_array($intent, ['VIDEO', 'IMAGE_ARTICLE', 'TEXT_ARTICLE'], true)) return [$capture, 'CAPTURE_SUBJECT_RECONCILIATION_INTENT_NOT_SUPPORTED'];
         if (!is_array($selection) || ($selection['confirmed'] ?? false) !== true) return [$capture, 'CAPTURE_SUBJECT_RECONCILIATION_CONFIRMATION_REQUIRED'];
         $authority = strtoupper(trim((string) ($selection['authority'] ?? $selection['source'] ?? '')));
         $explicitPacket = SubjectResolutionPacket::fromArray(is_array($selection['packet'] ?? null) ? $selection['packet'] : (is_array($selection['subject_resolution_packet'] ?? null) ? $selection['subject_resolution_packet'] : []));
-        if ($capture->status === 'REVIEW_REQUIRED' && $explicitPacket instanceof SubjectResolutionPacket
+        if (in_array($capture->status, ['REVIEW_REQUIRED', 'APPLIED'], true) && $explicitPacket instanceof SubjectResolutionPacket
             && $explicitPacket->status === 'resolved'
             && in_array($authority, ['USER_CONFIRMED_SUBJECT_RECONCILIATION', 'GOVERNED_SUBJECT_RECONCILIATION'], true)
         ) {
@@ -332,57 +338,18 @@ final class EditorialCaptureContinuationService
             ],
             'USER_CONFIRMED_SUBJECT_RECONCILIATION',
         );
-        $resolvedArray = $resolved->toArray();
-        $context = $capture->context;
-        $context['subject_resolution_packet'] = $resolvedArray;
-        $diagnostics = $capture->diagnostics;
-        $diagnostics['subject_resolution_packet'] = $resolvedArray;
-        $diagnostics['subjects'] = $resolved->toResolution();
-        $diagnostics['subject_reconciliation'] = ['status' => 'CONFIRMED', 'candidate_uuid' => $candidateId, 'source' => 'USER_CONFIRMED_SUBJECT_RECONCILIATION'];
-        $persisted = new CaptureRecord(
-            $capture->captureId,
-            $capture->idempotencyKey,
-            $capture->requestFingerprint,
-            $capture->stage,
-            $capture->status,
-            $capture->articleId,
-            $capture->articleStateToken,
-            $capture->assets,
-            $context,
-            $diagnostics,
-            $capture->phaseReceipts,
-            $capture->revision + 1,
-            $capture->createdAt,
-            gmdate('Y-m-d H:i:s.u'),
-        );
-        return [$this->captures->save($persisted), null];
+        return [$this->persistResolvedReconciliation($capture, $resolved, [
+            'status' => 'CONFIRMED',
+            'candidate_uuid' => $candidateId,
+            'source' => 'USER_CONFIRMED_SUBJECT_RECONCILIATION',
+        ]), null];
     }
 
-    private function persistResolvedReconciliation(CaptureRecord $capture, SubjectResolutionPacket $resolved): CaptureRecord
+    /** @param array<string,mixed> $metadata */
+    private function persistResolvedReconciliation(CaptureRecord $capture, SubjectResolutionPacket $resolved, array $metadata = []): CaptureRecord
     {
-        $resolvedArray = $resolved->toArray();
-        $context = $capture->context;
-        $context['subject_resolution_packet'] = $resolvedArray;
-        $diagnostics = $capture->diagnostics;
-        $diagnostics['subject_resolution_packet'] = $resolvedArray;
-        $diagnostics['subjects'] = $resolved->toResolution();
-        $diagnostics['subject_reconciliation'] = ['status' => 'CONFIRMED', 'source' => $resolved->primarySource];
-        return $this->captures->save(new CaptureRecord(
-            $capture->captureId,
-            $capture->idempotencyKey,
-            $capture->requestFingerprint,
-            $capture->stage,
-            $capture->status,
-            $capture->articleId,
-            $capture->articleStateToken,
-            $capture->assets,
-            $context,
-            $diagnostics,
-            $capture->phaseReceipts,
-            $capture->revision + 1,
-            $capture->createdAt,
-            gmdate('Y-m-d H:i:s.u'),
-        ));
+        $metadata = $metadata !== [] ? $metadata : ['status' => 'CONFIRMED', 'source' => $resolved->primarySource];
+        return $this->subjectBinding->persist($capture, (int) ($capture->articleId ?? 0), $resolved->toResolution(), $metadata);
     }
 
     /** @param array<string,mixed> $buckets */

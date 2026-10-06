@@ -738,6 +738,116 @@ final class EditorialCaptureContinuationTest extends TestCase
         self::assertSame($capture->captureId, $replay['body']['result']['structuredContent']['capture']['capture_id']);
     }
 
+    public function test_transport_routes_content_continuation_after_applied_mixed_authority_without_new_delta(): void
+    {
+        $captures = new ContinuationCaptureRepository();
+        $addenda = new ContinuationAddendumRepository();
+        $capture = new CaptureRecord(
+            UuidCodec::newV7(),
+            'applied-mixed-content-continuation',
+            hash('sha256', 'applied-mixed-content-continuation'),
+            CaptureStage::AUTHORITY_APPLIED->value,
+            'APPLIED',
+            342,
+            'state-342',
+            [],
+            [
+                'purpose' => 'MIXED',
+                'raw_input' => 'Nội dung editorial ban đầu.',
+                'content_intent' => ['intent' => 'TEXT_ARTICLE', 'article_required' => true],
+                'original_request' => ['intent' => 'TEXT_ARTICLE'],
+            ],
+            ['completion' => ['status' => 'REVIEW_REQUIRED', 'blockers' => ['OWNER_PUBLICATION_REQUIRED']]],
+        );
+        $captures->create($capture);
+        $events = [];
+        $coordinator = $this->coordinator($captures, $events);
+        $documentation = new McpDocumentationRegistry();
+        $checkpoint = $documentation->bootstrap();
+        $transport = new McpTransport(
+            new McpReadHandler(
+                $this->createMock(AuthorityRepository::class), new EntityTypeRegistry(),
+                $this->createMock(MediaRepository::class), $this->createMock(MediaAssetRepository::class),
+                $this->createMock(MediaUsageRepository::class), $this->createMock(VideoRepository::class),
+                $this->createMock(KnowledgeRepository::class), $this->createMock(EvidenceRepository::class),
+                null, $this->createMock(SourceRepository::class), null, null, null,
+            ),
+            new McpGovernanceHandler(new GovernanceService(new InMemoryProposalRepository())),
+            static fn (string $capability): bool => true,
+            documentation: $documentation,
+            capture: $coordinator,
+            captureContinuation: new EditorialCaptureContinuationService($captures, $addenda, $coordinator),
+            authorityCapture: new AuthorityCaptureService($captures, static fn (array $input, CaptureRecord $record): array => []),
+        );
+
+        $response = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/call', 'params' => [
+            'name' => 'nhk.capture.ingest',
+            'arguments' => [
+                'capture_id' => $capture->captureId,
+                'idempotency_key' => $capture->idempotencyKey,
+                'purpose' => 'MIXED',
+                'text' => 'Bổ sung nội dung editorial.',
+                'documentation_checkpoint' => ['manifest_hash' => $checkpoint['manifest_hash'], 'documentation_version' => $checkpoint['documentation_version']],
+            ],
+        ]]);
+
+        $result = $response['body']['result']['structuredContent'] ?? [];
+        self::assertFalse($response['body']['result']['isError'] ?? false);
+        self::assertArrayHasKey('addendum', $result);
+        self::assertArrayNotHasKey('error', $result);
+        self::assertNotSame('AUTHORITY_APPROVAL_PACKET_REQUIRED', $result['addendum']['diagnostics']['failure']['code'] ?? null);
+    }
+
+    public function test_applied_mixed_capture_persists_confirmed_subject_binding_before_content_retry(): void
+    {
+        $captures = new ContinuationCaptureRepository();
+        $addenda = new ContinuationAddendumRepository();
+        $candidateId = '4cbe5aa1-4222-46bd-a140-6ab66d2da199';
+        $capture = new CaptureRecord(
+            UuidCodec::newV7(),
+            'applied-subject-confirmation',
+            hash('sha256', 'applied-subject-confirmation'),
+            CaptureStage::AUTHORITY_APPLIED->value,
+            'APPLIED',
+            342,
+            'state-342',
+            [],
+            [
+                'purpose' => 'MIXED',
+                'raw_input' => 'Nội dung editorial ban đầu.',
+                'content_intent' => ['intent' => 'TEXT_ARTICLE', 'article_required' => true],
+                'subject_resolution_packet' => ['status' => 'resolved', 'canonical_subject_id' => $candidateId, 'entity_type' => 'model', 'stable_key' => 'nhk:model:vedette.37', 'canonical_name' => 'Vedette 37', 'revision' => 1, 'primary_source' => 'USER_CONFIRMED_SUBJECT_RECONCILIATION'],
+            ],
+            ['completion' => ['status' => 'REVIEW_REQUIRED', 'blockers' => ['OWNER_PUBLICATION_REQUIRED']]],
+        );
+        $captures->create($capture);
+        $events = [];
+        $service = new EditorialCaptureContinuationService($captures, $addenda, $this->coordinator($captures, $events));
+
+        $result = $service->retry([
+            'capture_id' => $capture->captureId,
+            'idempotency_key' => $capture->idempotencyKey,
+            'resume_mode' => 'RETRY',
+            'subject_reconciliation' => [
+                'confirmed' => true,
+                'authority' => 'USER_CONFIRMED_SUBJECT_RECONCILIATION',
+                'packet' => [
+                    'status' => 'resolved',
+                    'canonical_subject_id' => $candidateId,
+                    'entity_type' => 'model',
+                    'stable_key' => 'nhk:model:vedette.37',
+                    'canonical_name' => 'Vedette 37',
+                    'revision' => 1,
+                    'primary_source' => 'USER_CONFIRMED_SUBJECT_RECONCILIATION',
+                ],
+            ],
+        ]);
+
+        self::assertNotSame('AUTHORITY_APPROVAL_PACKET_REQUIRED', $result['retry']['code'] ?? null);
+        self::assertSame(1, $events['semantic'] ?? 0);
+        self::assertSame($candidateId, $captures->findById($capture->captureId)?->context['subject_resolution_packet']['canonical_subject_id']);
+    }
+
     public function test_existing_capture_continuation_preserves_governed_provenance_packets(): void
     {
         $captures = new ContinuationCaptureRepository();
