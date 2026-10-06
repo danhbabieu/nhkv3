@@ -23638,3 +23638,30 @@ migration, deployment or push was performed.
 STATUS: `CAPTURE_ARTICLE_UTF8_AND_QUALITY_BOUNDARIES_FIXED_LOCALLY /
 FOCUSED_GREEN / FULL_SUITE_ENVIRONMENT_LIMITED / NO_DATA_MUTATION /
 NO_DEPLOYMENT / COMMIT_PENDING`.
+
+# Checkpoint — 2026-10-06 — Existing duplicate audit, read-only
+
+IMPLEMENTATION: Added a thin `SystemWideDuplicateAuditCoordinator` with an
+explicit owner rule for Dictionary, Authority, Knowledge, Source, Evidence,
+Graph, Article, Media, MediaAsset, MediaUsage and Video. Dictionary reuses the
+existing `DictionaryDuplicateCandidateAudit`; no second Dictionary matcher was
+introduced. All output clusters use the shared owner/identity/state/revision/
+reason/provenance shape, and reconciliation candidates are planning-only with
+`apply=false`.
+
+SAFETY: The audit accepts only bounded stable-cursor readers or explicit page
+callables. It never falls back to unbounded `list()`, never calls mutation
+services, never persists findings and reports `AUDIT_MODEL_GAP` as `BLOCKED`
+when an owner lacks a correct page boundary. No migration, merge, retire,
+delete, rekey, frontend hiding, staging/production write or deployment was
+performed.
+
+REGRESSION COVERAGE: Added focused owner tests, including Côn hoa thị through
+the existing Dictionary audit, definite and possible duplicates, scoped and
+family distinctions, retired/active Graph history, pagination continuation and
+read-only proof. The audit slice passes 19 tests / 42 assertions. Composer PHP
+lint and diff checks pass.
+
+STATUS: `EXISTING_DUPLICATE_AUDIT_READ_ONLY_IMPLEMENTED_LOCALLY /
+FOCUSED_GREEN / LIVE_ALL_OWNER_RUN_BLOCKED_BY_EXPLICIT_MODEL_GAPS /
+NO_DATA_MUTATION / COMMIT_PENDING`.
