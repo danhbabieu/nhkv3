@@ -192,6 +192,26 @@ final class ArticleMediaPolicyTest extends TestCase
         self::assertFalse($result->slots['featured_primary']['valid_for_completeness']);
     }
 
+    public function test_usage_readback_rejects_subject_or_revision_drift(): void
+    {
+        [$media, $assets, $usages, $blueprints, $service] = $this->stores();
+        $stale = $service->create('readback-stale-revision', 'Readback stale revision', 'ready', ['subject_ids' => ['subject-readback'], 'subject_revision' => 1]);
+        $service->addAsset($stale->canonicalId, 'original', 'uploads/readback-stale-revision.jpg', hash('sha256', 'readback-stale-revision'), 'image/jpeg', 10, 1200, 675, 'PUBLIC');
+
+        $result = (new ArticleMediaCoordinator($service, $media, $assets, $usages, $blueprints, 1))->ensureForPost(644, [
+            'subject_ids' => ['subject-readback'],
+            'subject_revision' => 2,
+            'subject_scope_locked' => true,
+            'allow_scoped_reuse' => true,
+        ]);
+
+        $featured = array_values(array_filter($result->canonicalUsageReadback, static fn (array $usage): bool => ($usage['role'] ?? '') === 'featured_primary'))[0] ?? [];
+        self::assertSame('SYSTEM_AUTO', $featured['selection_source'] ?? null);
+        self::assertSame('AUTO', $featured['selection_policy'] ?? null);
+        self::assertNotSame('verified', $featured['status'] ?? null, json_encode($featured, JSON_THROW_ON_ERROR));
+        self::assertContains($featured['diagnostic'] ?? '', ['MEDIA_USAGE_SEMANTIC_MISMATCH', 'MEDIA_USAGE_SUBJECT_SCOPE_REQUIRED']);
+    }
+
     public function test_incompatible_current_capture_selection_cannot_fall_back_to_historical_media(): void
     {
         [$media, $assets, $usages, $blueprints, $service] = $this->stores();
@@ -660,7 +680,7 @@ final class ArticleMediaPolicyTest extends TestCase
         [$media, $assets, $usages, $blueprints, $service] = $this->stores();
         $item = $service->create('seo-bridge-featured', 'SEO bridge featured', 'ready');
         $asset = $service->addAsset($item->canonicalId, 'original', 'uploads/seo-bridge.jpg', hash('sha256', 'seo-bridge'), 'image/jpeg', 10, 1200, 675, 'PUBLIC');
-        $service->addUsage($item->canonicalId, 'wp_post', '1:50', 'featured_primary', 0, 'Ảnh mặt trước');
+        $service->addUsage($item->canonicalId, 'wp_post', '1:50', 'featured_primary', 0, 'Ảnh mặt trước', '', [], '', '', 'USER_EXPLICIT', 'PINNED');
         $adapter = new class implements WordPressArticleMediaAdapter {
             public function read(int $postId): array { return ['featured_media_id' => null, 'inline_media_ids' => [], 'managed_inline_media_id' => null, 'featured_attachment_id' => 0, 'inline_attachment_ids' => [], 'content' => '']; }
             public function synchronize(int $postId, array $result): array { return $this->read($postId); }
@@ -682,7 +702,7 @@ final class ArticleMediaPolicyTest extends TestCase
         [$media, $assets, $usages, $blueprints, $service] = $this->stores();
         $item = $service->create('portrait-featured', 'Portrait featured', 'ready');
         $service->addAsset($item->canonicalId, 'original', 'uploads/portrait-featured.webp', hash('sha256', 'portrait-featured'), 'image/webp', 10, 900, 1200, 'PUBLIC');
-        $service->addUsage($item->canonicalId, 'wp_post', '1:51', 'featured_primary', 0, 'Ảnh dọc');
+        $service->addUsage($item->canonicalId, 'wp_post', '1:51', 'featured_primary', 0, 'Ảnh dọc', '', [], '', '', 'USER_EXPLICIT', 'PINNED');
 
         $result = (new ArticleMediaSeoProjection($media, $assets, $usages))->forPost('1:51');
 

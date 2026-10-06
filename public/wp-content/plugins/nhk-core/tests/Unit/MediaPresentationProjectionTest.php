@@ -4,8 +4,8 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Media\MediaService;
-use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository, MediaUsageRepository};
-use NHK\Core\Domain\Media\{Media, MediaAsset, MediaUsage};
+use NHK\Core\Contracts\Media\{ArticleMediaBlueprintRepository, MediaAssetRepository, MediaRepository, MediaUsageRepository};
+use NHK\Core\Domain\Media\{Media, MediaAsset, MediaSeoBlueprint, MediaUsage};
 use PHPUnit\Framework\TestCase;
 
 final class MediaPresentationProjectionTest extends TestCase
@@ -58,13 +58,65 @@ final class MediaPresentationProjectionTest extends TestCase
         self::assertSame($item->canonicalId, $projection['representative']['media_id'] ?? null);
     }
 
+    public function test_system_auto_article_projection_hides_wrong_subject_media(): void
+    {
+        [$media, $assets, $usages, $service] = $this->stores();
+        $item = $service->create('article-wrong-subject', 'Wrong subject article image', 'ready', ['subject_id' => 'subject-other']);
+        $service->addAsset($item->canonicalId, 'original', 'uploads/article-wrong-subject.webp', hash('sha256', 'article-wrong-subject'), 'image/webp', 10, 1200, 675, 'PUBLIC', ['canonical_filename' => 'article-wrong-subject.webp']);
+        $service->addUsage($item->canonicalId, 'wp_post', '1:77', 'featured_primary');
+        $blueprints = new class implements ArticleMediaBlueprintRepository {
+            public function findByPostAndSlot(int $postId, string $slot): ?MediaSeoBlueprint
+            {
+                return MediaSeoBlueprint::forPost($postId, $slot, ['subject_context' => ['subject_ids' => ['subject-target']]]);
+            }
+            public function save(MediaSeoBlueprint $blueprint): MediaSeoBlueprint { return $blueprint; }
+            public function listByPost(int $postId): array { return []; }
+        };
+
+        $projection = new \NHK\Core\Application\Entity\EntityMediaProjection($media, $assets, $usages, new \NHK\Core\Application\Media\SemanticSuitabilityPolicy(), $blueprints);
+        $result = $projection->forEntity('wp_post', '1:77');
+
+        self::assertNull($result['representative']);
+        self::assertSame([], $result['gallery']);
+    }
+
+    public function test_article_dossier_and_frontend_gallery_share_fail_closed_projection(): void
+    {
+        [$media, $assets, $usages, $service] = $this->stores();
+        $item = $service->create('article-unscoped-auto', 'Unscoped article image', 'ready');
+        $service->addAsset($item->canonicalId, 'original', 'uploads/article-unscoped-auto.webp', hash('sha256', 'article-unscoped-auto'), 'image/webp', 10, 1200, 675, 'PUBLIC', ['canonical_filename' => 'article-unscoped-auto.webp']);
+        $service->addUsage($item->canonicalId, 'wp_post', '1:78', 'featured_primary');
+
+        $projection = new \NHK\Core\Application\Entity\EntityMediaProjection($media, $assets, $usages, new \NHK\Core\Application\Media\SemanticSuitabilityPolicy(), new class implements ArticleMediaBlueprintRepository {
+            public function findByPostAndSlot(int $postId, string $slot): ?MediaSeoBlueprint { return null; }
+            public function save(MediaSeoBlueprint $blueprint): MediaSeoBlueprint { return $blueprint; }
+            public function listByPost(int $postId): array { return []; }
+        });
+
+        self::assertNull($projection->representativeForEntity('wp_post', '1:78'));
+        self::assertSame([], $projection->forEntity('wp_post', '1:78')['gallery']);
+    }
+
+    public function test_system_auto_seo_projection_fails_closed_without_subject_scope(): void
+    {
+        [$media, $assets, $usages, $service] = $this->stores();
+        $item = $service->create('seo-unscoped-auto', 'SEO unscoped auto', 'ready');
+        $service->addAsset($item->canonicalId, 'original', 'uploads/seo-unscoped-auto.webp', hash('sha256', 'seo-unscoped-auto'), 'image/webp', 10, 1200, 675, 'PUBLIC', ['canonical_filename' => 'seo-unscoped-auto.webp']);
+        $service->addUsage($item->canonicalId, 'wp_post', '1:79', 'featured_primary');
+
+        $result = (new \NHK\Core\Application\Media\ArticleMediaSeoProjection($media, $assets, $usages))->forPost('1:79');
+
+        self::assertFalse($result['eligible']);
+        self::assertSame('MEDIA_USAGE_SUBJECT_SCOPE_REQUIRED', $result['diagnostic'] ?? null);
+    }
+
     /** @dataProvider mediaCapableOwnerMatrix */
     public function test_registered_media_capable_owner_projection_consumes_canonical_usage(string $endpointType, string $endpointKey, string $role): void
     {
         [$media, $assets, $usages, $service] = $this->stores();
         $item = $service->create('matrix-' . $endpointType, 'Matrix ' . $endpointType, 'ready', ['subject_id' => $endpointKey]);
         $service->addAsset($item->canonicalId, 'original', 'uploads/matrix-' . $endpointType . '.webp', hash('sha256', $endpointType), 'image/webp', 10, 1200, 675, 'PUBLIC', ['canonical_filename' => 'matrix-' . $endpointType . '.webp']);
-        $service->addUsage($item->canonicalId, $endpointType, $endpointKey, $role, 0, 'Matrix');
+        $service->addUsage($item->canonicalId, $endpointType, $endpointKey, $role, 0, 'Matrix', '', [], '', '', $endpointType === 'wp_post' ? 'USER_EXPLICIT' : 'SYSTEM_AUTO', $endpointType === 'wp_post' ? 'PINNED' : 'AUTO');
 
         $result = (new \NHK\Core\Application\Entity\EntityMediaProjection($media, $assets, $usages))->forEntity($endpointType, $endpointKey);
         self::assertSame($item->canonicalId, $result['representative']['media_id'] ?? null, $endpointType);

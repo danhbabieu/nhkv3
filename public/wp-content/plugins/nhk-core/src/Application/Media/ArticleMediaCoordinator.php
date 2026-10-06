@@ -194,11 +194,24 @@ final class ArticleMediaCoordinator
             $blueprint = MediaSeoBlueprint::forPost($postId, MediaUsageRoleRegistry::INLINE_PRIMARY, $context);
             return $this->usableMedia($placement['media_id'], $blueprint, false) !== null;
         })) === count($supportingPlacements);
+        $canonicalUsageReadback = $this->canonicalUsageReadback($endpointKey);
+        $readbackByRole = [];
+        foreach ($canonicalUsageReadback as $readback) $readbackByRole[(string) ($readback['role'] ?? '')] = $readback;
+        foreach (MediaUsageRoleRegistry::mandatoryArticleRoles() as $role) {
+            $readback = $readbackByRole[$role] ?? null;
+            if (($slots[$role]['valid_for_completeness'] ?? false) !== true || !is_array($readback) || strtoupper((string) ($readback['selection_source'] ?? 'SYSTEM_AUTO')) !== 'SYSTEM_AUTO' || ($readback['status'] ?? '') === 'verified') continue;
+            $slots[$role]['media_id'] = '';
+            $slots[$role]['placeholder'] = true;
+            $slots[$role]['valid_for_completeness'] = false;
+            $slots[$role]['state'] = $role === MediaUsageRoleRegistry::FEATURED_PRIMARY ? MediaSeoStateRegistry::INCOMPLETE_FEATURED : MediaSeoStateRegistry::INCOMPLETE_INLINE;
+            $slotMedia[$role] = '';
+            $diagnostics[] = ['code' => 'MEDIA_USAGE_READBACK_REJECTED', 'slot' => $role, 'reason' => (string) ($readback['diagnostic'] ?? 'MEDIA_USAGE_SEMANTIC_MISMATCH')];
+        }
         $mandatoryMediaMissing = array_filter($slots, static fn (array $slot): bool => $slot['placeholder'] || ($slot['valid_for_completeness'] ?? false) !== true) !== [];
         $state = $mandatoryMediaMissing && !$hasValidSupporting ? MediaSeoStateRegistry::PLACEHOLDER : (in_array('MEDIA_LOW_RESOLUTION', array_column($diagnostics, 'code'), true) ? MediaSeoStateRegistry::LOW_RESOLUTION : MediaSeoStateRegistry::COMPLETE);
         $guidance = $this->guidance($slots, $context);
         $mediaDispositions = $this->mediaDispositions($endpointKey, $desiredUsages, $usagePlan);
-        $result = new ArticleMediaResult($postId, $endpointKey, $state, $slotMedia, $slots, $diagnostics, is_array($editorial) ? (string) ($editorial['state_token'] ?? '') : '', $guidance, $mediaDispositions, $this->canonicalUsageReadback($endpointKey));
+        $result = new ArticleMediaResult($postId, $endpointKey, $state, $slotMedia, $slots, $diagnostics, is_array($editorial) ? (string) ($editorial['state_token'] ?? '') : '', $guidance, $mediaDispositions, $canonicalUsageReadback);
         if ($this->wordpress !== null) {
             $payload = $result->toArray();
             $payload['force_inline_reconcile'] = ($context['force_inline_reconcile'] ?? false) === true;
@@ -283,6 +296,8 @@ final class ArticleMediaCoordinator
             $context['subject_ids'] = $subjectIds;
             $subjectContext['subject_ids'] = $subjectIds;
         }
+        $contextRevision = trim((string) ($context['subject_revision'] ?? ''));
+        if ($contextRevision !== '') $subjectContext['subject_revision'] = $contextRevision;
         if (($context['subject_revision'] ?? 0) === 0 && $resolvedRevision > 0) $context['subject_revision'] = $resolvedRevision;
         if ($resolvedRevision > 0) $subjectContext['subject_revision'] = $resolvedRevision;
         if ($subjectContext !== []) $context['subject_context'] = $subjectContext;
@@ -544,6 +559,29 @@ final class ArticleMediaCoordinator
         $items = [];
         foreach ($this->usages->listByEndpoint('wp_post', $endpointKey) as $usage) {
             if (!$usage instanceof \NHK\Core\Domain\Media\MediaUsage || $usage->activeSlot === 'retired') continue;
+            $media = $this->media->findByCanonicalId($usage->mediaId);
+            $selectionSource = strtoupper(trim($usage->selectionSource)) ?: 'SYSTEM_AUTO';
+            $selectionPolicy = strtoupper(trim($usage->selectionPolicy)) ?: 'AUTO';
+            $status = $media instanceof Media && $media->active && $media->readiness === 'ready' && !$media->isSystemPlaceholder() ? 'verified' : 'incomplete';
+            $diagnostic = $status === 'verified' ? null : 'MEDIA_USAGE_SEMANTIC_MISMATCH';
+            $assessment = [];
+            if ($status === 'verified' && $selectionSource === 'SYSTEM_AUTO' && in_array($usage->role, MediaUsageRoleRegistry::mandatoryArticleRoles(), true)) {
+                $postId = (int) preg_replace('/^.*:/', '', $endpointKey);
+                $blueprint = $postId > 0 ? $this->blueprints->findByPostAndSlot($postId, $usage->role) : null;
+                $subjectContext = $blueprint?->subjectContext ?? [];
+                $subjectIds = [];
+                foreach (['subject_ids', 'canonical_subject_ids'] as $key) foreach ((array) ($subjectContext[$key] ?? []) as $subjectId) if (trim((string) $subjectId) !== '') $subjectIds[] = trim((string) $subjectId);
+                if ($subjectIds === []) {
+                    $status = 'review_required';
+                    $diagnostic = 'MEDIA_USAGE_SUBJECT_SCOPE_REQUIRED';
+                } else {
+                    $assessment = ($this->suitabilityPolicy ??= new SemanticSuitabilityPolicy())->evaluateMedia($media, $this->assets->listByMediaId($media->canonicalId), ['subject_ids' => array_values(array_unique($subjectIds)), 'subject_revision' => (string) ($subjectContext['subject_revision'] ?? $subjectContext['canonical_subject_revision'] ?? '')], 'SYSTEM_AUTO', $usage->role);
+                    if (($assessment['valid_for_completeness'] ?? false) !== true) {
+                        $status = 'review_required';
+                        $diagnostic = $assessment['diagnostic'] ?? 'MEDIA_USAGE_SEMANTIC_MISMATCH';
+                    }
+                }
+            }
             $items[] = [
                 'usage_id' => $usage->usageId,
                 'media_id' => $usage->mediaId,
@@ -556,8 +594,14 @@ final class ArticleMediaCoordinator
                 'title' => $usage->title,
                 'placement_key' => $usage->placementKey,
                 'revision' => $usage->revision,
+                'revision_verified' => $usage->revision >= 1,
+                'selection_source' => $selectionSource,
+                'selection_policy' => $selectionPolicy,
+                'suitability' => $assessment['suitability'] ?? null,
+                'semantic_tier' => $assessment['semantic_tier'] ?? null,
                 'active' => true,
-                'status' => 'verified',
+                'status' => $status,
+                'diagnostic' => $diagnostic,
             ];
         }
         usort($items, static fn (array $left, array $right): int => [$left['sort_order'], $left['usage_id']] <=> [$right['sort_order'], $right['usage_id']]);

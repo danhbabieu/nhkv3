@@ -8,7 +8,7 @@ use NHK\Core\Application\Entity\{EntityMediaProjection, PublicEntityEligibilityP
 use NHK\Core\Application\Graph\{GraphService, PredicateTraversalPolicy, RelatedSemanticQuery, StructuralContextQuery};
 use NHK\Core\Application\Knowledge\{EntityKnowledgeProjection, KnowledgePageQuery, PublicResearchSourceDisplayPolicy};
 use NHK\Core\Application\Projection\{ClaimProjectionService, ClaimScopeResolver, GraphProjectionPolicy, LiveLedgerProjectionBuilder, ProjectionEventSubscriber, ProjectionInvalidationService};
-use NHK\Core\Application\Media\{PublicMediaAssetDelivery, PublicMediaArticleLinkResolver, PublicMediaGalleryQuery};
+use NHK\Core\Application\Media\{PublicMediaAssetDelivery, PublicMediaArticleLinkResolver, PublicMediaGalleryQuery, SemanticSuitabilityPolicy};
 use NHK\Core\Domain\Authority\{AuthorityEntity, CanonicalEntityTypeCatalog, EntityTypeRegistry};
 use NHK\Core\Domain\Graph\{EndpointTypeRegistry, PredicateRegistry};
 use NHK\Core\Infrastructure\Admin\SemanticDossierCoverageAdminPage;
@@ -16,6 +16,7 @@ use NHK\Core\Infrastructure\Authority\WpdbAuthorityRepository;
 use NHK\Core\Infrastructure\Graph\{CoreEndpointResolverRegistrar, WpdbAuditSink, WpdbGraphRepository};
 use NHK\Core\Infrastructure\Knowledge\{WpdbEvidenceRepository, WpdbKnowledgeRepository, WpdbSourceRepository};
 use NHK\Core\Infrastructure\Media\{WpdbMediaAssetRepository, WpdbMediaRepository, WpdbMediaUsageRepository};
+use NHK\Core\Infrastructure\Media\WpdbArticleMediaBlueprintRepository;
 use NHK\Core\Infrastructure\Video\WpdbVideoRepository;
 use NHK\Core\Infrastructure\Projection\{WpdbProjectionDependencyIndex, WpdbProjectionRevisionStore, WpdbProjectionSchema};
 use NHK\Core\Infrastructure\Http\{CollectorProfileApi, ProjectionAdminApi};
@@ -73,7 +74,7 @@ final class FrontendSemanticBootstrap
         add_action('rest_api_init', [$projectionAdmin, 'register']);
 
         $gallery = new PublicMediaGalleryQuery($media, $assets, PublicMediaAssetDelivery::fromEnvironment($assets, $media), $usages, PublicMediaArticleLinkResolver::fromWordPress());
-        $entityMedia = new EntityMediaProjection($media, $assets, $usages);
+        $entityMedia = new EntityMediaProjection($media, $assets, $usages, new SemanticSuitabilityPolicy(), new WpdbArticleMediaBlueprintRepository($wpdb));
         $entityKnowledge = new EntityKnowledgeProjection($claims, $evidence, $sources, $status, $sourceDisplayPolicy);
         $knowledgeArchive = new KnowledgePageQuery($claims, $evidence, $sources, $status, $sourceDisplayPolicy);
         $postProjector = static function(int $postId): ?array {

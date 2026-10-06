@@ -73,7 +73,7 @@ use NHK\Core\Infrastructure\Graph\{CoreEndpointResolverRegistrar, GraphClockType
 use NHK\Core\Infrastructure\Governance\WpdbDependencyRepository;
 use NHK\Core\Infrastructure\Governance\GovernanceRuntimeFactory;
 use NHK\Core\Application\Entity\{ComparisonPageQuery, EntityMediaProjection, EntityPageQuery, EntityProfileAdminProjection, PublicEndpointEligibilityResolver, PublicEntityCollectionQuery, PublicEntityEligibilityPolicy, PublicIdentityContract, PublicRouteResolver, RelatedContentQuery};
-use NHK\Core\Application\Media\{ArticleMediaCoordinator, ArticleMediaSeoProjection, MediaEnrichmentFinalReadbackPolicy, MediaIngestGateway, MediaService, MediaVideoPageQuery, PublicMediaAssetDelivery, PublicMediaArticleLinkResolver, PublicMediaGalleryQuery, VisualOpportunityDetector, VisualSupportRequirementService};
+use NHK\Core\Application\Media\{ArticleMediaCoordinator, ArticleMediaSeoProjection, MediaEnrichmentFinalReadbackPolicy, MediaIngestGateway, MediaService, MediaVideoPageQuery, PublicMediaAssetDelivery, PublicMediaArticleLinkResolver, PublicMediaGalleryQuery, SemanticSuitabilityPolicy, VisualOpportunityDetector, VisualSupportRequirementService};
 use NHK\Core\Application\Media\MediaEnrichmentExactReadbackService;
 use NHK\Core\Application\Video\{VideoCompletenessPolicy, VideoEditorialAdapter, VideoEditorialGenerator, VideoHubClassifier, VideoIntakeService, VideoInternalSemanticResearcher, VideoKnowledgeEnrichmentPlanner, VideoRelationCandidatePlanner, VideoSeoProjection, VideoService, VideoSourceRefreshCommand, YouTubeDataApiClient, YouTubeSourceAdapter};
 use NHK\Core\Application\Home\HomeSemanticQuery;
@@ -223,7 +223,7 @@ final class Plugin {
                 $entity = $publicAuthority->findByCanonicalId($node->canonicalUuid);
                 return $entity !== null && $entity->entityType === 'classification' && $entity->active() && (($entity->payload['family'] ?? null) === 'clock_type');
             })));
-            $publicCollection = new PublicEntityCollectionQuery($publicAuthority, $publicTypes, new PublicIdentityContract($publicTypes), $publicEligibility, $publicRoutes, $publicAggregation, static fn (): bool => $publicStatus->authorityStorageReady(), new EntityMediaProjection($publicMedia, $publicAssets, $publicUsages), $publicKnowledge, null, $navigationProjection);
+            $publicCollection = new PublicEntityCollectionQuery($publicAuthority, $publicTypes, new PublicIdentityContract($publicTypes), $publicEligibility, $publicRoutes, $publicAggregation, static fn (): bool => $publicStatus->authorityStorageReady(), new EntityMediaProjection($publicMedia, $publicAssets, $publicUsages, new SemanticSuitabilityPolicy(), new \NHK\Core\Infrastructure\Media\WpdbArticleMediaBlueprintRepository($wpdb)), $publicKnowledge, null, $navigationProjection);
             add_filter('nhk_v3_clock_type_navigation_items', static function (array $items, string $placement) use ($navigationProjection, $publicAuthority, $publicRoutes, $publicEligibility): array {
                 foreach ($navigationProjection->menu($placement) as $node) {
                     $entity = $publicAuthority->findByCanonicalId((string) ($node['canonical_uuid'] ?? ''));
@@ -328,7 +328,7 @@ final class Plugin {
             $publicIdentityService = new \NHK\Core\Application\PublicIdentity\PublicIdentityService($publicIdentityRepository, static fn (string $slug): bool => false);
             $publicRoutes = new PublicRouteResolver($authority, $types, $publicContexts);
             $publicEligibility = new PublicEntityEligibilityPolicy($authority, $types, $publicRoutes, $publicContexts);
-            $entityMediaProjection = new EntityMediaProjection($media, $assets, $usages);
+            $entityMediaProjection = new EntityMediaProjection($media, $assets, $usages, new SemanticSuitabilityPolicy(), new \NHK\Core\Infrastructure\Media\WpdbArticleMediaBlueprintRepository($wpdb));
             $mediaCapabilities = \NHK\Core\Application\Media\MediaOwnerCapabilityRegistry::fromEndpointRegistry($endpoints);
             $mediaFinalReadback = new \NHK\Core\Application\Media\MediaEnrichmentCompletionPolicy(
                 static function (string $type, string $id) use ($mediaCapabilities, $types, $authority, $publicEligibility, $publicRoutes): ?array {

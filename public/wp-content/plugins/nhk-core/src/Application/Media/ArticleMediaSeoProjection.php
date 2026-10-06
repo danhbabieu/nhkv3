@@ -15,15 +15,19 @@ final class ArticleMediaSeoProjection
     {
         $usages = $this->usages->listByEndpoint('wp_post', $endpointKey, MediaUsageRoleRegistry::FEATURED_PRIMARY);
         if (count($usages) !== 1) return ['state' => MediaSeoStateRegistry::INCOMPLETE_FEATURED, 'eligible' => false, 'image_url' => null];
-        $media = $this->media->findByCanonicalId($usages[0]->mediaId);
+        $usage = $usages[0];
+        $media = $this->media->findByCanonicalId($usage->mediaId);
         if ($media === null || !$media->active || $media->isSystemPlaceholder()) return ['state' => MediaSeoStateRegistry::PLACEHOLDER, 'eligible' => false, 'image_url' => null];
         $assets = $this->assets->listByMediaId($media->canonicalId);
         $postId = (int) preg_replace('/^.*:/', '', $endpointKey);
         $blueprint = $postId > 0 ? $this->blueprints?->findByPostAndSlot($postId, MediaUsageRoleRegistry::FEATURED_PRIMARY) : null;
         $subjectIds = [];
         if ($blueprint !== null) foreach (['subject_ids', 'canonical_subject_ids'] as $key) foreach ((array) ($blueprint->subjectContext[$key] ?? []) as $subjectId) if (trim((string) $subjectId) !== '') $subjectIds[] = trim((string) $subjectId);
-        if ($subjectIds !== []) {
-            $assessment = ($this->suitabilityPolicy ??= new SemanticSuitabilityPolicy())->evaluateMedia($media, $assets, ['subject_ids' => array_values(array_unique($subjectIds))], 'SYSTEM_AUTO', MediaUsageRoleRegistry::FEATURED_PRIMARY);
+        if (strtoupper(trim((string) $usage->selectionSource)) === 'SYSTEM_AUTO') {
+            $subjectIds = array_values(array_unique($subjectIds));
+            if ($subjectIds === []) return ['state' => MediaSeoStateRegistry::INCOMPLETE_FEATURED, 'eligible' => false, 'image_url' => null, 'diagnostic' => 'MEDIA_USAGE_SUBJECT_SCOPE_REQUIRED'];
+            $subjectContext = $blueprint?->subjectContext ?? [];
+            $assessment = ($this->suitabilityPolicy ??= new SemanticSuitabilityPolicy())->evaluateMedia($media, $assets, ['subject_ids' => $subjectIds, 'subject_revision' => (string) ($subjectContext['subject_revision'] ?? $subjectContext['canonical_subject_revision'] ?? '')], 'SYSTEM_AUTO', MediaUsageRoleRegistry::FEATURED_PRIMARY);
             if (($assessment['valid_for_completeness'] ?? false) !== true) return ['state' => MediaSeoStateRegistry::INCOMPLETE_FEATURED, 'eligible' => false, 'image_url' => null, 'diagnostic' => $assessment['diagnostic'] ?? 'MEDIA_USAGE_SEMANTIC_MISMATCH'];
         }
         $asset = (new PublicMediaAssetSelector())->canonical($assets);
@@ -33,10 +37,10 @@ final class ArticleMediaSeoProjection
         }
         $representation = [];
         if ($this->wordpress !== null) {
-            try { $representation = $this->wordpress->attachmentForMedia($media, $asset, (string) ($usages[0]->altText ?? '')); } catch (\Throwable) { $representation = []; }
+            try { $representation = $this->wordpress->attachmentForMedia($media, $asset, (string) ($usage->altText ?? '')); } catch (\Throwable) { $representation = []; }
         }
         $canonical = (new PublicMediaAssetUrlResolver())->path(is_string($asset->metadata['canonical_filename'] ?? null) ? $asset->metadata['canonical_filename'] : basename($asset->storageKey));
-        return ['state' => MediaSeoStateRegistry::COMPLETE, 'eligible' => true, 'media_id' => $media->canonicalId, 'asset_id' => $asset->assetId, 'storage_key' => $asset->storageKey, 'image_url' => function_exists('home_url') ? home_url($canonical) : $canonical, 'src' => function_exists('home_url') ? home_url($canonical) : $canonical, 'srcset' => function_exists('home_url') ? home_url($canonical) . ' ' . (int) ($asset->width ?? 0) . 'w' : $canonical, 'sizes' => (string) ($representation['sizes'] ?? ''), 'width' => (int) ($asset->width ?? ($representation['width'] ?? 0)), 'height' => (int) ($asset->height ?? ($representation['height'] ?? 0)), 'alt' => (string) ($representation['alt'] ?? $usages[0]->altText)];
+        return ['state' => MediaSeoStateRegistry::COMPLETE, 'eligible' => true, 'media_id' => $media->canonicalId, 'asset_id' => $asset->assetId, 'storage_key' => $asset->storageKey, 'image_url' => function_exists('home_url') ? home_url($canonical) : $canonical, 'src' => function_exists('home_url') ? home_url($canonical) : $canonical, 'srcset' => function_exists('home_url') ? home_url($canonical) . ' ' . (int) ($asset->width ?? 0) . 'w' : $canonical, 'sizes' => (string) ($representation['sizes'] ?? ''), 'width' => (int) ($asset->width ?? ($representation['width'] ?? 0)), 'height' => (int) ($asset->height ?? ($representation['height'] ?? 0)), 'alt' => (string) ($representation['alt'] ?? $usage->altText)];
     }
 
     public function isImageSitemapEligible(string $endpointKey): bool

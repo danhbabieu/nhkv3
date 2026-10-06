@@ -20,7 +20,7 @@ final class PluginBootWiringTest extends TestCase
     {
         $plugin = (string) file_get_contents(__DIR__ . '/../../src/Plugin.php');
 
-        $projection = strpos($plugin, 'new EntityMediaProjection($publicMedia, $publicAssets, $publicUsages)');
+        $projection = strpos($plugin, 'new EntityMediaProjection($publicMedia, $publicAssets, $publicUsages, new SemanticSuitabilityPolicy()');
         $assets = strpos($plugin, '$publicAssets = new WpdbMediaAssetRepository($wpdb);');
         $usages = strpos($plugin, '$publicUsages = new WpdbMediaUsageRepository($wpdb);');
 
@@ -36,7 +36,7 @@ final class PluginBootWiringTest extends TestCase
         $plugin = (string) file_get_contents(__DIR__ . '/../../src/Plugin.php');
 
         self::assertStringContainsString(
-            'use NHK\\Core\\Application\\Media\\{ArticleMediaCoordinator, ArticleMediaSeoProjection, MediaEnrichmentFinalReadbackPolicy, MediaIngestGateway, MediaService, MediaVideoPageQuery, PublicMediaAssetDelivery, PublicMediaArticleLinkResolver, PublicMediaGalleryQuery, VisualOpportunityDetector, VisualSupportRequirementService};',
+            'use NHK\\Core\\Application\\Media\\{ArticleMediaCoordinator, ArticleMediaSeoProjection, MediaEnrichmentFinalReadbackPolicy, MediaIngestGateway, MediaService, MediaVideoPageQuery, PublicMediaAssetDelivery, PublicMediaArticleLinkResolver, PublicMediaGalleryQuery, SemanticSuitabilityPolicy, VisualOpportunityDetector, VisualSupportRequirementService};',
             $plugin,
         );
     }

@@ -5,13 +5,13 @@ namespace NHK\Core\Application\Entity;
 
 use NHK\Core\Application\Media\{PublicMediaAssetUrlResolver, SemanticSuitabilityPolicy};
 use NHK\Core\Application\Media\PublicMediaAssetSelector;
-use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository, MediaUsageRepository};
+use NHK\Core\Contracts\Media\{ArticleMediaBlueprintRepository, MediaAssetRepository, MediaRepository, MediaUsageRepository};
 use NHK\Core\Domain\Media\{Media, MediaAsset, MediaUsage, MediaUsageRoleRegistry};
 
 /** Read-only endpoint image projection; it never promotes usage into semantic truth. */
 final class EntityMediaProjection
 {
-    public function __construct(private MediaRepository $media, private MediaAssetRepository $assets, private MediaUsageRepository $usages, private ?SemanticSuitabilityPolicy $suitabilityPolicy = null) {}
+    public function __construct(private MediaRepository $media, private MediaAssetRepository $assets, private MediaUsageRepository $usages, private ?SemanticSuitabilityPolicy $suitabilityPolicy = null, private ?ArticleMediaBlueprintRepository $blueprints = null) {}
 
     /** @return array{representative:?array<string,mixed>,evidence:list<array<string,mixed>>,gallery:list<array<string,mixed>>} */
     public function forEntity(string $endpointType, string $endpointKey): array
@@ -51,6 +51,16 @@ final class EntityMediaProjection
     {
         $media = $this->media->findByCanonicalId($usage->mediaId);
         if (!$media instanceof Media || !$media->active || $media->readiness !== 'ready' || $media->isSystemPlaceholder()) return null;
+        if ($usage->endpointType === 'wp_post' && in_array($usage->role, [MediaUsageRoleRegistry::FEATURED_PRIMARY, MediaUsageRoleRegistry::INLINE_PRIMARY, MediaUsageRoleRegistry::INLINE_SUPPORTING], true) && strtoupper(trim($usage->selectionSource)) === 'SYSTEM_AUTO') {
+            $postId = (int) preg_replace('/^.*:/', '', $usage->endpointKey);
+            $blueprint = $postId > 0 ? $this->blueprints?->findByPostAndSlot($postId, in_array($usage->role, [MediaUsageRoleRegistry::FEATURED_PRIMARY, MediaUsageRoleRegistry::INLINE_PRIMARY], true) ? $usage->role : MediaUsageRoleRegistry::INLINE_PRIMARY) : null;
+            $subjectContext = $blueprint?->subjectContext ?? [];
+            $subjectIds = [];
+            foreach (['subject_ids', 'canonical_subject_ids'] as $key) foreach ((array) ($subjectContext[$key] ?? []) as $subjectId) if (trim((string) $subjectId) !== '') $subjectIds[] = trim((string) $subjectId);
+            if ($subjectIds === []) return null;
+            $assessment = ($this->suitabilityPolicy ??= new SemanticSuitabilityPolicy())->evaluateMedia($media, $this->assets->listByMediaId($media->canonicalId), ['subject_ids' => array_values(array_unique($subjectIds)), 'subject_revision' => (string) ($subjectContext['subject_revision'] ?? $subjectContext['canonical_subject_revision'] ?? '')], 'SYSTEM_AUTO', $usage->role);
+            if (($assessment['valid_for_completeness'] ?? false) !== true) return null;
+        }
         // MediaUsage is the canonical, governed consumer binding. Projection
         // must not re-run SYSTEM_AUTO suitability and silently hide an
         // explicit USER_EXPLICIT/PINNED binding from public read models.

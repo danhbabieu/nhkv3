@@ -6,13 +6,14 @@ namespace NHK\Core\Infrastructure\Frontend;
 use NHK\Core\Application\Entity\{BrandDossierProjection, ClockTypeDossierProjection, EntityMediaProjection, PublicEntityEligibilityPolicy, PublicIdentityContract, PublicRouteResolver, SemanticDossierQuery};
 use NHK\Core\Application\Graph\{BrandAggregationQuery, ClockTypeDerivedRelationshipQuery, ClockTypeHierarchyProjection, GraphService, PredicateTraversalPolicy, RelatedSemanticQuery, StructuralContextQuery};
 use NHK\Core\Application\Knowledge\{EntityKnowledgeProjection, PublicResearchSourceDisplayPolicy};
-use NHK\Core\Application\Media\PublicMediaGalleryQuery;
+use NHK\Core\Application\Media\{PublicMediaGalleryQuery, SemanticSuitabilityPolicy};
 use NHK\Core\Domain\Authority\{AuthorityEntity, CanonicalEntityTypeCatalog, EntityTypeRegistry};
 use NHK\Core\Domain\Graph\{EndpointTypeRegistry, PredicateRegistry};
 use NHK\Core\Infrastructure\Authority\WpdbAuthorityRepository;
 use NHK\Core\Infrastructure\Graph\{CoreEndpointResolverRegistrar, WpdbAuditSink, WpdbGraphRepository};
 use NHK\Core\Infrastructure\Knowledge\{WpdbEvidenceRepository, WpdbKnowledgeRepository, WpdbSourceRepository};
 use NHK\Core\Infrastructure\Media\{WpdbMediaAssetRepository, WpdbMediaRepository, WpdbMediaUsageRepository};
+use NHK\Core\Infrastructure\Media\WpdbArticleMediaBlueprintRepository;
 use NHK\Core\Infrastructure\Video\WpdbVideoRepository;
 use NHK\Core\Shared\Migration\MigrationStatus;
 
@@ -47,7 +48,7 @@ final class EntityDossierBootstrap
         $routes = new PublicRouteResolver($authority, $types, $contexts);
         $eligibility = new PublicEntityEligibilityPolicy($authority, $types, $routes, $contexts);
         $brandAggregation = new BrandAggregationQuery($graph, $authority, $types, $routes, $eligibility);
-        $entityMedia = new EntityMediaProjection($media, $assets, $usages);
+        $entityMedia = new EntityMediaProjection($media, $assets, $usages, new SemanticSuitabilityPolicy(), new WpdbArticleMediaBlueprintRepository($wpdb));
         $entityKnowledge = new EntityKnowledgeProjection($claims, $evidence, $sources, new MigrationStatus(), new PublicResearchSourceDisplayPolicy());
         $relations = new RelatedSemanticQuery($graph, new PredicateTraversalPolicy($predicates));
         $dossier = new SemanticDossierQuery(
