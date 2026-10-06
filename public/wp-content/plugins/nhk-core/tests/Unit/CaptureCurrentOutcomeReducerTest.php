@@ -10,6 +10,16 @@ use PHPUnit\Framework\TestCase;
 
 final class CaptureCurrentOutcomeReducerTest extends TestCase
 {
+    public function test_reconciliation_does_not_invent_failure_record_for_completion_only_blocker(): void
+    {
+        $diagnostics = ['completion' => ['status' => 'PARTIAL', 'blockers' => ['OWNER_PUBLICATION_REQUIRED']]];
+
+        $reconciled = CaptureCurrentOutcomeReducer::reconcileDiagnostics($diagnostics, []);
+
+        self::assertArrayNotHasKey('failure', $reconciled);
+        self::assertSame(['OWNER_PUBLICATION_REQUIRED'], $reconciled['completion']['blockers']);
+    }
+
     public function test_failed_retryable_x_then_success_makes_x_historical_only(): void
     {
         $receipts = CapturePhaseReceiptReducer::append([], 'PHASE_X', [

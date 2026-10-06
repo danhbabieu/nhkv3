@@ -55,9 +55,11 @@ final class CaptureCurrentOutcomeReducer
         if ($current !== []) {
             $completion['blockers'] = $current;
             $diagnostics['completion'] = $completion;
-            $failure = is_array($diagnostics['failure'] ?? null) ? $diagnostics['failure'] : [];
-            $failure['code'] = $current[0];
-            $diagnostics['failure'] = $failure;
+            if (is_array($diagnostics['failure'] ?? null)) {
+                $failure = $diagnostics['failure'];
+                $failure['code'] = $current[0];
+                $diagnostics['failure'] = $failure;
+            }
         } else {
             $completion['blockers'] = [];
             $diagnostics['completion'] = $completion;
