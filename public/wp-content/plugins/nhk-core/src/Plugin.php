@@ -54,7 +54,7 @@ use NHK\Core\Infrastructure\Dictionary\DictionaryBootstrap;
 use NHK\Core\Infrastructure\Mcp\EasyMcpNativeFileCompatibilityAdapter;
 use NHK\Core\Infrastructure\Admin\AdminPage;
 use NHK\Core\Infrastructure\Admin\AdminShell;
-use NHK\Core\Infrastructure\Media\{WpdbMediaAssetRepository, WpdbMediaBindingOperationRepository, WpdbMediaRepository, WpdbMediaUsageRepository, WordPressImageSitemapProvider, WordPressMediaAttachmentBridge, WordPressMediaAttachmentIngestor, WordPressMediaAttachmentWriteGuard};
+use NHK\Core\Infrastructure\Media\{WpdbArticleMediaUsageInventory, WpdbMediaAssetRepository, WpdbMediaBindingOperationRepository, WpdbMediaRepository, WpdbMediaUsageRepository, WordPressImageSitemapProvider, WordPressMediaAttachmentBridge, WordPressMediaAttachmentIngestor, WordPressMediaAttachmentWriteGuard};
 use NHK\Core\Infrastructure\Video\WpdbVideoRepository;
 use NHK\Core\Infrastructure\PublicIdentity\WpdbPublicIdentityRepository;
 use NHK\Core\Application\PublicIdentity\HistoricPublicRouteService;
@@ -73,7 +73,7 @@ use NHK\Core\Infrastructure\Graph\{CoreEndpointResolverRegistrar, GraphClockType
 use NHK\Core\Infrastructure\Governance\WpdbDependencyRepository;
 use NHK\Core\Infrastructure\Governance\GovernanceRuntimeFactory;
 use NHK\Core\Application\Entity\{ComparisonPageQuery, EntityMediaProjection, EntityPageQuery, EntityProfileAdminProjection, PublicEndpointEligibilityResolver, PublicEntityCollectionQuery, PublicEntityEligibilityPolicy, PublicIdentityContract, PublicRouteResolver, RelatedContentQuery};
-use NHK\Core\Application\Media\{ArticleMediaCoordinator, ArticleMediaSeoProjection, MediaEnrichmentFinalReadbackPolicy, MediaIngestGateway, MediaService, MediaVideoPageQuery, PublicMediaAssetDelivery, PublicMediaArticleLinkResolver, PublicMediaGalleryQuery, SemanticSuitabilityPolicy, VisualOpportunityDetector, VisualSupportRequirementService};
+use NHK\Core\Application\Media\{ArticleMediaCandidateSelector, ArticleMediaCoordinator, ArticleMediaLegacyAudit, ArticleMediaSeoProjection, MediaEnrichmentFinalReadbackPolicy, MediaIngestGateway, MediaService, MediaVideoPageQuery, PublicMediaAssetDelivery, PublicMediaArticleLinkResolver, PublicMediaGalleryQuery, SemanticSuitabilityPolicy, VisualOpportunityDetector, VisualSupportRequirementService};
 use NHK\Core\Application\Media\MediaEnrichmentExactReadbackService;
 use NHK\Core\Application\Video\{VideoCompletenessPolicy, VideoEditorialAdapter, VideoEditorialGenerator, VideoHubClassifier, VideoIntakeService, VideoInternalSemanticResearcher, VideoKnowledgeEnrichmentPlanner, VideoRelationCandidatePlanner, VideoSeoProjection, VideoService, VideoSourceRefreshCommand, YouTubeDataApiClient, YouTubeSourceAdapter};
 use NHK\Core\Application\Home\HomeSemanticQuery;
@@ -259,6 +259,8 @@ final class Plugin {
             $articleCaptureSubjectBinding = $captureRepository !== null ? new CaptureSubjectBindingRecovery($captureRepository) : null;
             $articleMedia = new ArticleMediaCoordinator($publicMediaService, $publicMedia, $publicAssets, $publicUsages, new \NHK\Core\Infrastructure\Media\WpdbArticleMediaBlueprintRepository($wpdb), null, $attachmentBridge);
             $articleSeo = new ArticleMediaSeoProjection($publicMedia, $publicAssets, $publicUsages, $attachmentBridge, null, new \NHK\Core\Infrastructure\Media\WpdbArticleMediaBlueprintRepository($wpdb));
+            $articleLegacyAudit = new ArticleMediaLegacyAudit(new WpdbArticleMediaUsageInventory($wpdb), $publicMedia, $publicAssets, $publicUsages, new \NHK\Core\Infrastructure\Media\WpdbArticleMediaBlueprintRepository($wpdb), new ArticleMediaCandidateSelector($publicMedia, $publicAssets, $publicUsages, new SemanticSuitabilityPolicy()), new SemanticSuitabilityPolicy());
+            add_filter('nhk_v3_article_media_legacy_audit', static function (array $value, string $cursor = '', int $limit = 100) use ($articleLegacyAudit): array { return $articleLegacyAudit->audit($cursor, $limit); }, 10, 3);
             add_filter('nhk_v3_article_media_seo', static function (array $value, int $postId) use ($articleSeo): array { return $articleSeo->forPost((string) get_current_blog_id() . ':' . $postId); }, 10, 2);
             add_action('wp_sitemaps_init', static function (object $sitemaps) use ($articleSeo): void {
                 if (isset($sitemaps->registry) && is_object($sitemaps->registry) && method_exists($sitemaps->registry, 'add_provider')) $sitemaps->registry->add_provider('images', new WordPressImageSitemapProvider($articleSeo));
