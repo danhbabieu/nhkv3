@@ -3,12 +3,12 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Mcp;
 
-use NHK\Core\Application\Media\{ArticleMediaLegacyAudit, ArticleMediaLegacyRepairPlan};
+use NHK\Core\Application\Media\{ArticleMediaLegacyAudit, ArticleMediaLegacyRepairPlan, ArticleMediaSubjectReverseReconciliation};
 
 /** MCP adapter for bounded Article Media audit and zero-mutation repair preview. */
 final class ArticleMediaLegacyAuditHandler
 {
-    public function __construct(private ArticleMediaLegacyAudit $audit, private ArticleMediaLegacyRepairPlan $repairPlan) {}
+    public function __construct(private ArticleMediaLegacyAudit $audit, private ArticleMediaLegacyRepairPlan $repairPlan, private ?ArticleMediaSubjectReverseReconciliation $subjectReconciliation = null) {}
 
     /** @return array<string,mixed> */
     public function audit(array $input): array
@@ -37,5 +37,19 @@ final class ArticleMediaLegacyAuditHandler
     public function repairPlan(array $input): array
     {
         return $this->repairPlan->preview($input);
+    }
+
+    /** @return array<string,mixed> */
+    public function subjectAudit(array $input): array
+    {
+        if (!$this->subjectReconciliation instanceof ArticleMediaSubjectReverseReconciliation) throw new \RuntimeException('ARTICLE_MEDIA_SUBJECT_RECONCILIATION_UNAVAILABLE');
+        return $this->subjectReconciliation->preview((string) ($input['endpoint_type'] ?? 'wp_post'), (string) ($input['endpoint_key'] ?? ''));
+    }
+
+    /** @return array<string,mixed> */
+    public function subjectPlan(array $input): array
+    {
+        if (!$this->subjectReconciliation instanceof ArticleMediaSubjectReverseReconciliation) throw new \RuntimeException('ARTICLE_MEDIA_SUBJECT_RECONCILIATION_UNAVAILABLE');
+        return $this->subjectReconciliation->plan((string) ($input['endpoint_type'] ?? 'wp_post'), (string) ($input['endpoint_key'] ?? ''));
     }
 }

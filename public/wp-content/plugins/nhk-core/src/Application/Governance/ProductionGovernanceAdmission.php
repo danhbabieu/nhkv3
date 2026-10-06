@@ -42,6 +42,7 @@ final class ProductionGovernanceAdmission implements StagingGuard
         $capabilities = ['nhk_apply_proposals'];
         if ($proposal->entityType === 'video' && $proposal->operation === 'source_refresh') $capabilities[] = 'nhk_create_proposals';
         if ($proposal->entityType === 'media' && in_array($proposal->operation, ['representative_bind', 'add', 'replace', 'remove'], true)) $capabilities[] = 'nhk_internal_content_operations';
+        if ($proposal->entityType === 'wp_post' && $proposal->operation === 'subject_bind') $capabilities[] = 'nhk_internal_content_operations';
         return $capabilities;
     }
 }

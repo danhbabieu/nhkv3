@@ -71,6 +71,25 @@ or inline usage is rejected rather than silently replaced by another image.
 No eligible Media is a readiness/incomplete outcome; it is not a blueprint
 corruption error and must not be reported as infrastructure retryable failure.
 
+## Article Media subject reverse reconciliation — 2026-10-06
+
+Graph subject identity and the Article Media subject binding are separate
+persisted concerns. The canonical ACTIVE Graph relation
+`wp_post:<blog_id>:<post_id> --about--> <Authority subject>` is the only source
+that may supply an Article Media subject binding. A bounded reverse-reconcile
+preview may copy the validated Authority type, canonical UUID, Authority
+revision, Graph relation revision and dependency fingerprint into the existing
+Article Media blueprint; it never derives identity from the Post title/body,
+slug, Media filename/title or keyword similarity.
+
+Exactly one valid ACTIVE `about` target is required. No target is
+`MISSING_SUBJECT_BINDING`; multiple targets, an inactive/unresolvable target or
+stale dependencies are review/blocked outcomes with no mutation. Persistence
+uses the existing Proposal → Approval → Eligibility → Controlled Apply path and
+blueprint CAS. The legacy Article Media audit consumes only the persisted
+binding, then applies the shared EXACT/registered-COMPATIBLE suitability policy;
+it never synthesizes a subject or automatically accepts a sibling/domain Media.
+
 
 Media là semantic entity độc lập. Media identity tách khỏi MediaAsset và
 MediaUsage: cùng một binary có thể dùng cho nhiều Post, entity, gallery Model,

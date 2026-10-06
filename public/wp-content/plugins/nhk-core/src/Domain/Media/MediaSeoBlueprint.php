@@ -76,6 +76,27 @@ final readonly class MediaSeoBlueprint
         ];
     }
 
+    /** @param array<string,mixed> $subjectContext */
+    public function withSubjectContext(array $subjectContext): self
+    {
+        return new self(
+            $this->postId,
+            $this->slot,
+            $subjectContext,
+            $this->preferredView,
+            $this->keywordGroups,
+            $this->plannedTitle,
+            $this->plannedFilenameStem,
+            $this->plannedAltIntent,
+            $this->preferredAspect,
+            $this->minimumWidth,
+            $this->minimumHeight,
+            $this->focalPointExpected,
+            $this->state,
+            $this->revision + 1,
+        );
+    }
+
     private static function slug(string $value): string
     {
         $value = function_exists('remove_accents') ? remove_accents($value) : (iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $value) ?: $value);

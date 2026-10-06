@@ -77,6 +77,14 @@ final class McpToolCatalog
                     'subject_revision' => ['type' => 'string', 'maxLength' => 64],
                 ], 'required' => ['usage_id', 'endpoint_type', 'endpoint_key', 'fingerprint', 'dependency_fingerprint', 'expected_usage_revision', 'subject_id', 'subject_revision'], 'additionalProperties' => false],
             ], ['finding']),
+            self::tool('nhk.article.media-subject-reconciliation-audit', 'Read-only bounded reverse reconciliation preview. It reads exactly one ACTIVE Graph wp_post about relation and never infers Article subject identity from editorial text or Media metadata.', [
+                'endpoint_type' => ['type' => 'string', 'const' => 'wp_post'],
+                'endpoint_key' => ['type' => 'string', 'pattern' => '^[1-9][0-9]*:[1-9][0-9]*$'],
+            ], ['endpoint_type', 'endpoint_key']),
+            self::tool('nhk.article.media-subject-reconciliation-plan', 'Zero-mutation Article Media subject-binding plan. Emits an exact wp_post subject_bind Proposal packet only when one ACTIVE Graph about target, its Authority revision, Blueprint revisions and dependency fingerprint are valid.', [
+                'endpoint_type' => ['type' => 'string', 'const' => 'wp_post'],
+                'endpoint_key' => ['type' => 'string', 'pattern' => '^[1-9][0-9]*:[1-9][0-9]*$'],
+            ], ['endpoint_type', 'endpoint_key']),
             self::tool('nhk.knowledge.writer.preview', 'NHK Knowledge Writer read-only preview: enriches the request through Universal Enrichment before drafting a reader-facing response from resolved canonical subjects and eligible existing Knowledge; it does not publish or mutate canonical data.', [
                 'subject' => ['type' => 'object', 'properties' => [
                     'type' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 64],

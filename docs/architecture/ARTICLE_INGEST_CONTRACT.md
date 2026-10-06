@@ -117,6 +117,24 @@ the owner of the Graph relation.
    entry point or a completed V3 knowledge Article workflow without these
    stages.
 
+## Article Media subject identity boundary
+
+The Graph relation and Article Media subject binding are distinct persisted
+records. Graph owns the canonical semantic relation; the Article Media
+blueprint owns the contextual binding consumed by MediaUsage audit and repair
+planning. A bounded reverse-reconciliation read/plan may copy identity only
+from one validated ACTIVE Graph `wp_post --about--> Authority` edge, including
+the Authority revision, Graph revision and dependency fingerprint. It must not
+use Article text, title, slug, Media metadata or keyword similarity as a
+substitute for that edge.
+
+Zero valid targets remains `MISSING_SUBJECT_BINDING`; multiple targets or an
+inactive, stale or unresolvable target fails closed. A durable binding is
+written only through the existing Governance Proposal/Approval/Eligibility/
+Controlled Apply/read-back lifecycle with expected revisions and CAS. The
+legacy audit re-reads this persisted binding before exposing any replacement
+evidence, and explicit/pinned MediaUsage is never changed by system repair.
+
 ## Completion and failure
 
 A completion claim requires success of every required editorial, semantic,

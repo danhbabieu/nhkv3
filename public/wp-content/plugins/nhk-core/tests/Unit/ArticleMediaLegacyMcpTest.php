@@ -41,6 +41,20 @@ final class ArticleMediaLegacyMcpTest extends TestCase
         self::assertContains('nhk.article.media-legacy-repair-plan', $names);
     }
 
+    public function test_subject_reverse_reconciliation_exposes_only_bounded_read_and_plan_tools(): void
+    {
+        foreach (['nhk.article.media-subject-reconciliation-audit', 'nhk.article.media-subject-reconciliation-plan'] as $name) {
+            $tool = array_values(array_filter(McpToolCatalog::tools(), static fn (array $tool): bool => $tool['name'] === $name))[0] ?? null;
+            self::assertIsArray($tool);
+            self::assertSame('read', $tool['kind']);
+            self::assertFalse($tool['governed']);
+            self::assertSame('internal_admin_only', $tool['surface']);
+            self::assertTrue(McpDispatchRegistry::hasHandler($name));
+            self::assertSame(['endpoint_type', 'endpoint_key'], $tool['inputSchema']['required']);
+            self::assertSame('^[1-9][0-9]*:[1-9][0-9]*$', $tool['inputSchema']['properties']['endpoint_key']['pattern']);
+        }
+    }
+
     public function test_audit_transport_returns_bounded_envelope_without_writes(): void
     {
         [$audit, $media, $assets, $usages, $blueprints, $service] = $this->fixture();

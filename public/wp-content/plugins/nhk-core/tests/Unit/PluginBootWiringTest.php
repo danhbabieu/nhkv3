@@ -123,7 +123,7 @@ final class PluginBootWiringTest extends TestCase
 
         self::assertSame(1, substr_count($plugin, '$articleLegacyAudit = new ArticleMediaLegacyAudit('));
         self::assertStringContainsString(
-            '$articleMediaLegacyAuditHandler = new ArticleMediaLegacyAuditHandler($articleLegacyAudit, new ArticleMediaLegacyRepairPlan($articleLegacyAudit, $publicUsages));',
+            '$articleMediaLegacyAuditHandler = new ArticleMediaLegacyAuditHandler($articleLegacyAudit, new ArticleMediaLegacyRepairPlan($articleLegacyAudit, $publicUsages), $governanceRuntime->articleMediaSubjectBinding);',
             $plugin,
         );
     }

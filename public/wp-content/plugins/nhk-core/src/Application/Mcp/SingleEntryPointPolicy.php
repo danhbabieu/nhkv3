@@ -43,6 +43,8 @@ final class SingleEntryPointPolicy
         'nhk.knowledge.quality-audit',
         'nhk.article.media-legacy-audit',
         'nhk.article.media-legacy-repair-plan',
+        'nhk.article.media-subject-reconciliation-audit',
+        'nhk.article.media-subject-reconciliation-plan',
         'nhk.dictionary.seed-audit',
         'nhk.dictionary.enrichment.audit',
         'nhk.dictionary.enrichment.plan',

@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Infrastructure\Governance;
 
 use NHK\Core\Application\Governance\{ControlledApplyService, GovernanceService, ProposalEligibilityService};
-use NHK\Core\Application\Media\MediaBindingService;
+use NHK\Core\Application\Media\{ArticleMediaSubjectReverseReconciliation, MediaBindingService};
 use NHK\Core\Application\Governance\StagingAcceptanceScopeVerifier;
 use NHK\Core\Application\Video\VideoProposalReconciliationService;
 use NHK\Core\Contracts\Governance\ProposalRepository;
@@ -20,5 +20,6 @@ final class GovernanceRuntime
         public readonly array $automationTypes = [],
         public readonly ?MediaBindingService $mediaBinding = null,
         public readonly ?StagingAcceptanceScopeVerifier $stagingScopeVerifier = null,
+        public readonly ?ArticleMediaSubjectReverseReconciliation $articleMediaSubjectBinding = null,
     ) {}
 }

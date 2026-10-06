@@ -3,10 +3,10 @@ declare(strict_types=1);
 
 namespace NHK\Core\Infrastructure\Media;
 
-use NHK\Core\Contracts\Media\ArticleMediaBlueprintRepository;
+use NHK\Core\Contracts\Media\ArticleMediaBlueprintCasRepository;
 use NHK\Core\Domain\Media\MediaSeoBlueprint;
 
-final class WpdbArticleMediaBlueprintRepository implements ArticleMediaBlueprintRepository
+final class WpdbArticleMediaBlueprintRepository implements ArticleMediaBlueprintCasRepository
 {
     private string $table;
 
@@ -29,6 +29,24 @@ final class WpdbArticleMediaBlueprintRepository implements ArticleMediaBlueprint
         $ok = $this->database->query($this->database->prepare("INSERT INTO {$this->table} (post_id,slot,state,blueprint_json,revision,created_at,updated_at) VALUES (%d,%s,%s,%s,%d,%s,%s) ON DUPLICATE KEY UPDATE state=VALUES(state),blueprint_json=VALUES(blueprint_json),revision=revision+1,updated_at=VALUES(updated_at)", $blueprint->postId, $blueprint->slot, $blueprint->state, $json, $blueprint->revision, gmdate('Y-m-d H:i:s.u'), gmdate('Y-m-d H:i:s.u')));
         if ($ok === false) throw new \RuntimeException('ARTICLE_MEDIA_BLUEPRINT_SAVE_FAILED');
         return $this->findByPostAndSlot($blueprint->postId, $blueprint->slot) ?? $blueprint;
+    }
+
+    public function saveExpected(MediaSeoBlueprint $blueprint, int $expectedRevision): MediaSeoBlueprint
+    {
+        if ($expectedRevision < 1 || $blueprint->revision !== $expectedRevision + 1) throw new \RuntimeException('ARTICLE_MEDIA_BLUEPRINT_REVISION_BINDING_INVALID');
+        $json = wp_json_encode($blueprint->toArray(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $ok = $this->database->query($this->database->prepare(
+            "UPDATE {$this->table} SET state=%s,blueprint_json=%s,revision=%d,updated_at=%s WHERE post_id=%d AND slot=%s AND revision=%d",
+            $blueprint->state,
+            $json,
+            $blueprint->revision,
+            gmdate('Y-m-d H:i:s.u'),
+            $blueprint->postId,
+            $blueprint->slot,
+            $expectedRevision,
+        ));
+        if ($ok !== 1) throw new \RuntimeException('ARTICLE_MEDIA_BLUEPRINT_REVISION_CONFLICT');
+        return $this->findByPostAndSlot($blueprint->postId, $blueprint->slot) ?? throw new \RuntimeException('ARTICLE_MEDIA_BLUEPRINT_READBACK_UNAVAILABLE');
     }
 
     public function listByPost(int $postId): array

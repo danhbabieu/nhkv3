@@ -2054,7 +2054,7 @@ final class Plugin {
                 new EditorialQualityGate(),
             );
             $knowledgeQualityAuditHandler = new \NHK\Core\Application\Mcp\KnowledgeQualityAuditHandler($knowledgeQualityAudit);
-            $articleMediaLegacyAuditHandler = new ArticleMediaLegacyAuditHandler($articleLegacyAudit, new ArticleMediaLegacyRepairPlan($articleLegacyAudit, $publicUsages));
+            $articleMediaLegacyAuditHandler = new ArticleMediaLegacyAuditHandler($articleLegacyAudit, new ArticleMediaLegacyRepairPlan($articleLegacyAudit, $publicUsages), $governanceRuntime->articleMediaSubjectBinding);
             $semanticRelationGovernance = null;
             $lexicalRelationGovernance = null;
             if ($dictionaryRuntime !== null) {

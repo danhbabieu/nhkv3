@@ -93,6 +93,8 @@ final class McpContractTest extends TestCase
             'nhk.article.preflight',
             'nhk.article.media-legacy-audit',
             'nhk.article.media-legacy-repair-plan',
+            'nhk.article.media-subject-reconciliation-audit',
+            'nhk.article.media-subject-reconciliation-plan',
             'nhk.knowledge.writer.preview',
             'nhk.knowledge.quality-audit',
             'nhk.dictionary.seed-audit',

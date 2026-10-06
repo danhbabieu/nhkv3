@@ -8,7 +8,7 @@ use NHK\Core\Application\Collector\CollectorFacetMaintenanceExecutor;
 use NHK\Core\Application\Governance\{AuthorityProposalExecutor, CanonicalApplyReadBackVerifier, ControlledApplyService, GovernanceAutomationPolicyRegistry, GovernanceAutomationPolicyResolver, GovernanceAutomationTypeRegistry, GovernanceService, MediaBindingStagingGuard, OperationScopedStagingGuard, ProposalEligibilityService, StagingAcceptanceScopeVerifier, VideoProposalEligibilityEvaluator, WordPressGovernanceAuthorizer};
 use NHK\Core\Application\Graph\{ClassifiedAsPolicy, ClassificationHierarchyPolicy, GraphService};
 use NHK\Core\Application\Knowledge\{CanonicalDependencyValidator, KnowledgeService};
-use NHK\Core\Application\Media\{MediaBindingService, MediaIngestGateway, MediaOwnerCapabilityRegistry, MediaService, MediaTargetNormalizer};
+use NHK\Core\Application\Media\{ArticleMediaSubjectReverseReconciliation, MediaBindingService, MediaIngestGateway, MediaOwnerCapabilityRegistry, MediaService, MediaTargetNormalizer};
 use NHK\Core\Application\Video\{HistoricalVideoRelationEvidenceReconciliation, VideoCompletenessPolicy, VideoService};
 use NHK\Core\Application\Semantic\{CanonicalAuthoritySubjectResolver, SubjectResolutionService};
 use NHK\Core\Contracts\Governance\ProposalRepository;
@@ -20,7 +20,7 @@ use NHK\Core\Infrastructure\Database\WpdbTransactionManager;
 use NHK\Core\Infrastructure\Graph\{CoreEndpointResolverRegistrar, SemanticMergeGraphAdapter, WpdbAuditSink as GraphAuditSink, WpdbGraphRepository};
 use NHK\Core\Infrastructure\Governance\WpdbAuditSink as GovernanceAuditSink;
 use NHK\Core\Infrastructure\Knowledge\{WpdbEvidenceRepository, WpdbKnowledgeRepository, WpdbSourceRepository};
-use NHK\Core\Infrastructure\Media\{WpdbMediaAssetRepository, WpdbMediaRepository, WpdbMediaUsageRepository, WordPressAttachmentUrlResolver, WordPressMediaAttachmentBridge};
+use NHK\Core\Infrastructure\Media\{WpdbArticleMediaBlueprintRepository, WpdbMediaAssetRepository, WpdbMediaRepository, WpdbMediaUsageRepository, WordPressAttachmentUrlResolver, WordPressMediaAttachmentBridge};
 use NHK\Core\Infrastructure\Video\WpdbVideoRepository;
 use NHK\Core\Infrastructure\Capture\WpdbCaptureRepository;
 use NHK\Core\Application\PublicIdentity\PublicIdentityService;
@@ -93,7 +93,16 @@ final class GovernanceRuntimeFactory
         }, new WpdbSemanticMergeReceiptRepository($wpdb));
         $dependencyValidator = new CanonicalDependencyValidator($claims, $sources, $evidence);
         $videoCompleteness = new \NHK\Core\Application\Video\VideoCompletenessReconciliationService($videos, $graphService, $dependencyValidator, new VideoCompletenessPolicy());
-        $canonicalReadBack = new CanonicalApplyReadBackVerifier(static function (string $entityType, string $id) use ($authority, $media, $videos, $claims, $sources, $evidence, $graphRepository): ?array {
+        $wpPostResolver = $endpoints->resolver('wp_post');
+        $articleMediaSubjectBinding = new ArticleMediaSubjectReverseReconciliation(
+            $graphService,
+            $authority,
+            new WpdbArticleMediaBlueprintRepository($wpdb),
+            static function (NodeReference $reference) use ($wpPostResolver): ?int {
+                return $wpPostResolver instanceof \NHK\Core\Contracts\Graph\EndpointRevisionReader ? $wpPostResolver->revision($reference) : null;
+            },
+        );
+        $canonicalReadBack = new CanonicalApplyReadBackVerifier(static function (string $entityType, string $id) use ($authority, $media, $videos, $claims, $sources, $evidence, $graphRepository, $wpdb): ?array {
             $record = match ($entityType) {
                 'knowledge' => $claims->findByCanonicalId($id),
                 'source' => $sources->findByCanonicalId($id),
@@ -101,6 +110,19 @@ final class GovernanceRuntimeFactory
                 'video' => $videos->findByCanonicalId($id),
                 'media' => $media->findByCanonicalId($id),
                 'relation' => $graphRepository->findByUuid($id),
+                'wp_post' => (function () use ($id, $wpdb): ?object {
+                    if (!preg_match('/^[1-9][0-9]*:([1-9][0-9]*)$/', $id, $match)) return null;
+                    $post = function_exists('get_post') ? get_post((int) $match[1]) : null;
+                    if (!is_object($post)) return null;
+                    $blueprints = (new WpdbArticleMediaBlueprintRepository($wpdb))->listByPost((int) $match[1]);
+                    $bindings = [];
+                    foreach ($blueprints as $blueprint) {
+                        if (is_array($blueprint->subjectContext['subject_binding'] ?? null)) {
+                            $bindings[] = ['post_id' => $blueprint->postId, 'slot' => $blueprint->slot, 'binding_revision' => $blueprint->revision, 'subject_binding' => $blueprint->subjectContext['subject_binding']];
+                        }
+                    }
+                    return (object) ['canonicalId' => $id, 'revision' => max(1, (int) (strtotime((string) ($post->post_modified_gmt ?? '')) ?: 1)), 'active' => (string) ($post->post_status ?? '') !== 'trash', 'article_media_subject_bindings' => $bindings];
+                })(),
                 default => $authority->findByCanonicalId($id),
             };
             if ($record === null) return null;
@@ -201,7 +223,7 @@ final class GovernanceRuntimeFactory
             $proposalRepository,
             $applyAttempts = new WpdbApplyAttemptRepository($wpdb),
             $transactionManager,
-            new AuthorityProposalExecutor($authorityService, $graphService, $mediaService, new VideoService($videos), $knowledgeService, new MediaIngestGateway($mediaService, $attachmentBridge), $merge, dependencies: $dependencyValidator, completeness: new VideoCompletenessPolicy(), relationProposals: $proposalRepository, historicalEvidence: $historicalEvidence, collectorFacetExecutor: $collectorExecutor, videoCompletenessReconciliation: $videoCompleteness, classifiedAs: $classifiedAsPolicy, mediaBinding: $mediaBinding, mediaProjection: $attachmentBridge),
+            new AuthorityProposalExecutor($authorityService, $graphService, $mediaService, new VideoService($videos), $knowledgeService, new MediaIngestGateway($mediaService, $attachmentBridge), $merge, dependencies: $dependencyValidator, completeness: new VideoCompletenessPolicy(), relationProposals: $proposalRepository, historicalEvidence: $historicalEvidence, collectorFacetExecutor: $collectorExecutor, videoCompletenessReconciliation: $videoCompleteness, classifiedAs: $classifiedAsPolicy, mediaBinding: $mediaBinding, mediaProjection: $attachmentBridge, articleMediaSubjectBinding: $articleMediaSubjectBinding),
             $governanceAudit,
             $eligibility,
             new NoOpApplyExecutionHook(),
@@ -235,6 +257,6 @@ final class GovernanceRuntimeFactory
             static function (string $proposalId) use ($applyAttempts): bool { return $applyAttempts->findSuccessful($proposalId) !== null; },
         );
 
-        return new GovernanceRuntime($proposalRepository, $governance, $eligibility, $controlledApply, $videoReconciliation, $automationTypes, $mediaBinding, $stagingScopeVerifier);
+        return new GovernanceRuntime($proposalRepository, $governance, $eligibility, $controlledApply, $videoReconciliation, $automationTypes, $mediaBinding, $stagingScopeVerifier, $articleMediaSubjectBinding);
     }
 }

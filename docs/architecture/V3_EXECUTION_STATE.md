@@ -1,5 +1,41 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-06 — Article Media subject reverse reconciliation
+
+ROOT_CAUSE: Historical Article MediaUsage audit correctly consumed persisted
+Article Media subject scope, but there was no bounded path to recover a missing
+scope from the already-canonical Article `about` relation. Text, slug and
+Media metadata are not semantic identity evidence and must remain unused.
+
+IMPLEMENTATION: Added read-only `nhk.article.media-subject-reconciliation-audit`
+and zero-mutation `...-plan` MCP abilities. They accept only one validated
+ACTIVE Graph `wp_post --about--> Authority` target, capture Authority/Graph
+revisions and a dependency fingerprint, and emit an exact governed
+`wp_post/subject_bind` Proposal packet. Controlled Apply now delegates that
+operation to a CAS-backed Article Media blueprint binding, with persisted
+subject type/UUID/revision, proposal identity, mutation result and canonical
+read-back. Legacy audit remains the consumer of persisted binding and then
+uses the shared EXACT/registered-COMPATIBLE eligibility policy.
+
+REGRESSION COVERAGE: Focused reverse-reconciliation, legacy audit, MCP and
+contract coverage passes 73 tests / 998 assertions. The 1:757-shaped fixture
+proves missing scope before reconciliation and Sonodo scope after governed
+binding without asserting eligibility for any particular Media row. Tests
+cover one/zero/multiple Graph targets, inactive targets, CAS and Authority
+revision drift, title-only non-selection and read-back fields.
+
+DATA_SAFETY: No repair apply, legacy MediaUsage mutation, staging/production
+mutation, deployment or push was performed. Existing user-explicit/pinned
+MediaUsage remains outside the reconciliation owner.
+
+VERIFICATION: Changed PHP files lint clean and `git diff --check` passes. The
+unit suite was rerun with PHP 512MB: 3,271 tests completed with 5 unrelated
+baseline failures and 1 pre-existing repository-test error. The full configured
+suite is environment-limited by unavailable WordPress/runtime prerequisites
+and the same unrelated baseline failures.
+
+STATUS: `ARTICLE_MEDIA_SUBJECT_REVERSE_RECONCILIATION_LOCAL / FOCUSED_GREEN / FULL_UNIT_BASELINE_LIMITED / NO_DATA_MUTATION / NO_DEPLOYMENT / COMMIT_PENDING`.
+
 # Checkpoint — 2026-10-06 — Plugin REST bootstrap dependency wiring regression fixed locally
 
 ROOT_CAUSE: The `rest_api_init` composition closure referenced the canonical

@@ -8,7 +8,7 @@ use NHK\Core\Application\Authority\SemanticMergeService;
 use NHK\Core\Application\Authority\SemanticRekeyMediaIsolation;
 use NHK\Core\Application\Graph\GraphService;
 use NHK\Core\Application\Graph\ClassifiedAsPolicy;
-use NHK\Core\Application\Media\{MediaBindingService, MediaIngestGateway, MediaService};
+use NHK\Core\Application\Media\{ArticleMediaSubjectBindingApplyResult, ArticleMediaSubjectReverseReconciliation, MediaBindingService, MediaIngestGateway, MediaService};
 use NHK\Core\Infrastructure\Media\WordPressMediaAttachmentBridge;
 use NHK\Core\Application\Video\{HistoricalVideoRelationEvidenceReconciliation, VideoCompletenessPolicy, VideoCompletenessReconciliationService, VideoService};
 use NHK\Core\Application\Knowledge\KnowledgeService;
@@ -24,12 +24,16 @@ use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim, Source};
 
 final class AuthorityProposalExecutor
 {
-    public function __construct(private AuthorityService $authority, private ?GraphService $graph = null, private ?MediaService $media = null, private ?VideoService $video = null, private ?KnowledgeService $knowledge = null, private ?MediaIngestGateway $mediaGateway = null, private ?SemanticMergeService $merge = null, private ?OperationCompatibility $operationCompatibility = null, private ?CanonicalDependencyValidator $dependencies = null, private ?VideoCompletenessPolicy $completeness = null, private ?ApprovedRelationProposalRepository $relationProposals = null, private ?HistoricalVideoRelationEvidenceReconciliation $historicalEvidence = null, private $collectorFacetExecutor = null, private ?VideoCompletenessReconciliationService $videoCompletenessReconciliation = null, private ?ClassifiedAsPolicy $classifiedAs = null, private ?MediaBindingService $mediaBinding = null, private ?WordPressMediaAttachmentBridge $mediaProjection = null) {}
+    public function __construct(private AuthorityService $authority, private ?GraphService $graph = null, private ?MediaService $media = null, private ?VideoService $video = null, private ?KnowledgeService $knowledge = null, private ?MediaIngestGateway $mediaGateway = null, private ?SemanticMergeService $merge = null, private ?OperationCompatibility $operationCompatibility = null, private ?CanonicalDependencyValidator $dependencies = null, private ?VideoCompletenessPolicy $completeness = null, private ?ApprovedRelationProposalRepository $relationProposals = null, private ?HistoricalVideoRelationEvidenceReconciliation $historicalEvidence = null, private $collectorFacetExecutor = null, private ?VideoCompletenessReconciliationService $videoCompletenessReconciliation = null, private ?ClassifiedAsPolicy $classifiedAs = null, private ?MediaBindingService $mediaBinding = null, private ?WordPressMediaAttachmentBridge $mediaProjection = null, private ?ArticleMediaSubjectReverseReconciliation $articleMediaSubjectBinding = null) {}
 
-    public function __invoke(Proposal $proposal): AuthorityEntity|GraphEdge|Media|Video|KnowledgeClaim|Source|Evidence|MediaRepresentativeApplyResult|MediaUsageApplyResult|\NHK\Core\Domain\Authority\SemanticMergeReceipt
+    public function __invoke(Proposal $proposal): AuthorityEntity|GraphEdge|Media|Video|KnowledgeClaim|Source|Evidence|MediaRepresentativeApplyResult|MediaUsageApplyResult|ArticleMediaSubjectBindingApplyResult|\NHK\Core\Domain\Authority\SemanticMergeReceipt
     {
         $compatibility = $this->operationCompatibility ?? new ControlledApplyOperationRegistry();
         if (!$compatibility->supports($proposal->entityType, $proposal->operation)) throw new OperationCompatibilityException('REGISTRY_GAP', 'Unsupported Controlled Apply combination: ' . $proposal->entityType . '+' . $proposal->operation);
+        if ($proposal->entityType === 'wp_post' && $proposal->operation === 'subject_bind') {
+            if (!$this->articleMediaSubjectBinding instanceof ArticleMediaSubjectReverseReconciliation) throw new \RuntimeException('ARTICLE_MEDIA_SUBJECT_BINDING_EXECUTOR_UNAVAILABLE');
+            return $this->articleMediaSubjectBinding->apply($proposal);
+        }
         if ($proposal->entityType === 'media' && $proposal->operation === 'ingest') {
             if (!$this->media) throw new \RuntimeException('Media executor is not configured.');
             $payload = $proposal->payload;

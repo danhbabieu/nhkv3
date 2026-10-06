@@ -75,6 +75,20 @@ and are normalized to the same explicit selection boundary. An explicit Media
 that is semantically incompatible is rejected or kept review-required; it is
 never silently replaced by historical Media.
 
+The bounded internal read surface also exposes
+`nhk.article.media-subject-reconciliation-audit` and
+`nhk.article.media-subject-reconciliation-plan`. These tools inspect an exact
+`wp_post` endpoint, accept only one validated ACTIVE Graph `about` target and
+never infer a subject from editorial or Media text. The plan is zero-mutation
+and emits the exact `nhk.proposal.create` `wp_post/subject_bind` packet with
+source/blueprint expected revisions and a dependency fingerprint. Actual
+persistence is only the existing Proposal → Approval → Eligibility →
+Controlled Apply → canonical read-back path; the read-back includes endpoint,
+Authority subject identity/revision, binding revision, dependency fingerprint,
+proposal identity and mutation result. The subsequent legacy audit consumes
+that persisted binding before evaluating shared EXACT or registered-COMPATIBLE
+Media eligibility.
+
 The standalone mutation tools for Media, Video, Knowledge, Source, Evidence,
 Article draft/update/publish, relation and proposal creation are retained only
 for internal/admin compatibility or lifecycle operations. The complete typed
