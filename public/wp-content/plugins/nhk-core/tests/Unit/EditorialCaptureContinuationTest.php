@@ -62,7 +62,7 @@ final class EditorialCaptureContinuationTest extends TestCase
         self::assertCount(1, array_values(array_filter($replayed['capture']['assets'], static fn (array $asset): bool => ($asset['kind'] ?? '') === 'video')));
     }
 
-    public function test_retry_resumes_original_capture_key_without_creating_addendum_or_replaying_physical_phases(): void
+    public function test_capture_retry_replay_keeps_same_capture_and_canonical_outputs(): void
     {
         $captures = new ContinuationCaptureRepository();
         $addenda = new ContinuationAddendumRepository();
@@ -107,6 +107,8 @@ final class EditorialCaptureContinuationTest extends TestCase
         self::assertSame($capture->captureId, $first['capture']['capture_id']);
         self::assertSame($capture->idempotencyKey, $first['capture']['idempotency_key']);
         self::assertSame($capture->captureId, $second['capture']['capture_id']);
+        self::assertSame($first['capture']['capture_id'], $second['capture']['capture_id']);
+        self::assertSame($first['capture']['idempotency_key'], $second['capture']['idempotency_key']);
         self::assertCount(0, $addenda->records);
         self::assertArrayNotHasKey('physical', $events);
         self::assertArrayNotHasKey('draft', $events);
@@ -116,7 +118,7 @@ final class EditorialCaptureContinuationTest extends TestCase
         self::assertSame($capture->idempotencyKey, $events['continuation_idempotency_key']);
     }
 
-    public function test_retry_requires_exact_original_key_and_rejects_new_editorial_payload(): void
+    public function test_capture_retry_rejects_changed_request_fingerprint(): void
     {
         $captures = new ContinuationCaptureRepository();
         $addenda = new ContinuationAddendumRepository();

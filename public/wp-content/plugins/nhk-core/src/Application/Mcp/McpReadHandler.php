@@ -92,6 +92,9 @@ final class McpReadHandler
             : (is_array($diagnostics['subject_resolution_packet'] ?? null) ? $diagnostics['subject_resolution_packet'] : null);
         $completion = is_array($diagnostics['completion'] ?? null) ? $diagnostics['completion'] : [];
         $completion = $this->reconcileCurrentCaptureCompletion($capture, $completion);
+        $projectionDiagnostics = $diagnostics;
+        $projectionDiagnostics['completion'] = $completion;
+        $completion['blockers'] = CaptureCurrentOutcomeReducer::currentBlockers($projectionDiagnostics, $capture->phaseReceipts);
         $preparation = is_array($diagnostics['content_preparation'] ?? null) ? $diagnostics['content_preparation'] : [];
         $review = null;
         if (strtoupper(trim((string) ($preparation['status'] ?? ''))) === 'REVIEW_REQUIRED') {

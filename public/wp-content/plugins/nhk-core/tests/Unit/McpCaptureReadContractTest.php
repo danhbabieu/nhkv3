@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Mcp\McpReadHandler;
+use NHK\Core\Application\Capture\CapturePhaseReceiptReducer;
 use NHK\Core\Contracts\Capture\CaptureRepository;
 use NHK\Core\Domain\Capture\CaptureRecord;
 use NHK\Core\Domain\Authority\EntityTypeRegistry;
@@ -17,6 +18,42 @@ use PHPUnit\Framework\TestCase;
 
 final class McpCaptureReadContractTest extends TestCase
 {
+    public function test_capture_read_hides_superseded_failure_from_current_blockers(): void
+    {
+        $id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+        $receipts = CapturePhaseReceiptReducer::append([], 'PHASE_X', [
+            'status' => 'FAILED', 'result' => 'FAILED_RETRYABLE', 'failure_code' => 'ERROR_X',
+        ]);
+        $receipts = CapturePhaseReceiptReducer::append($receipts, 'PHASE_X', [
+            'status' => 'COMPLETED', 'result' => 'RECOVERED',
+        ]);
+        $record = new CaptureRecord(
+            $id, 'capture-mcp-superseded', hash('sha256', 'capture-mcp-superseded'),
+            'SEMANTICS_RECONCILED', 'PARTIAL', null, null, [], [],
+            ['failure' => ['code' => 'ERROR_X'], 'completion' => ['status' => 'PARTIAL', 'blockers' => ['ERROR_X']]],
+            $receipts,
+        );
+        $captures = new class($record) implements CaptureRepository {
+            public function __construct(private CaptureRecord $record) {}
+            public function findByIdempotencyKey(string $key): ?CaptureRecord { return null; }
+            public function findById(string $captureId): ?CaptureRecord { return $captureId === $this->record->captureId ? $this->record : null; }
+            public function create(CaptureRecord $record): CaptureRecord { return $record; }
+            public function save(CaptureRecord $record): CaptureRecord { return $record; }
+        };
+        $read = new McpReadHandler(
+            $this->createMock(AuthorityRepository::class), new EntityTypeRegistry(),
+            $this->createMock(MediaRepository::class), $this->createMock(MediaAssetRepository::class), $this->createMock(MediaUsageRepository::class),
+            $this->createMock(VideoRepository::class), $this->createMock(KnowledgeRepository::class), $this->createMock(EvidenceRepository::class),
+            captures: $captures,
+        );
+
+        $projection = $read->captureGet($id);
+
+        self::assertNotContains('ERROR_X', $projection['blockers']);
+        self::assertSame('ERROR_X', $record->phaseReceipts['PHASE_X']['attempts'][0]['failure_code']);
+        self::assertSame('RECOVERED', $record->phaseReceipts['PHASE_X']['latest']['result']);
+    }
+
     public function test_capture_readback_reconciles_current_post_and_media_usage_over_stale_receipt(): void
     {
         $id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
