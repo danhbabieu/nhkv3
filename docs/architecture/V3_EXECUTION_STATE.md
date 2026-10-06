@@ -1,5 +1,44 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-06 — Dictionary pre-create resolution / reuse-before-create hardening
+
+ROOT_CAUSE: Dictionary Entry/Sense and reviewed candidate paths could allocate
+fresh UUIDs before resolving existing lexical Entry/Form/Sense state. Capture
+had no packet precondition for Dictionary creation, and duplicate evidence had
+no bounded read-only audit.
+
+IMPLEMENTATION: Added immutable `DictionaryPreCreateResolution` and the
+read-only `DictionaryPreCreateResolver`; wired direct Entry/Sense mutation,
+reviewed candidate curation, MCP reviewed outcomes, receipt replay binding and
+the optional WPDB transaction-time stale snapshot guard. Capture envelopes now
+bind Dictionary creation to the exact resolution action/fingerprint and
+dependency closure. Added `DictionaryDuplicateCandidateAudit` with a canonical
+bounded reader; it emits review-only findings and cannot repair, merge, retire,
+rekey or delete.
+
+CROSS_OWNER_AUDIT: `NO_PATCH_REQUIRED` for Authority (stable-key identity and
+collision handling), Knowledge/Source (stable-key identity), Evidence
+(citation equivalence remains owner-specific follow-up), Graph (canonical
+triple reuse/cardinality), Media/MediaUsage (canonical identity and usage
+reconciliation), Video (platform/external identity) and Article (native Post
+identity/idempotent ingest). No cross-owner fuzzy resolver or shared semantic
+owner was introduced.
+
+REGRESSION COVERAGE: Focused pre-create/Capture/duplicate-audit suite passes
+54 tests / 134 assertions. Task-level suites passed throughout Tasks 1–7.
+
+VERIFICATION: `composer lint` passes. `git diff --check` passes and the
+changed-file secret scan is clean. The default-memory full suite is limited by
+an existing 128MB fatal in `TrustedProvidedFileMaterializerTest`; the 512MB
+run completed with 33 existing integration/runtime errors and 28 unrelated unit
+failures, including missing `NHK_WP_TEST_PATH`/authorized runtime identity.
+
+DATA_SAFETY: No migration, live semantic mutation, production/staging mutation,
+repair/merge/retire/rekey/delete, frontend suppression or global normalized-form
+uniqueness constraint was added.
+
+STATUS: `DICTIONARY_PRECREATE_HARDENING_LOCAL / FOCUSED_GREEN / FULL_SUITE_ENVIRONMENT_LIMITED / NO_DATA_MUTATION / COMMIT_PENDING`
+
 # Checkpoint — 2026-10-06 — Universal Article media selection final verification
 
 ROOT_CAUSE: The Article media pipeline previously allowed technical ranking and
