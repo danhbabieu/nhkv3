@@ -23833,3 +23833,36 @@ deployment was performed.
 
 STATUS: `DICTIONARY_HUB_NUMERIC_INITIAL_FIXED_LOCALLY / FOCUSED_GREEN /
 FULL_SUITE_ENVIRONMENT_LIMITED / NO_DATA_MUTATION / PUSH_PENDING`.
+
+# Checkpoint — 2026-10-06 — Dictionary browse, rich detail and SEO presentation
+
+SCOPE: Implemented the approved Dictionary Phase 2+3 presentation slice in the
+theme and public route seam. The hub now consumes the canonical archive packet
+for exact totals, registered alphabet metadata, active/disabled initial states,
+search state and opaque cursor pagination. The detail template now renders the
+reader-safe lexical hero, forms, multiple senses, canonical owner link,
+registered semantic/facet groups, Knowledge, Media, Video, Articles, lexical
+relations and mention groups without exposing internal identifiers or raw
+operational payload fields.
+
+SEO_AND_SAFETY: Archive query, initial and cursor states retain the hub
+canonical URL and emit `noindex,follow`; standalone lexical entries continue
+to use the Dictionary SEO packet. Owner-backed lexical shells retain the
+contract-approved noindex behavior when they have independent lexical value;
+owner-only redirect behavior was not weakened. No semantic data, migration,
+legacy content, staging record or production record was mutated, and no
+deployment or push occurred.
+
+VERIFICATION: Focused Dictionary/frontend slice passes 47 tests / 213
+assertions. Composer PHP lint, changed-file PHP lint, `git diff --check` and
+scoped secret review pass. The default full suite is limited by the 128MB PHP
+ceiling in the unrelated TrustedProvidedFileMaterializer test. A 512MB rerun
+completed 3,529 tests / 19,950 assertions with 33 environment/infrastructure
+errors and 30 unrelated existing failures, including missing NHK_WP_TEST_PATH,
+unauthorized TEST RUNTIME identity and unrelated unit fixtures. Live browser
+acceptance was read-only against the documented baseline build before this
+local, undeployed change.
+
+STATUS: `DICTIONARY_BROWSE_AND_RICH_DETAIL_IMPLEMENTED_LOCALLY /
+FOCUSED_GREEN / FULL_SUITE_ENVIRONMENT_LIMITED / NO_DATA_MUTATION /
+NO_DEPLOYMENT / COMMIT_PENDING`.

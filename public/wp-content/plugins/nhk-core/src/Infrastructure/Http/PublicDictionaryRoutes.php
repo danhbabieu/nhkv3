@@ -44,7 +44,7 @@ final class PublicDictionaryRoutes
             $query = isset($_GET['q']) && is_string($_GET['q']) ? sanitize_text_field(wp_unslash($_GET['q'])) : '';
             $initial = isset($_GET['initial']) && is_string($_GET['initial']) ? sanitize_text_field(wp_unslash($_GET['initial'])) : '';
             $cursor = isset($_GET['cursor']) && is_string($_GET['cursor']) ? sanitize_text_field(wp_unslash($_GET['cursor'])) : null;
-            $packet = $this->query->archive(['query' => $query, 'initial' => $initial, 'page_size' => 500, 'cursor' => $cursor]);
+            $packet = $this->query->archive(['query' => $query, 'initial' => $initial, 'page_size' => 24, 'cursor' => $cursor]);
             if (!in_array(($packet['status'] ?? ''), ['AVAILABLE', 'EMPTY'], true)) {
                 $this->set404();
                 return get_404_template();
@@ -85,6 +85,10 @@ final class PublicDictionaryRoutes
         if ($mode === 'hub') {
             $canonical = $this->absolute('/tu-dien/');
             echo '<link rel="canonical" href="' . esc_url($canonical) . '" />' . "\n";
+            $query = isset($_GET['q']) && is_string($_GET['q']) ? sanitize_text_field(wp_unslash($_GET['q'])) : '';
+            $initial = isset($_GET['initial']) && is_string($_GET['initial']) ? sanitize_text_field(wp_unslash($_GET['initial'])) : '';
+            $cursor = isset($_GET['cursor']) && is_string($_GET['cursor']) ? sanitize_text_field(wp_unslash($_GET['cursor'])) : null;
+            if ($query !== '' || $initial !== '' || $cursor !== null) echo '<meta name="robots" content="noindex,follow" />' . "\n";
             $terms = [];
             foreach ((array) ($result['items'] ?? []) as $item) {
                 if (!is_array($item) || trim((string) ($item['url'] ?? '')) === '') continue;

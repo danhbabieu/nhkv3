@@ -47,10 +47,9 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString('template-parts/presentation/entity-card', $index);
         self::assertStringContainsString('representative', $search);
         self::assertStringContainsString('id="main-content"', $dictionary);
-        self::assertStringContainsString('array_keys($groups)', $dictionary);
+        self::assertStringContainsString("\$result['alphabet']", $dictionary);
         self::assertStringNotContainsString("range('A', 'Z')", $dictionary);
         self::assertStringContainsString('Từ điển đang được biên tập', $dictionary);
-        self::assertStringContainsString('nhk_v3_navigation_items', $dictionary);
     }
 
     public function test_dictionary_numeric_initial_groups_are_normalized_and_string_safe(): void
@@ -60,7 +59,23 @@ final class FrontendContractTest extends TestCase
         $dictionary = (string) file_get_contents($theme . '/dictionary.php');
 
         self::assertStringContainsString("if (preg_match('/^[0-9]$/', \$initial)) return '0–9';", $functions);
-        self::assertSame(2, substr_count($dictionary, 'nhk_v3_dictionary_anchor((string) $initial)'));
+        self::assertSame(1, substr_count($dictionary, 'nhk_v3_dictionary_anchor((string) $initial)'));
+    }
+
+    public function test_dictionary_hub_consumes_archive_totals_alphabet_metadata_and_cursor_pagination(): void
+    {
+        $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
+        $dictionary = (string) file_get_contents($theme . '/dictionary.php');
+        $routes = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/PublicDictionaryRoutes.php');
+
+        self::assertStringContainsString("\$pagination['total_count']", $dictionary);
+        self::assertStringContainsString("\$result['alphabet']", $dictionary);
+        self::assertStringContainsString("\$pagination['next_cursor']", $dictionary);
+        self::assertStringContainsString("'initial' =>", $dictionary);
+        self::assertStringContainsString("'cursor' =>", $dictionary);
+        self::assertStringContainsString("'page_size' => 24", $routes);
+        self::assertStringContainsString('aria-current="true"', $dictionary);
+        self::assertStringContainsString('aria-disabled="true"', $dictionary);
     }
 
     public function test_dictionary_detail_renders_contract_breadcrumb_and_reader_safe_sense_links(): void
@@ -69,10 +84,8 @@ final class FrontendContractTest extends TestCase
 
         self::assertStringContainsString('home_url(\'/tu-dien/\')); ?>">Từ điển</a>', $dictionary);
         self::assertStringContainsString("<?php echo esc_html((string) (\$result['item']['title'] ?? '')); ?>", $dictionary);
-        self::assertStringContainsString("if (trim((string) (\$value['url'] ?? '')) !== ''): ?><a href=\"<?php echo esc_url((string) \$value['url']); ?>\">", $dictionary);
-        self::assertStringContainsString("'semantic_relations' => 'Quan hệ kỹ thuật'", $dictionary);
-        self::assertStringContainsString("if (trim((string) (\$mention['url'] ?? '')) !== ''): ?><a href=\"<?php echo esc_url((string) \$mention['url']); ?>\">", $dictionary);
-        self::assertSame(1, substr_count($dictionary, 'echo esc_html((string) ($sense[\'description\'] ?? \'\'));'));
+        self::assertStringContainsString('Liên quan trực tiếp', $dictionary);
+        self::assertStringContainsString('Nội dung có nhắc đến', $dictionary);
     }
 
     public function test_dictionary_presentation_does_not_expose_internal_label_or_scope_keys(): void
@@ -81,9 +94,29 @@ final class FrontendContractTest extends TestCase
         $dictionary = (string) file_get_contents($theme . '/dictionary.php');
 
         self::assertStringContainsString('nhk_v3_dictionary_label_kind', $dictionary);
-        self::assertStringContainsString('nhk_v3_dictionary_scope_label', $dictionary);
         self::assertStringNotContainsString('echo esc_html((string) $label[\'kind\'])', $dictionary);
-        self::assertStringNotContainsString("implode(', ', array_map('strval'", $dictionary);
+    }
+
+    public function test_dictionary_detail_has_reader_safe_rich_lexical_sections_and_reusable_cards(): void
+    {
+        $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
+        $dictionary = (string) file_get_contents($theme . '/dictionary.php');
+        $style = (string) file_get_contents($theme . '/dictionary.css');
+
+        foreach ([
+            'Hồ sơ chính', 'Các nghĩa', 'Tri thức liên quan', 'Thương hiệu', 'Loại đồng hồ',
+            'Bộ máy', 'Âm nhạc', 'Quốc gia', 'Mẫu đồng hồ', 'Biến thể', 'Hiện vật', 'Linh kiện',
+            'Liên quan trực tiếp', 'Liên quan mở rộng', 'Bài viết liên quan', 'Nội dung có nhắc đến',
+            'Nhóm rộng hơn', 'Dạng cụ thể', 'Gần nghĩa', 'Cùng nhóm thuật ngữ', 'Thuật ngữ liên quan',
+            'template-parts/presentation/video-card', 'media-mosaic', 'figcaption',
+        ] as $term) self::assertStringContainsString($term, $dictionary, $term . ' missing from Dictionary detail');
+
+        foreach (['capture_id', 'provenance_class', 'publication_review', 'relation_backlog', 'research_sources', 'semantic_owner_status'] as $internal) {
+            self::assertStringNotContainsString("['{$internal}']", $dictionary);
+        }
+        self::assertStringContainsString('.dictionary-alphabet{', $style);
+        self::assertStringContainsString('.dictionary-related-grid{', $style);
+        self::assertStringContainsString('@media(max-width:48rem)', $style);
     }
 
     public function test_clock_type_frontend_is_profile_driven_and_uses_safe_archive_metadata(): void
@@ -631,6 +664,8 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString("'inDefinedTermSet'", $routes);
         self::assertStringContainsString('$senseDescriptions', $routes);
         self::assertStringContainsString("(\$seo['state'] ?? '') === 'REDIRECT'", $routes);
+        self::assertStringContainsString("\$query !== '' || \$initial !== '' || \$cursor !== null", $routes);
+        self::assertStringContainsString("noindex,follow", $routes);
     }
 
     public function test_public_related_and_external_links_fail_closed_when_url_is_missing(): void
