@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Tests\Unit;
 
-use NHK\Core\Application\Capture\{ContentPreparationOrchestrator, EditorialCaptureCoordinator};
+use NHK\Core\Application\Capture\{CaptureCurrentOutcomeReducer, CapturePhaseReceiptReducer, ContentPreparationOrchestrator, EditorialCaptureCoordinator};
 use NHK\Core\Application\Capture\ContentIntentRouter;
 use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, EditorialClaimRetrievalService, EditorialKnowledgeSelector, SharedEnrichmentBoundary, SubjectResolutionService, TextInputInterpreter};
 use NHK\Core\Contracts\Capture\{CaptureAddendumRepository, CaptureRepository};
@@ -18,6 +18,50 @@ use PHPUnit\Framework\TestCase;
  */
 final class EditorialCaptureConvergenceE2ETest extends TestCase
 {
+    public function test_retry_success_then_article_pre_create_review_does_not_reuse_historical_failure(): void
+    {
+        $captures = new Pr5CaptureRepository();
+        $calls = ['draft' => 0, 'semantic' => 0, 'media' => 0, 'publication' => 0, 'final' => 0];
+        $events = [];
+        $captureId = UuidCodec::newV7();
+        $idempotencyKey = 'retry-review-lifecycle';
+        $receipts = CapturePhaseReceiptReducer::append([], 'SEMANTICS_RECONCILED', [
+            'status' => 'FAILED', 'result' => 'FAILED_RETRYABLE', 'failure_code' => 'ERROR_X',
+        ]);
+        $capture = new CaptureRecord(
+            $captureId, $idempotencyKey, hash('sha256', $idempotencyKey), CaptureStage::SEMANTICS_RECONCILED->value,
+            'FAILED_RETRYABLE', null, null, [['kind' => 'image', 'client_file_id' => 'asset-1']],
+            ['raw_input' => 'Nội dung retry.', 'title' => 'Retry review'],
+            ['failure' => ['code' => 'ERROR_X'], 'completion' => ['status' => 'PARTIAL', 'blockers' => ['ERROR_X']]],
+            $receipts,
+        );
+        $captures->create($capture);
+        $coordinator = $this->coordinator(
+            $captures,
+            $calls,
+            $events,
+            semanticStatus: 'COMPLETED',
+            articlePreCreateResolver: static fn (): array => ['status' => 'REVIEW_REQUIRED', 'decision' => 'REVIEW_REQUIRED', 'diagnostics' => ['OWNER_REVIEW_REQUIRED']],
+            articlePreCreateRequired: true,
+        );
+
+        $result = $coordinator->retry($capture, [
+            'idempotency_key' => $idempotencyKey,
+            'intent' => 'TEXT_ARTICLE',
+            'text' => 'Nội dung retry.',
+            'title' => 'Retry review',
+        ]);
+
+        self::assertSame($captureId, $result->captureId);
+        self::assertSame('REVIEW_REQUIRED', $result->status);
+        self::assertSame('ERROR_X', $result->phaseReceipts['SEMANTICS_RECONCILED']['attempts'][0]['failure_code']);
+        self::assertArrayNotHasKey('failure_code', $result->phaseReceipts['ARTICLE_PRE_CREATE_REVIEW']['latest']);
+        self::assertContains('ERROR_X', array_column($result->diagnostics['failure_history'] ?? [], 'code'));
+        self::assertNotContains('ERROR_X', CaptureCurrentOutcomeReducer::currentBlockers($result->diagnostics, $result->phaseReceipts));
+        self::assertSame(1, $captures->count());
+        self::assertSame(0, $calls['draft']);
+    }
+
     public static function imageCounts(): iterable
     {
         yield 'one image' => [1];
@@ -1073,6 +1117,8 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
         ?callable $physical = null,
         ?SharedEnrichmentBoundary $shared = null,
         ?callable $sharedObserver = null,
+        ?callable $articlePreCreateResolver = null,
+        bool $articlePreCreateRequired = false,
     ): EditorialCaptureCoordinator {
         return new EditorialCaptureCoordinator(
             $captures,
@@ -1103,6 +1149,12 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
             null,
             $preparation,
             $shared,
+            null,
+            null,
+            null,
+            null,
+            $articlePreCreateResolver,
+            $articlePreCreateRequired,
         );
     }
 }
@@ -1123,4 +1175,6 @@ final class Pr5CaptureRepository implements CaptureRepository
     public function create(CaptureRecord $record): CaptureRecord { return $this->records[$record->idempotencyKey] ??= $record; }
 
     public function save(CaptureRecord $record): CaptureRecord { return $this->records[$record->idempotencyKey] = $record; }
+
+    public function count(): int { return count($this->records); }
 }

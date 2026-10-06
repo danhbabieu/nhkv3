@@ -497,7 +497,7 @@ final class EditorialCaptureCoordinator
             if (($preflightResolution['status'] ?? '') === 'conflict') {
                 $diagnostics['subjects'] = $preflightResolution;
                 $diagnostics['failure_code'] = 'SUBJECT_CONFLICT_REVIEW_REQUIRED';
-                return $this->save($record, CaptureStage::INTERPRETED, $assets, $diagnostics, $receipts, 'SUBJECT_CONFLICT_REVIEW_REQUIRED', $record->articleId, $record->articleStateToken, 'REVIEW_REQUIRED');
+                return $this->save($record, CaptureStage::INTERPRETED, $assets, $diagnostics, $receipts, 'SUBJECT_CONFLICT_REVIEW_REQUIRED', $record->articleId, $record->articleStateToken, 'REVIEW_REQUIRED', null, null, 'SUBJECT_CONFLICT_REVIEW_REQUIRED');
             }
             if (($preflightResolution['status'] ?? '') === 'resolved' && $this->subjectBinding !== null) {
                 $reconciliation = is_array($input['subject_reconciliation'] ?? null) ? $input['subject_reconciliation'] : [];
@@ -1165,7 +1165,7 @@ final class EditorialCaptureCoordinator
             );
             $diagnostics['completion'] = $partialCompletion;
             $diagnostics['resume_hints'] = $partialCompletion['resume_hints'] ?? ['resume_children' => []];
-            return $this->save($record, $record->stage, $assets, $diagnostics, $receipts, $this->activeReceiptPhase ?? $status, $record->articleId, $record->articleStateToken, $status);
+            return $this->save($record, $record->stage, $assets, $diagnostics, $receipts, $this->activeReceiptPhase ?? $status, $record->articleId, $record->articleStateToken, $status, null, null, $failureCode);
         }
     }
 
@@ -1731,7 +1731,7 @@ final class EditorialCaptureCoordinator
     }
 
     /** @param list<array<string,mixed>> $assets @param array<string,mixed> $diagnostics @param array<string,mixed> $receipts */
-    private function save(CaptureRecord $record, CaptureStage|string $stage, array $assets, array $diagnostics, array $receipts, string $receiptStage, ?int $articleId = null, ?string $token = null, string $status = 'IN_PROGRESS', ?string $receiptResult = null, ?array $context = null): CaptureRecord
+    private function save(CaptureRecord $record, CaptureStage|string $stage, array $assets, array $diagnostics, array $receipts, string $receiptStage, ?int $articleId = null, ?string $token = null, string $status = 'IN_PROGRESS', ?string $receiptResult = null, ?array $context = null, ?string $currentFailureCode = null): CaptureRecord
     {
         // Callers carry a local receipt snapshot through the phase pipeline;
         // the persisted record is authoritative when a prior save already
@@ -1769,9 +1769,10 @@ final class EditorialCaptureCoordinator
             'at' => gmdate('c'),
         ];
         $semanticDiagnostics = is_array($diagnostics['semantic_write_back'] ?? null) ? $diagnostics['semantic_write_back'] : [];
-        $failureCode = trim((string) ($diagnostics['failure']['code'] ?? ($semanticDiagnostics['blockers'][0] ?? '')));
+        $failureCode = trim((string) ($currentFailureCode ?? ($semanticDiagnostics['blockers'][0] ?? '')));
         if ($failureCode !== '' && $receiptStatus !== 'COMPLETED') $attempt['failure_code'] = $failureCode;
         $receipts = CapturePhaseReceiptReducer::append($receipts, $receiptStage, $attempt);
+        $diagnostics = CaptureCurrentOutcomeReducer::reconcileDiagnostics($diagnostics, $receipts);
         Utf8Contract::assertValid(['assets' => $assets, 'context' => $nextContext, 'diagnostics' => $diagnostics, 'phase_receipts' => $receipts], 'capture.persistence');
         return $this->captures->save(new CaptureRecord($record->captureId, $record->idempotencyKey, $record->requestFingerprint, $stage, $status, $articleId ?? $record->articleId, $token ?? $record->articleStateToken, $assets, $nextContext, $diagnostics, $receipts, $record->revision + 1, $record->createdAt, gmdate('Y-m-d H:i:s.u')));
     }
