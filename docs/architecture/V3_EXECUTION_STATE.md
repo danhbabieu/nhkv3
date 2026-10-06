@@ -1,5 +1,34 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-06 — Universal Article media semantic eligibility boundary
+
+ROOT_CAUSE: Automatic Article media policy accepted ready media with an empty
+target subject through `unscoped_article_media`, and the ranking path could
+therefore compare technical quality before semantic proof. Article-specific
+candidate diagnostics also lacked an explicit semantic tier.
+
+IMPLEMENTATION: `SemanticSuitabilityPolicy` now rejects unscoped automatic
+Article coverage, exposes relationship/tier/score diagnostics, and preserves
+explicit current-Capture/Article placement allowances. The new
+`ArticleMediaCandidateSelector` scans the complete repository, hard-gates
+semantic eligibility before technical ranking, uses stable-key tie-breaking,
+and returns `NO_SEMANTICALLY_ELIGIBLE_MEDIA` without selecting a fallback.
+
+REGRESSION COVERAGE: Exact subject precedence over visually larger unrelated
+media, sibling/ancestor rejection, registered compatibility distinction,
+unscoped fail-closed behavior, repository-order independence, large ineligible
+prefix scanning, no-safe-candidate disposition, and the converted exact-scope
+stable-key tie fixture.
+
+VERIFICATION: Focused Article Media/Semantic Suitability suite passes 50 tests
+/ 177 assertions; changed PHP files lint clean and `git diff --check` passes.
+The full suite remains environment-limited in this checkout: PHP 128M fatals
+in an existing materializer test; PHP 512M completes with 33 integration
+environment errors and 29 unrelated unit failures. No data mutation,
+deployment, schema change or production operation was performed.
+
+STATUS: `ARTICLE_MEDIA_SEMANTIC_POLICY_FIXED_LOCAL / FOCUSED_GREEN / FULL_SUITE_BASELINE_LIMITED / NO_DATA_MUTATION / COMMIT_79AA5B18`
+
 ## Checkpoint — 2026-10-06 — Broad Dictionary public projection regression
 
 ROOT_CAUSE: EntrySense availability switched `DictionaryPublicQuery::hub()`
