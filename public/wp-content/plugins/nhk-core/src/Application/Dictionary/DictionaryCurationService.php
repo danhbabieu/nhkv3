@@ -5,13 +5,14 @@ namespace NHK\Core\Application\Dictionary;
 
 use NHK\Core\Contracts\Dictionary\{DictionaryCandidateRepository, DictionaryConceptRepository};
 use NHK\Core\Domain\Dictionary\{DictionaryCandidate, DictionaryCandidateState, DictionaryConcept, DictionaryLabel};
+use NHK\Core\Domain\Dictionary\DictionaryPreCreateResolution;
 use NHK\Core\Shared\Uuid\UuidCodec;
 
 final class DictionaryCurationService
 {
     private DictionaryTermNormalizer $normalizer;
 
-    public function __construct(private DictionaryCandidateRepository $candidates, private DictionaryConceptRepository $concepts, private $idGenerator = null, ?DictionaryTermNormalizer $normalizer = null, private $destinationValidator = null)
+    public function __construct(private DictionaryCandidateRepository $candidates, private DictionaryConceptRepository $concepts, private $idGenerator = null, ?DictionaryTermNormalizer $normalizer = null, private $destinationValidator = null, private ?DictionaryPreCreateResolver $preCreateResolver = null)
     {
         $this->normalizer = $normalizer ?? new DictionaryTermNormalizer();
     }
@@ -22,6 +23,16 @@ final class DictionaryCurationService
         if ($candidate->suppressed()) throw new \RuntimeException('DICTIONARY_CANDIDATE_SUPPRESSED');
         $preferredLabel = trim($preferredLabel);
         if ($preferredLabel === '') throw new \InvalidArgumentException('DICTIONARY_PREFERRED_LABEL_REQUIRED');
+        $resolution = null;
+        if ($this->preCreateResolver instanceof DictionaryPreCreateResolver) {
+            $probe = trim((string) ($candidate->rawForms[0] ?? $preferredLabel));
+            $resolution = $this->preCreateResolver->resolveEntryCreate($probe, array_merge($candidate->context, $context));
+            if ($resolution->action === DictionaryPreCreateResolution::REUSE_EXISTING) {
+                $updated = $this->withState($candidate, DictionaryCandidateState::RESOLVED_EXISTING, ['resolution' => $resolution->toArray()]);
+                return ['resolution' => $resolution->toArray(), 'candidate' => $this->candidates->saveDecision($updated, $expectedRevision)];
+            }
+            if (!$resolution->canCreate()) throw new \RuntimeException('DICTIONARY_PRE_CREATE_REVIEW_REQUIRED');
+        }
         $concept = new DictionaryConcept($this->id(), $preferredLabel, trim($definition), DictionaryConcept::DRAFT, null, null, null, array_merge($candidate->context, $context));
         $concept = $this->concepts->createConcept($concept);
         $this->concepts->addLabel(new DictionaryLabel($concept->conceptId, $preferredLabel, $this->normalizer->normalize($preferredLabel), DictionaryLabel::PREFERRED, 'vi-VN', $candidate->context));
@@ -31,7 +42,9 @@ final class DictionaryCurationService
             $this->concepts->addLabel(new DictionaryLabel($concept->conceptId, $raw, $this->normalizer->normalize($raw), DictionaryLabel::ALTERNATE, 'vi-VN', $candidate->context));
         }
         $updated = $this->withState($candidate, DictionaryCandidateState::PROPOSED_NEW, ['concept_id' => $concept->conceptId]);
-        return ['concept' => $concept, 'candidate' => $this->candidates->saveDecision($updated, $expectedRevision)];
+        $result = ['concept' => $concept, 'candidate' => $this->candidates->saveDecision($updated, $expectedRevision)];
+        if ($resolution instanceof DictionaryPreCreateResolution) $result['resolution'] = $resolution->toArray();
+        return $result;
     }
 
     public function attachToExisting(string $candidateId, int $expectedRevision, string $conceptId, string $labelKind = DictionaryLabel::ALTERNATE, ?string $locale = 'vi-VN'): array

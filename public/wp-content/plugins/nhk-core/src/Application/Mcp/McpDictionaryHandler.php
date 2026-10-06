@@ -117,7 +117,8 @@ final class McpDictionaryHandler
     {
         $raw = trim((string) ($candidate->rawForms[0] ?? $candidate->normalizedTerm));
         $result = $mutation->createEntryWithSense($raw, (string) ($input['definition'] ?? ''), $candidate->context, (string) $input['idempotency_key']);
-        $result['candidate'] = $curation->decide($candidate->candidateId, $revision, DictionaryCandidateState::PROPOSED_NEW, ['entry_id' => $result['entry']->entryId]);
+        $reused = (($result['resolution']['action'] ?? '') === 'REUSE_EXISTING');
+        $result['candidate'] = $curation->decide($candidate->candidateId, $revision, $reused ? DictionaryCandidateState::RESOLVED_EXISTING : DictionaryCandidateState::PROPOSED_NEW, ['entry_id' => $result['entry']->entryId, 'resolution' => $result['resolution'] ?? null]);
         return $result;
     }
 

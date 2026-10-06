@@ -130,6 +130,7 @@ final class DictionaryRuntime
                 $entity = $this->authority->findByCanonicalId($id);
                 return $entity instanceof AuthorityEntity && $entity->entityType === $type && $entity->active();
             },
+            new DictionaryPreCreateResolver($this->entries, $this->normalizer),
         );
         $mediaProjection = new EntityMediaProjection(new WpdbMediaRepository($database), new WpdbMediaAssetRepository($database), new WpdbMediaUsageRepository($database));
         $mentionGallery = new PublicMediaGalleryQuery(new WpdbMediaRepository($database), new WpdbMediaAssetRepository($database));
