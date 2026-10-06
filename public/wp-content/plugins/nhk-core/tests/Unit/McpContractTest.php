@@ -91,6 +91,8 @@ final class McpContractTest extends TestCase
             'nhk.semantic.resolve',
             'nhk.entity.neighborhood',
             'nhk.article.preflight',
+            'nhk.article.media-legacy-audit',
+            'nhk.article.media-legacy-repair-plan',
             'nhk.knowledge.writer.preview',
             'nhk.knowledge.quality-audit',
             'nhk.dictionary.seed-audit',
@@ -383,9 +385,10 @@ final class McpContractTest extends TestCase
     public function test_canonical_id_tool_fields_declare_uuid_shape_validation(): void
     {
         $tools = array_column(McpToolCatalog::tools(), null, 'name');
-        foreach (['nhk.entity.get', 'nhk.media.get', 'nhk.video.get', 'nhk.knowledge.get', 'nhk.source.get', 'nhk.evidence.get', 'nhk.proposal.submit', 'nhk.proposal.approve', 'nhk.proposal.reject', 'nhk.proposal.eligibility', 'nhk.proposal.discover', 'nhk.proposal.apply'] as $name) {
+        foreach (['nhk.entity.get', 'nhk.media.get', 'nhk.video.get', 'nhk.knowledge.get', 'nhk.source.get', 'nhk.evidence.get', 'nhk.proposal.submit', 'nhk.proposal.approve', 'nhk.proposal.reject', 'nhk.proposal.eligibility', 'nhk.proposal.apply'] as $name) {
             self::assertSame('^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[1-8][0-9A-Fa-f]{3}-[89ABab][0-9A-Fa-f]{3}-[0-9A-Fa-f]{12}$', $tools[$name]['inputSchema']['properties']['id']['pattern'], $name);
         }
+        self::assertSame('^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[1-8][0-9A-Fa-f]{3}-[89ABab][0-9A-Fa-f]{3}-[0-9A-Fa-f]{12}$', $tools['nhk.proposal.discover']['inputSchema']['properties']['proposal_id']['pattern']);
         self::assertSame('^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[1-8][0-9A-Fa-f]{3}-[89ABab][0-9A-Fa-f]{3}-[0-9A-Fa-f]{12}$', $tools['nhk.evidence.ingest']['inputSchema']['properties']['claim_id']['pattern']);
         self::assertSame('^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[1-8][0-9A-Fa-f]{3}-[89ABab][0-9A-Fa-f]{3}-[0-9A-Fa-f]{12}$', $tools['nhk.evidence.ingest']['inputSchema']['properties']['source_id']['pattern']);
         self::assertSame('uuid', $tools['nhk.entity.get']['inputSchema']['properties']['id']['format']);

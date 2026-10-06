@@ -1,5 +1,45 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-06 — Article Media legacy audit + governed repair operational surface
+
+ROOT_CAUSE: The universal Article media semantic selection fix and its
+read-only legacy audit existed locally, but the current runtime exposed no
+callable MCP catalog/dispatch/Ability surface for the audit and no bounded
+zero-mutation repair preview.
+
+IMPLEMENTATION: Added the bounded internal read tools
+`nhk.article.media-legacy-audit` and
+`nhk.article.media-legacy-repair-plan` to the executable MCP catalog, dispatch
+registry, capability manifest, single-entry policy and WordPress/Easy MCP
+Ability bridge. The audit returns stable cursor pagination, normalized
+dispositions, canonical Usage/Article/subject/media identity, suitability and
+dependency fingerprints. The repair preview revalidates the exact finding,
+Usage CAS revision, subject binding and selector-proven candidate, rejects
+stale dependencies, protects explicit/pinned Usage and emits only an exact
+`nhk.media.usage` governed operation packet for downstream proposal,
+approval, eligibility, controlled apply and canonical readback.
+
+DATA_SAFETY: Audit and repair preview are read-only and report
+`mutated: false`; no Proposal is created by preview, no direct WordPress or
+database writer was added, and canonical MediaUsage remains the source of
+truth. No migration, schema change, legacy import, staging/production
+mutation, deployment or push was performed.
+
+REGRESSION COVERAGE: Focused operational MCP/media/contract coverage passes
+with explicit valid, protected, missing-scope, inactive, stale-subject,
+stale-candidate, stale-Usage-CAS, cursor, limit, arbitrary-replacement and
+zero-write assertions. Runtime `tools/list` exposure is asserted for both
+tools and the existing governed `nhk.media.usage` path remains the only apply
+boundary.
+
+VERIFICATION: Changed PHP files lint clean and `git diff --check` passes.
+The full suite is environment-limited: default PHP 128MB hits an existing
+large-stream materializer memory fatal; a PHP 512MB run completes but reports
+pre-existing WordPress/runtime integration prerequisites and unrelated legacy
+unit failures. No failure is in the new operational MCP/media focused suite.
+
+STATUS: `ARTICLE_MEDIA_LEGACY_OPERATIONAL_SURFACE_LOCAL / FOCUSED_GREEN / FULL_SUITE_ENVIRONMENT_LIMITED / NO_DATA_MUTATION / NO_DEPLOYMENT`
+
 # Checkpoint — 2026-10-06 — Dictionary pre-create resolution / reuse-before-create hardening
 
 ROOT_CAUSE: Dictionary Entry/Sense and reviewed candidate paths could allocate

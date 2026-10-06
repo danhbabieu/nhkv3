@@ -62,6 +62,8 @@ final class McpDispatchRegistry
         'nhk.semantic.resolve' => 'nhk.semantic.resolve',
         'nhk.entity.neighborhood' => 'nhk.entity.neighborhood',
         'nhk.article.preflight' => 'nhk.article.preflight',
+        'nhk.article.media-legacy-audit' => 'nhk.article.media-legacy-audit',
+        'nhk.article.media-legacy-repair-plan' => 'nhk.article.media-legacy-repair-plan',
         'nhk.knowledge.writer.preview' => 'nhk.knowledge.writer.preview',
         'nhk.knowledge.quality-audit' => 'nhk.knowledge.quality-audit',
         'nhk.dictionary.seed-audit' => 'nhk.dictionary.seed-audit',

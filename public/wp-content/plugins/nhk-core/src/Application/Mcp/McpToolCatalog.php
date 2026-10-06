@@ -61,6 +61,22 @@ final class McpToolCatalog
             self::tool('nhk.semantic.resolve', 'Resolve read-only Authority context by UUID, stable key or exact name/alias; ambiguous matches remain candidates.', ['context' => ['type' => 'object']], ['context']),
             self::tool('nhk.entity.neighborhood', 'Read a bounded semantic neighborhood from canonical Graph relations.', ['type' => ['type' => 'string', 'minLength' => 1], 'id' => self::uuidField(), 'profile' => ['type' => 'string', 'enum' => ['brand', 'model', 'variant', 'classification', 'specimen']], 'max_hops' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 2], 'limit' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 50]], ['type', 'id', 'profile']),
             self::tool('nhk.article.preflight', 'Read-only preflight for an existing WordPress Post semantic reconciliation.', self::articleProperties(false), ['intent']),
+            self::tool('nhk.article.media-legacy-audit', 'Read-only bounded audit of historical Article SYSTEM_AUTO MediaUsage. Returns deterministic findings and eligible-only replacement evidence; it never mutates MediaUsage or creates Governance records.', [
+                'limit' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 200],
+                'cursor' => ['type' => 'string', 'maxLength' => 191],
+            ], []),
+            self::tool('nhk.article.media-legacy-repair-plan', 'Zero-mutation revalidation of one Article Media audit finding. Emits an exact governed nhk.media.usage operation only when current CAS, subject binding and candidate eligibility still match; it never creates or applies a Proposal.', [
+                'finding' => ['type' => 'object', 'properties' => [
+                    'usage_id' => self::uuidField(),
+                    'endpoint_type' => ['type' => 'string', 'const' => 'wp_post'],
+                    'endpoint_key' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 191],
+                    'fingerprint' => ['type' => 'string', 'minLength' => 64, 'maxLength' => 64],
+                    'dependency_fingerprint' => ['type' => 'string', 'minLength' => 64, 'maxLength' => 64],
+                    'expected_usage_revision' => ['type' => 'integer', 'minimum' => 1],
+                    'subject_id' => ['type' => 'string', 'maxLength' => 191],
+                    'subject_revision' => ['type' => 'string', 'maxLength' => 64],
+                ], 'required' => ['usage_id', 'endpoint_type', 'endpoint_key', 'fingerprint', 'dependency_fingerprint', 'expected_usage_revision', 'subject_id', 'subject_revision'], 'additionalProperties' => false],
+            ], ['finding']),
             self::tool('nhk.knowledge.writer.preview', 'NHK Knowledge Writer read-only preview: enriches the request through Universal Enrichment before drafting a reader-facing response from resolved canonical subjects and eligible existing Knowledge; it does not publish or mutate canonical data.', [
                 'subject' => ['type' => 'object', 'properties' => [
                     'type' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 64],

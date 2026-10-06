@@ -60,6 +60,7 @@ final class McpTransport
         private ?\NHK\Core\Application\Media\MediaEnrichmentIntentCompiler $mediaIntentCompiler = null,
         private ?McpDictionaryHandler $dictionary = null,
         private ?DictionarySeedAuditHandler $dictionarySeedAudit = null,
+        private ?ArticleMediaLegacyAuditHandler $articleMediaLegacyAudit = null,
     ) {}
 
     /** @return array{status:int,body:?array} */
@@ -161,6 +162,7 @@ final class McpTransport
             'nhk.documentation.bootstrap', 'nhk.documentation.get', 'nhk.documentation.list', 'nhk.docs.bootstrap', 'nhk.docs.get' => 'read',
             'nhk.article.preflight', 'nhk.relationship.registry', 'nhk.relationship.list', 'nhk.relationship.get', 'nhk.relationship.preview', 'nhk.knowledge.writer.preview' => 'read',
             'nhk.knowledge.quality-audit' => 'nhk_view_governance',
+            'nhk.article.media-legacy-audit', 'nhk.article.media-legacy-repair-plan' => 'nhk_view_governance',
             'nhk.dictionary.seed-audit' => 'nhk_view_governance',
             'nhk.dictionary.enrichment.audit', 'nhk.dictionary.enrichment.plan' => 'nhk_view_governance',
             'nhk.dictionary.enrichment.apply' => 'nhk_curate_dictionary',
@@ -199,6 +201,8 @@ final class McpTransport
         $result = match ($dispatch) {
             'nhk.knowledge.writer.preview' => $this->knowledgeWriterPreview?->preview($arguments) ?? throw new \RuntimeException('KNOWLEDGE_WRITER_PREVIEW_UNAVAILABLE'),
             'nhk.knowledge.quality-audit' => $this->knowledgeQualityAudit?->audit($arguments) ?? throw new \RuntimeException('KNOWLEDGE_QUALITY_AUDIT_UNAVAILABLE'),
+            'nhk.article.media-legacy-audit' => $this->articleMediaLegacyAudit?->audit($arguments) ?? throw new \RuntimeException('ARTICLE_MEDIA_LEGACY_AUDIT_UNAVAILABLE'),
+            'nhk.article.media-legacy-repair-plan' => $this->articleMediaLegacyAudit?->repairPlan($arguments) ?? throw new \RuntimeException('ARTICLE_MEDIA_LEGACY_REPAIR_PLAN_UNAVAILABLE'),
             'nhk.dictionary.seed-audit' => $this->dictionarySeedAudit?->audit($arguments) ?? throw new \RuntimeException('DICTIONARY_SEED_AUDIT_UNAVAILABLE'),
             'nhk.documentation.bootstrap', 'nhk.docs.bootstrap' => ($this->documentation ?? new McpDocumentationRegistry())->bootstrap(),
             'nhk.documentation.get' => ($this->documentation ?? new McpDocumentationRegistry())->get((string) ($arguments['path'] ?? ''), isset($arguments['start_line']) ? (int) $arguments['start_line'] : null, isset($arguments['line_count']) ? (int) $arguments['line_count'] : null),

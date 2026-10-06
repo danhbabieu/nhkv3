@@ -36,7 +36,7 @@ final class PluginBootWiringTest extends TestCase
         $plugin = (string) file_get_contents(__DIR__ . '/../../src/Plugin.php');
 
         self::assertStringContainsString(
-            'use NHK\\Core\\Application\\Media\\{ArticleMediaCandidateSelector, ArticleMediaCoordinator, ArticleMediaLegacyAudit, ArticleMediaSeoProjection, MediaEnrichmentFinalReadbackPolicy, MediaIngestGateway, MediaService, MediaVideoPageQuery, PublicMediaAssetDelivery, PublicMediaArticleLinkResolver, PublicMediaGalleryQuery, SemanticSuitabilityPolicy, VisualOpportunityDetector, VisualSupportRequirementService};',
+            'use NHK\\Core\\Application\\Media\\{ArticleMediaCandidateSelector, ArticleMediaCoordinator, ArticleMediaLegacyAudit, ArticleMediaLegacyRepairPlan, ArticleMediaSeoProjection, MediaEnrichmentFinalReadbackPolicy, MediaIngestGateway, MediaService, MediaVideoPageQuery, PublicMediaAssetDelivery, PublicMediaArticleLinkResolver, PublicMediaGalleryQuery, SemanticSuitabilityPolicy, VisualOpportunityDetector, VisualSupportRequirementService};',
             $plugin,
         );
     }
