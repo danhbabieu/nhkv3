@@ -193,6 +193,39 @@ final class CaptureCurrentOutcomeReducerTest extends TestCase
         self::assertContains('CAPTURE_UTF8_INVALID', array_column(CaptureCurrentOutcomeReducer::reconcileDiagnostics($diagnostics, $receipts)['failure_history'], 'code'));
     }
 
+    public function test_legacy_article_pre_create_review_does_not_reassert_an_inherited_retryable_failure(): void
+    {
+        $receipts = [
+            'FAILED_RETRYABLE' => ['status' => 'FAILED', 'result' => 'FAILED_RETRYABLE', 'failure_code' => 'ERROR_X', 'current_outcome' => 'CURRENT'],
+            'INTERPRETED' => ['status' => 'COMPLETED', 'result' => 'COMPLETED', 'current_outcome' => 'CURRENT'],
+            'CONTENT_PREPARATION' => ['status' => 'COMPLETED', 'result' => 'COMPLETED', 'current_outcome' => 'CURRENT'],
+            'ARTICLE_PRE_CREATE_REVIEW' => ['status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'failure_code' => 'ERROR_X', 'current_outcome' => 'CURRENT'],
+        ];
+        $diagnostics = [
+            'failure' => ['code' => 'ERROR_X'],
+            'completion' => ['status' => 'REVIEW_REQUIRED', 'blockers' => ['ERROR_X']],
+        ];
+        $capture = $this->capture($diagnostics, $receipts, 'REVIEW_REQUIRED');
+
+        self::assertSame([], CaptureCurrentOutcomeReducer::currentBlockers($diagnostics, $receipts));
+        self::assertSame(['eligible' => true, 'reason' => 'STALE_REVIEW_REEVALUATABLE'], CaptureCurrentOutcomeReducer::retryEligibility($capture));
+    }
+
+    public function test_current_article_pre_create_review_attempt_remains_a_blocker(): void
+    {
+        $receipts = [
+            'FAILED_RETRYABLE' => ['status' => 'FAILED', 'result' => 'FAILED_RETRYABLE', 'failure_code' => 'ERROR_X'],
+            'INTERPRETED' => ['status' => 'COMPLETED', 'result' => 'COMPLETED'],
+            'ARTICLE_PRE_CREATE_REVIEW' => [
+                'attempts' => [['status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'failure_code' => 'ERROR_X']],
+                'latest' => ['status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'failure_code' => 'ERROR_X'],
+            ],
+        ];
+        $diagnostics = ['failure' => ['code' => 'ERROR_X'], 'completion' => ['status' => 'REVIEW_REQUIRED', 'blockers' => ['ERROR_X']]];
+
+        self::assertSame(['ERROR_X'], CaptureCurrentOutcomeReducer::currentBlockers($diagnostics, $receipts));
+    }
+
     public function test_legacy_article_pre_create_review_is_reevaluable_after_failure_is_superseded(): void
     {
         $receipts = [

@@ -1,5 +1,40 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-06 — Live Capture retry inherited-review reducer fix
+
+ROOT_CAUSE: The live `nhk.capture.get`/`nhk.capture.ingest` paths both reached
+`CaptureCurrentOutcomeReducer`, but commit `79b2d975` only recognized a legacy
+retryable receipt as superseded when a later receipt followed it. The persisted
+Capture shape also contained a legacy `ARTICLE_PRE_CREATE_REVIEW` row at the
+end of the sequence that had copied the old retryable `failure_code`. That row
+therefore reasserted the historical failure as current and caused
+`CAPTURE_RETRY_NOT_ALLOWED`; this was not an MCP registration bypass or a
+UUID/code-specific condition.
+
+FIX: `CapturePhaseReceiptReducer` now recognizes that bounded legacy shape as
+an inherited Article pre-create review failure only when the raw review row has
+no append-only attempts, matches an earlier retryable failure, and a completed
+phase proves recovery occurred before the review row. Current review attempts
+with persisted `attempts` remain blockers. Both Capture current-blocker and
+retry eligibility consumers continue to use the shared reducer; no response-only
+override, direct writer, database mutation or deployment was added.
+
+REGRESSION_COVERAGE: Focused Capture reducer, MCP read projection and Capture
+continuation coverage passes 81 tests / 360 assertions. The regression uses the
+live-shaped ordered receipts and verifies retry eligibility, while a companion
+case proves a genuine current Article review attempt remains blocking.
+
+VERIFICATION: Changed production PHP lint clean and `git diff --check` passes.
+The full suite at PHP 512MB completes 3,504 tests with 33 pre-existing
+environment/double errors, 28 unrelated baseline failures and 125 skips; the
+default 128MB run remains limited by the existing
+`TrustedProvidedFileMaterializerTest` memory fatal. No staging/production data,
+Capture `01a1105c-4cc6-7529-ad3e-6bc652b4ae7f`, deployment or publication was
+mutated.
+
+STATUS: `CAPTURE_LIVE_SHAPED_RETRY_FIXED_LOCAL / FOCUSED_GREEN /
+FULL_SUITE_BASELINE_LIMITED / NO_DATA_MUTATION / DEPLOYMENT_PENDING`.
+
 # Checkpoint — 2026-10-06 — System-wide duplicate audit cursor transport bound
 
 ROOT_CAUSE: The signed duplicate-audit cursor embedded up to 128 complete carry

@@ -40,7 +40,9 @@ final class CapturePhaseReceiptReducer
             $latest = self::latest($receipt);
             $code = trim((string) ($latest['failure_code'] ?? ''));
             if ($code === '' || !self::isFailureOutcome($latest)) continue;
-            if (self::legacyFailureWasSuperseded($receipts, $position, $latest, (string) array_keys($receipts)[$position])) continue;
+            $phase = (string) array_keys($receipts)[$position];
+            if (self::legacyFailureWasSuperseded($receipts, $position, $latest, $phase)
+                || self::legacyReviewInheritedFailureWasSuperseded($receipts, $position, $latest, $phase)) continue;
             $codes[] = $code;
         }
         return array_values(array_unique($codes));
@@ -67,7 +69,9 @@ final class CapturePhaseReceiptReducer
                 $code = trim((string) $code);
                 if ($code !== '') $codes[] = $code;
             }
-            if (self::legacyFailureWasSuperseded($receipts, $position, $latest, (string) array_keys($receipts)[$position])) {
+            $phase = (string) array_keys($receipts)[$position];
+            if (self::legacyFailureWasSuperseded($receipts, $position, $latest, $phase)
+                || self::legacyReviewInheritedFailureWasSuperseded($receipts, $position, $latest, $phase)) {
                 $code = trim((string) ($latest['failure_code'] ?? ''));
                 if ($code !== '') $codes[] = $code;
             }
@@ -104,6 +108,42 @@ final class CapturePhaseReceiptReducer
             return true;
         }
         return false;
+    }
+
+    /**
+     * A legacy Article pre-create review could copy the previous retryable
+     * failure into its own current row. The row has no attempts list, so the
+     * only safe recovery signal is the ordered persisted history: a matching
+     * retryable failure followed by at least one completed phase.
+     *
+     * @param array<string,mixed> $receipts
+     * @param array<string,mixed> $latest
+     */
+    private static function legacyReviewInheritedFailureWasSuperseded(array $receipts, int $position, array $latest, string $phase): bool
+    {
+        if (strtoupper(trim($phase)) !== 'ARTICLE_PRE_CREATE_REVIEW') return false;
+        $rawReceipt = array_values($receipts)[$position] ?? null;
+        if (is_array($rawReceipt) && is_array($rawReceipt['attempts'] ?? null) && $rawReceipt['attempts'] !== []) return false;
+        if (strtoupper(trim((string) ($latest['status'] ?? ''))) !== 'REVIEW_REQUIRED'
+            || strtoupper(trim((string) ($latest['result'] ?? ''))) !== 'REVIEW_REQUIRED') return false;
+
+        $code = strtoupper(trim((string) ($latest['failure_code'] ?? '')));
+        if ($code === '') return false;
+        $seenRetryable = false;
+        $sawCompletedAfterFailure = false;
+        foreach (array_values($receipts) as $index => $receipt) {
+            if ($index >= $position || !is_array($receipt)) continue;
+            $prior = self::latest($receipt);
+            $priorCode = strtoupper(trim((string) ($prior['failure_code'] ?? '')));
+            $priorResult = strtoupper(trim((string) ($prior['result'] ?? '')));
+            $priorStatus = strtoupper(trim((string) ($prior['status'] ?? '')));
+            if ($priorCode === $code && ($priorResult === 'FAILED_RETRYABLE' || strtoupper(trim((string) ($prior['classification'] ?? ''))) === 'FAILED_RETRYABLE')) {
+                $seenRetryable = true;
+                continue;
+            }
+            if ($seenRetryable && $priorStatus === 'COMPLETED' && $priorResult === 'COMPLETED') $sawCompletedAfterFailure = true;
+        }
+        return $seenRetryable && $sawCompletedAfterFailure;
     }
 
     /** @param array<string,mixed> $receipts @param array<string,mixed> $attempt @return array<string,mixed> */
