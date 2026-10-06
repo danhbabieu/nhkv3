@@ -412,6 +412,7 @@ function nhk_v3_dictionary_initial(string $title): string
     $title = trim($title);
     if ($title === '') return '#';
     $initial = function_exists('mb_substr') ? mb_substr($title, 0, 1, 'UTF-8') : substr($title, 0, 1);
+    if (preg_match('/^[0-9]$/', $initial)) return '0–9';
     return function_exists('mb_strtoupper') ? mb_strtoupper($initial, 'UTF-8') : strtoupper($initial);
 }
 

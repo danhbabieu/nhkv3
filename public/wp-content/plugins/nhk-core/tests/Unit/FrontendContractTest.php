@@ -53,6 +53,16 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString('nhk_v3_navigation_items', $dictionary);
     }
 
+    public function test_dictionary_numeric_initial_groups_are_normalized_and_string_safe(): void
+    {
+        $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
+        $functions = (string) file_get_contents($theme . '/functions.php');
+        $dictionary = (string) file_get_contents($theme . '/dictionary.php');
+
+        self::assertStringContainsString("if (preg_match('/^[0-9]$/', \$initial)) return '0–9';", $functions);
+        self::assertSame(2, substr_count($dictionary, 'nhk_v3_dictionary_anchor((string) $initial)'));
+    }
+
     public function test_dictionary_detail_renders_contract_breadcrumb_and_reader_safe_sense_links(): void
     {
         $dictionary = (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/dictionary.php');

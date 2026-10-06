@@ -23809,3 +23809,27 @@ mutation, migration, deployment, push or external data write was performed.
 
 STATUS: `CAPTURE_RETRY_CURRENT_OUTCOME_FIXED_LOCALLY / FOCUSED_GREEN /
 FULL_SUITE_ENVIRONMENT_LIMITED / NO_DATA_MUTATION / NO_DEPLOYMENT`.
+
+# Checkpoint — 2026-10-06 — Dictionary hub numeric initial render fix
+
+ROOT_CAUSE: The newly public `400 ngày` entry was grouped under the numeric
+PHP array key `4`. PHP converted that numeric-string key to `int`, and the
+strictly typed theme anchor helper then raised a `TypeError` while rendering
+the default Dictionary hub. The response stopped after the alphabet nav;
+filtered alphabet pages could still render, which made the failure look like
+a deployment or cache problem.
+
+FIX: Dictionary presentation now normalizes numeric initials to the canonical
+`0–9` bucket and casts group keys to string at the typed anchor/HTML boundary.
+Added a frontend contract regression test for numeric initial normalization and
+string safety. No semantic data, migration, or runtime records were changed.
+
+VERIFICATION: The focused Dictionary/frontend slice passes 96 tests / 869
+assertions with one existing deprecation. PHP lint and `git diff --check` pass.
+The full suite was rerun with a 512MB CLI limit and remains environment-limited
+with 33 existing errors, 28 unrelated failures, 24 warnings, 52 deprecations,
+61 PHPUnit deprecations and 125 skips. No staging/production mutation or
+deployment was performed.
+
+STATUS: `DICTIONARY_HUB_NUMERIC_INITIAL_FIXED_LOCALLY / FOCUSED_GREEN /
+FULL_SUITE_ENVIRONMENT_LIMITED / NO_DATA_MUTATION / PUSH_PENDING`.
