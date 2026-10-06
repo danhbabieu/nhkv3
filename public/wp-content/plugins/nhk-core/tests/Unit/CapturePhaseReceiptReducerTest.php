@@ -8,6 +8,97 @@ use PHPUnit\Framework\TestCase;
 
 final class CapturePhaseReceiptReducerTest extends TestCase
 {
+    public function test_latest_normalizes_legacy_receipt_without_attempts(): void
+    {
+        $receipt = [
+            'status' => 'FAILED',
+            'result' => 'FAILED_RETRYABLE',
+            'failure_code' => 'ERROR_X',
+        ];
+
+        $latest = CapturePhaseReceiptReducer::latest($receipt);
+
+        self::assertSame(1, $latest['attempt_no']);
+        self::assertSame('legacy:1', $latest['attempt_id']);
+        self::assertSame('ERROR_X', $latest['failure_code']);
+        self::assertSame('CURRENT', $latest['current_outcome']);
+    }
+
+    public function test_current_failure_codes_use_only_latest_failed_attempts(): void
+    {
+        $receipts = CapturePhaseReceiptReducer::append([], 'PHASE_X', [
+            'status' => 'FAILED',
+            'result' => 'FAILED_RETRYABLE',
+            'failure_code' => 'ERROR_X',
+        ]);
+        $receipts = CapturePhaseReceiptReducer::append($receipts, 'PHASE_X', [
+            'status' => 'COMPLETED',
+            'result' => 'RECOVERED',
+        ]);
+        $receipts = CapturePhaseReceiptReducer::append($receipts, 'PHASE_Y', [
+            'status' => 'FAILED',
+            'result' => 'FAILED_RETRYABLE',
+            'failure_code' => 'ERROR_Y',
+        ]);
+
+        self::assertSame(['ERROR_Y'], CapturePhaseReceiptReducer::currentFailureCodes($receipts));
+        self::assertSame(2, count($receipts['PHASE_X']['attempts']));
+        self::assertSame('ERROR_X', $receipts['PHASE_X']['attempts'][0]['failure_code']);
+    }
+
+    public function test_completed_latest_attempt_exposes_prior_failure_as_superseded(): void
+    {
+        $receipts = CapturePhaseReceiptReducer::append([], 'PHASE_X', [
+            'status' => 'FAILED',
+            'result' => 'FAILED_RETRYABLE',
+            'failure_code' => 'ERROR_X',
+        ]);
+        $receipts = CapturePhaseReceiptReducer::append($receipts, 'PHASE_X', [
+            'status' => 'COMPLETED',
+            'result' => 'RECOVERED',
+        ]);
+
+        self::assertSame([], CapturePhaseReceiptReducer::currentFailureCodes($receipts));
+        self::assertSame(['ERROR_X'], CapturePhaseReceiptReducer::supersededFailureCodes($receipts));
+        self::assertCount(2, $receipts['PHASE_X']['attempts']);
+    }
+
+    public function test_same_failure_on_latest_retry_remains_current(): void
+    {
+        $receipts = CapturePhaseReceiptReducer::append([], 'PHASE_X', [
+            'status' => 'FAILED',
+            'result' => 'FAILED_RETRYABLE',
+            'failure_code' => 'ERROR_X',
+        ]);
+        $receipts = CapturePhaseReceiptReducer::append($receipts, 'PHASE_X', [
+            'status' => 'FAILED',
+            'result' => 'FAILED_RETRYABLE',
+            'failure_code' => 'ERROR_X',
+        ]);
+
+        self::assertSame(['ERROR_X'], CapturePhaseReceiptReducer::currentFailureCodes($receipts));
+        self::assertSame(['ERROR_X'], CapturePhaseReceiptReducer::supersededFailureCodes($receipts));
+    }
+
+    public function test_different_latest_failure_replaces_prior_code_but_preserves_history(): void
+    {
+        $receipts = CapturePhaseReceiptReducer::append([], 'PHASE_X', [
+            'status' => 'FAILED',
+            'result' => 'FAILED_RETRYABLE',
+            'failure_code' => 'ERROR_X',
+        ]);
+        $receipts = CapturePhaseReceiptReducer::append($receipts, 'PHASE_X', [
+            'status' => 'FAILED',
+            'result' => 'FAILED_RETRYABLE',
+            'failure_code' => 'ERROR_Y',
+        ]);
+
+        self::assertSame(['ERROR_Y'], CapturePhaseReceiptReducer::currentFailureCodes($receipts));
+        self::assertSame(['ERROR_X'], CapturePhaseReceiptReducer::supersededFailureCodes($receipts));
+        self::assertSame('ERROR_X', $receipts['PHASE_X']['attempts'][0]['failure_code']);
+        self::assertSame('ERROR_Y', $receipts['PHASE_X']['attempts'][1]['failure_code']);
+    }
+
     public function test_append_preserves_historical_failure_and_exposes_verified_latest_outcome(): void
     {
         $failed = CapturePhaseReceiptReducer::append([], 'MEDIA_RECONCILED', [
