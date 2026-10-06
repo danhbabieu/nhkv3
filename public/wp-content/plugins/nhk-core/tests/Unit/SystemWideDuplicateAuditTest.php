@@ -50,6 +50,28 @@ final class SystemWideDuplicateAuditTest extends TestCase
         self::assertSame('DEFINITE_DUPLICATE', $result['owners']['Knowledge']['clusters'][0]['classification']);
     }
 
+    public function test_video_provenance_claims_with_different_video_referents_are_distinct(): void
+    {
+        $proposition = 'The source identifies this Video as concerning canonical Odo 62.';
+        $result = $this->audit('Knowledge', [
+            ['canonical_id' => 'k-1', 'claim_text' => $proposition, 'claim_type' => 'provenance', 'provenance' => ['origin' => 'CAPTURE_VIDEO_SOURCE_PROVENANCE', 'metadata' => ['subject_id' => 'subject-1', 'platform' => 'youtube', 'external_video_id' => 'video-a']], 'revision' => 1],
+            ['canonical_id' => 'k-2', 'claim_text' => $proposition, 'claim_type' => 'provenance', 'provenance' => ['origin' => 'CAPTURE_VIDEO_SOURCE_PROVENANCE', 'metadata' => ['subject_id' => 'subject-1', 'platform' => 'youtube', 'external_video_id' => 'video-b']], 'revision' => 1],
+        ]);
+
+        self::assertSame([], $result['owners']['Knowledge']['clusters']);
+    }
+
+    public function test_same_video_provenance_claim_is_still_a_definite_duplicate(): void
+    {
+        $proposition = 'The source identifies this Video as concerning canonical Odo 62.';
+        $result = $this->audit('Knowledge', [
+            ['canonical_id' => 'k-1', 'claim_text' => $proposition, 'claim_type' => 'provenance', 'provenance' => ['origin' => 'CAPTURE_VIDEO_SOURCE_PROVENANCE', 'metadata' => ['subject_id' => 'subject-1', 'platform' => 'youtube', 'external_video_id' => 'video-a', 'source_stable_key' => 'source-a']], 'revision' => 1],
+            ['canonical_id' => 'k-2', 'claim_text' => $proposition, 'claim_type' => 'provenance', 'provenance' => ['origin' => 'CAPTURE_VIDEO_SOURCE_PROVENANCE', 'metadata' => ['subject_id' => 'subject-1', 'platform' => 'youtube', 'external_video_id' => 'video-a', 'source_stable_key' => 'source-b']], 'revision' => 1],
+        ]);
+
+        self::assertSame('DEFINITE_DUPLICATE', $result['owners']['Knowledge']['clusters'][0]['classification']);
+    }
+
     public function test_knowledge_marks_nonidentical_wording_as_possible_and_qualification_as_scoped(): void
     {
         $result = $this->audit('Knowledge', [
@@ -102,6 +124,25 @@ final class SystemWideDuplicateAuditTest extends TestCase
         $states = $second['owners']['Authority']['clusters'][0]['active_states'];
         sort($states);
         self::assertSame(['ACTIVE', 'RETIRED'], $states);
+    }
+
+    public function test_paginated_duplicate_cluster_is_emitted_once_when_it_reappears_after_carry(): void
+    {
+        $reader = new BoundaryAuditPage([
+            [
+                ['canonical_id' => 'a-1', 'stable_key' => 'same', 'entity_type' => 'component', 'canonical_name' => 'Côn'],
+                ['canonical_id' => 'a-2', 'stable_key' => 'same', 'entity_type' => 'component', 'canonical_name' => 'Côn'],
+            ],
+            [
+                ['canonical_id' => 'a-3', 'stable_key' => 'same', 'entity_type' => 'component', 'canonical_name' => 'Côn'],
+            ],
+        ]);
+        $coordinator = $this->coordinator(['Authority' => $reader]);
+        $first = $coordinator->audit(2, [], true, 'Authority');
+        $second = $coordinator->audit(1, ['Authority' => $first['owners']['Authority']['next_cursor']], true, 'Authority');
+
+        self::assertCount(1, $first['owners']['Authority']['clusters']);
+        self::assertSame([], $second['owners']['Authority']['clusters']);
     }
 
     public function test_cursor_stays_within_mcp_transport_limit_when_carry_is_large(): void

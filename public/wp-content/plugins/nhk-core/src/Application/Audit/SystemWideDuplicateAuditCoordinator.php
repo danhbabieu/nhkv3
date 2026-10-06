@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Audit;
 
+use NHK\Core\Application\Knowledge\KnowledgeClaimIdentity;
 use NHK\Core\Contracts\Audit\DuplicateAuditPageReader;
 
 /**
@@ -18,8 +19,8 @@ final class SystemWideDuplicateAuditCoordinator
     private const MAX_CARRY_ROWS = 128;
     private const MAX_CURSOR_LENGTH = 4096;
     private const CURSOR_STATE_TTL = 900;
-    private const CURSOR_VERSION = 3;
-    private const CURSOR_POLICY = 'system-wide-duplicate-audit:v3';
+    private const CURSOR_VERSION = 4;
+    private const CURSOR_POLICY = 'system-wide-duplicate-audit:v4';
     /** @var array<string,list<array<string,mixed>>> */
     private static array $cursorStates = [];
     /** @var list<string> */
@@ -113,9 +114,12 @@ final class SystemWideDuplicateAuditCoordinator
                 'Video' => $this->video($combined),
                 default => [],
             };
+            $clusters = $this->dedupeClusters($clusters);
+            $clusters = array_values(array_filter($clusters, static fn (array $cluster): bool => !in_array((string) ($cluster['cluster_id'] ?? ''), $state['emitted'], true)));
+            $emitted = array_values(array_unique(array_merge($state['emitted'], array_values(array_filter(array_map(static fn (array $cluster): string => (string) ($cluster['cluster_id'] ?? ''), $clusters))))));
             $next = isset($page['next_cursor']) && $page['next_cursor'] !== null ? (string) $page['next_cursor'] : null;
             $boundReached = $next !== null && $scanned >= self::MAX_SCAN_ROWS;
-            $nextCursor = $boundReached ? null : ($next === null ? null : $this->encodeCursor($next, array_slice($combined, -self::MAX_CARRY_ROWS), $scanned, $owner, $includeRetired));
+            $nextCursor = $boundReached ? null : ($next === null ? null : $this->encodeCursor($next, array_slice($combined, -self::MAX_CARRY_ROWS), $scanned, $owner, $includeRetired, $emitted));
             $diagnostics = (array) ($page['diagnostics'] ?? []);
             if ($boundReached) $diagnostics[] = ['code' => 'AUDIT_MAX_SCAN_BOUND_REACHED', 'max_scan_rows' => self::MAX_SCAN_ROWS];
             $complete = $next === null;
@@ -141,11 +145,11 @@ final class SystemWideDuplicateAuditCoordinator
         return $reader->readPage($limit, $cursor, $includeRetired);
     }
 
-    /** @return array{after:?string,carry:list<array<string,mixed>>,scanned:int} */
+    /** @return array{after:?string,carry:list<array<string,mixed>>,scanned:int,emitted:list<string>} */
     private function decodeCursor(?string $cursor, string $owner, bool $includeRetired): array
     {
         $raw = trim((string) ($cursor ?? ''));
-        if ($raw === '') return ['after' => null, 'carry' => [], 'scanned' => 0];
+        if ($raw === '') return ['after' => null, 'carry' => [], 'scanned' => 0, 'emitted' => []];
         if (strlen($raw) > self::MAX_CURSOR_LENGTH) throw new \InvalidArgumentException('AUDIT_CURSOR_INVALID');
         $encoded = strtr($raw, '-_', '+/');
         $encoded .= str_repeat('=', (4 - strlen($encoded) % 4) % 4);
@@ -162,19 +166,21 @@ final class SystemWideDuplicateAuditCoordinator
         if ($after !== null && (!is_string($after) || $after === '' || strlen($after) > 512)) throw new \InvalidArgumentException('AUDIT_CURSOR_INVALID');
         $scanned = $payload['scanned'] ?? null;
         if (!is_int($scanned) || $scanned < 0 || $scanned > self::MAX_SCAN_ROWS) throw new \InvalidArgumentException('AUDIT_CURSOR_INVALID');
+        $emitted = $payload['emitted'] ?? [];
+        if (!is_array($emitted) || count($emitted) > 512 || array_filter($emitted, static fn (mixed $id): bool => !is_string($id) || $id === '') !== []) throw new \InvalidArgumentException('AUDIT_CURSOR_INVALID');
         $stateKey = $payload['state_key'] ?? null;
         if (!is_string($stateKey) || !preg_match('/^[a-f0-9]{64}$/', $stateKey)) throw new \InvalidArgumentException('AUDIT_CURSOR_INVALID');
         $carry = $this->loadCursorState($stateKey);
         if ($carry === null || count($carry) > self::MAX_CARRY_ROWS || array_filter($carry, static fn (mixed $row): bool => !is_array($row)) !== []) throw new \InvalidArgumentException('AUDIT_CURSOR_INVALID');
-        return ['after' => $after, 'carry' => array_values($carry), 'scanned' => $scanned];
+        return ['after' => $after, 'carry' => array_values($carry), 'scanned' => $scanned, 'emitted' => array_values($emitted)];
     }
 
     /** @param list<array<string,mixed>> $carry */
-    private function encodeCursor(string $after, array $carry, int $scanned, string $owner, bool $includeRetired): string
+    private function encodeCursor(string $after, array $carry, int $scanned, string $owner, bool $includeRetired, array $emitted = []): string
     {
         $carry = array_slice($carry, -self::MAX_CARRY_ROWS);
         $stateKey = $this->storeCursorState($carry);
-        $payload = ['v' => self::CURSOR_VERSION, 'policy' => self::CURSOR_POLICY, 'owner' => $owner, 'include_retired' => $includeRetired, 'after' => $after, 'state_key' => $stateKey, 'scanned' => $scanned];
+        $payload = ['v' => self::CURSOR_VERSION, 'policy' => self::CURSOR_POLICY, 'owner' => $owner, 'include_retired' => $includeRetired, 'after' => $after, 'state_key' => $stateKey, 'scanned' => $scanned, 'emitted' => array_values(array_unique($emitted))];
         $canonical = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
         $envelope = ['payload' => $payload, 'signature' => hash_hmac('sha256', $canonical, $this->cursorSecret())];
         $cursor = rtrim(strtr(base64_encode((string) json_encode($envelope, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)), '+/', '-_'), '=');
@@ -230,6 +236,20 @@ final class SystemWideDuplicateAuditCoordinator
         return array_values($out);
     }
 
+    /** @param list<array<string,mixed>> $clusters @return list<array<string,mixed>> */
+    private function dedupeClusters(array $clusters): array
+    {
+        $unique = [];
+        foreach ($clusters as $cluster) {
+            $ids = array_values(array_map('strval', (array) ($cluster['canonical_ids'] ?? [])));
+            sort($ids, SORT_STRING);
+            $key = (string) ($cluster['owner'] ?? '') . ':' . implode(',', $ids);
+            if ($ids === [] || isset($unique[$key])) continue;
+            $unique[$key] = $cluster;
+        }
+        return array_values($unique);
+    }
+
     /** @param list<array<string,mixed>> $carry @return array<string,mixed> */
     private function partialBound(array $carry, ?string $cursor): array
     {
@@ -256,12 +276,11 @@ final class SystemWideDuplicateAuditCoordinator
     private function knowledge(array $items): array
     {
         $groups = $this->group($items, function (array $row): string {
-            $metadata = $this->array($row, ['provenance', 'metadata']);
-            return implode('|', [$this->text($row, ['subject_id', 'canonical_subject_id'], $metadata), $this->text($row, ['facet'], $metadata), $this->text($row, ['scope'], $metadata), $this->text($row, ['claim_type']), $this->normalized($this->text($row, ['claim_text', 'text']))]);
+            return KnowledgeClaimIdentity::key(KnowledgeClaimIdentity::contextForAuditRow($row)) . '|' . $this->normalized($this->text($row, ['claim_text', 'text']));
         });
         $clusters = [];
         foreach ($groups as $key => $rows) if ($key !== '' && count($this->ids($rows)) > 1) $clusters[] = $this->cluster('Knowledge', $key, $rows, 'DEFINITE_DUPLICATE', 'HIGH', ['same_subject_facet_scope_type_normalized_proposition'], [], ['deterministic proposition identity matches'], 'REVIEW_KNOWLEDGE_REUSE_AND_EVIDENCE;DO_NOT_AUTO_MERGE');
-        $propositionGroups = $this->group($items, function (array $row): string { $metadata = $this->array($row, ['provenance', 'metadata']); return implode('|', [$this->text($row, ['subject_id', 'canonical_subject_id'], $metadata), $this->text($row, ['facet'], $metadata), $this->text($row, ['scope'], $metadata)]); });
+        $propositionGroups = $this->group($items, fn (array $row): string => KnowledgeClaimIdentity::key(KnowledgeClaimIdentity::contextForAuditRow($row)));
         foreach ($propositionGroups as $key => $rows) {
             $propositions = [];
             foreach ($rows as $row) $propositions[$this->normalized($this->text($row, ['claim_text', 'text']))] = true;
@@ -397,7 +416,7 @@ final class SystemWideDuplicateAuditCoordinator
     {
         $ids = $this->ids($rows);
         sort($ids, SORT_STRING);
-        return ['owner' => $owner, 'cluster_id' => strtolower($owner) . ':' . hash('sha256', $key . '|' . implode(',', $ids)), 'classification' => $classification, 'confidence_class' => $confidence, 'canonical_ids' => $ids, 'active_states' => array_values(array_unique(array_map(fn (array $row): string => strtoupper($this->text($row, ['state', 'status'], [], 'ACTIVE')), $rows))), 'revisions' => array_values(array_map(fn (array $row): array => ['canonical_id' => $this->id($row), 'revision' => (int) ($row['revision'] ?? 0)], $rows)), 'identity_signals' => $signals + ['key' => $key], 'conflicting_signals' => array_values(array_unique($conflicts)), 'reasons' => array_values(array_unique($reasons)), 'recommended_review_action' => $action, 'cursor_page_provenance' => []];
+        return ['owner' => $owner, 'cluster_id' => strtolower($owner) . ':' . hash('sha256', $key), 'classification' => $classification, 'confidence_class' => $confidence, 'canonical_ids' => $ids, 'active_states' => array_values(array_unique(array_map(fn (array $row): string => strtoupper($this->text($row, ['state', 'status'], [], 'ACTIVE')), $rows))), 'revisions' => array_values(array_map(fn (array $row): array => ['canonical_id' => $this->id($row), 'revision' => (int) ($row['revision'] ?? 0)], $rows)), 'identity_signals' => $signals + ['key' => $key], 'conflicting_signals' => array_values(array_unique($conflicts)), 'reasons' => array_values(array_unique($reasons)), 'recommended_review_action' => $action, 'cursor_page_provenance' => []];
     }
 
     /** @param list<array<string,mixed>> $clusters @param list<mixed> $items @return list<array<string,mixed>> */

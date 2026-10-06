@@ -28,7 +28,7 @@ final class KnowledgeEnrichmentPlanner
         $normalized = $this->normalize($observation);
         $scoped = [];
         foreach ($this->claims->list(true) as $claim) {
-            if (!$claim instanceof KnowledgeClaim || !$this->sameContext($claim, $subjectId, $profile)) continue;
+            if (!$claim instanceof KnowledgeClaim || !$this->sameContext($claim, $subjectId, $profile, $context)) continue;
             $scoped[] = $claim;
             if ($this->normalize($claim->claimText) !== $normalized) continue;
             if (!$claim->active) return [new KnowledgeEnrichmentCandidate('ambiguous', $subjectId, $profile, $observation, ['reason' => 'RETIRED_EQUIVALENT_CLAIM', 'matched_claim_id' => $claim->canonicalId, 'claim_revision' => $claim->revision])];
@@ -42,10 +42,13 @@ final class KnowledgeEnrichmentPlanner
         return [new KnowledgeEnrichmentCandidate('new_claim', $subjectId, $profile, $observation, ['reason' => 'No exact semantic match; requires governed review'])];
     }
 
-    private function sameContext(KnowledgeClaim $claim, string $subjectId, KnowledgeFacetProfile $profile): bool
+    private function sameContext(KnowledgeClaim $claim, string $subjectId, KnowledgeFacetProfile $profile, array $incoming = []): bool
     {
-        $metadata = $claim->provenance['metadata'] ?? [];
-        return is_array($metadata) && ($metadata['subject_id'] ?? null) === $subjectId && ($metadata['facet'] ?? null) === $profile->facet && ($metadata['scope'] ?? null) === $profile->scope;
+        $metadata = is_array($incoming['metadata'] ?? null) ? $incoming['metadata'] : [];
+        $metadata['subject_id'] = $subjectId;
+        $metadata['facet'] = $profile->facet;
+        $metadata['scope'] = $profile->scope;
+        return KnowledgeClaimIdentity::contextForClaim($claim) === KnowledgeClaimIdentity::contextForInput($claim->claimType, ['origin' => $incoming['origin'] ?? null, 'metadata' => $metadata]);
     }
 
     private function normalize(string $value): string

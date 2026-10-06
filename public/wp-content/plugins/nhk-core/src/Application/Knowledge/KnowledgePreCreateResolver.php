@@ -24,7 +24,7 @@ final class KnowledgePreCreateResolver
         $text = trim($text);
         $metadata = is_array($provenance['metadata'] ?? null) ? $provenance['metadata'] : [];
         $normalized = $this->normalizeText($text);
-        $input = ['stable_key' => $stableKey, 'claim_text' => $normalized, 'claim_type' => $type, 'context' => $this->claimContext($metadata)];
+        $input = ['stable_key' => $stableKey, 'claim_text' => $normalized, 'claim_type' => $type, 'context' => KnowledgeClaimIdentity::contextForInput($type, $provenance)];
         if ($stableKey === '' || $text === '') return $this->review('claim', 'create', $input, [], [], 'KNOWLEDGE_PRE_CREATE_INPUT_INVALID');
 
         try {
@@ -33,7 +33,7 @@ final class KnowledgePreCreateResolver
             foreach ($sameKey as $claim) {
                 $candidate = $this->claimCandidate($claim, 'STABLE_KEY_MATCH');
                 if (!$claim->active) return $this->review('claim', 'create', $input, [$candidate], $this->claimRevisions([$claim]), 'RETIRED_STABLE_KEY_CANDIDATE');
-                if ($this->claimEquivalent($claim, $normalized, $type, $metadata)) return $this->resolution('claim', 'create', KnowledgePreCreateResolution::REUSE_EXISTING, $input, [$candidate], $this->claimRevisions([$claim]), 'EXACT_STABLE_KEY_IDENTITY');
+                if ($this->claimEquivalent($claim, $normalized, $type, $provenance)) return $this->resolution('claim', 'create', KnowledgePreCreateResolution::REUSE_EXISTING, $input, [$candidate], $this->claimRevisions([$claim]), 'EXACT_STABLE_KEY_IDENTITY');
                 return $this->review('claim', 'create', $input, [$candidate], $this->claimRevisions([$claim]), 'STABLE_KEY_COLLISION');
             }
 
@@ -41,9 +41,9 @@ final class KnowledgePreCreateResolver
             $scoped = [];
             foreach ($claims as $claim) {
                 if (!$claim instanceof KnowledgeClaim || $claim->claimType !== $type) continue;
-                $claimMetadata = is_array($claim->provenance['metadata'] ?? null) ? $claim->provenance['metadata'] : [];
-                if ($this->sameClaimContext($claimMetadata, $metadata)) $scoped[] = $claim;
-                if ($this->normalizeText($claim->claimText) === $normalized && $this->sameClaimContext($claimMetadata, $metadata)) $exact[] = $claim;
+                $sameContext = KnowledgeClaimIdentity::contextForClaim($claim) === KnowledgeClaimIdentity::contextForInput($type, $provenance);
+                if ($sameContext) $scoped[] = $claim;
+                if ($this->normalizeText($claim->claimText) === $normalized && $sameContext) $exact[] = $claim;
             }
             if (count($exact) === 1) {
                 $claim = $exact[0];
@@ -132,22 +132,11 @@ final class KnowledgePreCreateResolver
         return $this->resolution($owner, $operation, KnowledgePreCreateResolution::REVIEW_REQUIRED, $input, $candidates, $revisions, $reason);
     }
 
-    private function claimContext(array $metadata): array
+    private function claimEquivalent(KnowledgeClaim $claim, string $normalized, string $type, array $provenance): bool
     {
-        $context = array_intersect_key($metadata, array_flip(['subject_id', 'facet', 'scope', 'claim_type']));
-        ksort($context);
-        return $context;
-    }
-
-    private function sameClaimContext(array $left, array $right): bool
-    {
-        return $this->claimContext($left) === $this->claimContext($right);
-    }
-
-    private function claimEquivalent(KnowledgeClaim $claim, string $normalized, string $type, array $metadata): bool
-    {
-        $claimMetadata = is_array($claim->provenance['metadata'] ?? null) ? $claim->provenance['metadata'] : [];
-        return $claim->claimType === $type && $this->normalizeText($claim->claimText) === $normalized && $this->sameClaimContext($claimMetadata, $metadata);
+        return $claim->claimType === $type
+            && $this->normalizeText($claim->claimText) === $normalized
+            && KnowledgeClaimIdentity::contextForClaim($claim) === KnowledgeClaimIdentity::contextForInput($type, $provenance);
     }
 
     private function claimCandidate(KnowledgeClaim $claim, string $reason): array

@@ -23,6 +23,32 @@ final class SystemWideDuplicatePreventionTest extends TestCase
         self::assertCount(1, $claims->items);
     }
 
+    public function test_different_video_referents_do_not_reuse_deictic_provenance_claim(): void
+    {
+        [$claims, $sources, $evidence] = $this->repositories();
+        $service = new KnowledgeService($claims, $sources, $evidence);
+        $subject = UuidCodec::newV7();
+        $provenance = static fn (string $videoId): array => ['origin' => 'CAPTURE_VIDEO_SOURCE_PROVENANCE', 'metadata' => ['subject_id' => $subject, 'facet' => 'recognition', 'scope' => 'entity', 'platform' => 'youtube', 'external_video_id' => $videoId]];
+        $first = $service->createClaim('video:first', 'The source identifies this Video as concerning canonical Odo 62.', 'provenance', $provenance('video-a'));
+        $second = $service->createClaim('video:second', 'The source identifies this Video as concerning canonical Odo 62.', 'provenance', $provenance('video-b'));
+
+        self::assertNotSame($first->canonicalId, $second->canonicalId);
+        self::assertCount(2, $claims->items);
+    }
+
+    public function test_same_video_referent_reuses_claim_across_sources(): void
+    {
+        [$claims, $sources, $evidence] = $this->repositories();
+        $service = new KnowledgeService($claims, $sources, $evidence);
+        $subject = UuidCodec::newV7();
+        $provenance = static fn (string $sourceKey): array => ['origin' => 'CAPTURE_VIDEO_SOURCE_PROVENANCE', 'metadata' => ['subject_id' => $subject, 'facet' => 'recognition', 'scope' => 'entity', 'platform' => 'youtube', 'external_video_id' => 'video-a', 'source_stable_key' => $sourceKey]];
+        $first = $service->createClaim('video:source-a', 'The source identifies this Video as concerning canonical Odo 62.', 'provenance', $provenance('source-a'));
+        $second = $service->createClaim('video:source-b', 'The source identifies this Video as concerning canonical Odo 62.', 'provenance', $provenance('source-b'));
+
+        self::assertSame($first->canonicalId, $second->canonicalId);
+        self::assertCount(1, $claims->items);
+    }
+
     public function test_possible_same_scope_paraphrase_is_review_not_create(): void
     {
         [$claims, $sources, $evidence] = $this->repositories();

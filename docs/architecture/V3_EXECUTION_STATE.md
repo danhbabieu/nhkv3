@@ -23925,3 +23925,40 @@ local, undeployed change.
 STATUS: `DICTIONARY_BROWSE_AND_RICH_DETAIL_IMPLEMENTED_LOCALLY /
 FOCUSED_GREEN / FULL_SUITE_ENVIRONMENT_LIMITED / NO_DATA_MUTATION /
 NO_DEPLOYMENT / COMMIT_PENDING`.
+
+# Checkpoint — 2026-10-07 — Knowledge Video-provenance duplicate identity
+
+ROOT_CAUSE: Knowledge audit, pre-create resolution and enrichment planning did
+not share one identity law. They compared the deictic Video provenance Claim
+only by subject/facet/scope/type/text, so identical wording for different
+external Videos could be classified as a definite duplicate or incorrectly
+reuse one Claim. Source identity remains support context; the existing Video
+referent is identity-bearing only for the registered
+`CAPTURE_VIDEO_SOURCE_PROVENANCE` origin.
+
+FIX: Added the Knowledge-owner-specific `KnowledgeClaimIdentity` context
+comparator and applied it consistently to audit, pre-create and enrichment
+planning. Video provenance context uses canonical Video UUID when present, or
+the existing platform/external-video identity; it does not include Source,
+Evidence or a global matcher. Audit cluster IDs are now stable across carry
+pages, duplicate owner signal clusters are collapsed by canonical ID set, and
+signed cursors carry emitted cluster IDs so one semantic cluster is counted
+once across pagination.
+
+REGRESSION COVERAGE: Added tests for different Video referents remaining
+distinct, same Video reuse across different Sources, audit classification in
+both directions, enrichment planning context and paginated cluster emission.
+Focused Knowledge/audit coverage passes 37 tests / 329 assertions. Changed
+files pass PHP lint and `git diff --check`. No Knowledge, Evidence, Source,
+Graph, Media, Video or staging data was mutated.
+
+VERIFICATION: The default full suite remains limited by the existing 128MB
+PHP ceiling in `TrustedProvidedFileMaterializerTest`. A 512MB rerun completed
+3,542 tests with 33 environment/infrastructure errors and 28 unrelated
+failures, including missing `NHK_WP_TEST_PATH`, unauthorized TEST RUNTIME
+identity and unrelated unit fixtures. No deployment, push or external data
+write occurred.
+
+STATUS: `KNOWLEDGE_VIDEO_PROVENANCE_DUPLICATE_IDENTITY_FIXED_LOCALLY /
+FOCUSED_GREEN / FULL_SUITE_ENVIRONMENT_LIMITED / NO_DATA_MUTATION /
+NO_DEPLOYMENT / COMMIT_PENDING`.
