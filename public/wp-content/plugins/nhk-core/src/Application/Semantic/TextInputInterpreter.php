@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Semantic;
 
+use NHK\Core\Shared\Encoding\{Utf8Contract, Utf8String};
+
 /** Deterministic candidate extractor. It never promotes input to canonical truth. */
 final class TextInputInterpreter
 {
@@ -14,6 +16,13 @@ final class TextInputInterpreter
     /** @param list<array<string,mixed>> $assets @param list<string> $subjectHints @param array<string,mixed> $metadata @return array<string,mixed> */
     public function interpret(string $text, array $assets = [], array $subjectHints = [], array $metadata = []): array
     {
+        // The interpreter is the first semantic producer. Do not let PCRE or
+        // a later persistence boundary become the first place that detects a
+        // malformed string.
+        Utf8Contract::assertValid($text, 'semantic.interpretation', 'input.text');
+        Utf8Contract::assertValid($assets, 'semantic.interpretation', 'input.assets');
+        Utf8Contract::assertValid($subjectHints, 'semantic.interpretation', 'input.subject_hints');
+        Utf8Contract::assertValid($metadata, 'semantic.interpretation', 'input.metadata');
         $text = trim($text);
         $packet = $this->structured->interpret(UniversalInputEnvelope::fromArray([
             'input_type' => (string) ($metadata['source_kind'] ?? $metadata['input_type'] ?? 'TEXT'),
@@ -26,7 +35,9 @@ final class TextInputInterpreter
             'observations' => array_values(array_filter($assets, 'is_array')),
             'lineage' => is_array($metadata['lineage'] ?? null) ? $metadata['lineage'] : [],
         ]))->toArray();
-        $sentences = array_values(array_filter(array_map('trim', preg_split('/(?<=[.!?。！？])\s+/u', $text) ?: []), static fn (string $item): bool => $item !== ''));
+        $split = preg_split('/(?<=[.!?。！？])\s+/u', $text);
+        if ($split === false) throw new \RuntimeException('SEMANTIC_INTERPRETATION_SEGMENTATION_FAILED');
+        $sentences = array_values(array_filter(array_map('trim', $split), static fn (string $item): bool => $item !== ''));
         if ($sentences === [] && $text !== '') $sentences = [$text];
         $mentions = [];
         foreach ($sentences as $sentence) {
@@ -125,7 +136,8 @@ final class TextInputInterpreter
     /** @return array<string,mixed> */
     private function userCandidate(string $sentence): array
     {
-        $sentence = trim($sentence, " \t\n\r-•*");
+        Utf8Contract::assertValid($sentence, 'semantic.interpretation', 'user_claim_candidates.text');
+        $sentence = Utf8String::trim($sentence, " \t\n\r-*•", 'semantic.interpretation', 'user_claim_candidates.text');
         $lower = function_exists('mb_strtolower') ? mb_strtolower($sentence) : strtolower($sentence);
         $configuration = str_contains($lower, 'côn') || str_contains($lower, 'tiges') || str_contains($lower, 'búa') || str_contains($lower, 'marteaux') || str_contains($lower, 'cấu hình');
         $music = str_contains($lower, 'bài nhạc') || str_contains($lower, 'giai điệu') || str_contains($lower, 'chơi 2 bài');

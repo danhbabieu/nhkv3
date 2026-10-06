@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Semantic;
 
 use NHK\Core\Application\Compliance\PublicEditorialCopyGuard;
+use NHK\Core\Shared\Encoding\Utf8String;
 
 /** Shared deterministic composer for Article, Video and Image/Media drafts. */
 final class SharedEditorialComposer
@@ -147,8 +148,8 @@ final class SharedEditorialComposer
     private function lowerFirst(string $value): string
     {
         if ($value === '') return $value;
-        if (function_exists('mb_strtolower')) return mb_strtolower(mb_substr($value, 0, 1)) . mb_substr($value, 1);
-        return strtolower(substr($value, 0, 1)) . substr($value, 1);
+        if (function_exists('mb_strtolower')) return mb_strtolower(Utf8String::slice($value, 0, 1, 'shared.editorial.composer', 'lower_first')) . Utf8String::slice($value, 1, null, 'shared.editorial.composer', 'lower_first');
+        return strtolower(Utf8String::slice($value, 0, 1, 'shared.editorial.composer', 'lower_first')) . Utf8String::slice($value, 1, null, 'shared.editorial.composer', 'lower_first');
     }
 
     private function comparisonKey(string $text): string
@@ -160,13 +161,13 @@ final class SharedEditorialComposer
     private function title(string $topic, string $input, string $explicitTitle = ''): string
     {
         $value = trim($explicitTitle !== '' ? $explicitTitle : ($topic !== '' ? $topic : $input));
-        return function_exists('mb_substr') ? mb_substr($value, 0, 120) : substr($value, 0, 120);
+        return Utf8String::truncate($value, 120, 'shared.editorial.composer', 'title');
     }
 
     private function summary(string $first, string $explicitExcerpt = ''): string
     {
         $value = trim($explicitExcerpt !== '' ? $explicitExcerpt : $first);
-        return function_exists('mb_substr') ? mb_substr($value, 0, 180) : substr($value, 0, 180);
+        return Utf8String::truncate($value, 180, 'shared.editorial.composer', 'summary');
     }
 
     private function informationGain(array $claimTexts, array $input): float

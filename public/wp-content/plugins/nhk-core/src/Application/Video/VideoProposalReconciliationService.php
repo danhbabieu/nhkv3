@@ -13,6 +13,7 @@ use NHK\Core\Application\PublicIdentity\PublicIdentityService;
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Governance\{CommandCanonicalizer, Proposal, ProposalState, ProposalSubjectBindingValidator};
 use NHK\Core\Shared\Uuid\UuidCodec;
+use NHK\Core\Shared\Encoding\Utf8String;
 use NHK\Core\Infrastructure\Admin\VideoRelationAdminContract;
 
 /**
@@ -154,7 +155,7 @@ final class VideoProposalReconciliationService implements VideoProposalReconcili
             if (!is_array($applied['canonical_readback'] ?? null)) return ['status' => 'FAILED', 'blockers' => ['CANONICAL_READBACK_VERIFICATION_FAILED']];
             return ['status' => 'APPLIED', 'proposal_id' => $proposal->id, 'canonical_id' => $applied['canonical_id'] ?? $applied['result_entity_uuid'] ?? null, 'canonical_readback' => $applied['canonical_readback'], 'idempotent' => (bool) ($applied['idempotent'] ?? false)];
         } catch (\Throwable $error) {
-            return ['status' => 'FAILED', 'blockers' => [$this->errorCode($error)], 'message' => substr(preg_replace('/\s+/', ' ', trim($error->getMessage())) ?: 'Video reconciliation failed.', 0, 160)];
+            return ['status' => 'FAILED', 'blockers' => [$this->errorCode($error)], 'message' => Utf8String::truncate(preg_replace('/\s+/', ' ', trim($error->getMessage())) ?: 'Video reconciliation failed.', 160, 'video.proposal.reconciliation', 'error.message')];
         }
     }
 

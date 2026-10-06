@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Mcp;
 
+use NHK\Core\Shared\Encoding\Utf8String;
+
 /**
  * Temporary, process-local diagnostics for the Easy MCP Apps wire boundary.
  *
@@ -84,7 +86,7 @@ final class McpAppDiagnostics
     private static function safeString(mixed $value, int $limit): ?string
     {
         if (!is_string($value) || $value === '') return null;
-        return function_exists('mb_substr') ? mb_substr($value, 0, $limit) : substr($value, 0, $limit);
+        return Utf8String::truncate($value, $limit, 'mcp.app.diagnostics', 'value');
     }
 
     private static function sanitizeErrorMessage(mixed $value): ?string

@@ -9,6 +9,7 @@ use NHK\Core\Domain\Governance\{EligibilityResult, Proposal, ProposalState};
 use NHK\Core\Governance\Exception\{GovernancePermissionDenied, InvalidProposalTransition, ProposalBindingConflict, ProposalNotFound};
 use NHK\Core\Domain\Knowledge\DependencyValidationException;
 use NHK\Core\Shared\Uuid\UuidCodec;
+use NHK\Core\Shared\Encoding\Utf8String;
 
 final class GovernanceQueueActionService
 {
@@ -193,7 +194,7 @@ final class GovernanceQueueActionService
     {
         if ($error instanceof ProposalNotFound || $error instanceof GovernancePermissionDenied || $error instanceof ProposalBindingConflict || $error instanceof InvalidProposalTransition) {
             $message = preg_replace('/\s+/', ' ', trim($error->getMessage())) ?: 'Governance action failed.';
-            return substr($message, 0, 160);
+            return Utf8String::truncate($message, 160, 'admin.governance.queue', 'error.message');
         }
         return 'Governance action failed.';
     }

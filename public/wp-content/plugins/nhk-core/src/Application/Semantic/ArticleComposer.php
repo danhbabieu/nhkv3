@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Semantic;
 
 use NHK\Core\Application\Compliance\PublicEditorialCopyGuard;
+use NHK\Core\Shared\Encoding\Utf8String;
 
 /** Deterministic editorial composer. Canonical Claim text is never dumped verbatim. */
 final class ArticleComposer
@@ -147,13 +148,13 @@ final class ArticleComposer
     private function title(string $input): string
     {
         $first = trim((string) (preg_split('/(?<=[.!?。！？])\s+/u', $input)[0] ?? $input));
-        return $first !== '' ? (function_exists('mb_substr') ? mb_substr($first, 0, 96) : substr($first, 0, 96)) : 'Bản ghi biên tập mới';
+        return $first !== '' ? Utf8String::truncate($first, 96, 'article.composer', 'title') : 'Bản ghi biên tập mới';
     }
 
     private function excerpt(string $text): string
     {
         $text = trim($text);
-        return function_exists('mb_substr') ? mb_substr($text, 0, 180) : substr($text, 0, 180);
+        return Utf8String::truncate($text, 180, 'article.composer', 'excerpt');
     }
 
     private function claimSummary(string $text): string
@@ -172,8 +173,8 @@ final class ArticleComposer
     private function lowerFirst(string $text): string
     {
         if ($text === '') return '';
-        if (function_exists('mb_strtolower') && function_exists('mb_substr')) return mb_strtolower(mb_substr($text, 0, 1)) . mb_substr($text, 1);
-        return strtolower(substr($text, 0, 1)) . substr($text, 1);
+        if (function_exists('mb_strtolower')) return mb_strtolower(Utf8String::slice($text, 0, 1, 'article.composer', 'lower_first')) . Utf8String::slice($text, 1, null, 'article.composer', 'lower_first');
+        return strtolower(Utf8String::slice($text, 0, 1, 'article.composer', 'lower_first')) . Utf8String::slice($text, 1, null, 'article.composer', 'lower_first');
     }
 
     /** @param list<array<string,mixed>> $assets */

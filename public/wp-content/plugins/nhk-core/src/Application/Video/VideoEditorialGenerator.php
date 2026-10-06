@@ -6,6 +6,7 @@ namespace NHK\Core\Application\Video;
 use NHK\Core\Application\Compliance\PublicClaimCopyPolicy;
 use NHK\Core\Application\Compliance\PublicEditorialCopyGuard;
 use NHK\Core\Domain\Video\VideoEditorialEnrichmentContext;
+use NHK\Core\Shared\Encoding\Utf8String;
 
 final class VideoEditorialGenerator
 {
@@ -50,5 +51,5 @@ final class VideoEditorialGenerator
     }
 
     private function firstSentence(string $value): string { return trim((string) preg_split('/[.!?\n]/', $value, 2)[0]); }
-    private function truncate(string $value, int $limit): string { return function_exists('mb_substr') ? mb_substr($value, 0, $limit) : substr($value, 0, $limit); }
+    private function truncate(string $value, int $limit): string { return Utf8String::truncate($value, $limit, 'video.editorial.generator', 'text'); }
 }

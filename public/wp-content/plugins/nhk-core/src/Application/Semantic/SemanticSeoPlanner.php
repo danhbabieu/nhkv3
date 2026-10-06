@@ -6,6 +6,7 @@ namespace NHK\Core\Application\Semantic;
 use NHK\Core\Application\Compliance\PublicEditorialCopyGuard;
 use NHK\Core\Application\Seo\SeoReadinessPolicy;
 use NHK\Core\Domain\Seo\SeoReadinessResult;
+use NHK\Core\Shared\Encoding\Utf8String;
 
 /** Shared, bounded, projection-only semantic SEO planner. */
 final class SemanticSeoPlanner
@@ -94,8 +95,8 @@ final class SemanticSeoPlanner
         }
         $readerCopy = trim($draft->summary . ' ' . $draft->body);
         if ($extra === '' && $readerCopy !== '') $extra = $this->readerSentence($readerCopy, $topic);
-        $text = trim($topic) . ($extra !== '' ? ' — ' . trim($extra, " .!?\t\n\r\0\x0B") : '');
-        return function_exists('mb_substr') ? mb_substr($text, 0, 155) : substr($text, 0, 155);
+        $text = trim($topic) . ($extra !== '' ? ' — ' . Utf8String::trim($extra, " .!?\t\n\r\0\x0B", 'semantic.seo', 'meta_description.extra') : '');
+        return Utf8String::truncate($text, 155, 'semantic.seo', 'meta_description');
     }
 
     /** @return list<array<string,mixed>> */
@@ -167,7 +168,7 @@ final class SemanticSeoPlanner
     private function narrowTopic(string $topic): string
     {
         $narrowed = preg_replace('/^\s*(?:\d+|three|four|five|ba|bốn|năm)\s+(?:types?|kinds?|versions?|features?|loại|phiên bản|đặc điểm|tính năng)\s+(?:(?:of|của)\s+)?/iu', '', trim($topic));
-        $narrowed = trim((string) ($narrowed ?? $topic), " .:;—–-");
+        $narrowed = Utf8String::trim((string) ($narrowed ?? $topic), " .:;—–-", 'semantic.seo', 'topic');
         return $narrowed !== '' ? $narrowed : trim($topic);
     }
 

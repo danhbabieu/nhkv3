@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Tests\Unit;
 
-use NHK\Core\Shared\Encoding\{Utf8Contract, Utf8ValidationException};
+use NHK\Core\Shared\Encoding\{Utf8Contract, Utf8String, Utf8ValidationException};
 use PHPUnit\Framework\TestCase;
 
 final class Utf8ContractTest extends TestCase
@@ -39,6 +39,15 @@ final class Utf8ContractTest extends TestCase
             self::assertSame('arguments[body]', $error->path);
             throw $error;
         }
+    }
+
+    public function test_unicode_truncation_never_cuts_a_multibyte_character(): void
+    {
+        $value = 'Đánh mượn “búa” — Westminster';
+        self::assertSame('Đánh mượn “b', Utf8String::truncate($value, 12, 'test.truncate', 'value'));
+        self::assertSame('Đánh mượn “b', Utf8String::slice($value, 0, 12, 'test.slice', 'value'));
+        self::assertSame(1, preg_match('//u', Utf8String::truncate($value, 12)));
+        self::assertStringContainsString('Đánh mượn', Utf8String::truncate($value, 12));
     }
 
     /** @return list<array{string}> */

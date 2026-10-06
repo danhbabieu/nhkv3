@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Mcp;
 
 use NHK\Core\Application\Graph\RelationshipOwnerContract;
+use NHK\Core\Shared\Encoding\Utf8String;
 
 final class McpAbilityRegistration
 {
@@ -326,7 +327,7 @@ final class McpAbilityRegistration
     private static function diagnosticMessage(string $message): string
     {
         $message = preg_replace('/\s+/', ' ', trim($message)) ?? '';
-        return function_exists('mb_substr') ? mb_substr($message, 0, 240) : substr($message, 0, 240);
+        return Utf8String::truncate($message, 240, 'mcp.ability.diagnostics', 'message');
     }
 
     /** @var array<string,string> */

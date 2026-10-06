@@ -6,6 +6,7 @@ namespace NHK\Core\Application\Dictionary;
 use NHK\Core\Contracts\Dictionary\DictionaryConceptRepository;
 use NHK\Core\Domain\Dictionary\{DictionaryConcept, DictionaryLabel};
 use NHK\Core\Domain\Dictionary\LexicalEntry;
+use NHK\Core\Shared\Encoding\Utf8String;
 
 final class DictionaryPublicQuery
 {
@@ -385,7 +386,7 @@ final class DictionaryPublicQuery
     {
         $value = $this->normalize($value);
         if ($value === '') return '';
-        $initial = function_exists('mb_substr') ? mb_substr($value, 0, 1, 'UTF-8') : substr($value, 0, 1);
+        $initial = Utf8String::slice($value, 0, 1, 'dictionary.public.query', 'initial');
         return function_exists('mb_strtoupper') ? mb_strtoupper($initial, 'UTF-8') : strtoupper($initial);
     }
 
