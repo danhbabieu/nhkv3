@@ -67,6 +67,8 @@ final class EditorialCaptureCoordinator
         private ?CaptureSubjectBindingRecovery $subjectBinding = null,
         private ?CaptureDictionaryCreatePrecondition $dictionaryCreatePrecondition = null,
         private ?DictionaryPreCreateResolver $dictionaryPreCreateResolver = null,
+        private $articlePreCreateResolver = null,
+        private bool $articlePreCreateRequired = false,
     ) { $this->completion = $completion ?? new CompletionCoordinator(); }
 
     /** @param array<string,mixed> $input */
@@ -574,6 +576,11 @@ final class EditorialCaptureCoordinator
                     $record = $this->save($record, $record->stage, $assets, $diagnostics, $receipts, 'CONTENT_PREPARATION_SAFE_CONTINUE', $record->articleId, $record->articleStateToken, 'REVIEW_REQUIRED', 'REVIEW_REQUIRED');
                 }
                 if ($articleRequired && $record->articleId === null && $preparationResult->blockers === []) {
+                    $articleResolution = $this->resolveArticleBeforeCreate($record, $input, $intent, $preflightResolution, $text, $assets);
+                    $diagnostics['article_resolution'] = $articleResolution;
+                    if (($articleResolution['status'] ?? '') !== 'CREATE_DIFFERENTIATED_ARTICLE') {
+                        return $this->save($record, CaptureStage::INTERPRETED, $assets, $diagnostics, $receipts, 'ARTICLE_PRE_CREATE_REVIEW', $record->articleId, $record->articleStateToken, 'REVIEW_REQUIRED', 'REVIEW_REQUIRED');
+                    }
                     $safeComposition = $this->composer->compose($text, [], [], [
                         'title' => (string) ($input['title'] ?? ''),
                         'excerpt' => (string) ($input['excerpt'] ?? ''),
@@ -586,6 +593,8 @@ final class EditorialCaptureCoordinator
                     $draft = ($this->draftCreator)([
                         'capture_id' => $record->captureId,
                         'idempotency_key' => $record->captureId . ':article',
+                        'subject_resolution' => $preflightResolution,
+                        'content_intent' => $intent,
                         'title' => (string) ($safeComposition['title'] ?? $input['title'] ?? ''),
                         'content' => (string) ($safeComposition['content'] ?? ''),
                         'excerpt' => (string) ($safeComposition['excerpt'] ?? ''),
@@ -888,6 +897,11 @@ final class EditorialCaptureCoordinator
             }
 
             if ($articleRequired && $record->articleId === null) {
+                $articleResolution = $this->resolveArticleBeforeCreate($record, $input, $intent, $resolution, $text, $assets);
+                $diagnostics['article_resolution'] = $articleResolution;
+                if (($articleResolution['status'] ?? '') !== 'CREATE_DIFFERENTIATED_ARTICLE') {
+                    return $this->save($record, CaptureStage::SEMANTICS_RECONCILED, $assets, $diagnostics, $receipts, 'ARTICLE_PRE_CREATE_REVIEW', $record->articleId, $record->articleStateToken, 'REVIEW_REQUIRED', 'REVIEW_REQUIRED');
+                }
                 $this->beginPhase('COMPOSED');
                 $sharedDraft = is_array($sharedEditorial ?? null) ? ($sharedEditorial['draft'] ?? null) : null;
                 $composition = is_object($sharedDraft)
@@ -896,6 +910,8 @@ final class EditorialCaptureCoordinator
                 $draft = ($this->draftCreator)([
                     'capture_id' => $record->captureId,
                     'idempotency_key' => $record->captureId . ':article',
+                    'subject_resolution' => $resolution,
+                    'content_intent' => $intent,
                     'title' => (string) ($composition['title'] ?? $input['title'] ?? ''),
                     'content' => (string) ($composition['content'] ?? ''),
                     'excerpt' => (string) ($composition['excerpt'] ?? ''),
@@ -1793,6 +1809,40 @@ final class EditorialCaptureCoordinator
         $this->activeReceiptPhase = $phase;
         $receipts = CapturePhaseReceiptReducer::append($receipts, $phase, ['status' => 'STARTED', 'result' => 'IN_PROGRESS', 'started_at' => $now, 'completed_at' => null, 'elapsed_ms' => null]);
         return $this->captures->save(new CaptureRecord($record->captureId, $record->idempotencyKey, $record->requestFingerprint, $record->stage, $record->status, $record->articleId, $record->articleStateToken, $assets, $record->context, $diagnostics, $receipts, $record->revision + 1, $record->createdAt, gmdate('Y-m-d H:i:s.u')));
+    }
+
+    /**
+     * Article identity remains owned by the Article research boundary. Capture
+     * only binds its decision before the native draft writer is invoked.
+     *
+     * @return array<string,mixed>
+     */
+    private function resolveArticleBeforeCreate(CaptureRecord $record, array $input, array $intent, array $subjectResolution, string $text, array $assets): array
+    {
+        if (!is_callable($this->articlePreCreateResolver)) {
+            return $this->articlePreCreateRequired
+                ? ['status' => 'REVIEW_REQUIRED', 'decision' => 'REVIEW_REQUIRED', 'diagnostics' => ['ARTICLE_PRE_CREATE_RESOLVER_UNAVAILABLE']]
+                : ['status' => 'CREATE_DIFFERENTIATED_ARTICLE', 'decision' => 'CREATE_DIFFERENTIATED_ARTICLE', 'diagnostics' => ['ARTICLE_PRE_CREATE_COMPATIBILITY_BOUNDARY']];
+        }
+        try {
+            $result = ($this->articlePreCreateResolver)([
+                'capture' => $record->toArray(),
+                'capture_id' => $record->captureId,
+                'capture_revision' => $record->revision,
+                'input' => $input,
+                'content_intent' => $intent,
+                'subject_resolution' => $subjectResolution,
+                'text' => $text,
+                'assets' => $assets,
+            ]);
+            if (!is_array($result)) return ['status' => 'REVIEW_REQUIRED', 'decision' => 'REVIEW_REQUIRED', 'diagnostics' => ['ARTICLE_PRE_CREATE_RESOLUTION_INVALID']];
+            $decision = strtoupper(trim((string) ($result['decision'] ?? $result['status'] ?? '')));
+            $result['status'] = $decision === 'CREATE_DIFFERENTIATED_ARTICLE' ? 'CREATE_DIFFERENTIATED_ARTICLE' : 'REVIEW_REQUIRED';
+            $result['decision'] = $decision !== '' ? $decision : 'REVIEW_REQUIRED';
+            return $result;
+        } catch (\Throwable $error) {
+            return ['status' => 'REVIEW_REQUIRED', 'decision' => 'REVIEW_REQUIRED', 'diagnostics' => ['ARTICLE_PRE_CREATE_RESOLUTION_UNAVAILABLE'], 'error' => $error->getMessage()];
+        }
     }
 
     /** @param array<string,mixed> $value @return array<string,mixed> */

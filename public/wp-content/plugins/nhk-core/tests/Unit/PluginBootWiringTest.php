@@ -182,6 +182,15 @@ final class PluginBootWiringTest extends TestCase
         self::assertStringContainsString('rest_do_request($request)', (string) file_get_contents(__DIR__ . '/../../src/Application/Mcp/McpAbilityRegistration.php'));
     }
 
+    public function test_production_draft_gateway_and_capture_share_strict_article_pre_create_resolver(): void
+    {
+        $plugin = (string) file_get_contents(__DIR__ . '/../../src/Plugin.php');
+
+        self::assertStringContainsString('$draftGateway = new EditorialDraftGateway($editorialPosts, $articleReceipts, $ownerPublication, $articlePreCreateResolver);', $plugin);
+        self::assertStringContainsString('articlePreCreateResolver: $articlePreCreateResolver,', $plugin);
+        self::assertStringContainsString('articlePreCreateRequired: true,', $plugin);
+    }
+
     public function test_capture_media_compiler_uses_first_party_target_url_resolver(): void
     {
         $plugin = (string) file_get_contents(__DIR__ . '/../../src/Plugin.php');

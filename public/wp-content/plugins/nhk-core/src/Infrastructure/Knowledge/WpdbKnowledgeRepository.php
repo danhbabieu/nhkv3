@@ -12,8 +12,8 @@ final class WpdbKnowledgeRepository implements KnowledgeRepository, KnowledgePag
 {
     private string $table;
     public function __construct(private object $database) { $this->table = $database->prefix . 'nhk_knowledge_claims'; }
-    public function findByCanonicalId(string $id): ?KnowledgeClaim { return $this->hydrate($this->database->get_row($this->database->prepare("SELECT * FROM {$this->table} WHERE canonical_uuid=%s LIMIT 1", UuidCodec::toBinary($id)), ARRAY_A)); }
-    public function findByStableKey(string $key): ?KnowledgeClaim { return $this->hydrate($this->database->get_row($this->database->prepare("SELECT * FROM {$this->table} WHERE stable_key=%s LIMIT 1", $key), ARRAY_A)); }
+    public function findByCanonicalId(string $id): ?KnowledgeClaim { return $this->hydrate($this->database->get_row($this->database->prepare("SELECT * FROM {$this->table} WHERE canonical_uuid=%s LIMIT 1", UuidCodec::toBinary($id)), ARRAY_A), true); }
+    public function findByStableKey(string $key): ?KnowledgeClaim { return $this->hydrate($this->database->get_row($this->database->prepare("SELECT * FROM {$this->table} WHERE stable_key=%s LIMIT 1", $key), ARRAY_A), true); }
     public function create(KnowledgeClaim $claim): KnowledgeClaim
     {
         $existingById = $this->findByCanonicalId($claim->canonicalId);
@@ -37,7 +37,7 @@ final class WpdbKnowledgeRepository implements KnowledgeRepository, KnowledgePag
         if ($ok !== 1) throw new KnowledgeException('Knowledge claim revision conflict.');
         return $this->findByCanonicalId($claim->canonicalId) ?? $claim;
     }
-    public function list(bool $includeRetired = false): array { $rows = $this->database->get_results("SELECT * FROM {$this->table}" . ($includeRetired ? '' : ' WHERE state=1') . ' ORDER BY id', ARRAY_A); return array_values(array_filter(array_map(fn (array $row): ?KnowledgeClaim => $this->hydrate($row), $rows ?: []), static fn (?KnowledgeClaim $claim): bool => $claim !== null)); }
+    public function list(bool $includeRetired = false): array { $rows = $this->database->get_results("SELECT * FROM {$this->table}" . ($includeRetired ? '' : ' WHERE state=1') . ' ORDER BY id', ARRAY_A); return array_values(array_filter(array_map(fn (array $row): ?KnowledgeClaim => $this->hydrate($row, $includeRetired), $rows ?: []), static fn (?KnowledgeClaim $claim): bool => $claim !== null)); }
     public function page(bool $includeRetired, ?string $afterStableKey, int $limit): array
     {
         $limit = max(1, min(200, $limit));
@@ -52,7 +52,7 @@ final class WpdbKnowledgeRepository implements KnowledgeRepository, KnowledgePag
         $rows = $this->database->get_results($this->database->prepare("SELECT * FROM {$this->table} WHERE {$pageWhere} ORDER BY stable_key ASC LIMIT %d", ...$args), ARRAY_A) ?: [];
         $pageRows = array_slice($rows, 0, $limit);
         foreach ($pageRows as $row) {
-            $claim = $this->hydrate($row);
+            $claim = $this->hydrate($row, $includeRetired);
             if ($claim !== null) {
                 $items[] = $claim;
                 continue;
@@ -67,7 +67,7 @@ final class WpdbKnowledgeRepository implements KnowledgeRepository, KnowledgePag
         return ['items' => $items, 'has_more' => $hasMore, 'next_cursor' => $nextCursor, 'diagnostics' => $diagnostics];
     }
     public function latestFeedCandidates(int $limit): array { $limit = max(1, min(100, $limit)); $rows = $this->database->get_results($this->database->prepare("SELECT * FROM {$this->table} WHERE state=1 ORDER BY created_at DESC, id DESC LIMIT %d", $limit), ARRAY_A); return array_values(array_filter(array_map(fn (array $row): ?KnowledgeClaim => $this->hydrate($row), $rows ?: []), static fn (?KnowledgeClaim $claim): bool => $claim !== null)); }
-    private function hydrate(?array $row): ?KnowledgeClaim { if (!$row) return null; try { $provenance = json_decode((string) ($row['provenance_json'] ?? ''), true, 512, JSON_THROW_ON_ERROR); if (!is_array($provenance) || preg_match('/^[01]$/', (string) ($row['state'] ?? '')) !== 1) return null; return new KnowledgeClaim(UuidCodec::fromBinary($row['canonical_uuid']), (string) $row['stable_key'], (string) $row['claim_text'], (string) $row['claim_type'], $provenance, (int) $row['state'] === 1, (int) $row['revision'], $row['created_at'] ?? null, $row['updated_at'] ?? null); } catch (\Throwable) { return null; } }
+    private function hydrate(?array $row, bool $allowRetired = false): ?KnowledgeClaim { if (!$row) return null; try { $provenance = json_decode((string) ($row['provenance_json'] ?? ''), true, 512, JSON_THROW_ON_ERROR); if (!is_array($provenance) || preg_match('/^[01]$/', (string) ($row['state'] ?? '')) !== 1 || (!$allowRetired && (int) $row['state'] !== 1)) return null; return new KnowledgeClaim(UuidCodec::fromBinary($row['canonical_uuid']), (string) $row['stable_key'], (string) $row['claim_text'], (string) $row['claim_type'], $provenance, (int) $row['state'] === 1, (int) $row['revision'], $row['created_at'] ?? null, $row['updated_at'] ?? null); } catch (\Throwable) { return null; } }
 
     private function sameClaim(KnowledgeClaim $left, KnowledgeClaim $right): bool
     {

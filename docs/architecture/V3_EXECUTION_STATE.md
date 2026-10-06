@@ -23524,3 +23524,77 @@ authorized TEST/DB-double environment failures.
 
 STATUS: `PRE_CREATE_HARDENING_FIXED_LOCALLY / FOCUSED_PASS /
 TEST_RUNTIME_CANARY_BLOCKED / NO_DATA_MUTATION`.
+
+## Checkpoint — 2026-10-06 — System-wide resolve-before-create review and Knowledge/Article implementation
+
+SCOPE: Completed the owner-boundary review requested for Dictionary, Authority,
+Knowledge Claim, Source, Evidence, Graph relation, Article/Post, Media,
+MediaAsset, MediaUsage, Video and Capture, including direct MCP/admin,
+candidate/review and repository paths. Added the bounded design record at
+`docs/architecture/SYSTEM_WIDE_DUPLICATE_PREVENTION_DESIGN.md`.
+
+IMPLEMENTATION: Knowledge Claim, Source and Evidence now perform owner-specific
+pre-create resolution over canonical active and retired state. Stable keys,
+canonical locators, explicit external identities and support-unit identity are
+handled deterministically; request/idempotency keys do not define semantic
+identity. Exact reuse is safe, lexical overlap only discovers review candidates,
+and unavailable/ambiguous state fails closed. WPDB repositories preserve
+retired rows for internal identity resolution while public defaults remain
+active-only. Article draft creation in the production Capture composition root
+now requires the Article research/overlap decision before the native WordPress
+draft writer runs; unresolved or overlapping input returns review-required.
+
+REGRESSION COVERAGE: Added
+`SystemWideDuplicatePreventionTest` for cross-request-key claim/source/evidence
+reuse, paraphrase review and clearly different new facts. Focused Knowledge and
+Article research slice passes 29 tests / 95 assertions and the Capture/Article
+slice passes 174 tests / 908 assertions. Preserved owner slice (Dictionary,
+Authority, Graph, Media usage and Video) passes 130 tests / 451 assertions.
+`composer lint` and `git diff --check` pass. PHPUnit reports existing
+deprecations/warnings in the focused owner slice; no new data/runtime mutation
+was performed.
+
+AUDIT STATUS: No automatic duplicate repair, merge, retirement, deletion,
+migration, staging/production write or deployment was performed. The remaining
+known boundary is the explicitly labelled compatibility constructor mode for
+legacy in-process Capture fixtures without an Article resolver; production
+wiring is strict and the follow-up is to migrate those constructors, then make
+strict mode universal.
+
+STATUS: `SYSTEM_WIDE_REVIEW_IMPLEMENTED_LOCALLY / FOCUSED_PASS /
+TEST_RUNTIME_CANARY_NOT_RUN / NO_DATA_MUTATION`.
+
+## Checkpoint — 2026-10-06 — Final Article create-boundary hardening
+
+STATIC AUDIT: The production Plugin composition is the only durable
+Capture/Draft composition in this repository and already binds strict Article
+pre-create resolution. All other `EditorialCaptureCoordinator` and
+`EditorialDraftGateway` constructions are unit/support fakes. The direct MCP
+`nhk.article.draft.create` path was nevertheless hardened: production
+`EditorialDraftGateway` now receives the same Article resolver as Capture and
+will not call the native WordPress draft writer unless the decision is exactly
+`CREATE_DIFFERENTIATED_ARTICLE`.
+
+ARTICLE POLICY: `REUSE_EXISTING_ARTICLE`, `ENRICH_EXISTING_ARTICLE`,
+`UPDATE_EXISTING_ARTICLE`, existing projections/pages, overlap, uncertainty and
+resolver failure are review/block outcomes for this new-draft boundary. The
+previous normalization of `NO_OVERLAP`/`COMPLEMENTARY_CONTENT` to generic
+`CREATE_NEW` was removed; the production resolver emits only
+`CREATE_DIFFERENTIATED_ARTICLE` for the authorized new-draft case. The
+no-resolver compatibility behavior remains test-only-safe because its bounded
+call sites use fake post stores and it is not wired into production.
+
+REGRESSION COVERAGE: Added direct DraftGateway review/authorization coverage
+and production Plugin wiring assertions. Combined duplicate-prevention,
+Knowledge/Source/Evidence, Article/Capture, Dictionary, Authority, Graph,
+Media/MediaUsage, Video and draft-gateway slice passes 378 tests / 1,639
+assertions. PHP lint for changed files and `git diff --check` pass. No
+migration, deployment, TEST runtime acceptance or data mutation ran.
+
+STATUS: `FINAL_HARDENING_FIXED_LOCALLY / FOCUSED_PASS /
+TEST_RUNTIME_NOT_REQUIRED / NO_DATA_MUTATION`.
+
+POST-CHECK CORRECTION: `KnowledgeService::cite()` now resolves Claim + Source +
+relation + support identity before allocating a new Evidence UUID. Explicit
+`citeWithId()` replay IDs remain supported; auto-generated IDs are created only
+after `CREATE_NEW`. The Knowledge regression slice was rerun successfully.

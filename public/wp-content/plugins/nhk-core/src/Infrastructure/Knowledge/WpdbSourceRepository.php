@@ -11,8 +11,8 @@ final class WpdbSourceRepository implements SourceRepository
 {
     private string $table;
     public function __construct(private object $database) { $this->table = $database->prefix . 'nhk_sources'; }
-    public function findByCanonicalId(string $id): ?Source { return $this->hydrate($this->database->get_row($this->database->prepare("SELECT * FROM {$this->table} WHERE canonical_uuid=%s LIMIT 1", UuidCodec::toBinary($id)), ARRAY_A)); }
-    public function findByStableKey(string $key): ?Source { return $this->hydrate($this->database->get_row($this->database->prepare("SELECT * FROM {$this->table} WHERE stable_key=%s LIMIT 1", $key), ARRAY_A)); }
+    public function findByCanonicalId(string $id): ?Source { return $this->hydrate($this->database->get_row($this->database->prepare("SELECT * FROM {$this->table} WHERE canonical_uuid=%s LIMIT 1", UuidCodec::toBinary($id)), ARRAY_A), true); }
+    public function findByStableKey(string $key): ?Source { return $this->hydrate($this->database->get_row($this->database->prepare("SELECT * FROM {$this->table} WHERE stable_key=%s LIMIT 1", $key), ARRAY_A), true); }
     public function create(Source $source): Source
     {
         $existingById = $this->findByCanonicalId($source->canonicalId);
@@ -43,8 +43,8 @@ final class WpdbSourceRepository implements SourceRepository
         if ($ok !== 1) throw new KnowledgeException('Source revision conflict.');
         return $this->findByCanonicalId($source->canonicalId) ?? $source;
     }
-    public function list(bool $includeRetired = false): array { $rows = $this->database->get_results("SELECT * FROM {$this->table}" . ($includeRetired ? '' : ' WHERE state=1') . ' ORDER BY id', ARRAY_A); return array_values(array_filter(array_map(fn (array $row): ?Source => $this->hydrate($row), $rows ?: []), static fn (?Source $source): bool => $source !== null)); }
-    private function hydrate(?array $row): ?Source { if (!$row) return null; try { $metadata = (string) ($row['metadata_json'] ?? ''); if ($metadata === '') { $decodedMetadata = []; } else { $decodedMetadata = json_decode($metadata, true, 512, JSON_THROW_ON_ERROR); if (!is_array($decodedMetadata)) return null; } if (preg_match('/^[01]$/', (string) ($row['state'] ?? '')) !== 1) return null; return new Source(UuidCodec::fromBinary($row['canonical_uuid']), (string) $row['stable_key'], (string) $row['title'], (string) $row['source_type'], $row['locator'] === null ? null : (string) $row['locator'], $decodedMetadata, (int) $row['state'] === 1, (int) $row['revision']); } catch (\Throwable) { return null; } }
+    public function list(bool $includeRetired = false): array { $rows = $this->database->get_results("SELECT * FROM {$this->table}" . ($includeRetired ? '' : ' WHERE state=1') . ' ORDER BY id', ARRAY_A); return array_values(array_filter(array_map(fn (array $row): ?Source => $this->hydrate($row, $includeRetired), $rows ?: []), static fn (?Source $source): bool => $source !== null)); }
+    private function hydrate(?array $row, bool $allowRetired = false): ?Source { if (!$row) return null; try { $metadata = (string) ($row['metadata_json'] ?? ''); if ($metadata === '') { $decodedMetadata = []; } else { $decodedMetadata = json_decode($metadata, true, 512, JSON_THROW_ON_ERROR); if (!is_array($decodedMetadata)) return null; } if (preg_match('/^[01]$/', (string) ($row['state'] ?? '')) !== 1 || (!$allowRetired && (int) $row['state'] !== 1)) return null; return new Source(UuidCodec::fromBinary($row['canonical_uuid']), (string) $row['stable_key'], (string) $row['title'], (string) $row['source_type'], $row['locator'] === null ? null : (string) $row['locator'], $decodedMetadata, (int) $row['state'] === 1, (int) $row['revision']); } catch (\Throwable) { return null; } }
 
     private function sameSource(Source $left, Source $right): bool
     {

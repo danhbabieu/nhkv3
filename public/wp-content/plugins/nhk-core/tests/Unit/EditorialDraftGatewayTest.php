@@ -22,6 +22,24 @@ final class EditorialDraftGatewayTest extends TestCase
         self::assertSame(1, $posts->creates); self::assertSame($first['post_id'], $second['post_id']); self::assertSame('draft', $first['post']['status']); self::assertArrayNotHasKey('content', $first['receipt']); self::assertStringNotContainsString('Nội dung bí mật', json_encode($first['receipt'], JSON_UNESCAPED_UNICODE)); self::assertContains('DRAFT_INCOMPLETE_FOR_PUBLICATION', $first['publication_blockers']);
     }
 
+    public function test_bound_article_resolver_must_authorize_differentiated_article_before_native_create(): void
+    {
+        $posts = new FakeEditorialStore();
+        $gateway = new EditorialDraftGateway($posts, new FakeReceiptRepo(), null, static fn (array $context): array => ['status' => 'REVIEW_REQUIRED', 'decision' => 'EXISTING_CANONICAL_ARTICLE']);
+
+        $blocked = $gateway->create(['idempotency_key' => 'article-review-1', 'title' => 'Existing', 'content' => 'Body']);
+
+        self::assertFalse($blocked['ok']);
+        self::assertSame('ARTICLE_PRE_CREATE_REVIEW_REQUIRED', $blocked['reason']);
+        self::assertSame(0, $posts->creates);
+
+        $allowedGateway = new EditorialDraftGateway($posts, new FakeReceiptRepo(), null, static fn (array $context): array => ['status' => 'CREATE_DIFFERENTIATED_ARTICLE', 'decision' => 'CREATE_DIFFERENTIATED_ARTICLE']);
+        $created = $allowedGateway->create(['idempotency_key' => 'article-create-1', 'title' => 'New', 'content' => 'Body']);
+
+        self::assertTrue($created['ok']);
+        self::assertSame(1, $posts->creates);
+    }
+
     public function test_create_allocates_native_slug_and_reads_back_permalink_for_titled_draft(): void
     {
         $posts = new RouteAllocatingEditorialStore();

@@ -5,27 +5,54 @@ namespace NHK\Core\Application\Knowledge;
 
 use NHK\Core\Application\Dictionary\DictionaryObservationRegistry;
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
-use NHK\Core\Domain\Knowledge\{CollectorFacetRegistry, Evidence, KnowledgeClaim, KnowledgeException, Source};
+use NHK\Core\Domain\Knowledge\{CollectorFacetRegistry, Evidence, KnowledgeClaim, KnowledgeException, KnowledgePreCreateResolution, Source};
 use NHK\Core\Shared\Uuid\UuidCodec;
 
 final class KnowledgeService
 {
-    public function __construct(private KnowledgeRepository $claims, private SourceRepository $sources, private EvidenceRepository $evidence, private $dictionaryObserver = null) {}
+    private KnowledgePreCreateResolver $preCreate;
+
+    public function __construct(private KnowledgeRepository $claims, private SourceRepository $sources, private EvidenceRepository $evidence, private $dictionaryObserver = null, ?KnowledgePreCreateResolver $preCreate = null)
+    {
+        $this->preCreate = $preCreate ?? new KnowledgePreCreateResolver($claims, $sources, $evidence);
+    }
 
     public function createClaim(string $stableKey, string $text, string $type = 'fact', array $provenance = []): KnowledgeClaim
     {
-        $existing = $this->claims->findByStableKey($stableKey);
-        if ($existing) { if ($existing->claimText === $text && $existing->claimType === $type && $existing->provenance === $provenance) return $existing; throw new KnowledgeException('Knowledge claim stable key already exists.'); }
-        $claim = $this->claims->create(new KnowledgeClaim(UuidCodec::newV7(), $stableKey, $text, $type, $provenance));
+        $resolution = $this->preCreate->resolveClaimCreate($stableKey, $text, $type, $provenance);
+        if ($resolution->action === KnowledgePreCreateResolution::REUSE_EXISTING) {
+            $existing = $this->claims->findByCanonicalId((string) $resolution->targetId());
+            if ($existing instanceof KnowledgeClaim) return $existing;
+            throw new KnowledgeException('KNOWLEDGE_PRE_CREATE_TARGET_UNAVAILABLE');
+        }
+        if (!$resolution->canCreate()) throw new KnowledgeException('KNOWLEDGE_PRE_CREATE_' . $resolution->diagnostics['reason']);
+        try {
+            $claim = $this->claims->create(new KnowledgeClaim(UuidCodec::newV7(), $stableKey, $text, $type, $provenance));
+        } catch (\Throwable $error) {
+            $retry = $this->preCreate->resolveClaimCreate($stableKey, $text, $type, $provenance);
+            if ($retry->action === KnowledgePreCreateResolution::REUSE_EXISTING && ($target = $this->claims->findByCanonicalId((string) $retry->targetId())) instanceof KnowledgeClaim) return $target;
+            throw $error;
+        }
         $this->observe($claim);
         return $claim;
     }
 
     public function createSource(string $stableKey, string $title, string $type = 'website', ?string $locator = null, array $metadata = []): Source
     {
-        $existing = $this->sources->findByStableKey($stableKey);
-        if ($existing) { if ($existing->title === $title && $existing->sourceType === $type && $existing->locator === $locator && $existing->metadata === $metadata) return $existing; throw new KnowledgeException('Source stable key already exists.'); }
-        return $this->sources->create(new Source(UuidCodec::newV7(), $stableKey, $title, $type, $locator, $metadata));
+        $resolution = $this->preCreate->resolveSourceCreate($stableKey, $title, $type, $locator, $metadata);
+        if ($resolution->action === KnowledgePreCreateResolution::REUSE_EXISTING) {
+            $existing = $this->sources->findByCanonicalId((string) $resolution->targetId());
+            if ($existing instanceof Source) return $existing;
+            throw new KnowledgeException('SOURCE_PRE_CREATE_TARGET_UNAVAILABLE');
+        }
+        if (!$resolution->canCreate()) throw new KnowledgeException('SOURCE_PRE_CREATE_' . $resolution->diagnostics['reason']);
+        try {
+            return $this->sources->create(new Source(UuidCodec::newV7(), $stableKey, $title, $type, $locator, $metadata));
+        } catch (\Throwable $error) {
+            $retry = $this->preCreate->resolveSourceCreate($stableKey, $title, $type, $locator, $metadata);
+            if ($retry->action === KnowledgePreCreateResolution::REUSE_EXISTING && ($target = $this->sources->findByCanonicalId((string) $retry->targetId())) instanceof Source) return $target;
+            throw $error;
+        }
     }
 
     public function updateClaim(string $id, string $text, string $type, array $provenance, int $revision): KnowledgeClaim
@@ -91,14 +118,31 @@ final class KnowledgeService
 
     public function cite(string $claimId, string $sourceId, string $excerpt, string $relation = 'supports', ?string $locator = null, array $metadata = []): Evidence
     {
-        return $this->citeWithId(UuidCodec::newV7(), $claimId, $sourceId, $excerpt, $relation, $locator, $metadata);
+        return $this->citeWithId(null, $claimId, $sourceId, $excerpt, $relation, $locator, $metadata);
     }
 
-    public function citeWithId(string $evidenceId, string $claimId, string $sourceId, string $excerpt, string $relation = 'supports', ?string $locator = null, array $metadata = []): Evidence
+    public function citeWithId(?string $evidenceId, string $claimId, string $sourceId, string $excerpt, string $relation = 'supports', ?string $locator = null, array $metadata = []): Evidence
     {
-        if (!UuidCodec::isValid($evidenceId)) throw new KnowledgeException('Evidence identity is invalid.');
-        if (!$this->claims->findByCanonicalId($claimId) || !$this->sources->findByCanonicalId($sourceId)) throw new KnowledgeException('Evidence endpoint does not exist.');
-        return $this->evidence->create(new Evidence($evidenceId, $claimId, $sourceId, $relation, $excerpt, $locator, true, 1, $metadata));
+        $evidenceId = trim((string) ($evidenceId ?? ''));
+        if ($evidenceId !== '' && !UuidCodec::isValid($evidenceId)) throw new KnowledgeException('Evidence identity is invalid.');
+        $claim = $this->claims->findByCanonicalId($claimId);
+        $source = $this->sources->findByCanonicalId($sourceId);
+        if (!$claim || !$source || !$claim->active || !$source->active) throw new KnowledgeException('Evidence endpoint does not exist or is retired.');
+        $resolution = $this->preCreate->resolveEvidence($evidenceId, $claimId, $sourceId, $excerpt, $relation, $locator, $metadata);
+        if ($resolution->action === KnowledgePreCreateResolution::REUSE_EXISTING) {
+            $existing = $this->evidence->findByCanonicalId((string) $resolution->targetId());
+            if ($existing instanceof Evidence) return $existing;
+            throw new KnowledgeException('EVIDENCE_PRE_CREATE_TARGET_UNAVAILABLE');
+        }
+        if (!$resolution->canCreate()) throw new KnowledgeException('EVIDENCE_PRE_CREATE_' . $resolution->diagnostics['reason']);
+        $createdEvidenceId = $evidenceId !== '' ? $evidenceId : UuidCodec::newV7();
+        try {
+            return $this->evidence->create(new Evidence($createdEvidenceId, $claimId, $sourceId, $relation, $excerpt, $locator, true, 1, $metadata));
+        } catch (\Throwable $error) {
+            $retry = $this->preCreate->resolveEvidence($createdEvidenceId, $claimId, $sourceId, $excerpt, $relation, $locator, $metadata);
+            if ($retry->action === KnowledgePreCreateResolution::REUSE_EXISTING && ($target = $this->evidence->findByCanonicalId((string) $retry->targetId())) instanceof Evidence) return $target;
+            throw $error;
+        }
     }
 
     /** @return list<Evidence> */

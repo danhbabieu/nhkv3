@@ -654,6 +654,35 @@ final class Plugin {
                 },
                 [$articlePublicEligibility, 'evaluate'],
             );
+            $articlePreCreateResolver = static function (array $context) use ($articleResearch): array {
+                $subjectResolution = is_array($context['subject_resolution'] ?? null) ? $context['subject_resolution'] : [];
+                $primary = is_array($subjectResolution['primary'] ?? null) ? $subjectResolution['primary'] : [];
+                if (trim((string) ($primary['id'] ?? '')) === '' || trim((string) ($primary['type'] ?? '')) === '') {
+                    return ['status' => 'REVIEW_REQUIRED', 'decision' => 'REVIEW_REQUIRED', 'diagnostics' => ['ARTICLE_SUBJECT_RESOLUTION_REQUIRED']];
+                }
+                $input = is_array($context['input'] ?? null) ? $context['input'] : [];
+                $topic = trim((string) ($input['title'] ?? '')) ?: trim((string) ($context['text'] ?? ''));
+                $packet = is_array($subjectResolution['packet'] ?? null) ? $subjectResolution['packet'] : [];
+                $research = $articleResearch->research($topic, $primary, [
+                    'planned_title' => $topic,
+                    'content_intent' => $context['content_intent'] ?? [],
+                    'subject_resolution_packet' => $packet,
+                ]);
+                $overlap = strtoupper(trim((string) ($research->overlap['classification'] ?? 'UNCERTAIN')));
+                $decision = match ($overlap) {
+                    'NO_OVERLAP', 'COMPLEMENTARY_CONTENT' => 'CREATE_DIFFERENTIATED_ARTICLE',
+                    'EXISTING_CANONICAL_ARTICLE' => 'EXISTING_CANONICAL_ARTICLE',
+                    'SUBSTANTIAL_OVERLAP', 'LIKELY_DUPLICATE_INTENT' => 'SUBSTANTIAL_OVERLAP',
+                    default => 'REVIEW_REQUIRED',
+                };
+                return [
+                    'status' => $decision === 'CREATE_DIFFERENTIATED_ARTICLE' ? 'CREATE_DIFFERENTIATED_ARTICLE' : 'REVIEW_REQUIRED',
+                    'decision' => $decision,
+                    'overlap' => $research->overlap,
+                    'research' => $research->toArray(),
+                    'resolution_fingerprint' => hash('sha256', json_encode([$context['capture_id'] ?? '', $context['capture_revision'] ?? 0, $research->overlap], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)),
+                ];
+            };
             $articleHandler = new McpArticleIngestHandler($articleCoordinator, $articlePreflight, $articleEditorial, $articleMedia, $articleResearch, static fn (): mixed => function_exists('apply_filters') ? apply_filters('nhk_v3_article_reconciliation_orchestrator', null) : null);
             $articlePreflightHandoff = new CaptureArticlePreflightHandoff();
             (new GovernanceApi($governance, $eligibility, $controlledApply, $endpoints))->register();
@@ -1021,7 +1050,7 @@ final class Plugin {
                 $published = ($result['outcome'] ?? '') === 'PASS' && (($result['post']['status'] ?? '') === 'publish');
                 return ['frontend_available' => $published, 'public_url' => (string) ($result['public_url'] ?? ''), 'publication' => $result, 'canonical_readback' => $applied['canonical_readback'] ?? null];
             });
-            $draftGateway = new EditorialDraftGateway($editorialPosts, $articleReceipts, $ownerPublication);
+            $draftGateway = new EditorialDraftGateway($editorialPosts, $articleReceipts, $ownerPublication, $articlePreCreateResolver);
             // One generic recovery boundary for existing Capture-owned Articles.
             // The orchestrator plans and bounds work; existing owner adapters
             // remain responsible for every durable mutation.
@@ -2024,6 +2053,8 @@ final class Plugin {
                 $captureFeatureBindings,
                 subjectBinding: $captureSubjectBinding,
                 dictionaryPreCreateResolver: $dictionaryRuntime?->preCreateResolver(),
+                articlePreCreateResolver: $articlePreCreateResolver,
+                articlePreCreateRequired: true,
             );
             $captureContinuation = new EditorialCaptureContinuationService($captureRepository, $captureAddendumRepository, $capture, static function (array $input) use ($imageIngest, $existingMediaResolver): array {
                 $mediaIds = is_array($input['media_ids'] ?? null) ? array_values($input['media_ids']) : [];

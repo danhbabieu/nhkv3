@@ -14,7 +14,7 @@ use NHK\Core\Application\Semantic\{ManagedArticleSectionConflict, ManagedArticle
 
 final class EditorialDraftGateway
 {
-    public function __construct(private EditorialPostStore $posts, private ArticleOperationReceiptRepository $receipts, private ?OwnerPublicationService $ownerPublication = null) {}
+    public function __construct(private EditorialPostStore $posts, private ArticleOperationReceiptRepository $receipts, private ?OwnerPublicationService $ownerPublication = null, private $articlePreCreateResolver = null) {}
 
     /** @param array<string,mixed> $input */
     public function create(array $input): array
@@ -25,6 +25,24 @@ final class EditorialDraftGateway
         if ($existing !== null) { if (!hash_equals($existing->requestFingerprint, $fingerprint)) return ['ok' => false, 'reason' => 'IDEMPOTENCY_CONFLICT', 'receipt' => $existing->toArray()]; return $this->result($existing, $existing->wpPostId === null ? null : $this->posts->read($existing->wpPostId)); }
         $research = is_array($input['research'] ?? null) ? $input['research'] : [];
         if (($research['ready_for_draft'] ?? true) === false) return ['ok' => false, 'reason' => 'RESEARCH_PREFLIGHT_BLOCKED', 'research' => $research];
+        if (is_callable($this->articlePreCreateResolver)) {
+            try {
+                $resolution = ($this->articlePreCreateResolver)([
+                    'input' => $input,
+                    'capture_id' => trim((string) ($input['capture_id'] ?? '')),
+                    'capture_revision' => (int) ($input['capture_revision'] ?? 0),
+                    'subject_resolution' => is_array($input['subject_resolution'] ?? null) ? $input['subject_resolution'] : (is_array($research['subject_resolution'] ?? null) ? $research['subject_resolution'] : []),
+                    'text' => (string) ($input['content'] ?? ''),
+                    'assets' => is_array($input['assets'] ?? null) ? $input['assets'] : [],
+                ]);
+                if (!is_array($resolution) || ($resolution['status'] ?? '') !== 'CREATE_DIFFERENTIATED_ARTICLE') {
+                    return ['ok' => false, 'reason' => 'ARTICLE_PRE_CREATE_REVIEW_REQUIRED', 'article_resolution' => is_array($resolution) ? $resolution : ['status' => 'REVIEW_REQUIRED']];
+                }
+                $input['article_resolution'] = $resolution;
+            } catch (\Throwable $error) {
+                return ['ok' => false, 'reason' => 'ARTICLE_PRE_CREATE_RESOLUTION_UNAVAILABLE', 'error' => $error->getMessage()];
+            }
+        }
         $captureOwned = trim((string) ($input['capture_id'] ?? '')) !== '';
         if ($captureOwned) CaptureEditorialWriteGuard::enter();
         try {
