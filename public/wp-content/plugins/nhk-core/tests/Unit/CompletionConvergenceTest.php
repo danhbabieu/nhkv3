@@ -58,6 +58,31 @@ final class CompletionConvergenceTest extends TestCase
         );
     }
 
+    public function test_knowledge_required_owner_uses_current_governed_canonical_id(): void
+    {
+        $coordinator = (new \ReflectionClass(EditorialCaptureCoordinator::class))->newInstanceWithoutConstructor();
+        $method = new \ReflectionMethod($coordinator, 'requiredOwners');
+        $method->setAccessible(true);
+        $capture = new CaptureRecord(
+            'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+            'capture-knowledge-owner-readback',
+            hash('sha256', 'capture-knowledge-owner-readback'),
+            'SEMANTICS_RECONCILED',
+            'PARTIAL',
+        );
+        $claimId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+
+        self::assertSame(
+            [['owner_type' => 'knowledge', 'owner_id' => $claimId]],
+            $method->invoke($coordinator, ['intent' => 'KNOWLEDGE_DELTA'], $capture, [], [], [], [
+                'writes' => [[
+                    'entity_type' => 'knowledge',
+                    'canonical_readback' => ['canonical_id' => $claimId, 'revision' => 2],
+                ]],
+            ]),
+        );
+    }
+
     public function test_image_article_media_branch_without_manifest_readback_is_not_complete(): void
     {
         $coordinator = (new \ReflectionClass(EditorialCaptureCoordinator::class))->newInstanceWithoutConstructor();

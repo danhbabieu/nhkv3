@@ -32,6 +32,53 @@ final class TextInputInterpreterRegressionTest extends TestCase
         self::assertStringContainsString('1922', $result['user_claim_candidates'][0]['text']);
     }
 
+    public function test_dictionary_command_handoff_uses_structured_semantic_assertion_instead_of_raw_sentence(): void
+    {
+        $result = (new TextInputInterpreter())->interpret(
+            'Bổ sung vào từ điển "Kính kim cương" nghĩa là một loại kính rào, ghi nhận năm 2020.',
+        );
+
+        self::assertSame(['ghi nhận năm 2020'], array_column($result['user_claim_candidates'], 'text'));
+        self::assertSame(['ghi nhận năm 2020'], array_column($result['structured_interpretation_packet']['knowledge_delta_candidates'], 'text'));
+        self::assertNotContains('Kính kim cương', $result['entity_mentions']);
+        self::assertNotContains('Bổ sung', $result['entity_mentions']);
+    }
+
+    public function test_lexical_only_dictionary_command_has_no_semantic_candidate(): void
+    {
+        $result = (new TextInputInterpreter())->interpret(
+            'Bổ sung vào từ điển "Kính kim cương" nghĩa là một loại kính rào.',
+        );
+
+        self::assertSame([], $result['user_claim_candidates']);
+        self::assertSame([], $result['structured_interpretation_packet']['knowledge_delta_candidates']);
+    }
+
+    public function test_explicit_semantic_observation_survives_lexical_command_with_lineage(): void
+    {
+        $result = (new TextInputInterpreter())->interpret(
+            'Bổ sung vào từ điển X nghĩa là Y.',
+            [],
+            [],
+            [
+                'raw_input_reference' => 'capture:1',
+                'source_identity' => ['source_id' => 'capture:1'],
+                'lineage' => ['parent' => 'request:1'],
+            ],
+            [[
+                'text' => 'X được ghi nhận năm 1954.',
+                'origin' => 'EXPLICIT_USER_KNOWLEDGE',
+                'scope' => 'model',
+            ]],
+        );
+
+        self::assertSame('X được ghi nhận năm 1954.', $result['user_claim_candidates'][0]['text']);
+        self::assertSame('EXPLICIT_USER_KNOWLEDGE', $result['user_claim_candidates'][0]['provenance']);
+        self::assertSame('model', $result['user_claim_candidates'][0]['scope']);
+        self::assertSame('capture:1', $result['user_claim_candidates'][0]['raw_input_reference']);
+        self::assertSame(['parent' => 'request:1'], $result['user_claim_candidates'][0]['lineage']);
+    }
+
     public function test_factual_imperative_is_not_misclassified_as_operator_instruction(): void
     {
         $result = (new TextInputInterpreter())->interpret('Hãy ghi nhận rằng Hermle được thành lập năm 1922.');

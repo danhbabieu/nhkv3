@@ -1728,6 +1728,57 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
         self::assertTrue($result['writes'][0]['idempotent']);
     }
 
+    public function test_applied_knowledge_replay_reads_back_from_knowledge_owner(): void
+    {
+        $proposalId = UuidCodec::newV7();
+        $subjectId = UuidCodec::newV7();
+        $claim = new KnowledgeClaim($subjectId, 'nhk:knowledge:replay', 'Đã có canonical readback.', revision: 3);
+        $claims = $this->createMock(KnowledgeRepository::class);
+        $claims->expects(self::once())->method('findByStableKey')->with($claim->stableKey)->willReturn($claim);
+        $governance = $this->createMock(GovernedLifecycle::class);
+        $governance->expects(self::once())->method('review')->with($proposalId)->willReturn([
+            'state' => 'applied', 'entity_type' => 'knowledge', 'operation' => 'ingest', 'subject_id' => $subjectId,
+            'payload' => ['stable_key' => $claim->stableKey, 'text' => $claim->claimText],
+            'content_fingerprint' => 'content', 'dependency_fingerprint' => 'dependency',
+        ]);
+        $service = new GovernedCaptureContinuationService(
+            $governance,
+            static fn (): array => throw new \LogicException('APPLIED proposal must not be applied again'),
+            $this->policies(),
+            static fn (): bool => true,
+            knowledgeRepository: $claims,
+        );
+
+        $result = $service->execute('capture-knowledge-replay', 'replay', [], ['proposal_ids' => [$proposalId]]);
+
+        self::assertSame('APPLIED', $result['status'], json_encode($result, JSON_UNESCAPED_UNICODE));
+        self::assertSame($subjectId, $result['writes'][0]['canonical_id']);
+        self::assertTrue($result['writes'][0]['idempotent']);
+    }
+
+    public function test_raw_dictionary_sentence_is_blocked_before_knowledge_proposal(): void
+    {
+        $subjectId = UuidCodec::newV7();
+        $governance = $this->createMock(GovernedLifecycle::class);
+        $service = new GovernedCaptureContinuationService($governance, static fn (): array => [], $this->policies(), static fn (): bool => true);
+
+        $result = $service->execute('capture-guard', 'guard', [
+            'content_intent' => ['intent' => 'KNOWLEDGE_DELTA'],
+            'subject_resolution' => ['primary' => ['id' => $subjectId, 'type' => 'model'], 'resolved' => [['id' => $subjectId, 'type' => 'model']]],
+            'interpretation' => [
+                'user_claim_candidates' => [['text' => 'Bổ sung vào từ điển X nghĩa là Y, ghi nhận năm 2020.']],
+                'structured_interpretation_packet' => [
+                    'dictionary_owner_commands' => [['operation' => 'CREATE', 'term' => 'X', 'definition' => 'Y']],
+                    'semantic_assertions' => [['text' => 'ghi nhận năm 2020', 'reason' => 'BOUNDED_FACTUAL_CUE']],
+                ],
+            ],
+        ]);
+
+        self::assertSame('REVIEW_REQUIRED', $result['status']);
+        self::assertSame(['KNOWLEDGE_SEMANTIC_HANDOFF_REQUIRED'], $result['blockers']);
+        self::assertSame([], $result['writes']);
+    }
+
     private function policies(array $types = ['knowledge'], array $stored = []): GovernanceAutomationPolicyResolver
     {
         return new GovernanceAutomationPolicyResolver($types, new class($stored) implements AutomationPolicyStorage {

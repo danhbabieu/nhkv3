@@ -403,7 +403,13 @@ final class EditorialCaptureCoordinator
             } else {
                 $this->beginPhase('INTERPRETED');
                 $naturalOwnerPlan = null;
-                $interpretation = $this->interpreter->interpret($text, $assets, is_array($input['subject_hints'] ?? null) ? $input['subject_hints'] : [], is_array($input['metadata'] ?? null) ? $input['metadata'] : []);
+                $interpretation = $this->interpreter->interpret(
+                    $text,
+                    $assets,
+                    is_array($input['subject_hints'] ?? null) ? $input['subject_hints'] : [],
+                    is_array($input['metadata'] ?? null) ? $input['metadata'] : [],
+                    is_array($input['observations'] ?? null) ? $input['observations'] : [],
+                );
                 $diagnostics['interpretation'] = $this->withoutBody($interpretation);
                 $dictionaryObservation = DictionaryObservationRegistry::observe('CAPTURE', $record->captureId, $text, $this->dictionaryObservationContext($record, $input), $this->dictionaryLexicalHints($input));
                 $diagnostics['dictionary_observation'] = $this->withoutBody($dictionaryObservation);
@@ -1677,7 +1683,7 @@ final class EditorialCaptureCoordinator
         $mediaOwners = array_values(array_unique(array_merge($bindingOwners, $mediaOwners), SORT_REGULAR));
         $required = match (strtoupper(trim((string) ($intent['intent'] ?? '')))) {
             'VIDEO' => $videoOwnerId === '' ? [['owner_type' => 'video']] : [['owner_type' => 'video', 'owner_id' => $videoOwnerId]],
-            'KNOWLEDGE_DELTA' => [['owner_type' => 'knowledge']],
+            'KNOWLEDGE_DELTA' => $this->knowledgeRequiredOwners($writes),
             'IMAGE_ARTICLE', 'TEXT_ARTICLE' => [['owner_type' => 'wp_post', 'owner_id' => $record->articleId === null ? '' : (string) $record->articleId]],
             'MEDIA_ENRICHMENT' => $mediaOwners !== [] ? $mediaOwners : [['owner_type' => 'media', 'owner_id' => '']],
             default => [],
@@ -1688,6 +1694,22 @@ final class EditorialCaptureCoordinator
         return array_values(array_filter($required, static function (array $owner): bool {
             return !array_key_exists('owner_id', $owner) || trim((string) $owner['owner_id']) !== '';
         }));
+    }
+
+    /** @return list<array{owner_type:string,owner_id?:string}> */
+    private function knowledgeRequiredOwners(array $writes): array
+    {
+        $ids = [];
+        foreach ((array) ($writes['writes'] ?? $writes) as $write) {
+            if (!is_array($write) || strtolower(trim((string) ($write['entity_type'] ?? ''))) !== 'knowledge') continue;
+            $readback = is_array($write['canonical_readback'] ?? null) ? $write['canonical_readback'] : [];
+            $id = trim((string) ($write['canonical_id'] ?? $write['result_entity_uuid'] ?? ($readback['canonical_id'] ?? '')));
+            if ($id !== '') $ids[] = $id;
+        }
+        $ids = array_values(array_unique($ids));
+        return $ids === []
+            ? [['owner_type' => 'knowledge']]
+            : array_map(static fn (string $id): array => ['owner_type' => 'knowledge', 'owner_id' => $id], $ids);
     }
 
     /** @return list<string> */

@@ -24521,3 +24521,36 @@ Dictionary/Capture selection retains the previously observed unrelated
 STATUS: `FOUR_NATURAL_DICTIONARY_GAPS_FIXED_LOCALLY / FOCUSED_GREEN /
 BROADER_BASELINE_ERROR_RECORDED / NO_DATA_MUTATION / NO_DEPLOYMENT /
 COMMIT_PENDING`.
+
+# Checkpoint — 2026-10-07 — Natural-language Dictionary semantic handoff, replay and completion closure
+
+ROOT_CAUSE_CONFIRMED: `TextInputInterpreter` consumed the shared Dictionary/
+Knowledge packet but rebuilt `user_claim_candidates` from raw sentences. The
+Capture continuation then passed those candidates to Knowledge Governance, so
+lexical command text could become a full Knowledge claim and raw command terms
+could enter subject hints. `GovernedCaptureContinuationService` also used the
+Video/dependency callback for APPLIED Knowledge replay, while non-Article
+completion derived `KNOWLEDGE_DELTA` required owners without canonical IDs.
+
+IMPLEMENTED: Structured assertions now drive Knowledge candidates; lexical-only
+Dictionary commands produce no Knowledge candidate; explicit observations keep
+scope, provenance and lineage; and the Capture adapter forwards observations
+through the same packet. A final `SemanticClaimCandidateGuard` rejects any
+Knowledge candidate not present in the structured assertion track before
+proposal construction and reports review/blocker state. APPLIED Knowledge
+replay reads the canonical owner through `KnowledgeRepository` and fails closed
+when it is unavailable/inactive. Completion required owners now derive exact
+Knowledge IDs from current governed write/read-back packets. Existing governed
+Knowledge repair preview remains read-only, revision/identity/dependency bound,
+and no cleanup mutation was run or added.
+
+VERIFIED: Focused semantic/capture/governance/completion/repair selection
+passes 161 tests / 692 assertions. No live Capture, staging acceptance, production write,
+database mutation, migration, deployment or push was performed.
+
+REMAINING_GAP: A live deployed acceptance/read-back is still infrastructure and
+authorization gated; cleanup of any existing contaminated Knowledge rows still
+requires the existing exact canonical repair packet and Governance lifecycle.
+
+STATUS: `NATURAL_DICTIONARY_SEMANTIC_HANDOFF_FIXED_LOCALLY / REPLAY_FIXED /
+COMPLETION_FIXED / CLEANUP_NO_MUTATION / COMMIT_PENDING`.

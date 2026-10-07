@@ -13,8 +13,8 @@ final class TextInputInterpreter
         $this->structured ??= new StructuredSemanticInterpreter();
     }
 
-    /** @param list<array<string,mixed>> $assets @param list<string> $subjectHints @param array<string,mixed> $metadata @return array<string,mixed> */
-    public function interpret(string $text, array $assets = [], array $subjectHints = [], array $metadata = []): array
+    /** @param list<array<string,mixed>> $assets @param list<string> $subjectHints @param array<string,mixed> $metadata @param list<array<string,mixed>> $observations @return array<string,mixed> */
+    public function interpret(string $text, array $assets = [], array $subjectHints = [], array $metadata = [], array $observations = []): array
     {
         // The interpreter is the first semantic producer. Do not let PCRE or
         // a later persistence boundary become the first place that detects a
@@ -24,6 +24,10 @@ final class TextInputInterpreter
         Utf8Contract::assertValid($subjectHints, 'semantic.interpretation', 'input.subject_hints');
         Utf8Contract::assertValid($metadata, 'semantic.interpretation', 'input.metadata');
         $text = trim($text);
+        $structuredObservations = array_values(array_filter(
+            array_merge($observations, is_array($metadata['observations'] ?? null) ? $metadata['observations'] : []),
+            'is_array',
+        ));
         $packet = $this->structured->interpret(UniversalInputEnvelope::fromArray([
             'input_type' => (string) ($metadata['source_kind'] ?? $metadata['input_type'] ?? 'TEXT'),
             'source_identity' => is_array($metadata['source_identity'] ?? null) ? $metadata['source_identity'] : [],
@@ -32,15 +36,20 @@ final class TextInputInterpreter
             'text' => $text,
             'subject_hints' => $subjectHints,
             'metadata' => $metadata,
-            'observations' => array_values(array_filter($assets, 'is_array')),
+            'observations' => $structuredObservations,
             'lineage' => is_array($metadata['lineage'] ?? null) ? $metadata['lineage'] : [],
         ]))->toArray();
         $split = preg_split('/(?<=[.!?。！？])\s+/u', $text);
         if ($split === false) throw new \RuntimeException('SEMANTIC_INTERPRETATION_SEGMENTATION_FAILED');
         $sentences = array_values(array_filter(array_map('trim', $split), static fn (string $item): bool => $item !== ''));
         if ($sentences === [] && $text !== '') $sentences = [$text];
+        $structuredClaims = $this->structuredClaims($packet);
         $mentions = [];
-        foreach ($sentences as $sentence) {
+        $mentionSentences = $structuredClaims === null ? $sentences : array_values(array_filter(array_map(
+            static fn (array $candidate): string => trim((string) ($candidate['text'] ?? '')),
+            $structuredClaims,
+        ), static fn (string $candidate): bool => $candidate !== ''));
+        foreach ($mentionSentences as $sentence) {
             if (preg_match_all('/(?:[A-ZĐ][\p{L}\d]*(?:[\s-]+[A-ZĐ0-9][\p{L}\d]*){0,4})/u', $sentence, $matches)) {
                 foreach ($matches[0] as $mention) {
                     $mention = trim((string) $mention, " \t\n\r.,;:()[]{}\"'");
@@ -66,7 +75,30 @@ final class TextInputInterpreter
                 $nonSemantic['instruction_classes'][] = ['text' => $sentence, 'classification' => $this->instructionClass($sentence)];
                 continue;
             }
-            $claims[] = $this->userCandidate($sentence);
+            if ($structuredClaims === null) $claims[] = $this->userCandidate($sentence);
+        }
+        if ($structuredClaims !== null) {
+            $claims = $structuredClaims;
+            $hasDictionaryCommand = array_values(array_filter((array) ($packet['dictionary_owner_commands'] ?? []), 'is_array')) !== [];
+            if (!$hasDictionaryCommand) {
+                $explicitClaims = array_values(array_filter($claims, static fn (array $claim): bool => ($claim['candidate_kind'] ?? '') === 'observation'));
+                $structuredByKey = [];
+                foreach (array_values(array_filter($claims, static fn (array $claim): bool => ($claim['candidate_kind'] ?? '') !== 'observation')) as $claim) {
+                    $structuredByKey[$this->claimKey((string) ($claim['text'] ?? ''))][] = $claim;
+                }
+                $claims = $explicitClaims;
+                foreach ($sentences as $sentence) {
+                    if ($this->sentenceRole($sentence) !== 'claim') continue;
+                    $key = $this->claimKey($sentence);
+                    if (($structuredByKey[$key] ?? []) !== []) {
+                        $claim = array_shift($structuredByKey[$key]);
+                        if (($claim['semantic_reason'] ?? '') === 'BOUNDED_FACTUAL_CUE') $claim['text'] = $sentence;
+                        $claims[] = $claim;
+                        continue;
+                    }
+                    $claims[] = $this->userCandidate($sentence);
+                }
+            }
         }
         foreach (['compliance_note', 'compliance_notes'] as $key) {
             $values = is_array($metadata[$key] ?? null) ? $metadata[$key] : [$metadata[$key] ?? null];
@@ -96,7 +128,10 @@ final class TextInputInterpreter
             'lexical_spans' => $packet['lexical_spans'],
             'primary_subject_hints' => array_values(array_unique(array_map('strval', $subjectHints))),
             'secondary_subject_hints' => [],
-            'entity_mentions' => array_values(array_unique(array_merge($mentions, array_column($packet['proper_name_spans'], 'term')))),
+            'entity_mentions' => array_values(array_unique(array_merge(
+                $mentions,
+                $structuredClaims === null ? array_column($packet['proper_name_spans'], 'term') : [],
+            ))),
             'user_claim_candidates' => $claims,
             'media_observations' => $mediaObservations,
             'relation_hints' => [],
@@ -105,6 +140,35 @@ final class TextInputInterpreter
             'uncertainty' => $text === '' ? ['EMPTY_INPUT'] : [],
             'asset_count' => count($assets),
         ];
+    }
+
+    /** @param array<string,mixed> $packet @return list<array<string,mixed>>|null */
+    private function structuredClaims(array $packet): ?array
+    {
+        $assertions = array_values(array_filter((array) ($packet['semantic_assertions'] ?? []), 'is_array'));
+        $commands = array_values(array_filter((array) ($packet['dictionary_owner_commands'] ?? []), 'is_array'));
+        if ($assertions === [] && $commands === []) return null;
+
+        $sourceContext = is_array($packet['source_context'] ?? null) ? $packet['source_context'] : [];
+        $lineage = is_array($sourceContext['lineage'] ?? null) ? $sourceContext['lineage'] : [];
+        $rawReference = $packet['raw_input_reference'] ?? null;
+        $claims = [];
+        foreach ($assertions as $assertion) {
+            $text = trim((string) ($assertion['text'] ?? ''));
+            if ($text === '') continue;
+            $candidate = $this->userCandidate($text);
+            $candidate['candidate_kind'] = ($assertion['reason'] ?? '') === 'EXPLICIT_OBSERVATION' ? 'observation' : 'derived_candidate';
+            if (trim((string) ($assertion['provenance'] ?? '')) !== '' && strtoupper((string) $assertion['provenance']) !== 'UNRESOLVED') $candidate['provenance'] = strtoupper((string) $assertion['provenance']);
+            if (trim((string) ($assertion['scope'] ?? '')) !== '' && strtoupper((string) $assertion['scope']) !== 'UNRESOLVED') $candidate['scope'] = (string) $assertion['scope'];
+            foreach (['facet', 'attributed', 'review_required', 'status', 'source_span', 'segment_id'] as $field) if (array_key_exists($field, $assertion)) $candidate[$field] = $assertion[$field];
+            $candidate['semantic_reason'] = (string) ($assertion['reason'] ?? 'STRUCTURED_SEMANTIC_ASSERTION');
+            $candidate['raw_input_reference'] = $rawReference;
+            $candidate['raw_or_derived'] = (string) ($sourceContext['raw_or_derived'] ?? 'RAW');
+            $candidate['lineage'] = $lineage;
+            $candidate['source_context'] = $sourceContext;
+            $claims[] = $candidate;
+        }
+        return $claims;
     }
 
     private function sentenceRole(string $sentence): string
@@ -131,6 +195,13 @@ final class TextInputInterpreter
         if (preg_match('/(?:evidence|bằng chứng|tuân thủ|compliance|không\s+được\s+đăng|không\s+được\s+project)/u', $lower) === 1) return 'COMPLIANCE_INSTRUCTION';
         if (preg_match('/(?:reuse|không\s+tạo|sửa\s+(?:semantic|subject|target)|đưa\s+.+\s+vào|không\s+dùng\s+.+\s+thay)/u', $lower) === 1) return 'WORKFLOW_INSTRUCTION';
         return 'EDITORIAL_INSTRUCTION';
+    }
+
+    private function claimKey(string $value): string
+    {
+        $value = trim($value, " \t\n\r.,;:!?。！？");
+        $value = preg_replace('/\s+/u', ' ', $value) ?: $value;
+        return function_exists('mb_strtolower') ? mb_strtolower($value) : strtolower($value);
     }
 
     /** @return array<string,mixed> */

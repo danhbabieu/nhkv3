@@ -6,6 +6,7 @@ namespace NHK\Core\Application\Capture;
 use NHK\Core\Application\Completion\CompletionCoordinator;
 use NHK\Core\Application\Governance\GovernanceAutomationPolicyResolver;
 use NHK\Core\Application\Semantic\ClaimReusePolicy;
+use NHK\Core\Application\Semantic\SemanticClaimCandidateGuard;
 use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
 use NHK\Core\Application\Knowledge\KnowledgeRepairPreviewService;
 use NHK\Core\Contracts\Governance\GovernedLifecycle;
@@ -31,6 +32,9 @@ final class GovernedCaptureContinuationService
 {
     private string $currentCaptureId = '';
     private CompletionCoordinator $completion;
+    private SemanticClaimCandidateGuard $semanticClaimCandidateGuard;
+    /** @var list<string> */
+    private array $semanticGuardFailures = [];
 
     public function __construct(
         private GovernedLifecycle $governance,
@@ -65,6 +69,7 @@ final class GovernedCaptureContinuationService
         private ?KnowledgeRepairPreviewService $knowledgeRepairPreview = null,
     ) {
         $this->completion = $completion ?? new CompletionCoordinator();
+        $this->semanticClaimCandidateGuard = new SemanticClaimCandidateGuard();
     }
 
     public function setVideoEditorialResume(?VideoEditorialResumePlanner $planner): void
@@ -76,6 +81,7 @@ final class GovernedCaptureContinuationService
     public function execute(string $captureId, string $continuationKey, array $context, array $control = []): array
     {
         $this->currentCaptureId = $captureId;
+        $this->semanticGuardFailures = [];
         $this->budget?->begin();
         $proposalIds = array_values(array_filter(array_map('strval', (array) ($control['proposal_ids'] ?? [])), static fn (string $id): bool => UuidCodec::isValid($id)));
         $resumeChildren = array_values(array_unique(array_map('strtolower', array_map('strval', (array) ($control['resume_children'] ?? [])))));
@@ -117,8 +123,10 @@ final class GovernedCaptureContinuationService
             $videoSubjectSatisfied = $intent === 'VIDEO' && $this->hasResolvedAuthoritativeSubject($context);
             $semanticNotRequired = $videoSubjectSatisfied
                 || (!$this->semanticDeltaRequested($context) && in_array($intent, ['IMAGE_ARTICLE', 'TEXT_ARTICLE'], true));
-            $blockers = $skippedVideoChildren !== [] ? ['VIDEO_CHILD_UNCHANGED_ON_TEXT_ADDENDUM'] : ($semanticNotRequired || $reusedClaims !== [] ? [] : ['SEMANTIC_SUBJECT_OR_DELTA_REQUIRED']);
-            $status = $semanticNotRequired ? 'SKIPPED' : 'REVIEW_REQUIRED';
+            $blockers = $this->semanticGuardFailures !== []
+                ? array_values(array_unique($this->semanticGuardFailures))
+                : ($skippedVideoChildren !== [] ? ['VIDEO_CHILD_UNCHANGED_ON_TEXT_ADDENDUM'] : ($semanticNotRequired || $reusedClaims !== [] ? [] : ['SEMANTIC_SUBJECT_OR_DELTA_REQUIRED']));
+            $status = $this->semanticGuardFailures !== [] ? 'REVIEW_REQUIRED' : ($semanticNotRequired ? 'SKIPPED' : 'REVIEW_REQUIRED');
             return [
                 'status' => $status,
                 'writes' => $skippedVideoChildren,
@@ -385,10 +393,15 @@ final class GovernedCaptureContinuationService
         if ($includeSemanticChildren && $this->semanticDeltaRequested($context) && ($intent === 'KNOWLEDGE_DELTA' || count($variants) === 1) && ($subject = $this->knowledgeSubject($subjects, $variants, $intent, $primary)) !== null) {
             $deltaText = trim((string) ($context['continuation_delta_text'] ?? ''));
             $candidates = $deltaText !== ''
-                ? [['text' => $deltaText, 'provenance' => 'EXPLICIT_USER_KNOWLEDGE']]
+                ? [['text' => $deltaText, 'provenance' => 'EXPLICIT_USER_KNOWLEDGE', 'candidate_source' => 'CONTINUATION_DELTA']]
                 : (array) ($context['interpretation']['user_claim_candidates'] ?? []);
             foreach ($candidates as $candidate) {
                 if (!is_array($candidate) || trim((string) ($candidate['text'] ?? '')) === '') continue;
+                $candidateGuard = $this->semanticClaimCandidateGuard->evaluate($candidate, (array) ($context['interpretation'] ?? []));
+                if (($candidateGuard['status'] ?? '') !== 'ALLOWED') {
+                    $this->semanticGuardFailures = array_values(array_unique(array_merge($this->semanticGuardFailures, array_map('strval', (array) ($candidateGuard['blockers'] ?? ['KNOWLEDGE_SEMANTIC_HANDOFF_REQUIRED'])))));
+                    continue;
+                }
                 $scope = $this->knowledgeScope((string) ($subject['type'] ?? ''), (string) ($candidate['scope'] ?? ''), $candidate);
                 if ($scope === null) continue;
                 $facet = trim((string) ($candidate['facet'] ?? 'identity')) ?: 'identity';
@@ -407,6 +420,7 @@ final class GovernedCaptureContinuationService
                 ];
                 $knowledgePlan = $this->arguments('knowledge', 'ingest', (string) $subject['id'], $payload, 'capture:' . $captureId . ':knowledge:' . hash('sha256', (string) $payload['stable_key']));
                 $knowledgePlan['candidate_id'] = 'knowledge-candidate-' . hash('sha256', (string) $payload['stable_key']);
+                $knowledgePlan['semantic_candidate_guard'] = $candidateGuard;
                 $knowledgePlan = $this->scopeDependencyPlan($captureId, $knowledgePlan);
                 $plans[] = $knowledgePlan;
                 // A Knowledge claim is not semantically attached merely by
@@ -1170,6 +1184,10 @@ final class GovernedCaptureContinuationService
     /** @param array<string,mixed> $plan @param list<string> $lifecycle @return array<string,mixed> */
     private function runGovernedPlan(array $plan, array $control, array &$lifecycle): array
     {
+        if (($plan['entity_type'] ?? '') === 'knowledge' && array_key_exists('semantic_candidate_guard', $plan)
+            && ($plan['semantic_candidate_guard']['status'] ?? '') !== 'ALLOWED') {
+            return ['entity_type' => 'knowledge', 'status' => 'REVIEW_REQUIRED', 'blockers' => ['KNOWLEDGE_SEMANTIC_HANDOFF_REQUIRED']];
+        }
         if (isset($plan['proposal_id'])) {
             $review = $this->governance->review((string) $plan['proposal_id']);
             $proposal = $this->proposalFromReview((string) $plan['proposal_id'], $review);
@@ -1288,6 +1306,14 @@ final class GovernedCaptureContinuationService
     /** @return array<string,mixed>|null */
     private function uncertainApplyReadback(array $plan, Proposal $proposal): ?array
     {
+        if ($proposal->entityType === 'knowledge' && $this->knowledgeRepository !== null) {
+            $stableKey = trim((string) ($proposal->payload['stable_key'] ?? ''));
+            $claim = $stableKey !== '' ? $this->knowledgeRepository->findByStableKey($stableKey) : null;
+            if ($claim !== null && $claim->active) {
+                return ['canonical_id' => $claim->canonicalId, 'entity_type' => 'knowledge', 'active' => true, 'revision' => $claim->revision];
+            }
+            return null;
+        }
         if ($this->videoDependencyState === null) return null;
         try { $state = ($this->videoDependencyState)($plan + ['proposal_id' => $proposal->id]); } catch (\Throwable) { return null; }
         if (!is_array($state)) return null;
