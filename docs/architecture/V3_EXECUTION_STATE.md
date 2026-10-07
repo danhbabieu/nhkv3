@@ -1,5 +1,40 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-07 — Media card projection and collection scale boundary
+
+MEDIA_IO: `PublicMediaGalleryQuery` is now a read-only card projection over
+PUBLIC/readiness/dimensions metadata. It no longer receives or invokes
+`PublicMediaAssetDelivery` for every archive/detail card, so archive rendering
+does not perform per-card path, filesize or checksum hashing. Binary delivery
+remains fail-closed in `PublicMediaAssetDelivery` and
+`PublicMediaAssetRoutes`, including the existing WebP/magic-byte and checksum
+checks.
+
+READ_MODEL: The card projection now reads MediaUsage once per card and reuses
+that result for article links and caption summary. No Media, Asset or Usage
+records were mutated.
+
+INDEX_REQUIRED: Public collection reads remain unbounded because the canonical
+interfaces expose only `AuthorityRepository::listByType()`,
+`MediaRepository::list()`, `VideoRepository::list()`,
+`KnowledgeRepository::list()`, and `MediaAssetRepository::listByMediaId()`.
+`PublicEntityCollectionQuery`, `PublicMediaGalleryQuery`, `MediaVideoPageQuery`,
+`KnowledgePageQuery`, `SearchSemanticQuery`, and
+`PublicMediaAssetDelivery::resolveByPublicFilename()` therefore remain
+explicit follow-up index/read-model work. No new schema, migration, or
+unverified bounded API was introduced.
+
+REGRESSION_COVERAGE: Task 5 focused Media/I-O suite passed 30 tests / 143
+assertions. RED coverage first failed while gallery cards still called binary
+delivery; GREEN passed after the delivery boundary was separated.
+
+QUALITY_GATES: Changed PHP files lint clean and `git diff --check` passes.
+No migration, data mutation, deployment, push, pull or rebase was performed.
+
+COMMIT: `450e6ab7` — `perf: separate media card projection from binary delivery`.
+
+STATUS: `MEDIA_CARD_PROJECTION_AND_INDEX_REQUIRED_REPORTED / FOCUSED_GREEN / NO_SEMANTIC_DATA_MUTATION / DEPLOYMENT_PENDING`
+
 # Checkpoint — 2026-10-07 — Comparison CSS family isolation
 
 CSS_BOUNDARY: Comparison selectors were removed from `entity.css` and retained

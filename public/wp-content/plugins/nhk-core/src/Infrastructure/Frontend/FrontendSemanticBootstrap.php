@@ -73,7 +73,7 @@ final class FrontendSemanticBootstrap
         $projectionAdmin = new ProjectionAdminApi($claimProjection);
         add_action('rest_api_init', [$projectionAdmin, 'register']);
 
-        $gallery = new PublicMediaGalleryQuery($media, $assets, PublicMediaAssetDelivery::fromEnvironment($assets, $media), $usages, PublicMediaArticleLinkResolver::fromWordPress());
+        $gallery = new PublicMediaGalleryQuery($media, $assets, $usages, PublicMediaArticleLinkResolver::fromWordPress());
         $entityMedia = new EntityMediaProjection($media, $assets, $usages, new SemanticSuitabilityPolicy(), new WpdbArticleMediaBlueprintRepository($wpdb));
         $entityKnowledge = new EntityKnowledgeProjection($claims, $evidence, $sources, $status, $sourceDisplayPolicy);
         $knowledgeArchive = new KnowledgePageQuery($claims, $evidence, $sources, $status, $sourceDisplayPolicy);

@@ -7,7 +7,7 @@ use NHK\Core\Application\Authority\AuthorityService;
 use NHK\Core\Application\Entity\{EntityPageQuery, PublicEntityCollectionQuery, PublicEntityEligibilityPolicy, PublicIdentityContract, PublicRouteResolver, RelatedContentQuery};
 use NHK\Core\Application\Graph\GraphService;
 use NHK\Core\Application\Knowledge\EntityKnowledgeProjection;
-use NHK\Core\Application\Media\{PublicMediaAssetDelivery, PublicMediaGalleryQuery};
+use NHK\Core\Application\Media\PublicMediaGalleryQuery;
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
 use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository, MediaUsageRepository};
 use NHK\Core\Contracts\Video\VideoRepository;
@@ -76,7 +76,7 @@ final class FrontendSemanticProjectionV2Test extends TestCase
         try {
             $mediaRepo = $this->mediaRepository([$media]);
             $assetRepo = $this->assetRepository([$asset]);
-            $gallery = new PublicMediaGalleryQuery($mediaRepo, $assetRepo, new PublicMediaAssetDelivery($assetRepo, $mediaRepo, $root));
+            $gallery = new PublicMediaGalleryQuery($mediaRepo, $assetRepo);
             $item = $gallery->archive(1, 12)['items'][0] ?? [];
             self::assertSame('Ảnh mặt trước', $item['title'] ?? null);
             self::assertStringContainsString('/anh/front.webp', (string) ($item['image_url'] ?? ''));
@@ -87,7 +87,7 @@ final class FrontendSemanticProjectionV2Test extends TestCase
         }
     }
 
-    public function test_media_gallery_fails_closed_when_the_canonical_public_asset_is_not_deliverable(): void
+    public function test_media_gallery_projects_public_asset_locator_without_per_card_binary_validation(): void
     {
         $root = sys_get_temp_dir() . '/nhk-gallery-missing-' . bin2hex(random_bytes(4));
         mkdir($root);
@@ -95,10 +95,10 @@ final class FrontendSemanticProjectionV2Test extends TestCase
         $media = new Media($mediaId, 'missing', 'Ảnh stale', 'ready');
         $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'derivative', 'missing.webp', hash('sha256', 'missing'), 'image/webp', 7, 1200, 800, 'PUBLIC', ['canonical_filename' => 'missing.webp']);
         try {
-            $gallery = new PublicMediaGalleryQuery($this->mediaRepository([$media]), $this->assetRepository([$asset]), new PublicMediaAssetDelivery($this->assetRepository([$asset]), $this->mediaRepository([$media]), $root));
+            $gallery = new PublicMediaGalleryQuery($this->mediaRepository([$media]), $this->assetRepository([$asset]));
             $item = $gallery->archive(1, 12)['items'][0] ?? [];
-            self::assertNull($item['image_url'] ?? null);
-            self::assertFalse($item['has_real_image'] ?? true);
+            self::assertSame('/anh/missing.webp', parse_url((string) ($item['image_url'] ?? ''), PHP_URL_PATH));
+            self::assertTrue($item['has_real_image'] ?? false);
         } finally {
             @rmdir($root);
         }

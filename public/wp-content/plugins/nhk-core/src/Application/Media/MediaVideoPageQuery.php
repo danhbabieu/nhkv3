@@ -38,7 +38,7 @@ final class MediaVideoPageQuery
         private ?PublicResearchSourceDisplayPolicy $sourceDisplayPolicy = null,
     ) {
         $this->delivery ??= PublicMediaAssetDelivery::fromEnvironment($assets, $media);
-        $this->gallery = $gallery ?? new PublicMediaGalleryQuery($media, $assets, $this->delivery, $usages, PublicMediaArticleLinkResolver::fromWordPress());
+        $this->gallery = $gallery ?? new PublicMediaGalleryQuery($media, $assets, $usages, PublicMediaArticleLinkResolver::fromWordPress());
         $this->videoMediaPresentation = $videoMediaPresentation ?? new VideoMediaPresentationResolver($media, $assets, $usages);
         $this->frontendProjection = new VideoFrontendProjection(null, $this->videoMediaPresentation);
         $this->sourceDisplayPolicy ??= new PublicResearchSourceDisplayPolicy();

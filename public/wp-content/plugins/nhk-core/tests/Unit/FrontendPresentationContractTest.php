@@ -262,6 +262,7 @@ final class FrontendPresentationContractTest extends TestCase
     {
         $css = $this->read('style.css');
         $functions = $this->read('functions.php');
+        $manifest = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/Presentation/PublicTemplateFamilyAssetManifest.php');
 
         self::assertStringContainsString('.hero-visual{width:min(100%,400px)', $css);
         self::assertStringContainsString('.hero-media-column{min-width:0', $css);
@@ -269,7 +270,8 @@ final class FrontendPresentationContractTest extends TestCase
         self::assertStringContainsString('overflow:hidden', $css);
         self::assertStringContainsString('.hero-image-frame{display:grid;place-items:center;width:100%;aspect-ratio:4/3;overflow:hidden', $css);
         self::assertStringContainsString('object-position:center center', $css);
-        self::assertStringContainsString("wp_register_style('nhk-v3-entity', get_theme_file_uri('entity.css'), ['nhk-v3-style'], '1.1.0')", $functions);
+        self::assertStringContainsString('PublicTemplateFamilyAssetManifest::dependencies()', $functions);
+        self::assertStringContainsString("'nhk-v3-entity' => ['nhk-v3-style', 'nhk-v3-presentation']", $manifest);
     }
 
     public function test_homepage_hero_and_video_archive_use_stable_centered_media_frames(): void
@@ -315,8 +317,8 @@ final class FrontendPresentationContractTest extends TestCase
         $source = $this->read('presentation.css');
         self::assertStringNotContainsString('minmax(170px,220px) minmax(0,1fr) minmax(230px,290px)', $source);
         self::assertStringNotContainsString('minmax(160px,190px) minmax(0,1fr) minmax(210px,250px)', $source);
-        self::assertStringContainsString("wp_register_style('nhk-v3-presentation', get_theme_file_uri('presentation.css'), ['nhk-v3-knowledge']", $this->read('functions.php'));
-        self::assertStringContainsString("wp_enqueue_style('nhk-v3-album-style')", $this->read('functions.php'));
+        self::assertStringContainsString("'nhk-v3-presentation' => ['nhk-v3-style']", (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/Presentation/PublicTemplateFamilyAssetManifest.php'));
+        self::assertStringContainsString("'nhk-v3-album-style'", (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/Presentation/PublicTemplateFamilyAssetManifest.php'));
     }
 
     public function test_entity_archive_intro_explains_the_reader_purpose_of_each_profile_family(): void

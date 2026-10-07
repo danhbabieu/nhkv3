@@ -18,7 +18,6 @@ final class PublicMediaGalleryQuery
     public function __construct(
         private MediaRepository $media,
         private MediaAssetRepository $assets,
-        private ?PublicMediaAssetDelivery $delivery = null,
         private ?MediaUsageRepository $usages = null,
         private ?PublicMediaArticleLinkResolver $articleLinks = null,
     ) {}
@@ -62,7 +61,7 @@ final class PublicMediaGalleryQuery
             'image_url' => $image['image_url'] ?? null,
             'thumbnail_url' => $image['thumbnail_url'] ?? ($image['image_url'] ?? null),
             'alt' => $media->canonicalName,
-            'summary' => $this->summary($media),
+            'summary' => $this->summary($usages),
             'width' => $image['width'] ?? null,
             'height' => $image['height'] ?? null,
             'has_real_image' => $image !== null,
@@ -78,16 +77,6 @@ final class PublicMediaGalleryQuery
     private function firstImage(Media $media): ?array
     {
         $asset = (new PublicMediaAssetSelector())->canonical($this->assets->listByMediaId($media->canonicalId));
-        // A public projection is not useful when its canonical locator points
-        // at an asset that cannot pass the delivery boundary.  Keep this
-        // read-only and fail closed so stale attachment/path metadata cannot
-        // become a broken <img> in public projections.
-        if ($asset instanceof MediaAsset && $this->delivery !== null && $this->delivery->resolve($asset->assetId) === null) {
-            return null;
-        }
-        // The read model may expose a governed public projection even when a
-        // request-time binary check is temporarily unavailable. The /anh/
-        // delivery route remains the fail-closed binary boundary.
         if (!$asset instanceof MediaAsset) return null;
         $filename = is_string($asset->metadata['canonical_filename'] ?? null) && trim((string) $asset->metadata['canonical_filename']) !== ''
             ? (string) $asset->metadata['canonical_filename']
@@ -108,9 +97,10 @@ final class PublicMediaGalleryQuery
         ];
     }
 
-    private function summary(Media $media): string
+    /** @param list<\NHK\Core\Domain\Media\MediaUsage> $usages */
+    private function summary(array $usages): string
     {
-        foreach ($this->usagesForMedia($media) as $usage) {
+        foreach ($usages as $usage) {
             $caption = trim(preg_replace('/\s+/u', ' ', $usage->caption) ?? '');
             if ($caption !== '') return $this->shorten($caption);
         }
