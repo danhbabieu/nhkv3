@@ -1,5 +1,48 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-07 — Live Capture retry shape diagnosed and reducer/policy fixed locally
+
+LIVE_READ_ONLY_DIAGNOSIS: On the authorized TEST runtime
+`staging / erourxcg_nhkv3 / https://demo.1945.vn`, read-only WP-CLI hydration of
+Capture `01a1105c-4cc6-7529-ad3e-6bc652b4ae7f` returned revision 14,
+`stage=SEMANTICS_RECONCILED`, `status=REVIEW_REQUIRED`, `article_id=null`.
+The persisted shape was append-only: both `FAILED_RETRYABLE` and
+`ARTICLE_PRE_CREATE_REVIEW` contained `attempts`, `latest`, `attempt_no` and
+`attempt_id`; recovery phases had `status=COMPLETED` with `result=IN_PROGRESS`.
+The review row copied `failure_code=CAPTURE_UTF8_INVALID` from the earlier
+retryable row. Completion projection was `status=BLOCKED` with
+`CAPTURE_UTF8_INVALID` and `CANONICAL_READBACK_UNVERIFIED`.
+
+ROOT_CAUSE_CONFIRMED: The local @v58 reducer classified the live review as a
+genuine current attempt solely because `attempts` existed, and also required
+`result=COMPLETED` to recognize recovery. It therefore returned
+`currentFailureCodes=[CAPTURE_UTF8_INVALID]`. Both `capture_get` and
+`capture_ingest` reached the shared `CaptureCurrentOutcomeReducer`; retry
+eligibility then returned `CAPTURE_RETRY_NOT_ALLOWED` at the completion-status
+guard because persisted completion was `BLOCKED`, before stale-review
+reevaluation could run.
+
+LOCAL_FIX: The shared receipt reducer now recognizes an inherited Article
+pre-create review when its failure matches an earlier retryable failure and a
+later phase has `status=COMPLETED`, including the live `attempts`/`IN_PROGRESS`
+shape. Historical failure remains in receipt/audit history. Shared retry policy
+allows the bounded stale-review reevaluation before the legacy completion-status
+guard, while category and hard-block guards remain fail-closed.
+
+REGRESSION_COVERAGE: Focused Capture phase/current-outcome/continuation/MCP
+coverage passes 82 tests / 362 assertions. The exact live-shaped regression
+proves current blockers drop the inherited UTF-8 code and retry returns
+`STALE_REVIEW_REEVALUATABLE`; a distinct current Article review remains a
+blocker.
+
+VERIFICATION: PHP lint and `git diff --check` pass. Full NHK Unit at PHP 512MB
+completed 3,358 tests / 20,157 assertions with 1 pre-existing repository-test
+error and 4 unrelated Knowledge failures; no Capture regression remains. No
+staging retry, Capture mutation, deployment or publication was performed.
+
+STATUS: `CAPTURE_LIVE_SHAPE_CONFIRMED / RETRY_FIX_LOCAL / FOCUSED_GREEN /
+FULL_UNIT_BASELINE_LIMITED / NO_DATA_MUTATION / DEPLOYMENT_PENDING`.
+
 # Checkpoint — 2026-10-06 — Live Capture retry inherited-review reducer fix
 
 ROOT_CAUSE: The live `nhk.capture.get`/`nhk.capture.ingest` paths both reached

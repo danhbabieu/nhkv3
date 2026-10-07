@@ -88,11 +88,16 @@ final class CaptureCurrentOutcomeReducer
         }
 
         $completion = is_array($capture->diagnostics['completion'] ?? null) ? $capture->diagnostics['completion'] : [];
-        if (!in_array(strtoupper(trim((string) ($completion['status'] ?? ''))), ['PARTIAL', 'REVIEW_REQUIRED'], true)) {
-            return ['eligible' => false, 'reason' => 'CAPTURE_RETRY_NOT_ALLOWED'];
-        }
         $completionBlockers = self::currentBlockers($capture->diagnostics, $capture->phaseReceipts);
         if (in_array('CATEGORY_UNRESOLVED', $completionBlockers, true) || self::failureCode($capture) === 'CATEGORY_UNRESOLVED') {
+            return ['eligible' => false, 'reason' => 'CAPTURE_RETRY_NOT_ALLOWED'];
+        }
+        if ($capture->status === 'REVIEW_REQUIRED'
+            && !self::isHardBlockedReview($capture)
+            && CapturePhaseReceiptReducer::hasStaleInheritedArticleReview($capture->phaseReceipts)) {
+            return ['eligible' => true, 'reason' => 'STALE_REVIEW_REEVALUATABLE'];
+        }
+        if (!in_array(strtoupper(trim((string) ($completion['status'] ?? ''))), ['PARTIAL', 'REVIEW_REQUIRED'], true)) {
             return ['eligible' => false, 'reason' => 'CAPTURE_RETRY_NOT_ALLOWED'];
         }
         if ($capture->status === 'REVIEW_REQUIRED') {

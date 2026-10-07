@@ -79,10 +79,20 @@ final class CapturePhaseReceiptReducer
         return array_values(array_unique($codes));
     }
 
+    /** @param array<string,mixed> $receipts */
+    public static function hasStaleInheritedArticleReview(array $receipts): bool
+    {
+        foreach (array_values($receipts) as $position => $receipt) {
+            if (!is_array($receipt)) continue;
+            $phase = (string) array_keys($receipts)[$position];
+            if (self::legacyReviewInheritedFailureWasSuperseded($receipts, $position, self::latest($receipt), $phase)) return true;
+        }
+        return false;
+    }
+
     /**
-     * Legacy rows predate append-only attempts and persisted CURRENT on each
-     * phase. A later phase outcome is the effective successor; the old row is
-     * retained for audit but cannot remain a current retryable blocker.
+     * A retryable failure phase is historical once a later phase has started
+     * and produced an effective successor. Its attempts remain audit-visible.
      *
      * @param array<string,mixed> $receipts
      * @param array<string,mixed> $latest
@@ -90,7 +100,7 @@ final class CapturePhaseReceiptReducer
     private static function legacyFailureWasSuperseded(array $receipts, int $position, array $latest, string $phase): bool
     {
         $receipt = array_values($receipts)[$position] ?? null;
-        if (!is_array($receipt) || is_array($receipt['attempts'] ?? null) && $receipt['attempts'] !== []) return false;
+        if (!is_array($receipt)) return false;
         $code = strtoupper(trim((string) ($latest['failure_code'] ?? '')));
         if ($code === '' || in_array($code, ['OWNER_REVIEW_REQUIRED', 'SYSTEM_BLOCKED'], true) || str_contains($code, 'GOVERNANCE')) return false;
 
@@ -122,8 +132,6 @@ final class CapturePhaseReceiptReducer
     private static function legacyReviewInheritedFailureWasSuperseded(array $receipts, int $position, array $latest, string $phase): bool
     {
         if (strtoupper(trim($phase)) !== 'ARTICLE_PRE_CREATE_REVIEW') return false;
-        $rawReceipt = array_values($receipts)[$position] ?? null;
-        if (is_array($rawReceipt) && is_array($rawReceipt['attempts'] ?? null) && $rawReceipt['attempts'] !== []) return false;
         if (strtoupper(trim((string) ($latest['status'] ?? ''))) !== 'REVIEW_REQUIRED'
             || strtoupper(trim((string) ($latest['result'] ?? ''))) !== 'REVIEW_REQUIRED') return false;
 
@@ -141,7 +149,7 @@ final class CapturePhaseReceiptReducer
                 $seenRetryable = true;
                 continue;
             }
-            if ($seenRetryable && $priorStatus === 'COMPLETED' && $priorResult === 'COMPLETED') $sawCompletedAfterFailure = true;
+            if ($seenRetryable && $priorStatus === 'COMPLETED') $sawCompletedAfterFailure = true;
         }
         return $seenRetryable && $sawCompletedAfterFailure;
     }

@@ -217,13 +217,42 @@ final class CaptureCurrentOutcomeReducerTest extends TestCase
             'FAILED_RETRYABLE' => ['status' => 'FAILED', 'result' => 'FAILED_RETRYABLE', 'failure_code' => 'ERROR_X'],
             'INTERPRETED' => ['status' => 'COMPLETED', 'result' => 'COMPLETED'],
             'ARTICLE_PRE_CREATE_REVIEW' => [
-                'attempts' => [['status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'failure_code' => 'ERROR_X']],
-                'latest' => ['status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'failure_code' => 'ERROR_X'],
+                'attempts' => [['status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'failure_code' => 'ARTICLE_SUBSTANTIAL_OVERLAP']],
+                'latest' => ['status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'failure_code' => 'ARTICLE_SUBSTANTIAL_OVERLAP'],
             ],
         ];
-        $diagnostics = ['failure' => ['code' => 'ERROR_X'], 'completion' => ['status' => 'REVIEW_REQUIRED', 'blockers' => ['ERROR_X']]];
+        $diagnostics = ['failure' => ['code' => 'ARTICLE_SUBSTANTIAL_OVERLAP'], 'completion' => ['status' => 'REVIEW_REQUIRED', 'blockers' => ['ARTICLE_SUBSTANTIAL_OVERLAP']]];
 
-        self::assertSame(['ERROR_X'], CaptureCurrentOutcomeReducer::currentBlockers($diagnostics, $receipts));
+        self::assertSame(['ARTICLE_SUBSTANTIAL_OVERLAP'], CaptureCurrentOutcomeReducer::currentBlockers($diagnostics, $receipts));
+    }
+
+    public function test_live_shaped_inherited_article_review_is_reevaluable_even_when_completion_is_blocked(): void
+    {
+        $receipts = [
+            'FAILED_RETRYABLE' => [
+                'status' => 'FAILED', 'result' => 'FAILED_RETRYABLE', 'failure_code' => 'CAPTURE_UTF8_INVALID',
+                'attempt_no' => 1, 'attempt_id' => 'FAILED_RETRYABLE:1',
+                'attempts' => [['status' => 'FAILED', 'result' => 'FAILED_RETRYABLE', 'failure_code' => 'CAPTURE_UTF8_INVALID', 'attempt_no' => 1]],
+                'latest' => ['status' => 'FAILED', 'result' => 'FAILED_RETRYABLE', 'failure_code' => 'CAPTURE_UTF8_INVALID', 'attempt_no' => 1],
+            ],
+            'INTERPRETED' => ['status' => 'COMPLETED', 'result' => 'IN_PROGRESS', 'attempts' => [['status' => 'COMPLETED', 'result' => 'IN_PROGRESS']]],
+            'CONTENT_PREPARATION' => ['status' => 'COMPLETED', 'result' => 'IN_PROGRESS', 'attempts' => [['status' => 'COMPLETED', 'result' => 'IN_PROGRESS']]],
+            'SEMANTICS_RECONCILED' => ['status' => 'COMPLETED', 'result' => 'IN_PROGRESS', 'attempts' => [['status' => 'COMPLETED', 'result' => 'IN_PROGRESS']]],
+            'ARTICLE_PRE_CREATE_REVIEW' => [
+                'status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'failure_code' => 'CAPTURE_UTF8_INVALID',
+                'attempt_no' => 1, 'attempt_id' => 'ARTICLE_PRE_CREATE_REVIEW:1',
+                'attempts' => [['status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'failure_code' => 'CAPTURE_UTF8_INVALID', 'attempt_no' => 1]],
+                'latest' => ['status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'failure_code' => 'CAPTURE_UTF8_INVALID', 'attempt_no' => 1],
+            ],
+        ];
+        $diagnostics = [
+            'failure' => ['code' => 'CAPTURE_UTF8_INVALID', 'classification' => 'FAILED_RETRYABLE'],
+            'completion' => ['status' => 'BLOCKED', 'blockers' => ['CAPTURE_UTF8_INVALID', 'CANONICAL_READBACK_UNVERIFIED']],
+        ];
+        $capture = $this->capture($diagnostics, $receipts, 'REVIEW_REQUIRED');
+
+        self::assertSame(['CANONICAL_READBACK_UNVERIFIED'], CaptureCurrentOutcomeReducer::currentBlockers($diagnostics, $receipts));
+        self::assertSame(['eligible' => true, 'reason' => 'STALE_REVIEW_REEVALUATABLE'], CaptureCurrentOutcomeReducer::retryEligibility($capture));
     }
 
     public function test_legacy_article_pre_create_review_is_reevaluable_after_failure_is_superseded(): void
