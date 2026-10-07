@@ -127,6 +127,22 @@ final class StructuredSemanticInterpreterTest extends TestCase
         self::assertSame('một chi tiết', $value['dictionary_owner_commands'][0]['definition']);
         self::assertNotEmpty($value['semantic_assertions']);
         self::assertSame('FACTUAL_CANDIDATE', $value['semantic_assertions'][0]['track']);
+        self::assertSame('sản xuất năm 2020', $value['semantic_assertions'][0]['text']);
+        self::assertCount(1, $value['knowledge_delta_candidates']);
+        self::assertSame('sản xuất năm 2020', $value['knowledge_delta_candidates'][0]['text']);
+        self::assertStringNotContainsString('bổ sung vào từ điển', mb_strtolower($value['knowledge_delta_candidates'][0]['text']));
+    }
+
+    public function test_alias_command_strips_factual_tail_from_dictionary_form(): void
+    {
+        $interpreter = new StructuredSemanticInterpreter();
+        $command = $interpreter->dictionaryOwnerCommand('Côn còn gọi là côn máng, ghi nhận năm 2020.');
+
+        self::assertIsArray($command);
+        self::assertSame('ADD_FORM', $command['operation']);
+        self::assertSame('Côn', $command['term']);
+        self::assertSame('côn máng', $command['form']);
+        self::assertSame('ghi nhận năm 2020', $command['semantic_track']['assertions'][0]['text']);
     }
 
     public function test_lexical_only_input_does_not_emit_a_knowledge_fact_candidate(): void
