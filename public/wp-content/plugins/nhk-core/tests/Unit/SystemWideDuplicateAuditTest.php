@@ -72,6 +72,39 @@ final class SystemWideDuplicateAuditTest extends TestCase
         self::assertSame('DEFINITE_DUPLICATE', $result['owners']['Knowledge']['clusters'][0]['classification']);
     }
 
+    public function test_same_video_provenance_with_changed_wording_is_still_one_identity(): void
+    {
+        $result = $this->audit('Knowledge', [
+            ['canonical_id' => 'k-1', 'claim_text' => 'The source identifies this Video as concerning Odo 62.', 'claim_type' => 'provenance', 'provenance' => ['origin' => 'CAPTURE_VIDEO_SOURCE_PROVENANCE', 'metadata' => ['subject_id' => 'subject-1', 'platform' => 'youtube', 'external_video_id' => 'video-a']], 'revision' => 1],
+            ['canonical_id' => 'k-2', 'claim_text' => 'This canonical Video concerns Odo 62.', 'claim_type' => 'provenance', 'provenance' => ['origin' => 'CAPTURE_VIDEO_SOURCE_PROVENANCE', 'metadata' => ['subject_id' => 'subject-1', 'platform' => 'youtube', 'external_video_id' => 'video-a']], 'revision' => 1],
+        ]);
+
+        self::assertSame('DEFINITE_DUPLICATE', $result['owners']['Knowledge']['clusters'][0]['classification']);
+    }
+
+    public function test_ordinary_claim_identity_ignores_source_locator_and_request_metadata(): void
+    {
+        $result = $this->audit('Knowledge', [
+            ['canonical_id' => 'k-1', 'claim_text' => 'X dùng máy M', 'claim_type' => 'fact', 'provenance' => ['metadata' => ['subject_id' => 'subject-1', 'facet' => 'movement', 'scope' => 'variant', 'source_locator' => 'https://example.test/a', 'request_key' => 'request-a']], 'revision' => 1],
+            ['canonical_id' => 'k-2', 'claim_text' => 'X dùng máy M', 'claim_type' => 'fact', 'provenance' => ['metadata' => ['subject_id' => 'subject-1', 'facet' => 'movement', 'scope' => 'variant', 'source_locator' => 'https://example.test/b', 'request_key' => 'request-b']], 'revision' => 1],
+        ]);
+
+        self::assertSame('DEFINITE_DUPLICATE', $result['owners']['Knowledge']['clusters'][0]['classification']);
+    }
+
+    public function test_missing_video_identity_is_reviewed_without_shared_duplicate_cluster(): void
+    {
+        $result = $this->audit('Knowledge', [
+            ['canonical_id' => 'k-1', 'claim_text' => 'Video concerns Odo 62.', 'claim_type' => 'provenance', 'provenance' => ['origin' => 'CAPTURE_VIDEO_SOURCE_PROVENANCE', 'metadata' => ['subject_id' => 'subject-1']], 'revision' => 1],
+            ['canonical_id' => 'k-2', 'claim_text' => 'Video concerns another subject.', 'claim_type' => 'provenance', 'provenance' => ['origin' => 'CAPTURE_VIDEO_SOURCE_PROVENANCE', 'metadata' => ['subject_id' => 'subject-1']], 'revision' => 1],
+        ]);
+
+        self::assertCount(1, $result['owners']['Knowledge']['clusters']);
+        self::assertSame('REVIEW_REQUIRED', $result['owners']['Knowledge']['clusters'][0]['classification']);
+        self::assertSame(['k-1', 'k-2'], $result['owners']['Knowledge']['clusters'][0]['canonical_ids']);
+        self::assertSame('REVIEW_KNOWLEDGE_IDENTITY;NO_MUTATION', $result['owners']['Knowledge']['clusters'][0]['recommended_review_action']);
+    }
+
     public function test_knowledge_marks_nonidentical_wording_as_possible_and_qualification_as_scoped(): void
     {
         $result = $this->audit('Knowledge', [

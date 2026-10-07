@@ -275,12 +275,37 @@ final class SystemWideDuplicateAuditCoordinator
     /** @param list<mixed> $items @return list<array<string,mixed>> */
     private function knowledge(array $items): array
     {
-        $groups = $this->group($items, function (array $row): string {
-            return KnowledgeClaimIdentity::key(KnowledgeClaimIdentity::contextForAuditRow($row)) . '|' . $this->normalized($this->text($row, ['claim_text', 'text']));
-        });
         $clusters = [];
-        foreach ($groups as $key => $rows) if ($key !== '' && count($this->ids($rows)) > 1) $clusters[] = $this->cluster('Knowledge', $key, $rows, 'DEFINITE_DUPLICATE', 'HIGH', ['same_subject_facet_scope_type_normalized_proposition'], [], ['deterministic proposition identity matches'], 'REVIEW_KNOWLEDGE_REUSE_AND_EVIDENCE;DO_NOT_AUTO_MERGE');
-        $propositionGroups = $this->group($items, fn (array $row): string => KnowledgeClaimIdentity::key(KnowledgeClaimIdentity::contextForAuditRow($row)));
+        $resolved = [];
+        $unresolved = [];
+        foreach ($items as $row) {
+            $identity = KnowledgeClaimIdentity::resolveAuditRow($row);
+            if ($identity->status() !== 'RESOLVED') {
+                $id = $this->id($row);
+                if ($id !== '') $unresolved[$identity->status() . '|' . implode(',', $identity->reasonCodes())][] = $row;
+                continue;
+            }
+            $resolved[$identity->fingerprint()][] = ['row' => $row, 'identity' => $identity];
+        }
+        foreach ($unresolved as $reviewKey => $rows) {
+            $identity = KnowledgeClaimIdentity::resolveAuditRow($rows[0]);
+            $clusters[] = $this->cluster('Knowledge', 'review:' . hash('sha256', $reviewKey), $rows, 'REVIEW_REQUIRED', 'LOW', ['identity_status' => $identity->status(), 'identity_policy' => $identity->policyVersion(), 'identity_fingerprint' => $identity->fingerprint()], $identity->reasonCodes(), ['Knowledge identity is not proven; records are never compared as equivalent'], 'REVIEW_KNOWLEDGE_IDENTITY;NO_MUTATION');
+        }
+        foreach ($resolved as $key => $entries) {
+            $rows = array_values(array_map(static fn (array $entry): array => $entry['row'], $entries));
+            if (count($this->ids($rows)) > 1) $clusters[] = $this->cluster('Knowledge', $key, $rows, 'DEFINITE_DUPLICATE', 'HIGH', ['identity_status' => 'RESOLVED', 'identity_policy' => $entries[0]['identity']->policyVersion(), 'identity_fingerprint' => $key], [], ['canonical Knowledge identity matches'], 'REVIEW_KNOWLEDGE_REUSE_AND_EVIDENCE;DO_NOT_AUTO_MERGE');
+        }
+        $propositionGroups = [];
+        foreach ($resolved as $entries) foreach ($entries as $entry) {
+            $row = $entry['row'];
+            $provenance = $this->array($row, ['provenance']);
+            $metadata = $this->array($row, ['provenance', 'metadata']);
+            $origin = strtoupper($this->text($row, ['origin'], $provenance));
+            if ($origin === 'CAPTURE_VIDEO_SOURCE_PROVENANCE' || strtoupper($this->text($metadata, ['origin'])) === 'CAPTURE_VIDEO_SOURCE_PROVENANCE') continue;
+            $packet = $entry['identity']->packet();
+            unset($packet['proposition']);
+            $propositionGroups[KnowledgeClaimIdentity::key($packet)][] = $row;
+        }
         foreach ($propositionGroups as $key => $rows) {
             $propositions = [];
             foreach ($rows as $row) $propositions[$this->normalized($this->text($row, ['claim_text', 'text']))] = true;

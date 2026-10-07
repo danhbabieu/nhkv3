@@ -39,10 +39,10 @@ final class KnowledgeClaimIdentity
         $provenance = is_array($row['provenance'] ?? null) ? $row['provenance'] : [];
         $metadata = is_array($provenance['metadata'] ?? null) ? $provenance['metadata'] : [];
         foreach (['subject_id', 'canonical_subject_id', 'facet', 'scope', 'platform', 'external_video_id', 'canonical_video_id', 'video_id', 'origin', 'proposition', 'deterministic_proposition', 'proposition_class'] as $key) if (array_key_exists($key, $row) && !array_key_exists($key, $metadata)) $metadata[$key] = $row[$key];
-        $provenance['metadata'] = $metadata;
         $provenance['origin'] = $provenance['origin'] ?? $metadata['origin'] ?? null;
         if (!isset($metadata['proposition']) && isset($row['claim_text'])) $metadata['proposition'] = (string) $row['claim_text'];
-        return self::resolveInput((string) ($row['claim_type'] ?? $metadata['claim_type'] ?? ''), $provenance, $videos);
+        $provenance['metadata'] = $metadata;
+        return self::resolveInput((string) ($row['claim_type'] ?? $metadata['claim_type'] ?? 'fact'), $provenance, $videos);
     }
 
     /** @param array<string,mixed> $metadata */
