@@ -727,26 +727,39 @@ idempotent via the existing Article operation receipt repository, never stores
 body in the receipt, and returns a native state token plus
 `DRAFT_INCOMPLETE_FOR_PUBLICATION`. Update requires a matching native state
 token, updates only supplied editorial fields, preserves omitted fields and
-public identity, and never accepts a status transition. The typed Article publication
-boundary is the only V3 publication writer: it requires the current draft token
-and verified evidence, calls `ArticlePublicationGate` before the native status
-transition, and reads the published Post back. Owner-review approval remains
-separate from system-blocked failures. Trash/restore uses the same CAS/receipt
-boundary and never permanently deletes a Post. Typed Category operations remain
-native taxonomy truth and never Graph truth.
+public identity, and never accepts a status transition. The typed Article
+publication boundary is the only V3 publication writer: it requires the current
+draft token and verified pre-publication evidence, validates native `wp_post`
+slug/permalink deterministically, calls `ArticlePublicationGate` before the
+native status transition, then reads the published Post back and performs final
+public/frontend verification. A draft does not need anonymous HTTP 200 before
+publication. Owner-review approval remains separate from system-blocked
+failures. Trash/restore uses the same CAS/receipt boundary and never
+permanently deletes a Post. Typed Category operations remain native taxonomy
+truth and never Graph truth.
 
 The publication boundary is enforced by `ArticlePublicationGate`. Publication
 readiness is separate from enrichment completeness: `TEXT_ARTICLE` may pass
 without Media, while `IMAGE_ARTICLE` requires its submitted Media branch.
 Optional featured/inline Media, visual support, SEO image and related-content
 gaps are returned as `warnings`, `missing_enrichments` or `deferred_repairs`,
-not publication blockers. Video thumbnail and representative Media follow the
-same intent-specific rule. Canonical identity, CAS, Governance, compliance,
-private/corrupt asset, route collision and public read-back failures remain
-hard blockers. Rendered
-public verification and exact integration runtime evidence remain separate
-completion gates. Article body/excerpt stays only in WordPress editorial
-storage; receipts, Knowledge and Graph never become a second Article-body store.
+not publication blockers. For `TEXT_ARTICLE`, missing featured, inline or
+real-image support is warning-only and no placeholder Media is created;
+`IMAGE_ARTICLE` retains its stricter submitted-media requirements. Native route
+invalidity, collision, resolver disagreement, canonical mismatch, CAS,
+Governance, compliance and private/corrupt asset failures remain hard blockers
+before publish. After native status/read-back succeeds, failed or unavailable
+public/frontend verification returns bounded `PARTIAL`/`verification_required`
+state and never triggers a duplicate Post. Article body/excerpt stays only in
+WordPress editorial storage; receipts, Knowledge and Graph never become a
+second Article-body store.
+
+Governed MediaUsage removal checks the exact target, Usage ID and revision
+before retiring the Usage. If its referenced Media no longer exists, the
+requested absent final state still converges idempotently and final read-back
+shows no active binding; the system never fabricates Media. Capture subject
+resolution remains canonical-first and ambiguous primary-subject resolution is
+review-required before Article creation.
 
 The minimum Article/Media runtime acceptance is the real-file chain:
 `file → governed ingest/adoption → attachment → one Media identity →

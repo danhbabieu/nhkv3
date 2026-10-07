@@ -376,8 +376,20 @@ and canonical read-back. Featured/inline Media, visual support, SEO image and
 related-content gaps are warnings or deferred enrichment unless the resolved
 intent explicitly requires them. The gate reports `publication_ready`,
 `enrichment_complete`, `warnings`, `missing_enrichments` and
-`deferred_repairs`. Identity, CAS, Governance, compliance, visibility,
-collision and public read-back failures remain fail-closed.
+`deferred_repairs`. For `TEXT_ARTICLE`, missing featured/inline/real-image
+support is warning-only and no placeholder Media is created; `IMAGE_ARTICLE`
+retains its stricter requirements. Identity, CAS, Governance, compliance,
+invalid native route, collision and resolver disagreement remain fail-closed
+before publish. Public verification failures after native publish are bounded
+verification state rather than a second publication attempt.
+
+Native `wp_post` permalink/slug is the Article route authority; semantic Public
+Identity is not a draft publication prerequisite. Governed MediaUsage removal
+checks the exact target, Usage ID and revision, retires stale bindings without
+resolving absent Media, and verifies no active binding remains. Capture subject
+resolution remains canonical-first: explicit subject precedence wins, related
+terms remain secondary, and ambiguous candidates remain review-required before
+Article creation.
 
 Shared recovery order is `read-back → classify → safe retry → deterministic
 repair → reconcile → degrade optional dependency → continue owner workflow →

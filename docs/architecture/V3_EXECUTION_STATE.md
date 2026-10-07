@@ -1,5 +1,36 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-07 — Global Article publication lifecycle fixed locally
+
+IMPLEMENTATION: Capture-owned Article publication now validates deterministic
+native `wp_post` route evidence before the gate and does not require draft
+frontend HTTP verification before native publish. TEXT_ARTICLE missing
+featured/inline/real-image support is warning-only; IMAGE_ARTICLE requirements
+remain strict. Post-publish public verification failure/unavailability returns
+bounded `PARTIAL`/`verification_required` state without a duplicate Post.
+
+MEDIA_CLEANUP: Governed removal retires an exact MediaUsage without resolving a
+missing referenced Media, verifies no active binding remains, and converges on
+repeated removal.
+
+SUBJECT_REGRESSION: Explicit canonical subject precedence and ambiguous
+review-required behavior are covered through the existing shared resolver; no
+new Authority resolver or semantic owner was added.
+
+REGRESSION_COVERAGE: Article gate 19 tests / 56 assertions; publication
+continuation/owner/MCP 21 tests / 98 assertions; MediaBinding 18 tests / 40
+assertions; subject-resolution/pre-create 31 tests / 118 assertions. PHP lint
+and `git diff --check` passed for changed implementation files.
+
+DATA_SAFETY: No migration, staging/production mutation, Post 766 publication,
+deployment or public cutover was performed. Existing untracked local design
+work was preserved.
+
+COMMITS: `3c6dbae0`, `42694229`, `ad5de1fc`, `43cedd4a`.
+
+STATUS: `ARTICLE_PUBLICATION_LIFECYCLE_FIXED_LOCAL / FOCUSED_GREEN /
+NO_DATA_MUTATION / DEPLOYMENT_PENDING`
+
 # Checkpoint — 2026-10-07 — Staging dependency reactivation admission fixed locally
 
 ROOT_CAUSE_CONFIRMED: Capture-bound staging admission and dependency scope
