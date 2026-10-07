@@ -40,7 +40,7 @@
 
 ## Execution Slices
 
-### Slice A — Architecture guard and correctness bugs
+### Task 1: Architecture guard, Dictionary correctness, and asset family manifest
 
 1. Add failing tests for forbidden record-specific public templates/includes and neutral Article/Video/Dictionary/Entity family reuse.
 2. Implement the guard as a read-only filesystem/source scanner with explicit allowlist categories for domain normalization and fixtures.
@@ -50,7 +50,7 @@
 6. Add failing asset tests for VideoDetail and Comparison family declarations; implement the smallest family asset manifest/decision seam.
 7. Run focused tests, PHP lint, diff-check, and scoped secret review; commit Slice A.
 
-### Slice B — SEO convergence
+### Task 2: SEO convergence
 
 1. Add failing tests for one normalized SEO packet, absolute canonical/OG/JSON-LD/sitemap URLs, and `wp_robots` ownership.
 2. Normalize `PublicSeoProjection`/family SEO input without adding a manual robots tag.
@@ -58,7 +58,7 @@
 4. Preserve Article, VideoObject, DefinedTerm, and BreadcrumbList nodes without duplicate output.
 5. Run SEO focused tests and commit Slice B.
 
-### Slice C — Presentation deduplication
+### Task 3: Presentation deduplication
 
 1. Add contract coverage for shared reusable partials and one family entry per domain.
 2. Extract only genuinely repeated relation/media/section presentation from Entity/Article/Video.
@@ -66,14 +66,14 @@
 4. Keep type/profile configuration in packets/registries and preserve domain behavior.
 5. Run theme/contract tests and commit Slice C.
 
-### Slice D — CSS and asset architecture
+### Task 4: CSS and asset architecture
 
 1. Add failing tests that assert family handle declarations and absence of unrelated dependency chains.
 2. Flatten stylesheet dependencies into base, shared presentation, family, and feature layers.
 3. Preserve visual selectors while ensuring VideoDetail and Comparison receive required CSS.
 4. Run asset, responsive, accessibility static checks and commit Slice D.
 
-### Slice E — Query scalability and media I/O
+### Task 5: Query scalability and media I/O
 
 1. Add instrumentation tests for bounded public query APIs where repository interfaces support them.
 2. Replace list-all/sort/slice only where an existing bounded contract is available.

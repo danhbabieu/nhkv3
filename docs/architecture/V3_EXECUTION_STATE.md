@@ -1,5 +1,39 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-07 — Template-family invariant and family asset manifest
+
+SCOPE: Implementation Task 1 from the approved final template-family
+architecture. Added a read-only public theme contract that rejects
+record-specific template filenames/references and maps neutral records to the
+existing Article, Video, Dictionary and Entity family entry templates.
+
+DICTIONARY_FIX: Public Dictionary usage projection now accepts explicit
+`usage_scope`, `usage_notes`, and singular reader-facing `usage_note` only.
+Generic internal `scope` is no longer exposed. Legacy `notes` is accepted only
+when the packet explicitly marks it `reader_facing_notes=true`. No Dictionary
+state or data was changed; the DRAFT Odo Sense remains untouched and
+non-public.
+
+ASSET_BOUNDARY: Added a deterministic family asset manifest. Video detail now
+declares the video stylesheet/player; Comparison has its own stylesheet; and
+Dictionary no longer depends on the Entity → Media/Video → Knowledge CSS
+chain. The theme uses the manifest while preserving the existing family entry
+templates.
+
+ROUTE_SAFETY: Existing focused regressions continue to prove Media semantic
+detail and Knowledge atomic detail remain fail-closed.
+
+REGRESSION_COVERAGE: Task 1 focused suite passed 84 tests / 869 assertions.
+The RED tests first failed on the missing guard/asset contract and the leaked
+generic Dictionary scope; the GREEN run passed after the minimal changes.
+
+QUALITY_GATES: Changed PHP files lint clean and `git diff --check` passes.
+No migration, data mutation, deployment, push, pull or rebase was performed.
+
+COMMIT: Pending for this checkpoint.
+
+STATUS: `TEMPLATE_FAMILY_GUARD_AND_ASSET_MANIFEST_LOCAL / FOCUSED_GREEN / NO_SEMANTIC_DATA_MUTATION / DEPLOYMENT_PENDING`
+
 # Checkpoint — 2026-10-07 — Unified Dictionary detail presentation and delegated owner overlay
 
 ROOT_CAUSE_CONFIRMED: Dedicated Dictionary detail and delegated owner detail

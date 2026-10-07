@@ -114,4 +114,24 @@ final class DictionaryDetailPresentationComposerTest extends TestCase
         self::assertSame('AVAILABLE_EMPTY', $packet['media']['status']);
         self::assertFalse($packet['seo']['indexable']);
     }
+
+    public function test_public_usage_text_never_exposes_generic_internal_scope(): void
+    {
+        $packet = (new DictionaryDetailPresentationComposer())->compose([
+            'status' => 'READY',
+            'item' => [
+                'title' => 'Độ dày mặt máy',
+                'senses' => [[
+                    'context' => [
+                        'scope' => 'movement_plate_thickness',
+                        'usage_note' => 'Dùng tương đối trong cùng họ máy.',
+                    ],
+                ]],
+            ],
+        ]);
+
+        self::assertSame([], $packet['senses'][0]['usage_scope']);
+        self::assertSame(['Dùng tương đối trong cùng họ máy.'], $packet['senses'][0]['usage_notes']);
+        self::assertStringNotContainsString('movement_plate_thickness', json_encode($packet, JSON_UNESCAPED_UNICODE));
+    }
 }

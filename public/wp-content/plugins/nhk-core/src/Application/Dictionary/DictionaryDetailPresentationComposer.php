@@ -92,8 +92,8 @@ final class DictionaryDetailPresentationComposer
         return [
             'title' => trim((string) ($sense['title'] ?? '')),
             'definition' => trim((string) ($sense['description'] ?? $sense['definition'] ?? '')),
-            'usage_scope' => $this->texts($context['usage_scope'] ?? $context['scope'] ?? []),
-            'usage_notes' => $this->texts($context['usage_notes'] ?? $context['notes'] ?? []),
+            'usage_scope' => $this->texts($context['usage_scope'] ?? []),
+            'usage_notes' => $this->usageNotes($context),
             'canonical_owner' => $this->ownerRow($sense['canonical_owner'] ?? null),
             'knowledge' => $this->bucket($sense['knowledge'] ?? null),
             'relations' => $this->bucket($sense['semantic_relations'] ?? null),
@@ -260,6 +260,16 @@ final class DictionaryDetailPresentationComposer
     {
         $values = is_array($value) ? $value : [$value];
         return array_values(array_filter(array_map(static fn (mixed $item): string => trim(is_scalar($item) ? (string) $item : ''), $values)));
+    }
+
+    /** @param array<string,mixed> $context @return list<string> */
+    private function usageNotes(array $context): array
+    {
+        $notes = $this->texts($context['usage_notes'] ?? []);
+        if ($notes !== []) return $notes;
+        $notes = $this->texts($context['usage_note'] ?? []);
+        if ($notes !== []) return $notes;
+        return ($context['reader_facing_notes'] ?? false) === true ? $this->texts($context['notes'] ?? []) : [];
     }
 
     private function sameText(string $left, string $right): bool { return $this->key($left) !== '' && $this->key($left) === $this->key($right); }

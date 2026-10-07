@@ -309,7 +309,7 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString('display:none', $style);
         self::assertStringContainsString('.skip-link:focus', $style);
         self::assertStringContainsString('overflow-wrap:anywhere', $style);
-        self::assertStringContainsString("get_theme_file_uri('navigation.js')", $functions);
+        self::assertStringContainsString("'nhk-v3-navigation' => 'navigation.js'", $functions);
 
         foreach (['front-page.php', 'index.php', 'single.php', 'entity.php', 'knowledge.php', 'media.php', 'video.php', 'comparison.php', '404.php'] as $template) {
             self::assertStringContainsString('id="main-content"', (string) file_get_contents($theme . '/' . $template), $template . ' must expose the skip-link target');
@@ -397,11 +397,10 @@ final class FrontendContractTest extends TestCase
     {
         $functions = (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/functions.php');
 
-        self::assertStringContainsString('$needsPresentation', $functions);
+        self::assertStringContainsString('PublicTemplateFamilyAssetManifest::forContext', $functions);
         self::assertStringContainsString("wp_register_style('nhk-v3-presentation'", $functions);
-        self::assertStringContainsString('if ($needsEntity)', $functions);
-        self::assertStringContainsString('if ($needsMediaVideo || $needsKnowledge)', $functions);
-        self::assertStringContainsString('if ($needsKnowledge)', $functions);
+        self::assertStringContainsString("wp_register_style('nhk-v3-comparison'", $functions);
+        self::assertStringContainsString("'nhk-v3-video-player' => 'video-player.js'", $functions);
         self::assertStringContainsString("nhk-v3-video-player", $functions);
     }
 
