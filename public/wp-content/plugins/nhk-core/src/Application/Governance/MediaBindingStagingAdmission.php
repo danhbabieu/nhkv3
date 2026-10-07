@@ -30,13 +30,15 @@ final class MediaBindingStagingAdmission
     public function __invoke(bool $admitted, array $scope, CaptureRecord $capture, array $input, array $assets): bool
     {
         if ($admitted) return true;
-        if (($scope['operation_family'] ?? '') === 'media_usage_reconciliation'
+        $policy = (new GovernedOperationPolicyRegistry())->find('media', (string) ($scope['operation'] ?? ''));
+        if ($policy !== null && $policy->captureStagingAllowed && ($scope['operation_family'] ?? '') === $policy->operationFamily
             && in_array((string) ($scope['operation'] ?? ''), ['add', 'replace', 'remove'], true)) {
             return $this->usageOperationAdmission($scope, $capture, $input);
         }
-        if (($scope['approved'] ?? false) !== true
+        if ($policy === null || !$policy->captureStagingAllowed
+            || ($scope['approved'] ?? false) !== true
             || ($scope['environment'] ?? '') !== 'staging'
-            || ($scope['operation_family'] ?? '') !== 'media_usage_reconciliation'
+            || ($scope['operation_family'] ?? '') !== $policy->operationFamily
             || ($scope['entity_type'] ?? '') !== 'media'
             || ($scope['operation'] ?? '') !== 'representative_bind'
             || ($scope['writer'] ?? '') !== 'canonical_media_binding'

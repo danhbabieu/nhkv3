@@ -42,11 +42,11 @@ final readonly class StagingOperationDescriptor
         $payload = self::normalizeSemanticPayload($payload, $entity);
         $dependencies = array_values(array_unique(array_map('strval', (array) ($payload['dependency_ids'] ?? $plan['dependency_ids'] ?? []))));
         sort($dependencies, SORT_STRING);
-        $family = self::family($entity, $operation);
+        $policy = (new GovernedOperationPolicyRegistry())->find($entity, $operation);
+        $family = $policy?->operationFamily ?? '';
         $rawExpected = $plan['expected_revision'] ?? null;
         if ($rawExpected !== null && !is_int($rawExpected)) throw new \InvalidArgumentException('EXPECTED_REVISION_INTEGER_REQUIRED');
-        $expected = $rawExpected;
-        if ($operation === 'ingest' && in_array($entity, ['source', 'knowledge', 'evidence', 'video'], true)) $expected = 0;
+        $expected = $policy?->revisionPolicy === 'ZERO' ? 0 : $rawExpected;
         return new self(
             'nhk.capture.ingest', $captureId, $captureFingerprint, $entity, $operation, $family,
             $operation === 'ingest' ? 'ingest' : null,
@@ -79,14 +79,7 @@ final readonly class StagingOperationDescriptor
 
     public static function family(string $entityType, string $operation): string
     {
-        return match ($entityType . ':' . $operation) {
-            'source:create', 'source:ingest', 'source:update', 'source:retire', 'source:reactivate', 'evidence:create', 'evidence:ingest', 'evidence:update', 'evidence:retire', 'evidence:reactivate' => 'source_evidence_reconciliation',
-            'knowledge:create', 'knowledge:ingest', 'knowledge:update', 'knowledge:retire', 'knowledge:reactivate' => 'knowledge_delta',
-            'video:ingest', 'video:update', 'video:retire', 'video:reactivate' => 'governed_video_plan',
-            'video:source_refresh' => 'video_source_refresh',
-            'relation:relation_create', 'relation:relation_retire', 'relation:relation_reactivate', 'relation:relation_replace' => 'capture_child_relation',
-            default => '',
-        };
+        return (new GovernedOperationPolicyRegistry())->find($entityType, $operation)?->operationFamily ?? '';
     }
 
     /** @param array<string,mixed> $value @return array<string,mixed> */

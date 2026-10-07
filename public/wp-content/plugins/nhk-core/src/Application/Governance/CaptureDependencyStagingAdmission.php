@@ -23,21 +23,22 @@ final class CaptureDependencyStagingAdmission
         $planningInput = is_array($capture->context['planning_input'] ?? null) ? $capture->context['planning_input'] : [];
         $intent = strtoupper(trim((string) ($contextIntent['intent'] ?? $planningInput['intent'] ?? $input['intent'] ?? '')));
         if (!in_array($intent, ['VIDEO', 'KNOWLEDGE_DELTA', 'KNOWLEDGE_REPAIR'], true)) { $this->lastReason = 'CAPTURE_CONTENT_INTENT_NOT_VIDEO'; return false; }
-        if (($scope['approved'] ?? false) !== true
+        $policy = (new GovernedOperationPolicyRegistry())->find((string) ($scope['entity_type'] ?? ''), (string) ($scope['operation'] ?? ''));
+        if ($policy === null || !$policy->captureStagingAllowed
+            || ($scope['approved'] ?? false) !== true
             || ($scope['environment'] ?? '') !== 'staging'
             || ($scope['semantic_write_policy'] ?? '') !== 'PROJECT_BUILD'
             || ($scope['entrypoint'] ?? '') !== 'nhk.capture.ingest'
             || ($scope['capture_id'] ?? '') !== $capture->captureId
             || ($scope['capture_fingerprint'] ?? '') !== $capture->requestFingerprint
             || (int) ($scope['capture_revision'] ?? 0) !== $capture->revision
-            || !in_array((string) ($scope['operation_family'] ?? ''), ['source_evidence_reconciliation', 'knowledge_delta'], true)
-            || !in_array((string) ($scope['entity_type'] ?? ''), ['source', 'knowledge', 'evidence'], true)
-            || !in_array((string) ($scope['operation'] ?? ''), ['ingest', 'create', 'update', 'retire', 'reactivate'], true)) { $this->lastReason = 'DEPENDENCY_OPERATION_NOT_ALLOWED'; return false; }
+            || ($scope['operation_family'] ?? '') !== $policy->operationFamily
+            || !in_array((string) ($scope['entity_type'] ?? ''), ['source', 'knowledge', 'evidence'], true)) { $this->lastReason = 'DEPENDENCY_OPERATION_NOT_ALLOWED'; return false; }
         if (preg_match('/^[a-f0-9]{64}$/i', (string) ($scope['plan_fingerprint'] ?? '')) !== 1
             || preg_match('/^[a-f0-9]{64}$/i', (string) ($scope['proposal_command_fingerprint'] ?? '')) !== 1
             || preg_match('/^[a-f0-9]{64}$/i', (string) ($scope['payload_fingerprint'] ?? '')) !== 1) { $this->lastReason = 'DEPENDENCY_FINGERPRINT_INVALID'; return false; }
         $operation = (string) ($scope['operation'] ?? '');
-        if (in_array($operation, ['update', 'retire', 'reactivate'], true) ? (int) ($scope['expected_revision'] ?? 0) < 1 : (int) ($scope['expected_revision'] ?? 0) !== 0) { $this->lastReason = in_array($operation, ['update', 'retire', 'reactivate'], true) ? 'TARGET_REVISION_REQUIRED' : 'CREATE_REVISION_NOT_ZERO'; return false; }
+        if ($policy->revisionPolicy === 'CURRENT_REQUIRED' ? (int) ($scope['expected_revision'] ?? 0) < 1 : (int) ($scope['expected_revision'] ?? 0) !== 0) { $this->lastReason = $policy->revisionPolicy === 'CURRENT_REQUIRED' ? 'TARGET_REVISION_REQUIRED' : 'CREATE_REVISION_NOT_ZERO'; return false; }
         $this->lastReason = 'ADMITTED';
         return true;
     }

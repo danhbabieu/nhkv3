@@ -15,9 +15,11 @@ final class MediaMetadataStagingAdmission
     public function __invoke(bool $admitted, array $scope, CaptureRecord $capture, array $input, array $assets): bool
     {
         if ($admitted) return true;
-        if (($scope['approved'] ?? false) !== true
+        $policy = (new GovernedOperationPolicyRegistry())->find('media', (string) ($scope['operation'] ?? ''));
+        if ($policy === null || !$policy->captureStagingAllowed
+            || ($scope['approved'] ?? false) !== true
             || ($scope['environment'] ?? '') !== 'staging'
-            || ($scope['operation_family'] ?? '') !== 'media_metadata_reconciliation'
+            || ($scope['operation_family'] ?? '') !== $policy->operationFamily
             || ($scope['entity_type'] ?? '') !== 'media'
             || ($scope['operation'] ?? '') !== 'update'
             || ($scope['writer'] ?? '') !== 'canonical_governed'

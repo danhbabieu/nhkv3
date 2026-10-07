@@ -12,9 +12,11 @@ final class CaptureChildRelationStagingAdmission
     public function __invoke(bool $admitted, array $scope, CaptureRecord $capture, array $input, array $assets): bool
     {
         if ($admitted) return true;
-        if (($scope['approved'] ?? false) !== true
+        $policy = (new GovernedOperationPolicyRegistry())->find('relation', 'relation_create');
+        if ($policy === null || !$policy->captureStagingAllowed
+            || ($scope['approved'] ?? false) !== true
             || ($scope['environment'] ?? '') !== 'staging'
-            || ($scope['operation_family'] ?? '') !== 'capture_child_relation'
+            || ($scope['operation_family'] ?? '') !== $policy->operationFamily
             || ($scope['entity_type'] ?? '') !== 'relation'
             || ($scope['operation'] ?? '') !== 'relation_create'
             || ($scope['writer'] ?? '') !== 'canonical_governed'

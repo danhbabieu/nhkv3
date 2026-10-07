@@ -16,10 +16,12 @@ final class VideoStagingAdmission
     public function __invoke(bool $admitted, array $scope, CaptureRecord $capture, array $input, array $assets): bool
     {
         if ($admitted) return true;
-        if (($scope['approved'] ?? false) !== true
+        $policy = (new GovernedOperationPolicyRegistry())->find('video', (string) ($scope['operation'] ?? ''));
+        if ($policy === null || !$policy->captureStagingAllowed
+            || ($scope['approved'] ?? false) !== true
             || ($scope['environment'] ?? '') !== 'staging'
             || ($scope['semantic_write_policy'] ?? 'PROJECT_BUILD') !== 'PROJECT_BUILD'
-            || ($scope['operation_family'] ?? '') !== 'governed_video_plan'
+            || ($scope['operation_family'] ?? '') !== $policy->operationFamily
             || ($scope['entity_type'] ?? '') !== 'video'
             || !in_array((string) ($scope['operation'] ?? ''), ['ingest', 'update'], true)
             || ($scope['writer'] ?? '') !== 'canonical_governed'

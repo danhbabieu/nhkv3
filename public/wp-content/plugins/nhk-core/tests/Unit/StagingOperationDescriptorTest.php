@@ -37,6 +37,21 @@ final class StagingOperationDescriptorTest extends TestCase
         yield 'evidence' => ['evidence', 'source_evidence_reconciliation'];
     }
 
+    public function test_registered_create_operation_uses_policy_revision_zero(): void
+    {
+        $descriptor = StagingOperationDescriptor::fromPlan([
+            'entity_type' => 'model',
+            'operation' => 'create',
+            'subject_id' => 'model',
+            'expected_revision' => 42,
+            'idempotency_key' => 'authority-create-policy',
+            'payload' => [],
+        ], UuidCodec::newV7(), hash('sha256', 'authority-create-policy'));
+
+        self::assertSame('governed_authority_plan', $descriptor->operationFamily);
+        self::assertSame(0, $descriptor->expectedRevision);
+    }
+
     /** @dataProvider semanticSubjectProvider */
     public function test_final_dependency_and_proposal_use_one_identity_for_optional_source_fields(string $subjectType): void
     {

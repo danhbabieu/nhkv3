@@ -251,7 +251,8 @@ final class StagingAcceptanceScopeVerifier
         // signed scope metadata and is not part of the child command hash.
         $plan['payload'] = is_array($plan['payload'] ?? null) ? $plan['payload'] : [];
         $descriptor = StagingOperationDescriptor::fromPlan($plan, $capture->captureId, $capture->requestFingerprint);
-        if (!in_array($descriptor->entityType, ['source', 'knowledge', 'evidence'], true) || !in_array($descriptor->operation, ['ingest', 'create', 'update', 'retire', 'reactivate'], true)) throw new \RuntimeException('STAGING_DEPENDENCY_OPERATION_INVALID');
+        $policy = (new GovernedOperationPolicyRegistry())->find($descriptor->entityType, $descriptor->operation);
+        if ($policy === null || !$policy->captureStagingAllowed || !in_array($descriptor->entityType, ['source', 'knowledge', 'evidence'], true)) throw new \RuntimeException('STAGING_DEPENDENCY_OPERATION_INVALID');
         $family = $descriptor->operationFamily;
         $payloadFingerprint = $descriptor->payloadFingerprint;
         $planFingerprint = hash('sha256', CommandCanonicalizer::canonicalize(StagingOperationDescriptor::withoutAuthorization($plan)));
@@ -289,6 +290,8 @@ final class StagingAcceptanceScopeVerifier
         if ($sourceType === '' || $sourceId === '' || $targetType === '' || $targetId === '' || $predicate === '' || $sourceRevision < 1 || $targetRevision < 1) {
             throw new \RuntimeException('STAGING_CAPTURE_CHILD_BINDING_INVALID');
         }
+        $relationPolicy = (new GovernedOperationPolicyRegistry())->find('relation', 'relation_create');
+        if ($relationPolicy === null || !$relationPolicy->captureStagingAllowed) throw new \RuntimeException('STAGING_CAPTURE_CHILD_OPERATION_INVALID');
         $payload['capture_id'] = $capture->captureId;
         $payload['capture_revision'] = $capture->revision;
         $payload['source_revision'] = $sourceRevision;
@@ -404,7 +407,8 @@ final class StagingAcceptanceScopeVerifier
         $targetUuid = trim((string) ($plan['target_uuid'] ?? ''));
         $expectedRevision = $descriptor->expectedRevision ?? 0;
         $planFingerprint = trim((string) ($plan['plan_fingerprint'] ?? $plan['fingerprint'] ?? ''));
-        if ($entityType !== 'video' || !in_array($operation, ['ingest', 'update'], true)) throw new \RuntimeException('STAGING_VIDEO_OPERATION_INVALID');
+        $policy = (new GovernedOperationPolicyRegistry())->find($entityType, $operation);
+        if ($entityType !== 'video' || $policy === null || !$policy->captureStagingAllowed) throw new \RuntimeException('STAGING_VIDEO_OPERATION_INVALID');
         if (!preg_match('/^[a-f0-9]{64}$/i', $planFingerprint)) throw new \RuntimeException('STAGING_VIDEO_BINDING_REQUIRED');
         // The Capture snapshot is only the immutable parent authorization
         // boundary. Reconciliation may have rebuilt the final Video command

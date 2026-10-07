@@ -18,8 +18,6 @@ use NHK\Core\Shared\Uuid\UuidCodec;
  */
 final class AuthorityStagingAdmission
 {
-    private const OPERATIONS = ['create', 'update', 'rename', 'rekey', 'retire', 'reactivate'];
-
     /** @param array<string,mixed> $scope @param array<string,mixed> $input @param list<array<string,mixed>> $assets */
     public function __invoke(bool $admitted, array $scope, CaptureRecord $capture, array $input, array $assets): bool
     {
@@ -39,6 +37,7 @@ final class AuthorityStagingAdmission
         $bindings = array_values(array_filter((array) ($scope['candidate_bindings'] ?? []), 'is_array'));
         if ($bindings === []) return false;
         $candidateIds = [];
+        $policyRegistry = new GovernedOperationPolicyRegistry();
         $types = new EntityTypeRegistry();
         CanonicalEntityTypeCatalog::registerInto($types);
         $predicates = new PredicateRegistry();
@@ -46,10 +45,11 @@ final class AuthorityStagingAdmission
             $candidateId = trim((string) ($binding['candidate_id'] ?? ''));
             $entityType = strtolower(trim((string) ($binding['entity_type'] ?? '')));
             $operation = strtolower(trim((string) ($binding['operation'] ?? '')));
+            $policy = $policyRegistry->find($entityType, $operation);
             if ($candidateId === '' || str_contains($candidateId, '*') || in_array($candidateId, $candidateIds, true)
                 || ($entityType !== 'relation' && !$types->has($entityType))
-                || ($entityType === 'relation' && !in_array($operation, ['relation_create', 'relation_retire', 'relation_reactivate', 'relation_replace'], true))
-                || ($entityType !== 'relation' && !in_array($operation, self::OPERATIONS, true))) return false;
+                || $policy === null || !$policy->captureStagingAllowed
+                || ($entityType === 'relation' && $policy->operationFamily !== 'capture_child_relation')) return false;
             $candidateIds[] = $candidateId;
             if (!preg_match('/^[a-f0-9]{64}$/i', (string) ($binding['candidate_payload_fingerprint'] ?? ''))
                 || !preg_match('/^[a-f0-9]{64}$/i', (string) ($binding['dependency_fingerprint'] ?? ''))
