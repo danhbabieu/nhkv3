@@ -11,12 +11,14 @@ class/platform/external video ID; wording and source locator are not identity.
 Unresolved and conflicting identity is review-required and never equivalent.
 
 KNOWLEDGE_IDENTITY_VERIFICATION: Focused Knowledge identity, resolver,
-enrichment, Capture provenance, audit, cursor/MCP, repair preview and proposal
-eligibility tests passed: 140 tests, 1,399 assertions. PHP lint and
-`git diff --check` passed. The full PHPUnit run was attempted with a 512M
+enrichment, Capture provenance, audit, cursor/MCP, repair preview, repair
+reconciliation and proposal eligibility tests passed: 105 tests, 582
+assertions, with 1 deprecation. PHP lint, `git diff --check` and credential-like
+secret review passed. The full NHK Unit PHPUnit run was attempted with a 512M
 memory limit and remains baseline-limited by existing environment/runtime
-errors and failures (3,559 tests; 35 errors; 29 failures; 24 warnings; 125
-skips); no claim of a fully green repository suite is made.
+errors and failures (3,383 tests; 3 errors; 5 failures; 24 warnings; 52
+deprecations; 60 PHPUnit deprecations); no claim of a fully green repository
+suite is made.
 
 KNOWLEDGE_IDENTITY_DATA_SAFETY: No migration, staging semantic mutation,
 legacy import, rekey, retire, merge or repair Apply was performed. The planned
