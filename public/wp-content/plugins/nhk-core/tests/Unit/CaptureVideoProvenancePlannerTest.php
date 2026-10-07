@@ -125,6 +125,17 @@ final class CaptureVideoProvenancePlannerTest extends TestCase
         self::assertStringNotContainsString(self::VARIANT, $new['reuse_scope']);
     }
 
+    public function test_claim_stable_key_excludes_source_locator(): void
+    {
+        $planner = new CaptureVideoProvenancePlanner();
+        $subject = ['id' => self::VARIANT, 'type' => 'variant', 'name' => 'Variant A'];
+        $first = $planner->plan('capture-locator-a', $this->videoProposal('samevideo111'), array_merge($this->snapshot('samevideo111'), ['canonical_source_url' => 'https://youtu.be/samevideo111']), $subject);
+        $second = $planner->plan('capture-locator-b', $this->videoProposal('samevideo111'), array_merge($this->snapshot('samevideo111'), ['canonical_source_url' => 'https://www.youtube.com/watch?v=samevideo111&utm_source=test']), $subject);
+
+        self::assertSame($first['claim_stable_key'], $second['claim_stable_key']);
+        self::assertNotSame($first['source_stable_key'], $second['source_stable_key']);
+    }
+
     public function test_same_external_source_reuses_dependency_identity_across_capture_retries(): void
     {
         $planner = new CaptureVideoProvenancePlanner();

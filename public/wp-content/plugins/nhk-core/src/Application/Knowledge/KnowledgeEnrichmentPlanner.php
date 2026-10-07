@@ -4,11 +4,12 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Knowledge;
 
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
+use NHK\Core\Contracts\Video\VideoIdentityReader;
 use NHK\Core\Domain\Knowledge\{KnowledgeClaim, KnowledgeEnrichmentCandidate, KnowledgeFacetProfile};
 
 final class KnowledgeEnrichmentPlanner
 {
-    public function __construct(private KnowledgeRepository $claims, private EvidenceRepository $evidence, private SourceRepository $sources) {}
+    public function __construct(private KnowledgeRepository $claims, private EvidenceRepository $evidence, private SourceRepository $sources, private ?VideoIdentityReader $videos = null) {}
 
     /** @return list<KnowledgeEnrichmentCandidate> */
     public function plan(string $subjectId, KnowledgeFacetProfile $profile, string $observation, array $context = []): array
@@ -25,11 +26,20 @@ final class KnowledgeEnrichmentPlanner
             if ($claim === null || $source === null) return [new KnowledgeEnrichmentCandidate('ambiguous', $subjectId, $profile, $observation, ['candidate_kind' => 'evidence_review', 'reason' => 'Claim or source is unresolved', 'claim_id' => $claimId, 'relation' => $relation])];
             return [new KnowledgeEnrichmentCandidate($classification, $subjectId, $profile, $observation, ['claim_id' => $claim->canonicalId, 'source_id' => $source->canonicalId, 'claim_revision' => $claim->revision, 'source_revision' => $source->revision, 'relation' => $relation, 'locator' => $context['locator'] ?? null, 'metadata' => is_array($context['metadata'] ?? null) ? $context['metadata'] : []])];
         }
+        $identityProvenance = ['origin' => $context['origin'] ?? null, 'metadata' => array_merge((array) ($context['metadata'] ?? []), ['subject_id' => $subjectId, 'facet' => $profile->facet, 'scope' => $profile->scope, 'proposition' => $observation])];
+        $identity = KnowledgeClaimIdentity::resolveInput('fact', $identityProvenance, $this->videos);
+        $videoProvenance = strtoupper(trim((string) ($context['origin'] ?? ''))) === 'CAPTURE_VIDEO_SOURCE_PROVENANCE';
+        if ($videoProvenance) $identity = KnowledgeClaimIdentity::resolveInput('provenance', $identityProvenance, $this->videos);
+        if ($identity->status() !== KnowledgeClaimIdentityResolution::RESOLVED) return [new KnowledgeEnrichmentCandidate('ambiguous', $subjectId, $profile, $observation, ['reason' => 'KNOWLEDGE_IDENTITY_' . $identity->status(), 'identity_policy' => $identity->policyVersion(), 'identity_fingerprint' => $identity->fingerprint()])];
         $normalized = $this->normalize($observation);
         $scoped = [];
         foreach ($this->claims->list(true) as $claim) {
-            if (!$claim instanceof KnowledgeClaim || !$this->sameContext($claim, $subjectId, $profile, $context)) continue;
+            if (!$claim instanceof KnowledgeClaim || !$this->sameContext($claim, $subjectId, $profile, $context, $identity)) continue;
             $scoped[] = $claim;
+            if ($videoProvenance && KnowledgeClaimIdentity::resolveClaim($claim, $this->videos)->equivalentTo($identity)) {
+                if (!$claim->active) return [new KnowledgeEnrichmentCandidate('ambiguous', $subjectId, $profile, $observation, ['reason' => 'RETIRED_EQUIVALENT_CLAIM', 'matched_claim_id' => $claim->canonicalId, 'claim_revision' => $claim->revision])];
+                return [new KnowledgeEnrichmentCandidate('same_claim', $subjectId, $profile, $observation, ['matched_claim_id' => $claim->canonicalId, 'claim_revision' => $claim->revision, 'identity_fingerprint' => $identity->fingerprint()])];
+            }
             if ($this->normalize($claim->claimText) !== $normalized) continue;
             if (!$claim->active) return [new KnowledgeEnrichmentCandidate('ambiguous', $subjectId, $profile, $observation, ['reason' => 'RETIRED_EQUIVALENT_CLAIM', 'matched_claim_id' => $claim->canonicalId, 'claim_revision' => $claim->revision])];
             return [new KnowledgeEnrichmentCandidate('same_claim', $subjectId, $profile, $observation, ['matched_claim_id' => $claim->canonicalId, 'claim_revision' => $claim->revision])];
@@ -42,12 +52,13 @@ final class KnowledgeEnrichmentPlanner
         return [new KnowledgeEnrichmentCandidate('new_claim', $subjectId, $profile, $observation, ['reason' => 'No exact semantic match; requires governed review'])];
     }
 
-    private function sameContext(KnowledgeClaim $claim, string $subjectId, KnowledgeFacetProfile $profile, array $incoming = []): bool
+    private function sameContext(KnowledgeClaim $claim, string $subjectId, KnowledgeFacetProfile $profile, array $incoming = [], ?KnowledgeClaimIdentityResolution $identity = null): bool
     {
         $metadata = is_array($incoming['metadata'] ?? null) ? $incoming['metadata'] : [];
         $metadata['subject_id'] = $subjectId;
         $metadata['facet'] = $profile->facet;
         $metadata['scope'] = $profile->scope;
+        if (strtoupper(trim((string) ($incoming['origin'] ?? ''))) === 'CAPTURE_VIDEO_SOURCE_PROVENANCE') return $identity !== null && KnowledgeClaimIdentity::resolveClaim($claim, $this->videos)->equivalentTo($identity);
         return KnowledgeClaimIdentity::contextForClaim($claim) === KnowledgeClaimIdentity::contextForInput($claim->claimType, ['origin' => $incoming['origin'] ?? null, 'metadata' => $metadata]);
     }
 

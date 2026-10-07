@@ -5,6 +5,7 @@ namespace NHK\Core\Application\Knowledge;
 
 use NHK\Core\Application\Dictionary\DictionaryObservationRegistry;
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
+use NHK\Core\Contracts\Video\VideoIdentityReader;
 use NHK\Core\Domain\Knowledge\{CollectorFacetRegistry, Evidence, KnowledgeClaim, KnowledgeException, KnowledgePreCreateResolution, Source};
 use NHK\Core\Shared\Uuid\UuidCodec;
 
@@ -12,9 +13,9 @@ final class KnowledgeService
 {
     private KnowledgePreCreateResolver $preCreate;
 
-    public function __construct(private KnowledgeRepository $claims, private SourceRepository $sources, private EvidenceRepository $evidence, private $dictionaryObserver = null, ?KnowledgePreCreateResolver $preCreate = null)
+    public function __construct(private KnowledgeRepository $claims, private SourceRepository $sources, private EvidenceRepository $evidence, private $dictionaryObserver = null, ?KnowledgePreCreateResolver $preCreate = null, ?VideoIdentityReader $videoIdentityReader = null)
     {
-        $this->preCreate = $preCreate ?? new KnowledgePreCreateResolver($claims, $sources, $evidence);
+        $this->preCreate = $preCreate ?? new KnowledgePreCreateResolver($claims, $sources, $evidence, $videoIdentityReader);
     }
 
     public function createClaim(string $stableKey, string $text, string $type = 'fact', array $provenance = []): KnowledgeClaim

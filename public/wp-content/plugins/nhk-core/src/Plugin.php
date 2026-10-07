@@ -397,7 +397,8 @@ final class Plugin {
             $attachmentBridge = $sharedAttachmentBridge ?? new WordPressMediaAttachmentBridge($wpdb, $mediaService, $media, $assets);
             $sharedAttachmentBridge = $attachmentBridge;
             $mediaEnrichmentExactReadback = new MediaEnrichmentExactReadbackService($usages, $attachmentBridge, [$entityMediaProjection, 'representativeForEntity']);
-            $knowledgeService = new KnowledgeService($claims, $sources, $evidence);
+            $videoIdentityReader = new \NHK\Core\Application\Knowledge\VideoRepositoryIdentityReader($videos);
+            $knowledgeService = new KnowledgeService($claims, $sources, $evidence, null, null, $videoIdentityReader);
             $knowledgeQualityAudit = new \NHK\Core\Application\Knowledge\KnowledgeQualityAuditCoordinator(
                 new \NHK\Core\Application\Knowledge\KnowledgeQualityAuditor($claims, $evidence, $sources, new \NHK\Core\Application\Semantic\StructuredSemanticInterpreter()),
                 $claims,
@@ -914,7 +915,7 @@ final class Plugin {
                 }
                 return $matches;
             });
-            $videoKnowledgeEnrichment = new VideoKnowledgeEnrichmentPlanner(new \NHK\Core\Application\Knowledge\KnowledgeEnrichmentPlanner($claims, $evidence, $sources));
+            $videoKnowledgeEnrichment = new VideoKnowledgeEnrichmentPlanner(new \NHK\Core\Application\Knowledge\KnowledgeEnrichmentPlanner($claims, $evidence, $sources, $videoIdentityReader));
             $videoEditorialResume = null;
             $canonicalDependencies = new CanonicalDependencyValidator($claims, $sources, $evidence);
             $knowledgeRepairPreview = new \NHK\Core\Application\Knowledge\KnowledgeRepairPreviewService($claims, $evidence, $graphService);

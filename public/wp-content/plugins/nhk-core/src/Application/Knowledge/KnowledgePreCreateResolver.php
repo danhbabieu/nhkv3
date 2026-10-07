@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Knowledge;
 
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
+use NHK\Core\Contracts\Video\VideoIdentityReader;
 use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim, KnowledgePreCreateResolution, Source};
 use NHK\Core\Shared\Uuid\UuidCodec;
 
@@ -14,7 +15,7 @@ use NHK\Core\Shared\Uuid\UuidCodec;
  */
 final class KnowledgePreCreateResolver
 {
-    public function __construct(private KnowledgeRepository $claims, private SourceRepository $sources, private EvidenceRepository $evidence)
+    public function __construct(private KnowledgeRepository $claims, private SourceRepository $sources, private EvidenceRepository $evidence, private ?VideoIdentityReader $videos = null)
     {
     }
 
@@ -24,8 +25,12 @@ final class KnowledgePreCreateResolver
         $text = trim($text);
         $metadata = is_array($provenance['metadata'] ?? null) ? $provenance['metadata'] : [];
         $normalized = $this->normalizeText($text);
-        $input = ['stable_key' => $stableKey, 'claim_text' => $normalized, 'claim_type' => $type, 'context' => KnowledgeClaimIdentity::contextForInput($type, $provenance)];
+        $identityProvenance = $this->identityProvenance($type, $provenance, $text);
+        $identity = KnowledgeClaimIdentity::resolveInput($type, $identityProvenance, $this->videos);
+        $identityRequired = $this->identityRequired($type, $provenance);
+        $input = ['stable_key' => $stableKey, 'claim_text' => $normalized, 'claim_type' => $type, 'context' => KnowledgeClaimIdentity::contextForInput($type, $provenance), 'identity_status' => $identity->status(), 'identity_fingerprint' => $identity->fingerprint()];
         if ($stableKey === '' || $text === '') return $this->review('claim', 'create', $input, [], [], 'KNOWLEDGE_PRE_CREATE_INPUT_INVALID');
+        if ($identityRequired && $identity->status() !== KnowledgeClaimIdentityResolution::RESOLVED) return $this->review('claim', 'create', $input, [], [], 'KNOWLEDGE_IDENTITY_' . $identity->status());
 
         try {
             $claims = $this->claims->list(true);
@@ -33,7 +38,7 @@ final class KnowledgePreCreateResolver
             foreach ($sameKey as $claim) {
                 $candidate = $this->claimCandidate($claim, 'STABLE_KEY_MATCH');
                 if (!$claim->active) return $this->review('claim', 'create', $input, [$candidate], $this->claimRevisions([$claim]), 'RETIRED_STABLE_KEY_CANDIDATE');
-                if ($this->claimEquivalent($claim, $normalized, $type, $provenance)) return $this->resolution('claim', 'create', KnowledgePreCreateResolution::REUSE_EXISTING, $input, [$candidate], $this->claimRevisions([$claim]), 'EXACT_STABLE_KEY_IDENTITY');
+                if ($this->claimEquivalent($claim, $normalized, $type, $provenance, $identityRequired)) return $this->resolution('claim', 'create', KnowledgePreCreateResolution::REUSE_EXISTING, $input, [$candidate], $this->claimRevisions([$claim]), 'EXACT_STABLE_KEY_IDENTITY');
                 return $this->review('claim', 'create', $input, [$candidate], $this->claimRevisions([$claim]), 'STABLE_KEY_COLLISION');
             }
 
@@ -41,9 +46,10 @@ final class KnowledgePreCreateResolver
             $scoped = [];
             foreach ($claims as $claim) {
                 if (!$claim instanceof KnowledgeClaim || $claim->claimType !== $type) continue;
-                $sameContext = KnowledgeClaimIdentity::contextForClaim($claim) === KnowledgeClaimIdentity::contextForInput($type, $provenance);
+                $sameContext = $identityRequired ? KnowledgeClaimIdentity::resolveClaim($claim, $this->videos)->equivalentTo($identity) : KnowledgeClaimIdentity::contextForClaim($claim) === KnowledgeClaimIdentity::contextForInput($type, $provenance);
                 if ($sameContext) $scoped[] = $claim;
-                if ($this->normalizeText($claim->claimText) === $normalized && $sameContext) $exact[] = $claim;
+                $videoProvenance = $type === 'provenance' && strtoupper(trim((string) ($provenance['origin'] ?? $metadata['origin'] ?? ''))) === 'CAPTURE_VIDEO_SOURCE_PROVENANCE';
+                if ($sameContext && ($videoProvenance || $this->normalizeText($claim->claimText) === $normalized)) $exact[] = $claim;
             }
             if (count($exact) === 1) {
                 $claim = $exact[0];
@@ -132,11 +138,28 @@ final class KnowledgePreCreateResolver
         return $this->resolution($owner, $operation, KnowledgePreCreateResolution::REVIEW_REQUIRED, $input, $candidates, $revisions, $reason);
     }
 
-    private function claimEquivalent(KnowledgeClaim $claim, string $normalized, string $type, array $provenance): bool
+    private function claimEquivalent(KnowledgeClaim $claim, string $normalized, string $type, array $provenance, bool $identityRequired): bool
     {
-        return $claim->claimType === $type
-            && $this->normalizeText($claim->claimText) === $normalized
-            && KnowledgeClaimIdentity::contextForClaim($claim) === KnowledgeClaimIdentity::contextForInput($type, $provenance);
+        if ($claim->claimType !== $type) return false;
+        if ($identityRequired) return KnowledgeClaimIdentity::resolveClaim($claim, $this->videos)->equivalentTo(KnowledgeClaimIdentity::resolveInput($type, $this->identityProvenance($type, $provenance, $normalized), $this->videos));
+        return $this->normalizeText($claim->claimText) === $normalized && KnowledgeClaimIdentity::contextForClaim($claim) === KnowledgeClaimIdentity::contextForInput($type, $provenance);
+    }
+
+    private function identityRequired(string $type, array $provenance): bool
+    {
+        $metadata = is_array($provenance['metadata'] ?? null) ? $provenance['metadata'] : [];
+        $origin = strtoupper(trim((string) ($provenance['origin'] ?? $metadata['origin'] ?? '')));
+        return $origin === 'CAPTURE_VIDEO_SOURCE_PROVENANCE' || array_intersect(['subject_id', 'canonical_subject_id', 'facet', 'scope', 'proposition', 'deterministic_proposition'], array_keys($metadata)) !== [];
+    }
+
+    /** @return array<string,mixed> */
+    private function identityProvenance(string $type, array $provenance, string $text): array
+    {
+        $metadata = is_array($provenance['metadata'] ?? null) ? $provenance['metadata'] : [];
+        $origin = strtoupper(trim((string) ($provenance['origin'] ?? $metadata['origin'] ?? '')));
+        if ($origin !== 'CAPTURE_VIDEO_SOURCE_PROVENANCE') $metadata['proposition'] = $text;
+        $provenance['metadata'] = $metadata;
+        return $provenance;
     }
 
     private function claimCandidate(KnowledgeClaim $claim, string $reason): array

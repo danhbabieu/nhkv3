@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Capture;
 
+use NHK\Core\Application\Knowledge\KnowledgeClaimIdentity;
 use NHK\Core\Domain\Governance\CommandCanonicalizer;
 use NHK\Core\Infrastructure\Admin\VideoRelationAdminContract;
 use NHK\Core\Shared\Uuid\UuidCodec;
@@ -50,9 +51,12 @@ final class CaptureVideoProvenancePlanner
         $locator = trim((string) ($sourceSnapshot['canonical_source_url'] ?? $payload['url'] ?? ''));
         $unsupported = $this->unsupportedClassifications($sourceTitle, (string) ($context['user_hint'] ?? ''));
 
-        $base = [$platform, $externalId, $locator, $subjectType, $subjectId];
         $sourceKey = 'nhk:source:video:' . hash('sha256', CommandCanonicalizer::canonicalize([$platform, $externalId, $locator]));
-        $claimKey = 'nhk:knowledge:video-provenance:' . hash('sha256', CommandCanonicalizer::canonicalize($base));
+        $identity = KnowledgeClaimIdentity::resolveInput('provenance', [
+            'origin' => 'CAPTURE_VIDEO_SOURCE_PROVENANCE',
+            'metadata' => ['subject_id' => $subjectId, 'platform' => $platform, 'external_video_id' => $externalId, 'proposition_class' => 'VIDEO_CONCERNS_SUBJECT'],
+        ]);
+        $claimKey = $identity->status() === 'RESOLVED' ? 'nhk:knowledge:video-provenance:' . hash('sha256', CommandCanonicalizer::canonicalize($identity->packet())) : '';
         $evidenceKey = 'video-provenance:evidence:' . hash('sha256', CommandCanonicalizer::canonicalize([$sourceKey, $claimKey]));
         $emptyVideo = $this->withAttachments($video, []);
 
@@ -67,6 +71,9 @@ final class CaptureVideoProvenancePlanner
             'identity_fields' => array_keys($identityFields),
             'identity_matches' => $identityMatches,
             'subject_match' => (string) ($resolvedSubject['match'] ?? ''),
+            'identity_status' => $identity->status(),
+            'identity_policy' => $identity->policyVersion(),
+            'identity_fingerprint' => $identity->fingerprint(),
             'explicit_subject' => $handoff['subject'] ?? null,
             'conflicts' => $conflicts,
         ];
@@ -74,6 +81,18 @@ final class CaptureVideoProvenancePlanner
             return [
                 'status' => 'REVIEW_REQUIRED',
                 'blockers' => [(string) ($handoff['reason'] ?? 'SUBJECT_UNRESOLVED')],
+                'dependencies' => [],
+                'video_proposal' => $emptyVideo,
+                'evidence_idempotency_key' => $evidenceKey,
+                'reuse_scope' => 'source-specific-external-video',
+                'unsupported_classifications' => $unsupported,
+                'diagnostics' => $diagnostics,
+            ];
+        }
+        if ($identity->status() !== 'RESOLVED') {
+            return [
+                'status' => 'REVIEW_REQUIRED',
+                'blockers' => ['KNOWLEDGE_IDENTITY_' . $identity->status()],
                 'dependencies' => [],
                 'video_proposal' => $emptyVideo,
                 'evidence_idempotency_key' => $evidenceKey,

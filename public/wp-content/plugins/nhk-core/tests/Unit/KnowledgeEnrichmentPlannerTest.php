@@ -36,6 +36,20 @@ final class KnowledgeEnrichmentPlannerTest extends TestCase
         self::assertSame('new_claim', $result[0]->classification);
     }
 
+    public function test_same_video_provenance_reuses_when_wording_changes(): void
+    {
+        $subject = UuidCodec::newV7();
+        $claim = new KnowledgeClaim(UuidCodec::newV7(), 'video:a', 'The source identifies this Video as concerning canonical Odo 62.', 'provenance', ['origin' => 'CAPTURE_VIDEO_SOURCE_PROVENANCE', 'metadata' => ['subject_id' => $subject, 'platform' => 'youtube', 'external_video_id' => 'video-a', 'proposition_class' => 'VIDEO_CONCERNS_SUBJECT']]);
+        $claims = new class($claim) implements KnowledgeRepository { public function __construct(private KnowledgeClaim $claim) {} public function findByCanonicalId(string $id): ?KnowledgeClaim { return $this->claim->canonicalId === $id ? $this->claim : null; } public function findByStableKey(string $key): ?KnowledgeClaim { return null; } public function create(KnowledgeClaim $claim): KnowledgeClaim { throw new \LogicException('planner must not write'); } public function update(KnowledgeClaim $claim, int $revision): KnowledgeClaim { throw new \LogicException('planner must not write'); } public function list(bool $includeRetired = false): array { return [$this->claim]; } };
+        $sources = new class implements SourceRepository { public function findByCanonicalId(string $id): ?Source { return null; } public function findByStableKey(string $key): ?Source { return null; } public function create(Source $item): Source { throw new \LogicException(); } public function update(Source $item, int $revision): Source { throw new \LogicException(); } public function list(bool $includeRetired = false): array { return []; } };
+        $evidence = new class implements EvidenceRepository { public function findByCanonicalId(string $id): ?Evidence { return null; } public function create(Evidence $item): Evidence { throw new \LogicException(); } public function update(Evidence $item, int $revision): Evidence { throw new \LogicException(); } public function listByClaim(string $claimId, bool $includeRetired = false): array { return []; } public function listBySource(string $sourceId, bool $includeRetired = false): array { return []; } };
+
+        $result = (new KnowledgeEnrichmentPlanner($claims, $evidence, $sources))->plan($subject, new KnowledgeFacetProfile('recognition', 'entity'), 'This canonical Video concerns the same subject.', ['origin' => 'CAPTURE_VIDEO_SOURCE_PROVENANCE', 'metadata' => ['platform' => 'youtube', 'external_video_id' => 'video-a', 'proposition_class' => 'VIDEO_CONCERNS_SUBJECT']]);
+
+        self::assertSame('same_claim', $result[0]->classification);
+        self::assertSame($claim->canonicalId, $result[0]->provenance['matched_claim_id']);
+    }
+
     public function test_unresolved_source_is_review_candidate_not_evidence_candidate(): void
     {
         $subject = UuidCodec::newV7(); $claimId = UuidCodec::newV7();
