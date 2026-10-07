@@ -3,16 +3,17 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Capture;
 
+use NHK\Core\Application\Article\ArticleReviewFreshness;
 use NHK\Core\Domain\Capture\CaptureRecord;
 
 /** Derives current retry truth from latest phase outcomes and completion evidence. */
 final class CaptureCurrentOutcomeReducer
 {
     /** @param array<string,mixed> $diagnostics @param array<string,mixed> $phaseReceipts @return list<string> */
-    public static function currentBlockers(array $diagnostics, array $phaseReceipts): array
+    public static function currentBlockers(array $diagnostics, array $phaseReceipts, ?CaptureRecord $capture = null, array $input = []): array
     {
         $currentByPhase = CapturePhaseReceiptReducer::currentFailureCodesByPhase($phaseReceipts);
-        $reevaluableArticleReview = self::isReevaluatableArticleReview($diagnostics);
+        $reevaluableArticleReview = self::isReevaluatableArticleReview($diagnostics, $phaseReceipts, $capture, $input);
         $current = [];
         foreach ($currentByPhase as $phase => $codes) {
             if ($reevaluableArticleReview && strtoupper(trim($phase)) === 'ARTICLE_PRE_CREATE_REVIEW') continue;
@@ -39,9 +40,9 @@ final class CaptureCurrentOutcomeReducer
     }
 
     /** @param array<string,mixed> $diagnostics @param array<string,mixed> $phaseReceipts @return array<string,mixed> */
-    public static function reconcileDiagnostics(array $diagnostics, array $phaseReceipts): array
+    public static function reconcileDiagnostics(array $diagnostics, array $phaseReceipts, ?CaptureRecord $capture = null, array $input = []): array
     {
-        $current = self::currentBlockers($diagnostics, $phaseReceipts);
+        $current = self::currentBlockers($diagnostics, $phaseReceipts, $capture, $input);
         $superseded = CapturePhaseReceiptReducer::supersededFailureCodes($phaseReceipts);
         $history = is_array($diagnostics['failure_history'] ?? null) ? array_values(array_filter($diagnostics['failure_history'], 'is_array')) : [];
         $historyCodes = array_values(array_filter(array_map(
@@ -60,7 +61,7 @@ final class CaptureCurrentOutcomeReducer
             $historyCodes[] = $code;
         }
 
-        if ($current === [] && self::isReevaluatableArticleReview($diagnostics)) {
+        if ($current === [] && self::isReevaluatableArticleReview($diagnostics, $phaseReceipts, $capture, $input)) {
             $failureCode = trim((string) (($diagnostics['failure']['code'] ?? '') ?: ''));
             if ($failureCode !== '' && !in_array(strtoupper($failureCode), ['OWNER_REVIEW_REQUIRED', 'SYSTEM_BLOCKED'], true) && !in_array($failureCode, $historyCodes, true)) {
                 $history[] = ['code' => $failureCode, 'reason' => 'ARTICLE_PRE_CREATE_REVIEW_REEVALUATABLE'];
@@ -89,24 +90,14 @@ final class CaptureCurrentOutcomeReducer
     }
 
     /** @param array<string,mixed> $diagnostics */
-    private static function isReevaluatableArticleReview(array $diagnostics): bool
+    private static function isReevaluatableArticleReview(array $diagnostics, array $phaseReceipts = [], ?CaptureRecord $capture = null, array $input = []): bool
     {
-        $resolution = is_array($diagnostics['article_resolution'] ?? null) ? $diagnostics['article_resolution'] : [];
-        $research = is_array($resolution['research'] ?? null) ? $resolution['research'] : [];
-        if (($research['ready_for_draft'] ?? false) !== true || (array) ($research['blockers'] ?? []) !== []) return false;
-        $overlap = is_array($research['overlap_analysis'] ?? null) ? $research['overlap_analysis'] : (is_array($resolution['overlap'] ?? null) ? $resolution['overlap'] : []);
-        if (strtoupper(trim((string) ($overlap['classification'] ?? ''))) === 'SUBSTANTIAL_OVERLAP') return false;
-        if (in_array('OWNER_REVIEW_REQUIRED', array_map('strval', (array) ($research['blockers'] ?? [])), true)) return false;
-        if (in_array('SYSTEM_BLOCKED', array_map('strval', (array) ($research['blockers'] ?? [])), true)) return false;
-        $failure = is_array($diagnostics['failure'] ?? null) ? $diagnostics['failure'] : [];
-        if (strtoupper(trim((string) ($failure['classification'] ?? ''))) === 'HARD_BLOCK') return false;
-        $preparation = is_array($diagnostics['content_preparation'] ?? null) ? $diagnostics['content_preparation'] : [];
-        return strtoupper(trim((string) ($preparation['quality_decision'] ?? ''))) !== 'HARD_BLOCK';
+        return ArticleReviewFreshness::isReevaluatable($capture, $diagnostics, $input);
     }
 
     public static function effectiveCapture(CaptureRecord $capture): CaptureRecord
     {
-        $diagnostics = self::reconcileDiagnostics($capture->diagnostics, $capture->phaseReceipts);
+        $diagnostics = self::reconcileDiagnostics($capture->diagnostics, $capture->phaseReceipts, $capture);
         if ($diagnostics === $capture->diagnostics) return $capture;
         return new CaptureRecord(
             $capture->captureId,
@@ -143,7 +134,7 @@ final class CaptureCurrentOutcomeReducer
         }
 
         $completion = is_array($capture->diagnostics['completion'] ?? null) ? $capture->diagnostics['completion'] : [];
-        $completionBlockers = self::currentBlockers($capture->diagnostics, $capture->phaseReceipts);
+        $completionBlockers = self::currentBlockers($capture->diagnostics, $capture->phaseReceipts, $capture, $input);
         if (in_array('CATEGORY_UNRESOLVED', $completionBlockers, true) || self::failureCode($capture) === 'CATEGORY_UNRESOLVED') {
             return ['eligible' => false, 'reason' => 'CAPTURE_RETRY_NOT_ALLOWED'];
         }
@@ -155,7 +146,7 @@ final class CaptureCurrentOutcomeReducer
         if ($capture->status === 'REVIEW_REQUIRED'
             && !self::isHardBlockedReview($capture)
             && (CapturePhaseReceiptReducer::hasStaleInheritedArticleReview($capture->phaseReceipts)
-                || self::isReevaluatableArticleReview($capture->diagnostics))) {
+                || ArticleReviewFreshness::isReevaluatable($capture, $capture->diagnostics))) {
             return ['eligible' => true, 'reason' => 'STALE_REVIEW_REEVALUATABLE'];
         }
         if (!in_array(strtoupper(trim((string) ($completion['status'] ?? ''))), ['PARTIAL', 'REVIEW_REQUIRED'], true)) {
@@ -216,7 +207,8 @@ final class CaptureCurrentOutcomeReducer
         $resolution = is_array($capture->diagnostics['article_resolution'] ?? null) ? $capture->diagnostics['article_resolution'] : [];
         $research = is_array($resolution['research'] ?? null) ? $resolution['research'] : [];
         $overlap = is_array($research['overlap_analysis'] ?? null) ? $research['overlap_analysis'] : (is_array($resolution['overlap'] ?? null) ? $resolution['overlap'] : []);
-        return strtoupper(trim((string) ($overlap['classification'] ?? ''))) === 'SUBSTANTIAL_OVERLAP';
+        return strtoupper(trim((string) ($overlap['classification'] ?? ''))) === 'SUBSTANTIAL_OVERLAP'
+            && !ArticleReviewFreshness::isReevaluatable($capture, $capture->diagnostics);
     }
 
     public static function supportsCanonicalVideoCompletionRetry(CaptureRecord $capture): bool

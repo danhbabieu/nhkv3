@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Capture;
 
+use NHK\Core\Application\Article\ArticleReviewFreshness;
 use NHK\Core\Application\Completion\CompletionCoordinator;
 use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, EditorialContentProjection, SharedEnrichmentBoundary, SubjectResolutionService, TextInputInterpreter};
 use NHK\Core\Application\Article\ArticleEditorialAdapter;
@@ -1745,6 +1746,9 @@ final class EditorialCaptureCoordinator
                 $nextContext,
                 $diagnostics,
             );
+            if ($receiptStage === 'ARTICLE_PRE_CREATE_REVIEW') {
+                $diagnostics['article_review_provenance'] = ArticleReviewFreshness::persistedMetadata($record, $diagnostics);
+            }
         }
         $stage = $stage instanceof CaptureStage ? $stage->value : $stage;
         $completedAt = microtime(true);
@@ -1772,7 +1776,7 @@ final class EditorialCaptureCoordinator
         $failureCode = trim((string) ($currentFailureCode ?? ($semanticDiagnostics['blockers'][0] ?? '')));
         if ($failureCode !== '' && $receiptStatus !== 'COMPLETED') $attempt['failure_code'] = $failureCode;
         $receipts = CapturePhaseReceiptReducer::append($receipts, $receiptStage, $attempt);
-        $diagnostics = CaptureCurrentOutcomeReducer::reconcileDiagnostics($diagnostics, $receipts);
+        $diagnostics = CaptureCurrentOutcomeReducer::reconcileDiagnostics($diagnostics, $receipts, $record);
         Utf8Contract::assertValid(['assets' => $assets, 'context' => $nextContext, 'diagnostics' => $diagnostics, 'phase_receipts' => $receipts], 'capture.persistence');
         return $this->captures->save(new CaptureRecord($record->captureId, $record->idempotencyKey, $record->requestFingerprint, $stage, $status, $articleId ?? $record->articleId, $token ?? $record->articleStateToken, $assets, $nextContext, $diagnostics, $receipts, $record->revision + 1, $record->createdAt, gmdate('Y-m-d H:i:s.u')));
     }

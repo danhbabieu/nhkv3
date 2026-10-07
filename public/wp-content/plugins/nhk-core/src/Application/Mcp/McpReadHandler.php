@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Mcp;
 
+use NHK\Core\Application\Article\ArticleReviewFreshness;
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Contracts\Capture\CaptureRepository;
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
@@ -94,7 +95,7 @@ final class McpReadHandler
         $completion = $this->reconcileCurrentCaptureCompletion($capture, $completion);
         $projectionDiagnostics = $diagnostics;
         $projectionDiagnostics['completion'] = $completion;
-        $completion['blockers'] = CaptureCurrentOutcomeReducer::currentBlockers($projectionDiagnostics, $capture->phaseReceipts);
+        $completion['blockers'] = CaptureCurrentOutcomeReducer::currentBlockers($projectionDiagnostics, $capture->phaseReceipts, $capture);
         $preparation = is_array($diagnostics['content_preparation'] ?? null) ? $diagnostics['content_preparation'] : [];
         $review = null;
         if (strtoupper(trim((string) ($preparation['status'] ?? ''))) === 'REVIEW_REQUIRED') {
@@ -117,7 +118,8 @@ final class McpReadHandler
         $research = is_array($resolution['research'] ?? null) ? $resolution['research'] : [];
         $overlap = is_array($research['overlap_analysis'] ?? null) ? $research['overlap_analysis'] : (is_array($resolution['overlap'] ?? null) ? $resolution['overlap'] : []);
         if (($articleReview['status'] ?? '') === 'REVIEW_REQUIRED' && $articleReviewCode !== '' && ($overlap['classification'] ?? '') === 'SUBSTANTIAL_OVERLAP') {
-            $review = ['status' => 'REVIEW_REQUIRED', 'current' => true, 'failure_code' => $articleReviewCode, 'candidates' => array_values((array) ($overlap['candidates'] ?? [])), 'reason' => (string) ($overlap['reason'] ?? 'Current Article overlap requires review.'), 'continuation' => ['entrypoint' => 'nhk.capture.ingest', 'input' => 'capture_continuation']];
+            $stale = ArticleReviewFreshness::isReevaluatable($capture, $diagnostics);
+            $review = ['status' => 'REVIEW_REQUIRED', 'current' => !$stale, 'freshness' => $stale ? 'STALE_REVIEW_REEVALUATABLE' : 'CURRENT_REVIEW_REQUIRED', 'failure_code' => $articleReviewCode, 'candidates' => array_values((array) ($overlap['candidates'] ?? [])), 'reason' => (string) ($overlap['reason'] ?? 'Current Article overlap requires review.'), 'continuation' => ['entrypoint' => 'nhk.capture.ingest', 'input' => 'capture_continuation']];
         }
         $children = \NHK\Core\Application\Completion\CompletionCoordinator::effectiveChildren(
             array_values(array_filter((array) ($completion['children'] ?? []), 'is_array')),

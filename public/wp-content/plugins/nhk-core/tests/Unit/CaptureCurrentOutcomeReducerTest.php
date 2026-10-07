@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Tests\Unit;
 
+use NHK\Core\Application\Article\ArticleReviewFreshness;
 use NHK\Core\Application\Capture\{CaptureCurrentOutcomeReducer, CaptureDecisionDependencyFingerprint, CapturePhaseReceiptReducer};
 use NHK\Core\Domain\Capture\{CaptureRecord, CaptureStage};
 use NHK\Core\Shared\Uuid\UuidCodec;
@@ -436,13 +437,60 @@ final class CaptureCurrentOutcomeReducerTest extends TestCase
         $capture = $this->capture([
             'failure' => ['code' => 'SUBSTANTIAL_OVERLAP'],
             'completion' => ['status' => 'REVIEW_REQUIRED', 'blockers' => ['SUBSTANTIAL_OVERLAP']],
-            'article_resolution' => ['research' => ['ready_for_draft' => true, 'blockers' => [], 'overlap_analysis' => ['classification' => 'SUBSTANTIAL_OVERLAP', 'candidates' => [['article_id' => 902]]]]],
+            'article_resolution' => ['research' => ['ready_for_draft' => true, 'blockers' => [], 'overlap_analysis' => ['classification' => 'SUBSTANTIAL_OVERLAP', 'candidates' => [['article_id' => 902, 'post_id' => 902, 'classification' => 'SAME_INTENT', 'matched_dimensions' => ['primary_subject'], 'reason' => 'same persisted editorial intent']]]]],
+        ], [
+            'ARTICLE_PRE_CREATE_REVIEW' => ['status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'failure_code' => 'SUBSTANTIAL_OVERLAP', 'current_outcome' => 'CURRENT'],
+        ], 'REVIEW_REQUIRED');
+        $capture = $this->withArticleReviewProvenance($capture);
+
+        self::assertSame(['902'], $capture->diagnostics['article_review_provenance']['candidate_ids']);
+        self::assertSame('SAME_INTENT', $capture->diagnostics['article_review_provenance']['candidates'][0]['classification']);
+        self::assertSame(['primary_subject'], $capture->diagnostics['article_review_provenance']['candidates'][0]['matched_dimensions']);
+        self::assertSame(['SUBSTANTIAL_OVERLAP'], CaptureCurrentOutcomeReducer::currentBlockers($capture->diagnostics, $capture->phaseReceipts));
+        self::assertSame(['eligible' => false, 'reason' => 'CURRENT_REVIEW_REQUIRED'], CaptureCurrentOutcomeReducer::retryEligibility($capture));
+    }
+
+    public function test_legacy_article_overlap_review_without_policy_metadata_is_reevaluable(): void
+    {
+        $capture = $this->capture([
+            'failure' => ['code' => 'SUBSTANTIAL_OVERLAP'],
+            'completion' => ['status' => 'REVIEW_REQUIRED', 'blockers' => ['SUBSTANTIAL_OVERLAP']],
+            'article_resolution' => ['research' => ['ready_for_draft' => true, 'blockers' => [], 'overlap_analysis' => ['classification' => 'SUBSTANTIAL_OVERLAP', 'candidates' => []]]],
         ], [
             'ARTICLE_PRE_CREATE_REVIEW' => ['status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'failure_code' => 'SUBSTANTIAL_OVERLAP', 'current_outcome' => 'CURRENT'],
         ], 'REVIEW_REQUIRED');
 
-        self::assertSame(['SUBSTANTIAL_OVERLAP'], CaptureCurrentOutcomeReducer::currentBlockers($capture->diagnostics, $capture->phaseReceipts));
-        self::assertSame(['eligible' => false, 'reason' => 'CURRENT_REVIEW_REQUIRED'], CaptureCurrentOutcomeReducer::retryEligibility($capture));
+        self::assertSame([], CaptureCurrentOutcomeReducer::currentBlockers($capture->diagnostics, $capture->phaseReceipts));
+        self::assertSame(['eligible' => true, 'reason' => 'STALE_REVIEW_REEVALUATABLE'], CaptureCurrentOutcomeReducer::retryEligibility($capture));
+    }
+
+    public function test_article_review_policy_change_reopens_a_persisted_overlap_review(): void
+    {
+        $capture = $this->withArticleReviewProvenance($this->capture([
+            'failure' => ['code' => 'SUBSTANTIAL_OVERLAP'],
+            'completion' => ['status' => 'REVIEW_REQUIRED', 'blockers' => ['SUBSTANTIAL_OVERLAP']],
+            'article_resolution' => ['research' => ['ready_for_draft' => true, 'blockers' => [], 'overlap_analysis' => ['classification' => 'SUBSTANTIAL_OVERLAP', 'candidates' => [['article_id' => 902]]]]],
+        ], [
+            'ARTICLE_PRE_CREATE_REVIEW' => ['status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'failure_code' => 'SUBSTANTIAL_OVERLAP'],
+        ], 'REVIEW_REQUIRED'));
+        $diagnostics = $capture->diagnostics;
+        $diagnostics['article_review_provenance']['policy_fingerprint'] = 'obsolete-policy';
+        $changed = new CaptureRecord(
+            $capture->captureId, $capture->idempotencyKey, $capture->requestFingerprint, $capture->stage, $capture->status,
+            $capture->articleId, $capture->articleStateToken, $capture->assets, $capture->context, $diagnostics, $capture->phaseReceipts,
+        );
+
+        self::assertSame(['eligible' => true, 'reason' => 'STALE_REVIEW_REEVALUATABLE'], CaptureCurrentOutcomeReducer::retryEligibility($changed));
+    }
+
+    private function withArticleReviewProvenance(CaptureRecord $capture): CaptureRecord
+    {
+        $diagnostics = $capture->diagnostics;
+        $diagnostics['article_review_provenance'] = ArticleReviewFreshness::persistedMetadata($capture, $diagnostics);
+        return new CaptureRecord(
+            $capture->captureId, $capture->idempotencyKey, $capture->requestFingerprint, $capture->stage, $capture->status,
+            $capture->articleId, $capture->articleStateToken, $capture->assets, $capture->context, $diagnostics, $capture->phaseReceipts,
+        );
     }
 
     /** @param array<string,mixed> $diagnosticParts */

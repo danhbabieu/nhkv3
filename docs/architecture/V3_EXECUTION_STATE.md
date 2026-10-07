@@ -1,5 +1,36 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-07 — Legacy Article overlap review freshness
+
+ROOT_CAUSE_CONFIRMED: Article pre-create overlap reviews were classified as
+current from the persisted overlap classification alone. The prior review did
+not carry the classifier/policy fingerprint or bounded decision diagnostics,
+so a historical `SUBSTANTIAL_OVERLAP` could not be distinguished from a
+current-policy decision after the overlap semantics changed.
+
+FIXED_BOUNDARY: Added `ArticleReviewFreshness` with a bounded producer,
+policy version/fingerprint, Capture decision-dependency fingerprint, candidate
+IDs and candidate diagnostics. New Article pre-create review saves persist
+that metadata without a migration. Legacy reviews without it are eligible for
+one normal canonical reevaluation only when Article research is otherwise
+ready; owner/system/hard blockers remain fail-closed. Policy or dependency
+drift reopens a persisted review, while unchanged current metadata remains
+`CURRENT_REVIEW_REQUIRED`.
+
+READ_RETRY_PARITY: `capture_get`, current-outcome reconciliation and
+`nhk.capture.ingest` retry eligibility now consume the same freshness decision
+with the hydrated Capture and current dependency inputs. Candidate diagnostics
+remain bounded and include Article/post identity, title, route/slug,
+classification, score, matched dimensions and reason.
+
+REGRESSION_COVERAGE: Focused Article/Capture/MCP/retry suites pass 145 tests /
+689 assertions before the final full-suite check; coverage includes legacy
+overlap reevaluation, current-policy blocking, policy drift, candidate
+diagnostics, hard blockers, inherited legacy receipts and read/retry parity.
+
+DATA_SAFETY: No database migration, staging/production mutation, Capture
+retry, deployment or publication was performed.
+
 # Checkpoint — 2026-10-07 — Knowledge identity V2 final consistency hardening
 
 IMPLEMENTATION: Knowledge pre-create now applies one status-aware identity law

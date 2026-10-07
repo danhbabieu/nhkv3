@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Tests\Unit;
 
+use NHK\Core\Application\Article\ArticleReviewFreshness;
 use NHK\Core\Application\Mcp\McpReadHandler;
 use NHK\Core\Application\Capture\CapturePhaseReceiptReducer;
 use NHK\Core\Contracts\Capture\CaptureRepository;
@@ -365,6 +366,9 @@ final class McpCaptureReadContractTest extends TestCase
         ], [
             'ARTICLE_PRE_CREATE_REVIEW' => ['status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'failure_code' => 'SUBSTANTIAL_OVERLAP', 'current_outcome' => 'CURRENT'],
         ]);
+        $diagnostics = $record->diagnostics;
+        $diagnostics['article_review_provenance'] = ArticleReviewFreshness::persistedMetadata($record, $diagnostics);
+        $record = new CaptureRecord($record->captureId, $record->idempotencyKey, $record->requestFingerprint, $record->stage, $record->status, $record->articleId, $record->articleStateToken, $record->assets, $record->context, $diagnostics, $record->phaseReceipts);
         $repository = new class($record) implements CaptureRepository {
             public function __construct(private CaptureRecord $record) {}
             public function findByIdempotencyKey(string $key): ?CaptureRecord { return null; }
