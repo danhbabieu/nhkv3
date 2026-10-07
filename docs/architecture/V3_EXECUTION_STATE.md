@@ -24442,3 +24442,45 @@ exception proves bounded failure persistence and retryable classification.
 
 STATUS: `SEMANTICS_CHECKPOINT_RESUME_FIXED_LOCAL / FAILURE_DIAGNOSTICS_PERSISTED /
 FOCUSED_GREEN / NO_DATA_MUTATION / DEPLOYMENT_PENDING`
+
+# Checkpoint — 2026-10-07 — Natural-language Dictionary Capture owner boundary fixed locally
+
+LAW: Natural Capture wording may produce lexical observations independently of
+semantic subject resolution. Dictionary remains lexical curation only;
+factual assertions stay on the semantic/Knowledge track. CREATE, ADD_FORM,
+ADD_SENSE and ENRICH must resolve/reuse first, fail closed on ambiguity, and
+retain revision, idempotency and canonical read-back boundaries.
+
+ROOT_CAUSE_CONFIRMED: `nhk.capture.ingest` persisted Dictionary observations
+but only validated a client-supplied technical `dictionary_owner_plan`. It did
+not derive a plan from natural wording, did not apply Dictionary mutation from
+the shared Capture path, and performed the pre-create boundary after subject
+conflict could terminate the Capture.
+
+IMPLEMENTED: The shared `StructuredSemanticInterpreter` now emits a bounded
+natural Dictionary owner command. `DictionaryNaturalLanguageCaptureService`
+classifies CREATE/ADD_FORM/ADD_SENSE/ENRICH with exact resolver reuse, an
+atomic new-Sense mutation primitive, deterministic UUID v5 identity, and a
+factual-track exclusion. `DictionaryObservationRegistry` and bootstrap wire
+plan/apply callbacks. Capture derives and validates the server-owned packet,
+applies it before subject conflict, and records explicit Entry/Sense/Form
+read-back with revisions. Existing enrichment audit/plan/apply remains
+unchanged as maintenance tooling.
+
+VERIFIED: Six natural-language planner/apply tests pass (20 assertions), the
+related Dictionary/Capture/Semantic focused selection passes 40 tests / 119
+assertions, changed PHP files lint clean, and `git diff --check` is clean. A
+broader Dictionary/Capture selection passes 849 tests / 4,063 assertions with
+one unrelated pre-existing Knowledge fixture error and existing warnings/
+deprecations. No migration, live Capture, staging mutation, production write,
+deployment, push or pull was performed.
+
+REMAINING_GAP: Natural wording can create lexical definitions, aliases and
+additional lexical Senses, but natural semantic-reference binding still
+requires the existing governed/canonical semantic-owner input; no automatic
+Authority/Knowledge/Source/Evidence/Graph inference was added. Live acceptance
+and runtime read-back remain deployment/infrastructure-gated.
+
+STATUS: `NATURAL_DICTIONARY_CAPTURE_OWNER_BOUNDARY_FIXED_LOCALLY /
+FOCUSED_GREEN / BROADER_SUITE_ENVIRONMENT_LIMITED / NO_DATA_MUTATION /
+NO_DEPLOYMENT / COMMIT_PENDING`.

@@ -53,6 +53,19 @@ final readonly class DictionaryPreCreateResolution
         return new self($action, $normalizedForm, self::sort($context), array_values($candidates), self::sort($dependencyRevisions), self::sort($diagnostics));
     }
 
+    /** Rehydrate a server-produced resolution packet; client data is never trusted as authority. */
+    public static function fromArray(array $value): self
+    {
+        return self::fromDecision(
+            (string) ($value['action'] ?? ''),
+            (string) ($value['normalized_form'] ?? ''),
+            (array) ($value['context'] ?? []),
+            (array) ($value['candidates'] ?? []),
+            (array) ($value['dependency_revisions'] ?? []),
+            (array) ($value['diagnostics'] ?? []),
+        );
+    }
+
     public function canCreate(): bool
     {
         return $this->action === self::CREATE_NEW;

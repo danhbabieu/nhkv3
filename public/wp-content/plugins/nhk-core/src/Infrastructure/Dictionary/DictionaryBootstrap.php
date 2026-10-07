@@ -21,6 +21,7 @@ final class DictionaryBootstrap
 
         self::$runtime = new DictionaryRuntime($wpdb);
         $harvester = self::$runtime->harvester();
+        $naturalCapture = self::$runtime->naturalCaptureService();
         DictionaryObservationRegistry::register(
             static function (string $kind, string $id, string $text, array $context = [], array $hints = []) use ($harvester): array {
                 $result = $harvester->harvest([['source_kind' => $kind, 'source_id' => $id, 'text' => $text, 'context' => $context, 'hints' => $hints]], true);
@@ -29,6 +30,13 @@ final class DictionaryBootstrap
             static function (string $kind, string $text, array $context = [], array $hints = []) use ($harvester): array {
                 $result = $harvester->harvest([['source_kind' => $kind, 'source_id' => 'preview', 'text' => $text, 'context' => $context, 'hints' => $hints]], false);
                 return is_array($result['items'][0]['plan'] ?? null) ? $result['items'][0]['plan'] : ['status' => 'UNAVAILABLE', 'blocking' => false];
+            },
+            static function (string $kind, string $id, string $text, array $context = [], array $observation = []) use ($naturalCapture): array {
+                $sharedCommand = is_array($observation['natural_owner_command'] ?? null) ? $observation['natural_owner_command'] : null;
+                return $naturalCapture->plan($text, $id, $context, $sharedCommand);
+            },
+            static function (array $plan, string $idempotencyKey) use ($naturalCapture): array {
+                return $naturalCapture->apply($plan, $idempotencyKey);
             },
         );
         (new DictionaryWordPressBridge(self::$runtime))->register();

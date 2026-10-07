@@ -41,6 +41,18 @@ final class DictionaryMutationService
         });
     }
 
+    /** Append a bounded lexical note without replacing the existing definition. */
+    public function enrichConcept(string $conceptId, int $expectedRevision, string $definitionDelta, array $context, string $idempotencyKey): array
+    {
+        $current = $this->requireConcept($conceptId);
+        $definitionDelta = trim($definitionDelta);
+        if ($definitionDelta === '') throw new \InvalidArgumentException('DICTIONARY_ENRICHMENT_CONTENT_REQUIRED');
+        $definition = trim($current->definition);
+        if ($definition === '') $definition = $definitionDelta;
+        elseif ($definition !== $definitionDelta && !str_contains($definition, $definitionDelta)) $definition .= "\n\n" . $definitionDelta;
+        return $this->updateConcept($conceptId, $expectedRevision, $current->preferredLabel, $definition, array_merge($current->context, $context), $idempotencyKey);
+    }
+
     public function createDraft(string $preferredLabel, string $definition, array $context, string $idempotencyKey): array
     {
         if (!$this->preCreateResolver instanceof DictionaryPreCreateResolver) throw new \RuntimeException('PRE_CREATE_RESOLUTION_REQUIRED');
@@ -168,6 +180,24 @@ final class DictionaryMutationService
         };
         if (!$this->preCreateResolver instanceof DictionaryPreCreateResolver) throw new \RuntimeException('PRE_CREATE_RESOLUTION_REQUIRED');
         return $this->mutateResolved($idempotencyKey, $payload, fn (): DictionaryPreCreateResolution => $this->preCreateResolver->resolveSenseAddition($entryId, $conceptId, $context), $operation);
+    }
+
+    /** Create one new lexical Sense and attach it atomically to an existing Entry. */
+    public function addNewSenseToEntry(string $entryId, int $expectedRevision, string $conceptId, string $preferredLabel, string $definition, array $context, string $idempotencyKey, ?string $semanticType = null, ?string $semanticId = null, ?int $semanticRevision = null): array
+    {
+        $this->assertEntrySenseReady();
+        if (!is_object($this->entryRepository) || !method_exists($this->entryRepository, 'addSenseToEntry')) throw new \RuntimeException('DICTIONARY_ENTRY_REPOSITORY_UNAVAILABLE');
+        $conceptId = trim($conceptId);
+        $preferredLabel = trim($preferredLabel);
+        $definition = trim($definition);
+        if ($conceptId === '' || $preferredLabel === '' || $definition === '') throw new \InvalidArgumentException('DICTIONARY_NEW_SENSE_CONTENT_REQUIRED');
+        $payload = ['operation' => 'entry.sense.create-and-add', 'entry_id' => $entryId, 'expected_revision' => $expectedRevision, 'concept_id' => $conceptId, 'preferred_label' => $preferredLabel, 'definition' => $definition, 'context' => $this->sort($context), 'semantic_type' => $semanticType, 'semantic_id' => $semanticId, 'semantic_revision' => $semanticRevision];
+        return $this->mutate($idempotencyKey, $payload, function () use ($entryId, $expectedRevision, $conceptId, $preferredLabel, $definition, $context, $semanticType, $semanticId, $semanticRevision): array {
+            $sense = $this->concepts->findById($conceptId) ?? new DictionaryConcept($conceptId, $preferredLabel, $definition, DictionaryConcept::DRAFT, null, null, null, $context, 1);
+            $result = ($this->entryRepository)->addSenseToEntry($entryId, $expectedRevision, $sense, $context, $semanticType, $semanticId, $semanticRevision);
+            if (!is_array($result) || !($result['entry'] ?? null) instanceof LexicalEntry || !($result['sense'] ?? null) instanceof DictionaryConcept) throw new \RuntimeException('DICTIONARY_ENTRY_SENSE_READBACK_FAILED');
+            return $result;
+        });
     }
 
     public function setSenseSemanticReference(string $entryId, string $senseId, int $expectedEntryRevision, string $semanticType, string $semanticId, ?int $semanticRevision, string $idempotencyKey): array

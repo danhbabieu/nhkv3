@@ -41,6 +41,7 @@ final readonly class StructuredInterpretationPacket
             'editorial_signals' => [],
             'reuse_matches' => [],
             'dictionary_delta_candidates' => [],
+            'dictionary_owner_command' => null,
             'knowledge_delta_candidates' => [],
             'relation_delta_candidates' => [],
             'semantic_query_seeds' => [],

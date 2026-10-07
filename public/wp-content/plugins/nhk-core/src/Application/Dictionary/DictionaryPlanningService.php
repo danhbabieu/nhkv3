@@ -205,6 +205,7 @@ final class DictionaryPlanningService
             'ambiguous_terms' => $ambiguous,
             'candidate_terms' => $candidateTerms,
             'internal_link_candidates' => $this->links->plan($text, $linkItems),
+            'natural_owner_command' => $packet['dictionary_owner_command'] ?? null,
             'warnings' => array_values(array_unique($warnings)),
             'blocking' => false,
         ];

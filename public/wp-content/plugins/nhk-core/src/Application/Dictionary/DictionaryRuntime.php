@@ -586,6 +586,25 @@ final class DictionaryRuntime
 
     public function harvester(): DictionaryHarvester { return new DictionaryHarvester($this->planning); }
 
+    public function naturalCaptureService(): DictionaryNaturalLanguageCaptureService
+    {
+        return new DictionaryNaturalLanguageCaptureService(
+            $this->preCreateResolver(),
+            function (array $plan, string $idempotencyKey): array {
+                $mutation = $this->mutation();
+                $operation = strtoupper(trim((string) ($plan['operation'] ?? '')));
+                $context = is_array($plan['context'] ?? null) ? $plan['context'] : [];
+                return match ($operation) {
+                    'CREATE' => $mutation->createEntryWithSense((string) ($plan['preferred_form'] ?? $plan['term'] ?? ''), (string) ($plan['definition'] ?? ''), $context, $idempotencyKey),
+                    'ADD_FORM' => $mutation->addFormToEntry((string) ($plan['entry_id'] ?? ''), (int) ($plan['expected_revision'] ?? 0), (string) ($plan['form'] ?? ''), $context, $idempotencyKey),
+                    'ADD_SENSE' => $mutation->addNewSenseToEntry((string) ($plan['entry_id'] ?? ''), (int) ($plan['expected_revision'] ?? 0), (string) ($plan['concept_id'] ?? ''), (string) ($plan['preferred_label'] ?? $plan['term'] ?? ''), (string) ($plan['definition'] ?? ''), $context, $idempotencyKey),
+                    'ENRICH' => $mutation->enrichConcept((string) ($plan['sense_id'] ?? ''), (int) ($plan['expected_revision'] ?? 0), (string) ($plan['definition'] ?? ''), $context, $idempotencyKey),
+                    default => throw new \RuntimeException('DICTIONARY_OWNER_OPERATION_INVALID'),
+                };
+            },
+        );
+    }
+
     public function relationHandoff(): DictionaryRelationHandoff
     {
         return new DictionaryRelationHandoff(

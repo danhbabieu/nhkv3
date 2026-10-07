@@ -25,6 +25,7 @@ final class StructuredSemanticInterpreter
     {
         $value = $input instanceof UniversalInputEnvelope ? $input->toArray() : UniversalInputEnvelope::fromArray($input)->toArray();
         $text = trim((string) ($value['raw_text'] ?? $value['body'] ?? ''));
+        $dictionaryOwnerCommand = $this->dictionaryOwnerCommand($text);
         $metadata = is_array($value['metadata'] ?? null) ? $value['metadata'] : [];
         $approved = $this->strings($metadata['approved_labels'] ?? $metadata['dictionary_labels'] ?? []);
         $hints = is_array($metadata['lexical_hints'] ?? null) ? $metadata['lexical_hints'] : (array) ($value['user_hints'] ?? []);
@@ -109,12 +110,44 @@ final class StructuredSemanticInterpreter
             'editorial_signals' => $editorialSignals,
             'reuse_matches' => $this->reuseMatches($value, $claims),
             'dictionary_delta_candidates' => $this->dictionaryCandidates($lexical, $unresolved),
+            'dictionary_owner_command' => $dictionaryOwnerCommand,
             'knowledge_delta_candidates' => $this->knowledgeCandidates($claims),
             'relation_delta_candidates' => $relations,
             'semantic_query_seeds' => $this->querySeeds($lexical, $value, $ambiguous),
             'diagnostics' => $diagnostics,
             'outcomes' => $this->outcomes($lexical, $claims, $relations, $ambiguous, $unresolved),
         ]);
+    }
+
+    /** @return array<string,mixed>|null */
+    public function dictionaryOwnerCommand(string $text): ?array
+    {
+        $text = trim($text);
+        if ($text === '') return null;
+        if (preg_match('/\b(?:dữ\s+kiện|thông\s+tin|sự\s+kiện|năm\s+\d{4}|ngày\s+\d{1,2})\b/iu', $text) === 1) {
+            return ['status' => 'SEMANTIC_ONLY', 'diagnostics' => ['FACT_NOT_DICTIONARY_CONTENT'], 'dictionary_mutation' => false];
+        }
+        if (preg_match('/^(.+?)\s+(?:còn\s+(?:được\s+)?gọi\s+là|tên\s+(?:khác|gọi)\s+là)\s+(.+?)\s*[.!?。！？]?$/iu', $text, $match) === 1) {
+            return ['operation' => 'ADD_FORM', 'term' => $this->cleanDictionaryCommandPart($match[1]), 'form' => $this->cleanDictionaryCommandPart($match[2])];
+        }
+        if (preg_match('/^(.+?)\s+(?:có\s+thêm\s+(?:một\s+)?nghĩa|nghĩa\s+khác)\s*(?:là|:)\s*(.+?)\s*[.!?。！？]?$/iu', $text, $match) === 1) {
+            return ['operation' => 'ADD_SENSE', 'term' => $this->cleanDictionaryCommandPart($match[1]), 'definition' => $this->cleanDictionaryCommandPart($match[2])];
+        }
+        if (preg_match('/^(?:bổ\s+sung|thêm|cập\s+nhật)\s+(?:định\s+nghĩa|nghĩa|cách\s+dùng|ngữ\s+cảnh)\s+cho\s+(.+?)\s*:\s*(.+?)\s*[.!?。！？]?$/iu', $text, $match) === 1) {
+            return ['operation' => 'ENRICH', 'term' => $this->cleanDictionaryCommandPart($match[1]), 'definition' => $this->cleanDictionaryCommandPart($match[2])];
+        }
+        if (preg_match('/^(?:bổ\s+sung|thêm)\s+vào\s+từ\s+điển\s+["“]?(.+?)["”]?\s+(?:có\s+)?(?:nghĩa\s+là|được\s+hiểu\s+là)\s+(.+?)\s*[.!?。！？]?$/iu', $text, $match) === 1) {
+            return ['operation' => 'CREATE', 'term' => $this->cleanDictionaryCommandPart($match[1]), 'definition' => $this->cleanDictionaryCommandPart($match[2])];
+        }
+        if (preg_match('/^["“]?(.+?)["”]?\s+(?:có\s+)?nghĩa\s+là\s+(.+?)\s*[.!?。！？]?$/iu', $text, $match) === 1) {
+            return ['operation' => 'CREATE', 'term' => $this->cleanDictionaryCommandPart($match[1]), 'definition' => $this->cleanDictionaryCommandPart($match[2])];
+        }
+        return null;
+    }
+
+    private function cleanDictionaryCommandPart(string $value): string
+    {
+        return trim($value, " \t\n\r\0\x0B\"“”'‘’.,!?。！？:;");
     }
 
     /** @param array<string,mixed> $span @return array<string,mixed> */
