@@ -3,26 +3,13 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Governance;
 
-/** Read-only compatibility policy extracted from AuthorityProposalExecutor dispatch. */
+/** Compatibility adapter backed by the canonical read-only operation policy. */
 final class ControlledApplyOperationRegistry implements OperationCompatibility
 {
-    /** @var array<string, list<string>> */
-    private const ENTITY_OPERATIONS = [
-        'knowledge' => ['create', 'ingest', 'update', 'retire', 'reactivate', 'collector_facet_update', 'relation_create', 'relation_retire', 'relation_reactivate'],
-        'source' => ['create', 'ingest', 'update', 'retire', 'reactivate'],
-        'evidence' => ['create', 'ingest', 'update', 'retire', 'reactivate'],
-        'media' => ['ingest', 'update', 'add', 'replace', 'remove', 'representative_bind', 'relation_create', 'relation_retire', 'relation_reactivate'],
-        'video' => ['ingest', 'update', 'source_refresh', 'retire', 'reactivate', 'relation_create', 'relation_retire', 'relation_reactivate'],
-        'wp_post' => ['relation_create', 'relation_retire', 'relation_reactivate', 'subject_bind'],
-        'relation' => ['relation_create', 'relation_retire', 'relation_reactivate', 'relation_replace'],
-    ];
-
-    /** @var list<string> */
-    private const AUTHORITY_OPERATIONS = ['create', 'ingest', 'rekey', 'merge', 'rename', 'update', 'retire', 'reactivate'];
+    public function __construct(private GovernedOperationPolicyRegistry $policy = new GovernedOperationPolicyRegistry()) {}
 
     public function supports(string $entityType, string $operation): bool
     {
-        if (isset(self::ENTITY_OPERATIONS[$entityType])) return in_array($operation, self::ENTITY_OPERATIONS[$entityType], true);
-        return in_array($operation, self::AUTHORITY_OPERATIONS, true);
+        return $this->policy->supports($entityType, $operation);
     }
 }
