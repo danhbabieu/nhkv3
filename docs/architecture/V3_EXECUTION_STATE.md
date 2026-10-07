@@ -1,5 +1,30 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-07 — Shared presentation components and stable Article archive configuration
+
+PRESENTATION: Public archive/search/library families now reuse the existing
+`empty-state` component, including custom family classes, instead of repeating
+empty-state markup. Contextual discovery now consumes the shared
+`section-header` component. No semantic-type or record-specific partials were
+created.
+
+ARTICLE_ARCHIVE: `/tri-thuc/` now queries the stable category slug
+`tri-thuc-dong-ho` rather than environment-specific numeric category ID `4`.
+The canonical category redirect also matches the registered slug only. Native
+WordPress posts, permalink ownership and archive pagination remain unchanged.
+
+REGRESSION_COVERAGE: Task 3 focused presentation/editorial suite passed 79
+tests / 874 assertions. The stable-slug test first failed against the numeric
+ID implementation and passed after the route/configuration change.
+
+QUALITY_GATES: Changed PHP files lint clean and `git diff --check` passes.
+No migration, category creation, data mutation, deployment or push was
+performed.
+
+COMMIT: Pending for this checkpoint.
+
+STATUS: `SHARED_PRESENTATION_AND_STABLE_ARTICLE_ARCHIVE_LOCAL / FOCUSED_GREEN / NO_SEMANTIC_DATA_MUTATION / DEPLOYMENT_PENDING`
+
 # Checkpoint — 2026-10-07 — Normalized public SEO packet
 
 SEO_PACKET: `PublicSeoProjection` now distinguishes `canonical_path` from

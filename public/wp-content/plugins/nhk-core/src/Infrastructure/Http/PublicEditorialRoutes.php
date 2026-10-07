@@ -6,7 +6,6 @@ namespace NHK\Core\Infrastructure\Http;
 final class PublicEditorialRoutes
 {
     private const TRI_THUC_ROUTE = 'tri-thuc';
-    private const TRI_THUC_CATEGORY_ID = 4;
     private const TRI_THUC_CATEGORY_SLUG = 'tri-thuc-dong-ho';
 
     public function register(): void
@@ -44,7 +43,7 @@ final class PublicEditorialRoutes
         if (is_admin() || wp_doing_ajax() || (defined('REST_REQUEST') && REST_REQUEST) || PHP_SAPI === 'cli') return;
         if ((string) get_query_var('nhk_editorial_route') === self::TRI_THUC_ROUTE || !is_category()) return;
         $term = get_queried_object();
-        if (!is_object($term) || (string) ($term->taxonomy ?? '') !== 'category' || (int) ($term->term_id ?? 0) !== self::TRI_THUC_CATEGORY_ID || (string) ($term->slug ?? '') !== self::TRI_THUC_CATEGORY_SLUG) return;
+        if (!is_object($term) || (string) ($term->taxonomy ?? '') !== 'category' || (string) ($term->slug ?? '') !== self::TRI_THUC_CATEGORY_SLUG) return;
         $page = max(1, (int) get_query_var('paged', 1));
         wp_safe_redirect(self::triThucPresentationPath($page), 301, 'NHK canonical Tri thức archive');
         exit;

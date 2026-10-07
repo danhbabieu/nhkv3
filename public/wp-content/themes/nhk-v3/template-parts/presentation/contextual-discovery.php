@@ -10,7 +10,7 @@ if ($modules === []) return;
     if ($items === []) continue;
   ?>
     <section class="contextual-discovery-module discovery-kind-<?php echo esc_attr($kind); ?>">
-      <div class="section-head"><div><p class="eyebrow"><?php echo esc_html(!empty($module['content_backed']) ? 'Liên quan' : nhk_v3_contextual_discovery_copy($context)); ?></p><h2><?php echo esc_html((string) ($module['title'] ?? 'Liên quan')); ?></h2></div></div>
+      <?php get_template_part('template-parts/presentation/section-header', null, ['eyebrow' => !empty($module['content_backed']) ? 'Liên quan' : nhk_v3_contextual_discovery_copy($context), 'title' => (string) ($module['title'] ?? 'Liên quan')]); ?>
       <div class="compact-discovery-list">
         <?php foreach ($items as $item):
           $title = nhk_v3_public_brand_text(trim((string) ($item['title'] ?? $item['name'] ?? '')));

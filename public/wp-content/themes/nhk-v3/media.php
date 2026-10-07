@@ -19,7 +19,7 @@ get_header();
         </article>
       <?php endforeach; ?>
     </div>
-  <?php else: ?><div class="empty media-empty"><h2>Chưa có ảnh sẵn sàng</h2><p>Hồ sơ này hiện chưa có tài nguyên hình ảnh công khai để hiển thị.</p></div><?php endif; ?>
+  <?php else: ?><?php get_template_part('template-parts/presentation/empty-state', null, ['class' => 'empty media-empty', 'title' => 'Chưa có ảnh sẵn sàng', 'message' => 'Hồ sơ này hiện chưa có tài nguyên hình ảnh công khai để hiển thị.']); ?><?php endif; ?>
   <section class="contextual-discovery media-downstream-discovery"><p class="eyebrow">Khám phá tiếp</p><h2>Đi tiếp từ hình ảnh này</h2><nav class="topic-cloud" aria-label="Khám phá tiếp từ hình ảnh"><?php foreach (nhk_v3_contextual_discovery_items('media') as $item): ?><a href="<?php echo esc_url(home_url($item['path'])); ?>"><?php echo esc_html($item['label']); ?> →</a><?php endforeach; ?></nav></section>
 
 <?php elseif (is_array($context) && is_array($archive)): ?>
@@ -49,8 +49,8 @@ get_header();
         </article>
       <?php endforeach; ?>
     </div>
-  <?php else: ?><div class="empty media-empty"><h2>Chưa có hình ảnh công khai</h2><p>Thư viện sẽ hiện ảnh thật ngay khi tài nguyên đủ điều kiện. Các bố cục khác vẫn dùng ảnh minh họa mặc định khi chưa có ảnh đại diện.</p></div><?php endif; ?>
+  <?php else: ?><?php get_template_part('template-parts/presentation/empty-state', null, ['class' => 'empty media-empty', 'title' => 'Chưa có hình ảnh công khai', 'message' => 'Thư viện sẽ hiện ảnh thật ngay khi tài nguyên đủ điều kiện. Các bố cục khác vẫn dùng ảnh minh họa mặc định khi chưa có ảnh đại diện.']); ?><?php endif; ?>
   <?php $pages = (int) ceil((int) ($archive['total'] ?? 0) / max(1, (int) ($archive['per_page'] ?? 1))); if ($pages > 1): ?><nav class="entity-pagination" aria-label="Phân trang thư viện"><?php for ($page = 1; $page <= $pages; $page++): $url = home_url('/thu-vien/' . ($page > 1 ? 'page/' . $page . '/' : '')); $current = $page === (int) ($archive['page'] ?? 1); ?><a class="<?php echo $current ? 'current' : ''; ?>"<?php echo $current ? ' aria-current="page"' : ''; ?> href="<?php echo esc_url($url); ?>"><?php echo esc_html((string) $page); ?></a><?php endfor; ?></nav><?php endif; ?><section class="contextual-discovery media-downstream-discovery"><p class="eyebrow">Khám phá tiếp</p><h2>Đi tiếp từ thư viện hình ảnh</h2><nav class="topic-cloud" aria-label="Khám phá tiếp từ thư viện"><?php foreach (nhk_v3_contextual_discovery_items('media') as $item): ?><a href="<?php echo esc_url(home_url($item['path'])); ?>"><?php echo esc_html($item['label']); ?> →</a><?php endforeach; ?></nav></section>
-<?php else: ?><div class="empty"><h1>Thư viện chưa sẵn sàng</h1><p>Không thể tải dữ liệu hình ảnh.</p></div><?php endif; ?>
+<?php else: ?><?php get_template_part('template-parts/presentation/empty-state', null, ['title' => 'Thư viện chưa sẵn sàng', 'message' => 'Không thể tải dữ liệu hình ảnh.']); ?><?php endif; ?>
 </main>
 <?php get_footer(); ?>

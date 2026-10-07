@@ -11,7 +11,8 @@ final class TriThucArchiveRouteTest extends TestCase
     {
         $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
         $template = (string) file_get_contents($theme . '/tri-thuc.php');
-        self::assertStringContainsString("'category__in' => [4]", $template);
+        self::assertStringContainsString("'category_name' => 'tri-thuc-dong-ho'", $template);
+        self::assertStringNotContainsString("'category__in' => [4]", $template);
         self::assertStringContainsString("'post_type' => 'post'", $template);
         self::assertStringContainsString("'post_status' => 'publish'", $template);
         self::assertStringContainsString("'orderby' => 'date'", $template);
@@ -63,7 +64,7 @@ final class TriThucArchiveRouteTest extends TestCase
         $card = (string) file_get_contents($theme . '/template-parts/article-card.php');
         self::assertStringContainsString('<div class="post-grid">', $template);
         self::assertStringContainsString('$archiveQuery = new WP_Query([', $template);
-        self::assertStringContainsString("'category__in' => [4]", $template);
+        self::assertStringContainsString("'category_name' => 'tri-thuc-dong-ho'", $template);
         self::assertStringContainsString("'post_type' => 'post'", $template);
         self::assertStringContainsString("'post_status' => 'publish'", $template);
         self::assertStringContainsString("'orderby' => 'date'", $template);
