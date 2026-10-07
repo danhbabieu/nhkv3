@@ -24484,3 +24484,40 @@ and runtime read-back remain deployment/infrastructure-gated.
 STATUS: `NATURAL_DICTIONARY_CAPTURE_OWNER_BOUNDARY_FIXED_LOCALLY /
 FOCUSED_GREEN / BROADER_SUITE_ENVIRONMENT_LIMITED / NO_DATA_MUTATION /
 NO_DEPLOYMENT / COMMIT_PENDING`.
+
+# Checkpoint — 2026-10-07 — Natural-language Dictionary Capture four gap closure
+
+ROOT_CAUSE_CONFIRMED: ADD_SENSE identity was source/Capture-derived rather than
+bounded by the target Entry and normalized meaning/context; lexical and factual
+tracks were classified from whole input; ENRICH could overwrite or conflate
+context and definition fields; and Dictionary owner mutation occurred before
+the durable interpreted Capture checkpoint.
+
+IMPLEMENTED: Existing approved Senses are now resolved by exact normalized
+meaning/context, with reuse, multiple-match review, context-conflict review and
+`NEW_SENSE_ALLOWED`; new Sense identity is deterministic from Entry/meaning/
+context only. The shared interpreter compiles per-segment lexical commands and
+bounded factual assertions, validates commands against lexical spans, and keeps
+factual tails off lexical definitions. ENRICH uses explicit field policy,
+immutable identity-context conflict review, bounded/deduplicated usage notes,
+CAS/idempotency and canonical read-back. Capture now observes first and applies
+the server-owned lexical plan only at `DICTIONARY_OWNER_APPLIED` after the
+`INTERPRETED` checkpoint; semantic review may leave lexical APPLIED state, while
+pre-checkpoint failure and replay remain non-mutating/idempotent. The existing
+list-shaped dependency closure is accepted fail-closed without schema change.
+
+VERIFIED: The focused Dictionary/Capture/Semantic selection passed 159 tests /
+640 assertions before the final lexical-span guard, and its affected interpreter
+and natural-planner selection passed 25 tests / 93 assertions after that guard.
+Changed PHP files lint clean, and the changed-scope secret scan and diff check
+are clean. No migration, live mutation, staging acceptance, production write,
+deployment, push or pull was performed.
+
+REMAINING_GAP: Natural semantic-owner/reference binding still requires governed
+canonical input; no live acceptance/runtime read-back was attempted. The wider
+Dictionary/Capture selection retains the previously observed unrelated
+`DictionaryWriteObservationTest` Knowledge identity fixture error.
+
+STATUS: `FOUR_NATURAL_DICTIONARY_GAPS_FIXED_LOCALLY / FOCUSED_GREEN /
+BROADER_BASELINE_ERROR_RECORDED / NO_DATA_MUTATION / NO_DEPLOYMENT /
+COMMIT_PENDING`.

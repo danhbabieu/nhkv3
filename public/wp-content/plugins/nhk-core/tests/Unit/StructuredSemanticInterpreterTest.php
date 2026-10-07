@@ -117,6 +117,38 @@ final class StructuredSemanticInterpreterTest extends TestCase
         }
     }
 
+    public function test_mixed_input_compiles_lexical_command_and_keeps_factual_assertion_on_semantic_track(): void
+    {
+        $value = (new StructuredSemanticInterpreter())->interpret([
+            'raw_text' => 'Bổ sung vào từ điển kính rào nghĩa là một chi tiết, sản xuất năm 2020.',
+        ])->toArray();
+
+        self::assertSame('CREATE', $value['dictionary_owner_commands'][0]['operation']);
+        self::assertSame('một chi tiết', $value['dictionary_owner_commands'][0]['definition']);
+        self::assertNotEmpty($value['semantic_assertions']);
+        self::assertSame('FACTUAL_CANDIDATE', $value['semantic_assertions'][0]['track']);
+    }
+
+    public function test_lexical_only_input_does_not_emit_a_knowledge_fact_candidate(): void
+    {
+        $value = (new StructuredSemanticInterpreter())->interpret([
+            'raw_text' => 'Bổ sung vào từ điển kính rào nghĩa là một chi tiết.',
+        ])->toArray();
+
+        self::assertSame([], $value['knowledge_delta_candidates']);
+    }
+
+    public function test_multi_sentence_input_compiles_only_the_lexical_sentence(): void
+    {
+        $value = (new StructuredSemanticInterpreter())->interpret([
+            'raw_text' => 'Bổ sung vào từ điển kính rào nghĩa là một chi tiết. Thông tin này được ghi nhận năm 2020.',
+        ])->toArray();
+
+        self::assertCount(1, $value['dictionary_owner_commands']);
+        self::assertSame('CREATE', $value['dictionary_owner_commands'][0]['operation']);
+        self::assertNotEmpty($value['semantic_assertions']);
+    }
+
     public function test_qualified_two_pair_configuration_exposes_one_compact_lookup_variant_only_when_cardinalities_match(): void
     {
         $packet = (new StructuredSemanticInterpreter())->interpret([

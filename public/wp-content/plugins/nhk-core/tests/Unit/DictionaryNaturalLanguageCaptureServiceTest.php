@@ -36,7 +36,7 @@ final class DictionaryNaturalLanguageCaptureServiceTest extends TestCase
         self::assertSame('côn máng', $plan['form']);
     }
 
-    public function test_existing_definition_becomes_enrichment_but_factual_input_stays_out_of_dictionary(): void
+    public function test_existing_definition_becomes_enrichment_and_factual_only_input_has_no_dictionary_plan(): void
     {
         $entry = $this->entry('entry-1', 'Côn', ['sense-1']);
         $service = $this->service([$entry], [$this->sense('sense-1', 'Côn')], ['côn' => [$entry]]);
@@ -46,8 +46,8 @@ final class DictionaryNaturalLanguageCaptureServiceTest extends TestCase
 
         self::assertSame('ENRICH', $enrichment['operation']);
         self::assertSame('ENRICH_EXISTING', $enrichment['pre_create_resolution']['action']);
-        self::assertSame('SEMANTIC_ONLY', $fact['status']);
-        self::assertSame('FACT_NOT_DICTIONARY_CONTENT', $fact['diagnostics'][0]);
+        self::assertSame('NOT_REQUESTED', $fact['status']);
+        self::assertFalse($fact['dictionary_mutation']);
     }
 
     public function test_ambiguous_headword_fails_closed(): void
@@ -68,11 +68,51 @@ final class DictionaryNaturalLanguageCaptureServiceTest extends TestCase
         $service = $this->service([$entry], [$this->sense('sense-1', 'Côn')], ['côn' => [$entry]]);
 
         $first = $service->plan('Côn có thêm nghĩa: một bộ phận của bút.', 'capture-6', []);
-        $second = $service->plan('Côn có thêm nghĩa: một bộ phận của bút.', 'capture-6', []);
+        $second = $service->plan('Côn có thêm nghĩa: một bộ phận của bút.', 'capture-7', []);
 
         self::assertSame('ADD_SENSE', $first['operation']);
         self::assertSame('ADD_SENSE_TO_ENTRY', $first['pre_create_resolution']['action']);
         self::assertSame($first['concept_id'], $second['concept_id']);
+    }
+
+    public function test_same_meaning_from_two_captures_reuses_one_existing_canonical_sense_identity(): void
+    {
+        $entry = $this->entry('entry-1', 'Côn', ['sense-1']);
+        $service = $this->service([$entry], [$this->senseWithDefinition('sense-1', 'Côn', 'một bộ phận của bút.')], ['côn' => [$entry]]);
+
+        $first = $service->plan('Côn có thêm nghĩa: một bộ phận của bút.', 'capture-a', []);
+        $second = $service->plan('Côn có thêm nghĩa: một bộ phận của bút.', 'capture-b', []);
+
+        self::assertSame('REUSE', $first['operation']);
+        self::assertSame('REUSE', $second['operation']);
+        self::assertSame($first['pre_create_resolution']['candidates'][0]['sense_id'], $second['pre_create_resolution']['candidates'][0]['sense_id']);
+    }
+
+    public function test_multiple_equivalent_existing_senses_fail_closed_for_new_sense(): void
+    {
+        $entry = $this->entry('entry-1', 'Côn', ['sense-1', 'sense-2']);
+        $service = $this->service(
+            [$entry],
+            [$this->senseWithDefinition('sense-1', 'Côn', 'một bộ phận của bút.'), $this->senseWithDefinition('sense-2', 'Côn', 'một bộ phận của bút.')],
+            ['côn' => [$entry]],
+        );
+
+        $plan = $service->plan('Côn có thêm nghĩa: một bộ phận của bút.', 'capture-c', []);
+
+        self::assertSame('REVIEW_REQUIRED', $plan['status']);
+        self::assertSame('MULTIPLE_EQUIVALENT_SENSES', $plan['pre_create_resolution']['diagnostics']['reason']);
+    }
+
+    public function test_mixed_lexical_and_factual_sentences_keep_fact_out_of_definition(): void
+    {
+        $service = $this->service();
+
+        $plan = $service->plan('Bổ sung vào từ điển kính rào nghĩa là một chi tiết, sản xuất năm 2020.', 'capture-mixed', []);
+
+        self::assertSame('CREATE', $plan['operation']);
+        self::assertSame('một chi tiết', $plan['definition']);
+        self::assertStringNotContainsString('2020', $plan['definition']);
+        self::assertNotEmpty($plan['semantic_track']['assertions']);
     }
 
     public function test_ready_plan_applies_once_through_the_injected_canonical_mutation_boundary(): void
@@ -104,6 +144,11 @@ final class DictionaryNaturalLanguageCaptureServiceTest extends TestCase
     private function sense(string $id, string $label): DictionaryConcept
     {
         return new DictionaryConcept($id, $label, 'Nghĩa cũ', DictionaryConcept::APPROVED, null, null, null, [], 2);
+    }
+
+    private function senseWithDefinition(string $id, string $label, string $definition): DictionaryConcept
+    {
+        return new DictionaryConcept($id, $label, $definition, DictionaryConcept::APPROVED, null, null, null, [], 2);
     }
 
     private function entry(string $id, string $label, array $senseIds): LexicalEntry

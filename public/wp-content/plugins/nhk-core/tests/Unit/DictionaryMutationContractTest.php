@@ -42,6 +42,34 @@ final class DictionaryMutationContractTest extends TestCase
         $service->updateConcept('concept-1', 2, 'Khác', 'Khác', ['public_slug' => 'khac'], 'dictionary-edit-1');
     }
 
+    public function test_enrichment_preserves_identity_context_and_reviews_conflicting_scope(): void
+    {
+        $repo = new class implements DictionaryConceptRepository {
+            public DictionaryConcept $concept;
+            public function __construct() { $this->concept = new DictionaryConcept('concept-1', 'Côn máng', 'Cũ', DictionaryConcept::DRAFT, null, null, null, ['domain' => 'máy', 'scope' => 'collector'], 1); }
+            public function findById(string $conceptId): ?DictionaryConcept { return $this->concept; }
+            public function findApprovedByNormalizedLabel(string $normalizedLabel, array $context = []): array { return []; }
+            public function listApproved(int $limit = 500): array { return []; }
+            public function listLabels(string $conceptId, bool $includeInactive = false): array { return []; }
+            public function createConcept(DictionaryConcept $concept): DictionaryConcept { return $concept; }
+            public function updateConcept(DictionaryConcept $concept, int $expectedRevision): DictionaryConcept { return $this->concept = new DictionaryConcept($concept->conceptId, $concept->preferredLabel, $concept->definition, $concept->status, $concept->destinationType, $concept->destinationId, $concept->destinationUrl, $concept->context, $expectedRevision + 1); }
+            public function addLabel(DictionaryLabel $label): DictionaryLabel { return $label; }
+            public function saveLabel(DictionaryLabel $label, string $previousNormalizedLabel, int $expectedConceptRevision): DictionaryLabel { return $label; }
+        };
+        $service = new DictionaryMutationService($repo);
+
+        $result = $service->enrichConcept('concept-1', 1, 'Bổ sung cách dùng.', ['domain' => 'máy'], 'enrich-safe-1', 'usage_note');
+
+        self::assertSame('máy', $result['concept']->context['domain']);
+        self::assertSame(2, $result['concept']->revision);
+        self::assertSame(['Bổ sung cách dùng.'], $result['concept']->context['usage_notes']);
+
+        $conflict = $service->enrichConcept('concept-1', 2, 'Không đổi định nghĩa.', ['domain' => 'bút'], 'enrich-safe-2', 'definition_refinement');
+        self::assertSame('REVIEW_REQUIRED', $conflict['status']);
+        self::assertSame('DICTIONARY_ENRICHMENT_CONTEXT_CONFLICT', $conflict['diagnostics'][0]);
+        self::assertSame('máy', $repo->concept->context['domain']);
+    }
+
     public function test_retire_and_reactivate_are_soft_lifecycle_operations(): void
     {
         $repo = new class implements DictionaryConceptRepository {

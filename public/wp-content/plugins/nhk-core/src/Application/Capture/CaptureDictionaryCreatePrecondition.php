@@ -35,7 +35,9 @@ final class CaptureDictionaryCreatePrecondition
         if (!$this->same((string) ($track['request_fingerprint'] ?? ''), $envelope->requestFingerprint)) throw new \RuntimeException('CAPTURE_DICTIONARY_PRE_CREATE_PACKET_STALE');
         if (!array_key_exists('expected_revision', $track)) throw new \RuntimeException('CAPTURE_DICTIONARY_PRE_CREATE_PACKET_STALE');
         if (!$this->same((array) ($track['dependency_revisions'] ?? []), $resolution->dependencyRevisions)) throw new \RuntimeException('CAPTURE_DICTIONARY_PRE_CREATE_PACKET_STALE');
-        if (!is_array($envelope->dependencyClosure['lexical'] ?? null)) throw new \RuntimeException('CAPTURE_DICTIONARY_PRE_CREATE_PACKET_STALE');
+        $lexicalClosure = $envelope->dependencyClosure['lexical'] ?? null;
+        if (!is_array($lexicalClosure)) foreach ($envelope->dependencyClosure as $closure) if (is_array($closure) && ($closure['owner'] ?? '') === 'lexical') { $lexicalClosure = $closure; break; }
+        if (!is_array($lexicalClosure)) throw new \RuntimeException('CAPTURE_DICTIONARY_PRE_CREATE_PACKET_STALE');
     }
 
     private function same(mixed $left, mixed $right): bool

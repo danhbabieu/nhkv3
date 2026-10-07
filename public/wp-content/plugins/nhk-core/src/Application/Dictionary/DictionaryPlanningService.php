@@ -206,6 +206,8 @@ final class DictionaryPlanningService
             'candidate_terms' => $candidateTerms,
             'internal_link_candidates' => $this->links->plan($text, $linkItems),
             'natural_owner_command' => $packet['dictionary_owner_command'] ?? null,
+            'natural_owner_commands' => $packet['dictionary_owner_commands'] ?? [],
+            'semantic_assertions' => $packet['semantic_assertions'] ?? [],
             'warnings' => array_values(array_unique($warnings)),
             'blocking' => false,
         ];

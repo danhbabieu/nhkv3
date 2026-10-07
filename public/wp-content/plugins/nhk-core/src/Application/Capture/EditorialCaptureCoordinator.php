@@ -402,6 +402,7 @@ final class EditorialCaptureCoordinator
                 $stagingScope = null;
             } else {
                 $this->beginPhase('INTERPRETED');
+                $naturalOwnerPlan = null;
                 $interpretation = $this->interpreter->interpret($text, $assets, is_array($input['subject_hints'] ?? null) ? $input['subject_hints'] : [], is_array($input['metadata'] ?? null) ? $input['metadata'] : []);
                 $diagnostics['interpretation'] = $this->withoutBody($interpretation);
                 $dictionaryObservation = DictionaryObservationRegistry::observe('CAPTURE', $record->captureId, $text, $this->dictionaryObservationContext($record, $input), $this->dictionaryLexicalHints($input));
@@ -421,17 +422,6 @@ final class EditorialCaptureCoordinator
                                 'dependency_revisions' => $resolution->dependencyRevisions,
                                 'expected_revision' => (int) ($naturalOwnerPlan['expected_revision'] ?? 0),
                             ];
-                            $earlyPlanningEnvelope = CaptureEnrichmentPlanningEnvelope::fromState($record->captureId, $record->requestFingerprint, $input, [], [], $diagnostics, $receipts);
-                            ($this->dictionaryCreatePrecondition ?? new CaptureDictionaryCreatePrecondition())->assert($earlyPlanningEnvelope, $resolution, match (strtoupper((string) ($naturalOwnerPlan['operation'] ?? ''))) {
-                                'CREATE' => 'CREATE_ENTRY_WITH_SENSE',
-                                'ADD_FORM' => 'ADD_FORM_TO_ENTRY',
-                                'ADD_SENSE' => 'ADD_SENSE_TO_ENTRY',
-                                'ENRICH' => 'ENRICH_EXISTING',
-                                default => 'REUSE_EXISTING',
-                            });
-                            $ownerApply = DictionaryObservationRegistry::applyOwnerPlan($naturalOwnerPlan, $record->captureId . ':dictionary');
-                            if (($ownerApply['status'] ?? '') === 'UNAVAILABLE') throw new \RuntimeException('DICTIONARY_OWNER_APPLY_UNAVAILABLE');
-                            $diagnostics['dictionary_owner_apply'] = $this->withoutBody($ownerApply);
                         }
                     }
                 }
@@ -453,7 +443,40 @@ final class EditorialCaptureCoordinator
                     }
                 }
                 $record = $this->save($record, CaptureStage::INTERPRETED, $assets, $diagnostics, $receipts, 'INTERPRETED', $record->articleId, $record->articleStateToken, 'IN_PROGRESS', null, $record->context + ['content_intent' => $intent] + ($stagingScope !== null ? ['staging_acceptance' => $stagingScope] : []));
+                $assets = $record->assets;
+                $diagnostics = $record->diagnostics;
                 $receipts = $record->phaseReceipts;
+                $naturalOwnerPlan = is_array($naturalOwnerPlan) ? $naturalOwnerPlan : (is_array($diagnostics['dictionary_natural_owner_plan'] ?? null) ? $diagnostics['dictionary_natural_owner_plan'] : []);
+                $naturalOperation = strtoupper(trim((string) ($naturalOwnerPlan['operation'] ?? '')));
+                if (in_array($naturalOperation, ['CREATE', 'ADD_FORM', 'ADD_SENSE', 'ENRICH', 'REUSE'], true) && ($naturalOwnerPlan['status'] ?? '') === 'READY' && !isset($diagnostics['dictionary_owner_apply'])) {
+                    $resolutionPacket = is_array($naturalOwnerPlan['pre_create_resolution'] ?? null) ? $naturalOwnerPlan['pre_create_resolution'] : (array) ($diagnostics['dictionary_pre_create_resolution'] ?? []);
+                    $resolution = DictionaryPreCreateResolution::fromArray($resolutionPacket);
+                    $planningEnvelope = CaptureEnrichmentPlanningEnvelope::fromState($record->captureId, $record->requestFingerprint, $input, $interpretation, $assets, $diagnostics, $receipts);
+                    ($this->dictionaryCreatePrecondition ?? new CaptureDictionaryCreatePrecondition())->assert($planningEnvelope, $resolution, match ($naturalOperation) {
+                        'CREATE' => 'CREATE_ENTRY_WITH_SENSE',
+                        'ADD_FORM' => 'ADD_FORM_TO_ENTRY',
+                        'ADD_SENSE' => 'ADD_SENSE_TO_ENTRY',
+                        'ENRICH' => 'ENRICH_EXISTING',
+                        default => 'REUSE_EXISTING',
+                    });
+                    $this->beginPhase('DICTIONARY_OWNER_APPLIED');
+                    $ownerApply = DictionaryObservationRegistry::applyOwnerPlan($naturalOwnerPlan, $record->captureId . ':dictionary');
+                    $diagnostics['dictionary_owner_apply'] = $this->withoutBody($ownerApply);
+                    $diagnostics['dictionary_lexical_checkpoint'] = [
+                        'status' => in_array(strtoupper((string) ($ownerApply['status'] ?? '')), ['APPLIED', 'REUSED'], true) ? 'APPLIED' : 'REVIEW_REQUIRED',
+                        'phase' => 'DICTIONARY_OWNER_APPLIED',
+                        'idempotency_key' => $record->captureId . ':dictionary',
+                        'canonical_readback' => $this->withoutBody((array) ($ownerApply['canonical_readback'] ?? [])),
+                    ];
+                    if (!in_array(strtoupper((string) ($ownerApply['status'] ?? '')), ['APPLIED', 'REUSED'], true)) {
+                        $failureCode = trim((string) (($ownerApply['diagnostics'][0] ?? '') ?: 'DICTIONARY_OWNER_APPLY_UNAVAILABLE'));
+                        return $this->save($record, CaptureStage::INTERPRETED, $assets, $diagnostics, $receipts, 'DICTIONARY_OWNER_APPLIED', $record->articleId, $record->articleStateToken, 'REVIEW_REQUIRED', 'REVIEW_REQUIRED', null, $failureCode);
+                    }
+                    $record = $this->save($record, CaptureStage::INTERPRETED, $assets, $diagnostics, $receipts, 'DICTIONARY_OWNER_APPLIED', $record->articleId, $record->articleStateToken, 'IN_PROGRESS', (string) ($ownerApply['status'] ?? 'APPLIED'));
+                    $assets = $record->assets;
+                    $diagnostics = $record->diagnostics;
+                    $receipts = $record->phaseReceipts;
+                }
             }
             if (($intent['status'] ?? '') !== 'resolved') {
                 return $this->save($record, CaptureStage::INTERPRETED, $assets, $diagnostics, $receipts, 'INTERPRETED', $record->articleId, $record->articleStateToken, 'REVIEW_REQUIRED');
@@ -785,7 +808,8 @@ final class EditorialCaptureCoordinator
             );
             $lexicalPlan = is_array($input['dictionary_owner_plan'] ?? null) ? $input['dictionary_owner_plan'] : [];
             $dictionaryOperation = strtoupper(trim((string) ($lexicalPlan['operation'] ?? '')));
-            if (in_array($dictionaryOperation, ['CREATE', 'ADD_FORM', 'ADD_SENSE', 'ENRICH'], true) && !isset($diagnostics['dictionary_owner_apply'])) {
+            $isNaturalOwnerPlan = is_array($diagnostics['dictionary_natural_owner_plan'] ?? null);
+            if (in_array($dictionaryOperation, ['CREATE', 'ADD_FORM', 'ADD_SENSE', 'ENRICH'], true) && !isset($diagnostics['dictionary_owner_apply']) && (!$isNaturalOwnerPlan || ($lexicalPlan['status'] ?? '') === 'READY')) {
                 if (!$this->dictionaryPreCreateResolver instanceof DictionaryPreCreateResolver) throw new \RuntimeException('PRE_CREATE_RESOLUTION_REQUIRED');
                 $dictionaryContext = is_array($lexicalPlan['context'] ?? null) ? $lexicalPlan['context'] : [];
                 $resolution = match ($dictionaryOperation) {

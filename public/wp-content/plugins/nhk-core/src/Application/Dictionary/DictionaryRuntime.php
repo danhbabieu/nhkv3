@@ -598,7 +598,7 @@ final class DictionaryRuntime
                     'CREATE' => $mutation->createEntryWithSense((string) ($plan['preferred_form'] ?? $plan['term'] ?? ''), (string) ($plan['definition'] ?? ''), $context, $idempotencyKey),
                     'ADD_FORM' => $mutation->addFormToEntry((string) ($plan['entry_id'] ?? ''), (int) ($plan['expected_revision'] ?? 0), (string) ($plan['form'] ?? ''), $context, $idempotencyKey),
                     'ADD_SENSE' => $mutation->addNewSenseToEntry((string) ($plan['entry_id'] ?? ''), (int) ($plan['expected_revision'] ?? 0), (string) ($plan['concept_id'] ?? ''), (string) ($plan['preferred_label'] ?? $plan['term'] ?? ''), (string) ($plan['definition'] ?? ''), $context, $idempotencyKey),
-                    'ENRICH' => $mutation->enrichConcept((string) ($plan['sense_id'] ?? ''), (int) ($plan['expected_revision'] ?? 0), (string) ($plan['definition'] ?? ''), $context, $idempotencyKey),
+                    'ENRICH' => $mutation->enrichConcept((string) ($plan['sense_id'] ?? ''), (int) ($plan['expected_revision'] ?? 0), (string) ($plan['definition'] ?? ''), $context, $idempotencyKey, (string) ($plan['enrichment_field'] ?? 'definition_refinement')),
                     default => throw new \RuntimeException('DICTIONARY_OWNER_OPERATION_INVALID'),
                 };
             },

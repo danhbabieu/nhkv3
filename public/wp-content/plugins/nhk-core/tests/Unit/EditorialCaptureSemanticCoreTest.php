@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Capture\EditorialCaptureCoordinator;
+use NHK\Core\Application\Dictionary\DictionaryObservationRegistry;
 use NHK\Core\Application\Article\ArticleEditorialAdapter;
 use NHK\Core\Application\Semantic\{ArticleComposer, CanonicalAuthoritySubjectResolver, ClaimRetrievalEngine, SubjectResolutionService, TextInputInterpreter};
 use NHK\Core\Domain\Authority\{AuthorityEntity, AuthorityState, EntityTypeRegistry, CanonicalEntityTypeCatalog};
@@ -11,10 +12,20 @@ use NHK\Tests\Support\InMemoryAuthorityRepository;
 use NHK\Core\Contracts\Capture\CaptureRepository;
 use NHK\Core\Domain\Capture\CaptureRecord;
 use NHK\Core\Shared\Uuid\UuidCodec;
+use NHK\Core\Domain\Dictionary\DictionaryPreCreateResolution;
 use PHPUnit\Framework\TestCase;
 
 final class EditorialCaptureSemanticCoreTest extends TestCase
 {
+    protected function tearDown(): void
+    {
+        DictionaryObservationRegistry::register(
+            static fn (string $kind, string $id, string $text, array $context = [], array $hints = []): array => ['status' => 'NOT_CONFIGURED'],
+            static fn (string $kind, string $text, array $context = [], array $hints = []): array => ['status' => 'NOT_CONFIGURED'],
+        );
+        parent::tearDown();
+    }
+
     public function test_text_article_fixture_preserves_unicode_heading_and_retries_without_duplicate_native_draft(): void
     {
         $repository = new InMemoryCaptureRepository();
@@ -939,6 +950,113 @@ final class EditorialCaptureSemanticCoreTest extends TestCase
         self::assertSame('PUBLISHED', $result->stage);
         self::assertSame(2, $publicationCalls);
         self::assertSame('token-current', $publisherToken);
+    }
+
+    public function test_dictionary_owner_apply_waits_for_checkpoint_and_survives_later_subject_review(): void
+    {
+        $ownerCalls = 0;
+        $this->registerNaturalDictionaryPlan($ownerCalls);
+        $wrong = '11111111-1111-4111-8111-111111111111';
+        $right = '22222222-2222-4222-8222-222222222222';
+        $coordinator = $this->captureCoordinator(
+            new SubjectResolutionService(fn (string $hint): array => match ($hint) {
+                $wrong => [['id' => $wrong, 'type' => 'model', 'name' => 'Wrong subject', 'revision' => 1]],
+                'Right subject' => [['id' => $right, 'type' => 'model', 'name' => 'Right subject', 'revision' => 1]],
+                default => [],
+            }),
+        );
+
+        $result = $coordinator->execute([
+            'idempotency_key' => 'capture-dictionary-checkpoint',
+            'text' => 'Bổ sung vào từ điển kính rào nghĩa là một chi tiết.',
+            'canonical_uuid' => $wrong,
+            'subject_hints' => ['Right subject'],
+        ]);
+
+        self::assertSame('REVIEW_REQUIRED', $result->status, json_encode($result->toArray(), JSON_UNESCAPED_UNICODE));
+        self::assertSame('APPLIED', $result->diagnostics['dictionary_owner_apply']['status'] ?? null, json_encode($result->toArray(), JSON_UNESCAPED_UNICODE));
+        self::assertSame('SUBJECT_CONFLICT_REVIEW_REQUIRED', $result->diagnostics['failure_code'] ?? null);
+        self::assertSame('COMPLETED', $result->phaseReceipts['DICTIONARY_OWNER_APPLIED']['latest']['status']);
+        self::assertSame(1, $ownerCalls);
+        self::assertSame('AVAILABLE', $result->diagnostics['dictionary_observation']['status']);
+    }
+
+    public function test_dictionary_owner_apply_is_not_replayed_after_checkpoint_review(): void
+    {
+        $ownerCalls = 0;
+        $this->registerNaturalDictionaryPlan($ownerCalls);
+        $wrong = '33333333-3333-4333-8333-333333333333';
+        $right = '44444444-4444-4444-8444-444444444444';
+        $coordinator = $this->captureCoordinator(
+            new SubjectResolutionService(fn (string $hint): array => match ($hint) {
+                $wrong => [['id' => $wrong, 'type' => 'model', 'name' => 'Wrong subject', 'revision' => 1]],
+                'Right subject' => [['id' => $right, 'type' => 'model', 'name' => 'Right subject', 'revision' => 1]],
+                default => [],
+            }),
+        );
+        $input = ['idempotency_key' => 'capture-dictionary-replay', 'text' => 'Bổ sung vào từ điển kính rào nghĩa là một chi tiết.', 'canonical_uuid' => $wrong, 'subject_hints' => ['Right subject']];
+
+        $first = $coordinator->execute($input);
+        $second = $coordinator->execute($input);
+
+        self::assertSame('APPLIED', $first->diagnostics['dictionary_owner_apply']['status']);
+        self::assertSame('APPLIED', $second->diagnostics['dictionary_owner_apply']['status']);
+        self::assertSame(1, $ownerCalls);
+        self::assertSame('COMPLETED', $second->phaseReceipts['DICTIONARY_OWNER_APPLIED']['latest']['status']);
+    }
+
+    public function test_dictionary_owner_apply_does_not_run_when_capture_fails_before_checkpoint(): void
+    {
+        $ownerCalls = 0;
+        $this->registerNaturalDictionaryPlan($ownerCalls);
+        $coordinator = new EditorialCaptureCoordinator(
+            new InMemoryCaptureRepository(),
+            static fn (array $input): array => throw new \RuntimeException('PHYSICAL_INGEST_FAILED'),
+            static fn (array $input): array => ['post_id' => 99],
+            new TextInputInterpreter(),
+            new SubjectResolutionService(static fn (string $hint): array => []),
+            new ClaimRetrievalEngine(static fn (array $subject): array => ['status' => 'available', 'items' => []], static fn (array $subject, array $neighborhood): array => []),
+            static fn (array $context): array => ['status' => 'PLANNED', 'writes' => []],
+            new ArticleComposer(),
+            static fn (array $context): array => ['status' => 'RECONCILED'],
+            static fn (array $context): array => ['eligible' => false, 'blockers' => ['OWNER_PUBLICATION_REQUIRED']],
+            static fn (array $context): array => ['status' => 'verified'],
+        );
+
+        $result = $coordinator->execute(['idempotency_key' => 'capture-dictionary-before-checkpoint', 'text' => 'Bổ sung vào từ điển kính rào nghĩa là một chi tiết.']);
+
+        self::assertSame(0, $ownerCalls);
+        self::assertArrayNotHasKey('dictionary_owner_apply', $result->diagnostics);
+    }
+
+    private function registerNaturalDictionaryPlan(int &$ownerCalls): void
+    {
+        $resolution = DictionaryPreCreateResolution::fromDecision(DictionaryPreCreateResolution::CREATE_NEW, 'kính rào', [], [], [], ['reason' => 'TEST_SERVER_PLAN']);
+        DictionaryObservationRegistry::register(
+            static fn (string $kind, string $id, string $text, array $context = [], array $hints = []): array => ['status' => 'AVAILABLE', 'blocking' => false],
+            static fn (string $kind, string $text, array $context = [], array $hints = []): array => ['status' => 'AVAILABLE'],
+            static function (string $kind, string $id, string $text, array $context = [], array $observation = []) use ($resolution): array {
+                return ['status' => 'READY', 'operation' => 'CREATE', 'term' => 'kính rào', 'preferred_form' => 'kính rào', 'definition' => 'một chi tiết', 'context' => [], 'expected_revision' => 0, 'pre_create_resolution' => $resolution->toArray()];
+            },
+            static function (array $plan, string $key) use (&$ownerCalls): array { ++$ownerCalls; return ['status' => 'APPLIED', 'dictionary_mutation' => true, 'canonical_readback' => ['entry_id' => 'entry-readback', 'revision' => 2]]; },
+        );
+    }
+
+    private function captureCoordinator(SubjectResolutionService $subjects): EditorialCaptureCoordinator
+    {
+        return new EditorialCaptureCoordinator(
+            new InMemoryCaptureRepository(),
+            static fn (array $input): array => ['items' => []],
+            static fn (array $input): array => ['post_id' => 99, 'state_token' => 'token-99', 'post' => ['post_id' => 99]],
+            new TextInputInterpreter(),
+            $subjects,
+            new ClaimRetrievalEngine(static fn (array $subject): array => ['status' => 'available', 'items' => []], static fn (array $subject, array $neighborhood): array => []),
+            static fn (array $context): array => ['status' => 'PLANNED', 'writes' => []],
+            new ArticleComposer(),
+            static fn (array $context): array => ['status' => 'RECONCILED'],
+            static fn (array $context): array => ['eligible' => false, 'blockers' => ['OWNER_PUBLICATION_REQUIRED']],
+            static fn (array $context): array => ['status' => 'verified'],
+        );
     }
 }
 

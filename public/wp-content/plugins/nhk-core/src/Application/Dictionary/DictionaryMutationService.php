@@ -42,15 +42,50 @@ final class DictionaryMutationService
     }
 
     /** Append a bounded lexical note without replacing the existing definition. */
-    public function enrichConcept(string $conceptId, int $expectedRevision, string $definitionDelta, array $context, string $idempotencyKey): array
+    public function enrichConcept(string $conceptId, int $expectedRevision, string $definitionDelta, array $context, string $idempotencyKey, string $field = 'definition_refinement'): array
     {
         $current = $this->requireConcept($conceptId);
         $definitionDelta = trim($definitionDelta);
         if ($definitionDelta === '') throw new \InvalidArgumentException('DICTIONARY_ENRICHMENT_CONTENT_REQUIRED');
+        $field = strtolower(trim($field));
+        if (!in_array($field, ['definition_refinement', 'usage_note', 'lexical_context'], true)) throw new \InvalidArgumentException('DICTIONARY_ENRICHMENT_FIELD_INVALID');
+        $mergedContext = $this->mergeEnrichmentContext($current->context, $context, $field === 'usage_note' ? $definitionDelta : null);
+        if (($mergedContext['status'] ?? '') === 'REVIEW_REQUIRED') return $mergedContext;
         $definition = trim($current->definition);
-        if ($definition === '') $definition = $definitionDelta;
-        elseif ($definition !== $definitionDelta && !str_contains($definition, $definitionDelta)) $definition .= "\n\n" . $definitionDelta;
-        return $this->updateConcept($conceptId, $expectedRevision, $current->preferredLabel, $definition, array_merge($current->context, $context), $idempotencyKey);
+        if ($field === 'definition_refinement') {
+            if ($definition === '') $definition = $definitionDelta;
+            elseif ($definition !== $definitionDelta && !str_contains($definition, $definitionDelta)) $definition .= "\n\n" . $definitionDelta;
+        }
+        return $this->updateConcept($conceptId, $expectedRevision, $current->preferredLabel, $definition, $mergedContext, $idempotencyKey);
+    }
+
+    private function mergeEnrichmentContext(array $current, array $incoming, ?string $usageNote): array
+    {
+        $identityKeys = ['locale', 'lexical_locale', 'domain', 'usage_scope', 'region', 'community', 'scope', 'term_type', 'subject', 'semantic_reference', 'public_slug'];
+        foreach ($incoming as $key => $value) {
+            if ($value === null || $value === '' || $value === []) continue;
+            if (in_array($key, $identityKeys, true) && array_key_exists($key, $current) && $this->canonicalContextValue($current[$key]) !== $this->canonicalContextValue($value)) {
+                return ['status' => 'REVIEW_REQUIRED', 'dictionary_mutation' => false, 'diagnostics' => ['DICTIONARY_ENRICHMENT_CONTEXT_CONFLICT']];
+            }
+            if (!in_array($key, $identityKeys, true) && $key !== 'usage_notes') {
+                return ['status' => 'REVIEW_REQUIRED', 'dictionary_mutation' => false, 'diagnostics' => ['DICTIONARY_ENRICHMENT_CONTEXT_FIELD_UNGOVERNED']];
+            }
+        }
+        $merged = $current;
+        foreach ($incoming as $key => $value) if (!array_key_exists($key, $merged) || $merged[$key] === '' || $merged[$key] === null) $merged[$key] = $value;
+        if ($usageNote !== null) {
+            $notes = array_values(array_filter(array_map('strval', (array) ($merged['usage_notes'] ?? [])), static fn (string $note): bool => trim($note) !== ''));
+            if (!in_array($usageNote, $notes, true)) $notes[] = $usageNote;
+            $merged['usage_notes'] = array_slice(array_values(array_unique($notes)), 0, 20);
+        }
+        ksort($merged, SORT_STRING);
+        return $merged;
+    }
+
+    private function canonicalContextValue(mixed $value): string
+    {
+        if (is_array($value)) { ksort($value, SORT_STRING); return json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR); }
+        return (string) $value;
     }
 
     public function createDraft(string $preferredLabel, string $definition, array $context, string $idempotencyKey): array

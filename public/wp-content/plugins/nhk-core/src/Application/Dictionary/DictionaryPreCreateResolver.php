@@ -5,6 +5,7 @@ namespace NHK\Core\Application\Dictionary;
 
 use NHK\Core\Contracts\Dictionary\DictionaryEntryRepository;
 use NHK\Core\Domain\Dictionary\{DictionaryConcept, DictionaryPreCreateResolution, LexicalEntry};
+use NHK\Core\Shared\Uuid\UuidCodec;
 
 final class DictionaryPreCreateResolver
 {
@@ -132,6 +133,61 @@ final class DictionaryPreCreateResolver
         }
     }
 
+    /**
+     * Resolve a natural-language meaning against one existing Entry before a
+     * new Sense identity is proposed. Similarity is deliberately excluded:
+     * only normalized lexical meaning plus compatible bounded context can
+     * prove reuse.
+     */
+    public function resolveNewSenseAddition(string $entryId, string $definition, array $context = []): DictionaryPreCreateResolution
+    {
+        $target = $this->findEntry($entryId);
+        $meaning = $this->meaningKey($definition);
+        if (!$target instanceof LexicalEntry || $meaning === '') return $this->review($meaning !== '' ? $meaning : $entryId, $context, [], [], 'DICTIONARY_ENTRY_NOT_FOUND');
+
+        try {
+            $revisions = ['entry:' . $entryId => $target->revision];
+            $equivalent = [];
+            $contextConflicts = [];
+            foreach ($this->entries->listSenses($target, []) as $sense) {
+                if (!$sense instanceof DictionaryConcept) continue;
+                $this->recordRevision($revisions, 'sense:' . $sense->conceptId, $sense->revision);
+                if (!$sense->approved() || $this->meaningKey($sense->definition) !== $meaning) continue;
+                $candidate = $this->entryCandidate($target, $sense, 'ACTIVE');
+                if ($this->compatibleMeaningContext($sense->context, $context)) $equivalent[] = $candidate;
+                else $contextConflicts[] = $candidate;
+            }
+
+            if (count($equivalent) > 1) return $this->review($meaning, $context, $equivalent, $revisions, 'MULTIPLE_EQUIVALENT_SENSES');
+            if ($equivalent !== []) return DictionaryPreCreateResolution::fromDecision(
+                DictionaryPreCreateResolution::REUSE_EXISTING,
+                $this->normalizer->normalize($target->preferredForm),
+                $context,
+                $equivalent,
+                $revisions,
+                ['reason' => 'EXACT_NORMALIZED_MEANING_REUSE'],
+            );
+            if ($contextConflicts !== []) return $this->review($meaning, $context, $contextConflicts, $revisions, 'SENSE_CONTEXT_CONFLICT');
+
+            $semanticKey = 'entry=' . $entryId . '|meaning=' . $meaning . '|context=' . $this->canonicalContext($context);
+            $conceptId = UuidCodec::v5('nhk.dictionary.sense|' . $semanticKey);
+            return DictionaryPreCreateResolution::fromDecision(
+                DictionaryPreCreateResolution::ADD_SENSE_TO_ENTRY,
+                $this->normalizer->normalize($target->preferredForm),
+                $context,
+                [['entry_id' => $entryId, 'sense_id' => $conceptId, 'entry_revision' => $target->revision]],
+                $revisions,
+                [
+                    'decision' => 'NEW_SENSE_ALLOWED',
+                    'meaning_key' => $meaning,
+                    'new_sense_identity' => ['algorithm' => 'UUID_V5', 'semantic_key' => $semanticKey, 'concept_id' => $conceptId],
+                ],
+            );
+        } catch (\Throwable) {
+            return $this->review($meaning !== '' ? $meaning : $entryId, $context, [], ['entry:' . $entryId => $target->revision], 'DICTIONARY_PRE_CREATE_DEPENDENCY_UNAVAILABLE');
+        }
+    }
+
     private function findEntry(string $entryId): ?LexicalEntry
     {
         if (!method_exists($this->entries, 'findById')) return null;
@@ -144,6 +200,37 @@ final class DictionaryPreCreateResolver
         $normalized = $this->normalizer->normalize(trim($term));
         if ($normalized === '') throw new \InvalidArgumentException('DICTIONARY_PRE_CREATE_FORM_REQUIRED');
         return $normalized;
+    }
+
+    private function meaningKey(string $definition): string
+    {
+        $value = trim($definition);
+        $value = function_exists('mb_strtolower') ? mb_strtolower($value, 'UTF-8') : strtolower($value);
+        $value = preg_replace('/\s+/u', ' ', $value) ?? $value;
+        return trim($value, " \t\n\r\0\x0B.,;:!?。！？");
+    }
+
+    private function compatibleMeaningContext(array $current, array $incoming): bool
+    {
+        foreach (['domain', 'usage_scope', 'region', 'community', 'scope', 'term_type', 'locale', 'lexical_locale'] as $key) {
+            if (!array_key_exists($key, $current) || !array_key_exists($key, $incoming)) continue;
+            if ($this->canonicalContextValue($current[$key]) !== $this->canonicalContextValue($incoming[$key])) return false;
+        }
+        return true;
+    }
+
+    private function canonicalContext(array $context): string
+    {
+        $context = $context;
+        ksort($context, SORT_STRING);
+        foreach ($context as $key => $value) if (is_array($value)) $context[$key] = $this->canonicalContextValue($value);
+        return json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+    }
+
+    private function canonicalContextValue(mixed $value): string
+    {
+        if (is_array($value)) { ksort($value, SORT_STRING); return json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR); }
+        return (string) $value;
     }
 
     private function entryCandidate(LexicalEntry $entry, ?DictionaryConcept $sense, string $status): array

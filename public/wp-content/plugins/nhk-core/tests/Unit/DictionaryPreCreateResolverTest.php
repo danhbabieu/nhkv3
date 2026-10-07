@@ -103,6 +103,41 @@ final class DictionaryPreCreateResolverTest extends TestCase
         self::assertSame(DictionaryPreCreateResolution::REVIEW_REQUIRED, $resolver->resolveSenseAddition('entry-2', 'sense-1')->action);
     }
 
+    public function test_new_sense_resolution_allows_only_a_deterministic_semantic_identity_when_no_approved_meaning_matches(): void
+    {
+        $sense = $this->sense('sense-1', 'Côn', ['domain' => 'máy']);
+        $entry = $this->entry('entry-1', 'Côn', [$sense->conceptId]);
+
+        $result = (new DictionaryPreCreateResolver($this->repository([$entry], [$sense])))->resolveNewSenseAddition('entry-1', 'Một nghĩa mới', []);
+
+        self::assertSame(DictionaryPreCreateResolution::ADD_SENSE_TO_ENTRY, $result->action);
+        self::assertSame('NEW_SENSE_ALLOWED', $result->diagnostics['decision']);
+        self::assertSame($result->candidates[0]['sense_id'], $result->diagnostics['new_sense_identity']['concept_id']);
+    }
+
+    public function test_new_sense_resolution_reuses_exact_approved_meaning(): void
+    {
+        $sense = $this->senseWithDefinition('sense-1', 'Côn', 'Một nghĩa đã duyệt.');
+        $entry = $this->entry('entry-1', 'Côn', [$sense->conceptId]);
+
+        $result = (new DictionaryPreCreateResolver($this->repository([$entry], [$sense])))->resolveNewSenseAddition('entry-1', ' một nghĩa đã duyệt ', []);
+
+        self::assertSame(DictionaryPreCreateResolution::REUSE_EXISTING, $result->action);
+        self::assertSame('sense-1', $result->candidates[0]['sense_id']);
+    }
+
+    public function test_new_sense_resolution_reviews_multiple_equivalent_approved_meanings(): void
+    {
+        $first = $this->senseWithDefinition('sense-1', 'Côn', 'Một nghĩa đã duyệt.');
+        $second = $this->senseWithDefinition('sense-2', 'Côn', 'Một nghĩa đã duyệt.');
+        $entry = $this->entry('entry-1', 'Côn', [$first->conceptId, $second->conceptId]);
+
+        $result = (new DictionaryPreCreateResolver($this->repository([$entry], [$first, $second])))->resolveNewSenseAddition('entry-1', 'một nghĩa đã duyệt', []);
+
+        self::assertSame(DictionaryPreCreateResolution::REVIEW_REQUIRED, $result->action);
+        self::assertSame('MULTIPLE_EQUIVALENT_SENSES', $result->diagnostics['reason']);
+    }
+
     public function test_shared_owner_is_evidence_and_does_not_override_divergent_context(): void
     {
         $sense = $this->sense('sense-1', 'Côn', ['domain' => 'máy'], 'classification', 'owner-1');
@@ -171,6 +206,11 @@ final class DictionaryPreCreateResolverTest extends TestCase
     private function sense(string $id, string $label, array $context = [], ?string $destinationType = null, ?string $destinationId = null): DictionaryConcept
     {
         return new DictionaryConcept($id, $label, 'Nghĩa', DictionaryConcept::APPROVED, $destinationType, $destinationId, null, $context, 2);
+    }
+
+    private function senseWithDefinition(string $id, string $label, string $definition): DictionaryConcept
+    {
+        return new DictionaryConcept($id, $label, $definition, DictionaryConcept::APPROVED, null, null, null, [], 2);
     }
 
     private function entry(string $id, string $preferred, array $senseIds, array $context = [], string $status = DictionaryConcept::APPROVED): LexicalEntry
