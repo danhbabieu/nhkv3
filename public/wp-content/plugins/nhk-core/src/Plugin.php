@@ -424,7 +424,7 @@ final class Plugin {
                 $systemWideReaders[$auditOwner] = new WpdbDuplicateAuditPageReader($wpdb, $auditOwner);
             }
             $systemWideDictionary = $dictionaryRuntime?->duplicateAudit();
-            $knowledgeReconciliationPlanner = new \NHK\Core\Application\Knowledge\KnowledgeDuplicateReconciliationPlanner($claims, $evidence, $graphService);
+            $knowledgeReconciliationPlanner = new \NHK\Core\Application\Knowledge\KnowledgeDuplicateReconciliationPlanner($claims, $evidence, $graphService, $videoIdentityReader);
             $systemWideCoordinator = new SystemWideDuplicateAuditCoordinator(
                 $systemWideReaders,
                 $systemWideDictionary instanceof \NHK\Core\Application\Dictionary\DictionaryDuplicateCandidateAudit
@@ -922,7 +922,7 @@ final class Plugin {
             $videoKnowledgeEnrichment = new VideoKnowledgeEnrichmentPlanner(new \NHK\Core\Application\Knowledge\KnowledgeEnrichmentPlanner($claims, $evidence, $sources, $videoIdentityReader));
             $videoEditorialResume = null;
             $canonicalDependencies = new CanonicalDependencyValidator($claims, $sources, $evidence);
-            $knowledgeRepairPreview = new \NHK\Core\Application\Knowledge\KnowledgeRepairPreviewService($claims, $evidence, $graphService);
+            $knowledgeRepairPreview = new \NHK\Core\Application\Knowledge\KnowledgeRepairPreviewService($claims, $evidence, $graphService, $videoIdentityReader);
             $videoRelationCandidates = new VideoRelationCandidatePlanner(new PredicateRegistry(), $evidence, $claims, $sources, $canonicalDependencies);
             $videoCompleteness = new \NHK\Core\Application\Video\VideoCompletenessReconciliationService($videos, $graphService, $canonicalDependencies, new VideoCompletenessPolicy());
             $captureGovernance = new GovernedCaptureContinuationService(

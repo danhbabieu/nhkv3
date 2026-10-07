@@ -15,7 +15,7 @@ final class GovernedLivingKnowledgeCorrectiveTest extends TestCase
         $subject = UuidCodec::newV7(); $profile = new KnowledgeFacetProfile('recognition', 'variant');
         $retired = new KnowledgeClaim(UuidCodec::newV7(), 'retired', 'Cọc đen.', 'fact', ['metadata' => ['subject_id' => $subject, 'facet' => 'recognition', 'scope' => 'variant']], false);
         $result = $this->planner([$retired])->plan($subject, $profile, 'Cọc đen.');
-        self::assertSame('new_claim', $result[0]->classification);
+        self::assertSame('ambiguous', $result[0]->classification);
     }
 
     public function test_explicit_evidence_context_classifies_add_qualify_and_contradict(): void

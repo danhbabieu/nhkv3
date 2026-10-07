@@ -76,7 +76,7 @@ final class SystemWideDuplicatePreventionTest extends TestCase
     {
         [$claims, $sources, $evidence] = $this->repositories();
         $service = new KnowledgeService($claims, $sources, $evidence);
-        $claim = $service->createClaim('knowledge:evidence-claim', 'Claim with support.');
+        $claim = $service->createClaim('knowledge:evidence-claim', 'Claim with support.', 'fact', ['metadata' => ['subject_id' => UuidCodec::newV7(), 'facet' => 'recognition', 'scope' => 'variant']]);
         $source = $service->createSource('source:first-key', 'Catalogue', 'catalog', 'https://example.test/item/?b=2&a=1');
         $sameSource = $service->createSource('source:second-key', 'Same catalogue', 'catalog', 'https://EXAMPLE.test/item?a=1&b=2');
         $first = $service->citeWithId(UuidCodec::newV7(), $claim->canonicalId, $source->canonicalId, 'Support passage.', 'supports', 'https://example.test/item#p4', ['visibility' => 'PRIVATE']);

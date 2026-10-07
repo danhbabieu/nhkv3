@@ -105,9 +105,14 @@ final class SystemWideDuplicateAuditCoordinator
                 $missing = $this->articleModelGap($combined);
                 if ($missing !== []) return $this->blocked('AUDIT_MODEL_GAP', ['missing_identity_fields' => $missing]);
             }
+            $ownerDiagnostics = [];
             $clusters = match ($owner) {
                 'Authority' => $this->authority($combined),
-                'Knowledge' => $this->knowledge($combined),
+                'Knowledge' => (function () use ($combined, &$ownerDiagnostics): array {
+                    $result = $this->knowledge($combined);
+                    $ownerDiagnostics = $result['diagnostics'];
+                    return $result['clusters'];
+                })(),
                 'Source' => $this->source($combined),
                 'Evidence' => $this->evidence($combined),
                 'Graph' => $this->graph($combined),
@@ -124,7 +129,7 @@ final class SystemWideDuplicateAuditCoordinator
             $next = isset($page['next_cursor']) && $page['next_cursor'] !== null ? (string) $page['next_cursor'] : null;
             $boundReached = $next !== null && $scanned >= self::MAX_SCAN_ROWS;
             $nextCursor = $boundReached ? null : ($next === null ? null : $this->encodeCursor($next, array_slice($combined, -self::MAX_CARRY_ROWS), $scanned, $owner, $includeRetired, $emitted));
-            $diagnostics = (array) ($page['diagnostics'] ?? []);
+            $diagnostics = array_merge((array) ($page['diagnostics'] ?? []), $ownerDiagnostics);
             if ($boundReached) $diagnostics[] = ['code' => 'AUDIT_MAX_SCAN_BOUND_REACHED', 'max_scan_rows' => self::MAX_SCAN_ROWS];
             $complete = $next === null;
             return ['status' => $complete ? 'COMPLETE' : 'PARTIAL', 'complete' => $complete, 'clusters' => $this->withPage($clusters, $cursor, $nextCursor, $items), 'next_cursor' => $nextCursor, 'rows_read' => count($items), 'diagnostics' => $diagnostics];
@@ -283,19 +288,20 @@ final class SystemWideDuplicateAuditCoordinator
     {
         $clusters = [];
         $resolved = [];
-        $unresolved = [];
+        $coverage = ['identity_resolved_rows' => 0, 'identity_unresolved_rows' => 0, 'identity_conflicting_rows' => 0, 'bounded_identity_review_samples' => []];
         foreach ($items as $row) {
             $identity = KnowledgeClaimIdentity::resolveAuditRow($row, $this->videoIdentityReader);
             if ($identity->status() !== 'RESOLVED') {
                 $id = $this->id($row);
-                if ($id !== '') $unresolved[$identity->status() . '|' . implode(',', $identity->reasonCodes()) . '|' . $id][] = $row;
+                $statusKey = strtolower($identity->status());
+                $coverage['identity_' . ($statusKey === 'conflicting' ? 'conflicting' : 'unresolved') . '_rows']++;
+                if (count($coverage['bounded_identity_review_samples']) < 16) {
+                    $coverage['bounded_identity_review_samples'][] = ['canonical_id' => $id, 'status' => $identity->status(), 'reason_codes' => $identity->reasonCodes()];
+                }
                 continue;
             }
+            $coverage['identity_resolved_rows']++;
             $resolved[$identity->fingerprint()][] = ['row' => $row, 'identity' => $identity];
-        }
-        foreach ($unresolved as $reviewKey => $rows) {
-            $identity = KnowledgeClaimIdentity::resolveAuditRow($rows[0], $this->videoIdentityReader);
-            $clusters[] = $this->cluster('Knowledge', 'review:' . hash('sha256', $reviewKey), $rows, 'REVIEW_REQUIRED', 'LOW', ['identity_status' => $identity->status(), 'identity_policy' => $identity->policyVersion(), 'identity_fingerprint' => $identity->fingerprint()], $identity->reasonCodes(), ['Knowledge identity is not proven; records are never compared as equivalent'], 'REVIEW_KNOWLEDGE_IDENTITY;NO_MUTATION');
         }
         foreach ($resolved as $key => $entries) {
             $rows = array_values(array_map(static fn (array $entry): array => $entry['row'], $entries));
@@ -320,7 +326,7 @@ final class SystemWideDuplicateAuditCoordinator
             $classification = count(array_filter($qualifiers, static fn (string $value): bool => $value !== '')) > 1 ? 'CONTEXTUAL_OR_SCOPED_VARIANT' : 'POSSIBLE_DUPLICATE';
             $clusters[] = $this->cluster('Knowledge', $key, $rows, $classification, 'MEDIUM', ['same_subject_facet_scope_with_nonidentical_proposition'], $classification === 'CONTEXTUAL_OR_SCOPED_VARIANT' ? ['qualification_differs'] : [], ['wording differs; equivalence is not proven by lexical similarity'], 'REVIEW_KNOWLEDGE_SEMANTIC_EQUIVALENCE;NO_MUTATION');
         }
-        return $clusters;
+        return ['clusters' => $clusters, 'diagnostics' => $coverage];
     }
 
     /** @param list<mixed> $items @return list<array<string,mixed>> */

@@ -5,6 +5,7 @@ namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Knowledge\KnowledgeRepairPreviewService;
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository};
+use NHK\Core\Contracts\Video\VideoIdentityReader;
 use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim};
 use PHPUnit\Framework\TestCase;
 
@@ -86,5 +87,37 @@ final class KnowledgeRepairPreviewServiceTest extends TestCase
 
         self::assertSame('REVIEW_REQUIRED', $preview['status']);
         self::assertContains('KNOWLEDGE_RECONCILIATION_IDENTITY_BINDING_REQUIRED', $preview['blockers']);
+    }
+
+    public function testVideoIdentityUsesInjectedReaderForRepairPreview(): void
+    {
+        $claim = new KnowledgeClaim(self::ID, 'nhk:test:video-repair', 'Video provenance.', 'provenance', [
+            'origin' => 'CAPTURE_VIDEO_SOURCE_PROVENANCE',
+            'metadata' => ['subject_id' => '01a09786-dd67-70e7-9d30-9b8d39317670', 'canonical_video_id' => 'video-canonical', 'proposition_class' => 'VIDEO_CONCERNS_SUBJECT'],
+        ], true, 4);
+        $claims = $this->createMock(KnowledgeRepository::class);
+        $claims->method('findByCanonicalId')->willReturn($claim);
+        $evidence = $this->createMock(EvidenceRepository::class);
+        $evidence->method('listByClaim')->willReturn([]);
+        $reader = new class implements VideoIdentityReader {
+            public function findVideoIdentity(string $canonicalVideoId): ?array
+            {
+                return ['canonical_video_id' => $canonicalVideoId, 'platform' => 'youtube', 'external_video_id' => 'external-video'];
+            }
+        };
+        $identity = \NHK\Core\Application\Knowledge\KnowledgeClaimIdentity::resolveClaim($claim, $reader);
+        $dependencyFingerprint = hash('sha256', json_encode(['graph' => [], 'evidence' => []], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
+        $preview = (new KnowledgeRepairPreviewService($claims, $evidence, null, $reader))->preview([
+            'canonical_knowledge_uuid' => self::ID,
+            'expected_revision' => 4,
+            'operation' => 'retire',
+            'reason' => 'duplicate review',
+            'provenance' => ['origin' => 'TEST'],
+            'cleanup_class' => 'INTERNAL_WORKFLOW_KNOWLEDGE',
+            'identity_binding' => ['policy_version' => $identity->policyVersion(), 'identity_fingerprint' => $identity->fingerprint(), 'dependency_fingerprint' => $dependencyFingerprint, 'classification' => 'DEFINITE_DUPLICATE'],
+        ]);
+
+        self::assertSame('SAFE_TO_RETIRE', $preview['status']);
+        self::assertSame('RESOLVED', $preview['identity']['status']);
     }
 }

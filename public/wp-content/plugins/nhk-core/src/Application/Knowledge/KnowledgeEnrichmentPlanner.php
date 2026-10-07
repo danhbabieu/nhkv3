@@ -54,12 +54,13 @@ final class KnowledgeEnrichmentPlanner
 
     private function sameContext(KnowledgeClaim $claim, string $subjectId, KnowledgeFacetProfile $profile, array $incoming = [], ?KnowledgeClaimIdentityResolution $identity = null): bool
     {
-        $metadata = is_array($incoming['metadata'] ?? null) ? $incoming['metadata'] : [];
-        $metadata['subject_id'] = $subjectId;
-        $metadata['facet'] = $profile->facet;
-        $metadata['scope'] = $profile->scope;
-        if (strtoupper(trim((string) ($incoming['origin'] ?? ''))) === 'CAPTURE_VIDEO_SOURCE_PROVENANCE') return $identity !== null && KnowledgeClaimIdentity::resolveClaim($claim, $this->videos)->equivalentTo($identity);
-        return KnowledgeClaimIdentity::contextForClaim($claim) === KnowledgeClaimIdentity::contextForInput($claim->claimType, ['origin' => $incoming['origin'] ?? null, 'metadata' => $metadata]);
+        if ($identity === null || $identity->status() !== KnowledgeClaimIdentityResolution::RESOLVED) return false;
+        $existing = KnowledgeClaimIdentity::resolveClaim($claim, $this->videos);
+        if ($existing->status() !== KnowledgeClaimIdentityResolution::RESOLVED) return false;
+        $existingPacket = $existing->packet();
+        $incomingPacket = $identity->packet();
+        unset($existingPacket['proposition'], $incomingPacket['proposition']);
+        return $this->canonicalize($existingPacket) === $this->canonicalize($incomingPacket);
     }
 
     private function normalize(string $value): string
@@ -83,5 +84,13 @@ final class KnowledgeEnrichmentPlanner
     {
         $tokens = preg_split('/[^\p{L}\p{N}]+/u', $this->normalize($value), -1, PREG_SPLIT_NO_EMPTY);
         return is_array($tokens) ? array_values(array_unique($tokens)) : [];
+    }
+
+    private function canonicalize(mixed $value): mixed
+    {
+        if (!is_array($value)) return $value;
+        foreach ($value as $key => $child) $value[$key] = $this->canonicalize($child);
+        if (!array_is_list($value)) ksort($value);
+        return $value;
     }
 }

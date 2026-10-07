@@ -92,18 +92,29 @@ final class SystemWideDuplicateAuditTest extends TestCase
         self::assertSame('DEFINITE_DUPLICATE', $result['owners']['Knowledge']['clusters'][0]['classification']);
     }
 
-    public function test_missing_video_identity_is_reviewed_without_shared_duplicate_cluster(): void
+    public function test_missing_video_identity_is_coverage_diagnostic_without_duplicate_cluster(): void
     {
         $result = $this->audit('Knowledge', [
             ['canonical_id' => 'k-1', 'claim_text' => 'Video concerns Odo 62.', 'claim_type' => 'provenance', 'provenance' => ['origin' => 'CAPTURE_VIDEO_SOURCE_PROVENANCE', 'metadata' => ['subject_id' => 'subject-1']], 'revision' => 1],
             ['canonical_id' => 'k-2', 'claim_text' => 'Video concerns another subject.', 'claim_type' => 'provenance', 'provenance' => ['origin' => 'CAPTURE_VIDEO_SOURCE_PROVENANCE', 'metadata' => ['subject_id' => 'subject-1']], 'revision' => 1],
         ]);
 
-        self::assertCount(2, $result['owners']['Knowledge']['clusters']);
-        self::assertSame('REVIEW_REQUIRED', $result['owners']['Knowledge']['clusters'][0]['classification']);
-        self::assertSame(['k-1'], $result['owners']['Knowledge']['clusters'][0]['canonical_ids']);
-        self::assertSame(['k-2'], $result['owners']['Knowledge']['clusters'][1]['canonical_ids']);
-        self::assertSame('REVIEW_KNOWLEDGE_IDENTITY;NO_MUTATION', $result['owners']['Knowledge']['clusters'][0]['recommended_review_action']);
+        self::assertSame([], $result['owners']['Knowledge']['clusters']);
+        self::assertSame(0, $result['owners']['Knowledge']['diagnostics']['identity_resolved_rows']);
+        self::assertSame(2, $result['owners']['Knowledge']['diagnostics']['identity_unresolved_rows']);
+        self::assertSame(0, $result['owners']['Knowledge']['diagnostics']['identity_conflicting_rows']);
+        self::assertCount(2, $result['owners']['Knowledge']['diagnostics']['bounded_identity_review_samples']);
+    }
+
+    public function test_two_unresolved_ordinary_rows_never_form_duplicate_cluster(): void
+    {
+        $result = $this->audit('Knowledge', [
+            ['canonical_id' => 'k-1', 'claim_text' => 'Same text', 'claim_type' => 'fact', 'revision' => 1],
+            ['canonical_id' => 'k-2', 'claim_text' => 'Same text', 'claim_type' => 'fact', 'revision' => 1],
+        ]);
+
+        self::assertSame([], $result['owners']['Knowledge']['clusters']);
+        self::assertSame(2, $result['owners']['Knowledge']['diagnostics']['identity_unresolved_rows']);
     }
 
     public function test_knowledge_marks_nonidentical_wording_as_possible_and_qualification_as_scoped(): void
@@ -399,18 +410,17 @@ final class SystemWideDuplicateAuditTest extends TestCase
         self::assertSame('AUDIT_MODEL_GAP', $result['owners']['Authority']['diagnostics']['code']);
     }
 
-    public function test_missing_video_referents_are_separate_review_findings(): void
+    public function test_missing_video_referents_are_coverage_findings_not_clusters(): void
     {
         $result = $this->audit('Knowledge', [
             ['canonical_id' => 'claim-missing-video-1', 'claim_type' => 'provenance', 'claim_text' => 'Video concerns Variant A.', 'provenance' => ['origin' => 'CAPTURE_VIDEO_SOURCE_PROVENANCE', 'metadata' => ['subject_id' => 'subject-a']]],
             ['canonical_id' => 'claim-missing-video-2', 'claim_type' => 'provenance', 'claim_text' => 'Video concerns Variant A.', 'provenance' => ['origin' => 'CAPTURE_VIDEO_SOURCE_PROVENANCE', 'metadata' => ['subject_id' => 'subject-a']]],
         ]);
 
-        self::assertCount(2, $result['owners']['Knowledge']['clusters']);
-        self::assertSame(['claim-missing-video-1'], $result['owners']['Knowledge']['clusters'][0]['canonical_ids']);
-        self::assertSame(['claim-missing-video-2'], $result['owners']['Knowledge']['clusters'][1]['canonical_ids']);
-        self::assertSame('REVIEW_REQUIRED', $result['owners']['Knowledge']['clusters'][0]['classification']);
-        self::assertSame([], array_filter($result['reconciliation_candidates'], static fn (array $candidate): bool => $candidate['classification'] === 'DEFINITE_DUPLICATE'));
+        self::assertSame([], $result['owners']['Knowledge']['clusters']);
+        self::assertSame(2, $result['owners']['Knowledge']['diagnostics']['identity_unresolved_rows']);
+        self::assertCount(2, $result['owners']['Knowledge']['diagnostics']['bounded_identity_review_samples']);
+        self::assertSame([], $result['reconciliation_candidates']);
     }
 
     /** @param list<array<string,mixed>> $items @return array<string,mixed> */

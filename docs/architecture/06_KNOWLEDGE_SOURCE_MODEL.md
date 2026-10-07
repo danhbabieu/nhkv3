@@ -321,4 +321,7 @@ verify identity status, policy version, identity fingerprint, Claim revision,
 dependency topology/fingerprint and Evidence lifecycle. Possible duplicates,
 unresolved or conflicting identity, stale bindings and
 `KNOWLEDGE_REPAIR_DEPENDENCY_REVIEW_REQUIRED` cannot be auto-retired or
-reactivated by the identity resolver.
+reactivated by the identity resolver. An unresolved or conflicting legacy row
+is an identity-coverage finding, not a duplicate cluster; the audit exposes
+bounded resolved/unresolved/conflicting counts and review samples while
+remaining `COMPLETE` when the bounded corpus is exhausted.

@@ -6,12 +6,13 @@ namespace NHK\Core\Application\Knowledge;
 use NHK\Core\Application\Capture\KnowledgeRepairIntent;
 use NHK\Core\Application\Graph\GraphService;
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository};
+use NHK\Core\Contracts\Video\VideoIdentityReader;
 use NHK\Core\Domain\Graph\NodeReference;
 
 /** Read-only dependency and impact preview for one existing Knowledge claim. */
 final class KnowledgeRepairPreviewService
 {
-    public function __construct(private KnowledgeRepository $claims, private EvidenceRepository $evidence, private ?GraphService $graph = null) {}
+    public function __construct(private KnowledgeRepository $claims, private EvidenceRepository $evidence, private ?GraphService $graph = null, private ?VideoIdentityReader $videoIdentityReader = null) {}
 
     public function preview(array $input): array
     {
@@ -31,7 +32,7 @@ final class KnowledgeRepairPreviewService
         $evidence = array_map(static fn ($item): array => ['canonical_id' => $item->canonicalId, 'claim_id' => $item->claimId, 'source_id' => $item->sourceId, 'active' => $item->active, 'revision' => $item->revision], $this->evidence->listByClaim($claim->canonicalId, true));
         $manualReview = $repair->operation === 'retire' && (array_filter($edges, static fn (array $edge): bool => $edge['active'] === true) !== [] || array_filter($evidence, static fn (array $row): bool => $row['active'] === true) !== []);
         $revisionOk = $claim->revision === $repair->expectedRevision;
-        $identity = KnowledgeClaimIdentity::resolveClaim($claim);
+        $identity = KnowledgeClaimIdentity::resolveClaim($claim, $this->videoIdentityReader);
         $dependencyFingerprint = $this->dependencyFingerprint($edges, $evidence);
         $identityBinding = is_array($input['identity_binding'] ?? null) ? $input['identity_binding'] : [];
         $identityBlockers = [];

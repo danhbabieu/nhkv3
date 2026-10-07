@@ -1,5 +1,38 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-07 — Knowledge identity V2 final consistency hardening
+
+IMPLEMENTATION: Knowledge pre-create now applies one status-aware identity law
+to all new semantic Claim requests. An unresolved or conflicting request is
+`REVIEW_REQUIRED` and cannot reuse a differently keyed legacy Claim or become
+`CREATE_NEW`; only an exact stable-key replay with structurally identical
+legacy payload remains a compatibility reuse. Enrichment no longer uses the
+legacy context helpers for identity decisions.
+
+AUDIT: Unresolved/conflicting Knowledge rows are excluded from duplicate
+clusters and exposed as bounded identity-coverage diagnostics. Resolved rows
+continue to use the shared `KnowledgeClaimIdentityResolution` fingerprint,
+and the audit remains read-only with `mutated=false`.
+
+VIDEO_RECONCILIATION: `KnowledgeDuplicateReconciliationPlanner` and
+`KnowledgeRepairPreviewService` now receive the same `VideoIdentityReader`
+used by audit/pre-create/enrichment. Canonical Video UUIDs are resolved to
+`platform + external_video_id`; lookup failures and canonical/external
+conflicts remain review-only.
+
+REGRESSION_COVERAGE: Focused Knowledge identity/pre-create/enrichment/audit/
+reconciliation/repair and duplicate-prevention coverage passes 70 tests / 420 assertions. Changed PHP
+files lint clean and `git diff --check` passes. A broader selected invocation
+was accidentally empty and invoked the configured full suite; it reproduced
+the existing 128MB `TrustedProvidedFileMaterializerTest` memory fatal and
+baseline failures, so it is not used as focused evidence.
+
+DATA_SAFETY: No migration, semantic write, staging mutation, incident
+recovery, Côn hoa thị operation, POSSIBLE_DUPLICATE reconciliation, deployment
+or publication was performed. The requested live 1,176-row audit is pending
+deployment of this local change and a fresh documentation/build identity
+checkpoint.
+
 # Checkpoint — 2026-10-07 — Live persisted Capture shape fix verified locally
 
 ROOT_CAUSE_CONFIRMED: `WpdbCaptureRepository::hydrate()` returned the raw

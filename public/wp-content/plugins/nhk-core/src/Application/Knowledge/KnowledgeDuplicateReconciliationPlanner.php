@@ -5,12 +5,13 @@ namespace NHK\Core\Application\Knowledge;
 
 use NHK\Core\Application\Graph\GraphService;
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository};
+use NHK\Core\Contracts\Video\VideoIdentityReader;
 use NHK\Core\Domain\Graph\NodeReference;
 
 /** Read-only owner-specific gate for a future Knowledge duplicate repair. */
 final class KnowledgeDuplicateReconciliationPlanner
 {
-    public function __construct(private KnowledgeRepository $claims, private EvidenceRepository $evidence, private ?GraphService $graph = null) {}
+    public function __construct(private KnowledgeRepository $claims, private EvidenceRepository $evidence, private ?GraphService $graph = null, private ?VideoIdentityReader $videoIdentityReader = null) {}
 
     /** @return array<string,mixed> */
     public function plan(array $candidate): array
@@ -30,7 +31,7 @@ final class KnowledgeDuplicateReconciliationPlanner
 
         $identities = [];
         foreach ($claims as $id => $claim) {
-            $identity = KnowledgeClaimIdentity::resolveClaim($claim);
+            $identity = KnowledgeClaimIdentity::resolveClaim($claim, $this->videoIdentityReader);
             $identities[$id] = $identity;
             if ($identity->status() !== KnowledgeClaimIdentityResolution::RESOLVED) $blockers[] = 'KNOWLEDGE_IDENTITY_' . $identity->status();
             if (!$claim->active) $blockers[] = 'KNOWLEDGE_RECONCILIATION_RETIRED_CLAIM_REVIEW_REQUIRED';

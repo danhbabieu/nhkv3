@@ -39,6 +39,29 @@ final class KnowledgePreCreateResolverTest extends TestCase
         self::assertSame('CREATE_NEW', $result->action);
     }
 
+    public function testLegacyMissingIdentityDoesNotReuseDifferentStableKeyByText(): void
+    {
+        $claim = new KnowledgeClaim('01a09786-dd67-70e7-9d30-9b8d39317670', 'legacy-claim', 'Legacy text.', 'fact', []);
+        $resolver = new KnowledgePreCreateResolver($this->claims([$claim]), $this->sources(), $this->evidence());
+
+        $result = $resolver->resolveClaimCreate('new-key', 'Legacy text.', 'fact', []);
+
+        self::assertSame('REVIEW_REQUIRED', $result->action);
+        self::assertSame('KNOWLEDGE_IDENTITY_UNRESOLVED', $result->diagnostics['reason']);
+    }
+
+    public function testLegacyStableKeyReplayRemainsIdempotentWhenPayloadIsIdentical(): void
+    {
+        $provenance = ['origin' => 'LEGACY', 'metadata' => ['source_locator' => 'https://example.test/legacy']];
+        $claim = new KnowledgeClaim('01a09786-dd67-70e7-9d30-9b8d39317670', 'legacy-claim', 'Legacy text.', 'fact', $provenance);
+        $resolver = new KnowledgePreCreateResolver($this->claims([$claim]), $this->sources(), $this->evidence());
+
+        $result = $resolver->resolveClaimCreate('legacy-claim', 'Legacy text.', 'fact', $provenance);
+
+        self::assertSame('REUSE_EXISTING', $result->action);
+        self::assertSame($claim->canonicalId, $result->targetId());
+    }
+
     /** @param list<KnowledgeClaim> $items */
     private function claims(array $items): KnowledgeRepository
     {

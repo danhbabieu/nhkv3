@@ -62,9 +62,13 @@ Knowledge audit rows use the same canonical Claim identity boundary as
 pre-create, enrichment and reconciliation. Resolved rows expose the identity
 policy, status and fingerprint in `identity_signals`; equality is asserted
 only for two `RESOLVED` packets with the same fingerprint. `UNRESOLVED` and
-`CONFLICTING` rows are bounded review-only buckets with
-`REVIEW_KNOWLEDGE_IDENTITY;NO_MUTATION`; they are never classified as
-equivalent. Wording or locator similarity cannot turn them into a duplicate.
+`CONFLICTING` rows are excluded from duplicate clusters and reported through
+bounded identity-coverage diagnostics (`identity_resolved_rows`,
+`identity_unresolved_rows`, `identity_conflicting_rows`, and
+`bounded_identity_review_samples`). They are never classified as equivalent.
+Wording or locator similarity cannot turn them into a duplicate. Exhausting
+the reader may still return `COMPLETE`, but that status does not imply full
+semantic identity coverage.
 Video provenance compares the registered `platform + external_video_id`
 referent and subject, not wording or a canonical owner UUID.
 
