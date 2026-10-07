@@ -160,6 +160,38 @@ final class HierarchicalSubjectResolutionVerificationTest extends TestCase
         self::assertSame($specialized, $result['primary']['id']);
     }
 
+    public function test_explicit_primary_subject_remains_sole_subject_when_related_terms_are_present(): void
+    {
+        $primary = '19191919-1919-4919-8919-191919191919';
+        [$resolver] = $this->resolver([
+            new AuthorityEntity($primary, 'brand', 'nhk:brand:explicit', 'Explicit Brand', 1, []),
+            new AuthorityEntity('20202020-2020-4020-8020-202020202020', 'model', 'nhk:model:related', 'Related Model', 1, []),
+        ]);
+
+        $result = (new SubjectResolutionService($resolver))->resolveSources([
+            'canonical_uuid' => [$primary],
+            'body_mentions' => ['Related Model', 'common contextual term'],
+        ]);
+
+        self::assertSame('resolved', $result['status']);
+        self::assertSame($primary, $result['primary']['id']);
+        self::assertCount(1, $result['subjects']);
+    }
+
+    public function test_ambiguous_text_subject_candidates_remain_review_required(): void
+    {
+        [$resolver] = $this->resolver([
+            new AuthorityEntity('21212121-2121-4121-8121-212121212121', 'brand', 'nhk:brand:one', 'Common', 1, []),
+            new AuthorityEntity('22222222-2222-4222-8222-222222222222', 'model', 'nhk:model:two', 'Common', 1, []),
+        ]);
+
+        $result = (new SubjectResolutionService($resolver))->resolveSources(['title_subject' => ['Common']]);
+
+        self::assertSame('ambiguous', $result['status']);
+        self::assertCount(2, $result['subjects']);
+        self::assertContains('AMBIGUOUS_SUBJECT_REVIEW', $result['diagnostics']);
+    }
+
     public function test_exact_base_uuid_conflicts_with_explicit_specialized_identity(): void
     {
         $base = '14141414-1414-4414-8414-141414141414';
