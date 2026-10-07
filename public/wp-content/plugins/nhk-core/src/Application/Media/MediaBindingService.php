@@ -128,12 +128,30 @@ final class MediaBindingService implements MediaBindingPort
         }
 
         if (!$existing instanceof MediaUsage) throw new MediaException('MEDIA_USAGE_NOT_FOUND');
+        if ($operation === 'remove' && $existing->activeSlot === 'retired') return $this->removalResult($existing, $target);
         if ((int) $normalized['expected_usage_revision'] !== $existing->revision) throw new MediaException('MEDIA_USAGE_REVISION_CONFLICT');
         if (!$updater instanceof MediaUsageUpdater) throw new MediaException('MEDIA_USAGE_UPDATE_UNAVAILABLE');
         foreach ($this->activeUsages($target['type'], $target['key']) as $item) {
             if ($item->usageId !== $existing->usageId && $item->role === $existing->role && $item->placementKey === $existing->placementKey) throw new MediaException('MEDIA_USAGE_SLOT_CONFLICT');
         }
-        $nextMedia = $operation === 'replace' ? $media : $this->resolveMedia(['id' => $existing->mediaId]);
+        if ($operation === 'remove') {
+            $usage = $updater->update(new MediaUsage(
+                $existing->usageId, $existing->mediaId, $existing->endpointType, $existing->endpointKey,
+                $existing->role, $existing->sortOrder, $existing->altText, $existing->caption,
+                $existing->keywordGroups, $existing->title, $existing->revision, $existing->placementKey,
+                $existing->selectionSource, $existing->selectionPolicy, 'retired',
+            ));
+            $result = $this->mutationResult($operation, $usage->mediaId, $usage, $existing->usageId, $target);
+            $result['readback'] = [
+                'status' => 'verified',
+                'target_type' => $target['type'],
+                'target_id' => $target['key'],
+                'usage_id' => $usage->usageId,
+                'active_usage_present' => false,
+            ];
+            return $result;
+        }
+        $nextMedia = $media;
         if (!$nextMedia instanceof Media) throw new MediaException('MEDIA_USAGE_MEDIA_REQUIRED');
         if ($operation === 'replace') {
             $updater->update(new MediaUsage(
@@ -152,12 +170,12 @@ final class MediaBindingService implements MediaBindingPort
         }
         $usage = $updater->update(new MediaUsage(
             $existing->usageId, $nextMedia->canonicalId, $existing->endpointType, $existing->endpointKey,
-            $existing->role, $operation === 'replace' ? $normalized['sort_order'] : $existing->sortOrder,
-            $operation === 'replace' ? $normalized['seo']['alt_text'] : $existing->altText,
-            $operation === 'replace' ? $normalized['seo']['caption'] : $existing->caption,
-            $existing->keywordGroups, $operation === 'replace' ? $normalized['seo']['title'] : $existing->title,
+            $existing->role, $normalized['sort_order'],
+            $normalized['seo']['alt_text'],
+            $normalized['seo']['caption'],
+            $existing->keywordGroups, $normalized['seo']['title'],
             $existing->revision, $existing->placementKey, $existing->selectionSource, $existing->selectionPolicy,
-            $operation === 'remove' ? 'retired' : $existing->activeSlot,
+            $existing->activeSlot,
         ));
         return $this->mutationResult($operation, $nextMedia->canonicalId, $usage, $existing->usageId, $target);
     }
@@ -341,6 +359,26 @@ final class MediaBindingService implements MediaBindingPort
         $this->emitInvalidation('nhk_v3_media_binding_seo_invalidate', (string) $target['type'], (string) $target['key'], $usage->usageId);
         $this->emitInvalidation('nhk_v3_media_binding_projection_invalidate', (string) $target['type'], (string) $target['key'], $usage->usageId);
         return ['status' => 'COMPLETE', 'operation' => $operation, 'media_id' => $mediaId, 'usage_id' => $usage->usageId, 'previous_usage_id' => $previousUsageId, 'usage' => $this->usageArray($usage), 'readback' => ['status' => 'verified', 'media_id' => $mediaId, 'target_type' => $target['type'], 'target_id' => $target['key'], 'usage_id' => $usage->usageId, 'role' => $usage->role, 'active_slot' => $usage->activeSlot, 'revision' => $usage->revision]];
+    }
+
+    /** @return array<string,mixed> */
+    private function removalResult(MediaUsage $usage, array $target): array
+    {
+        return [
+            'status' => 'COMPLETE',
+            'operation' => 'remove',
+            'media_id' => $usage->mediaId,
+            'usage_id' => $usage->usageId,
+            'previous_usage_id' => $usage->usageId,
+            'usage' => $this->usageArray($usage),
+            'readback' => [
+                'status' => 'verified',
+                'target_type' => $target['type'],
+                'target_id' => $target['key'],
+                'usage_id' => $usage->usageId,
+                'active_usage_present' => false,
+            ],
+        ];
     }
 
     private function emitInvalidation(string $hook, string $type, string $target, string $usageId): void

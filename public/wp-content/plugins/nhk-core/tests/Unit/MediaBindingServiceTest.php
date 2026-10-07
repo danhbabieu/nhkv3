@@ -279,6 +279,48 @@ final class MediaBindingServiceTest extends TestCase
         ]);
     }
 
+    public function test_remove_cleans_up_usage_when_referenced_media_is_missing(): void
+    {
+        [$service, $usages, $media] = $this->service();
+        $target = ['type' => 'wp_post', 'blog_id' => 1, 'post_id' => 576];
+        $added = $service->mutate([
+            'operation' => 'add', 'idempotency_key' => 'stale-media-add', 'media' => ['id' => '01a0ab0c-fde0-7c01-a89d-fc5eef832c89'],
+            'target' => $target, 'role' => 'featured_primary', 'placement_key' => 'featured_primary',
+        ]);
+        $media->remove('01a0ab0c-fde0-7c01-a89d-fc5eef832c89');
+
+        $removed = $service->mutate([
+            'operation' => 'remove', 'idempotency_key' => 'stale-media-remove', 'target' => $target,
+            'usage_id' => $added['usage_id'], 'expected_usage_revision' => 1, 'role' => 'featured_primary', 'placement_key' => 'featured_primary',
+        ]);
+
+        self::assertSame('COMPLETE', $removed['status']);
+        self::assertFalse($removed['readback']['active_usage_present']);
+        self::assertSame('retired', $removed['usage']['active_slot']);
+        self::assertSame('retired', $usages->listByEndpoint('wp_post', '1:576', 'featured_primary')[0]->activeSlot);
+    }
+
+    public function test_repeated_stale_media_cleanup_replays_idempotently(): void
+    {
+        [$service, , $media] = $this->service();
+        $target = ['type' => 'wp_post', 'blog_id' => 1, 'post_id' => 577];
+        $added = $service->mutate([
+            'operation' => 'add', 'idempotency_key' => 'stale-replay-add', 'media' => ['id' => '01a0ab0c-fde0-7c01-a89d-fc5eef832c89'],
+            'target' => $target, 'role' => 'featured_primary', 'placement_key' => 'featured_primary',
+        ]);
+        $media->remove('01a0ab0c-fde0-7c01-a89d-fc5eef832c89');
+        $request = [
+            'operation' => 'remove', 'idempotency_key' => 'stale-replay-remove', 'target' => $target,
+            'usage_id' => $added['usage_id'], 'expected_usage_revision' => 1, 'role' => 'featured_primary', 'placement_key' => 'featured_primary',
+        ];
+
+        $first = $service->mutate($request);
+        $second = $service->mutate($request);
+
+        self::assertSame($first['operation_id'], $second['operation_id']);
+        self::assertSame($first['usage_id'], $second['usage_id']);
+    }
+
     /** @return array{0:MediaBindingService,1:MemoryUsageRepository} */
     private function service(bool $activeTarget = true, ?MediaBindingOperationRepository $operations = null, mixed $attachmentUrlResolver = null, ?callable $invalidationDispatcher = null): array
     {
@@ -297,7 +339,7 @@ final class MediaBindingServiceTest extends TestCase
         $types = new EntityTypeRegistry();
         $types->register(new EntityTypeDefinition('classification', 1, true));
         $usages = new MemoryUsageRepository();
-        return [new MediaBindingService($media, $assets, $usages, $authority, $types, $operations ?? new MemoryOperationRepository(), attachmentUrlResolver: $attachmentUrlResolver, invalidationDispatcher: $invalidationDispatcher), $usages];
+        return [new MediaBindingService($media, $assets, $usages, $authority, $types, $operations ?? new MemoryOperationRepository(), attachmentUrlResolver: $attachmentUrlResolver, invalidationDispatcher: $invalidationDispatcher), $usages, $media];
     }
 }
 
@@ -309,6 +351,7 @@ final class MemoryMediaRepository implements MediaRepository
     public function create(Media $media): Media { $this->items[] = $media; return $media; }
     public function update(Media $media, int $expectedRevision): Media { return $media; }
     public function list(bool $includeRetired = false): array { return $this->items; }
+    public function remove(string $id): void { $this->items = array_values(array_filter($this->items, static fn (Media $item): bool => $item->canonicalId !== $id)); }
 }
 
 final class MemoryAssetRepository implements MediaAssetRepository
