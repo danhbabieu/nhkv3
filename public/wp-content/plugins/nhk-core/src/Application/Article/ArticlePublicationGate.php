@@ -26,7 +26,18 @@ final class ArticlePublicationGate
         // Native WordPress Articles use the post's own slug/permalink lifecycle.
         // Semantic Authority PublicIdentity is a separate boundary and must not
         // be required to publish an editorial wp_post.
-        if ($draft->postId < 1 || $draft->slug === '' || $draft->permalink === '') $blockers[] = 'PUBLIC_ROUTE_NOT_READY';
+        $nativeRoute = is_array($evidence['native_route'] ?? null) ? $evidence['native_route'] : null;
+        if ($nativeRoute !== null) {
+            $routeConsistent = ($nativeRoute['ready'] ?? false) === true
+                && trim((string) ($nativeRoute['slug'] ?? '')) !== ''
+                && trim((string) ($nativeRoute['permalink'] ?? '')) !== ''
+                && trim((string) ($nativeRoute['canonical_url'] ?? '')) === trim((string) ($nativeRoute['permalink'] ?? ''))
+                && ($nativeRoute['collision'] ?? false) !== true
+                && ($nativeRoute['resolver_agreement'] ?? false) === true;
+            if (!$routeConsistent) $blockers[] = 'PUBLIC_ROUTE_NOT_READY';
+        } elseif ($draft->postId < 1 || $draft->slug === '' || $draft->permalink === '') {
+            $blockers[] = 'PUBLIC_ROUTE_NOT_READY';
+        }
         $this->requireTrue($evidence, 'research_acceptable', 'RESEARCH_PREFLIGHT_BLOCKED', $blockers);
         $this->requireTrue($evidence, 'subject_resolved', 'SUBJECT_UNRESOLVED', $blockers);
         if (($evidence['subject_persistence_status'] ?? '') === 'unattached_planning_candidate' && ($evidence['capture_subject_binding_verified'] ?? false) !== true) {
@@ -67,7 +78,7 @@ final class ArticlePublicationGate
         }
         if (($evidence['real_image_requirements_met'] ?? false) !== true) {
             if ($intent === 'IMAGE_ARTICLE' && ($evidence['real_image_requirements_met_status'] ?? '') === 'invalid') $blockers[] = 'REAL_IMAGE_REQUIREMENTS_UNMET';
-            elseif (in_array(($evidence['real_image_requirements_met_status'] ?? ''), ['missing', 'incomplete'], true)) { $warnings[] = 'REAL_IMAGE_INCOMPLETE'; $blockers[] = 'REAL_IMAGE_INCOMPLETE'; }
+            elseif ($intent === 'IMAGE_ARTICLE' && in_array(($evidence['real_image_requirements_met_status'] ?? ''), ['missing', 'incomplete'], true)) { $warnings[] = 'REAL_IMAGE_INCOMPLETE'; $blockers[] = 'REAL_IMAGE_INCOMPLETE'; }
             else { $warnings[] = 'REAL_IMAGE_INCOMPLETE'; $missingEnrichments[] = 'REAL_IMAGE_SUPPORT'; }
         }
         $this->requireTrue($evidence, 'claim_compliance_acceptable', 'PUBLIC_CLAIM_COMPLIANCE_BLOCKED', $blockers);
@@ -76,8 +87,7 @@ final class ArticlePublicationGate
         if (in_array(($evidence['structured_data_status'] ?? ''), ['unavailable', 'incomplete'], true)) $warnings[] = 'STRUCTURED_DATA_INCOMPLETE';
         else $this->requireTrue($evidence, 'structured_data_valid', 'STRUCTURED_DATA_INVALID', $blockers);
         $this->requireTrue($evidence, 'public_route_ready', 'PUBLIC_ROUTE_NOT_READY', $blockers);
-        if (($evidence['rendered_public_verification_status'] ?? '') === 'unavailable') $warnings[] = 'RENDERED_PUBLIC_VERIFICATION_UNAVAILABLE';
-        else $this->requireTrue($evidence, 'rendered_public_verification', 'RENDERED_PUBLIC_VERIFICATION_UNAVAILABLE', $blockers);
+        if (($evidence['rendered_public_verification'] ?? false) !== true) $warnings[] = 'RENDERED_PUBLIC_VERIFICATION_UNAVAILABLE';
         if (($evidence['media_repair_status'] ?? '') === 'deferred') $deferredRepairs[] = 'MEDIA_ATTACHMENT_BINDING';
         return new ArticlePublicationGateResult($blockers === [], $blockers, $warnings, $missingEnrichments, $deferredRepairs);
     }

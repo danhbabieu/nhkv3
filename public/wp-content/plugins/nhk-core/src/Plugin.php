@@ -1066,6 +1066,10 @@ final class Plugin {
                 $canonical['duplicate_intent_handled'] = true;
                 $canonical['capture_subject_binding_verified'] = $captureSubjectBinding->packet($capture) !== null;
                 $canonical['subject_resolution_packet'] = $subjectPacketArray;
+                $canonical['native_route'] = (new \NHK\Core\Application\Article\NativeArticleRoutePreflight(
+                    static fn (\NHK\Core\Domain\Article\EditorialPostState $post): string => function_exists('get_permalink') ? (string) get_permalink($post->postId) : '',
+                    static fn (\NHK\Core\Domain\Article\EditorialPostState $post): bool => function_exists('url_to_postid') && (int) url_to_postid($post->permalink) > 0 && (int) url_to_postid($post->permalink) !== $post->postId,
+                ))->check($state);
                 $canonical['canonical_publication_context'] = [
                     'capture_id' => $capture->captureId,
                     'capture_revision' => $capture->revision,

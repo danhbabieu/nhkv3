@@ -182,6 +182,89 @@ final class ArticlePublicationGateTest extends TestCase
         self::assertFalse($result->toArray()['enrichment_complete']);
     }
 
+    public function test_text_article_missing_real_image_is_warning_only(): void
+    {
+        $evidence = $this->evidence();
+        $evidence['real_image_requirements_met'] = false;
+        $evidence['real_image_requirements_met_status'] = 'missing';
+        $result = (new ArticlePublicationGate())->check($this->draft(), $evidence, $this->draft()->token);
+
+        self::assertTrue($result->eligible);
+        self::assertContains('REAL_IMAGE_INCOMPLETE', $result->warnings);
+        self::assertNotContains('REAL_IMAGE_INCOMPLETE', $result->blockers);
+    }
+
+    public function test_explicit_native_route_packet_is_authoritative_and_draft_frontend_is_not_precondition(): void
+    {
+        $evidence = $this->evidence();
+        $evidence['rendered_public_verification'] = false;
+        $evidence['rendered_public_verification_status'] = 'unavailable';
+        $evidence['native_route'] = [
+            'ready' => true,
+            'diagnostics' => [],
+            'slug' => 'title',
+            'permalink' => 'https://demo.test/title/',
+            'canonical_url' => 'https://demo.test/title/',
+            'collision' => false,
+            'resolver_agreement' => true,
+        ];
+
+        $result = (new ArticlePublicationGate())->check($this->draft(), $evidence, $this->draft()->token);
+
+        self::assertTrue($result->eligible);
+        self::assertNotContains('PUBLIC_ROUTE_NOT_READY', $result->blockers);
+        self::assertContains('RENDERED_PUBLIC_VERIFICATION_UNAVAILABLE', $result->warnings);
+    }
+
+    public function test_native_route_packet_cannot_claim_ready_with_inconsistent_fields(): void
+    {
+        $evidence = $this->evidence();
+        $evidence['native_route'] = [
+            'ready' => true,
+            'diagnostics' => [],
+            'slug' => '',
+            'permalink' => 'https://demo.test/title/',
+            'canonical_url' => 'https://demo.test/other/',
+            'collision' => false,
+            'resolver_agreement' => false,
+        ];
+
+        $result = (new ArticlePublicationGate())->check($this->draft(), $evidence, $this->draft()->token);
+
+        self::assertContains('PUBLIC_ROUTE_NOT_READY', $result->blockers);
+    }
+
+    /** @dataProvider invalidNativeRouteProvider */
+    public function test_invalid_native_route_packet_remains_a_system_blocker(array $route): void
+    {
+        $evidence = $this->evidence();
+        $evidence['native_route'] = $route;
+
+        $result = (new ArticlePublicationGate())->check($this->draft(), $evidence, $this->draft()->token);
+
+        self::assertContains('PUBLIC_ROUTE_NOT_READY', $result->blockers);
+    }
+
+    /** @return iterable<string,array{0:array<string,mixed>}> */
+    public static function invalidNativeRouteProvider(): iterable
+    {
+        yield 'empty slug' => [[
+            'ready' => false, 'diagnostics' => ['NATIVE_ROUTE_SLUG_INVALID'], 'slug' => '',
+            'permalink' => 'https://demo.test/title/', 'canonical_url' => 'https://demo.test/title/',
+            'collision' => false, 'resolver_agreement' => true,
+        ]];
+        yield 'collision' => [[
+            'ready' => false, 'diagnostics' => ['NATIVE_ROUTE_COLLISION'], 'slug' => 'title',
+            'permalink' => 'https://demo.test/title/', 'canonical_url' => 'https://demo.test/title/',
+            'collision' => true, 'resolver_agreement' => true,
+        ]];
+        yield 'resolver disagreement' => [[
+            'ready' => false, 'diagnostics' => ['NATIVE_ROUTE_RESOLVER_DISAGREEMENT'], 'slug' => 'title',
+            'permalink' => 'https://demo.test/title/', 'canonical_url' => 'https://demo.test/other/',
+            'collision' => false, 'resolver_agreement' => false,
+        ]];
+    }
+
     public function test_image_article_without_required_media_remains_blocked(): void
     {
         $evidence = $this->evidence();
