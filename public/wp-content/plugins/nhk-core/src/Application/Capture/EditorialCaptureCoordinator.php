@@ -909,7 +909,7 @@ final class EditorialCaptureCoordinator
                 $articleResolution = $this->resolveArticleBeforeCreate($record, $input, $intent, $resolution, $text, $assets);
                 $diagnostics['article_resolution'] = $articleResolution;
                 if (($articleResolution['status'] ?? '') !== 'CREATE_DIFFERENTIATED_ARTICLE') {
-                    return $this->save($record, CaptureStage::SEMANTICS_RECONCILED, $assets, $diagnostics, $receipts, 'ARTICLE_PRE_CREATE_REVIEW', $record->articleId, $record->articleStateToken, 'REVIEW_REQUIRED', 'REVIEW_REQUIRED');
+                    return $this->save($record, CaptureStage::SEMANTICS_RECONCILED, $assets, $diagnostics, $receipts, 'ARTICLE_PRE_CREATE_REVIEW', $record->articleId, $record->articleStateToken, 'REVIEW_REQUIRED', 'REVIEW_REQUIRED', null, $this->articlePreCreateFailureCode($articleResolution));
                 }
                 $this->beginPhase('COMPOSED');
                 $sharedDraft = is_array($sharedEditorial ?? null) ? ($sharedEditorial['draft'] ?? null) : null;
@@ -1860,6 +1860,28 @@ final class EditorialCaptureCoordinator
         } catch (\Throwable $error) {
             return ['status' => 'REVIEW_REQUIRED', 'decision' => 'REVIEW_REQUIRED', 'diagnostics' => ['ARTICLE_PRE_CREATE_RESOLUTION_UNAVAILABLE'], 'error' => $error->getMessage()];
         }
+    }
+
+    /** @param array<string,mixed> $resolution */
+    private function articlePreCreateFailureCode(array $resolution): ?string
+    {
+        $candidates = [];
+        $diagnostics = is_array($resolution['diagnostics'] ?? null) ? $resolution['diagnostics'] : [];
+        foreach (['research_preflight_blockers', 'blockers'] as $key) {
+            foreach ((array) ($diagnostics[$key] ?? []) as $candidate) $candidates[] = (string) $candidate;
+        }
+        foreach ($diagnostics as $candidate) if (is_string($candidate)) $candidates[] = $candidate;
+        $research = is_array($resolution['research'] ?? null) ? $resolution['research'] : [];
+        foreach ((array) ($research['blockers'] ?? []) as $candidate) $candidates[] = (string) $candidate;
+        foreach (['failure_code', 'decision'] as $key) {
+            if (isset($resolution[$key])) $candidates[] = (string) $resolution[$key];
+        }
+        foreach ($candidates as $candidate) {
+            $candidate = strtoupper(trim($candidate));
+            if ($candidate === '' || $candidate === 'CREATE_DIFFERENTIATED_ARTICLE' || $candidate === 'REVIEW_REQUIRED') continue;
+            if (preg_match('/^[A-Z][A-Z0-9_]{1,127}$/', $candidate) === 1) return $candidate;
+        }
+        return 'ARTICLE_PRE_CREATE_REVIEW_REQUIRED';
     }
 
     /** @param array<string,mixed> $value @return array<string,mixed> */

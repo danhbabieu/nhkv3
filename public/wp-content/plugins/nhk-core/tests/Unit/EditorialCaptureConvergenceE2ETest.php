@@ -55,10 +55,57 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
         self::assertSame($captureId, $result->captureId);
         self::assertSame('REVIEW_REQUIRED', $result->status);
         self::assertSame('ERROR_X', $result->phaseReceipts['SEMANTICS_RECONCILED']['attempts'][0]['failure_code']);
-        self::assertArrayNotHasKey('failure_code', $result->phaseReceipts['ARTICLE_PRE_CREATE_REVIEW']['latest']);
+        self::assertSame('OWNER_REVIEW_REQUIRED', $result->phaseReceipts['ARTICLE_PRE_CREATE_REVIEW']['latest']['failure_code']);
         self::assertContains('ERROR_X', array_column($result->diagnostics['failure_history'] ?? [], 'code'));
         self::assertNotContains('ERROR_X', CaptureCurrentOutcomeReducer::currentBlockers($result->diagnostics, $result->phaseReceipts));
         self::assertSame(1, $captures->count());
+        self::assertSame(0, $calls['draft']);
+    }
+
+    public function test_article_pre_create_attempt_two_persists_the_concrete_research_blocker(): void
+    {
+        $captures = new Pr5CaptureRepository();
+        $calls = ['draft' => 0, 'semantic' => 0, 'media' => 0, 'publication' => 0, 'final' => 0];
+        $events = [];
+        $captureId = UuidCodec::newV7();
+        $idempotencyKey = 'retry-review-reason';
+        $receipts = CapturePhaseReceiptReducer::append([], 'ARTICLE_PRE_CREATE_REVIEW', [
+            'status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'failure_code' => 'CAPTURE_UTF8_INVALID',
+        ]);
+        $capture = new CaptureRecord(
+            $captureId, $idempotencyKey, hash('sha256', $idempotencyKey), CaptureStage::SEMANTICS_RECONCILED->value,
+            'REVIEW_REQUIRED', null, null, [['kind' => 'image', 'client_file_id' => 'asset-1']],
+            ['raw_input' => 'Nội dung retry.', 'title' => 'Retry review'],
+            ['failure' => ['code' => 'CAPTURE_UTF8_INVALID'], 'completion' => ['status' => 'REVIEW_REQUIRED', 'blockers' => ['CAPTURE_UTF8_INVALID']]],
+            $receipts,
+        );
+        $captures->create($capture);
+        $coordinator = $this->coordinator(
+            $captures,
+            $calls,
+            $events,
+            semanticStatus: 'COMPLETED',
+            articlePreCreateResolver: static fn (): array => [
+                'status' => 'REVIEW_REQUIRED',
+                'decision' => 'RESEARCH_PREFLIGHT_BLOCKED',
+                'diagnostics' => ['research_preflight_blockers' => ['EXISTING_ARTICLE_OVERLAP']],
+            ],
+            articlePreCreateRequired: true,
+        );
+
+        $result = $coordinator->retry($capture, [
+            'idempotency_key' => $idempotencyKey,
+            'intent' => 'TEXT_ARTICLE',
+            'text' => 'Nội dung retry.',
+            'title' => 'Retry review',
+        ]);
+
+        self::assertSame('REVIEW_REQUIRED', $result->phaseReceipts['ARTICLE_PRE_CREATE_REVIEW']['latest']['status']);
+        self::assertSame(2, $result->phaseReceipts['ARTICLE_PRE_CREATE_REVIEW']['latest']['attempt_no']);
+        self::assertSame('EXISTING_ARTICLE_OVERLAP', $result->phaseReceipts['ARTICLE_PRE_CREATE_REVIEW']['latest']['failure_code']);
+        self::assertSame('RESEARCH_PREFLIGHT_BLOCKED', $result->diagnostics['article_resolution']['decision']);
+        self::assertSame(['EXISTING_ARTICLE_OVERLAP'], $result->diagnostics['article_resolution']['diagnostics']['research_preflight_blockers']);
+        self::assertNull($result->articleId);
         self::assertSame(0, $calls['draft']);
     }
 
