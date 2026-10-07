@@ -237,6 +237,21 @@ final class ArticlePublicationGateTest extends TestCase
         self::assertNotContains('PUBLIC_ROUTE_NOT_READY', $result->blockers);
     }
 
+    public function test_draft_wp_post_with_valid_native_route_does_not_require_frontend_readback_before_publish(): void
+    {
+        $evidence = $this->evidence();
+        $evidence['endpoint_type'] = 'wp_post';
+        $evidence['public_route_ready'] = false;
+        $evidence['rendered_public_verification'] = false;
+        unset($evidence['native_route']);
+
+        $result = (new ArticlePublicationGate())->check($this->draft(), $evidence, $this->draft()->token);
+
+        self::assertTrue($result->eligible);
+        self::assertNotContains('PUBLIC_ROUTE_NOT_READY', $result->blockers);
+        self::assertContains('RENDERED_PUBLIC_VERIFICATION_UNAVAILABLE', $result->warnings);
+    }
+
     public function test_native_route_packet_cannot_claim_ready_with_inconsistent_fields(): void
     {
         $evidence = $this->evidence();
@@ -283,6 +298,11 @@ final class ArticlePublicationGateTest extends TestCase
             'ready' => false, 'diagnostics' => ['NATIVE_ROUTE_RESOLVER_DISAGREEMENT'], 'slug' => 'title',
             'permalink' => 'https://demo.test/title/', 'canonical_url' => 'https://demo.test/other/',
             'collision' => false, 'resolver_agreement' => false,
+        ]];
+        yield 'invalid permalink' => [[
+            'ready' => true, 'diagnostics' => [], 'slug' => 'title',
+            'permalink' => 'not-a-route', 'canonical_url' => 'not-a-route',
+            'collision' => false, 'resolver_agreement' => true,
         ]];
     }
 

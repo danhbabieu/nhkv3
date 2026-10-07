@@ -1064,6 +1064,7 @@ final class Plugin {
                 // Article identity is already durable. Publication checks for a
                 // new public collision; it must not re-run creation-time intent.
                 $canonical['duplicate_intent_handled'] = true;
+                $canonical['endpoint_type'] = 'wp_post';
                 $canonical['capture_subject_binding_verified'] = $captureSubjectBinding->packet($capture) !== null;
                 $canonical['subject_resolution_packet'] = $subjectPacketArray;
                 $canonical['native_route'] = (new \NHK\Core\Application\Article\NativeArticleRoutePreflight(

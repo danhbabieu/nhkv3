@@ -27,11 +27,15 @@ final class ArticlePublicationGate
         // Semantic Authority PublicIdentity is a separate boundary and must not
         // be required to publish an editorial wp_post.
         $nativeRoute = is_array($evidence['native_route'] ?? null) ? $evidence['native_route'] : null;
+        if ($nativeRoute === null && $draft->status === 'draft' && ($evidence['endpoint_type'] ?? '') === 'wp_post') {
+            $nativeRoute = (new NativeArticleRoutePreflight())->check($draft);
+        }
         $nativeRouteReady = false;
         if ($nativeRoute !== null) {
             $routeConsistent = ($nativeRoute['ready'] ?? false) === true
                 && trim((string) ($nativeRoute['slug'] ?? '')) !== ''
                 && trim((string) ($nativeRoute['permalink'] ?? '')) !== ''
+                && NativeArticleRoutePreflight::isValidPermalink(trim((string) ($nativeRoute['permalink'] ?? '')))
                 && trim((string) ($nativeRoute['canonical_url'] ?? '')) === trim((string) ($nativeRoute['permalink'] ?? ''))
                 && ($nativeRoute['collision'] ?? false) !== true
                 && ($nativeRoute['resolver_agreement'] ?? false) === true;

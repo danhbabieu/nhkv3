@@ -25,6 +25,25 @@ final class OwnerPublicationApplicationServiceTest extends TestCase
         self::assertSame(0, $posts->publishCalls);
     }
 
+    public function test_publish_review_allows_draft_wp_post_with_native_route_when_frontend_is_unavailable(): void
+    {
+        $posts = new OwnerPublicationFakeStore();
+        $service = new OwnerPublicationApplicationService($posts, new OwnerPublicationFakeDecisionRepository(), static fn (PublicationPrincipal $principal): bool => true);
+        $evidence = ownerPublicationEvidence([
+            'endpoint_type' => 'wp_post',
+            'public_route_ready' => false,
+            'rendered_public_verification' => false,
+            'media_snapshot' => [],
+        ]);
+
+        $result = $service->review(1, $posts->rows[1]->token, $evidence, 'live-draft-route', new PublicationPrincipal('owner-1', 'mcp', 'live-draft-route'));
+
+        self::assertSame('PASS', $result['outcome']);
+        self::assertNotContains('PUBLIC_ROUTE_NOT_READY', $result['diagnostics']);
+        self::assertContains('ARTICLE_FEATURED_MEDIA_MISSING', $result['warnings']);
+        self::assertSame('draft', $posts->rows[1]->status);
+    }
+
     public function test_review_with_recovered_capture_context_does_not_return_publication_context_unavailable(): void
     {
         $posts = new OwnerPublicationFakeStore();

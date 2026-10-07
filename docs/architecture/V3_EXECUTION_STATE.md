@@ -1,5 +1,32 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-07 — Draft wp_post publication route fallback fixed
+
+ROOT_CAUSE_CONFIRMED: `ArticlePublicationGate` left `nativeRouteReady=false`
+when `publish_review` evidence did not carry a `native_route` packet. The later
+`public_route_ready` evidence check then converted frontend unavailability into
+`PUBLIC_ROUTE_NOT_READY`, even when a draft native `wp_post` already had a valid
+slug/permalink.
+
+FIXED_BOUNDARY: For explicit `endpoint_type=wp_post` drafts, the gate now
+validates the native slug/permalink deterministically from the WordPress-owned
+editorial state and does not require pre-publish frontend read-back. Explicit
+route packets still require valid permalink syntax, canonical/resolver
+agreement, and no collision. Post-publish rendered verification remains in the
+continuation boundary.
+
+REGRESSION_COVERAGE: Exact `publish_review` service path now covers a draft
+`wp_post` with zero media and unavailable frontend evidence; it returns `PASS`
+without `PUBLIC_ROUTE_NOT_READY`. Invalid permalink coverage remains blocked.
+Focused publication slice passed 72 tests / 318 assertions. `composer lint`
+passed for the full plugin tree; `git diff --check` passed.
+
+DATA_SAFETY: No database migration, staging/production mutation, Post 766
+publication, deployment or public cutover was performed.
+
+STATUS: `ARTICLE_PUBLICATION_DRAFT_NATIVE_ROUTE_FALLBACK_FIXED_LOCAL /
+FOCUSED_GREEN / NO_DATA_MUTATION / DEPLOYMENT_PENDING`
+
 # Checkpoint — 2026-10-07 — Capture interrupted IN_PROGRESS convergence fixed locally
 
 ROOT_CAUSE_CONFIRMED: `EditorialCaptureCoordinator::run()` persists the
