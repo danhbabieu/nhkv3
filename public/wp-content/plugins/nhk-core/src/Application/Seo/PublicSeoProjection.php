@@ -12,32 +12,39 @@ final class PublicSeoProjection
     public function project(array $urlResult, array $page = []): array
     {
         $path = isset($urlResult['path']) && is_string($urlResult['path']) ? trim($urlResult['path']) : '';
+        $canonicalInput = isset($urlResult['canonical_url']) && is_string($urlResult['canonical_url']) ? trim($urlResult['canonical_url']) : $path;
+        $renderedInput = isset($urlResult['rendered_url']) && is_string($urlResult['rendered_url']) ? trim($urlResult['rendered_url']) : $canonicalInput;
+        $canonicalUrl = $this->publicUrl($canonicalInput);
+        $renderedUrl = $this->publicUrl($renderedInput);
         $readiness = $urlResult['readiness'] ?? (($urlResult['eligible'] ?? false) === true ? SeoReadinessResult::READY : SeoReadinessResult::BLOCKED);
         $indexability = (new SeoIndexabilityPolicy())->evaluate([
             'readiness' => $readiness,
             'public_eligible' => $urlResult['public_eligible'] ?? (($urlResult['eligible'] ?? false) === true),
-            'canonical_url' => $urlResult['canonical_url'] ?? $path,
-            'rendered_url' => $urlResult['rendered_url'] ?? ($urlResult['canonical_url'] ?? $path),
+            'canonical_url' => $canonicalUrl,
+            'rendered_url' => $renderedUrl,
         ]);
         $eligible = ($urlResult['eligible'] ?? false) === true && $path !== '' && $indexability->indexable();
-        $path = $eligible ? $path : null;
+        $canonicalUrl = $eligible ? $canonicalUrl : null;
+        $canonicalPath = $eligible ? $path : null;
         $title = trim((string) ($page['title'] ?? ''));
         $description = trim((string) ($page['description'] ?? ''));
         $jsonLd = [];
         if ($eligible) {
-            $jsonLd = ['url' => $path, '@id' => $path];
+            $jsonLd = ['url' => $canonicalUrl, '@id' => $canonicalUrl];
             if (isset($page['type']) && is_string($page['type']) && $page['type'] !== '') $jsonLd['@type'] = $page['type'];
-            $jsonLd['mainEntityOfPage'] = $path;
+            $jsonLd['mainEntityOfPage'] = $canonicalUrl;
         }
         return [
-            'canonical' => $path,
-            'open_graph' => $eligible ? ['url' => $path, 'title' => $title, 'description' => $description] : [],
+            'canonical' => $canonicalUrl,
+            'canonical_path' => $canonicalPath,
+            'canonical_url' => $canonicalUrl,
+            'open_graph' => $eligible ? ['url' => $canonicalUrl, 'title' => $title, 'description' => $description] : [],
             'json_ld' => $jsonLd,
-            'sitemap' => $path,
-            'breadcrumb' => $path,
-            'card' => $path,
-            'search' => $path,
-            'internal_link' => $path,
+            'sitemap' => $canonicalUrl,
+            'breadcrumb' => $canonicalUrl,
+            'card' => $canonicalPath,
+            'search' => $canonicalPath,
+            'internal_link' => $canonicalPath,
             'indexable' => $eligible,
             'readiness' => $readiness,
             'blockers' => array_values(array_unique(array_map('strval', is_array($urlResult['blockers'] ?? null) ? $urlResult['blockers'] : []))),
@@ -50,5 +57,13 @@ final class PublicSeoProjection
     public function eligibleUrl(string $path): array
     {
         return ['path' => $path, 'eligible' => true, 'blockers' => [], 'warnings' => []];
+    }
+
+    public function publicUrl(string $value): string
+    {
+        $value = trim($value);
+        if ($value === '' || preg_match('#^https?://#i', $value) === 1) return $value;
+        if (function_exists('home_url')) return (string) home_url('/' . ltrim($value, '/'));
+        return $value;
     }
 }

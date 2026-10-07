@@ -669,13 +669,15 @@ function nhk_v3_seo_head(): void
         if (($knowledge_context['mode'] ?? '') === 'detail' && is_array($knowledge_context['claim'] ?? null)) { $claim = $knowledge_context['claim']; $title = (string) $claim['text'] . ' — Tri thức NHK'; $description = 'Tri thức được kiểm soát trong kho NHK.'; }
         elseif (($knowledge_context['mode'] ?? '') === 'archive') { $title = 'Kho tri thức — Đồng Hồ Nhà Kho'; $description = 'Các tri thức đang hoạt động trong kho NHK.'; }
     }
-    if (is_string($sharedSeo['canonical'] ?? null) && $sharedSeo['canonical'] !== '') $canonical = (string) $sharedSeo['canonical'];
+    $sharedCanonical = $sharedSeo['canonical_url'] ?? $sharedSeo['canonical'] ?? '';
+    if (is_string($sharedCanonical) && $sharedCanonical !== '') $canonical = $sharedCanonical;
+    elseif (is_string($sharedSeo['canonical_path'] ?? null) && $sharedSeo['canonical_path'] !== '') $canonical = home_url((string) $sharedSeo['canonical_path']);
     if (is_array($comparison_context) && ($comparison_context['mode'] ?? '') === 'compare') { $title = 'So sánh hồ sơ — Đồng Hồ Nhà Kho'; $description = 'Đọc cạnh nhau các dữ kiện công khai của hai hồ sơ NHK.'; $canonical = home_url('/so-sanh/'); }
     if (is_array($dictionary_context) && ($dictionary_context['mode'] ?? '') === 'detail' && is_array($dictionary_context['result']['presentation'] ?? null)) {
         $dictionarySeo = is_array($dictionary_context['result']['presentation']['seo'] ?? null) ? $dictionary_context['result']['presentation']['seo'] : [];
         $title = (string) ($dictionarySeo['title'] ?? $title);
         $description = (string) ($dictionarySeo['meta_description'] ?? $description);
-        $canonical = (string) ($dictionarySeo['canonical'] ?? $canonical);
+        $canonical = (string) ($dictionarySeo['canonical_url'] ?? $dictionarySeo['canonical'] ?? $canonical);
     }
     if ($canonical === '') {
         if (is_front_page() || is_home() || is_search()) $canonical = home_url('/');
@@ -727,7 +729,7 @@ function nhk_v3_robots(array $robots): array
     }
     $sharedSeo = nhk_v3_context_seo_projection();
     $mustNoindex = is_404() || is_search() || $isPaginated || (($sharedSeo['indexable'] ?? true) === false);
-    $canonical = $sharedSeo['canonical'] ?? (function_exists('wp_get_canonical_url') ? wp_get_canonical_url() : home_url('/'));
+    $canonical = $sharedSeo['canonical_url'] ?? $sharedSeo['canonical'] ?? (function_exists('wp_get_canonical_url') ? wp_get_canonical_url() : home_url('/'));
     $decision = (new \NHK\Core\Application\Seo\SeoIndexabilityPolicy())->evaluate([
         'readiness' => $mustNoindex ? 'BLOCKED' : 'READY',
         'public_eligible' => !$mustNoindex,

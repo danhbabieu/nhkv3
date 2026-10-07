@@ -57,4 +57,24 @@ final class PublicSeoProjectionTest extends TestCase
         self::assertSame('/odo/', $result['json_ld']['url']);
         self::assertSame('/odo/', $result['json_ld']['@id']);
     }
+
+    public function test_normalized_packet_distinguishes_path_from_absolute_public_url(): void
+    {
+        $result = (new PublicSeoProjection())->project([
+            'path' => '/thuong-hieu/odo/',
+            'canonical_url' => 'https://demo.1945.vn/thuong-hieu/odo/',
+            'rendered_url' => 'https://demo.1945.vn/thuong-hieu/odo/',
+            'eligible' => true,
+            'public_eligible' => true,
+            'readiness' => 'READY',
+        ], ['title' => 'Ô Đô', 'type' => 'Entity']);
+
+        self::assertSame('/thuong-hieu/odo/', $result['canonical_path']);
+        self::assertSame('https://demo.1945.vn/thuong-hieu/odo/', $result['canonical_url']);
+        self::assertSame('https://demo.1945.vn/thuong-hieu/odo/', $result['canonical']);
+        self::assertSame('https://demo.1945.vn/thuong-hieu/odo/', $result['sitemap']);
+        self::assertSame('https://demo.1945.vn/thuong-hieu/odo/', $result['open_graph']['url']);
+        self::assertSame('https://demo.1945.vn/thuong-hieu/odo/', $result['json_ld']['url']);
+        self::assertSame('/thuong-hieu/odo/', $result['internal_link']);
+    }
 }

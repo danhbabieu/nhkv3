@@ -1,5 +1,31 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-07 — Normalized public SEO packet
+
+SEO_PACKET: `PublicSeoProjection` now distinguishes `canonical_path` from
+`canonical_url`. Canonical, sitemap, breadcrumb, Open Graph and structured-data
+URLs use the public URL value; card/search/internal-link surfaces retain the
+canonical path. Runtime conversion to an absolute URL uses the active
+`home_url` boundary and does not persist a host.
+
+SERIALIZER: The theme SEO head prefers `canonical_url` and the Dictionary
+presentation SEO packet now reuses the normalized projection for sitemap and
+DefinedTerm URLs. The existing single theme serializer remains the HTML
+emitter. Robots remain exclusively owned by WordPress `wp_robots`; no manual
+robots meta tag was added.
+
+REGRESSION_COVERAGE: SEO-focused Task 2 suite passed 90 tests / 911
+assertions. RED coverage first failed because the normalized path/url fields
+were absent and the theme did not consume `canonical_url`; GREEN passed after
+the projection and serializer changes.
+
+QUALITY_GATES: Changed PHP files lint clean and `git diff --check` passes.
+No migration, data mutation, deployment or public cutover was performed.
+
+COMMIT: Pending for this checkpoint.
+
+STATUS: `PUBLIC_SEO_PACKET_NORMALIZED_LOCALLY / FOCUSED_GREEN / NO_SEMANTIC_DATA_MUTATION / DEPLOYMENT_PENDING`
+
 # Checkpoint — 2026-10-07 — Template-family invariant and family asset manifest
 
 SCOPE: Implementation Task 1 from the approved final template-family

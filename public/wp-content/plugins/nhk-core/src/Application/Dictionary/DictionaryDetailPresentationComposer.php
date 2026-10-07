@@ -181,16 +181,17 @@ final class DictionaryDetailPresentationComposer
             'readiness' => $canonical !== '' ? 'READY' : 'BLOCKED',
         ], ['title' => $title . ' — Từ điển — Đồng Hồ Nhà Kho', 'description' => $description, 'type' => 'DefinedTerm']);
         $projection['indexable'] = $indexable;
-        $projection['sitemap'] = $indexable ? $canonical : false;
+        $projection['sitemap'] = $indexable ? $projection['canonical'] : false;
         $projection['title'] = $title . ' — Từ điển — Đồng Hồ Nhà Kho';
         $projection['meta_description'] = $description;
         $projection['robots'] = $indexable ? 'index,follow' : 'noindex,follow';
         if (!$indexable) $projection['json_ld'] = [];
         if ($indexable) {
+            $publicCanonical = (string) ($projection['canonical'] ?? $canonical);
             $projection['json_ld'] = [
-                '@context' => 'https://schema.org', '@type' => 'DefinedTerm', '@id' => $canonical,
-                'url' => $canonical, 'mainEntityOfPage' => $canonical, 'name' => $title,
-                'description' => $description, 'inDefinedTermSet' => '/tu-dien/',
+                '@context' => 'https://schema.org', '@type' => 'DefinedTerm', '@id' => $publicCanonical,
+                'url' => $publicCanonical, 'mainEntityOfPage' => $publicCanonical, 'name' => $title,
+                'description' => $description, 'inDefinedTermSet' => (new PublicSeoProjection())->publicUrl('/tu-dien/'),
             ];
             $alternate = array_values(array_filter(array_map(static fn (array $row): string => trim((string) ($row['form'] ?? '')), $forms)));
             if ($alternate !== []) $projection['json_ld']['alternateName'] = $alternate;
