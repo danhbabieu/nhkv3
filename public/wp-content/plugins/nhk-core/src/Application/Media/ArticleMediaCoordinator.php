@@ -75,6 +75,9 @@ final class ArticleMediaCoordinator
             }
             foreach (($editorial['unmapped_attachment_ids'] ?? []) as $attachmentId) $diagnostics[] = ['code' => 'WORDPRESS_ATTACHMENT_UNMAPPED', 'attachment_id' => (int) $attachmentId];
         }
+        $zeroImageTextArticle = $contentIntent === 'TEXT_ARTICLE'
+            && ($context['capture_has_physical_assets'] ?? false) !== true
+            && $supportingMediaIds === [];
         foreach (MediaUsageRoleRegistry::mandatoryArticleRoles() as $slot) {
             $blueprint = MediaSeoBlueprint::forPost($postId, $slot, $context, MediaSeoStateRegistry::PLACEHOLDER);
             $existing = $this->existingSlotMedia($endpointKey, $slot);
@@ -109,11 +112,39 @@ final class ArticleMediaCoordinator
             // permission to substitute stale editorial history or a ranked
             // candidate. Historical reuse is only considered when the current
             // request did not select a Media for this slot.
-            if ($candidate === null && !$hasExplicitSelection && $allowHistoricalSubjectReuse && $existing !== null && !in_array($existing->canonicalId, array_values($slotMedia), true)) $candidate = $this->usableMedia($existing->canonicalId, $blueprint, $subjectScopeLocked);
-            if ($candidate === null && !$hasExplicitSelection && $allowHistoricalSubjectReuse) {
+            if ($candidate === null && !$zeroImageTextArticle && !$hasExplicitSelection && $allowHistoricalSubjectReuse && $existing !== null && !in_array($existing->canonicalId, array_values($slotMedia), true)) $candidate = $this->usableMedia($existing->canonicalId, $blueprint, $subjectScopeLocked);
+            if ($candidate === null && !$zeroImageTextArticle && !$hasExplicitSelection && $allowHistoricalSubjectReuse) {
                 $selection = ($this->candidateSelector ??= new ArticleMediaCandidateSelector($this->media, $this->assets, $this->usages, $this->suitabilityPolicy ??= new SemanticSuitabilityPolicy()))->select($blueprint, array_values($slotMedia), !$enforceDistinctMandatoryMedia);
                 $candidate = $selection['media'] instanceof Media ? $selection['media'] : null;
                 foreach ((array) ($selection['diagnostics'] ?? []) as $diagnostic) $diagnostics[] = ['slot' => $slot] + $diagnostic;
+            }
+            if ($candidate === null && $contentIntent === 'TEXT_ARTICLE') {
+                // A text Article may intentionally have no images. Keep the
+                // absence explicit: never mint a fake Media identity or an
+                // active MediaUsage just to satisfy the historical mandatory
+                // slot shape. Any stale usage for this slot is converged to
+                // retired state through the existing MediaUsage owner.
+                $state = $slot === MediaUsageRoleRegistry::FEATURED_PRIMARY ? MediaSeoStateRegistry::INCOMPLETE_FEATURED : MediaSeoStateRegistry::INCOMPLETE_INLINE;
+                $blueprint = MediaSeoBlueprint::forPost($postId, $slot, $context, $state);
+                $this->blueprints->save($blueprint);
+                $this->retireActiveUsages($endpointKey, $slot);
+                $slots[$slot] = [
+                    'media_id' => '',
+                    'persisted_media_id' => $existing?->canonicalId,
+                    'placeholder' => true,
+                    'state' => $state,
+                    'suitability' => SemanticSuitabilityPolicy::UNKNOWN,
+                    'availability' => SemanticSuitabilityPolicy::MISSING,
+                    'valid_for_completeness' => false,
+                    'selection_source' => (string) ($selectedContextBySlot[$slot]['selection_source'] ?? ($existingUsage?->selectionSource ?? 'SYSTEM_AUTO')),
+                    'selection_policy' => (string) ($selectedContextBySlot[$slot]['selection_policy'] ?? ($existingUsage?->selectionPolicy ?? 'AUTO')),
+                    'placement_key' => '',
+                    'placement_anchor' => null,
+                    'blueprint' => $blueprint->toArray(),
+                ];
+                $slotMedia[$slot] = '';
+                $diagnostics[] = ['code' => $slot === MediaUsageRoleRegistry::FEATURED_PRIMARY ? 'ARTICLE_MEDIA_FEATURED_MISSING' : 'ARTICLE_MEDIA_INLINE_MISSING', 'slot' => $slot];
+                continue;
             }
             if ($candidate === null) $candidate = $this->placeholder($slot);
             // Repoint the endpoint usage through the normal CAS-aware boundary
@@ -442,6 +473,36 @@ final class ArticleMediaCoordinator
         $key = 'system:placeholder:' . $slot;
         $name = $slot === MediaUsageRoleRegistry::FEATURED_PRIMARY ? 'System placeholder — featured image' : 'System placeholder — inline image';
         return $this->mediaService->create($key, $name, 'ready', ['system_role' => 'placeholder', 'slot' => $slot]);
+    }
+
+    private function retireActiveUsages(string $endpointKey, string $slot): void
+    {
+        $activeUsages = array_values(array_filter(
+            $this->usages->listByEndpoint('wp_post', $endpointKey, $slot),
+            static fn (mixed $usage): bool => $usage instanceof \NHK\Core\Domain\Media\MediaUsage && $usage->activeSlot !== 'retired',
+        ));
+        if ($activeUsages === []) return;
+        if (!$this->usages instanceof MediaUsageUpdater) throw new \RuntimeException('ARTICLE_MEDIA_USAGE_RETIRE_UNAVAILABLE');
+        foreach ($activeUsages as $usage) {
+            if (!$usage instanceof \NHK\Core\Domain\Media\MediaUsage || $usage->activeSlot === 'retired') continue;
+            $this->usages->update(new \NHK\Core\Domain\Media\MediaUsage(
+                $usage->usageId,
+                $usage->mediaId,
+                $usage->endpointType,
+                $usage->endpointKey,
+                $usage->role,
+                $usage->sortOrder,
+                $usage->altText,
+                $usage->caption,
+                $usage->keywordGroups,
+                $usage->title,
+                $usage->revision,
+                $usage->placementKey,
+                $usage->selectionSource,
+                $usage->selectionPolicy,
+                'retired',
+            ));
+        }
     }
 
     /** @param array<string,array<string,mixed>> $slots @return array<string,mixed> */

@@ -194,12 +194,18 @@ final class ContentPreparationOrchestrator
     private function sources(array $input, array $interpretation): array
     {
         $mentions = array_values(array_unique(array_map('strval', (array) ($interpretation['entity_mentions'] ?? []))));
+        $intent = strtoupper(trim((string) ($input['intent'] ?? '')));
+        $articleIntent = in_array($intent, ['TEXT_ARTICLE', 'IMAGE_ARTICLE'], true);
         return [
             'canonical_uuid' => $input['canonical_uuid'] ?? $input['subject_uuid'] ?? [],
             'stable_key' => $input['stable_key'] ?? $input['subject_stable_key'] ?? [],
             'subject_hints' => $input['subject_hints'] ?? $interpretation['primary_subject_hints'] ?? [],
             'title_subject' => $input['title_subject'] ?? $input['topic_subject'] ?? [],
-            'body_mentions' => $mentions,
+            // Article creation must lock its primary subject from an explicit
+            // canonical locator, stable key, primary hint or title subject.
+            // Body/entity mentions remain secondary context and cannot be
+            // promoted into an Article owner identity by resolution order.
+            'body_mentions' => $articleIntent ? [] : $mentions,
         ];
     }
 

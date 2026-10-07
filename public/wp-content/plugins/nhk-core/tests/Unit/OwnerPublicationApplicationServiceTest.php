@@ -109,6 +109,23 @@ final class OwnerPublicationApplicationServiceTest extends TestCase
         self::assertContains('ALREADY_PUBLISHED', $result['diagnostics']);
         self::assertSame(1, $posts->publishCalls);
     }
+
+    public function test_existing_draft_766_publishes_once_and_replay_is_idempotent(): void
+    {
+        $posts = new OwnerPublicationExistingDraft766Store();
+        $receipts = new OwnerPublicationReceiptRepository();
+        $service = new OwnerPublicationApplicationService($posts, new OwnerPublicationFakeDecisionRepository(), static fn (PublicationPrincipal $principal): bool => true, null, $receipts);
+        $key = 'post-766-publication';
+
+        $first = $service->request(766, $posts->rows[766]->token, ownerPublicationEvidence(), $key, new PublicationPrincipal('owner-1', 'mcp', 'post-766'));
+        $second = $service->request(766, $posts->rows[766]->token, ownerPublicationEvidence(), $key, new PublicationPrincipal('owner-1', 'mcp', 'post-766'));
+
+        self::assertSame('PASS', $first['outcome']);
+        self::assertSame('publish', $first['post']['status']);
+        self::assertSame('PASS', $second['outcome']);
+        self::assertSame(1, $posts->publishCalls);
+        self::assertSame(766, $second['post']['post_id']);
+    }
 }
 
 /** @param array<string,bool> $overrides @return array<string,mixed> */
@@ -137,6 +154,15 @@ final class OwnerPublicationRouteDroppingStore extends OwnerPublicationFakeStore
     {
         $old = $this->rows[$postId];
         return $this->rows[$postId] = new EditorialPostState($old->postId, $old->endpointKey, $old->postType, 'publish', $old->title, $old->content, $old->excerpt, '', '', $old->latestRevisionId + 1, $old->revisionCount + 1);
+    }
+}
+
+final class OwnerPublicationExistingDraft766Store extends OwnerPublicationFakeStore
+{
+    public function __construct()
+    {
+        parent::__construct();
+        $this->rows[766] = new EditorialPostState(766, '1:766', 'post', 'draft', 'Existing Article 766', 'Body', '', 'existing-article-766', 'https://example.test/existing-article-766/', 4, 4);
     }
 }
 

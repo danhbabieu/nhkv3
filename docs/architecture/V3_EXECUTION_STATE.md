@@ -151,6 +151,32 @@ COMMITS: `3c6dbae0`, `42694229`, `ad5de1fc`, `43cedd4a`.
 STATUS: `ARTICLE_PUBLICATION_LIFECYCLE_FIXED_LOCAL / FOCUSED_GREEN /
 NO_DATA_MUTATION / DEPLOYMENT_PENDING`
 
+# Checkpoint — 2026-10-07 — Article publication v59 regression closure
+
+IMPLEMENTATION: TEXT_ARTICLE zero-image reconciliation now avoids placeholder
+Media and active mandatory MediaUsage, retires stale usage through the governed
+updater idempotently, and keeps missing-image diagnostics non-blocking. Native
+WordPress route evidence is authoritative before controlled publish when its
+permalink/slug/collision/resolver packet is valid; rendered public verification
+remains post-publish. Article primary-subject resolution no longer promotes
+body/entity mentions for TEXT_ARTICLE or IMAGE_ARTICLE, so missing or ambiguous
+primary identity remains REVIEW_REQUIRED. Existing-draft publication replay is
+covered with Post 766 as a fixture and performs one controlled publish.
+
+REGRESSION_COVERAGE: Focused publication/media/subject suite passes 140 tests /
+503 assertions. Full Unit directory reaches 3,446 tests / 21,437 assertions
+but remains non-green on 14 environment/errors and 12 pre-existing unrelated
+failures; the repository worktree has no local vendor directory, so bootstrap
+uses the configured workspace autoloader. Changed PHP files lint clean,
+`git diff --check` and scoped secret review pass.
+
+DATA_SAFETY: No database migration, staging/production mutation, Post 766
+publication, deployment or public cutover was performed.
+
+STATUS: `ARTICLE_PUBLICATION_V59_REGRESSION_CLOSED_LOCALLY /
+FOCUSED_GREEN / FULL_SUITE_ENVIRONMENT_AND_PREEXISTING_FAILURES /
+NO_DATA_MUTATION / DEPLOYMENT_PENDING`
+
 # Checkpoint — 2026-10-07 — Staging dependency reactivation admission fixed locally
 
 ROOT_CAUSE_CONFIRMED: Capture-bound staging admission and dependency scope

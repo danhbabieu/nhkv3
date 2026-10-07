@@ -11,6 +11,26 @@ use PHPUnit\Framework\TestCase;
 
 final class ArticleMediaPolicyTest extends TestCase
 {
+    public function test_text_article_without_images_is_zero_image_safe_and_cleans_stale_usage_idempotently(): void
+    {
+        [$media, $assets, $usages, $blueprints, $service] = $this->stores();
+        $stale = $service->create('stale-zero-image', 'Stale image', 'ready');
+        $service->addAsset($stale->canonicalId, 'original', 'uploads/stale-zero-image.jpg', hash('sha256', 'stale-zero-image'), 'image/jpeg', 10, 1200, 800, 'PUBLIC');
+        $service->addUsage($stale->canonicalId, 'wp_post', '1:766', 'featured_primary');
+        $service->addUsage($stale->canonicalId, 'wp_post', '1:766', 'inline_primary');
+        $coordinator = new ArticleMediaCoordinator($service, $media, $assets, $usages, $blueprints, 1);
+
+        $first = $coordinator->ensureForPost(766, ['content_intent' => ['intent' => 'TEXT_ARTICLE']]);
+        $second = $coordinator->ensureForPost(766, ['content_intent' => ['intent' => 'TEXT_ARTICLE']]);
+
+        self::assertSame('', $first->slotMedia['featured_primary']);
+        self::assertSame('', $first->slotMedia['inline_primary']);
+        self::assertSame([], array_filter($media->items, static fn (Media $item): bool => $item->isSystemPlaceholder()));
+        self::assertSame([], array_filter($usages->listByEndpoint('wp_post', '1:766'), static fn (MediaUsage $usage): bool => $usage->activeSlot !== 'retired'));
+        self::assertSame($first->slotMedia, $second->slotMedia);
+        self::assertNotContains('MEDIA_BINDING_MEDIA_NOT_FOUND', array_column($first->diagnostics, 'code'));
+    }
+
     public function test_new_post_gets_distinct_placeholders_blueprints_and_idempotent_required_usages(): void
     {
         [$media, $assets, $usages, $blueprints, $service] = $this->stores();
@@ -950,7 +970,7 @@ final class ArticleMediaPolicyTest extends TestCase
                     throw new MediaException('Media usage update conflict.');
                 }
                 $next = $usage->revision + 1;
-                return $this->items[$usage->usageId] = new MediaUsage($usage->usageId, $usage->mediaId, $usage->endpointType, $usage->endpointKey, $usage->role, $usage->sortOrder, $usage->altText, $usage->caption, $usage->keywordGroups, $usage->title, $next, $usage->placementKey, $usage->selectionSource, $usage->selectionPolicy);
+                return $this->items[$usage->usageId] = new MediaUsage($usage->usageId, $usage->mediaId, $usage->endpointType, $usage->endpointKey, $usage->role, $usage->sortOrder, $usage->altText, $usage->caption, $usage->keywordGroups, $usage->title, $next, $usage->placementKey, $usage->selectionSource, $usage->selectionPolicy, $usage->activeSlot);
             }
             public function removeByEndpointRole(string $type, string $key, string $role): int { $before = count($this->items); foreach ($this->items as $id => $usage) if ($usage->endpointType === $type && $usage->endpointKey === $key && $usage->role === $role) unset($this->items[$id]); return $before - count($this->items); }
         };

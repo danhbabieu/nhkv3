@@ -27,6 +27,7 @@ final class ArticlePublicationGate
         // Semantic Authority PublicIdentity is a separate boundary and must not
         // be required to publish an editorial wp_post.
         $nativeRoute = is_array($evidence['native_route'] ?? null) ? $evidence['native_route'] : null;
+        $nativeRouteReady = false;
         if ($nativeRoute !== null) {
             $routeConsistent = ($nativeRoute['ready'] ?? false) === true
                 && trim((string) ($nativeRoute['slug'] ?? '')) !== ''
@@ -34,6 +35,7 @@ final class ArticlePublicationGate
                 && trim((string) ($nativeRoute['canonical_url'] ?? '')) === trim((string) ($nativeRoute['permalink'] ?? ''))
                 && ($nativeRoute['collision'] ?? false) !== true
                 && ($nativeRoute['resolver_agreement'] ?? false) === true;
+            $nativeRouteReady = $routeConsistent;
             if (!$routeConsistent) $blockers[] = 'PUBLIC_ROUTE_NOT_READY';
         } elseif ($draft->postId < 1 || $draft->slug === '' || $draft->permalink === '') {
             $blockers[] = 'PUBLIC_ROUTE_NOT_READY';
@@ -86,7 +88,7 @@ final class ArticlePublicationGate
         $this->optionalTrue($evidence, 'internal_links_valid', 'INTERNAL_LINKS_INVALID', 'INTERNAL_LINKS_INCOMPLETE', $blockers, $warnings);
         if (in_array(($evidence['structured_data_status'] ?? ''), ['unavailable', 'incomplete'], true)) $warnings[] = 'STRUCTURED_DATA_INCOMPLETE';
         else $this->requireTrue($evidence, 'structured_data_valid', 'STRUCTURED_DATA_INVALID', $blockers);
-        $this->requireTrue($evidence, 'public_route_ready', 'PUBLIC_ROUTE_NOT_READY', $blockers);
+        if (!$nativeRouteReady) $this->requireTrue($evidence, 'public_route_ready', 'PUBLIC_ROUTE_NOT_READY', $blockers);
         if (($evidence['rendered_public_verification'] ?? false) !== true) $warnings[] = 'RENDERED_PUBLIC_VERIFICATION_UNAVAILABLE';
         if (($evidence['media_repair_status'] ?? '') === 'deferred') $deferredRepairs[] = 'MEDIA_ATTACHMENT_BINDING';
         return new ArticlePublicationGateResult($blockers === [], $blockers, $warnings, $missingEnrichments, $deferredRepairs);

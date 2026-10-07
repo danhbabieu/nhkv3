@@ -11,6 +11,23 @@ use PHPUnit\Framework\TestCase;
 
 final class ContentPreparationOrchestratorTest extends TestCase
 {
+    public function test_text_article_related_term_cannot_be_promoted_to_primary_subject(): void
+    {
+        $subjectId = '55555555-5555-4555-8555-555555555555';
+        $resolver = new SubjectResolutionService(static fn (string $value): array => $value === 'Related term'
+            ? [['id' => $subjectId, 'type' => 'model', 'name' => 'Related term', 'revision' => 1]]
+            : []);
+
+        $result = (new ContentPreparationOrchestrator($resolver))->prepare(
+            ['intent' => 'TEXT_ARTICLE'],
+            ['entity_mentions' => ['Related term']],
+        );
+
+        self::assertSame('REVIEW_REQUIRED', $result->status);
+        self::assertNull($result->subjectResolutionPacket);
+        self::assertContains('PRIMARY_SUBJECT_NOT_RESOLVED', $result->reviewReasons);
+    }
+
     public function test_explicit_model_uuid_beats_prose_music_mention_and_locks_prepared_packet(): void
     {
         $modelId = '11111111-1111-4111-8111-111111111111';

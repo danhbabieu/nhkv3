@@ -216,6 +216,27 @@ final class ArticlePublicationGateTest extends TestCase
         self::assertContains('RENDERED_PUBLIC_VERIFICATION_UNAVAILABLE', $result->warnings);
     }
 
+    public function test_valid_native_route_overrides_stale_frontend_route_flag_before_publish(): void
+    {
+        $evidence = $this->evidence();
+        $evidence['public_route_ready'] = false;
+        $evidence['rendered_public_verification'] = false;
+        $evidence['native_route'] = [
+            'ready' => true,
+            'diagnostics' => [],
+            'slug' => 'title',
+            'permalink' => 'https://demo.test/title/',
+            'canonical_url' => 'https://demo.test/title/',
+            'collision' => false,
+            'resolver_agreement' => true,
+        ];
+
+        $result = (new ArticlePublicationGate())->check($this->draft(), $evidence, $this->draft()->token);
+
+        self::assertTrue($result->eligible);
+        self::assertNotContains('PUBLIC_ROUTE_NOT_READY', $result->blockers);
+    }
+
     public function test_native_route_packet_cannot_claim_ready_with_inconsistent_fields(): void
     {
         $evidence = $this->evidence();
