@@ -101,4 +101,20 @@ final class KnowledgeClaimIdentityTest extends TestCase
         self::assertSame('knowledge-identity-v2', $result->policyVersion());
         self::assertSame(64, strlen($result->fingerprint()));
     }
+
+    public function testVideoContextUsesStableExternalReferentWhenCanonicalIdIsAlsoPresent(): void
+    {
+        $context = KnowledgeClaimIdentity::contextForInput('provenance', [
+            'origin' => 'CAPTURE_VIDEO_SOURCE_PROVENANCE',
+            'metadata' => [
+                'subject_id' => self::SUBJECT,
+                'canonical_video_id' => self::VIDEO,
+                'platform' => 'YouTube',
+                'external_video_id' => 'dQw4w9WgXcQ',
+            ],
+        ]);
+
+        self::assertSame(['external_video_id' => 'dQw4w9WgXcQ', 'platform' => 'youtube'], $context['video_referent']);
+        self::assertArrayNotHasKey('canonical_video_id', $context['video_referent']);
+    }
 }

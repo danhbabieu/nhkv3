@@ -21,7 +21,7 @@ final class SystemWideDuplicateAuditCoordinator
     private const CURSOR_STATE_TTL = 900;
     private const CURSOR_VERSION = 4;
     private const CURSOR_POLICY = 'system-wide-duplicate-audit:v4';
-    /** @var array<string,list<array<string,mixed>>> */
+    /** @var array<string,array{carry:list<array<string,mixed>>,emitted:list<string>}> */
     private static array $cursorStates = [];
     /** @var list<string> */
     public const OWNERS = ['Dictionary', 'Authority', 'Knowledge', 'Source', 'Evidence', 'Graph', 'Article', 'Media', 'MediaAsset', 'MediaUsage', 'Video'];
@@ -166,12 +166,13 @@ final class SystemWideDuplicateAuditCoordinator
         if ($after !== null && (!is_string($after) || $after === '' || strlen($after) > 512)) throw new \InvalidArgumentException('AUDIT_CURSOR_INVALID');
         $scanned = $payload['scanned'] ?? null;
         if (!is_int($scanned) || $scanned < 0 || $scanned > self::MAX_SCAN_ROWS) throw new \InvalidArgumentException('AUDIT_CURSOR_INVALID');
-        $emitted = $payload['emitted'] ?? [];
-        if (!is_array($emitted) || count($emitted) > 512 || array_filter($emitted, static fn (mixed $id): bool => !is_string($id) || $id === '') !== []) throw new \InvalidArgumentException('AUDIT_CURSOR_INVALID');
         $stateKey = $payload['state_key'] ?? null;
         if (!is_string($stateKey) || !preg_match('/^[a-f0-9]{64}$/', $stateKey)) throw new \InvalidArgumentException('AUDIT_CURSOR_INVALID');
-        $carry = $this->loadCursorState($stateKey);
-        if ($carry === null || count($carry) > self::MAX_CARRY_ROWS || array_filter($carry, static fn (mixed $row): bool => !is_array($row)) !== []) throw new \InvalidArgumentException('AUDIT_CURSOR_INVALID');
+        $state = $this->loadCursorState($stateKey);
+        $carry = $state['carry'] ?? null;
+        $emitted = $state['emitted'] ?? null;
+        if (!is_array($carry) || count($carry) > self::MAX_CARRY_ROWS || array_filter($carry, static fn (mixed $row): bool => !is_array($row)) !== []) throw new \InvalidArgumentException('AUDIT_CURSOR_INVALID');
+        if (!is_array($emitted) || count($emitted) > self::MAX_SCAN_ROWS || array_filter($emitted, static fn (mixed $id): bool => !is_string($id) || $id === '') !== []) throw new \InvalidArgumentException('AUDIT_CURSOR_INVALID');
         return ['after' => $after, 'carry' => array_values($carry), 'scanned' => $scanned, 'emitted' => array_values($emitted)];
     }
 
@@ -179,8 +180,8 @@ final class SystemWideDuplicateAuditCoordinator
     private function encodeCursor(string $after, array $carry, int $scanned, string $owner, bool $includeRetired, array $emitted = []): string
     {
         $carry = array_slice($carry, -self::MAX_CARRY_ROWS);
-        $stateKey = $this->storeCursorState($carry);
-        $payload = ['v' => self::CURSOR_VERSION, 'policy' => self::CURSOR_POLICY, 'owner' => $owner, 'include_retired' => $includeRetired, 'after' => $after, 'state_key' => $stateKey, 'scanned' => $scanned, 'emitted' => array_values(array_unique($emitted))];
+        $stateKey = $this->storeCursorState($carry, array_values(array_unique($emitted)));
+        $payload = ['v' => self::CURSOR_VERSION, 'policy' => self::CURSOR_POLICY, 'owner' => $owner, 'include_retired' => $includeRetired, 'after' => $after, 'state_key' => $stateKey, 'scanned' => $scanned];
         $canonical = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
         $envelope = ['payload' => $payload, 'signature' => hash_hmac('sha256', $canonical, $this->cursorSecret())];
         $cursor = rtrim(strtr(base64_encode((string) json_encode($envelope, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)), '+/', '-_'), '=');
@@ -188,29 +189,30 @@ final class SystemWideDuplicateAuditCoordinator
         return $cursor;
     }
 
-    /** @param list<array<string,mixed>> $carry */
-    private function storeCursorState(array $carry): string
+    /** @param list<array<string,mixed>> $carry @param list<string> $emitted */
+    private function storeCursorState(array $carry, array $emitted): string
     {
-        $stateKey = hash('sha256', (string) json_encode($carry, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
-        self::$cursorStates[$stateKey] = $carry;
-        if (function_exists('wp_cache_set')) wp_cache_set($stateKey, $carry, 'nhk_system_wide_duplicate_audit', self::CURSOR_STATE_TTL);
-        if (function_exists('set_transient')) set_transient('nhk_swda_' . $stateKey, $carry, self::CURSOR_STATE_TTL);
+        $state = ['carry' => array_values($carry), 'emitted' => array_values(array_unique($emitted))];
+        $stateKey = hash('sha256', (string) json_encode($state, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
+        self::$cursorStates[$stateKey] = $state;
+        if (function_exists('wp_cache_set')) wp_cache_set($stateKey, $state, 'nhk_system_wide_duplicate_audit', self::CURSOR_STATE_TTL);
+        if (function_exists('set_transient')) set_transient('nhk_swda_' . $stateKey, $state, self::CURSOR_STATE_TTL);
         return $stateKey;
     }
 
-    /** @return list<array<string,mixed>>|null */
+    /** @return array{carry:list<array<string,mixed>>,emitted:list<string>}|null */
     private function loadCursorState(string $stateKey): ?array
     {
-        $carry = self::$cursorStates[$stateKey] ?? null;
-        if ($carry === null && function_exists('wp_cache_get')) {
+        $state = self::$cursorStates[$stateKey] ?? null;
+        if ($state === null && function_exists('wp_cache_get')) {
             $cached = wp_cache_get($stateKey, 'nhk_system_wide_duplicate_audit');
-            $carry = is_array($cached) ? $cached : null;
+            $state = is_array($cached) ? $cached : null;
         }
-        if ($carry === null && function_exists('get_transient')) {
+        if ($state === null && function_exists('get_transient')) {
             $cached = get_transient('nhk_swda_' . $stateKey);
-            $carry = is_array($cached) ? $cached : null;
+            $state = is_array($cached) ? $cached : null;
         }
-        return is_array($carry) ? array_values($carry) : null;
+        return is_array($state) && isset($state['carry'], $state['emitted']) ? $state : null;
     }
 
     private function cursorSecret(): string
@@ -282,7 +284,7 @@ final class SystemWideDuplicateAuditCoordinator
             $identity = KnowledgeClaimIdentity::resolveAuditRow($row);
             if ($identity->status() !== 'RESOLVED') {
                 $id = $this->id($row);
-                if ($id !== '') $unresolved[$identity->status() . '|' . implode(',', $identity->reasonCodes())][] = $row;
+                if ($id !== '') $unresolved[$identity->status() . '|' . implode(',', $identity->reasonCodes()) . '|' . $id][] = $row;
                 continue;
             }
             $resolved[$identity->fingerprint()][] = ['row' => $row, 'identity' => $identity];

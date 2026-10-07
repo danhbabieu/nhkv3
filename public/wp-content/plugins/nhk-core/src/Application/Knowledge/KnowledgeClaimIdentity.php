@@ -117,8 +117,6 @@ final class KnowledgeClaimIdentity
     /** @return array<string,string>|array{unresolved:true} */
     private static function videoReferent(array $metadata): array
     {
-        $canonical = trim((string) ($metadata['canonical_video_id'] ?? $metadata['video_id'] ?? ''));
-        if ($canonical !== '') return ['canonical_video_id' => $canonical];
         $platform = strtolower(trim((string) ($metadata['platform'] ?? '')));
         $external = trim((string) ($metadata['external_video_id'] ?? ''));
         if ($platform !== '' && $external !== '') return ['external_video_id' => $external, 'platform' => $platform];
