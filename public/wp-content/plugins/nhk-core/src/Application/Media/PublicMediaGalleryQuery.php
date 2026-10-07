@@ -15,6 +15,8 @@ use NHK\Core\Application\Presentation\LatestFirstOrder;
  */
 final class PublicMediaGalleryQuery
 {
+    private const CARD_READINESS_MODEL_REQUIRED = 'MEDIA_CARD_READINESS_MODEL_REQUIRED';
+
     public function __construct(
         private MediaRepository $media,
         private MediaAssetRepository $assets,
@@ -78,6 +80,7 @@ final class PublicMediaGalleryQuery
     {
         $asset = (new PublicMediaAssetSelector())->canonical($this->assets->listByMediaId($media->canonicalId));
         if (!$asset instanceof MediaAsset) return null;
+        if (!$this->cardAssetReady($asset)) return null;
         $filename = is_string($asset->metadata['canonical_filename'] ?? null) && trim((string) $asset->metadata['canonical_filename']) !== ''
             ? (string) $asset->metadata['canonical_filename']
             : basename(str_replace('\\', '/', $asset->storageKey));
@@ -95,6 +98,27 @@ final class PublicMediaGalleryQuery
             'srcset' => $attachmentId > 0 && function_exists('wp_get_attachment_image_srcset') ? (string) wp_get_attachment_image_srcset($attachmentId, 'large') : null,
             'sizes' => $attachmentId > 0 && function_exists('wp_get_attachment_image_sizes') ? (string) wp_get_attachment_image_sizes($attachmentId, 'large') : null,
         ];
+    }
+
+    private function cardAssetReady(MediaAsset $asset): bool
+    {
+        $readback = strtolower(trim((string) ($asset->metadata['attachment_readback_status'] ?? '')));
+        if (in_array($readback, ['missing', 'unavailable', 'failed', 'invalid', 'broken'], true)) return false;
+        if ($readback === 'verified') return true;
+
+        $attachmentId = (int) ($asset->metadata['wordpress_attachment_id'] ?? 0);
+        if ($attachmentId < 1) {
+            if (function_exists('do_action')) do_action('nhk_v3_media_card_readiness_warning', self::CARD_READINESS_MODEL_REQUIRED, $asset->canonicalId);
+            return false;
+        }
+        if (!function_exists('get_post')) return false;
+        $attachment = get_post($attachmentId);
+        if (!is_object($attachment) || (string) ($attachment->post_type ?? '') !== 'attachment') return false;
+        $status = function_exists('get_post_status') ? (string) get_post_status($attachmentId) : (string) ($attachment->post_status ?? '');
+        if (in_array($status, ['trash', 'auto-draft', 'inherit-disabled'], true)) return false;
+        if (!function_exists('get_attached_file')) return false;
+        $path = get_attached_file($attachmentId, true);
+        return is_string($path) && $path !== '' && is_file($path);
     }
 
     /** @param list<\NHK\Core\Domain\Media\MediaUsage> $usages */

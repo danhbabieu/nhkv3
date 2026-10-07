@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Infrastructure\Http;
 
 use NHK\Core\Application\Knowledge\KnowledgePageQuery;
+use NHK\Core\Application\Seo\PublicSeoProjection;
 
 final class PublicKnowledgeRoutes
 {
@@ -33,7 +34,7 @@ final class PublicKnowledgeRoutes
             $this->set404();
             return get_404_template();
         } elseif ($page !== '') {
-            $GLOBALS['nhk_core_knowledge_context'] = ['mode' => 'archive', 'archive' => $this->query->archive(max(1, (int) $page)), 'archive_url' => home_url('/tri-thuc/')];
+            $GLOBALS['nhk_core_knowledge_context'] = ['mode' => 'archive', 'archive' => $this->query->archive(max(1, (int) $page)), 'archive_url' => home_url('/tri-thuc/'), 'seo_projection' => (new PublicSeoProjection())->project(['path' => '/tri-thuc/', 'eligible' => true, 'readiness' => 'READY', 'canonical_url' => '/tri-thuc/', 'public_eligible' => true], ['title' => 'Kho tri thức — Đồng Hồ Nhà Kho', 'description' => 'Các tri thức đang hoạt động trong kho NHK.', 'type' => 'CollectionPage'])];
         } else return $template;
         $found = locate_template('knowledge.php');
         return $found !== '' ? $found : $template;

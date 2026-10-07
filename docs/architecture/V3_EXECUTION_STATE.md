@@ -1,5 +1,49 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-07 — Final pre-deploy presentation corrections
+
+SEO_DECISION_OWNERSHIP: Custom Entity, Dictionary, Video, Media Library,
+Knowledge collection and Comparison routes now provide normalized SEO packets;
+the theme only adapts native WordPress surfaces and serializes the resolved
+packet. The single head serializer emits one absolute canonical, matching
+Open Graph URL and one JSON-LD payload, preserving DefinedTerm, VideoObject,
+Article and breadcrumb nodes. Robots remain exclusively owned by `wp_robots`;
+no manual robots meta tag was added.
+
+MEDIA_CARD_READINESS: Archive cards now accept a persisted verified read-back
+state or a physically readable WordPress attachment-backed state. Known
+unready assets and assets without a trustworthy cheap signal fail closed to no
+image URL; the latter reports `MEDIA_CARD_READINESS_MODEL_REQUIRED` through an
+internal request hook. Archive projection still performs no hash, filesize,
+magic-byte or checksum work; strict binary delivery remains unchanged.
+
+ARTICLE_ALBUM: Article album assets are now conditional on a cheap gallery
+signal from the queried post's gallery block/shortcode or lightweight media
+projection. Plain Articles do not enqueue album assets; Articles with an
+album do. No dossier assembly or rendered-HTML scan is used.
+
+TEMPLATE_FAMILY: Approved template-family map is unchanged. INDEX_REQUIRED
+remains follow-up debt for the existing full-list collection readers; no
+schema/index change was made.
+
+REGRESSION_COVERAGE: Focused SEO/frontend/media/template suite passed 179
+tests / 1,434 assertions with 2 warnings. Related route, delivery, SEO,
+Dictionary, Video and media projection checks are included in that focused
+run. The configured broader run completed 3,690 tests with 46 environment or
+infrastructure errors and 29 unrelated existing failures; the known changed
+surface regressions are green. The default 128M run also hit the existing
+`TrustedProvidedFileMaterializerTest` memory ceiling, so the broad run was
+repeated at 512M.
+
+QUALITY_GATES: Changed PHP files lint clean and `git diff --check` passes.
+No migration, schema/index change, data mutation, deployment or push was
+performed.
+
+COMMIT: Local correction commit `fix: close public presentation deployment blockers`
+(final commit identity is the repository `HEAD` after this checkpoint).
+
+STATUS: `PRE_DEPLOY_PRESENTATION_CORRECTIONS_LOCAL / FOCUSED_GREEN / BROADER_ENVIRONMENT_BLOCKERS_RECORDED / NO_SEMANTIC_DATA_MUTATION / DEPLOYMENT_PENDING`
+
 # Checkpoint — 2026-10-07 — Media card projection and collection scale boundary
 
 MEDIA_IO: `PublicMediaGalleryQuery` is now a read-only card projection over

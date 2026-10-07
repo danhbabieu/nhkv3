@@ -46,7 +46,7 @@ final class HomeSemanticQueryTest extends TestCase
     public function test_home_media_and_video_modules_are_visual_first_without_media_detail_links(): void
     {
         $media = new Media($mediaId = UuidCodec::newV7(), 'front', 'Ảnh mặt trước', 'ready');
-        $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'derivative', 'front.jpg', hash('sha256', 'x'), 'image/jpeg', 1, 1200, 800, 'PUBLIC', ['canonical_filename' => 'front.jpg']);
+        $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'derivative', 'front.jpg', hash('sha256', 'x'), 'image/jpeg', 1, 1200, 800, 'PUBLIC', ['canonical_filename' => 'front.jpg', 'attachment_readback_status' => 'verified']);
         $video = new Video(UuidCodec::newV7(), 'youtube', 'dQw4w9WgXcQ', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'Video kỹ thuật', ['public_identity' => ['current_slug' => 'video-ky-thuat'], 'source_snapshot' => ['availability' => 'available', 'embeddable' => true, 'thumbnail_selection' => ['url' => 'https://img.example.test/video.jpg', 'variant' => 'mqdefault', 'width' => 320, 'height' => 180]], 'editorial' => ['title' => 'Video kỹ thuật', 'summary' => 'Tóm tắt'], 'hub' => ['primary' => '06'], 'provenance' => ['kind' => 'TEST'], 'semantic_attachments' => [['target_type' => 'variant', 'target_uuid' => UuidCodec::newV7(), 'predicate' => 'about', 'evidence_refs' => [['evidence_id' => UuidCodec::newV7()]]]]]);
         $mediaRepo = $this->media([$media]);
         $gallery = new PublicMediaGalleryQuery($mediaRepo, $this->assets([$asset]));

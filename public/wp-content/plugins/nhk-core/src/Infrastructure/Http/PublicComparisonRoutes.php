@@ -39,7 +39,7 @@ final class PublicComparisonRoutes
         if ((string) get_query_var('nhk_comparison_route') === '') return $template;
         $left = isset($_GET['a']) && is_scalar($_GET['a']) ? sanitize_text_field(wp_unslash((string) $_GET['a'])) : '';
         $right = isset($_GET['b']) && is_scalar($_GET['b']) ? sanitize_text_field(wp_unslash((string) $_GET['b'])) : '';
-        $GLOBALS['nhk_core_comparison_context'] = ['mode' => 'compare', 'comparison' => $this->query->read($left, $right), 'seo_projection' => (new PublicSeoProjection())->project(['path' => '/so-sanh/', 'eligible' => true, 'readiness' => 'READY', 'canonical_url' => '/so-sanh/', 'public_eligible' => true], ['type' => 'CollectionPage'])];
+        $GLOBALS['nhk_core_comparison_context'] = ['mode' => 'compare', 'comparison' => $this->query->read($left, $right), 'seo_projection' => (new PublicSeoProjection())->project(['path' => '/so-sanh/', 'eligible' => true, 'readiness' => 'READY', 'canonical_url' => '/so-sanh/', 'public_eligible' => true], ['title' => 'So sánh hồ sơ — Đồng Hồ Nhà Kho', 'description' => 'Đọc cạnh nhau các dữ kiện công khai của hai hồ sơ NHK.', 'type' => 'CollectionPage'])];
         $found = locate_template('comparison.php');
         return $found !== '' ? $found : $template;
     }

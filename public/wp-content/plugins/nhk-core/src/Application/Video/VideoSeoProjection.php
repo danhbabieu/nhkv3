@@ -35,15 +35,17 @@ final class VideoSeoProjection
             '@context' => 'https://schema.org', '@type' => 'VideoObject',
             'name' => $editorialTitle,
             'description' => $editorialSummary,
-            'url' => $watchPath,
+            'url' => (string) ($seoProjection['canonical_url'] ?? $watchPath),
             'embedUrl' => preg_match('/^[A-Za-z0-9_-]{11}$/', $id) === 1 ? \NHK\Core\Domain\Video\YouTubeVideoIdentity::privacyEmbedUrl($id) : null,
         ];
         if (!$seoProjection['indexable']) return [
             'title' => $seoTitle,
             'description' => $seoDescription,
             'canonical' => null,
+            'canonical_url' => null,
             'indexable' => false,
             'open_graph' => [],
+            'json_ld' => [],
             'video_object' => [],
         ];
         if (($source['published_at'] ?? null) !== null && (string) $source['published_at'] !== '') $object['uploadDate'] = (string) $source['published_at'];
@@ -66,7 +68,7 @@ final class VideoSeoProjection
                 $end = isset($chapters[$index + 1]['start_seconds']) ? (int) $chapters[$index + 1]['start_seconds'] : (isset($source['duration_seconds']) ? (int) $source['duration_seconds'] : 0);
                 $start = (int) $chapter['start_seconds'];
                 if ($end <= $start) continue;
-                $parts[] = ['@type' => 'Clip', 'name' => (string) $chapter['label'], 'startOffset' => $start, 'endOffset' => $end, 'url' => rtrim($watchPath, '#') . '#t=' . $start];
+                $parts[] = ['@type' => 'Clip', 'name' => (string) $chapter['label'], 'startOffset' => $start, 'endOffset' => $end, 'url' => rtrim((string) ($seoProjection['canonical_url'] ?? $watchPath), '#') . '#t=' . $start];
             }
             if ($parts !== []) $object['hasPart'] = $parts;
         }
@@ -74,8 +76,10 @@ final class VideoSeoProjection
             'title' => $seoTitle,
             'description' => $seoDescription,
             'canonical' => $seoProjection['canonical'],
+            'canonical_url' => $seoProjection['canonical_url'],
             'indexable' => $seoProjection['indexable'],
             'open_graph' => [...$seoProjection['open_graph'], 'type' => 'video.other'] + (($thumbnail['url'] ?? '') !== '' ? ['image' => (string) $thumbnail['url']] : []),
+            'json_ld' => $object,
             'video_object' => $object,
         ];
     }

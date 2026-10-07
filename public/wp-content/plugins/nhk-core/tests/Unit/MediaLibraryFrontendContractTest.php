@@ -15,7 +15,7 @@ final class MediaLibraryFrontendContractTest extends TestCase
     {
         $mediaId = UuidCodec::newV7();
         $media = new Media($mediaId, 'stale-card', 'Ảnh chưa xác thực lại', 'ready');
-        $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'derivative', 'stale-card.webp', hash('sha256', 'stale'), 'image/webp', 5, 1200, 800, 'PUBLIC', ['canonical_filename' => 'stale-card.webp']);
+        $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'derivative', 'stale-card.webp', hash('sha256', 'stale'), 'image/webp', 5, 1200, 800, 'PUBLIC', ['canonical_filename' => 'stale-card.webp', 'attachment_readback_status' => 'verified']);
         $item = (new PublicMediaGalleryQuery(
             $this->mediaRepository([$media]),
             $this->assetRepository([$asset]),
@@ -26,11 +26,46 @@ final class MediaLibraryFrontendContractTest extends TestCase
         self::assertSame('/anh/stale-card.webp', parse_url((string) ($item['image_url'] ?? ''), PHP_URL_PATH));
     }
 
+    public function test_archive_card_drops_a_known_unready_asset_without_binary_validation(): void
+    {
+        $mediaId = UuidCodec::newV7();
+        $media = new Media($mediaId, 'missing-card', 'Ảnh thiếu file', 'ready');
+        $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'derivative', 'missing-card.webp', hash('sha256', 'missing'), 'image/webp', 5, 1200, 800, 'PUBLIC', [
+            'canonical_filename' => 'missing-card.webp',
+            'attachment_readback_status' => 'missing',
+        ]);
+        $item = (new PublicMediaGalleryQuery($this->mediaRepository([$media]), $this->assetRepository([$asset])))->archive()['items'][0] ?? [];
+
+        self::assertNull($item['image_url'] ?? null);
+        self::assertFalse($item['has_real_image'] ?? true);
+    }
+
+    public function test_archive_card_without_a_cheap_readiness_signal_fails_closed(): void
+    {
+        $mediaId = UuidCodec::newV7();
+        $media = new Media($mediaId, 'unknown-card', 'Ảnh chưa có trạng thái delivery', 'ready');
+        $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'derivative', 'unknown-card.webp', hash('sha256', 'unknown'), 'image/webp', 7, 1200, 800, 'PUBLIC', ['canonical_filename' => 'unknown-card.webp']);
+        $item = (new PublicMediaGalleryQuery($this->mediaRepository([$media]), $this->assetRepository([$asset])))->archive()['items'][0] ?? [];
+
+        self::assertNull($item['image_url'] ?? null);
+        self::assertFalse($item['has_real_image'] ?? true);
+    }
+
+    public function test_archive_projection_keeps_binary_delivery_strict_and_card_projection_has_no_hashing(): void
+    {
+        $projection = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/Media/PublicMediaGalleryQuery.php');
+        $delivery = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/Media/PublicMediaAssetDelivery.php');
+
+        self::assertStringNotContainsString('hash_file(', $projection);
+        self::assertStringContainsString('hash_file(', $delivery);
+        self::assertStringContainsString('attachment_readback_status', $projection);
+    }
+
     public function test_gallery_projects_canonical_image_link_and_caption_summary(): void
     {
         $mediaId = UuidCodec::newV7();
         $media = new Media($mediaId, 'example', 'Ảnh tư liệu', 'ready');
-        $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'derivative', 'uploads/example.webp', hash('sha256', 'image'), 'image/webp', 5, 1200, 800, 'PUBLIC', ['canonical_filename' => 'example.webp']);
+        $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'derivative', 'uploads/example.webp', hash('sha256', 'image'), 'image/webp', 5, 1200, 800, 'PUBLIC', ['canonical_filename' => 'example.webp', 'attachment_readback_status' => 'verified']);
         $usage = new MediaUsage(UuidCodec::newV7(), $mediaId, 'wp_post', '1:42', 'featured', 0, 'Ảnh mặt trước', 'Tư liệu ảnh mặt trước của hiện vật.');
 
         $item = (new PublicMediaGalleryQuery($this->mediaRepository([$media]), $this->assetRepository([$asset]), $this->usageRepository([$usage]), new PublicMediaArticleLinkResolver(
@@ -51,7 +86,7 @@ final class MediaLibraryFrontendContractTest extends TestCase
     {
         $mediaId = UuidCodec::newV7();
         $media = new Media($mediaId, 'example', 'Ảnh tư liệu', 'ready');
-        $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'derivative', 'example.webp', hash('sha256', 'image'), 'image/webp', 5, 1200, 800, 'PUBLIC', ['canonical_filename' => 'example.webp']);
+        $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'derivative', 'example.webp', hash('sha256', 'image'), 'image/webp', 5, 1200, 800, 'PUBLIC', ['canonical_filename' => 'example.webp', 'attachment_readback_status' => 'verified']);
         $usages = [
             new MediaUsage(UuidCodec::newV7(), $mediaId, 'wp_post', '1:42', 'featured'),
             new MediaUsage(UuidCodec::newV7(), $mediaId, 'brand', 'brand-1', 'gallery'),
@@ -68,7 +103,7 @@ final class MediaLibraryFrontendContractTest extends TestCase
     {
         $mediaId = UuidCodec::newV7();
         $media = new Media($mediaId, 'ambiguous', 'Ảnh dùng chung', 'ready');
-        $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'derivative', 'uploads/ambiguous.webp', hash('sha256', 'image'), 'image/webp', 5, 1200, 800, 'PUBLIC', ['canonical_filename' => 'ambiguous.webp']);
+        $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'derivative', 'uploads/ambiguous.webp', hash('sha256', 'image'), 'image/webp', 5, 1200, 800, 'PUBLIC', ['canonical_filename' => 'ambiguous.webp', 'attachment_readback_status' => 'verified']);
         $usages = [
             new MediaUsage(UuidCodec::newV7(), $mediaId, 'wp_post', '1:42', 'featured', 0),
             new MediaUsage(UuidCodec::newV7(), $mediaId, 'wp_post', '1:43', 'featured', 1),
@@ -86,7 +121,7 @@ final class MediaLibraryFrontendContractTest extends TestCase
     {
         $mediaId = UuidCodec::newV7();
         $media = new Media($mediaId, 'shared-context', 'Ảnh dùng chung', 'ready');
-        $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'derivative', 'shared-context.webp', hash('sha256', 'shared-context'), 'image/webp', 5, 1200, 800, 'PUBLIC', ['canonical_filename' => 'shared-context.webp']);
+        $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'derivative', 'shared-context.webp', hash('sha256', 'shared-context'), 'image/webp', 5, 1200, 800, 'PUBLIC', ['canonical_filename' => 'shared-context.webp', 'attachment_readback_status' => 'verified']);
         $usages = [
             new MediaUsage(UuidCodec::newV7(), $mediaId, 'wp_post', '1:42', 'featured', 0),
             new MediaUsage(UuidCodec::newV7(), $mediaId, 'wp_post', '1:43', 'gallery', 1),
@@ -104,7 +139,7 @@ final class MediaLibraryFrontendContractTest extends TestCase
     {
         $mediaId = UuidCodec::newV7();
         $media = new Media($mediaId, 'example', 'Ảnh tư liệu', 'ready');
-        $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'derivative', 'example.webp', hash('sha256', 'image'), 'image/webp', 5, 1200, 800, 'PUBLIC', ['canonical_filename' => 'example.webp']);
+        $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'derivative', 'example.webp', hash('sha256', 'image'), 'image/webp', 5, 1200, 800, 'PUBLIC', ['canonical_filename' => 'example.webp', 'attachment_readback_status' => 'verified']);
 
         $item = (new PublicMediaGalleryQuery($this->mediaRepository([$media]), $this->assetRepository([$asset])))->archive()['items'][0];
 
@@ -115,7 +150,7 @@ final class MediaLibraryFrontendContractTest extends TestCase
     {
         $mediaId = UuidCodec::newV7();
         $media = new Media($mediaId, 'example', 'Ảnh tư liệu', 'ready');
-        $private = new MediaAsset(UuidCodec::newV7(), $mediaId, 'original', 'example.webp', hash('sha256', 'image'), 'image/webp', 5, 1200, 800, 'PRIVATE', ['canonical_filename' => 'example.webp']);
+        $private = new MediaAsset(UuidCodec::newV7(), $mediaId, 'original', 'example.webp', hash('sha256', 'image'), 'image/webp', 5, 1200, 800, 'PRIVATE', ['canonical_filename' => 'example.webp', 'attachment_readback_status' => 'verified']);
 
         $item = (new PublicMediaGalleryQuery($this->mediaRepository([$media]), $this->assetRepository([$private])))->archive()['items'][0];
 

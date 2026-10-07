@@ -190,7 +190,7 @@ final class FrontendContractTest extends TestCase
     public function test_theme_seo_contract_covers_editorial_entity_media_and_video_surfaces(): void
     {
         $functions = (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/functions.php');
-        foreach (['pre_get_document_title', 'wp_get_canonical_url', 'og:title', 'BreadcrumbList', 'VideoObject', 'nhk_core_media_context', 'nhk_core_video_context'] as $contract) {
+        foreach (['pre_get_document_title', 'wp_get_canonical_url', 'og:title', 'BreadcrumbList', 'VideoObject', 'nhk_core_media_context', 'nhk_core_video_context', 'nhk_v3_normalize_seo_packet', 'nhk_v3_seo_packet'] as $contract) {
             self::assertStringContainsString($contract, $functions);
         }
         self::assertStringContainsString('PublicMediaAssetRoutes', (string) file_get_contents(dirname(__DIR__, 2) . '/src/Plugin.php'));
@@ -199,12 +199,9 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString('$media->readiness !== \'ready\'', $delivery);
         self::assertStringContainsString('!$media->active', $delivery);
         self::assertStringContainsString("'mode' => 'archive', 'type' => \$type", (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/PublicEntityRoutes.php'));
-        self::assertStringContainsString('nhk_v3_entity_label', $functions);
-        self::assertStringContainsString("return 'Đồng Hồ Nhà Kho — Kho tri thức và sưu tầm';", $functions);
-        self::assertStringContainsString("Khám phá bài viết, thương hiệu, mẫu đồng hồ và hiện vật trong kho tri thức NHK.", $functions);
-        self::assertStringContainsString('$description = \'Khám phá \' . $label . \' trong kho tri thức NHK.\';', $functions);
-        self::assertStringContainsString('if (is_front_page()) $description', $functions);
-        self::assertLessThan(strpos($functions, 'if (is_array($context))'), strpos($functions, 'if (is_front_page()) $description'));
+        self::assertStringContainsString('function nhk_v3_native_seo_packet', $functions);
+        self::assertStringContainsString("\$description = 'Khám phá bài viết, thương hiệu, mẫu đồng hồ và hiện vật trong kho tri thức NHK.';", $functions);
+        self::assertStringContainsString('function nhk_v3_seo_head', $functions);
         $readApi = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/ReadApi.php');
         self::assertStringContainsString('!$media->active', $readApi);
         self::assertStringContainsString('!$video->active', $readApi);
@@ -471,8 +468,8 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString("add_filter('wp_robots', 'nhk_v3_robots', 20)", $functions);
         self::assertStringContainsString('nhk_v3_allow_semantic_search_pages', $functions);
         self::assertStringContainsString("add_filter('pre_handle_404', 'nhk_v3_allow_semantic_search_pages', 10, 2)", $functions);
-        self::assertStringContainsString('if (is_front_page() || is_home() || is_search()) $canonical = home_url(\'/\');', $functions);
-        self::assertStringContainsString("return \$term === '' ? 'Tìm kiếm — Đồng Hồ Nhà Kho'", $functions);
+        self::assertStringContainsString("\$canonical = home_url('/');", $functions);
+        self::assertStringContainsString("\$title = \$term === '' ? 'Tìm kiếm — Đồng Hồ Nhà Kho'", $functions);
         self::assertStringContainsString("Kết quả tìm kiếm cho ' . \$term . ' trong kho tri thức NHK.", $functions);
     }
 
@@ -614,11 +611,13 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString('function nhk_v3_public_editorial_label', $functions);
         self::assertStringContainsString('nhk_v3_public_editorial_label($editorialRoute)', (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/index.php'));
         self::assertStringContainsString("\$canonical = home_url('/' . \$editorialRoute . '/')", $functions);
-        self::assertStringContainsString("if (is_404()) return 'Không tìm thấy trang — Đồng Hồ Nhà Kho';", $functions);
+        self::assertStringContainsString("\$title = 'Không tìm thấy trang — Đồng Hồ Nhà Kho';", $functions);
         self::assertStringContainsString("if (is_404()) {", $functions);
         self::assertStringContainsString('$mustNoindex = is_404() || is_search() || $isPaginated || (($sharedSeo[\'indexable\'] ?? true) === false);', $functions);
         self::assertStringContainsString('nhk_v3_public_archive_title()', (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/index.php'));
-        self::assertStringContainsString("is_category() || is_tag() || is_author()", $functions);
+        self::assertStringContainsString('is_category()', $functions);
+        self::assertStringContainsString('is_tag()', $functions);
+        self::assertStringContainsString('is_author()', $functions);
         self::assertStringContainsString("if (is_category())", $functions);
         self::assertStringContainsString('$canonical = nhk_v3_public_url($categoryUrl)', $functions);
         self::assertStringContainsString('nhk_v3_post_categories(', (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/single.php'));
@@ -944,7 +943,7 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString("comparison/?$", $routes);
         self::assertStringContainsString('ComparisonPageQuery', $plugin);
         self::assertStringContainsString('name="a"', $template);
-        self::assertStringContainsString("'/so-sanh/'", (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/functions.php'));
+        self::assertStringContainsString('So sánh hồ sơ — Đồng Hồ Nhà Kho', (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/PublicComparisonRoutes.php'));
         self::assertStringContainsString("'/so-sanh/' => 200", (string) file_get_contents(dirname(__DIR__, 6) . '/tools/frontend-route-smoke.php'));
         $routeSmoke = (string) file_get_contents(dirname(__DIR__, 6) . '/tools/frontend-route-smoke.php');
         self::assertStringContainsString("'movement-url', 'music-url', 'component-url', 'classification-url', 'variant-url'", $routeSmoke);
@@ -958,7 +957,7 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString("'/feed/' => '<rss'", $routeSmoke);
         $functions = (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/functions.php');
         self::assertStringContainsString('nhk_core_comparison_context', $functions);
-        self::assertStringContainsString('So sánh hồ sơ — Đồng Hồ Nhà Kho', $functions);
+        self::assertStringContainsString('So sánh hồ sơ — Đồng Hồ Nhà Kho', (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/PublicComparisonRoutes.php'));
     }
 
     public function test_public_brand_spelling_policy_covers_wordpress_and_semantic_surfaces(): void

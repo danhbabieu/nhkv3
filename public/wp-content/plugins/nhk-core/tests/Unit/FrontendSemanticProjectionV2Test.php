@@ -72,7 +72,7 @@ final class FrontendSemanticProjectionV2Test extends TestCase
         mkdir($root);
         $bytes = 'image-bytes'; file_put_contents($root . '/front.jpg', $bytes);
         $media = new Media($mediaId = UuidCodec::newV7(), 'front', 'Ảnh mặt trước', 'ready');
-        $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'derivative', 'front.jpg', hash('sha256', $bytes), 'image/jpeg', strlen($bytes), 1200, 800, 'PUBLIC', ['canonical_filename' => 'front.jpg']);
+        $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'derivative', 'front.jpg', hash('sha256', $bytes), 'image/jpeg', strlen($bytes), 1200, 800, 'PUBLIC', ['canonical_filename' => 'front.jpg', 'attachment_readback_status' => 'verified']);
         try {
             $mediaRepo = $this->mediaRepository([$media]);
             $assetRepo = $this->assetRepository([$asset]);
@@ -93,12 +93,12 @@ final class FrontendSemanticProjectionV2Test extends TestCase
         mkdir($root);
         $mediaId = UuidCodec::newV7();
         $media = new Media($mediaId, 'missing', 'Ảnh stale', 'ready');
-        $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'derivative', 'missing.webp', hash('sha256', 'missing'), 'image/webp', 7, 1200, 800, 'PUBLIC', ['canonical_filename' => 'missing.webp']);
+        $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'derivative', 'missing.webp', hash('sha256', 'missing'), 'image/webp', 7, 1200, 800, 'PUBLIC', ['canonical_filename' => 'missing.webp', 'attachment_readback_status' => 'missing']);
         try {
             $gallery = new PublicMediaGalleryQuery($this->mediaRepository([$media]), $this->assetRepository([$asset]));
             $item = $gallery->archive(1, 12)['items'][0] ?? [];
-            self::assertSame('/anh/missing.webp', parse_url((string) ($item['image_url'] ?? ''), PHP_URL_PATH));
-            self::assertTrue($item['has_real_image'] ?? false);
+            self::assertNull($item['image_url'] ?? null);
+            self::assertFalse($item['has_real_image'] ?? true);
         } finally {
             @rmdir($root);
         }

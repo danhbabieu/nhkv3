@@ -12,6 +12,7 @@ final class VideoSeoProjectionTest extends TestCase
     {
         $result = (new VideoSeoProjection())->project(['source' => ['external_video_id' => 'bad'], 'editorial' => ['title' => 'Video', 'summary' => 'Summary']], ['path' => null, 'eligible' => false, 'blockers' => ['VIDEO_THUMBNAIL_UNAVAILABLE']]);
         self::assertFalse($result['indexable']);
+        self::assertSame([], $result['json_ld']);
         self::assertSame([], $result['video_object']);
     }
 
@@ -38,6 +39,8 @@ final class VideoSeoProjectionTest extends TestCase
         self::assertSame(['https://i.ytimg.com/vi/VwP1AH9E3HA/hqdefault.jpg'], $result['video_object']['thumbnailUrl']);
         self::assertSame(1280, $result['video_object']['thumbnailWidth']);
         self::assertSame('https://i.ytimg.com/vi/VwP1AH9E3HA/hqdefault.jpg', $result['open_graph']['image']);
+        self::assertSame('VideoObject', $result['json_ld']['@type']);
+        self::assertSame('/video/test/', $result['json_ld']['url']);
     }
 
     public function test_video_object_prefers_canonical_representative_thumbnail_over_source_selection(): void

@@ -110,7 +110,7 @@ final class PublicEntityRoutes
             $path = $this->query->publicPath($entity);
             $profile = (new EntityProfileResolver())->resolveProfile($entity);
             $archivePath = $profile->profileKey !== null ? $this->query->archivePathForProfile($profile->profileKey) : $this->query->archivePath($publicType);
-            $GLOBALS['nhk_core_entity_context'] = ['mode' => 'detail', 'type' => $publicType, 'profile' => $profile->profileKey ?? '', 'entity' => $this->query->detailForEntity($entity), 'archive_url' => $archivePath !== null ? home_url($archivePath) : '', 'seo_projection' => $this->seo($path)];
+            $GLOBALS['nhk_core_entity_context'] = ['mode' => 'detail', 'type' => $publicType, 'profile' => $profile->profileKey ?? '', 'entity' => $this->query->detailForEntity($entity), 'archive_url' => $archivePath !== null ? home_url($archivePath) : '', 'seo_projection' => $this->seo($path, $entity->canonicalName . ' — Đồng Hồ Nhà Kho', 'Hồ sơ ' . $entity->canonicalName . ' trong kho NHK.')];
             $themeTemplate = locate_template('entity.php');
             return $themeTemplate !== '' ? $themeTemplate : $template;
         }
@@ -132,7 +132,7 @@ final class PublicEntityRoutes
             $archiveQuery = self::archiveQueryForPresentation($profile, $query);
             $archive = $profile !== '' ? $this->query->archiveProfile($profile, $page, 24, $archiveQuery) : $this->query->archive($type, $page, 24, $query);
             if ($profile !== '' && (string) ($archive['type'] ?? '') !== $type) { $this->set404(); return get_404_template(); }
-            $GLOBALS['nhk_core_entity_context'] = ['mode' => 'archive', 'type' => $type, 'profile' => $profile, 'archive' => $archive, 'archive_url' => home_url($path ?? '/'), 'seo_projection' => $this->seo($path)];
+            $GLOBALS['nhk_core_entity_context'] = ['mode' => 'archive', 'type' => $type, 'profile' => $profile, 'archive' => $archive, 'archive_url' => home_url($path ?? '/'), 'seo_projection' => $this->seo($path, 'Khám phá ' . ($profile !== '' ? $profile : $type) . ' — Đồng Hồ Nhà Kho', 'Khám phá ' . ($profile !== '' ? $profile : $type) . ' trong kho tri thức NHK.')];
         }
         $themeTemplate = locate_template('entity.php');
         return $themeTemplate !== '' ? $themeTemplate : $template;
@@ -171,9 +171,9 @@ final class PublicEntityRoutes
         return PublicRouteResolver::routePrefixForProfile($profileKey) ?? '';
     }
 
-    private function seo(?string $path): array
+    private function seo(?string $path, string $title = '', string $description = ''): array
     {
-        return (new PublicSeoProjection())->project(['path' => $path, 'eligible' => $path !== null, 'readiness' => $path !== null ? 'READY' : 'BLOCKED', 'canonical_url' => $path ?? '', 'public_eligible' => $path !== null], ['type' => 'CollectionPage']);
+        return (new PublicSeoProjection())->project(['path' => $path, 'eligible' => $path !== null, 'readiness' => $path !== null ? 'READY' : 'BLOCKED', 'canonical_url' => $path ?? '', 'public_eligible' => $path !== null], ['title' => $title, 'description' => $description, 'type' => 'CollectionPage']);
     }
 
     /** @return object|null */

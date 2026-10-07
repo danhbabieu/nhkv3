@@ -601,6 +601,14 @@ final class FrontendPresentationContractTest extends TestCase
         self::assertStringContainsString('nhk_v3_article_faq', $source);
     }
 
+    public function test_article_album_assets_follow_a_lightweight_album_feature_signal(): void
+    {
+        $functions = $this->readTheme('functions.php');
+        self::assertStringContainsString('function nhk_v3_article_has_album_feature', $functions);
+        self::assertStringContainsString("'album' => nhk_v3_article_has_album_feature()", $functions);
+        self::assertStringNotContainsString("'album' => is_singular('post')", $functions);
+    }
+
     public function test_media_archive_renders_images_without_requiring_a_fake_detail_url(): void
     {
         $source = $this->read('media.php');

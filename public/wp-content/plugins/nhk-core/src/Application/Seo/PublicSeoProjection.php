@@ -35,6 +35,8 @@ final class PublicSeoProjection
             $jsonLd['mainEntityOfPage'] = $canonicalUrl;
         }
         return [
+            'title' => $title,
+            'description' => $description,
             'canonical' => $canonicalUrl,
             'canonical_path' => $canonicalPath,
             'canonical_url' => $canonicalUrl,

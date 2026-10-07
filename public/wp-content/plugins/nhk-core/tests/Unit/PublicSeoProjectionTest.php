@@ -26,6 +26,10 @@ final class PublicSeoProjectionTest extends TestCase
         foreach (['canonical', 'sitemap', 'breadcrumb', 'card', 'search', 'internal_link'] as $surface) {
             self::assertSame('/thuong-hieu/odo/', $result[$surface], $surface);
         }
+        self::assertSame('Ô Đô', $result['title']);
+        self::assertSame('Hồ sơ Ô Đô trong kho NHK.', $result['description']);
+        self::assertSame('Ô Đô', $result['open_graph']['title']);
+        self::assertSame('Hồ sơ Ô Đô trong kho NHK.', $result['open_graph']['description']);
         self::assertSame('/thuong-hieu/odo/', $result['open_graph']['url']);
         self::assertSame('/thuong-hieu/odo/', $result['json_ld']['url']);
         self::assertSame('/thuong-hieu/odo/', $result['json_ld']['mainEntityOfPage']);
@@ -74,6 +78,8 @@ final class PublicSeoProjectionTest extends TestCase
         self::assertSame('https://demo.1945.vn/thuong-hieu/odo/', $result['canonical']);
         self::assertSame('https://demo.1945.vn/thuong-hieu/odo/', $result['sitemap']);
         self::assertSame('https://demo.1945.vn/thuong-hieu/odo/', $result['open_graph']['url']);
+        self::assertSame('Ô Đô', $result['title']);
+        self::assertSame('', $result['description']);
         self::assertSame('https://demo.1945.vn/thuong-hieu/odo/', $result['json_ld']['url']);
         self::assertSame('/thuong-hieu/odo/', $result['internal_link']);
     }

@@ -17,7 +17,7 @@ final class PublicMediaAssetProjectionTest extends TestCase
         $mediaId = UuidCodec::newV7();
         $source = $this->asset($mediaId, 'original', 'uploads/source-original.jpg', 'source', 2400, 3400, 'PRIVATE', ['source_original' => true]);
         $thumbnail = $this->asset($mediaId, 'derivative', 'uploads/mat-truoc-odo-36-10-thung-kinh-qua-chuong-dep-240x340.webp', 'thumbnail', 240, 340, 'PUBLIC', ['thumbnail' => true]);
-        $large = $this->asset($mediaId, 'derivative', 'uploads/mat-truoc-odo-36-10-thung-kinh-qua-chuong-dep.webp', 'large', 1355, 1920, 'PUBLIC', ['derived_from' => 'uploads/source-original.jpg', 'canonical_filename' => 'mat-truoc-odo-36-10-thung-kinh-qua-chuong-dep.webp']);
+        $large = $this->asset($mediaId, 'derivative', 'uploads/mat-truoc-odo-36-10-thung-kinh-qua-chuong-dep.webp', 'large', 1355, 1920, 'PUBLIC', ['derived_from' => 'uploads/source-original.jpg', 'canonical_filename' => 'mat-truoc-odo-36-10-thung-kinh-qua-chuong-dep.webp', 'attachment_readback_status' => 'verified']);
 
         $selected = (new PublicMediaAssetSelector())->canonical([$thumbnail, $source, $large]);
 
@@ -42,7 +42,7 @@ final class PublicMediaAssetProjectionTest extends TestCase
         $media = new Media($mediaId, 'odo-36-10-image', 'Mặt trước Ô Đô 36/10', 'ready');
         $source = $this->asset($mediaId, 'original', 'uploads/source-original.jpg', 'source', 2400, 3400, 'PRIVATE');
         $thumbnail = $this->asset($mediaId, 'derivative', 'uploads/image-240x340.webp', 'thumbnail', 240, 340, 'PUBLIC', ['thumbnail' => true]);
-        $large = $this->asset($mediaId, 'derivative', 'uploads/mat-truoc-odo-36-10-thung-kinh-qua-chuong-dep.webp', 'large', 1355, 1920, 'PUBLIC', ['canonical_filename' => 'mat-truoc-odo-36-10-thung-kinh-qua-chuong-dep.webp']);
+        $large = $this->asset($mediaId, 'derivative', 'uploads/mat-truoc-odo-36-10-thung-kinh-qua-chuong-dep.webp', 'large', 1355, 1920, 'PUBLIC', ['canonical_filename' => 'mat-truoc-odo-36-10-thung-kinh-qua-chuong-dep.webp', 'attachment_readback_status' => 'verified']);
 
         $item = (new PublicMediaGalleryQuery($this->mediaRepository([$media]), $this->assetRepository([$source, $thumbnail, $large])))->archive()['items'][0];
 
