@@ -10,6 +10,50 @@ use PHPUnit\Framework\TestCase;
 
 final class CaptureDependencyStagingAdmissionTest extends TestCase
 {
+    /** @dataProvider reactivationEntityProvider */
+    public function test_reactivate_is_admitted_for_capture_bound_dependency_with_existing_revision(string $entityType, string $family): void
+    {
+        $capture = $this->capture('reactivate-' . $entityType);
+        $scope = $this->scope($capture, $entityType, $family, 'reactivate', 2);
+
+        $admission = new CaptureDependencyStagingAdmission();
+
+        self::assertTrue($admission(false, $scope, $capture, [], []));
+        self::assertSame('ADMITTED', $admission->reason());
+    }
+
+    /** @dataProvider reactivationEntityProvider */
+    public function test_reactivate_with_zero_revision_is_rejected(string $entityType, string $family): void
+    {
+        $capture = $this->capture('reactivate-zero-' . $entityType);
+        $scope = $this->scope($capture, $entityType, $family, 'reactivate', 0);
+        $admission = new CaptureDependencyStagingAdmission();
+
+        self::assertFalse($admission(false, $scope, $capture, [], []));
+        self::assertSame('TARGET_REVISION_REQUIRED', $admission->reason());
+    }
+
+    public function test_reactivate_without_valid_capture_scope_is_rejected(): void
+    {
+        $capture = $this->capture('reactivate-invalid-scope');
+        $scope = $this->scope($capture, 'knowledge', 'knowledge_delta', 'reactivate', 2);
+        $scope['capture_id'] = UuidCodec::newV7();
+        $admission = new CaptureDependencyStagingAdmission();
+
+        self::assertFalse($admission(false, $scope, $capture, [], []));
+        self::assertSame('DEPENDENCY_OPERATION_NOT_ALLOWED', $admission->reason());
+    }
+
+    public function test_unsupported_dependency_operation_remains_rejected(): void
+    {
+        $capture = $this->capture('unsupported-operation');
+        $scope = $this->scope($capture, 'knowledge', 'knowledge_delta', 'delete', 2);
+        $admission = new CaptureDependencyStagingAdmission();
+
+        self::assertFalse($admission(false, $scope, $capture, [], []));
+        self::assertSame('DEPENDENCY_OPERATION_NOT_ALLOWED', $admission->reason());
+    }
+
     /** @dataProvider subjectTypeProvider */
     public function test_video_dependency_uses_content_intent_not_capture_purpose(string $subjectType): void
     {
@@ -86,5 +130,41 @@ final class CaptureDependencyStagingAdmissionTest extends TestCase
     {
         yield 'classification' => ['classification'];
         yield 'variant' => ['variant'];
+    }
+
+    /** @return iterable<string,array{0:string,1:string}> */
+    public static function reactivationEntityProvider(): iterable
+    {
+        yield 'knowledge' => ['knowledge', 'knowledge_delta'];
+        yield 'source' => ['source', 'source_evidence_reconciliation'];
+        yield 'evidence' => ['evidence', 'source_evidence_reconciliation'];
+    }
+
+    private function capture(string $key): CaptureRecord
+    {
+        return new CaptureRecord(UuidCodec::newV7(), $key, hash('sha256', $key), 'SEMANTICS_RECONCILED', 'IN_PROGRESS', context: [
+            'content_intent' => ['intent' => 'KNOWLEDGE_DELTA'],
+        ], revision: 3);
+    }
+
+    /** @return array<string,mixed> */
+    private function scope(CaptureRecord $capture, string $entityType, string $family, string $operation, int $expectedRevision): array
+    {
+        return [
+            'approved' => true,
+            'environment' => 'staging',
+            'semantic_write_policy' => 'PROJECT_BUILD',
+            'entrypoint' => 'nhk.capture.ingest',
+            'capture_id' => $capture->captureId,
+            'capture_fingerprint' => $capture->requestFingerprint,
+            'operation_family' => $family,
+            'entity_type' => $entityType,
+            'operation' => $operation,
+            'plan_fingerprint' => str_repeat('a', 64),
+            'proposal_command_fingerprint' => str_repeat('b', 64),
+            'payload_fingerprint' => str_repeat('c', 64),
+            'capture_revision' => $capture->revision,
+            'expected_revision' => $expectedRevision,
+        ];
     }
 }

@@ -32,12 +32,12 @@ final class CaptureDependencyStagingAdmission
             || (int) ($scope['capture_revision'] ?? 0) !== $capture->revision
             || !in_array((string) ($scope['operation_family'] ?? ''), ['source_evidence_reconciliation', 'knowledge_delta'], true)
             || !in_array((string) ($scope['entity_type'] ?? ''), ['source', 'knowledge', 'evidence'], true)
-            || !in_array((string) ($scope['operation'] ?? ''), ['ingest', 'create', 'update', 'retire'], true)) { $this->lastReason = 'DEPENDENCY_OPERATION_NOT_ALLOWED'; return false; }
+            || !in_array((string) ($scope['operation'] ?? ''), ['ingest', 'create', 'update', 'retire', 'reactivate'], true)) { $this->lastReason = 'DEPENDENCY_OPERATION_NOT_ALLOWED'; return false; }
         if (preg_match('/^[a-f0-9]{64}$/i', (string) ($scope['plan_fingerprint'] ?? '')) !== 1
             || preg_match('/^[a-f0-9]{64}$/i', (string) ($scope['proposal_command_fingerprint'] ?? '')) !== 1
             || preg_match('/^[a-f0-9]{64}$/i', (string) ($scope['payload_fingerprint'] ?? '')) !== 1) { $this->lastReason = 'DEPENDENCY_FINGERPRINT_INVALID'; return false; }
         $operation = (string) ($scope['operation'] ?? '');
-        if (in_array($operation, ['update', 'retire'], true) ? (int) ($scope['expected_revision'] ?? 0) < 1 : (int) ($scope['expected_revision'] ?? 0) !== 0) { $this->lastReason = in_array($operation, ['update', 'retire'], true) ? 'TARGET_REVISION_REQUIRED' : 'CREATE_REVISION_NOT_ZERO'; return false; }
+        if (in_array($operation, ['update', 'retire', 'reactivate'], true) ? (int) ($scope['expected_revision'] ?? 0) < 1 : (int) ($scope['expected_revision'] ?? 0) !== 0) { $this->lastReason = in_array($operation, ['update', 'retire', 'reactivate'], true) ? 'TARGET_REVISION_REQUIRED' : 'CREATE_REVISION_NOT_ZERO'; return false; }
         $this->lastReason = 'ADMITTED';
         return true;
     }

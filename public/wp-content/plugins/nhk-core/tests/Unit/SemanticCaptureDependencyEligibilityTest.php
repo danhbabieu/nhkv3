@@ -160,6 +160,19 @@ final class SemanticCaptureDependencyEligibilityTest extends TestCase
         self::assertNull($verifier->proposalFailureReason($scope, $proposal));
     }
 
+    /** @dataProvider retirementTypeProvider */
+    public function test_minimal_capture_bound_reactivation_proposals_are_admitted_with_existing_revision(string $entityType, string $expectedFamily): void
+    {
+        [$capture, $proposal, $scope, $verifier] = $this->retirementFixture($entityType, 'reactivate', 1);
+        $result = $this->eligibility($proposal, $verifier, static fn (): CaptureRecord => $capture)->check($proposal->id);
+
+        self::assertGreaterThanOrEqual(1, $scope['expected_revision']);
+        self::assertSame($expectedFamily, $scope['operation_family']);
+        self::assertTrue($result->ready, json_encode($result->reasons, JSON_THROW_ON_ERROR));
+        self::assertSame([], $result->reasons);
+        self::assertNull($verifier->proposalFailureReason($scope, $proposal));
+    }
+
     /** @return iterable<string,array{0:string}> */
     public static function dependencyTypeProvider(): iterable
     {
@@ -225,7 +238,7 @@ final class SemanticCaptureDependencyEligibilityTest extends TestCase
     }
 
     /** @return array{0:CaptureRecord,1:Proposal,2:array<string,mixed>,3:StagingAcceptanceScopeVerifier} */
-    private function retirementFixture(string $entityType): array
+    private function retirementFixture(string $entityType, string $operation = 'retire', int $expectedRevision = 1): array
     {
         $captureId = UuidCodec::newV7();
         $subjectId = UuidCodec::newV7();
@@ -241,10 +254,10 @@ final class SemanticCaptureDependencyEligibilityTest extends TestCase
         $payload = ['capture_id' => $captureId];
         $plan = [
             'entity_type' => $entityType,
-            'operation' => 'retire',
+            'operation' => $operation,
             'subject_id' => $subjectId,
-            'expected_revision' => 1,
-            'idempotency_key' => 'semantic-retirement-' . $entityType . '-' . $captureId,
+            'expected_revision' => $expectedRevision,
+            'idempotency_key' => 'semantic-' . $operation . '-' . $entityType . '-' . $captureId,
             'payload' => $payload,
         ];
         $admission = new CaptureDependencyStagingAdmission();
@@ -260,10 +273,10 @@ final class SemanticCaptureDependencyEligibilityTest extends TestCase
         $proposal = new Proposal(
             UuidCodec::newV7(),
             $subjectId,
-            'retire',
+            $operation,
             $payload,
             'semantic-retirement-content',
-            1,
+            $expectedRevision,
             'semantic-retirement-dependency',
             ProposalState::APPROVED,
             idempotencyKey: $plan['idempotency_key'],

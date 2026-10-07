@@ -251,7 +251,7 @@ final class StagingAcceptanceScopeVerifier
         // signed scope metadata and is not part of the child command hash.
         $plan['payload'] = is_array($plan['payload'] ?? null) ? $plan['payload'] : [];
         $descriptor = StagingOperationDescriptor::fromPlan($plan, $capture->captureId, $capture->requestFingerprint);
-        if (!in_array($descriptor->entityType, ['source', 'knowledge', 'evidence'], true) || !in_array($descriptor->operation, ['ingest', 'create', 'update', 'retire'], true)) throw new \RuntimeException('STAGING_DEPENDENCY_OPERATION_INVALID');
+        if (!in_array($descriptor->entityType, ['source', 'knowledge', 'evidence'], true) || !in_array($descriptor->operation, ['ingest', 'create', 'update', 'retire', 'reactivate'], true)) throw new \RuntimeException('STAGING_DEPENDENCY_OPERATION_INVALID');
         $family = $descriptor->operationFamily;
         $payloadFingerprint = $descriptor->payloadFingerprint;
         $planFingerprint = hash('sha256', CommandCanonicalizer::canonicalize(StagingOperationDescriptor::withoutAuthorization($plan)));

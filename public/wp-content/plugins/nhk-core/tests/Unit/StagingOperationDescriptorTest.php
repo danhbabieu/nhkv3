@@ -12,6 +12,31 @@ use PHPUnit\Framework\TestCase;
 
 final class StagingOperationDescriptorTest extends TestCase
 {
+    /** @dataProvider reactivationFamilyProvider */
+    public function test_reactivation_uses_existing_dependency_operation_family(string $entityType, string $expectedFamily): void
+    {
+        $descriptor = StagingOperationDescriptor::fromPlan([
+            'entity_type' => $entityType,
+            'operation' => 'reactivate',
+            'subject_id' => UuidCodec::newV7(),
+            'target_uuid' => UuidCodec::newV7(),
+            'expected_revision' => 2,
+            'idempotency_key' => 'reactivate-' . $entityType,
+            'payload' => [],
+        ], UuidCodec::newV7(), hash('sha256', 'reactivate-capture'));
+
+        self::assertSame($expectedFamily, $descriptor->operationFamily);
+        self::assertSame(2, $descriptor->expectedRevision);
+    }
+
+    /** @return iterable<string,array{0:string,1:string}> */
+    public static function reactivationFamilyProvider(): iterable
+    {
+        yield 'knowledge' => ['knowledge', 'knowledge_delta'];
+        yield 'source' => ['source', 'source_evidence_reconciliation'];
+        yield 'evidence' => ['evidence', 'source_evidence_reconciliation'];
+    }
+
     /** @dataProvider semanticSubjectProvider */
     public function test_final_dependency_and_proposal_use_one_identity_for_optional_source_fields(string $subjectType): void
     {

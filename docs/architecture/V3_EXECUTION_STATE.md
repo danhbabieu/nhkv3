@@ -1,5 +1,31 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-07 — Staging dependency reactivation admission fixed locally
+
+ROOT_CAUSE_CONFIRMED: Capture-bound staging admission and dependency scope
+issuance classified Source/Knowledge/Evidence `reactivate` as unsupported before
+Controlled Apply. The existing descriptor families and lifecycle executor
+already support the operation.
+
+LOCAL_FIX: Existing `source_evidence_reconciliation` and `knowledge_delta`
+families now include `reactivate`; Capture dependency admission and scope
+issuance allow it, while create/ingest require revision 0 and update/retire/
+reactivate require revision >= 1. No bypass, identity logic or semantic owner
+changed.
+
+REGRESSION_COVERAGE: Focused staging descriptor/admission/eligibility suite
+passes 53 tests / 170 assertions. PHP lint and `git diff --check` pass.
+
+INCIDENT_READ_ONLY: Proposal
+`01a114af-f861-7837-9441-1effb25699f7` is approved for
+`knowledge:reactivate`, target
+`01a094df-714b-7d1a-8c92-e0d88819f7b8`, expected revision 2; successful
+ApplyAttempt count is 0; target Knowledge remains RETIRED at revision 2.
+The proposal was not applied and no semantic data was mutated.
+
+STATUS: `STAGING_REACTIVATION_ADMISSION_FIX_LOCAL / FOCUSED_GREEN /
+INCIDENT_READ_ONLY_VERIFIED / NO_SEMANTIC_DATA_MUTATION / DEPLOYMENT_PENDING`
+
 # Checkpoint — 2026-10-07 — Legacy Article overlap review freshness
 
 ROOT_CAUSE_CONFIRMED: Article pre-create overlap reviews were classified as
