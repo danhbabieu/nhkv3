@@ -80,18 +80,21 @@ final class FrontendContractTest extends TestCase
 
     public function test_dictionary_detail_renders_contract_breadcrumb_and_reader_safe_sense_links(): void
     {
-        $dictionary = (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/dictionary.php');
+        $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
+        $dictionary = (string) file_get_contents($theme . '/dictionary.php');
+        $detail = (string) file_get_contents($theme . '/template-parts/dictionary/dictionary-detail.php');
 
         self::assertStringContainsString('home_url(\'/tu-dien/\')); ?>">Từ điển</a>', $dictionary);
-        self::assertStringContainsString("<?php echo esc_html((string) (\$result['item']['title'] ?? '')); ?>", $dictionary);
-        self::assertStringContainsString('Liên quan trực tiếp', $dictionary);
-        self::assertStringContainsString('Nội dung có nhắc đến', $dictionary);
+        self::assertStringContainsString("get_template_part('template-parts/dictionary/dictionary-detail'", $dictionary);
+        self::assertStringContainsString('esc_html($title)', $detail);
+        self::assertStringContainsString('Liên quan', $detail);
+        self::assertStringContainsString('Nội dung có nhắc đến', $detail);
     }
 
     public function test_dictionary_presentation_does_not_expose_internal_label_or_scope_keys(): void
     {
         $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
-        $dictionary = (string) file_get_contents($theme . '/dictionary.php');
+        $dictionary = (string) file_get_contents($theme . '/template-parts/dictionary/dictionary-detail.php');
 
         self::assertStringContainsString('nhk_v3_dictionary_label_kind', $dictionary);
         self::assertStringNotContainsString('echo esc_html((string) $label[\'kind\'])', $dictionary);
@@ -100,7 +103,7 @@ final class FrontendContractTest extends TestCase
     public function test_dictionary_detail_has_reader_safe_rich_lexical_sections_and_reusable_cards(): void
     {
         $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
-        $dictionary = (string) file_get_contents($theme . '/dictionary.php');
+        $dictionary = (string) file_get_contents($theme . '/template-parts/dictionary/dictionary-detail.php');
         $style = (string) file_get_contents($theme . '/dictionary.css');
 
         foreach ([
@@ -614,7 +617,7 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString("\$canonical = home_url('/' . \$editorialRoute . '/')", $functions);
         self::assertStringContainsString("if (is_404()) return 'Không tìm thấy trang — Đồng Hồ Nhà Kho';", $functions);
         self::assertStringContainsString("if (is_404()) {", $functions);
-        self::assertStringContainsString('$mustNoindex = is_404() || is_search() || $isPaginated;', $functions);
+        self::assertStringContainsString('$mustNoindex = is_404() || is_search() || $isPaginated || (($sharedSeo[\'indexable\'] ?? true) === false);', $functions);
         self::assertStringContainsString('nhk_v3_public_archive_title()', (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/index.php'));
         self::assertStringContainsString("is_category() || is_tag() || is_author()", $functions);
         self::assertStringContainsString("if (is_category())", $functions);
@@ -657,13 +660,18 @@ final class FrontendContractTest extends TestCase
     {
         $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
         $dictionary = (string) file_get_contents($theme . '/dictionary.php');
+        $detail = (string) file_get_contents($theme . '/template-parts/dictionary/dictionary-detail.php');
+        $composer = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/Dictionary/DictionaryDetailPresentationComposer.php');
         $routes = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/PublicDictionaryRoutes.php');
 
-        foreach (['canonical_uuid', 'stable_key', 'source_id', 'raw_predicate', 'diagnostics', 'SQLSTATE', 'Evidence'] as $internal) self::assertStringNotContainsString($internal, $dictionary);
-        self::assertStringContainsString("'@type' => 'DefinedTerm'", $routes);
-        self::assertStringContainsString("'inDefinedTermSet'", $routes);
-        self::assertStringContainsString('$senseDescriptions', $routes);
-        self::assertStringContainsString("(\$seo['state'] ?? '') === 'REDIRECT'", $routes);
+        foreach (['canonical_uuid', 'stable_key', 'source_id', 'raw_predicate', 'diagnostics', 'SQLSTATE', 'Evidence'] as $internal) {
+            self::assertStringNotContainsString($internal, $dictionary);
+            self::assertStringNotContainsString($internal, $detail);
+        }
+        self::assertStringContainsString("'@type' => 'DefinedTerm'", $composer);
+        self::assertStringContainsString("'inDefinedTermSet'", $composer);
+        self::assertStringContainsString("'meta_description'", $composer);
+        self::assertStringContainsString("(\$result['status'] ?? '') === 'REDIRECT'", $routes);
         self::assertStringContainsString("\$query !== '' || \$initial !== '' || \$cursor !== null", $routes);
         self::assertStringContainsString("noindex,follow", $routes);
     }

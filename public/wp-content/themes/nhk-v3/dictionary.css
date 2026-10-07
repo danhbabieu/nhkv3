@@ -2,3 +2,4 @@
 @media(max-width:64rem){.dictionary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:48rem){.dictionary-related-grid,.dictionary-gallery{grid-template-columns:repeat(2,minmax(0,1fr))}.dictionary-lexical-hero{padding-top:45px}}
 @media(max-width:36rem){.dictionary-grid,.dictionary-related-grid,.dictionary-gallery{grid-template-columns:1fr}.dictionary-alphabet{overflow-x:auto;flex-wrap:nowrap;padding-bottom:18px}.dictionary-alphabet a,.dictionary-alphabet span{flex:0 0 auto}.dictionary-card-body{padding:16px}.dictionary-definition{font-size:1.05rem}}
+.dictionary-usage ul{margin:0;padding-left:20px}.dictionary-usage li+li{margin-top:8px}.dictionary-unified-detail>.dictionary-detail-section:first-of-type{margin-top:30px}

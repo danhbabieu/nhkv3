@@ -12,7 +12,7 @@ final class DictionaryPublicQuery
 {
     private DictionaryLexicalBrowsePolicy $browsePolicy;
 
-    public function __construct(private DictionaryConceptRepository $concepts, private $imageResolver = null, private $destinationValidator = null, private $entries = null, private $entrySenseReady = null, private $semanticProjection = null, private ?DictionaryDetailQuery $detailQuery = null)
+    public function __construct(private DictionaryConceptRepository $concepts, private $imageResolver = null, private $destinationValidator = null, private $entries = null, private $entrySenseReady = null, private $semanticProjection = null, private ?DictionaryDetailQuery $detailQuery = null, private ?DictionaryDetailPresentationComposer $presentationComposer = null)
     {
         $this->browsePolicy = new DictionaryLexicalBrowsePolicy();
     }
@@ -272,7 +272,7 @@ final class DictionaryPublicQuery
 
     public function detail(string $slug): array
     {
-        if ($this->detailQuery !== null) return $this->detailQuery->detail($slug);
+        if ($this->detailQuery !== null) return $this->decorateDetail($this->detailQuery->detail($slug));
         $slug = $this->slug($slug);
         if ($slug === '') return ['status' => 'NOT_FOUND'];
         if ($this->entrySenseAvailable() && is_object($this->entries) && method_exists($this->entries, 'listEntries')) {
@@ -302,6 +302,36 @@ final class DictionaryPublicQuery
         if (($item['eligible'] ?? false) !== true) return ['status' => 'INCOMPLETE', 'reason' => 'CANONICAL_DESTINATION_NOT_READY', 'concept_id' => $concept->conceptId];
         if (($item['dedicated'] ?? true) === false) return ['status' => 'REDIRECT', 'destination_url' => $item['url'], 'concept_id' => $concept->conceptId];
         return ['status' => 'READY', 'item' => $item, 'labels' => $item['labels'], 'canonical_url' => $item['url'], 'indexable' => true];
+    }
+
+    /** Read-only reverse lexical projection for one canonical semantic owner. */
+    public function detailForOwner(string $type, string $id): array
+    {
+        $type = trim($type); $id = trim($id);
+        if ($type === '' || $id === '' || !is_object($this->entries) || !method_exists($this->entries, 'findEntriesBySemanticReference')) return ['status' => 'UNAVAILABLE', 'reason' => 'REVERSE_MAPPING_UNAVAILABLE'];
+        try { $matches = array_values(array_filter((array) $this->entries->findEntriesBySemanticReference($type, $id, 2), static fn (mixed $entry): bool => $entry instanceof LexicalEntry)); }
+        catch (\Throwable) { return ['status' => 'UNAVAILABLE', 'reason' => 'REVERSE_MAPPING_READ_FAILED']; }
+        if ($matches === []) return ['status' => 'EMPTY', 'reason' => 'NO_DICTIONARY_MAPPING'];
+        if (count($matches) !== 1) return ['status' => 'AMBIGUOUS_LEXICAL_OVERLAY', 'reason' => 'MULTIPLE_DICTIONARY_ENTRIES'];
+        $slug = trim((string) ($matches[0]->context['public_slug'] ?? ''));
+        if ($slug === '') return ['status' => 'BLOCKED', 'reason' => 'DICTIONARY_PUBLIC_IDENTITY_MISSING'];
+        try { $ownerUrl = is_callable($this->destinationValidator) ? ($this->destinationValidator)($type, $id, null) : null; }
+        catch (\Throwable) { return ['status' => 'BLOCKED', 'reason' => 'CANONICAL_OWNER_READ_FAILED']; }
+        if (!is_string($ownerUrl) || trim($ownerUrl) === '') return ['status' => 'BLOCKED', 'reason' => 'CANONICAL_OWNER_UNAVAILABLE'];
+        $raw = $this->detail($slug);
+        if ($this->presentationComposer === null || !is_array($raw['item'] ?? null)) return ['status' => 'UNAVAILABLE', 'reason' => 'PRESENTATION_COMPOSER_UNAVAILABLE'];
+        $raw['status'] = 'READY';
+        $presentation = $this->presentationComposer->compose($raw, ['mode' => 'delegated', 'canonical_url' => trim($ownerUrl)]);
+        return ['status' => 'READY', 'presentation' => $presentation, 'canonical_url' => trim($ownerUrl), 'seo_projection' => $presentation['seo'] ?? []];
+    }
+
+    /** @param array<string,mixed> $result @return array<string,mixed> */
+    private function decorateDetail(array $result): array
+    {
+        if ($this->presentationComposer === null || !is_array($result['item'] ?? null)) return $result;
+        $result['presentation'] = $this->presentationComposer->compose($result);
+        $result['seo_projection'] = $result['presentation']['seo'] ?? [];
+        return $result;
     }
 
     /** Lightweight Entry summary used by hub/search; no dossier, Graph or source reads. */

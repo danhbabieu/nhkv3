@@ -47,7 +47,9 @@ function nhk_v3_assets(): void
     if ($needsMediaVideo || $needsKnowledge) wp_enqueue_style('nhk-v3-media-video');
     if ($needsKnowledge) wp_enqueue_style('nhk-v3-knowledge');
     if ($needsPresentation) wp_enqueue_style('nhk-v3-presentation');
-    if (is_array($GLOBALS['nhk_core_dictionary_context'] ?? null)) wp_enqueue_style('nhk-v3-dictionary');
+    $dictionaryContext = $GLOBALS['nhk_core_dictionary_context'] ?? null;
+    $entityContext = $GLOBALS['nhk_core_entity_context'] ?? null;
+    if (is_array($dictionaryContext) || (is_array($entityContext) && is_array($entityContext['entity']['dictionary_detail'] ?? null))) wp_enqueue_style('nhk-v3-dictionary');
     if (is_singular('post')) {
         wp_enqueue_style('nhk-v3-album-style');
         wp_enqueue_script('nhk-v3-album', get_theme_file_uri('album.js'), [], '1.1.0', true);
@@ -543,8 +545,9 @@ function nhk_v3_article_faq(int $postId): array
 
 function nhk_v3_context_seo_projection(): array
 {
-    foreach (['nhk_core_entity_context', 'nhk_core_media_context', 'nhk_core_video_context', 'nhk_core_knowledge_context', 'nhk_core_comparison_context'] as $key) {
+    foreach (['nhk_core_dictionary_context', 'nhk_core_entity_context', 'nhk_core_media_context', 'nhk_core_video_context', 'nhk_core_knowledge_context', 'nhk_core_comparison_context'] as $key) {
         $context = $GLOBALS[$key] ?? null;
+        if ($key === 'nhk_core_dictionary_context' && is_array($context) && is_array($context['seo_projection'] ?? null)) return $context['seo_projection'];
         if (is_array($context) && is_array($context['seo_projection'] ?? null)) return $context['seo_projection'];
         if ($key === 'nhk_core_entity_context' && is_array($context['entity']['seo_projection'] ?? null)) return $context['entity']['seo_projection'];
     }
@@ -558,6 +561,9 @@ function nhk_v3_document_title(string $title): string
     $video = $GLOBALS['nhk_core_video_context'] ?? null;
     $knowledge = $GLOBALS['nhk_core_knowledge_context'] ?? null;
     $comparison = $GLOBALS['nhk_core_comparison_context'] ?? null;
+    $dictionary = $GLOBALS['nhk_core_dictionary_context'] ?? null;
+    if (is_array($dictionary) && ($dictionary['mode'] ?? '') === 'detail' && is_array($dictionary['result']['presentation']['seo'] ?? null)) return (string) ($dictionary['result']['presentation']['seo']['title'] ?? $title);
+    if (is_array($dictionary) && ($dictionary['mode'] ?? '') === 'hub') return 'Từ điển đồng hồ cổ — Đồng Hồ Nhà Kho';
     if (is_array($entity) && ($entity['mode'] ?? '') === 'detail' && is_array($entity['entity'] ?? null)) return (string) $entity['entity']['name'] . ' — Đồng Hồ Nhà Kho';
     if (is_array($entity) && ($entity['mode'] ?? '') === 'archive') return 'Khám phá ' . nhk_v3_entity_label((string) ($entity['type'] ?? ''), (string) ($entity['profile'] ?? '')) . ' — Đồng Hồ Nhà Kho';
     if (is_array($media) && ($media['mode'] ?? '') === 'detail' && is_array($media['media'] ?? null)) return (string) ($media['media']['name'] ?? 'Media') . ' — Đồng Hồ Nhà Kho';
@@ -589,8 +595,13 @@ function nhk_v3_seo_head(): void
     $video_context = $GLOBALS['nhk_core_video_context'] ?? null;
     $knowledge_context = $GLOBALS['nhk_core_knowledge_context'] ?? null;
     $comparison_context = $GLOBALS['nhk_core_comparison_context'] ?? null;
+    $dictionary_context = $GLOBALS['nhk_core_dictionary_context'] ?? null;
     $title = wp_get_document_title(); $description = get_bloginfo('description'); $canonical = '';
     $sharedSeo = nhk_v3_context_seo_projection();
+    if (is_array($sharedSeo['open_graph'] ?? null)) {
+        if (trim((string) ($sharedSeo['open_graph']['title'] ?? '')) !== '') $title = (string) $sharedSeo['open_graph']['title'];
+        if (trim((string) ($sharedSeo['open_graph']['description'] ?? '')) !== '') $description = (string) $sharedSeo['open_graph']['description'];
+    }
     if (is_404()) {
         $title = 'Không tìm thấy trang — Đồng Hồ Nhà Kho';
         $description = 'Trang bạn tìm kiếm không tồn tại hoặc đã được chuyển sang địa chỉ khác trong kho NHK.';
@@ -646,6 +657,12 @@ function nhk_v3_seo_head(): void
     }
     if (is_string($sharedSeo['canonical'] ?? null) && $sharedSeo['canonical'] !== '') $canonical = (string) $sharedSeo['canonical'];
     if (is_array($comparison_context) && ($comparison_context['mode'] ?? '') === 'compare') { $title = 'So sánh hồ sơ — Đồng Hồ Nhà Kho'; $description = 'Đọc cạnh nhau các dữ kiện công khai của hai hồ sơ NHK.'; $canonical = home_url('/so-sanh/'); }
+    if (is_array($dictionary_context) && ($dictionary_context['mode'] ?? '') === 'detail' && is_array($dictionary_context['result']['presentation'] ?? null)) {
+        $dictionarySeo = is_array($dictionary_context['result']['presentation']['seo'] ?? null) ? $dictionary_context['result']['presentation']['seo'] : [];
+        $title = (string) ($dictionarySeo['title'] ?? $title);
+        $description = (string) ($dictionarySeo['meta_description'] ?? $description);
+        $canonical = (string) ($dictionarySeo['canonical'] ?? $canonical);
+    }
     if ($canonical === '') {
         if (is_front_page() || is_home() || is_search()) $canonical = home_url('/');
         else $canonical = function_exists('wp_get_canonical_url') ? (string) wp_get_canonical_url() : home_url(add_query_arg([]));
@@ -666,6 +683,12 @@ function nhk_v3_seo_head(): void
     if (is_array($video_context)) $breadcrumb['itemListElement'][] = ['@type' => 'ListItem', 'position' => 2, 'name' => 'Video', 'item' => home_url('/video/')];
     if (is_array($knowledge_context)) $breadcrumb['itemListElement'][] = ['@type' => 'ListItem', 'position' => 2, 'name' => 'Tri thức', 'item' => home_url('/tri-thuc/')];
     if (is_array($comparison_context)) $breadcrumb['itemListElement'][] = ['@type' => 'ListItem', 'position' => 2, 'name' => 'So sánh hồ sơ', 'item' => home_url('/so-sanh/')];
+    if (is_array($dictionary_context) && ($dictionary_context['mode'] ?? '') === 'detail' && is_array($dictionary_context['result']['presentation'] ?? null)) {
+        $dictionaryTitle = (string) ($dictionary_context['result']['presentation']['identity']['title'] ?? 'Từ điển');
+        $dictionaryCanonical = (string) ($dictionary_context['result']['presentation']['seo']['canonical'] ?? home_url('/tu-dien/'));
+        $breadcrumb['itemListElement'][] = ['@type' => 'ListItem', 'position' => 2, 'name' => 'Từ điển', 'item' => home_url('/tu-dien/')];
+        $breadcrumb['itemListElement'][] = ['@type' => 'ListItem', 'position' => 3, 'name' => $dictionaryTitle, 'item' => $dictionaryCanonical];
+    }
     echo '<script type="application/ld+json">' . wp_json_encode($breadcrumb, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . '</script>' . "\n";
     if (!is_singular('post') && !is_array($video_context) && is_array($sharedSeo['json_ld'] ?? null) && $sharedSeo['json_ld'] !== []) echo '<script type="application/ld+json">' . wp_json_encode($sharedSeo['json_ld'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . '</script>' . "\n";
     if (is_singular('post')) {
@@ -688,8 +711,9 @@ function nhk_v3_robots(array $robots): array
             break;
         }
     }
-    $mustNoindex = is_404() || is_search() || $isPaginated;
-    $canonical = nhk_v3_context_seo_projection()['canonical'] ?? (function_exists('wp_get_canonical_url') ? wp_get_canonical_url() : home_url('/'));
+    $sharedSeo = nhk_v3_context_seo_projection();
+    $mustNoindex = is_404() || is_search() || $isPaginated || (($sharedSeo['indexable'] ?? true) === false);
+    $canonical = $sharedSeo['canonical'] ?? (function_exists('wp_get_canonical_url') ? wp_get_canonical_url() : home_url('/'));
     $decision = (new \NHK\Core\Application\Seo\SeoIndexabilityPolicy())->evaluate([
         'readiness' => $mustNoindex ? 'BLOCKED' : 'READY',
         'public_eligible' => !$mustNoindex,

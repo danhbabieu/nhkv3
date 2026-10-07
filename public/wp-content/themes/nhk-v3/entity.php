@@ -16,7 +16,9 @@ $nhkReaderType = static function (array $item): string {
 get_header();
 ?>
 <main id="main-content" class="site-main entity-shell entity-v2">
-<?php if (is_array($context) && ($context['mode'] ?? '') === 'detail' && is_array($context['entity'] ?? null)): $entity = $context['entity'];
+<?php if (is_array($context) && ($context['mode'] ?? '') === 'detail' && is_array($context['entity']['dictionary_detail'] ?? null)): ?>
+  <?php get_template_part('template-parts/dictionary/dictionary-detail', null, ['packet' => $context['entity']['dictionary_detail']]); ?>
+<?php elseif (is_array($context) && ($context['mode'] ?? '') === 'detail' && is_array($context['entity'] ?? null)): $entity = $context['entity'];
     $profileKey = trim((string) ($entity['profile_key'] ?? $profileKey));
     $label = $profileKey === 'clock_type' ? 'Loại đồng hồ' : ($labels[$type] ?? 'Khám phá');
     $dossier = is_array($entity['dossier'] ?? null) && ($entity['dossier']['status'] ?? '') === 'AVAILABLE' ? $entity['dossier'] : null;

@@ -169,7 +169,7 @@ final class DictionaryRuntime
                 if (!$this->types->has($type)) return [];
                 $entity = $this->authority->findByCanonicalId($id);
                 if (!$entity instanceof AuthorityEntity || !$entity->active() || $entity->entityType !== $type) return [];
-                $value = ['dossier' => null];
+                $value = ['dossier' => null, '_nhk_dictionary_owner_projection' => true];
                 if (function_exists('apply_filters') && has_filter('nhk_v3_entity_detail_projection')) $value = apply_filters('nhk_v3_entity_detail_projection', $value, $entity);
                 $sections = is_array($value['dossier']['relation_sections'] ?? null) ? $value['dossier']['relation_sections'] : [];
                 $candidates = [];
@@ -194,6 +194,7 @@ final class DictionaryRuntime
             fn (): bool => $this->entrySenseAvailable(),
             fn (string $type, string $id): array => $this->canonicalOwnerDossier($type, $id),
             $detailQuery,
+            new DictionaryDetailPresentationComposer(),
         );
     }
 
@@ -202,7 +203,7 @@ final class DictionaryRuntime
         if (!$this->types->has($type)) return [];
         $entity = $this->authority->findByCanonicalId($id);
         if (!$entity instanceof AuthorityEntity || !$entity->active() || $entity->entityType !== $type) return [];
-        $value = ['dossier' => null];
+        $value = ['dossier' => null, '_nhk_dictionary_owner_projection' => true];
         if (function_exists('apply_filters') && has_filter('nhk_v3_entity_detail_projection')) $value = apply_filters('nhk_v3_entity_detail_projection', $value, $entity);
         if (is_array($value['dossier'] ?? null)) return $value['dossier'];
         return ['identity' => ['type' => $entity->entityType, 'id' => $entity->canonicalId, 'title' => $entity->canonicalName, 'url' => $this->routes->path($entity)]];

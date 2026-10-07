@@ -1,5 +1,67 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-07 — Unified Dictionary detail presentation and delegated owner overlay
+
+ROOT_CAUSE_CONFIRMED: Dedicated Dictionary detail and delegated owner detail
+were rendered by separate template paths, while Dictionary SEO emitted a
+second private head surface. Reverse owner lookup also had no single
+fail-closed presentation boundary. This allowed presentation drift and could
+leave delegated owners on the generic Entity dossier rather than the approved
+Dictionary form.
+
+ARCHITECTURE_IMPLEMENTED: Dictionary remains the lexical owner. A new
+read-only `DictionaryDetailPresentationComposer` creates one public packet
+from canonical Dictionary detail data, with identity, preferred/alternate
+forms, senses, usage scope/notes, canonical owner, Knowledge, relations and
+facets, Media, Video, Articles, related terms, mentions, availability and the
+shared `PublicSeoProjection`. Internal identifiers and provenance fields are
+stripped before the packet reaches templates.
+
+SHARED_RENDERER: Dedicated `/tu-dien/{slug}/` and delegated owner detail both
+call `template-parts/dictionary/dictionary-detail.php`. The partial is
+presentation-only, has one H1, renders alternate forms, omits empty or
+unavailable sections, and makes no repository calls. Generic Entity rendering
+remains the fallback for zero reverse mappings; multiple mappings return
+`AMBIGUOUS_LEXICAL_OVERLAY` and fail closed. An explicit internal owner-dossier
+marker prevents recursive reverse lookup while allowing the normal Entity
+projection filter to attach the shared Dictionary packet after the generic
+dossier filters run.
+
+SEO_SURFACE: Dictionary detail and hub now expose shared SEO context consumed
+by the theme's single title/canonical/robots/Open Graph/JSON-LD emitter.
+Dedicated eligible Dictionary details use `DefinedTerm` projection and remain
+the only Dictionary sitemap candidates. Delegated owner overlays preserve the
+owner canonical URL and are `noindex,follow`, with no duplicate Dictionary
+JSON-LD or sitemap entry. Hub query/initial/cursor views are lightweight and
+`noindex,follow`; no detail enrichment is added to hub/search/archive paths.
+
+REGRESSION_COVERAGE: Focused Dictionary/Entity/SEO/frontend slice passed 141
+tests / 1,081 assertions with one deprecation. The broader configured suite
+ran 3,673 tests / 21,728 assertions and remains non-green on 46 environment or
+infrastructure errors and 29 unrelated existing failures; no changed-surface
+Dictionary renderer or SEO contract failure remains. The default 128M PHP
+memory limit is insufficient for the full suite; the verified broader run used
+`memory_limit=512M`.
+
+QUALITY_GATES: Changed PHP files lint clean, `git diff --check` passes, and a
+scoped secret scan found no credential or private-key patterns. No migration
+was added or run because this change is read-only presentation/routing/SEO
+composition.
+
+DATA_SAFETY: No database migration, staging/production mutation, legacy-body
+import, semantic write, deploy, push, pull/rebase, or public cutover was
+performed. Existing unrelated work was preserved.
+
+FILES_CHANGED: Dictionary presentation composer/query/runtime/WordPress bridge,
+public Dictionary routes, shared Dictionary detail partial, Dictionary and
+Entity templates, theme SEO/assets, and focused contract/regression tests.
+
+COMMIT: Local implementation commit created: `feat: unify dictionary detail presentation and seo`.
+
+STATUS: `DICTIONARY_DETAIL_PRESENTATION_UNIFIED_LOCALLY / FOCUSED_GREEN /
+FULL_SUITE_ENVIRONMENT_AND_PREEXISTING_FAILURES / NO_SEMANTIC_DATA_MUTATION /
+DEPLOYMENT_PENDING`
+
 # Checkpoint — 2026-10-07 — Draft wp_post publication route fallback fixed
 
 ROOT_CAUSE_CONFIRMED: `ArticlePublicationGate` left `nativeRouteReady=false`

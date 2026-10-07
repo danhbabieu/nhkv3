@@ -4,10 +4,14 @@ declare(strict_types=1);
 namespace NHK\Core\Infrastructure\Dictionary;
 
 use NHK\Core\Application\Dictionary\{DictionaryHtmlLinker, DictionaryObservationRegistry, DictionaryRuntime};
+use NHK\Core\Domain\Authority\AuthorityEntity;
 use NHK\Core\Infrastructure\Http\PublicDictionaryRoutes;
 
 final class DictionaryWordPressBridge
 {
+    /** @var array<string,array<string,mixed>> */
+    private array $ownerProjectionCache = [];
+
     public function __construct(private DictionaryRuntime $runtime) {}
 
     public function register(): void
@@ -21,10 +25,24 @@ final class DictionaryWordPressBridge
             add_filter('nhk_v3_home_semantic_modules', [$this, 'extendHome'], 30, 1);
             add_filter('nhk_v3_public_dictionary_terms_for_text', [$this, 'termsForText'], 10, 2);
             add_filter('the_content', [$this, 'linkContent'], 20);
+            add_filter('nhk_v3_entity_detail_projection', [$this, 'attachDictionaryDetail'], 30, 2);
         }
         add_action('wp_after_insert_post', [$this, 'observePost'], 40, 3);
         add_action('add_attachment', [$this, 'observeAttachment'], 40, 1);
         add_action('edit_attachment', [$this, 'observeAttachment'], 40, 1);
+    }
+
+    /** Attach exactly one approved lexical Entry to its canonical owner without changing owner truth. */
+    public function attachDictionaryDetail(array $item, AuthorityEntity $entity): array
+    {
+        // DictionaryRuntime marks its internal owner-dossier read to prevent a
+        // recursive reverse lookup while normal entity detail projections may
+        // already contain the generic dossier from earlier filters.
+        if (($item['_nhk_dictionary_owner_projection'] ?? false) === true) return $item;
+        $key = $entity->entityType . ':' . $entity->canonicalId;
+        $projection = $this->ownerProjectionCache[$key] ??= $this->runtime->publicQuery()->detailForOwner($entity->entityType, $entity->canonicalId);
+        if (($projection['status'] ?? '') === 'READY' && is_array($projection['presentation'] ?? null)) $item['dictionary_detail'] = $projection['presentation'];
+        return $item;
     }
 
     public function preview(string $text, array $context = []): array

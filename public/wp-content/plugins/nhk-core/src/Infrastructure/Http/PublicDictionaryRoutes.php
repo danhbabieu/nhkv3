@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Infrastructure\Http;
 
 use NHK\Core\Application\Dictionary\DictionaryPublicQuery;
+use NHK\Core\Application\Seo\PublicSeoProjection;
 
 final class PublicDictionaryRoutes
 {
@@ -14,7 +15,6 @@ final class PublicDictionaryRoutes
         add_filter('query_vars', function (array $vars): array { foreach (['nhk_dictionary_hub', 'nhk_dictionary_slug'] as $name) if (!in_array($name, $vars, true)) $vars[] = $name; return $vars; });
         add_action('init', [$this, 'rewrite']);
         add_filter('template_include', [$this, 'template']);
-        add_action('wp_head', [$this, 'head'], 2);
     }
 
     public function rewrite(): void
@@ -39,7 +39,7 @@ final class PublicDictionaryRoutes
                 $this->set404();
                 return get_404_template();
             }
-            $GLOBALS['nhk_core_dictionary_context'] = ['mode' => 'detail', 'result' => $result];
+            $GLOBALS['nhk_core_dictionary_context'] = ['mode' => 'detail', 'result' => $result, 'seo_projection' => $result['seo_projection'] ?? []];
         } else {
             $query = isset($_GET['q']) && is_string($_GET['q']) ? sanitize_text_field(wp_unslash($_GET['q'])) : '';
             $initial = isset($_GET['initial']) && is_string($_GET['initial']) ? sanitize_text_field(wp_unslash($_GET['initial'])) : '';
@@ -49,54 +49,16 @@ final class PublicDictionaryRoutes
                 $this->set404();
                 return get_404_template();
             }
-            $GLOBALS['nhk_core_dictionary_context'] = ['mode' => 'hub', 'result' => $packet];
+            $hubSeo = (new PublicSeoProjection())->project(['path' => '/tu-dien/', 'eligible' => true], ['title' => 'Từ điển đồng hồ cổ — Đồng Hồ Nhà Kho', 'description' => 'Tra cứu thuật ngữ kỹ thuật, tên gọi quốc tế và cách gọi trong giới sưu tầm đồng hồ.', 'type' => 'DefinedTermSet']);
+            if ($query !== '' || $initial !== '' || $cursor !== null) {
+                $hubSeo['indexable'] = false; $hubSeo['sitemap'] = false; $hubSeo['robots'] = 'noindex,follow'; $hubSeo['json_ld'] = [];
+            }
+            $packet['seo_projection'] = $hubSeo;
+            $GLOBALS['nhk_core_dictionary_context'] = ['mode' => 'hub', 'result' => $packet, 'seo_projection' => $hubSeo];
         }
 
-        // The active theme owns the public presentation; the plugin file is a portability fallback.
         $theme = locate_template('dictionary.php', false, false);
-        if ($theme !== '') return $theme;
-        return dirname(__DIR__, 3) . '/templates/dictionary.php';
-    }
-
-    public function head(): void
-    {
-        $context = $GLOBALS['nhk_core_dictionary_context'] ?? null;
-        if (!is_array($context) || !is_array($context['result'] ?? null)) return;
-        $result = $context['result'];
-        $mode = (string) ($context['mode'] ?? '');
-        if ($mode === 'detail') {
-            $item = is_array($result['item'] ?? null) ? $result['item'] : [];
-            $seo = is_array($result['seo'] ?? null) ? $result['seo'] : [];
-            $canonical = $this->absolute((string) ($seo['canonical'] ?? $result['canonical_url'] ?? ''));
-            if ($canonical !== '') echo '<link rel="canonical" href="' . esc_url($canonical) . '" />' . "\n";
-            if (($seo['robots'] ?? '') !== '') echo '<meta name="robots" content="' . esc_attr((string) $seo['robots']) . '" />' . "\n";
-            if (($seo['sitemap'] ?? true) === false) echo '<meta name="nhk-dictionary-sitemap" content="exclude" />' . "\n";
-            if (($seo['state'] ?? '') === 'REDIRECT') return;
-            $description = trim((string) ($item['description'] ?? ''));
-            if ($description === '') {
-                $senseDescriptions = [];
-                foreach ((array) ($item['senses'] ?? []) as $sense) if (is_array($sense) && trim((string) ($sense['description'] ?? '')) !== '') $senseDescriptions[] = trim((string) $sense['description']);
-                $description = implode(' ', array_slice($senseDescriptions, 0, 6));
-            }
-            $schema = ['@context' => 'https://schema.org', '@type' => 'DefinedTerm', 'name' => (string) ($item['title'] ?? ''), 'description' => $description, 'url' => $canonical, 'inDefinedTermSet' => $this->absolute('/tu-dien/')];
-            echo '<script type="application/ld+json">' . wp_json_encode($schema, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . '</script>' . "\n";
-            return;
-        }
-        if ($mode === 'hub') {
-            $canonical = $this->absolute('/tu-dien/');
-            echo '<link rel="canonical" href="' . esc_url($canonical) . '" />' . "\n";
-            $query = isset($_GET['q']) && is_string($_GET['q']) ? sanitize_text_field(wp_unslash($_GET['q'])) : '';
-            $initial = isset($_GET['initial']) && is_string($_GET['initial']) ? sanitize_text_field(wp_unslash($_GET['initial'])) : '';
-            $cursor = isset($_GET['cursor']) && is_string($_GET['cursor']) ? sanitize_text_field(wp_unslash($_GET['cursor'])) : null;
-            if ($query !== '' || $initial !== '' || $cursor !== null) echo '<meta name="robots" content="noindex,follow" />' . "\n";
-            $terms = [];
-            foreach ((array) ($result['items'] ?? []) as $item) {
-                if (!is_array($item) || trim((string) ($item['url'] ?? '')) === '') continue;
-                $terms[] = ['@type' => 'DefinedTerm', 'name' => (string) ($item['title'] ?? ''), 'url' => $this->absolute((string) $item['url'])];
-            }
-            $schema = ['@context' => 'https://schema.org', '@type' => 'DefinedTermSet', 'name' => 'Từ điển đồng hồ cổ', 'url' => $canonical, 'hasDefinedTerm' => $terms];
-            echo '<script type="application/ld+json">' . wp_json_encode($schema, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . '</script>' . "\n";
-        }
+        return $theme !== '' ? $theme : dirname(__DIR__, 3) . '/templates/dictionary.php';
     }
 
     private function absolute(string $url): string
