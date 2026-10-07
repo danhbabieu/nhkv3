@@ -1,5 +1,89 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-07 — System-wide governed operation policy consolidation
+
+SCOPE: Consolidated generic Governance operation metadata behind one
+read-only `GovernedOperationPolicyRegistry`. The policy explicitly registers
+every current Controlled Apply owner/operation pair and declares operation
+family, lifecycle class, revision policy, target binding, Capture staging
+decision, production decision and generic capabilities. `ControlledApply`
+compatibility, staging descriptor/fingerprint identity, Capture dependency and
+relation scope issuance, staging guards, owner admissions' generic checks,
+eligibility routing and production capability admission now consume the shared
+policy where applicable.
+
+POLICY_DRIFT_FOUND:
+
+- `ControlledApplyOperationRegistry` previously fell back to Authority
+  operations for unknown entity types instead of failing closed.
+- `StagingOperationDescriptor` independently enumerated operation families and
+  only partially centralized create/ingest revision-zero behavior.
+- Capture dependency admission independently enumerated supported operations
+  and revision rules, which omitted the executor-supported Knowledge/Source/
+  Evidence `reactivate` lifecycle path.
+- Authority, Video, Media and generic scoped/production admissions duplicated
+  operation and capability decisions. Owner-specific identity, endpoint,
+  predicate, binding, readiness and semantic checks remain separate.
+
+CANONICAL_POLICY_MODEL: One explicit policy entry per exact owner/operation;
+unknown pairs fail closed. `CREATE` uses `ZERO`, existing lifecycle mutation/
+retire/reactivate uses `CURRENT_REQUIRED`, and relation/MediaUsage/wp_post
+special operations declare `NONE` with their owner-specific CAS contracts.
+Executor compatibility is not staging authorization. Staging-denied entries
+remain explicit denials; notably Video source refresh/retire/reactivate and
+Video/Media relation routes without a valid Capture owner flow are not opened
+for symmetry. MediaUsage add/replace/remove and representative binding remain
+staging-allowed because their exact governed Capture scope issuers already
+exist.
+
+OWNER_SPECIFIC_EXCEPTIONS: Video canonical/external identity and completeness;
+Media binding/usage eligibility; Relation endpoint, predicate, cardinality and
+edge revision; Authority semantic plan/candidate checks; Knowledge
+provenance/identity; Source/Evidence dependency and visibility rules. These
+were not flattened into the generic policy.
+
+MATRIX: `docs/architecture/GOVERNANCE_OPERATION_POLICY_MATRIX_2026-10-07.md`.
+
+REGRESSION_COVERAGE: Policy registry 25 tests / 1,164 assertions; staging
+descriptor/scope/admission 83 tests / 186 assertions; Governance policy,
+eligibility and apply slice 31 tests / 210 assertions. The historical
+Knowledge `reactivate` omission is covered and passes. The full configured
+suite ran 3,627 tests / 21,537 assertions with 46 environment/errors and 29
+unrelated existing failures; explicit Unit-directory rerun ran 3,442 tests /
+21,465 assertions with 14 errors and 5 unrelated existing failures. The
+configured `--testsuite Unit` name is absent and executed zero tests.
+
+QUALITY_GATES: Changed PHP files lint clean and `git diff --check` passes.
+Scoped secret review found no credential/key material. No guarded integration
+runtime is available locally (`NHK_WP_TEST_PATH`/authorized TEST runtime and
+`wp-config.php` are absent), so no integration mutation or acceptance was
+attempted.
+
+PRODUCTION_BEHAVIOR_CHANGED: NO. Production remains separate from staging
+packets and keeps its existing apply capability boundary; policy metadata only
+removes duplicated generic capability decisions.
+
+INCIDENT_PROPOSAL_STATE: UNCHANGED / READ_ONLY. The existing execution-state
+evidence records Proposal `01a114af-f861-7837-9441-1effb25699f7` as approved,
+`knowledge:reactivate`, target `01a094df-714b-7d1a-8c92-e0d88819f7b8`, expected
+revision 2, with zero successful ApplyAttempts and the target retired at
+revision 2. Fresh local runtime inspection is unavailable, and the proposal
+was not submitted, approved, applied, recovered or otherwise mutated in this
+checkpoint.
+
+FILES_CHANGED: Canonical policy model/registry, compatibility adapter, staging
+descriptor/scope/admissions/guard, eligibility, production admission, policy
+contract tests, staging regression, matrix and this execution-state entry.
+
+SEMANTIC_DATA_MUTATION: NONE.
+DEPLOYED_REVISION: NOT DEPLOYED.
+COMMITS: `f2cbb898` (policy/matrix), `19a82a3b` (staging), `0a78c172`
+(eligibility/production/tests). Documentation checkpoint commit pending.
+
+STATUS: `GOVERNED_OPERATION_POLICY_CONSOLIDATED_LOCALLY / FOCUSED_GREEN /
+FULL_SUITE_ENVIRONMENT_AND_PREEXISTING_FAILURES / NO_SEMANTIC_DATA_MUTATION /
+INCIDENT_READ_ONLY_UNCHANGED / DEPLOYMENT_PENDING`
+
 # Checkpoint — 2026-10-07 — Global Article publication lifecycle fixed locally
 
 IMPLEMENTATION: Capture-owned Article publication now validates deterministic
@@ -24215,3 +24299,34 @@ write occurred.
 STATUS: `KNOWLEDGE_VIDEO_PROVENANCE_DUPLICATE_IDENTITY_FIXED_LOCALLY /
 FOCUSED_GREEN / FULL_SUITE_ENVIRONMENT_LIMITED / NO_DATA_MUTATION /
 NO_DEPLOYMENT / COMMIT_PENDING`.
+
+# Checkpoint — 2026-10-07 — Documentation checkpoint authority blocker fixed locally
+
+ROOT_CAUSE_CONFIRMED: The canonical documentation bootstrap and MCP transport
+were composed with one `McpDocumentationRegistry`, while the
+`EditorialCaptureCoordinator` received a second registry constructed directly
+inside Plugin bootstrap. Capture ingest/retry therefore had two checkpoint
+validation authorities and could resolve a different deployed documentation
+root/snapshot from the bootstrap/transport path. The first mismatching field
+is `manifest_hash` because the validator compares it first; if it matches, the
+next field is `documentation_version`. The comparison itself was fail-closed
+and was not weakened. Stale diagnostics now report the sanitized expected and
+supplied pair plus the first mismatching field, without secrets.
+
+LOCAL_FIX: The coordinator now consumes the same `$documentation` instance as
+the MCP transport. Bootstrap, transport validation and Capture continuation
+validation therefore share one canonical checkpoint authority without
+accepting arbitrary or partial tuples.
+
+REGRESSION_COVERAGE: Added wiring coverage proving one documentation registry
+construction is shared by transport and Capture, plus a runtime contract
+matrix deriving the checkpoint from bootstrap and asserting current acceptance
+and rejection of wrong-version, wrong-manifest, both-stale and mixed tuples.
+
+VERIFICATION: Focused MCP documentation/contract/plugin wiring coverage passes
+95 tests / 1,579 assertions with 3 existing deprecations. Changed PHP files
+lint clean and `git diff --check` passes. No Capture retry, staging mutation,
+deployment or publication was performed.
+
+STATUS: `DOCUMENTATION_CHECKPOINT_AUTHORITY_FIXED_LOCALLY / FOCUSED_GREEN /
+NO_DATA_MUTATION / NO_DEPLOYMENT / COMMIT_PENDING`.
