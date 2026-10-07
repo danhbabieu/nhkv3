@@ -295,6 +295,20 @@ final class ProposalEligibilityServiceTest extends TestCase
         self::assertContains('KNOWLEDGE_RECONCILIATION_IDENTITY_BINDING_REQUIRED', $result->reasons);
     }
 
+    public function test_knowledge_reactivate_is_capture_scoped_by_canonical_policy(): void
+    {
+        $proposal = new Proposal(self::ID, self::SUBJECT, 'reactivate', [
+            'capture_id' => '01a0b2e0-1888-7038-9811-2dd7e7073a27',
+        ], 'knowledge-reactivate-content', 2, 'knowledge-reactivate-dependency', ProposalState::APPROVED, idempotencyKey: 'knowledge-reactivate-policy', targetUuid: self::SUBJECT, entityType: 'knowledge');
+        $service = $this->service($proposal);
+        $service->setStagingScopeVerifier(static fn (Proposal $checked): string => 'STAGING_SCOPE_REQUIRED');
+
+        $result = $service->check($proposal->id);
+
+        self::assertFalse($result->ready);
+        self::assertContains('STAGING_SCOPE_REQUIRED', $result->reasons);
+    }
+
     private function service(Proposal $proposal, ?SubjectResolutionService $subjectResolver = null, ?EligibilityReader $relationReader = null, ?MediaUsageRepository $mediaUsages = null): ProposalEligibilityService
     {
         $repository = new class($proposal) implements ProposalRepository {

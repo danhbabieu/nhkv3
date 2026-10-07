@@ -40,16 +40,16 @@ final class ProposalEligibilityService
         }
         $reasons = [];
         $diagnostics = [];
-        $authorityTypes = ['brand', 'model', 'variant', 'movement', 'music', 'component', 'classification', 'specimen', 'product'];
-        $authorityScoped = in_array($proposal->entityType, $authorityTypes, true)
-            && in_array($proposal->operation, ['create', 'ingest', 'update', 'rename', 'rekey', 'merge', 'retire', 'reactivate'], true);
-        $semanticDependencyScoped = in_array($proposal->entityType, ['source', 'knowledge', 'evidence'], true)
-            && in_array($proposal->operation, ['create', 'ingest', 'update', 'retire'], true);
+        $policy = (new GovernedOperationPolicyRegistry())->find($proposal->entityType, $proposal->operation);
+        if ($policy === null) $reasons[] = 'OPERATION_UNREGISTERED';
+        $authorityScoped = $policy?->operationFamily === 'governed_authority_plan';
+        $semanticDependencyScoped = in_array($policy?->operationFamily, ['source_evidence_reconciliation', 'knowledge_delta'], true);
+        $videoScoped = $policy?->operationFamily === 'governed_video_plan' && $policy->captureStagingAllowed;
         $captureBound = $semanticDependencyScoped
             || array_key_exists('capture_id', $proposal->payload)
             || is_array($proposal->payload['project_build_audit'] ?? null)
             || $authorityScoped;
-        if ($this->stagingScopeVerifier !== null && (($proposal->entityType === 'video' && in_array($proposal->operation, ['ingest', 'update'], true)) || $semanticDependencyScoped || $authorityScoped) && $captureBound) {
+        if ($this->stagingScopeVerifier !== null && ($videoScoped || $semanticDependencyScoped || $authorityScoped) && $captureBound) {
             $scope = $proposal->payload['staging_acceptance'] ?? null;
             $scopeResolutionError = null;
             if (!is_array($scope) && is_callable($this->stagingScopeResolver)) {
@@ -88,7 +88,7 @@ final class ProposalEligibilityService
                 if (in_array(strtoupper(trim((string) ($binding['classification'] ?? ''))), ['POSSIBLE_DUPLICATE', 'UNRESOLVED', 'CONFLICTING'], true)) $reasons[] = 'KNOWLEDGE_RECONCILIATION_CLASSIFICATION_NOT_EXECUTABLE';
             }
         }
-        $isCreation = in_array($proposal->operation, ['create', 'ingest'], true) && $proposal->targetUuid === null;
+        $isCreation = $policy?->revisionPolicy === 'ZERO' && $proposal->targetUuid === null;
         // relation_create carries typed endpoint keys in its payload. A
         // WordPress endpoint key such as 1:487 is not an Authority UUID, so
         // do not send it through the generic canonical-target check before

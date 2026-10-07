@@ -25,8 +25,9 @@ final class ProductionGovernanceAdmission implements StagingGuard
     {
         $environment = strtolower(trim((string) ($this->environment)()));
         if (!in_array($environment, ['production', 'prod'], true)) return;
-        if (!$this->operations->supports($proposal->entityType, $proposal->operation)) throw new \RuntimeException('PRODUCTION_OPERATION_UNREGISTERED');
-        foreach ($this->capabilities($proposal) as $capability) {
+        $policy = (new GovernedOperationPolicyRegistry())->find($proposal->entityType, $proposal->operation);
+        if ($policy === null || !$policy->productionAllowed || !$this->operations->supports($proposal->entityType, $proposal->operation)) throw new \RuntimeException('PRODUCTION_OPERATION_UNREGISTERED');
+        foreach (array_values(array_unique(array_merge($this->capabilities($proposal), $policy->requiredCapabilities))) as $capability) {
             if (!(bool) ($this->can)($capability)) throw new \RuntimeException('PRODUCTION_CAPABILITY_REQUIRED:' . $capability);
         }
         if (!ProposalSubjectBindingValidator::isValid($proposal)) throw new \RuntimeException('PRODUCTION_SUBJECT_BINDING_INVALID');
@@ -39,10 +40,6 @@ final class ProductionGovernanceAdmission implements StagingGuard
     /** @return list<string> */
     private function capabilities(Proposal $proposal): array
     {
-        $capabilities = ['nhk_apply_proposals'];
-        if ($proposal->entityType === 'video' && $proposal->operation === 'source_refresh') $capabilities[] = 'nhk_create_proposals';
-        if ($proposal->entityType === 'media' && in_array($proposal->operation, ['representative_bind', 'add', 'replace', 'remove'], true)) $capabilities[] = 'nhk_internal_content_operations';
-        if ($proposal->entityType === 'wp_post' && $proposal->operation === 'subject_bind') $capabilities[] = 'nhk_internal_content_operations';
-        return $capabilities;
+        return ['nhk_apply_proposals'];
     }
 }
