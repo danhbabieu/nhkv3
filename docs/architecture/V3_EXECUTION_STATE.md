@@ -1,5 +1,41 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-07 — Capture interrupted IN_PROGRESS convergence fixed locally
+
+ROOT_CAUSE_CONFIRMED: `EditorialCaptureCoordinator::run()` persists the
+`SEMANTICS_RECONCILED` checkpoint with `status=IN_PROGRESS` before entering
+the Article pre-create review boundary. If the worker stops after that write,
+the exception recovery path cannot append the next
+`ARTICLE_PRE_CREATE_REVIEW` attempt, leaving a valid persisted checkpoint with
+no terminal blocker and no active phase receipt. Retry admission previously
+treated the status string as sufficient and returned
+`CAPTURE_RETRY_NOT_ALLOWED`.
+
+AUTHORITATIVE_LIFECYCLE: `CaptureCurrentOutcomeReducer::lifecycleState()` is
+now the shared decision for read projection, continuation retry admission and
+coordinator admission. A fresh unfinished `STARTED` phase receipt is
+`ACTIVELY_EXECUTING`; an unfinished receipt older than the bounded 15-minute
+window or no active receipt is not an immortal lock. An `IN_PROGRESS` Capture
+with no current blocker is `RECOVERABLE_INTERRUPTED`, a current non-reevaluable
+blocker is `TERMINALLY_BLOCKED`, and canonical completion is
+`COMPLETED_CONVERGED`.
+
+RESUMABILITY_FIX: Recoverable `IN_PROGRESS` Article review states now pass the
+same stale-review reevaluation path as `REVIEW_REQUIRED`. Duplicate retries
+against an actively executing Capture are denied with
+`CAPTURE_EXECUTION_IN_PROGRESS`. `capture_get` exposes the derived lifecycle
+state while preserving the persisted status and revision.
+
+REGRESSION_COVERAGE: Capture-focused suite passed 498 tests / 2,491
+assertions with deprecation notices only. Added coverage for the revision-40
+live-shaped interrupted checkpoint and for fresh active-phase duplicate denial.
+
+DATA_SAFETY: No Capture UUID was special-cased, no database state was edited,
+no Article was created, no publication, staging mutation, deployment or push
+was performed.
+
+STATUS: `CAPTURE_IN_PROGRESS_CONVERGENCE_FIXED_LOCAL / FOCUSED_GREEN / NO_DATA_MUTATION / DEPLOYMENT_PENDING`
+
 # Checkpoint — 2026-10-07 — System-wide governed operation policy consolidation
 
 SCOPE: Consolidated generic Governance operation metadata behind one

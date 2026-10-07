@@ -86,6 +86,9 @@ final class EditorialCaptureCoordinator
         $existing = $this->captures->findByIdempotencyKey($key);
         if ($existing !== null) {
             if (!hash_equals($existing->requestFingerprint, $fingerprint)) return $this->conflict($existing, $fingerprint);
+            if (CaptureCurrentOutcomeReducer::lifecycleState($existing, $input) === 'ACTIVELY_EXECUTING') {
+                throw new \RuntimeException('CAPTURE_EXECUTION_IN_PROGRESS');
+            }
             if ($existing->stage === CaptureStage::READY_FOR_PUBLICATION->value || $existing->stage === CaptureStage::PUBLISHED->value) return $existing;
             if ($this->hasTerminalSemanticReadback($existing)) return $existing;
             return $this->run($existing, $input);
@@ -129,6 +132,9 @@ final class EditorialCaptureCoordinator
     /** Resume the persisted Capture checkpoint without creating an addendum. */
     public function retry(CaptureRecord $record, array $input): CaptureRecord
     {
+        if (CaptureCurrentOutcomeReducer::lifecycleState($record, $input) === 'ACTIVELY_EXECUTING') {
+            throw new \RuntimeException('CAPTURE_EXECUTION_IN_PROGRESS');
+        }
         $this->documentation?->assertCheckpoint((array) ($input['documentation_checkpoint'] ?? []));
         $input = $this->normalizeEditorialInput($this->rehydrateRetryInput($record, $input));
         Utf8Contract::assertValid($input, 'mcp.capture.retry', 'arguments');

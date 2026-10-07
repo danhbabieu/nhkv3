@@ -9,6 +9,45 @@ use NHK\Core\Domain\Capture\CaptureRecord;
 /** Derives current retry truth from latest phase outcomes and completion evidence. */
 final class CaptureCurrentOutcomeReducer
 {
+    private const ACTIVE_EXECUTION_TTL_SECONDS = 900;
+
+    /**
+     * One lifecycle decision for Capture reads and continuation admission.
+     * An unfinished phase receipt is the persisted execution signal; once it
+     * is absent or expires, IN_PROGRESS is an interrupted checkpoint, not a
+     * durable claim that a worker still owns the Capture.
+     */
+    public static function lifecycleState(CaptureRecord $capture, array $input = []): string
+    {
+        if ($capture->status === 'COMPLETE' || $capture->status === 'PUBLISHED'
+            || in_array($capture->stage, ['READY_FOR_PUBLICATION', 'PUBLISHED'], true)
+            && (($capture->diagnostics['completion']['complete'] ?? false) === true)) {
+            return 'COMPLETED_CONVERGED';
+        }
+        if ($capture->status === 'IN_PROGRESS' && self::hasActiveExecution($capture)) return 'ACTIVELY_EXECUTING';
+
+        $blockers = self::currentBlockers($capture->diagnostics, $capture->phaseReceipts, $capture, $input);
+        if ($blockers !== [] && !self::isReevaluatableArticleReview($capture->diagnostics, $capture->phaseReceipts, $capture, $input)) {
+            return 'TERMINALLY_BLOCKED';
+        }
+        if ($capture->status === 'IN_PROGRESS') return 'RECOVERABLE_INTERRUPTED';
+        return $blockers !== [] ? 'TERMINALLY_BLOCKED' : 'RECOVERABLE_INTERRUPTED';
+    }
+
+    private static function hasActiveExecution(CaptureRecord $capture): bool
+    {
+        $now = time();
+        foreach ($capture->phaseReceipts as $receipt) {
+            if (!is_array($receipt)) continue;
+            $latest = CapturePhaseReceiptReducer::latest($receipt);
+            if (strtoupper(trim((string) ($latest['status'] ?? ''))) !== 'STARTED') continue;
+            if (trim((string) ($latest['completed_at'] ?? '')) !== '') continue;
+            $startedAt = strtotime((string) ($latest['started_at'] ?? ''));
+            if ($startedAt !== false && $startedAt <= $now && ($now - $startedAt) <= self::ACTIVE_EXECUTION_TTL_SECONDS) return true;
+        }
+        return false;
+    }
+
     /** @param array<string,mixed> $diagnostics @param array<string,mixed> $phaseReceipts @return list<string> */
     public static function currentBlockers(array $diagnostics, array $phaseReceipts, ?CaptureRecord $capture = null, array $input = []): array
     {
@@ -125,6 +164,9 @@ final class CaptureCurrentOutcomeReducer
      */
     public static function retryEligibility(CaptureRecord $capture, array $input = []): array
     {
+        $lifecycle = self::lifecycleState($capture, $input);
+        if ($lifecycle === 'ACTIVELY_EXECUTING') return ['eligible' => false, 'reason' => 'CAPTURE_EXECUTION_IN_PROGRESS'];
+        if ($lifecycle === 'COMPLETED_CONVERGED') return ['eligible' => false, 'reason' => 'CAPTURE_RETRY_NOT_ALLOWED'];
         if ($capture->status === 'FAILED_RETRYABLE') return ['eligible' => true, 'reason' => null];
         if (in_array($capture->stage, ['READY_FOR_PUBLICATION', 'PUBLISHED'], true)) return ['eligible' => false, 'reason' => 'CAPTURE_RETRY_NOT_ALLOWED'];
         if (in_array($capture->status, ['APPLIED', 'REVIEW_REQUIRED'], true)
@@ -143,7 +185,7 @@ final class CaptureCurrentOutcomeReducer
         ) {
             return ['eligible' => false, 'reason' => 'CURRENT_REVIEW_REQUIRED'];
         }
-        if ($capture->status === 'REVIEW_REQUIRED'
+        if (in_array($capture->status, ['REVIEW_REQUIRED', 'IN_PROGRESS'], true)
             && !self::isHardBlockedReview($capture)
             && (CapturePhaseReceiptReducer::hasStaleInheritedArticleReview($capture->phaseReceipts)
                 || ArticleReviewFreshness::isReevaluatable($capture, $capture->diagnostics))) {

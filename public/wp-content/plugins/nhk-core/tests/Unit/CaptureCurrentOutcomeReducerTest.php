@@ -393,6 +393,35 @@ final class CaptureCurrentOutcomeReducerTest extends TestCase
         self::assertSame(['eligible' => true, 'reason' => 'STALE_REVIEW_REEVALUATABLE'], CaptureCurrentOutcomeReducer::retryEligibility($capture));
     }
 
+    public function test_interrupted_in_progress_capture_with_no_active_phase_is_resumable(): void
+    {
+        $capture = $this->capture([
+            'failure' => ['code' => 'SUBSTANTIAL_OVERLAP'],
+            'completion' => ['status' => 'BLOCKED', 'blockers' => ['SUBSTANTIAL_OVERLAP']],
+            'article_resolution' => ['research' => ['ready_for_draft' => true, 'blockers' => [], 'overlap_analysis' => ['classification' => 'SUBSTANTIAL_OVERLAP', 'candidates' => []]]],
+        ], [
+            'INTERPRETED' => ['status' => 'COMPLETED', 'result' => 'IN_PROGRESS'],
+            'CONTENT_PREPARATION' => ['status' => 'COMPLETED', 'result' => 'IN_PROGRESS'],
+            'SEMANTICS_RECONCILED' => ['status' => 'COMPLETED', 'result' => 'IN_PROGRESS'],
+            'ARTICLE_PRE_CREATE_REVIEW' => ['status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'failure_code' => 'SUBSTANTIAL_OVERLAP'],
+        ], 'IN_PROGRESS');
+
+        self::assertSame('RECOVERABLE_INTERRUPTED', CaptureCurrentOutcomeReducer::lifecycleState($capture));
+        self::assertSame(['eligible' => true, 'reason' => 'STALE_REVIEW_REEVALUATABLE'], CaptureCurrentOutcomeReducer::retryEligibility($capture));
+    }
+
+    public function test_fresh_started_phase_denies_duplicate_execution(): void
+    {
+        $capture = $this->capture(
+            ['completion' => ['status' => 'PARTIAL', 'blockers' => []]],
+            ['SEMANTICS_RECONCILED' => ['status' => 'STARTED', 'result' => 'IN_PROGRESS', 'started_at' => gmdate('c'), 'completed_at' => null]],
+            'IN_PROGRESS',
+        );
+
+        self::assertSame('ACTIVELY_EXECUTING', CaptureCurrentOutcomeReducer::lifecycleState($capture));
+        self::assertSame(['eligible' => false, 'reason' => 'CAPTURE_EXECUTION_IN_PROGRESS'], CaptureCurrentOutcomeReducer::retryEligibility($capture));
+    }
+
     public function test_review_with_same_dependency_fingerprint_is_active_and_not_retryable(): void
     {
         $capture = $this->reviewCapture(['content_preparation' => ['quality_decision' => 'READY']]);

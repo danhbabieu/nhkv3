@@ -167,6 +167,7 @@ final class McpReadHandler
             'purpose' => (string) ($context['purpose'] ?? 'EDITORIAL'),
             'intent' => is_array($context['content_intent'] ?? null) ? $context['content_intent'] : null,
             'revision' => $capture->revision, 'stage' => $capture->stage, 'capture_status' => $capture->status,
+            'lifecycle_state' => CaptureCurrentOutcomeReducer::lifecycleState($capture),
             'subject_resolution_packet' => $packet,
             'article' => $capture->articleId === null ? null : ['post_id' => $capture->articleId, 'state' => (string) ($diagnostics['publication']['status'] ?? '')],
             'article_id' => $capture->articleId,
