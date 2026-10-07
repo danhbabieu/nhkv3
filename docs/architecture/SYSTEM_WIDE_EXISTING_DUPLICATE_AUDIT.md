@@ -55,3 +55,22 @@ bounded limit and retired-row flag, and returns owner status, counts, clusters,
 next cursor and completeness. It has no mutation, apply, repair, merge, retire,
 delete, rekey or migration path. No schema migration is required for this
 audit capability.
+
+## Knowledge identity V2 audit law — 2026-10-07
+
+Knowledge audit rows use the same canonical Claim identity boundary as
+pre-create, enrichment and reconciliation. Resolved rows expose the identity
+policy, status and fingerprint in `identity_signals`; equality is asserted
+only for two `RESOLVED` packets with the same fingerprint. `UNRESOLVED` and
+`CONFLICTING` rows are bounded review-only buckets with
+`REVIEW_KNOWLEDGE_IDENTITY;NO_MUTATION`; they are never classified as
+equivalent. Wording or locator similarity cannot turn them into a duplicate.
+Video provenance compares the registered `platform + external_video_id`
+referent and subject, not wording or a canonical owner UUID.
+
+The audit remains strictly read-only (`apply=false`). It creates no Governance
+proposal, retirement, reactivation, merge, rekey or repair action. Any future
+retirement must re-read and bind the current policy version, identity status
+and fingerprint, Claim revisions, dependency topology/fingerprint and
+Evidence lifecycle. Stale bindings, possible duplicates, unresolved/conflicting
+identity and `KNOWLEDGE_REPAIR_DEPENDENCY_REVIEW_REQUIRED` remain fail-closed.

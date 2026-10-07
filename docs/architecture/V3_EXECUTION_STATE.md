@@ -1,5 +1,29 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-07 — Knowledge identity V2 implemented and verified locally
+
+KNOWLEDGE_IDENTITY_V2: The current design is implemented on `main` without
+reverting prior Capture work. Knowledge Claim identity now has one shared,
+status-aware resolver for pre-create, enrichment, duplicate audit and repair
+reconciliation. Ordinary identity is subject/facet/scope/claim type/
+deterministic proposition. Video provenance identity is subject/proposition
+class/platform/external video ID; wording and source locator are not identity.
+Unresolved and conflicting identity is review-required and never equivalent.
+
+KNOWLEDGE_IDENTITY_VERIFICATION: Focused Knowledge identity, resolver,
+enrichment, Capture provenance, audit, cursor/MCP, repair preview and proposal
+eligibility tests passed: 140 tests, 1,399 assertions. PHP lint and
+`git diff --check` passed. The full PHPUnit run was attempted with a 512M
+memory limit and remains baseline-limited by existing environment/runtime
+errors and failures (3,559 tests; 35 errors; 29 failures; 24 warnings; 125
+skips); no claim of a fully green repository suite is made.
+
+KNOWLEDGE_IDENTITY_DATA_SAFETY: No migration, staging semantic mutation,
+legacy import, rekey, retire, merge or repair Apply was performed. The planned
+1,176-row live duplicate audit is `LIVE_READONLY_AUDIT=NOT_RUN` pending a
+fresh documentation/deployment identity checkpoint and authorized runtime
+access. Local verification is not evidence of a live deployment.
+
 # Checkpoint — 2026-10-07 — Live Capture retry shape diagnosed and reducer/policy fixed locally
 
 LIVE_READ_ONLY_DIAGNOSIS: On the authorized TEST runtime

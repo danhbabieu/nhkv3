@@ -292,3 +292,33 @@ need, uses only registered safe tiers, and marks broader material as relaxed,
 comparative or background context; it never satisfies exact coverage or
 rewrites a broader Claim as a narrow fact. The existing KnowledgeUnit, coverage
 and adaptive selector remain the downstream selection boundary.
+
+## Knowledge-owner identity V2 — 2026-10-07
+
+Knowledge owns Claim identity through one canonical, read-only resolution
+boundary shared by pre-create reuse, enrichment, duplicate audit and repair
+reconciliation. The resolver returns explicit `RESOLVED`, `UNRESOLVED` or
+`CONFLICTING` status, a policy version and a canonical identity fingerprint.
+`UNRESOLVED` and `CONFLICTING` are never equivalent to any Claim and always
+remain review-required.
+
+Ordinary Claim identity is the deterministic tuple `subject + facet + scope +
+claim_type + proposition`. The registered `CAPTURE_VIDEO_SOURCE_PROVENANCE`
+profile uses `subject + proposition_class + video_referent`, where the Video
+referent is consistently `platform + external_video_id`. A
+`canonical_video_id` is only a read-only owner lookup result and cannot replace
+the external referent. Wording is not identity; different subjects or Video
+referents remain distinct and require review when identity cannot be resolved.
+
+New provenance stable keys are derived from the resolved canonical identity
+packet and never from a source locator or wording. Existing legacy stable keys
+remain reusable compatibility identity and are never rekeyed. Source locator
+changes therefore do not create a new Claim, and Video provenance wording
+changes do not create a new Claim when subject and Video referent are unchanged.
+
+Retired reuse and reconciliation are fail-closed: execution must freshly
+verify identity status, policy version, identity fingerprint, Claim revision,
+dependency topology/fingerprint and Evidence lifecycle. Possible duplicates,
+unresolved or conflicting identity, stale bindings and
+`KNOWLEDGE_REPAIR_DEPENDENCY_REVIEW_REQUIRED` cannot be auto-retired or
+reactivated by the identity resolver.
