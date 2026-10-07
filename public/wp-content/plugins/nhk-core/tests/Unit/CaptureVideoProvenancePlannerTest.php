@@ -9,6 +9,7 @@ use NHK\Core\Application\Governance\GovernanceAutomationPolicyResolver;
 use NHK\Core\Application\Video\{VideoRelationCandidatePlanner, VideoThumbnailSelector, YouTubeSourceAdapter};
 use NHK\Core\Contracts\Governance\{AutomationPolicyStorage, GovernedLifecycle};
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
+use NHK\Core\Contracts\Video\VideoIdentityReader;
 use NHK\Core\Domain\Governance\{Proposal, ProposalState};
 use NHK\Core\Domain\Graph\PredicateRegistry;
 use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim, Source};
@@ -134,6 +135,29 @@ final class CaptureVideoProvenancePlannerTest extends TestCase
 
         self::assertSame($first['claim_stable_key'], $second['claim_stable_key']);
         self::assertNotSame($first['source_stable_key'], $second['source_stable_key']);
+    }
+
+    public function test_canonical_video_id_is_resolved_to_external_identity_before_claim_key_generation(): void
+    {
+        $canonicalVideoId = UuidCodec::newV7();
+        $reader = new class($canonicalVideoId) implements VideoIdentityReader {
+            public function __construct(private string $id) {}
+            public function findVideoIdentity(string $canonicalVideoId): ?array
+            {
+                return $canonicalVideoId === $this->id ? ['canonical_video_id' => $this->id, 'platform' => 'youtube', 'external_video_id' => 'resolved-video-1'] : null;
+            }
+        };
+        $planner = new CaptureVideoProvenancePlanner(null, $reader);
+        $plan = $planner->plan(
+            'capture-canonical-video',
+            ['operation' => 'ingest', 'entity_type' => 'video', 'payload' => ['metadata' => ['source' => ['canonical_video_id' => $canonicalVideoId, 'source_title' => 'Variant A resolved source']]]],
+            ['canonical_video_id' => $canonicalVideoId, 'source_title' => 'Variant A resolved source'],
+            ['id' => self::VARIANT, 'type' => 'variant', 'name' => 'Variant A'],
+        );
+
+        self::assertSame('READY', $plan['status']);
+        self::assertSame('youtube', $plan['dependencies'][1]['payload']['provenance']['metadata']['platform']);
+        self::assertSame('resolved-video-1', $plan['dependencies'][1]['payload']['provenance']['metadata']['external_video_id']);
     }
 
     public function test_same_external_source_reuses_dependency_identity_across_capture_retries(): void

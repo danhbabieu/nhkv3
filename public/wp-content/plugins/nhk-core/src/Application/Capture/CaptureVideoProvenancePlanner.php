@@ -6,6 +6,7 @@ namespace NHK\Core\Application\Capture;
 use NHK\Core\Application\Knowledge\KnowledgeClaimIdentity;
 use NHK\Core\Domain\Governance\CommandCanonicalizer;
 use NHK\Core\Infrastructure\Admin\VideoRelationAdminContract;
+use NHK\Core\Contracts\Video\VideoIdentityReader;
 use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Core\Application\Video\VideoThumbnailSelector;
 
@@ -16,7 +17,7 @@ use NHK\Core\Application\Video\VideoThumbnailSelector;
  */
 final class CaptureVideoProvenancePlanner
 {
-    public function __construct(private ?VideoThumbnailSelector $thumbnailSelector = null)
+    public function __construct(private ?VideoThumbnailSelector $thumbnailSelector = null, private ?VideoIdentityReader $videoIdentityReader = null)
     {
     }
 
@@ -51,11 +52,19 @@ final class CaptureVideoProvenancePlanner
         $locator = trim((string) ($sourceSnapshot['canonical_source_url'] ?? $payload['url'] ?? ''));
         $unsupported = $this->unsupportedClassifications($sourceTitle, (string) ($context['user_hint'] ?? ''));
 
-        $sourceKey = 'nhk:source:video:' . hash('sha256', CommandCanonicalizer::canonicalize([$platform, $externalId, $locator]));
+        $canonicalVideoId = trim((string) ($sourceSnapshot['canonical_video_id'] ?? $metadata['source']['canonical_video_id'] ?? ''));
         $identity = KnowledgeClaimIdentity::resolveInput('provenance', [
             'origin' => 'CAPTURE_VIDEO_SOURCE_PROVENANCE',
-            'metadata' => ['subject_id' => $subjectId, 'platform' => $platform, 'external_video_id' => $externalId, 'proposition_class' => 'VIDEO_CONCERNS_SUBJECT'],
-        ]);
+            'metadata' => ['subject_id' => $subjectId, 'platform' => $platform, 'external_video_id' => $externalId, 'canonical_video_id' => $canonicalVideoId, 'proposition_class' => 'VIDEO_CONCERNS_SUBJECT'],
+        ], $this->videoIdentityReader);
+        if ($identity->status() === 'RESOLVED') {
+            $referent = (array) ($identity->packet()['video_referent'] ?? []);
+            $platform = strtolower(trim((string) ($referent['platform'] ?? $platform)));
+            $externalId = trim((string) ($referent['external_video_id'] ?? $externalId));
+            $sourceSnapshot['platform'] = $platform;
+            $sourceSnapshot['external_video_id'] = $externalId;
+        }
+        $sourceKey = 'nhk:source:video:' . hash('sha256', CommandCanonicalizer::canonicalize([$platform, $externalId, $locator]));
         $claimKey = $identity->status() === 'RESOLVED' ? 'nhk:knowledge:video-provenance:' . hash('sha256', CommandCanonicalizer::canonicalize($identity->packet())) : '';
         $evidenceKey = 'video-provenance:evidence:' . hash('sha256', CommandCanonicalizer::canonicalize([$sourceKey, $claimKey]));
         $emptyVideo = $this->withAttachments($video, []);
