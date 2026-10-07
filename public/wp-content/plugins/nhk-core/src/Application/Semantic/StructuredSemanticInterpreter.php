@@ -139,7 +139,9 @@ final class StructuredSemanticInterpreter
         foreach ($this->segments($text) as $segment) {
             $command = $this->compileDictionaryOwnerCue($segment);
             if ($command === null) continue;
-            if ($lexicalSpans !== [] && !$this->commandHasLexicalSupport($command, $lexicalSpans)) continue;
+            $command['lexical_support'] = $lexicalSpans === []
+                ? 'UNRESOLVED'
+                : ($this->commandHasLexicalSupport($command, $lexicalSpans) ? 'OBSERVED' : 'UNRESOLVED');
             $command['semantic_track'] = ['assertions' => $this->factualAssertions([], $text)];
             $commands[] = $command;
         }

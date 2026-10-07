@@ -54,6 +54,32 @@ final class TextInputInterpreterRegressionTest extends TestCase
         self::assertSame([], $result['structured_interpretation_packet']['knowledge_delta_candidates']);
     }
 
+    public function test_add_sense_dictionary_command_survives_without_detector_lexical_support(): void
+    {
+        $result = (new TextInputInterpreter())->interpret(
+            'Vách dày có thêm nghĩa: cách gọi của người chơi đồng hồ Odo tại Việt Nam cho nhóm máy Odo 36 đời đầu có vách máy dày hơn các bản thông thường.',
+        );
+
+        self::assertSame('ADD_SENSE', $result['structured_interpretation_packet']['dictionary_owner_commands'][0]['operation']);
+        self::assertSame('UNRESOLVED', $result['structured_interpretation_packet']['dictionary_owner_commands'][0]['lexical_support']);
+        self::assertSame([], $result['structured_interpretation_packet']['semantic_assertions']);
+        self::assertSame([], $result['structured_interpretation_packet']['knowledge_delta_candidates']);
+        self::assertSame([], $result['user_claim_candidates']);
+        self::assertSame([], $result['entity_mentions']);
+    }
+
+    public function test_add_sense_dictionary_command_keeps_only_independent_factual_sentence(): void
+    {
+        $result = (new TextInputInterpreter())->interpret(
+            'Vách dày có thêm nghĩa: cách gọi của người chơi đồng hồ Odo tại Việt Nam cho nhóm máy Odo 36 đời đầu. Odo 36 được ghi nhận năm 1954.',
+        );
+
+        self::assertSame('ADD_SENSE', $result['structured_interpretation_packet']['dictionary_owner_commands'][0]['operation']);
+        self::assertSame(['Odo 36 được ghi nhận năm 1954'], array_column($result['structured_interpretation_packet']['semantic_assertions'], 'text'));
+        self::assertSame(['Odo 36 được ghi nhận năm 1954'], array_column($result['user_claim_candidates'], 'text'));
+        self::assertSame(['Odo 36'], $result['entity_mentions']);
+    }
+
     public function test_explicit_semantic_observation_survives_lexical_command_with_lineage(): void
     {
         $result = (new TextInputInterpreter())->interpret(
