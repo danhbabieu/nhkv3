@@ -261,6 +261,28 @@ final class ProposalEligibilityServiceTest extends TestCase
         self::assertContains('SOURCE_REVISION_CHANGED', $this->service($proposal, relationReader: $staleReader)->check($proposal->id)->reasons);
     }
 
+    public function test_possible_duplicate_knowledge_retire_cannot_become_executable_apply(): void
+    {
+        $proposal = new Proposal(self::ID, self::SUBJECT, 'retire', [
+            'repair' => [
+                'target_uuid' => self::SUBJECT,
+                'expected_revision' => 1,
+                'manual_review_required' => false,
+                'identity_binding' => [
+                    'policy_version' => 'knowledge-identity-v2',
+                    'identity_fingerprint' => str_repeat('a', 64),
+                    'dependency_fingerprint' => str_repeat('b', 64),
+                    'classification' => 'POSSIBLE_DUPLICATE',
+                ],
+            ],
+        ], 'knowledge-retire-content', 1, 'knowledge-retire-dependency', ProposalState::APPROVED, idempotencyKey: 'knowledge-retire-possible', targetUuid: self::SUBJECT, entityType: 'knowledge');
+
+        $result = $this->service($proposal)->check($proposal->id);
+
+        self::assertFalse($result->ready);
+        self::assertContains('KNOWLEDGE_RECONCILIATION_CLASSIFICATION_NOT_EXECUTABLE', $result->reasons);
+    }
+
     private function service(Proposal $proposal, ?SubjectResolutionService $subjectResolver = null, ?EligibilityReader $relationReader = null, ?MediaUsageRepository $mediaUsages = null): ProposalEligibilityService
     {
         $repository = new class($proposal) implements ProposalRepository {

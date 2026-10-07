@@ -38,4 +38,32 @@ final class KnowledgeRepairPreviewServiceTest extends TestCase
         self::assertSame('REVIEW_REQUIRED', $preview['status']);
         self::assertContains('KNOWLEDGE_REPAIR_DEPENDENCY_REVIEW_REQUIRED', $preview['blockers']);
     }
+
+    public function testDuplicateRetirePreviewRejectsStaleIdentityBindingAndPossibleDuplicate(): void
+    {
+        $claim = new KnowledgeClaim(self::ID, 'nhk:test:bound-repair', 'Bound claim.', 'fact', ['metadata' => ['subject_id' => '01a09786-dd67-70e7-9d30-9b8d39317670', 'facet' => 'recognition', 'scope' => 'variant']], true, 4);
+        $claims = $this->createMock(KnowledgeRepository::class);
+        $claims->method('findByCanonicalId')->willReturn($claim);
+        $evidence = $this->createMock(EvidenceRepository::class);
+        $evidence->method('listByClaim')->willReturn([]);
+
+        $preview = (new KnowledgeRepairPreviewService($claims, $evidence))->preview([
+            'canonical_knowledge_uuid' => self::ID,
+            'expected_revision' => 4,
+            'operation' => 'retire',
+            'reason' => 'duplicate review',
+            'provenance' => ['origin' => 'TEST'],
+            'cleanup_class' => 'INTERNAL_WORKFLOW_KNOWLEDGE',
+            'identity_binding' => [
+                'policy_version' => 'knowledge-identity-old',
+                'identity_fingerprint' => str_repeat('a', 64),
+                'dependency_fingerprint' => str_repeat('b', 64),
+                'classification' => 'POSSIBLE_DUPLICATE',
+            ],
+        ]);
+
+        self::assertSame('REVIEW_REQUIRED', $preview['status']);
+        self::assertContains('KNOWLEDGE_IDENTITY_POLICY_STALE', $preview['blockers']);
+        self::assertContains('KNOWLEDGE_RECONCILIATION_CLASSIFICATION_NOT_EXECUTABLE', $preview['blockers']);
+    }
 }

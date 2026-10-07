@@ -6,6 +6,7 @@ namespace NHK\Core\Application\Governance;
 use NHK\Core\Contracts\Governance\{EligibilityReader, ProposalRepository};
 use NHK\Core\Contracts\Media\MediaUsageRepository;
 use NHK\Core\Application\Graph\ClassifiedAsPolicy;
+use NHK\Core\Application\Knowledge\KnowledgeClaimIdentityResolution;
 use NHK\Core\Domain\Governance\{DependencyGraph, EligibilityResult, ProposalState, ProposalSubjectBindingValidator};
 
 final class ProposalEligibilityService
@@ -78,6 +79,13 @@ final class ProposalEligibilityService
             if (($repair['target_uuid'] ?? '') !== ($proposal->targetUuid ?: $proposal->subjectId)) $reasons[] = 'KNOWLEDGE_REPAIR_TARGET_MISMATCH';
             if ((int) ($repair['expected_revision'] ?? 0) !== $proposal->expectedRevision) $reasons[] = 'KNOWLEDGE_REPAIR_REVISION_BINDING_MISMATCH';
             if ($proposal->operation === 'retire' && (($repair['manual_review_required'] ?? false) === true)) $reasons[] = 'KNOWLEDGE_REPAIR_DEPENDENCY_REVIEW_REQUIRED';
+            if ($proposal->operation === 'retire' && is_array($repair['identity_binding'] ?? null)) {
+                $binding = $repair['identity_binding'];
+                if (($binding['policy_version'] ?? '') !== KnowledgeClaimIdentityResolution::POLICY_VERSION) $reasons[] = 'KNOWLEDGE_IDENTITY_POLICY_STALE';
+                if (!preg_match('/^[a-f0-9]{64}$/i', (string) ($binding['identity_fingerprint'] ?? ''))) $reasons[] = 'KNOWLEDGE_IDENTITY_FINGERPRINT_INVALID';
+                if (!preg_match('/^[a-f0-9]{64}$/i', (string) ($binding['dependency_fingerprint'] ?? ''))) $reasons[] = 'KNOWLEDGE_DEPENDENCY_FINGERPRINT_INVALID';
+                if (in_array(strtoupper(trim((string) ($binding['classification'] ?? ''))), ['POSSIBLE_DUPLICATE', 'UNRESOLVED', 'CONFLICTING'], true)) $reasons[] = 'KNOWLEDGE_RECONCILIATION_CLASSIFICATION_NOT_EXECUTABLE';
+            }
         }
         $isCreation = in_array($proposal->operation, ['create', 'ingest'], true) && $proposal->targetUuid === null;
         // relation_create carries typed endpoint keys in its payload. A
