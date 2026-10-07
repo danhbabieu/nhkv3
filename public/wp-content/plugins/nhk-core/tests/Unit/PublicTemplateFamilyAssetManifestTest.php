@@ -33,4 +33,15 @@ final class PublicTemplateFamilyAssetManifestTest extends TestCase
         self::assertNotContains('nhk-v3-media-video', $manifest['styles']);
         self::assertNotContains('nhk-v3-knowledge', $manifest['styles']);
     }
+
+    public function test_comparison_rules_live_in_the_comparison_family_stylesheet(): void
+    {
+        $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
+        $entity = (string) file_get_contents($theme . '/entity.css');
+        $comparison = (string) file_get_contents($theme . '/comparison.css');
+
+        self::assertStringNotContainsString('.comparison-shell', $entity);
+        self::assertStringContainsString('.comparison-shell', $comparison);
+        self::assertSame(['nhk-v3-style', 'nhk-v3-presentation'], PublicTemplateFamilyAssetManifest::dependencies()['nhk-v3-comparison']);
+    }
 }

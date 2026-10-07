@@ -1,5 +1,23 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-07 — Comparison CSS family isolation
+
+CSS_BOUNDARY: Comparison selectors were removed from `entity.css` and retained
+in the approved `comparison.css` family stylesheet. The asset manifest already
+registers Comparison with only base + shared presentation dependencies, so
+Comparison no longer relies on Entity CSS for its visual contract.
+
+REGRESSION_COVERAGE: Task 4 asset/CSS suite passed 86 tests / 905 assertions.
+The CSS ownership test first failed while selectors remained in `entity.css`
+and passed after the extraction.
+
+QUALITY_GATES: PHP syntax checks and `git diff --check` pass. No design-wide
+CSS rewrite, data mutation, migration, deployment or push was performed.
+
+COMMIT: Pending for this checkpoint.
+
+STATUS: `COMPARISON_CSS_FAMILY_ISOLATED_LOCAL / FOCUSED_GREEN / NO_SEMANTIC_DATA_MUTATION / DEPLOYMENT_PENDING`
+
 # Checkpoint — 2026-10-07 — Shared presentation components and stable Article archive configuration
 
 PRESENTATION: Public archive/search/library families now reuse the existing
