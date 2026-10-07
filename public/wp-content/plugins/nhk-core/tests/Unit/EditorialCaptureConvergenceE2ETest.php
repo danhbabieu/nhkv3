@@ -9,6 +9,7 @@ use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, Editor
 use NHK\Core\Contracts\Capture\{CaptureAddendumRepository, CaptureRepository};
 use NHK\Core\Domain\Capture\CaptureAddendumRecord;
 use NHK\Core\Domain\Capture\{CaptureRecord, CaptureStage, SubjectResolutionPacket};
+use NHK\Core\Infrastructure\Capture\WpdbCaptureRepository;
 use NHK\Core\Shared\Uuid\UuidCodec;
 use PHPUnit\Framework\TestCase;
 
@@ -193,6 +194,92 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
         self::assertSame(1, $resolverCalls);
         self::assertSame(41, $result->revision);
         self::assertSame(2, $result->phaseReceipts['ARTICLE_PRE_CREATE_REVIEW']['latest']['attempt_no']);
+    }
+
+    public function test_hydrated_semantics_checkpoint_with_legacy_diagnostics_does_not_replay_semantics(): void
+    {
+        $captures = new Pr5CaptureRepository();
+        $calls = ['draft' => 0, 'semantic' => 0, 'media' => 0, 'publication' => 0, 'final' => 0];
+        $events = [];
+        $captureId = UuidCodec::newV7();
+        $key = 'hydrated-semantic-checkpoint-legacy-shape';
+        $capture = new CaptureRecord(
+            $captureId,
+            $key,
+            hash('sha256', $key),
+            CaptureStage::SEMANTICS_RECONCILED->value,
+            'IN_PROGRESS',
+            null,
+            null,
+            [],
+            [
+                'raw_input' => 'Hydrated checkpoint text.',
+                'title' => 'Hydrated checkpoint title',
+                'content_intent' => ['intent' => 'TEXT_ARTICLE', 'article_required' => true],
+                'subject_resolution_packet' => [
+                    'status' => 'resolved',
+                    'canonical_subject_id' => '11111111-1111-4111-8111-111111111111',
+                    'entity_type' => 'model',
+                    'revision' => 2,
+                ],
+            ],
+            [
+                'article_resolution' => ['research' => ['ready_for_draft' => true, 'blockers' => []]],
+                'completion' => ['status' => 'REVIEW_REQUIRED', 'blockers' => []],
+            ],
+            array_reduce(
+                ['INTERPRETED', 'CONTENT_PREPARATION', 'SUBJECTS_RESOLVED', 'KNOWLEDGE_RETRIEVED', 'SEMANTICS_RECONCILED'],
+                static fn (array $receipts, string $phase): array => CapturePhaseReceiptReducer::append($receipts, $phase, ['status' => 'COMPLETED', 'result' => 'COMPLETED']),
+                [],
+            ),
+            56,
+        );
+        if (!defined('ARRAY_A')) define('ARRAY_A', 'ARRAY_A');
+        $row = [
+            'capture_uuid' => UuidCodec::toBinary($captureId),
+            'idempotency_key' => $capture->idempotencyKey,
+            'request_fingerprint' => $capture->requestFingerprint,
+            'stage' => $capture->stage,
+            'status' => $capture->status,
+            'wp_post_id' => 0,
+            'wp_state_token' => '',
+            'assets_json' => json_encode($capture->assets, JSON_THROW_ON_ERROR),
+            'context_json' => json_encode($capture->context, JSON_THROW_ON_ERROR),
+            'diagnostics_json' => json_encode($capture->diagnostics, JSON_THROW_ON_ERROR),
+            'phase_receipts_json' => json_encode($capture->phaseReceipts, JSON_THROW_ON_ERROR),
+            'revision' => $capture->revision,
+            'created_at' => '',
+            'updated_at' => '',
+        ];
+        $wpdb = new class($row) {
+            public string $prefix = 'wp_';
+            public function __construct(private array $row) {}
+            public function prepare(string $query, mixed ...$args): string { return $query; }
+            public function get_row(string $query, mixed $output = null): array { return $this->row; }
+        };
+        $hydrated = (new WpdbCaptureRepository($wpdb))->findById($captureId);
+        self::assertNotNull($hydrated);
+        $captures->create($hydrated);
+        $resolverCalls = 0;
+        $coordinator = $this->coordinator(
+            $captures,
+            $calls,
+            $events,
+            semanticStatus: 'COMPLETED',
+            articlePreCreateResolver: static function () use (&$resolverCalls): array {
+                ++$resolverCalls;
+                return ['status' => 'REVIEW_REQUIRED', 'decision' => 'REVIEW_REQUIRED', 'diagnostics' => ['OWNER_REVIEW_REQUIRED']];
+            },
+            articlePreCreateRequired: true,
+        );
+
+        $result = $coordinator->retry($hydrated, ['idempotency_key' => $key, 'resume_mode' => 'RETRY']);
+
+        self::assertSame('REVIEW_REQUIRED', $result->status);
+        self::assertSame(57, $result->revision);
+        self::assertSame(0, $calls['semantic']);
+        self::assertSame(1, $resolverCalls);
+        self::assertSame(1, $result->phaseReceipts['ARTICLE_PRE_CREATE_REVIEW']['latest']['attempt_no']);
     }
 
     public function test_checkpoint_exception_is_persisted_with_bounded_failure_diagnostics(): void

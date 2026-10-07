@@ -1858,11 +1858,14 @@ final class EditorialCaptureCoordinator
         if ($record->stage !== CaptureStage::SEMANTICS_RECONCILED->value || $record->articleId !== null) return null;
         $intent = is_array($record->context['content_intent'] ?? null) ? $record->context['content_intent'] : [];
         if (!(($intent['article_required'] ?? false) === true)) return null;
+        $semanticReceipt = CapturePhaseReceiptReducer::latest((array) ($receipts['SEMANTICS_RECONCILED'] ?? []));
+        if (!in_array(strtoupper(trim((string) ($semanticReceipt['status'] ?? ''))), ['COMPLETED', 'VERIFIED'], true)) return null;
         $resolution = is_array($diagnostics['subjects'] ?? null) ? $diagnostics['subjects'] : [];
-        $interpretation = is_array($diagnostics['interpretation'] ?? null) ? $diagnostics['interpretation'] : [];
-        $writes = is_array($diagnostics['semantic_write_back'] ?? null) ? $diagnostics['semantic_write_back'] : [];
-        $retrieved = is_array($diagnostics['claim_retrieval'] ?? null) ? $diagnostics['claim_retrieval'] : [];
-        if ($resolution === [] || $interpretation === [] || $writes === [] || $retrieved === []) return null;
+        if ($resolution === []) {
+            $packet = SubjectResolutionPacket::fromArray((array) ($record->context['subject_resolution_packet'] ?? []));
+            $resolution = $packet?->toResolution() ?? [];
+        }
+        if (($resolution['status'] ?? '') !== 'resolved') return null;
 
         $articleResolution = $this->resolveArticleBeforeCreate($record, $input, $intent, $resolution, $text, $assets);
         $diagnostics['article_resolution'] = $articleResolution;
