@@ -35,6 +35,9 @@ final class KnowledgeRepairPreviewService
         $dependencyFingerprint = $this->dependencyFingerprint($edges, $evidence);
         $identityBinding = is_array($input['identity_binding'] ?? null) ? $input['identity_binding'] : [];
         $identityBlockers = [];
+        if ($repair->operation === 'retire' && $identityBinding === []) {
+            $identityBlockers[] = 'KNOWLEDGE_RECONCILIATION_IDENTITY_BINDING_REQUIRED';
+        }
         if ($repair->operation === 'retire' && $identityBinding !== []) {
             if (($identityBinding['policy_version'] ?? '') !== $identity->policyVersion()) $identityBlockers[] = 'KNOWLEDGE_IDENTITY_POLICY_STALE';
             if ($identity->status() !== KnowledgeClaimIdentityResolution::RESOLVED) $identityBlockers[] = 'KNOWLEDGE_IDENTITY_' . $identity->status();

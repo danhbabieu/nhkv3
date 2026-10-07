@@ -79,6 +79,7 @@ final class ProposalEligibilityService
             if (($repair['target_uuid'] ?? '') !== ($proposal->targetUuid ?: $proposal->subjectId)) $reasons[] = 'KNOWLEDGE_REPAIR_TARGET_MISMATCH';
             if ((int) ($repair['expected_revision'] ?? 0) !== $proposal->expectedRevision) $reasons[] = 'KNOWLEDGE_REPAIR_REVISION_BINDING_MISMATCH';
             if ($proposal->operation === 'retire' && (($repair['manual_review_required'] ?? false) === true)) $reasons[] = 'KNOWLEDGE_REPAIR_DEPENDENCY_REVIEW_REQUIRED';
+            if ($proposal->operation === 'retire' && !is_array($repair['identity_binding'] ?? null)) $reasons[] = 'KNOWLEDGE_RECONCILIATION_IDENTITY_BINDING_REQUIRED';
             if ($proposal->operation === 'retire' && is_array($repair['identity_binding'] ?? null)) {
                 $binding = $repair['identity_binding'];
                 if (($binding['policy_version'] ?? '') !== KnowledgeClaimIdentityResolution::POLICY_VERSION) $reasons[] = 'KNOWLEDGE_IDENTITY_POLICY_STALE';

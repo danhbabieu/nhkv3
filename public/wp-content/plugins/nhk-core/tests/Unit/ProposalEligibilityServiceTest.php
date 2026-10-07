@@ -283,6 +283,18 @@ final class ProposalEligibilityServiceTest extends TestCase
         self::assertContains('KNOWLEDGE_RECONCILIATION_CLASSIFICATION_NOT_EXECUTABLE', $result->reasons);
     }
 
+    public function test_knowledge_retire_without_identity_binding_is_not_eligible(): void
+    {
+        $proposal = new Proposal(self::ID, self::SUBJECT, 'retire', [
+            'repair' => ['target_uuid' => self::SUBJECT, 'expected_revision' => 1, 'manual_review_required' => false],
+        ], 'knowledge-retire-unbound-content', 1, 'knowledge-retire-unbound-dependency', ProposalState::APPROVED, idempotencyKey: 'knowledge-retire-unbound', targetUuid: self::SUBJECT, entityType: 'knowledge');
+
+        $result = $this->service($proposal)->check($proposal->id);
+
+        self::assertFalse($result->ready);
+        self::assertContains('KNOWLEDGE_RECONCILIATION_IDENTITY_BINDING_REQUIRED', $result->reasons);
+    }
+
     private function service(Proposal $proposal, ?SubjectResolutionService $subjectResolver = null, ?EligibilityReader $relationReader = null, ?MediaUsageRepository $mediaUsages = null): ProposalEligibilityService
     {
         $repository = new class($proposal) implements ProposalRepository {
