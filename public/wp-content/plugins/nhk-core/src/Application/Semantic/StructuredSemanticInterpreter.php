@@ -69,7 +69,9 @@ final class StructuredSemanticInterpreter
         $relations = $this->relationCandidates($value);
         $dictionaryOwnerCommands = $this->dictionaryOwnerCommandsFromPacket($text, $lexical);
         $semanticAssertions = $this->semanticAssertions($value, $text);
-        if ($dictionaryOwnerCommands !== [] && $semanticAssertions === [] && (array) ($value['observations'] ?? []) === [] && $relations === []) $claims = [];
+        if ($dictionaryOwnerCommands !== []) {
+            $claims = $this->claimsFromSemanticAssertions($semanticAssertions);
+        }
         $dictionaryOwnerCommand = $dictionaryOwnerCommands[0] ?? null;
         $editorialSignals = array_values(array_filter(array_merge($detectorEditorial, $declaredEditorial), 'is_array'));
         $diagnostics = array_values(array_unique(array_merge(
@@ -164,7 +166,13 @@ final class StructuredSemanticInterpreter
         foreach ((array) ($value['observations'] ?? []) as $observation) {
             if (!is_array($observation)) continue;
             $candidate = trim((string) ($observation['text'] ?? $observation['value'] ?? ''));
-            if ($candidate !== '') $assertions[] = ['text' => $candidate, 'track' => 'SEMANTIC_CANDIDATE', 'reason' => 'EXPLICIT_OBSERVATION'];
+            if ($candidate !== '') $assertions[] = [
+                'text' => $candidate,
+                'track' => 'SEMANTIC_CANDIDATE',
+                'reason' => 'EXPLICIT_OBSERVATION',
+                'provenance' => strtoupper((string) ($observation['origin'] ?? 'SYSTEM_INFERENCE')),
+                'scope' => (string) ($observation['scope'] ?? 'UNRESOLVED'),
+            ];
         }
         return array_values(array_merge($assertions, $this->factualAssertions($value, $text)));
     }
@@ -175,7 +183,11 @@ final class StructuredSemanticInterpreter
         $assertions = [];
         foreach ($this->segments($text) as $segment) {
             if (preg_match('/\b(?:dữ\s+kiện|thông\s+tin|sự\s+kiện|sản\s+xuất|ra\s+mắt|phát\s+hành|ghi\s+nhận|xảy\s+ra|năm\s+\d{4}|ngày\s+\d{1,2})\b/iu', $segment) !== 1) continue;
-            $assertions[] = ['text' => $segment, 'track' => 'FACTUAL_CANDIDATE', 'reason' => 'BOUNDED_FACTUAL_CUE'];
+            $assertionText = $this->compileDictionaryOwnerCue($segment) !== null
+                ? $this->factualTail($segment)
+                : $this->cleanDictionaryCommandPart($segment);
+            if ($assertionText === '') continue;
+            $assertions[] = ['text' => $assertionText, 'track' => 'FACTUAL_CANDIDATE', 'reason' => 'BOUNDED_FACTUAL_CUE'];
         }
         return $assertions;
     }
@@ -185,7 +197,8 @@ final class StructuredSemanticInterpreter
         $text = trim($text);
         if ($text === '') return null;
         if (preg_match('/^(.+?)\s+(?:còn\s+(?:được\s+)?gọi\s+là|tên\s+(?:khác|gọi)\s+là)\s+(.+?)\s*[.!?。！？]?$/iu', $text, $match) === 1) {
-            return ['operation' => 'ADD_FORM', 'term' => $this->cleanDictionaryCommandPart($match[1]), 'form' => $this->cleanDictionaryCommandPart($match[2])];
+            $form = $this->lexicalDefinitionPart($match[2]);
+            return $form === '' ? null : ['operation' => 'ADD_FORM', 'term' => $this->cleanDictionaryCommandPart($match[1]), 'form' => $form];
         }
         if (preg_match('/^(.+?)\s+(?:có\s+thêm\s+(?:một\s+)?nghĩa|nghĩa\s+khác)\s*(?:là|:)\s*(.+?)\s*[.!?。！？]?$/iu', $text, $match) === 1) {
             $definition = $this->lexicalDefinitionPart($match[2]);
@@ -214,6 +227,18 @@ final class StructuredSemanticInterpreter
         if (preg_match('/^(.*?)(?:[,;]\s*|\s+)năm\s+\d{4}\b/iu', $value, $match) === 1) return $this->cleanDictionaryCommandPart($match[1]);
         if (preg_match('/^(.*?)(?:[,;]\s*|\s+)ngày\s+\d{1,2}(?:[\/\-]\d{1,2})?\b/iu', $value, $match) === 1) return $this->cleanDictionaryCommandPart($match[1]);
         return $value;
+    }
+
+    private function factualTail(string $value): string
+    {
+        $value = $this->cleanDictionaryCommandPart($value);
+        if (preg_match('/(?:^|[,;]\s*|\s+)((?:sản\s+xuất|ra\s+mắt|phát\s+hành|ghi\s+nhận|xảy\s+ra)\b.*)$/iu', $value, $match) === 1) {
+            return $this->cleanDictionaryCommandPart($match[1]);
+        }
+        if (preg_match('/(?:^|[,;]\s*|\s+)((?:năm\s+\d{4}|ngày\s+\d{1,2}(?:[\/\-]\d{1,2})?)\b.*)$/iu', $value, $match) === 1) {
+            return $this->cleanDictionaryCommandPart($match[1]);
+        }
+        return '';
     }
 
     /** @return list<string> */
@@ -291,6 +316,24 @@ final class StructuredSemanticInterpreter
             if ($candidate !== '') $claims[] = ['text' => $candidate, 'candidate_kind' => 'observation', 'provenance' => strtoupper((string) ($observation['origin'] ?? 'SYSTEM_INFERENCE')), 'scope' => (string) ($observation['scope'] ?? 'UNRESOLVED')];
         }
         if ($text !== '' && $claims === []) $claims[] = ['text' => $text, 'candidate_kind' => 'derived_candidate', 'provenance' => (string) ($value['provenance']['source_class'] ?? 'UNRESOLVED'), 'scope' => 'UNRESOLVED'];
+        return $claims;
+    }
+
+    /** @param list<array<string,mixed>> $assertions @return list<array<string,mixed>> */
+    private function claimsFromSemanticAssertions(array $assertions): array
+    {
+        $claims = [];
+        foreach ($assertions as $assertion) {
+            if (!is_array($assertion)) continue;
+            $text = trim((string) ($assertion['text'] ?? ''));
+            if ($text === '') continue;
+            $claims[] = [
+                'text' => $text,
+                'candidate_kind' => (($assertion['reason'] ?? '') === 'EXPLICIT_OBSERVATION') ? 'observation' : 'derived_candidate',
+                'provenance' => (string) ($assertion['provenance'] ?? 'UNRESOLVED'),
+                'scope' => (string) ($assertion['scope'] ?? 'UNRESOLVED'),
+            ];
+        }
         return $claims;
     }
 
