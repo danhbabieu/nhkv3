@@ -72,6 +72,8 @@ final class PublicationDiagnosticRegistry
             $system('STRUCTURED_DATA_INVALID', 'Structured data không hợp lệ.', 'Sửa structured data.'),
             $system('PUBLIC_ROUTE_NOT_READY', 'Public route chưa sẵn sàng.', 'Giải quyết route/identity conflict.'),
             $system('RENDERED_PUBLIC_VERIFICATION_UNAVAILABLE', 'Không xác minh được rendered public output.', 'Khôi phục verification runtime.'),
+            $system('PUBLIC_RENDERED_VERIFICATION_UNAVAILABLE', 'Không xác minh được rendered public output sau khi đăng.', 'Khôi phục verification runtime rồi đọc lại bài đã đăng.'),
+            $system('PUBLIC_RENDERED_VERIFICATION_FAILED', 'Rendered public output không khớp sau khi đăng.', 'Kiểm tra route và projection của bài đã đăng.'),
         ] as $definition) self::$definitions[$definition->code] = $definition;
     }
 }

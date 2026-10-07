@@ -95,6 +95,33 @@ final class ArticlePublicationContinuationCommandTest extends TestCase
         self::assertSame('nhk.article.publish', $calls[0]['tool']);
     }
 
+    public function test_publish_returns_partial_when_native_publish_succeeds_but_public_read_back_fails(): void
+    {
+        $calls = [];
+        $command = $this->command($calls, ['outcome' => 'PASS', 'post' => ['status' => 'publish', 'permalink' => 'https://demo.test/?p=331'], 'state_token' => 'new-token', 'publication_receipt' => ['outcome' => 'COMPLETED']], null, null, static fn (string $url): array => ['status' => 'failed', 'url' => $url, 'http_status' => 503]);
+
+        $result = $command->execute($this->input('publish'));
+
+        self::assertSame('PARTIAL', $result['outcome']);
+        self::assertSame('verification_required', $result['final_outcome']);
+        self::assertContains('PUBLIC_RENDERED_VERIFICATION_FAILED', $result['diagnostics']);
+        self::assertSame(331, $result['article_id']);
+        self::assertSame('publish', $result['post']['status']);
+    }
+
+    public function test_unavailable_public_read_back_is_partial_without_republishing(): void
+    {
+        $calls = [];
+        $command = $this->command($calls, ['outcome' => 'PASS', 'post' => ['status' => 'publish', 'permalink' => 'https://demo.test/?p=331'], 'state_token' => 'new-token', 'publication_receipt' => ['outcome' => 'COMPLETED']], null, null, null);
+
+        $result = $command->execute($this->input('publish'));
+
+        self::assertSame('PARTIAL', $result['outcome']);
+        self::assertSame('verification_required', $result['final_outcome']);
+        self::assertContains('PUBLIC_RENDERED_VERIFICATION_UNAVAILABLE', $result['diagnostics']);
+        self::assertSame(1, count($calls));
+    }
+
     public function test_cli_is_discoverable_and_contains_no_low_level_publish_writer(): void
     {
         $cli = dirname(__DIR__, 2) . '/bin/nhk-core-publication.php';

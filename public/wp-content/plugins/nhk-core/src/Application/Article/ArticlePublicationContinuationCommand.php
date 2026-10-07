@@ -104,10 +104,25 @@ final class ArticlePublicationContinuationCommand
         if (!$finalCapture instanceof CaptureRecord) return $result + ['outcome' => 'SYSTEM_BLOCKED', 'diagnostics' => ['CAPTURE_READBACK_UNAVAILABLE'], 'root_cause' => 'CAPTURE_READBACK_UNAVAILABLE'];
         if ((string) ($result['publication_receipt']['outcome'] ?? '') !== 'COMPLETED') return $result + ['outcome' => 'SYSTEM_BLOCKED', 'diagnostics' => ['PUBLICATION_RECEIPT_UNAVAILABLE'], 'root_cause' => 'PUBLICATION_RECEIPT_UNAVAILABLE'];
         $permalink = trim((string) ($result['public_url'] ?? $result['post']['permalink'] ?? ''));
-        if ($permalink === '' || $this->publicReadBack === null) return $result + ['outcome' => 'SYSTEM_BLOCKED', 'diagnostics' => ['PUBLIC_RENDERED_VERIFICATION_UNAVAILABLE'], 'root_cause' => 'PUBLIC_RENDERED_VERIFICATION_UNAVAILABLE'];
-        $public = ($this->publicReadBack)($permalink);
-        if (($public['status'] ?? '') !== 'verified') return $result + ['outcome' => 'SYSTEM_BLOCKED', 'diagnostics' => ['PUBLIC_RENDERED_VERIFICATION_FAILED'], 'public_rendered_readback' => $public, 'root_cause' => 'PUBLIC_RENDERED_VERIFICATION_FAILED'];
+        if ($permalink === '' || $this->publicReadBack === null) return $this->partial($result, 'PUBLIC_RENDERED_VERIFICATION_UNAVAILABLE');
+        try {
+            $public = ($this->publicReadBack)($permalink);
+        } catch (\Throwable $error) {
+            return $this->partial($result, 'PUBLIC_RENDERED_VERIFICATION_FAILED', ['error' => $error->getMessage()]);
+        }
+        if (($public['status'] ?? '') !== 'verified') return $this->partial($result, 'PUBLIC_RENDERED_VERIFICATION_FAILED', ['public_rendered_readback' => $public]) + ['public_rendered_readback' => $public];
         return $result + ['public_rendered_readback' => $public];
+    }
+
+    /** @param array<string,mixed> $result @param array<string,mixed> $details */
+    private function partial(array $result, string $code, array $details = []): array
+    {
+        return array_replace($result, [
+            'outcome' => 'PARTIAL',
+            'final_outcome' => 'verification_required',
+            'diagnostics' => array_values(array_unique(array_merge((array) ($result['diagnostics'] ?? []), [$code]))),
+            'root_cause' => $code,
+        ]) + ($details === [] ? [] : ['verification_details' => $details]);
     }
 
     /** @param array<string,mixed> $result @return array<string,mixed> */
