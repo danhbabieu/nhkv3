@@ -529,7 +529,10 @@ final class Plugin {
                     $primary = is_array($input['subject_resolution']['primary'] ?? null) ? $input['subject_resolution']['primary'] : [];
                     $subjects = is_array($input['subject_resolution']['subjects'] ?? null) ? $input['subject_resolution']['subjects'] : ($primary !== [] ? [$primary] : []);
                     $subjectIds = array_values(array_unique(array_filter(array_map(static fn (mixed $subject): string => is_array($subject) ? trim((string) ($subject['id'] ?? '')) : '', $subjects))));
-                    $posts = function_exists('get_posts') ? array_map(static fn (\WP_Post $post): array => ['id' => (string) $post->ID, 'title' => (string) $post->post_title, 'published' => $post->post_status === 'publish', 'subject_ids' => []], get_posts(['post_type' => 'post', 'post_status' => ['publish', 'draft', 'private'], 'posts_per_page' => 100, 'no_found_rows' => true])) : [];
+                    $posts = function_exists('get_posts') ? array_map(static function (\WP_Post $post): array {
+                        $editorialIntent = function_exists('get_post_meta') ? trim((string) get_post_meta($post->ID, '_nhk_editorial_intent', true)) : '';
+                        return ['id' => (string) $post->ID, 'article_id' => (int) $post->ID, 'title' => (string) $post->post_title, 'slug' => (string) $post->post_name, 'route' => function_exists('get_permalink') ? (string) get_permalink($post) : '', 'status' => (string) $post->post_status, 'published' => $post->post_status === 'publish', 'editorial_intent' => $editorialIntent !== '' ? $editorialIntent : null, 'subject_ids' => []];
+                    }, get_posts(['post_type' => 'post', 'post_status' => ['publish', 'draft', 'private'], 'posts_per_page' => 100, 'no_found_rows' => true])) : [];
                     $timings['editorial_inventory_ms'] = (int) round((microtime(true) - $started) * 1000);
                     $articlePostId = (int) ($input['article_context']['post_id'] ?? 0);
                     $defaultCategoryId = function_exists('get_option') ? (int) get_option('default_category', 0) : 0;
@@ -687,6 +690,7 @@ final class Plugin {
                 $packet = is_array($subjectResolution['packet'] ?? null) ? $subjectResolution['packet'] : [];
                 $research = $articleResearch->research($topic, $primary, [
                     'planned_title' => $topic,
+                    'editorial_intent' => (string) ($input['editorial_intent'] ?? $input['metadata']['editorial_intent'] ?? $input['intent'] ?? ''),
                     'content_intent' => $context['content_intent'] ?? [],
                     'subject_resolution_packet' => $packet,
                 ]);

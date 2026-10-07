@@ -171,6 +171,35 @@ mutated.
 STATUS: `CAPTURE_LIVE_SHAPED_RETRY_FIXED_LOCAL / FOCUSED_GREEN /
 FULL_SUITE_BASELINE_LIMITED / NO_DATA_MUTATION / DEPLOYMENT_PENDING`.
 
+# Checkpoint — 2026-10-07 — Article overlap policy/readback fix local
+
+ROOT_CAUSE_CONFIRMED: `ArticleResearchPreflight::overlap()` treated every
+Article sharing the resolved primary subject as `SUBSTANTIAL_OVERLAP`, without
+comparing editorial intent. `McpReadHandler::captureGet()` and the shared
+`CaptureCurrentOutcomeReducer` also treated a current Article pre-create
+overlap review as stale when research was otherwise ready, dropping the
+current blocker and exposing `STALE_REVIEW_REEVALUATABLE`.
+
+LOCAL_FIX: Article inventory candidates now expose native Article identity,
+status, slug/route, subject context, intent when persisted, score, matched
+dimensions, classification and reason. Only `EXACT_DUPLICATE` or
+`SAME_INTENT` candidates are substantial; subject-only and partial overlap
+remain differentiated content. Current substantial overlap is preserved as a
+machine-readable current review with candidate details and is not retryable as
+stale. The existing stale-review recovery path remains intact.
+
+REGRESSION_COVERAGE: Article preflight, current-outcome reducer, Capture
+readback, Capture convergence, Article MCP and retry-related focused suites
+pass (154 tests / 715 assertions in the broad targeted run). PHP lint and
+`git diff --check` pass. Local WP-CLI read-only verification could not hydrate
+the requested Capture because the local database connection is unavailable;
+no live candidate inventory was guessed, and no Capture, staging/production
+data, deployment or publication was mutated.
+
+STATUS: `ARTICLE_OVERLAP_POLICY_FIX_LOCAL / CURRENT_REVIEW_READBACK_FIXED /
+FOCUSED_GREEN / LIVE_INVENTORY_UNAVAILABLE / NO_DATA_MUTATION /
+DEPLOYMENT_PENDING`.
+
 # Checkpoint — 2026-10-06 — System-wide duplicate audit cursor transport bound
 
 ROOT_CAUSE: The signed duplicate-audit cursor embedded up to 128 complete carry

@@ -55,8 +55,8 @@ final class ArticleResearchPreflight
             'post_id' => $postId > 0 ? $postId : null,
             'subject_id' => $primaryId,
         ];
-        $overlap = $this->overlap($topic, $primaryId, $posts, $postId);
-        if (in_array($overlap['classification'], ['LIKELY_DUPLICATE_INTENT', 'EXISTING_CANONICAL_ARTICLE'], true)) $blockers[] = 'EXISTING_ARTICLE_OVERLAP';
+        $overlap = $this->overlap($topic, $primaryId, $posts, $postId, $articleContext);
+        if (($overlap['substantial'] ?? false) === true) $blockers[] = 'EXISTING_ARTICLE_OVERLAP';
         $relations = $this->relations(is_array($inventory['relations'] ?? null) ? $inventory['relations'] : [], $blockers);
         $links = $this->links($relations, is_array($inventory['posts'] ?? null) ? $inventory['posts'] : [], $warnings);
         $media = is_array($inventory['media'] ?? null) ? $inventory['media'] : [];
@@ -118,16 +118,48 @@ final class ArticleResearchPreflight
     private function blocked(array $blockers, array $inventory): ArticleResearchResult { return new ArticleResearchResult([], $inventory, ['classification' => 'UNCERTAIN'], ['claims' => [], 'sources' => [], 'evidence' => []], [], [], ['status' => 'UNKNOWN'], ['candidates' => [], 'media_complete' => false], ['candidates' => []], [], ['status' => 'UNAVAILABLE'], array_values(array_unique($blockers)), [], false, ['status' => 'UNAVAILABLE', 'resolved_terms' => [], 'ambiguous_terms' => [], 'candidate_terms' => [], 'internal_link_candidates' => [], 'warnings' => ['DICTIONARY_PLANNING_UNAVAILABLE'], 'blocking' => false], ['timings_ms' => []]); }
 
     private function elapsed(float $started): int { return (int) round((microtime(true) - $started) * 1000); }
-    private function overlap(string $topic, string $subjectId, array $posts, int $currentPostId = 0): array
+    private function overlap(string $topic, string $subjectId, array $posts, int $currentPostId = 0, array $articleContext = []): array
     {
         $posts = array_values(array_filter($posts, static function (mixed $post) use ($currentPostId): bool {
             if (!is_array($post) || $currentPostId < 1) return is_array($post);
             return (int) preg_replace('/^.*:/', '', (string) ($post['id'] ?? '')) !== $currentPostId;
         }));
-        foreach ($posts as $post) if (in_array($subjectId, (array) ($post['subject_ids'] ?? []), true) && strcasecmp(trim((string) ($post['title'] ?? '')), trim($topic)) === 0) return ['classification' => 'EXISTING_CANONICAL_ARTICLE', 'post' => $post];
-        foreach ($posts as $post) if (in_array($subjectId, (array) ($post['subject_ids'] ?? []), true)) return ['classification' => 'SUBSTANTIAL_OVERLAP', 'post' => $post];
-        return ['classification' => $posts === [] ? 'NO_OVERLAP' : 'COMPLEMENTARY_CONTENT', 'post' => null];
+        $candidates = [];
+        $intent = trim((string) ($articleContext['editorial_intent'] ?? $articleContext['intent'] ?? ''));
+        foreach ($posts as $post) {
+            if (!is_array($post) || !in_array($subjectId, (array) ($post['subject_ids'] ?? []), true)) continue;
+            $candidateIntent = trim((string) ($post['editorial_intent'] ?? $post['intent'] ?? ''));
+            $titleScore = $this->tokenSimilarity($topic, (string) ($post['title'] ?? ''));
+            $intentMatch = $intent !== '' && $candidateIntent !== '' && $this->phraseKey($intent) === $this->phraseKey($candidateIntent);
+            $sameTitle = $this->phraseKey($topic) !== '' && $this->phraseKey($topic) === $this->phraseKey((string) ($post['title'] ?? ''));
+            $classification = $sameTitle ? 'EXACT_DUPLICATE' : ($intentMatch ? 'SAME_INTENT' : ($titleScore >= 0.45 ? 'PARTIAL_OVERLAP' : 'SUBJECT_ONLY_OVERLAP'));
+            $substantial = in_array($classification, ['EXACT_DUPLICATE', 'SAME_INTENT'], true);
+            $matched = ['primary_subject'];
+            if ($sameTitle) $matched[] = 'exact_title'; elseif ($titleScore >= 0.45) $matched[] = 'title_similarity';
+            if ($intentMatch) $matched[] = 'editorial_intent';
+            $id = (int) preg_replace('/^.*:/', '', (string) ($post['id'] ?? ''));
+            $candidates[] = [
+                'post_id' => $id, 'article_id' => $id, 'canonical_identity' => ['type' => 'wp_post', 'id' => $id],
+                'title' => (string) ($post['title'] ?? ''), 'slug' => (string) ($post['slug'] ?? ''), 'route' => (string) ($post['route'] ?? ''),
+                'status' => (string) ($post['status'] ?? (($post['published'] ?? false) ? 'publish' : 'draft')),
+                'primary_subject' => $subjectId, 'relevant_subjects' => array_values(array_map('strval', (array) ($post['subject_ids'] ?? []))),
+                'editorial_intent' => $candidateIntent !== '' ? $candidateIntent : null,
+                'overlap_score' => round(max($sameTitle ? 1.0 : 0.0, $intentMatch ? 1.0 : 0.0, $titleScore), 6),
+                'matched_dimensions' => $matched, 'classification' => $classification,
+                'reason' => $this->overlapReason($classification), 'substantial' => $substantial,
+            ];
+        }
+        $substantialCandidates = array_values(array_filter($candidates, static fn (array $candidate): bool => ($candidate['substantial'] ?? false) === true));
+        if ($substantialCandidates !== []) {
+            $winnerId = (int) ($substantialCandidates[0]['post_id'] ?? 0);
+            $winner = array_values(array_filter($posts, static fn (array $post): bool => (int) preg_replace('/^.*:/', '', (string) ($post['id'] ?? '')) === $winnerId))[0] ?? null;
+            return ['classification' => 'SUBSTANTIAL_OVERLAP', 'substantial' => true, 'post' => $winner, 'candidates' => $candidates, 'candidate_articles' => $substantialCandidates, 'reason' => 'A candidate matches the same editorial intent or exact title.'];
+        }
+        return ['classification' => $candidates === [] ? ($posts === [] ? 'NO_OVERLAP' : 'COMPLEMENTARY_CONTENT') : 'COMPLEMENTARY_CONTENT', 'substantial' => false, 'post' => null, 'candidates' => $candidates, 'candidate_articles' => [], 'reason' => $candidates === [] ? 'No current Article is bound to the primary subject.' : 'Subject overlap without proof of the same editorial intent is not substantial.'];
     }
+    private function phraseKey(string $value): string { $value = function_exists('mb_strtolower') ? mb_strtolower(trim($value), 'UTF-8') : strtolower(trim($value)); $value = preg_replace('/[^\p{L}\p{N}]+/u', ' ', $value) ?? $value; return trim(preg_replace('/\s+/u', ' ', $value) ?? $value); }
+    private function tokenSimilarity(string $left, string $right): float { $a = array_values(array_unique(array_filter(explode(' ', $this->phraseKey($left))))); $b = array_values(array_unique(array_filter(explode(' ', $this->phraseKey($right))))); if ($a === [] || $b === []) return 0.0; return count(array_intersect($a, $b)) / max(1, min(count($a), count($b))); }
+    private function overlapReason(string $classification): string { return match ($classification) { 'EXACT_DUPLICATE' => 'Same canonical subject and exact editorial title.', 'SAME_INTENT' => 'Same canonical subject and persisted editorial intent.', 'PARTIAL_OVERLAP' => 'Same canonical subject with partial title/topic overlap; intent is not proven identical.', default => 'Same canonical subject only; no same-intent signal was persisted.' }; }
     private function relations(array $items, array &$blockers): array { $out = []; foreach ($items as $item) { $class = (string) ($item['class'] ?? 'UNSUPPORTED'); if (!in_array($class, ['DIRECT', 'DERIVED', 'PROPOSED_DIRECT', 'EDITORIAL_RELATED', 'AMBIGUOUS', 'UNSUPPORTED'], true)) $class = 'UNSUPPORTED'; if ($class === 'DERIVED' && count((array) ($item['path'] ?? [])) > 2) $class = 'UNSUPPORTED'; if (in_array($class, ['AMBIGUOUS', 'UNSUPPORTED'], true)) $blockers[] = $class . '_RELATION'; $item['classification'] = ['DIRECT' => 'EXISTING_DIRECT', 'DERIVED' => 'EXISTING_DERIVED', 'PROPOSED_DIRECT' => 'PROPOSED_DIRECT', 'EDITORIAL_RELATED' => 'EDITORIAL_RELATED', 'AMBIGUOUS' => 'AMBIGUOUS', 'UNSUPPORTED' => 'UNSUPPORTED'][$class]; $out[] = $item; } return $out; }
     private function links(array $relations, array $posts, array &$warnings): array { $links = []; foreach ($relations as $relation) if (in_array($relation['classification'], ['EXISTING_DIRECT', 'EXISTING_DERIVED'], true)) { try { $eligible = ($this->publicEligibility)($relation); } catch (\Throwable) { $eligible = ['eligible' => false, 'status' => 'unavailable']; } if (($eligible['status'] ?? '') === 'unavailable') { $warnings[] = 'PUBLIC_ROUTE_ELIGIBILITY_UNAVAILABLE'; continue; } if (($eligible['eligible'] ?? false) && trim((string) ($eligible['route'] ?? '')) !== '') $links[] = ['route' => $eligible['route'], 'relation_class' => $relation['classification'], 'reason' => $relation['reason'] ?? 'registered semantic context', 'source' => 'graph', 'path' => $relation['path'] ?? []]; } return $links; }
     private function categoryPlan(array $currentCategories, array $availableCategories = []): array

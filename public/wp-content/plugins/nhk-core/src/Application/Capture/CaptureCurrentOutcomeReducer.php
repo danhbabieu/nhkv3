@@ -94,6 +94,8 @@ final class CaptureCurrentOutcomeReducer
         $resolution = is_array($diagnostics['article_resolution'] ?? null) ? $diagnostics['article_resolution'] : [];
         $research = is_array($resolution['research'] ?? null) ? $resolution['research'] : [];
         if (($research['ready_for_draft'] ?? false) !== true || (array) ($research['blockers'] ?? []) !== []) return false;
+        $overlap = is_array($research['overlap_analysis'] ?? null) ? $research['overlap_analysis'] : (is_array($resolution['overlap'] ?? null) ? $resolution['overlap'] : []);
+        if (strtoupper(trim((string) ($overlap['classification'] ?? ''))) === 'SUBSTANTIAL_OVERLAP') return false;
         if (in_array('OWNER_REVIEW_REQUIRED', array_map('strval', (array) ($research['blockers'] ?? [])), true)) return false;
         if (in_array('SYSTEM_BLOCKED', array_map('strval', (array) ($research['blockers'] ?? [])), true)) return false;
         $failure = is_array($diagnostics['failure'] ?? null) ? $diagnostics['failure'] : [];
@@ -144,6 +146,11 @@ final class CaptureCurrentOutcomeReducer
         $completionBlockers = self::currentBlockers($capture->diagnostics, $capture->phaseReceipts);
         if (in_array('CATEGORY_UNRESOLVED', $completionBlockers, true) || self::failureCode($capture) === 'CATEGORY_UNRESOLVED') {
             return ['eligible' => false, 'reason' => 'CAPTURE_RETRY_NOT_ALLOWED'];
+        }
+        if ($capture->status === 'REVIEW_REQUIRED'
+            && self::hasCurrentArticleOverlapReview($capture)
+        ) {
+            return ['eligible' => false, 'reason' => 'CURRENT_REVIEW_REQUIRED'];
         }
         if ($capture->status === 'REVIEW_REQUIRED'
             && !self::isHardBlockedReview($capture)
@@ -198,6 +205,18 @@ final class CaptureCurrentOutcomeReducer
         if (strtoupper(trim((string) ($failure['classification'] ?? ''))) === 'HARD_BLOCK') return true;
         if (strtoupper(trim((string) ($preparation['quality_decision'] ?? ''))) === 'HARD_BLOCK') return true;
         return in_array('HARD_BLOCK', array_map('strval', (array) ($preparation['blockers'] ?? [])), true);
+    }
+
+    private static function hasCurrentArticleOverlapReview(CaptureRecord $capture): bool
+    {
+        $latest = CapturePhaseReceiptReducer::latest((array) ($capture->phaseReceipts['ARTICLE_PRE_CREATE_REVIEW'] ?? []));
+        if (strtoupper(trim((string) ($latest['status'] ?? ''))) !== 'REVIEW_REQUIRED') return false;
+        $code = strtoupper(trim((string) ($latest['failure_code'] ?? '')));
+        if (!in_array($code, ['SUBSTANTIAL_OVERLAP', 'ARTICLE_SUBSTANTIAL_OVERLAP', 'EXISTING_ARTICLE_OVERLAP'], true)) return false;
+        $resolution = is_array($capture->diagnostics['article_resolution'] ?? null) ? $capture->diagnostics['article_resolution'] : [];
+        $research = is_array($resolution['research'] ?? null) ? $resolution['research'] : [];
+        $overlap = is_array($research['overlap_analysis'] ?? null) ? $research['overlap_analysis'] : (is_array($resolution['overlap'] ?? null) ? $resolution['overlap'] : []);
+        return strtoupper(trim((string) ($overlap['classification'] ?? ''))) === 'SUBSTANTIAL_OVERLAP';
     }
 
     public static function supportsCanonicalVideoCompletionRetry(CaptureRecord $capture): bool

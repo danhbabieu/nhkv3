@@ -23,7 +23,7 @@ use NHK\Core\Contracts\Media\WordPressMediaAttachmentIngestor;
 use NHK\Core\Application\Inventory\{CanonicalInventoryService, GraphInventoryService};
 use NHK\Core\Application\Graph\RelationBackfillService;
 use NHK\Core\Application\Presentation\LatestFirstOrder;
-use NHK\Core\Application\Capture\CaptureCurrentOutcomeReducer;
+use NHK\Core\Application\Capture\{CaptureCurrentOutcomeReducer, CapturePhaseReceiptReducer};
 use NHK\Core\Application\Graph\RelationshipReadService;
 use NHK\Core\Application\Governance\ProposalDiscoveryService;
 use NHK\Core\Application\Knowledge\PublicResearchSourceDisplayPolicy;
@@ -110,6 +110,14 @@ final class McpReadHandler
                     'input' => $subjectReview ? 'subject_reconciliation' : 'capture_continuation',
                 ],
             ];
+        }
+        $articleReview = CapturePhaseReceiptReducer::latest((array) ($capture->phaseReceipts['ARTICLE_PRE_CREATE_REVIEW'] ?? []));
+        $articleReviewCode = strtoupper(trim((string) ($articleReview['failure_code'] ?? '')));
+        $resolution = is_array($diagnostics['article_resolution'] ?? null) ? $diagnostics['article_resolution'] : [];
+        $research = is_array($resolution['research'] ?? null) ? $resolution['research'] : [];
+        $overlap = is_array($research['overlap_analysis'] ?? null) ? $research['overlap_analysis'] : (is_array($resolution['overlap'] ?? null) ? $resolution['overlap'] : []);
+        if (($articleReview['status'] ?? '') === 'REVIEW_REQUIRED' && $articleReviewCode !== '' && ($overlap['classification'] ?? '') === 'SUBSTANTIAL_OVERLAP') {
+            $review = ['status' => 'REVIEW_REQUIRED', 'current' => true, 'failure_code' => $articleReviewCode, 'candidates' => array_values((array) ($overlap['candidates'] ?? [])), 'reason' => (string) ($overlap['reason'] ?? 'Current Article overlap requires review.'), 'continuation' => ['entrypoint' => 'nhk.capture.ingest', 'input' => 'capture_continuation']];
         }
         $children = \NHK\Core\Application\Completion\CompletionCoordinator::effectiveChildren(
             array_values(array_filter((array) ($completion['children'] ?? []), 'is_array')),

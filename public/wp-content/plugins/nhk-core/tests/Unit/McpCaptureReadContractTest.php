@@ -354,4 +354,35 @@ final class McpCaptureReadContractTest extends TestCase
 
         self::assertSame(['eligible' => false, 'reason' => 'CAPTURE_RETRY_NOT_ALLOWED', 'capture_id' => $id], $read->captureGet($id)['retry']);
     }
+
+    public function test_capture_get_exposes_current_overlap_review_candidates_and_reason(): void
+    {
+        $id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+        $record = new CaptureRecord($id, 'current-overlap', hash('sha256', 'current-overlap'), 'SEMANTICS_RECONCILED', 'REVIEW_REQUIRED', null, null, [], [], [
+            'failure' => ['code' => 'SUBSTANTIAL_OVERLAP'],
+            'completion' => ['status' => 'REVIEW_REQUIRED', 'blockers' => ['SUBSTANTIAL_OVERLAP']],
+            'article_resolution' => ['research' => ['ready_for_draft' => true, 'blockers' => [], 'overlap_analysis' => ['classification' => 'SUBSTANTIAL_OVERLAP', 'reason' => 'same intent', 'candidates' => [['article_id' => 902, 'classification' => 'SAME_INTENT', 'reason' => 'same persisted editorial intent']]]]],
+        ], [
+            'ARTICLE_PRE_CREATE_REVIEW' => ['status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'failure_code' => 'SUBSTANTIAL_OVERLAP', 'current_outcome' => 'CURRENT'],
+        ]);
+        $repository = new class($record) implements CaptureRepository {
+            public function __construct(private CaptureRecord $record) {}
+            public function findByIdempotencyKey(string $key): ?CaptureRecord { return null; }
+            public function findById(string $captureId): ?CaptureRecord { return $captureId === $this->record->captureId ? $this->record : null; }
+            public function create(CaptureRecord $record): CaptureRecord { return $record; }
+            public function save(CaptureRecord $record): CaptureRecord { return $record; }
+        };
+        $read = new McpReadHandler(
+            $this->createMock(AuthorityRepository::class), new EntityTypeRegistry(), $this->createMock(MediaRepository::class), $this->createMock(MediaAssetRepository::class), $this->createMock(MediaUsageRepository::class),
+            $this->createMock(VideoRepository::class), $this->createMock(KnowledgeRepository::class), $this->createMock(EvidenceRepository::class), captures: $repository,
+        );
+
+        $projection = $read->captureGet($id);
+
+        self::assertSame(['SUBSTANTIAL_OVERLAP'], $projection['blockers']);
+        self::assertTrue($projection['review']['current']);
+        self::assertSame('SUBSTANTIAL_OVERLAP', $projection['review']['failure_code']);
+        self::assertSame([902], array_column($projection['review']['candidates'], 'article_id'));
+        self::assertSame(['eligible' => false, 'reason' => 'CURRENT_REVIEW_REQUIRED', 'capture_id' => $id], $projection['retry']);
+    }
 }

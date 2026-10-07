@@ -431,6 +431,20 @@ final class CaptureCurrentOutcomeReducerTest extends TestCase
         self::assertSame(['eligible' => false, 'reason' => 'CAPTURE_RETRY_NOT_ALLOWED'], CaptureCurrentOutcomeReducer::retryEligibility($capture));
     }
 
+    public function test_current_substantial_overlap_review_stays_current_and_is_not_stale_retryable(): void
+    {
+        $capture = $this->capture([
+            'failure' => ['code' => 'SUBSTANTIAL_OVERLAP'],
+            'completion' => ['status' => 'REVIEW_REQUIRED', 'blockers' => ['SUBSTANTIAL_OVERLAP']],
+            'article_resolution' => ['research' => ['ready_for_draft' => true, 'blockers' => [], 'overlap_analysis' => ['classification' => 'SUBSTANTIAL_OVERLAP', 'candidates' => [['article_id' => 902]]]]],
+        ], [
+            'ARTICLE_PRE_CREATE_REVIEW' => ['status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'failure_code' => 'SUBSTANTIAL_OVERLAP', 'current_outcome' => 'CURRENT'],
+        ], 'REVIEW_REQUIRED');
+
+        self::assertSame(['SUBSTANTIAL_OVERLAP'], CaptureCurrentOutcomeReducer::currentBlockers($capture->diagnostics, $capture->phaseReceipts));
+        self::assertSame(['eligible' => false, 'reason' => 'CURRENT_REVIEW_REQUIRED'], CaptureCurrentOutcomeReducer::retryEligibility($capture));
+    }
+
     /** @param array<string,mixed> $diagnosticParts */
     private function reviewCapture(array $diagnosticParts): CaptureRecord
     {

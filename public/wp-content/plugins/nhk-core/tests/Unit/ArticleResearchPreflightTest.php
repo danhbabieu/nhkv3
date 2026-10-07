@@ -30,7 +30,8 @@ final class ArticleResearchPreflightTest extends TestCase
 
         self::assertFalse($result->readyForDraft);
         self::assertSame('brand-1', $result->subjectResolution['primary']['id']);
-        self::assertSame('EXISTING_CANONICAL_ARTICLE', $result->overlap['classification']);
+        self::assertSame('SUBSTANTIAL_OVERLAP', $result->overlap['classification']);
+        self::assertSame('EXACT_DUPLICATE', $result->overlap['candidates'][0]['classification']);
         self::assertSame(['EXISTING_DIRECT', 'EXISTING_DERIVED'], array_column($result->relationPlan, 'classification'));
         self::assertSame('/model/nhk', $result->internalLinks[0]['route']);
         self::assertContains('EXISTING_ARTICLE_OVERLAP', $result->blockers);
@@ -355,5 +356,39 @@ final class ArticleResearchPreflightTest extends TestCase
 
         self::assertSame('Đồng hồ chim cúc cu: checklist cho người sưu tầm', $result->seoBlueprint['title_intent']);
         self::assertSame('dong-ho-chim-cuc-cu-checklist-cho-nguoi-suu-tam', $result->seoBlueprint['slug_intent']);
+    }
+
+    public function test_distinct_intent_same_subject_is_not_a_duplicate(): void
+    {
+        $service = new ArticleResearchPreflight(
+            static fn (array $subject): array => ['status' => 'resolved', 'primary' => ['id' => 'odo-24', 'type' => 'variant', 'name' => 'Odo 24']],
+            static fn (array $context): array => ['status' => 'available', 'posts' => [['id' => '901', 'title' => 'Odo 24 lịch sử', 'subject_ids' => ['odo-24'], 'editorial_intent' => 'history', 'status' => 'publish']], 'categories' => [['slug' => 'tri-thuc']], 'knowledge' => [], 'media' => [], 'videos' => [], 'sources' => [], 'evidence' => [], 'relations' => []],
+            static fn (array $candidate): array => ['eligible' => false],
+        );
+
+        $result = $service->research('Đánh mượn côn là gì?', ['type' => 'variant'], ['editorial_intent' => 'borrowed-strike-mechanism']);
+
+        self::assertTrue($result->readyForDraft);
+        self::assertSame('COMPLEMENTARY_CONTENT', $result->overlap['classification']);
+        self::assertSame('SUBJECT_ONLY_OVERLAP', $result->overlap['candidates'][0]['classification']);
+        self::assertNotContains('EXISTING_ARTICLE_OVERLAP', $result->blockers);
+    }
+
+    public function test_same_persisted_editorial_intent_remains_review_required_with_candidate_details(): void
+    {
+        $service = new ArticleResearchPreflight(
+            static fn (array $subject): array => ['status' => 'resolved', 'primary' => ['id' => 'odo-24', 'type' => 'variant', 'name' => 'Odo 24']],
+            static fn (array $context): array => ['status' => 'available', 'posts' => [['id' => '902', 'title' => 'Đánh mượn trên Odo 24', 'subject_ids' => ['odo-24'], 'editorial_intent' => 'borrowed-strike-mechanism', 'status' => 'draft', 'slug' => 'danh-muon-tren-odo-24', 'route' => '/danh-muon-tren-odo-24/']], 'categories' => [['slug' => 'tri-thuc']], 'knowledge' => [], 'media' => [], 'videos' => [], 'sources' => [], 'evidence' => [], 'relations' => []],
+            static fn (array $candidate): array => ['eligible' => false],
+        );
+
+        $result = $service->research('Đánh mượn côn là gì?', ['type' => 'variant'], ['editorial_intent' => 'borrowed-strike-mechanism']);
+
+        self::assertFalse($result->readyForDraft);
+        self::assertSame('SUBSTANTIAL_OVERLAP', $result->overlap['classification']);
+        self::assertSame('SAME_INTENT', $result->overlap['candidates'][0]['classification']);
+        self::assertSame(902, $result->overlap['candidates'][0]['article_id']);
+        self::assertSame('/danh-muon-tren-odo-24/', $result->overlap['candidates'][0]['route']);
+        self::assertContains('EXISTING_ARTICLE_OVERLAP', $result->blockers);
     }
 }
