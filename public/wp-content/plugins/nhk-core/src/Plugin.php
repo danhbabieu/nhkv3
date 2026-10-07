@@ -424,11 +424,15 @@ final class Plugin {
                 $systemWideReaders[$auditOwner] = new WpdbDuplicateAuditPageReader($wpdb, $auditOwner);
             }
             $systemWideDictionary = $dictionaryRuntime?->duplicateAudit();
+            $knowledgeReconciliationPlanner = new \NHK\Core\Application\Knowledge\KnowledgeDuplicateReconciliationPlanner($claims, $evidence, $graphService);
             $systemWideCoordinator = new SystemWideDuplicateAuditCoordinator(
                 $systemWideReaders,
                 $systemWideDictionary instanceof \NHK\Core\Application\Dictionary\DictionaryDuplicateCandidateAudit
                     ? new DictionaryDuplicateAuditAdapter($systemWideDictionary)
                     : null,
+                null,
+                $videoIdentityReader,
+                $knowledgeReconciliationPlanner,
             );
             $systemWideDuplicateAuditHandler = new SystemWideDuplicateAuditHandler($systemWideCoordinator);
             $collectorBranchReader = static function (string $classificationId) use ($authority, $claims, $graphService): array {

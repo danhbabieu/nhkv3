@@ -4,7 +4,9 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Audit;
 
 use NHK\Core\Application\Knowledge\KnowledgeClaimIdentity;
+use NHK\Core\Application\Knowledge\KnowledgeDuplicateReconciliationPlanner;
 use NHK\Core\Contracts\Audit\DuplicateAuditPageReader;
+use NHK\Core\Contracts\Video\VideoIdentityReader;
 
 /**
  * Thin orchestration boundary for owner-specific, read-only duplicate audits.
@@ -31,6 +33,8 @@ final class SystemWideDuplicateAuditCoordinator
         private array $readers = [],
         private ?DictionaryDuplicateAuditAdapter $dictionaryAudit = null,
         private ?string $cursorSigningSecret = null,
+        private ?VideoIdentityReader $videoIdentityReader = null,
+        private ?KnowledgeDuplicateReconciliationPlanner $knowledgeReconciliationPlanner = null,
     ) {}
 
     /** @return array<string,mixed> */
@@ -281,7 +285,7 @@ final class SystemWideDuplicateAuditCoordinator
         $resolved = [];
         $unresolved = [];
         foreach ($items as $row) {
-            $identity = KnowledgeClaimIdentity::resolveAuditRow($row);
+            $identity = KnowledgeClaimIdentity::resolveAuditRow($row, $this->videoIdentityReader);
             if ($identity->status() !== 'RESOLVED') {
                 $id = $this->id($row);
                 if ($id !== '') $unresolved[$identity->status() . '|' . implode(',', $identity->reasonCodes()) . '|' . $id][] = $row;
@@ -290,7 +294,7 @@ final class SystemWideDuplicateAuditCoordinator
             $resolved[$identity->fingerprint()][] = ['row' => $row, 'identity' => $identity];
         }
         foreach ($unresolved as $reviewKey => $rows) {
-            $identity = KnowledgeClaimIdentity::resolveAuditRow($rows[0]);
+            $identity = KnowledgeClaimIdentity::resolveAuditRow($rows[0], $this->videoIdentityReader);
             $clusters[] = $this->cluster('Knowledge', 'review:' . hash('sha256', $reviewKey), $rows, 'REVIEW_REQUIRED', 'LOW', ['identity_status' => $identity->status(), 'identity_policy' => $identity->policyVersion(), 'identity_fingerprint' => $identity->fingerprint()], $identity->reasonCodes(), ['Knowledge identity is not proven; records are never compared as equivalent'], 'REVIEW_KNOWLEDGE_IDENTITY;NO_MUTATION');
         }
         foreach ($resolved as $key => $entries) {
@@ -466,7 +470,21 @@ final class SystemWideDuplicateAuditCoordinator
     /** @param list<array<string,mixed>> $clusters @return list<array<string,mixed>> */
     private function reconciliationCandidates(array $clusters): array
     {
-        return array_values(array_map(static fn (array $cluster): array => ['owner' => $cluster['owner'], 'cluster_id' => $cluster['cluster_id'], 'classification' => $cluster['classification'], 'canonical_ids' => $cluster['canonical_ids'], 'action' => $cluster['recommended_review_action'], 'apply' => false], array_filter($clusters, static fn (array $cluster): bool => in_array($cluster['classification'] ?? '', ['DEFINITE_DUPLICATE', 'HIGH_CONFIDENCE_EQUIVALENT', 'POSSIBLE_DUPLICATE', 'REVIEW_REQUIRED'], true))));
+        return array_values(array_map(function (array $cluster): array {
+            $candidate = ['owner' => $cluster['owner'], 'cluster_id' => $cluster['cluster_id'], 'classification' => $cluster['classification'], 'canonical_ids' => $cluster['canonical_ids'], 'action' => $cluster['recommended_review_action'], 'apply' => false];
+            if ($cluster['owner'] === 'Knowledge' && $this->knowledgeReconciliationPlanner !== null) {
+                $signals = is_array($cluster['identity_signals'] ?? null) ? $cluster['identity_signals'] : [];
+                $candidate['plan'] = $this->knowledgeReconciliationPlanner->plan([
+                    'classification' => $cluster['classification'],
+                    'canonical_ids' => $cluster['canonical_ids'],
+                    'identity_policy' => $signals['identity_policy'] ?? '',
+                    'identity_fingerprint' => $signals['identity_fingerprint'] ?? '',
+                    'record_revisions' => array_reduce((array) ($cluster['revisions'] ?? []), static function (array $carry, array $row): array { $carry[(string) ($row['canonical_id'] ?? '')] = (int) ($row['revision'] ?? 0); return $carry; }, []),
+                ]);
+                $candidate['executable'] = ($candidate['plan']['status'] ?? '') === 'SAFE_TO_RECONCILE' && ($candidate['plan']['apply'] ?? true) === false;
+            }
+            return $candidate;
+        }, array_filter($clusters, static fn (array $cluster): bool => in_array($cluster['classification'] ?? '', ['DEFINITE_DUPLICATE', 'HIGH_CONFIDENCE_EQUIVALENT', 'POSSIBLE_DUPLICATE', 'REVIEW_REQUIRED'], true))));
     }
 
     /** @param array<string,mixed> $owners */
