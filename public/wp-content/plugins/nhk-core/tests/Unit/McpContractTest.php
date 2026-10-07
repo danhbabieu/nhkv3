@@ -231,6 +231,33 @@ final class McpContractTest extends TestCase
         self::assertSame('DOCUMENTATION_CHECKPOINT_STALE', $response['body']['result']['structuredContent']['error']['code']);
     }
 
+    public function test_capture_checkpoint_validator_accepts_only_the_current_bootstrap_tuple(): void
+    {
+        $documentation = new McpDocumentationRegistry();
+        $bootstrap = $documentation->bootstrap();
+        $current = [
+            'manifest_hash' => $bootstrap['manifest_hash'],
+            'documentation_version' => $bootstrap['documentation_version'],
+        ];
+        $cases = [
+            'current' => [$current, false],
+            'wrong_documentation_version' => [['manifest_hash' => $current['manifest_hash'], 'documentation_version' => str_repeat('0', 64)], true],
+            'wrong_manifest' => [['manifest_hash' => str_repeat('0', 64), 'documentation_version' => $current['documentation_version']], true],
+            'both_stale' => [['manifest_hash' => str_repeat('1', 64), 'documentation_version' => str_repeat('2', 64)], true],
+            'mixed_snapshot' => [['manifest_hash' => str_repeat('3', 64), 'documentation_version' => $current['documentation_version']], true],
+        ];
+
+        foreach ($cases as $name => [$checkpoint, $stale]) {
+            $transport = new McpTransport($this->readHandler(), new McpGovernanceHandler(new GovernanceService(new InMemoryProposalRepository())), static fn (string $capability): bool => true, documentation: $documentation);
+            $response = $transport->dispatch(['jsonrpc' => '2.0', 'id' => $name, 'method' => 'tools/call', 'params' => ['name' => 'nhk.capture.ingest', 'arguments' => [
+                'idempotency_key' => 'checkpoint-' . $name,
+                'documentation_checkpoint' => $checkpoint,
+            ]]]);
+            $errorCode = $response['body']['result']['structuredContent']['error']['code'] ?? null;
+            self::assertSame($stale, $errorCode === 'DOCUMENTATION_CHECKPOINT_STALE', $name);
+        }
+    }
+
     public function test_capture_ingest_create_capable_lexical_plan_cannot_bypass_pre_create_gate(): void
     {
         $transport = new McpTransport($this->readHandler(), new McpGovernanceHandler(new GovernanceService(new InMemoryProposalRepository())), static fn (string $capability): bool => true);

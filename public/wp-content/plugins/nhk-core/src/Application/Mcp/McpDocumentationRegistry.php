@@ -235,7 +235,13 @@ final class McpDocumentationRegistry
     {
         if (trim((string) ($checkpoint['manifest_hash'] ?? '')) === '' || trim((string) ($checkpoint['documentation_version'] ?? '')) === '') throw new McpDocumentationException('DOCUMENTATION_CHECKPOINT_REQUIRED');
         $manifest = $this->context()['manifest'];
-        if (!hash_equals((string) $manifest['manifest_hash'], (string) $checkpoint['manifest_hash']) || !hash_equals((string) $manifest['documentation_version'], (string) $checkpoint['documentation_version'])) throw new McpDocumentationException('DOCUMENTATION_CHECKPOINT_STALE');
+        $manifestMatches = hash_equals((string) $manifest['manifest_hash'], (string) $checkpoint['manifest_hash']);
+        $documentationMatches = hash_equals((string) $manifest['documentation_version'], (string) $checkpoint['documentation_version']);
+        if (!$manifestMatches || !$documentationMatches) throw new McpDocumentationException('DOCUMENTATION_CHECKPOINT_STALE', null, [
+            'first_mismatch' => !$manifestMatches ? 'manifest_hash' : 'documentation_version',
+            'expected' => ['manifest_hash' => $manifest['manifest_hash'], 'documentation_version' => $manifest['documentation_version']],
+            'supplied' => ['manifest_hash' => (string) $checkpoint['manifest_hash'], 'documentation_version' => (string) $checkpoint['documentation_version']],
+        ]);
     }
 
     /** @return array{root:string,manifest:array<string,mixed>} */

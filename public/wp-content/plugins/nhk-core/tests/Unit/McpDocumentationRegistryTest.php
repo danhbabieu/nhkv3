@@ -364,7 +364,13 @@ final class McpDocumentationRegistryTest extends TestCase
         try {
             $registry->assertCheckpoint(['manifest_hash' => str_repeat('0', 64), 'documentation_version' => $manifest['documentation_version']]);
             self::fail('Expected stale checkpoint.');
-        } catch (\RuntimeException $error) { self::assertSame('DOCUMENTATION_CHECKPOINT_STALE', $error->getMessage()); }
+        } catch (\RuntimeException $error) {
+            self::assertSame('DOCUMENTATION_CHECKPOINT_STALE', $error->getMessage());
+            self::assertSame('manifest_hash', $error->details['first_mismatch']);
+            self::assertSame($manifest['manifest_hash'], $error->details['expected']['manifest_hash']);
+            self::assertSame(str_repeat('0', 64), $error->details['supplied']['manifest_hash']);
+            self::assertSame($manifest['documentation_version'], $error->details['supplied']['documentation_version']);
+        }
         try {
             (new McpDocumentationRegistry($directory, 'runtime-b'))->bootstrap();
             self::fail('Expected runtime mismatch.');

@@ -182,6 +182,14 @@ final class PluginBootWiringTest extends TestCase
         self::assertStringContainsString('rest_do_request($request)', (string) file_get_contents(__DIR__ . '/../../src/Application/Mcp/McpAbilityRegistration.php'));
     }
 
+    public function test_capture_and_transport_share_one_documentation_checkpoint_authority(): void
+    {
+        $plugin = (string) file_get_contents(__DIR__ . '/../../src/Plugin.php');
+
+        self::assertSame(1, substr_count($plugin, 'new McpDocumentationRegistry('));
+        self::assertStringContainsString('$documentation,', $plugin);
+    }
+
     public function test_production_draft_gateway_and_capture_share_strict_article_pre_create_resolver(): void
     {
         $plugin = (string) file_get_contents(__DIR__ . '/../../src/Plugin.php');

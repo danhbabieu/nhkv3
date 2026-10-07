@@ -2037,7 +2037,7 @@ final class Plugin {
                 static function (array $context) use ($draftGateway): array {
                     return $draftGateway->publish((int) ($context['article_id'] ?? 0), (string) ($context['expected_state_token'] ?? ''), (array) ($context['evidence'] ?? []), (string) ($context['idempotency_key'] ?? ''));
                 },
-                new McpDocumentationRegistry(),
+                $documentation,
                 static function (array $context) use ($videoIntake): array {
                     $video = is_array($context['video'] ?? null) ? $context['video'] : [];
                     if (trim((string) ($video['url'] ?? '')) === '') return ['status' => 'unavailable', 'items' => [], 'diagnostics' => ['VIDEO_URL_REQUIRED']];
