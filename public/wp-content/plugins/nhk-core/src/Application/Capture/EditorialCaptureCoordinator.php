@@ -337,6 +337,8 @@ final class EditorialCaptureCoordinator
         $diagnostics = $record->diagnostics;
         $receipts = $record->phaseReceipts;
         try {
+            $checkpointResult = $this->resumeFromSemanticsCheckpoint($record, $input, $text, $assets, $diagnostics, $receipts);
+            if ($checkpointResult instanceof CaptureRecord) return $checkpointResult;
             $followupItems = array_values(array_filter((array) ($input['asset_followup_items'] ?? []), 'is_array'));
             if ($followupItems !== []) {
                 $orderedFollowup = [];
@@ -1144,7 +1146,23 @@ final class EditorialCaptureCoordinator
             }
             $failureCode = $this->failureCode($error);
             $status = $this->failureStatus($failureCode);
-            $diagnostics['failure'] = ['code' => $failureCode, 'message' => $error->getMessage(), 'classification' => $status];
+            $trace = $error->getTrace();
+            $caller = is_array($trace[0] ?? null) ? $trace[0] : [];
+            $diagnostics['failure'] = [
+                'code' => $failureCode,
+                'message' => $error->getMessage(),
+                'classification' => $status,
+                'exception_class' => get_class($error),
+                'phase' => $this->activeReceiptPhase ?? $record->stage,
+                'throw_site' => $error->getFile() . ':' . $error->getLine(),
+                'caller' => array_filter([
+                    'class' => (string) ($caller['class'] ?? ''),
+                    'type' => (string) ($caller['type'] ?? ''),
+                    'function' => (string) ($caller['function'] ?? ''),
+                ], static fn (string $value): bool => $value !== ''),
+                'input_shape' => array_values(array_keys($input)),
+                'retryable' => $status === 'FAILED_RETRYABLE',
+            ];
             if ($error instanceof Utf8ValidationException || $error instanceof Utf8SerializationException) {
                 $diagnostics['utf8'] = ['status' => 'INVALID', 'code' => 'CAPTURE_UTF8_INVALID', 'producer' => $error->producer, 'field' => $error->path, 'remediation_class' => 'FIX_UPSTREAM_ENCODER_OR_STORAGE'];
             }
@@ -1829,6 +1847,35 @@ final class EditorialCaptureCoordinator
         $this->phaseStartedAt[$phase] = microtime(true);
     }
 
+    /**
+     * Resume the Article owner from a durable semantic checkpoint. A retry
+     * after SEMANTICS_RECONCILED must not replay interpretation, preparation,
+     * retrieval or governed semantic writes; those owners have already
+     * committed their checkpoint and may have produced independent receipts.
+     */
+    private function resumeFromSemanticsCheckpoint(CaptureRecord $record, array $input, string $text, array $assets, array $diagnostics, array $receipts): ?CaptureRecord
+    {
+        if ($record->stage !== CaptureStage::SEMANTICS_RECONCILED->value || $record->articleId !== null) return null;
+        $intent = is_array($record->context['content_intent'] ?? null) ? $record->context['content_intent'] : [];
+        if (!(($intent['article_required'] ?? false) === true)) return null;
+        $resolution = is_array($diagnostics['subjects'] ?? null) ? $diagnostics['subjects'] : [];
+        $interpretation = is_array($diagnostics['interpretation'] ?? null) ? $diagnostics['interpretation'] : [];
+        $writes = is_array($diagnostics['semantic_write_back'] ?? null) ? $diagnostics['semantic_write_back'] : [];
+        $retrieved = is_array($diagnostics['claim_retrieval'] ?? null) ? $diagnostics['claim_retrieval'] : [];
+        if ($resolution === [] || $interpretation === [] || $writes === [] || $retrieved === []) return null;
+
+        $articleResolution = $this->resolveArticleBeforeCreate($record, $input, $intent, $resolution, $text, $assets);
+        $diagnostics['article_resolution'] = $articleResolution;
+        if (($articleResolution['status'] ?? '') !== 'CREATE_DIFFERENTIATED_ARTICLE') {
+            return $this->save($record, CaptureStage::SEMANTICS_RECONCILED, $assets, $diagnostics, $receipts, 'ARTICLE_PRE_CREATE_REVIEW', null, null, 'REVIEW_REQUIRED', 'REVIEW_REQUIRED', null, $this->articlePreCreateFailureCode($articleResolution));
+        }
+
+        // A differentiated Article still uses the normal downstream owner
+        // path. This checkpoint shortcut only handles the review handoff;
+        // composition and draft creation retain their existing owner path.
+        return null;
+    }
+
     /** Persist the STARTED marker before entering a long external/governed phase. */
     private function startReceipt(CaptureRecord $record, array $assets, array $diagnostics, array $receipts, string $phase): CaptureRecord
     {
@@ -1851,25 +1898,21 @@ final class EditorialCaptureCoordinator
                 ? ['status' => 'REVIEW_REQUIRED', 'decision' => 'REVIEW_REQUIRED', 'diagnostics' => ['ARTICLE_PRE_CREATE_RESOLVER_UNAVAILABLE']]
                 : ['status' => 'CREATE_DIFFERENTIATED_ARTICLE', 'decision' => 'CREATE_DIFFERENTIATED_ARTICLE', 'diagnostics' => ['ARTICLE_PRE_CREATE_COMPATIBILITY_BOUNDARY']];
         }
-        try {
-            $result = ($this->articlePreCreateResolver)([
-                'capture' => $record->toArray(),
-                'capture_id' => $record->captureId,
-                'capture_revision' => $record->revision,
-                'input' => $input,
-                'content_intent' => $intent,
-                'subject_resolution' => $subjectResolution,
-                'text' => $text,
-                'assets' => $assets,
-            ]);
-            if (!is_array($result)) return ['status' => 'REVIEW_REQUIRED', 'decision' => 'REVIEW_REQUIRED', 'diagnostics' => ['ARTICLE_PRE_CREATE_RESOLUTION_INVALID']];
-            $decision = strtoupper(trim((string) ($result['decision'] ?? $result['status'] ?? '')));
-            $result['status'] = $decision === 'CREATE_DIFFERENTIATED_ARTICLE' ? 'CREATE_DIFFERENTIATED_ARTICLE' : 'REVIEW_REQUIRED';
-            $result['decision'] = $decision !== '' ? $decision : 'REVIEW_REQUIRED';
-            return $result;
-        } catch (\Throwable $error) {
-            return ['status' => 'REVIEW_REQUIRED', 'decision' => 'REVIEW_REQUIRED', 'diagnostics' => ['ARTICLE_PRE_CREATE_RESOLUTION_UNAVAILABLE'], 'error' => $error->getMessage()];
-        }
+        $result = ($this->articlePreCreateResolver)([
+            'capture' => $record->toArray(),
+            'capture_id' => $record->captureId,
+            'capture_revision' => $record->revision,
+            'input' => $input,
+            'content_intent' => $intent,
+            'subject_resolution' => $subjectResolution,
+            'text' => $text,
+            'assets' => $assets,
+        ]);
+        if (!is_array($result)) return ['status' => 'REVIEW_REQUIRED', 'decision' => 'REVIEW_REQUIRED', 'diagnostics' => ['ARTICLE_PRE_CREATE_RESOLUTION_INVALID']];
+        $decision = strtoupper(trim((string) ($result['decision'] ?? $result['status'] ?? '')));
+        $result['status'] = $decision === 'CREATE_DIFFERENTIATED_ARTICLE' ? 'CREATE_DIFFERENTIATED_ARTICLE' : 'REVIEW_REQUIRED';
+        $result['decision'] = $decision !== '' ? $decision : 'REVIEW_REQUIRED';
+        return $result;
     }
 
     /** @param array<string,mixed> $resolution */

@@ -141,6 +141,96 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
         self::assertSame(0, $calls['draft']);
     }
 
+    public function test_semantics_checkpoint_retry_reuses_persisted_work_before_article_pre_create(): void
+    {
+        $captures = new Pr5CaptureRepository();
+        $calls = ['draft' => 0, 'semantic' => 0, 'media' => 0, 'publication' => 0, 'final' => 0];
+        $events = [];
+        $captureId = UuidCodec::newV7();
+        $key = 'semantics-checkpoint-retry';
+        $subjectId = '11111111-1111-4111-8111-111111111111';
+        $packet = new SubjectResolutionPacket('resolved', $subjectId, 'model', 'nhk:model:checkpoint', 'Checkpoint Model', 2, 'persisted', [], 'CAPTURE');
+        $receipts = [];
+        foreach (['INTERPRETED', 'CONTENT_PREPARATION', 'SUBJECTS_RESOLVED', 'KNOWLEDGE_RETRIEVED', 'SEMANTICS_RECONCILED'] as $phase) {
+            $receipts = CapturePhaseReceiptReducer::append($receipts, $phase, ['status' => 'COMPLETED', 'result' => 'COMPLETED']);
+        }
+        $receipts = CapturePhaseReceiptReducer::append($receipts, 'ARTICLE_PRE_CREATE_REVIEW', [
+            'status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'failure_code' => 'SUBSTANTIAL_OVERLAP',
+        ]);
+        $capture = new CaptureRecord(
+            $captureId, $key, hash('sha256', $key), CaptureStage::SEMANTICS_RECONCILED->value, 'IN_PROGRESS', null, null, [],
+            [
+                'raw_input' => 'Checkpoint text.', 'title' => 'Checkpoint title',
+                'content_intent' => ['status' => 'resolved', 'intent' => 'TEXT_ARTICLE', 'article_required' => true],
+                'subject_resolution_packet' => $packet->toArray(),
+                'content_preparation' => ['status' => 'PREPARED'],
+            ],
+            [
+                'interpretation' => ['article_intent' => 'Checkpoint text.', 'non_semantic_context' => [], 'entity_mentions' => []],
+                'subjects' => $packet->toResolution(), 'subject_resolution_packet' => $packet->toArray(),
+                'claim_retrieval' => ['status' => 'available', 'items' => [], 'selected_claims' => []],
+                'semantic_write_back' => ['status' => 'COMPLETED', 'writes' => [], 'blockers' => []],
+                'article_resolution' => ['research' => ['ready_for_draft' => true, 'blockers' => []], 'overlap' => ['classification' => 'SUBSTANTIAL_OVERLAP']],
+                'completion' => ['status' => 'REVIEW_REQUIRED', 'blockers' => []],
+            ],
+            $receipts, 40,
+        );
+        $captures->create($capture);
+        $resolverCalls = 0;
+        $coordinator = $this->coordinator(
+            $captures, $calls, $events, semanticStatus: 'COMPLETED',
+            articlePreCreateResolver: static function () use (&$resolverCalls): array {
+                ++$resolverCalls;
+                return ['status' => 'REVIEW_REQUIRED', 'decision' => 'SAME_INTENT', 'diagnostics' => ['blockers' => ['SAME_INTENT']]];
+            },
+            articlePreCreateRequired: true,
+        );
+
+        $result = $coordinator->retry($capture, ['idempotency_key' => $key, 'resume_mode' => 'RETRY']);
+
+        self::assertSame('REVIEW_REQUIRED', $result->status);
+        self::assertSame(0, $calls['semantic']);
+        self::assertSame(1, $resolverCalls);
+        self::assertSame(41, $result->revision);
+        self::assertSame(2, $result->phaseReceipts['ARTICLE_PRE_CREATE_REVIEW']['latest']['attempt_no']);
+    }
+
+    public function test_checkpoint_exception_is_persisted_with_bounded_failure_diagnostics(): void
+    {
+        $captures = new Pr5CaptureRepository();
+        $calls = ['draft' => 0, 'semantic' => 0, 'media' => 0, 'publication' => 0, 'final' => 0];
+        $events = [];
+        $captureId = UuidCodec::newV7();
+        $key = 'semantics-checkpoint-failure';
+        $subjectId = '11111111-1111-4111-8111-111111111111';
+        $packet = new SubjectResolutionPacket('resolved', $subjectId, 'model', 'nhk:model:checkpoint', 'Checkpoint Model', 2, 'persisted', [], 'CAPTURE');
+        $receipts = [];
+        foreach (['INTERPRETED', 'CONTENT_PREPARATION', 'SUBJECTS_RESOLVED', 'KNOWLEDGE_RETRIEVED', 'SEMANTICS_RECONCILED'] as $phase) {
+            $receipts = CapturePhaseReceiptReducer::append($receipts, $phase, ['status' => 'COMPLETED', 'result' => 'COMPLETED']);
+        }
+        $capture = new CaptureRecord(
+            $captureId, $key, hash('sha256', $key), CaptureStage::SEMANTICS_RECONCILED->value, 'IN_PROGRESS', null, null, [],
+            ['raw_input' => 'Checkpoint text.', 'title' => 'Checkpoint title', 'content_intent' => ['status' => 'resolved', 'intent' => 'TEXT_ARTICLE', 'article_required' => true], 'subject_resolution_packet' => $packet->toArray(), 'content_preparation' => ['status' => 'PREPARED']],
+            ['interpretation' => ['article_intent' => 'Checkpoint text.'], 'subjects' => $packet->toResolution(), 'claim_retrieval' => ['status' => 'available'], 'semantic_write_back' => ['status' => 'COMPLETED']],
+            $receipts, 40,
+        );
+        $captures->create($capture);
+        $coordinator = $this->coordinator(
+            $captures, $calls, $events, semanticStatus: 'COMPLETED',
+            articlePreCreateResolver: static function (): array { throw new \RuntimeException('ARTICLE_RESEARCH_SOURCE_UNAVAILABLE'); },
+            articlePreCreateRequired: true,
+        );
+
+        $result = $coordinator->retry($capture, ['idempotency_key' => $key, 'resume_mode' => 'RETRY']);
+
+        self::assertSame('FAILED_RETRYABLE', $result->status);
+        self::assertSame('RuntimeException', $result->diagnostics['failure']['exception_class']);
+        self::assertSame('ARTICLE_RESEARCH_SOURCE_UNAVAILABLE', $result->diagnostics['failure']['code']);
+        self::assertSame('SEMANTICS_RECONCILED', $result->diagnostics['failure']['phase']);
+        self::assertArrayHasKey('input_shape', $result->diagnostics['failure']);
+        self::assertArrayNotHasKey('trace', $result->diagnostics['failure']);
+    }
+
     public static function imageCounts(): iterable
     {
         yield 'one image' => [1];

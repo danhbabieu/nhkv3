@@ -24392,3 +24392,26 @@ deployment or publication was performed.
 
 STATUS: `DOCUMENTATION_CHECKPOINT_AUTHORITY_FIXED_LOCALLY / FOCUSED_GREEN /
 NO_DATA_MUTATION / NO_DEPLOYMENT / COMMIT_PENDING`.
+# Checkpoint — 2026-10-07 — SEMANTICS_RECONCILED retry continuation fixed locally
+
+ROOT_CAUSE_CONFIRMED: The public Capture retry path re-entered the full
+coordinator from a valid `SEMANTICS_RECONCILED` checkpoint. Interpretation,
+preparation, retrieval and governed semantic work were replayed, producing
+the observed revision churn before Article pre-create. A resolver Throwable was
+also converted into a review-shaped return, so the original failure could be
+lost behind an opaque MCP transport error.
+
+LOCAL_FIX: A bounded checkpoint cursor now reuses persisted semantic
+interpretation, subject resolution, retrieval and write-back state and resumes
+at Article pre-create review. Genuine resolver exceptions remain failures and
+persist class, message, phase, throw site, caller, retryability and input-key
+shape without a stack trace. No live Capture, staging data, Article or
+publication was mutated.
+
+REGRESSION_COVERAGE: The exact checkpoint-shaped public coordinator retry
+proves semantic writes are not replayed, Article pre-create is attempted once,
+and the revision advances by one for the review receipt. A controlled resolver
+exception proves bounded failure persistence and retryable classification.
+
+STATUS: `SEMANTICS_CHECKPOINT_RESUME_FIXED_LOCAL / FAILURE_DIAGNOSTICS_PERSISTED /
+FOCUSED_GREEN / NO_DATA_MUTATION / DEPLOYMENT_PENDING`
