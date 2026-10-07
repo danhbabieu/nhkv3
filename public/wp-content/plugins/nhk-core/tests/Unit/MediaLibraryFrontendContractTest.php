@@ -51,6 +51,14 @@ final class MediaLibraryFrontendContractTest extends TestCase
         self::assertFalse($item['has_real_image'] ?? true);
     }
 
+    public function test_readiness_warning_uses_the_media_asset_identity_field(): void
+    {
+        $projection = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/Media/PublicMediaGalleryQuery.php');
+
+        self::assertStringContainsString('$asset->assetId', $projection);
+        self::assertStringNotContainsString('$asset->canonicalId', $projection);
+    }
+
     public function test_archive_projection_keeps_binary_delivery_strict_and_card_projection_has_no_hashing(): void
     {
         $projection = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/Media/PublicMediaGalleryQuery.php');

@@ -108,7 +108,7 @@ final class PublicMediaGalleryQuery
 
         $attachmentId = (int) ($asset->metadata['wordpress_attachment_id'] ?? 0);
         if ($attachmentId < 1) {
-            if (function_exists('do_action')) do_action('nhk_v3_media_card_readiness_warning', self::CARD_READINESS_MODEL_REQUIRED, $asset->canonicalId);
+            if (function_exists('do_action')) do_action('nhk_v3_media_card_readiness_warning', self::CARD_READINESS_MODEL_REQUIRED, $asset->assetId);
             return false;
         }
         if (!function_exists('get_post')) return false;

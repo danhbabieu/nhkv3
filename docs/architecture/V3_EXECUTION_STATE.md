@@ -1,5 +1,30 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-07 — Media gallery readiness warning identity fix
+
+ROOT_CAUSE_CONFIRMED: `PublicMediaGalleryQuery::cardAssetReady()` emitted the
+`MEDIA_CARD_READINESS_MODEL_REQUIRED` diagnostic with `$asset->canonicalId`,
+but `MediaAsset` owns `assetId` and `mediaId` only. Public `/thu-vien/`
+rendering therefore produced repeated PHP undefined-property warnings whenever
+an asset lacked both a verified read-back signal and a WordPress attachment.
+
+FIXED_BOUNDARY: The diagnostic now carries the concrete `MediaAsset::assetId`.
+The fail-closed readiness behavior and public projection remain unchanged.
+
+REGRESSION_COVERAGE: Focused Media/frontend suite passed 41 tests / 172
+assertions, including a regression contract that rejects the nonexistent
+`canonicalId` access. Full suite at 512M completed 3,691 tests with 46
+environment/infrastructure errors and 29 pre-existing or unrelated failures;
+the default 128M run also hit the known materializer memory ceiling.
+
+QUALITY_GATES: Changed PHP files lint clean, `git diff --check` passes and the
+scoped secret scan found no credential/private-key patterns. No migration,
+semantic data mutation, deployment, push or production/staging write occurred.
+
+STATUS: `MEDIA_GALLERY_WARNING_IDENTITY_FIXED_LOCALLY / FOCUSED_GREEN /
+FULL_SUITE_ENVIRONMENT_AND_PREEXISTING_FAILURES / NO_SEMANTIC_DATA_MUTATION /
+DEPLOYMENT_PENDING`
+
 # Checkpoint — 2026-10-07 — Final pre-deploy presentation corrections
 
 SEO_DECISION_OWNERSHIP: Custom Entity, Dictionary, Video, Media Library,
