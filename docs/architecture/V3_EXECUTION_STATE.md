@@ -31,7 +31,7 @@ delivery; GREEN passed after the delivery boundary was separated.
 QUALITY_GATES: Changed PHP files lint clean and `git diff --check` passes.
 No migration, data mutation, deployment, push, pull or rebase was performed.
 
-COMMIT: `450e6ab7` — `perf: separate media card projection from binary delivery`.
+COMMIT: `6fb57a06` — `perf: separate media card projection from binary delivery`.
 
 STATUS: `MEDIA_CARD_PROJECTION_AND_INDEX_REQUIRED_REPORTED / FOCUSED_GREEN / NO_SEMANTIC_DATA_MUTATION / DEPLOYMENT_PENDING`
 
