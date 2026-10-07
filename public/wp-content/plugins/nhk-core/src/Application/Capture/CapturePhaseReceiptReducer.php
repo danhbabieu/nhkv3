@@ -35,6 +35,16 @@ final class CapturePhaseReceiptReducer
     public static function currentFailureCodes(array $receipts): array
     {
         $codes = [];
+        foreach (self::currentFailureCodesByPhase($receipts) as $phaseCodes) {
+            foreach ($phaseCodes as $code) $codes[] = $code;
+        }
+        return array_values(array_unique($codes));
+    }
+
+    /** @param array<string,mixed> $receipts @return array<string,list<string>> */
+    public static function currentFailureCodesByPhase(array $receipts): array
+    {
+        $codes = [];
         foreach (array_values($receipts) as $position => $receipt) {
             if (!is_array($receipt)) continue;
             $latest = self::latest($receipt);
@@ -43,9 +53,10 @@ final class CapturePhaseReceiptReducer
             $phase = (string) array_keys($receipts)[$position];
             if (self::legacyFailureWasSuperseded($receipts, $position, $latest, $phase)
                 || self::legacyReviewInheritedFailureWasSuperseded($receipts, $position, $latest, $phase)) continue;
-            $codes[] = $code;
+            $codes[$phase][] = $code;
         }
-        return array_values(array_unique($codes));
+        foreach ($codes as $phase => $phaseCodes) $codes[$phase] = array_values(array_unique($phaseCodes));
+        return $codes;
     }
 
     /** @param array<string,mixed> $receipts @return list<string> */

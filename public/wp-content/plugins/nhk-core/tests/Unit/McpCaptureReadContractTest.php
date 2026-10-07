@@ -7,6 +7,7 @@ use NHK\Core\Application\Mcp\McpReadHandler;
 use NHK\Core\Application\Capture\CapturePhaseReceiptReducer;
 use NHK\Core\Contracts\Capture\CaptureRepository;
 use NHK\Core\Domain\Capture\CaptureRecord;
+use NHK\Core\Infrastructure\Capture\WpdbCaptureRepository;
 use NHK\Core\Domain\Authority\EntityTypeRegistry;
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
@@ -18,6 +19,48 @@ use PHPUnit\Framework\TestCase;
 
 final class McpCaptureReadContractTest extends TestCase
 {
+    public function test_live_persisted_shape_is_reconciled_by_real_wpdb_hydration_before_capture_get(): void
+    {
+        if (!defined('ARRAY_A')) define('ARRAY_A', 'ARRAY_A');
+        $id = '01a1105c-4cc6-7529-ad3e-6bc652b4ae7f';
+        $row = [
+            'capture_uuid' => UuidCodec::toBinary($id),
+            'idempotency_key' => 'live-capture-retry',
+            'request_fingerprint' => hash('sha256', 'live-capture-retry'),
+            'stage' => 'SEMANTICS_RECONCILED', 'status' => 'REVIEW_REQUIRED', 'wp_post_id' => 0, 'wp_state_token' => '',
+            'assets_json' => '[]',
+            'context_json' => json_encode(['content_intent' => ['intent' => 'TEXT_ARTICLE', 'article_required' => true], 'subject_resolution_packet' => ['status' => 'resolved', 'canonical_subject_id' => '984658bf-19a6-4daa-a220-2a6c13af81ed', 'entity_type' => 'model', 'revision' => 1]], JSON_THROW_ON_ERROR),
+            'diagnostics_json' => json_encode(['failure' => ['code' => 'CANONICAL_READBACK_UNVERIFIED', 'classification' => 'FAILED_RETRYABLE', 'message' => 'UTF8_INVALID_INPUT'], 'completion' => ['status' => 'BLOCKED', 'canonical_readback_verified' => false, 'blockers' => ['CANONICAL_READBACK_UNVERIFIED']], 'article_resolution' => ['research' => ['ready_for_draft' => true, 'blockers' => [], 'warnings' => ['MEDIA_PLACEHOLDER_OR_UNAVAILABLE']]]], JSON_THROW_ON_ERROR),
+            'phase_receipts_json' => json_encode(['FAILED_RETRYABLE' => ['status' => 'FAILED', 'result' => 'FAILED_RETRYABLE', 'failure_code' => 'CAPTURE_UTF8_INVALID', 'attempt_no' => 1, 'attempts' => [['status' => 'FAILED', 'result' => 'FAILED_RETRYABLE', 'failure_code' => 'CAPTURE_UTF8_INVALID', 'attempt_no' => 1]], 'latest' => ['status' => 'FAILED', 'result' => 'FAILED_RETRYABLE', 'failure_code' => 'CAPTURE_UTF8_INVALID', 'attempt_no' => 1]], 'INTERPRETED' => ['status' => 'COMPLETED', 'result' => 'IN_PROGRESS', 'attempts' => [['status' => 'COMPLETED', 'result' => 'IN_PROGRESS']]], 'CONTENT_PREPARATION' => ['status' => 'COMPLETED', 'result' => 'IN_PROGRESS', 'attempts' => [['status' => 'COMPLETED', 'result' => 'IN_PROGRESS']]], 'SEMANTICS_RECONCILED' => ['status' => 'COMPLETED', 'result' => 'IN_PROGRESS', 'attempts' => [['status' => 'COMPLETED', 'result' => 'IN_PROGRESS']]], 'ARTICLE_PRE_CREATE_REVIEW' => ['status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'failure_code' => 'CANONICAL_READBACK_UNVERIFIED', 'attempt_no' => 2, 'attempts' => [['status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'failure_code' => 'CAPTURE_UTF8_INVALID', 'attempt_no' => 1], ['status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'failure_code' => 'CANONICAL_READBACK_UNVERIFIED', 'attempt_no' => 2, 'superseded_failure_codes' => ['CAPTURE_UTF8_INVALID']]], 'latest' => ['status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'failure_code' => 'CANONICAL_READBACK_UNVERIFIED', 'attempt_no' => 2]]], JSON_THROW_ON_ERROR),
+            'revision' => 23, 'created_at' => '', 'updated_at' => '',
+        ];
+        $wpdb = new class($row) {
+            public string $prefix = 'wp_';
+            public function __construct(private array $row) {}
+            public function prepare(string $query, mixed ...$args): string { return $query; }
+            public function get_row(string $query, mixed $output = null): array { return $this->row; }
+        };
+        $repository = new WpdbCaptureRepository($wpdb);
+        $hydrated = $repository->findById($id);
+
+        self::assertNotNull($hydrated);
+        self::assertSame([], $hydrated->diagnostics['completion']['blockers']);
+        self::assertArrayNotHasKey('failure', $hydrated->diagnostics);
+        self::assertContains('CANONICAL_READBACK_UNVERIFIED', array_column($hydrated->diagnostics['failure_history'], 'code'));
+
+        $read = new McpReadHandler(
+            $this->createMock(AuthorityRepository::class), new EntityTypeRegistry(),
+            $this->createMock(MediaRepository::class), $this->createMock(MediaAssetRepository::class), $this->createMock(MediaUsageRepository::class),
+            $this->createMock(VideoRepository::class), $this->createMock(KnowledgeRepository::class), $this->createMock(EvidenceRepository::class),
+            captures: $repository,
+        );
+        $projection = $read->captureGet($id);
+
+        self::assertSame([], $projection['blockers']);
+        self::assertTrue($projection['retry']['eligible']);
+        self::assertSame('STALE_REVIEW_REEVALUATABLE', $projection['retry']['reason']);
+    }
+
     public function test_capture_read_hides_superseded_failure_from_current_blockers(): void
     {
         $id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';

@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Tests\Unit;
 
-use NHK\Core\Application\Capture\{CaptureCurrentOutcomeReducer, CapturePhaseReceiptReducer, ContentPreparationOrchestrator, EditorialCaptureCoordinator};
+use NHK\Core\Application\Capture\{CaptureCurrentOutcomeReducer, CapturePhaseReceiptReducer, ContentPreparationOrchestrator, EditorialCaptureContinuationService, EditorialCaptureCoordinator};
 use NHK\Core\Application\Capture\ContentIntentRouter;
 use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, EditorialClaimRetrievalService, EditorialKnowledgeSelector, SharedEnrichmentBoundary, SubjectResolutionService, TextInputInterpreter};
 use NHK\Core\Contracts\Capture\{CaptureAddendumRepository, CaptureRepository};
@@ -106,6 +106,38 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
         self::assertSame('RESEARCH_PREFLIGHT_BLOCKED', $result->diagnostics['article_resolution']['decision']);
         self::assertSame(['EXISTING_ARTICLE_OVERLAP'], $result->diagnostics['article_resolution']['diagnostics']['research_preflight_blockers']);
         self::assertNull($result->articleId);
+        self::assertSame(0, $calls['draft']);
+    }
+
+    public function test_live_capture_retry_reaches_article_pre_create_attempt_three(): void
+    {
+        $captures = new Pr5CaptureRepository();
+        $calls = ['draft' => 0, 'semantic' => 0, 'media' => 0, 'publication' => 0, 'final' => 0];
+        $events = [];
+        $captureId = '01a1105c-4cc6-7529-ad3e-6bc652b4ae7f';
+        $key = 'live-capture-retry';
+        $receipts = [
+            'FAILED_RETRYABLE' => ['status' => 'FAILED', 'result' => 'FAILED_RETRYABLE', 'failure_code' => 'CAPTURE_UTF8_INVALID', 'attempt_no' => 1, 'attempts' => [['status' => 'FAILED', 'result' => 'FAILED_RETRYABLE', 'failure_code' => 'CAPTURE_UTF8_INVALID', 'attempt_no' => 1]], 'latest' => ['status' => 'FAILED', 'result' => 'FAILED_RETRYABLE', 'failure_code' => 'CAPTURE_UTF8_INVALID', 'attempt_no' => 1]],
+            'INTERPRETED' => ['status' => 'COMPLETED', 'result' => 'IN_PROGRESS', 'attempts' => [['status' => 'COMPLETED', 'result' => 'IN_PROGRESS']]],
+            'CONTENT_PREPARATION' => ['status' => 'COMPLETED', 'result' => 'IN_PROGRESS', 'attempts' => [['status' => 'COMPLETED', 'result' => 'IN_PROGRESS']]],
+            'SEMANTICS_RECONCILED' => ['status' => 'COMPLETED', 'result' => 'IN_PROGRESS', 'attempts' => [['status' => 'COMPLETED', 'result' => 'IN_PROGRESS']]],
+            'ARTICLE_PRE_CREATE_REVIEW' => ['status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'failure_code' => 'CANONICAL_READBACK_UNVERIFIED', 'attempt_no' => 2, 'attempts' => [['status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'failure_code' => 'CAPTURE_UTF8_INVALID', 'attempt_no' => 1], ['status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'failure_code' => 'CANONICAL_READBACK_UNVERIFIED', 'attempt_no' => 2, 'superseded_failure_codes' => ['CAPTURE_UTF8_INVALID']]], 'latest' => ['status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'failure_code' => 'CANONICAL_READBACK_UNVERIFIED', 'attempt_no' => 2]],
+        ];
+        $capture = new CaptureRecord($captureId, $key, hash('sha256', $key), CaptureStage::SEMANTICS_RECONCILED->value, 'REVIEW_REQUIRED', null, null, [], ['raw_input' => 'Live retry text.', 'title' => 'Live retry', 'content_intent' => ['intent' => 'TEXT_ARTICLE', 'article_required' => true]], ['failure' => ['code' => 'CANONICAL_READBACK_UNVERIFIED', 'classification' => 'FAILED_RETRYABLE'], 'completion' => ['status' => 'BLOCKED', 'canonical_readback_verified' => false, 'blockers' => ['CANONICAL_READBACK_UNVERIFIED']], 'article_resolution' => ['research' => ['ready_for_draft' => true, 'blockers' => [], 'warnings' => ['MEDIA_PLACEHOLDER_OR_UNAVAILABLE']]]], $receipts, 23);
+        $captures->create($capture);
+        $coordinator = $this->coordinator($captures, $calls, $events, semanticStatus: 'COMPLETED', articlePreCreateResolver: static fn (): array => ['status' => 'REVIEW_REQUIRED', 'decision' => 'RESEARCH_PREFLIGHT_BLOCKED', 'diagnostics' => ['research_preflight_blockers' => ['EXISTING_ARTICLE_OVERLAP']], 'research' => ['ready_for_draft' => false, 'blockers' => ['EXISTING_ARTICLE_OVERLAP'], 'overlap_analysis' => ['overlapping_articles' => [['post_id' => 901, 'route' => '/bai-viet-901/'], ['post_id' => 902, 'route' => '/bai-viet-902/']]]]], articlePreCreateRequired: true);
+        $addenda = new class implements CaptureAddendumRepository {
+            public function findByIdempotencyKey(string $key): ?CaptureAddendumRecord { return null; }
+            public function create(CaptureAddendumRecord $record): CaptureAddendumRecord { return $record; }
+            public function save(CaptureAddendumRecord $record): CaptureAddendumRecord { return $record; }
+        };
+        $result = (new EditorialCaptureContinuationService($captures, $addenda, $coordinator))->retry(['capture_id' => $captureId, 'idempotency_key' => $key, 'resume_mode' => 'RETRY']);
+
+        self::assertSame(3, $result['capture']['phase_receipts']['ARTICLE_PRE_CREATE_REVIEW']['latest']['attempt_no']);
+        self::assertSame('EXISTING_ARTICLE_OVERLAP', $result['capture']['phase_receipts']['ARTICLE_PRE_CREATE_REVIEW']['latest']['failure_code']);
+        self::assertSame([901, 902], array_column($result['capture']['diagnostics']['article_resolution']['research']['overlap_analysis']['overlapping_articles'], 'post_id'));
+        self::assertSame(['/bai-viet-901/', '/bai-viet-902/'], array_column($result['capture']['diagnostics']['article_resolution']['research']['overlap_analysis']['overlapping_articles'], 'route'));
+        self::assertNull($result['capture']['article_id']);
         self::assertSame(0, $calls['draft']);
     }
 

@@ -1,5 +1,39 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-07 — Live persisted Capture shape fix verified locally
+
+ROOT_CAUSE_CONFIRMED: `WpdbCaptureRepository::hydrate()` returned the raw
+persisted diagnostics/phase receipts without invoking effective-state
+reconciliation. `McpReadHandler::captureGet()` only rebuilt a local completion
+projection, while `EditorialCaptureContinuationService::retry()` passed the
+raw hydrated record to `retryEligibility()`. For the current live shape,
+`ARTICLE_PRE_CREATE_REVIEW` attempt 2 had a persisted readback failure while
+the current Article research/preflight was already `ready_for_draft=true` with
+no blockers. The completion `BLOCKED`/`canonical_readback_verified=false`
+state described the not-yet-created Article owner, not a current blocker to
+re-running Article pre-create research.
+
+FIXED_BOUNDARY: The shared reducer now derives a bounded reevaluable Article
+pre-create state from current research readiness, preserves
+`OWNER_REVIEW_REQUIRED` and `SYSTEM_BLOCKED`, moves stale top-level failure
+diagnostics into audit-visible history, and the WPDB repository applies that
+effective state immediately after hydration. No failure-code supersession
+allowlist, UUID special case, direct writer or data mutation was added.
+
+REGRESSION_COVERAGE: The exact revision-23 live-shaped fixture is hydrated
+through `WpdbCaptureRepository`, read through `capture_get`, and retried
+through `EditorialCaptureContinuationService`/`EditorialCaptureCoordinator`.
+The retry reaches `ARTICLE_PRE_CREATE_REVIEW` attempt 3 and returns the current
+`EXISTING_ARTICLE_OVERLAP` review with post IDs 901/902 and their routes;
+`article_id` remains null and no draft is created.
+
+VERIFICATION: Capture-focused suite passed 151 tests / 720 assertions with one
+environment-skipped integration test and deprecation warnings. PHP lint and
+`git diff --check` pass. No staging retry, database mutation, deployment or
+publication was performed.
+
+STATUS: `CAPTURE_LIVE_PERSISTED_SHAPE_FIXED / ATTEMPT_3_REVIEW_VERIFIED / NO_DATA_MUTATION / NO_DEPLOYMENT`
+
 # Checkpoint — 2026-10-07 — Knowledge identity V2 implemented and verified locally
 
 KNOWLEDGE_IDENTITY_V2: The current design is implemented on `main` without

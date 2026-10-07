@@ -255,6 +255,47 @@ final class CaptureCurrentOutcomeReducerTest extends TestCase
         self::assertSame(['eligible' => true, 'reason' => 'STALE_REVIEW_REEVALUATABLE'], CaptureCurrentOutcomeReducer::retryEligibility($capture));
     }
 
+    public function test_persisted_live_capture_shape_reopens_article_pre_create_review_after_hydration_state_is_recomputed(): void
+    {
+        $receipts = [
+            'FAILED_RETRYABLE' => [
+                'status' => 'FAILED', 'result' => 'FAILED_RETRYABLE', 'failure_code' => 'CAPTURE_UTF8_INVALID',
+                'attempt_no' => 1, 'attempts' => [['status' => 'FAILED', 'result' => 'FAILED_RETRYABLE', 'failure_code' => 'CAPTURE_UTF8_INVALID', 'attempt_no' => 1]],
+                'latest' => ['status' => 'FAILED', 'result' => 'FAILED_RETRYABLE', 'failure_code' => 'CAPTURE_UTF8_INVALID', 'attempt_no' => 1],
+            ],
+            'INTERPRETED' => ['status' => 'COMPLETED', 'result' => 'IN_PROGRESS', 'attempts' => [['status' => 'COMPLETED', 'result' => 'IN_PROGRESS']]],
+            'CONTENT_PREPARATION' => ['status' => 'COMPLETED', 'result' => 'IN_PROGRESS', 'attempts' => [['status' => 'COMPLETED', 'result' => 'IN_PROGRESS']]],
+            'SEMANTICS_RECONCILED' => ['status' => 'COMPLETED', 'result' => 'IN_PROGRESS', 'attempts' => [['status' => 'COMPLETED', 'result' => 'IN_PROGRESS']]],
+            'ARTICLE_PRE_CREATE_REVIEW' => [
+                'status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'failure_code' => 'CANONICAL_READBACK_UNVERIFIED',
+                'attempt_no' => 2, 'attempts' => [
+                    ['status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'failure_code' => 'CAPTURE_UTF8_INVALID', 'attempt_no' => 1],
+                    ['status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'failure_code' => 'CANONICAL_READBACK_UNVERIFIED', 'attempt_no' => 2, 'superseded_failure_codes' => ['CAPTURE_UTF8_INVALID']],
+                ],
+                'latest' => ['status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'failure_code' => 'CANONICAL_READBACK_UNVERIFIED', 'attempt_no' => 2],
+            ],
+        ];
+        $capture = new CaptureRecord(
+            '01a1105c-4cc6-7529-ad3e-6bc652b4ae7f', 'live-capture-retry', hash('sha256', 'live-capture-retry'),
+            CaptureStage::SEMANTICS_RECONCILED->value, 'REVIEW_REQUIRED', null, null, [],
+            ['content_intent' => ['intent' => 'TEXT_ARTICLE', 'article_required' => true], 'subject_resolution_packet' => [
+                'status' => 'resolved', 'canonical_subject_id' => '984658bf-19a6-4daa-a220-2a6c13af81ed', 'entity_type' => 'model', 'revision' => 1,
+            ]],
+            [
+                'failure' => ['code' => 'CANONICAL_READBACK_UNVERIFIED', 'classification' => 'FAILED_RETRYABLE', 'message' => 'UTF8_INVALID_INPUT'],
+                'completion' => ['status' => 'BLOCKED', 'canonical_readback_verified' => false, 'blockers' => ['CANONICAL_READBACK_UNVERIFIED']],
+                'article_resolution' => ['research' => ['ready_for_draft' => true, 'blockers' => [], 'warnings' => ['MEDIA_PLACEHOLDER_OR_UNAVAILABLE']]],
+            ],
+            $receipts, 23,
+        );
+
+        self::assertSame([], CaptureCurrentOutcomeReducer::currentBlockers($capture->diagnostics, $capture->phaseReceipts));
+        self::assertSame(['eligible' => true, 'reason' => 'STALE_REVIEW_REEVALUATABLE'], CaptureCurrentOutcomeReducer::retryEligibility($capture));
+        $effective = CaptureCurrentOutcomeReducer::effectiveCapture($capture);
+        self::assertArrayNotHasKey('failure', $effective->diagnostics);
+        self::assertContains('CANONICAL_READBACK_UNVERIFIED', array_column($effective->diagnostics['failure_history'], 'code'));
+    }
+
     public function test_legacy_article_pre_create_review_is_reevaluable_after_failure_is_superseded(): void
     {
         $receipts = [

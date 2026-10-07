@@ -5,6 +5,7 @@ namespace NHK\Core\Infrastructure\Capture;
 
 use NHK\Core\Contracts\Capture\CaptureRepository;
 use NHK\Core\Domain\Capture\CaptureRecord;
+use NHK\Core\Application\Capture\CaptureCurrentOutcomeReducer;
 use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Core\Shared\Encoding\Utf8Contract;
 
@@ -101,7 +102,7 @@ final class WpdbCaptureRepository implements CaptureRepository
     private function hydrate(array $row): CaptureRecord
     {
         try { $captureId = UuidCodec::fromBinary((string) $row['capture_uuid']); } catch (\Throwable) { throw new \RuntimeException('CAPTURE_IDENTITY_READBACK_FAILED'); }
-        return new CaptureRecord(
+        return CaptureCurrentOutcomeReducer::effectiveCapture(new CaptureRecord(
             $captureId,
             (string) $row['idempotency_key'],
             (string) $row['request_fingerprint'],
@@ -116,7 +117,7 @@ final class WpdbCaptureRepository implements CaptureRepository
             max(1, (int) ($row['revision'] ?? 1)),
             (string) ($row['created_at'] ?? ''),
             (string) ($row['updated_at'] ?? ''),
-        );
+        ));
     }
 
     /** @return array<string,mixed> */
