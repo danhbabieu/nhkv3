@@ -615,6 +615,10 @@ availability; local HTTP wire smoke remains an environment check.
 | `nhk.dictionary.candidate.list` | Private Dictionary review queue | READ | No | N/A | No raw edge | READY; candidates are never public truth |
 | `nhk.dictionary.candidate.get` / `nhk.dictionary.mentions.list` | Candidate detail and mention/source context | READ | No | N/A | No raw edge | READY; source context is lexical provenance only |
 | `nhk.dictionary.concept.create` / `nhk.dictionary.concept.update` / `nhk.dictionary.concept.lifecycle` | Dictionary Concept lexical curation | WRITE / INTERNAL | Yes | Expected concept revision + idempotency + audit/read-back | No Graph write | READY through `nhk_curate_dictionary` + `nhk_internal_content_operations`; lifecycle retires/reactivates, never hard-deletes |
+| `nhk.dictionary.entry.create-with-sense` | Create one Entry with its first durable Sense | WRITE / INTERNAL | Yes | Preferred form + non-empty definition + idempotency; research completeness still follows Dictionary §6.1 | No semantic owner/Graph write | PRESENT in current catalog; target-runtime connector exposure must still be verified |
+| `nhk.dictionary.entry.form.add` | Add one non-colliding Form to an existing Entry | WRITE / INTERNAL | Yes | Entry revision/CAS + idempotency | No semantic owner/Graph write | PRESENT in current catalog; same-Sense decision remains curator-controlled |
+| `nhk.dictionary.entry.sense.add` | Attach an existing durable Sense to an Entry | WRITE / INTERNAL | Yes | Entry revision/CAS + existing Sense UUID + idempotency | No semantic owner/Graph write | PRESENT in current catalog; no implicit grouping/merge |
+| `nhk.dictionary.enrichment.audit` / `nhk.dictionary.enrichment.plan` / `nhk.dictionary.enrichment.apply` | Entry/Sense lexical and owner-backed completeness/enrichment | READ / PLAN / INTERNAL APPLY | Apply only | Bounded audit; reviewed plan fingerprint; CAS/idempotency/read-back on apply | Existing owners remain authoritative | PRESENT in current catalog; apply never substitutes for missing owner truth |
 | `nhk.dictionary.label.save` | Dictionary Label lexical curation | WRITE / INTERNAL | Yes | Expected concept revision + idempotency + audit/read-back | No Graph write | READY through governed Dictionary boundary |
 | `nhk.dictionary.candidate.review` | Candidate review/attach/create-draft | WRITE / INTERNAL | Yes | Expected candidate revision + idempotency | No semantic owner creation | READY; attach reuses existing Concept/owner and remains curator-controlled |
 | `nhk.dictionary.relation.handoff` | Dictionary relation intent packet | READ / INTERNAL | Existing Governance apply required | Idempotency packet; owner revisions | Never writes Graph directly | READY as `REVIEW_REQUIRED` handoff; Graph predicate/edge remains in existing Governance registry/lifecycle |
@@ -657,24 +661,25 @@ keeps the item in Candidate/review/draft state; it must not be presented as a
 complete or public-ready Dictionary item merely because a low-level create call
 can succeed.
 
-The current Dictionary MCP truth remains Concept/Label/Candidate/Mention:
-`ATTACH`, `CREATE_DRAFT`, `AMBIGUOUS`, `REJECT`, `IGNORE` and
-`DO_NOT_SUGGEST` are the current Candidate workflow semantics. The target
-Entry/Sense semantics `CREATE_ENTRY_WITH_SENSE`, `ADD_SENSE_TO_ENTRY`,
-`ADD_FORM_TO_ENTRY` and optional `ADD_SENSE_SPECIFIC_FORM` are DESIGN / NOT
-IMPLEMENTED and must not be presented as current operations. In particular,
-the catalog rows for `nhk.dictionary.concept.*`, `nhk.dictionary.label.save`,
-`nhk.dictionary.candidate.review` and `nhk.dictionary.mentions.list` remain
-runtime Concept/Label/Candidate/Mention operations.
+The current catalog contains both the compatibility
+Concept/Label/Candidate/Mention boundary and guarded internal/admin Entry/Sense
+curation. Candidate review currently recognizes `ATTACH`, `CREATE_DRAFT`,
+`CREATE_ENTRY_WITH_SENSE`, `ADD_SENSE_TO_ENTRY`, `ADD_FORM_TO_ENTRY`,
+`AMBIGUOUS`, `REJECT`, `IGNORE` and `DO_NOT_SUGGEST`. The catalog also
+contains `nhk.dictionary.entry.create-with-sense`,
+`nhk.dictionary.entry.form.add`, `nhk.dictionary.entry.sense.add` and the
+bounded enrichment/materialization operations. These are internal/admin
+curation boundaries; new normal content intake still follows Capture and target
+runtime/connector availability must be discovered rather than assumed.
 
 The Entry/Sense architecture documented in
-`docs/architecture/DICTIONARY_ENTRY_SENSE_ARCHITECTURE.md` now has an internal
-additive schema/read slice: `LexicalEntry`, `LexicalEntryForm`, compatibility
-repository fallback and resolver. No Entry/Sense rows are populated, no
-`LexicalEntry`, `LexicalSense`, Entry/Form or Sense-specific MCP mutation tool
-exists, and current Dictionary MCP operations remain
-Concept/Label/Candidate/Mention operations. Public Entry routes and write
-lifecycle remain explicit gaps.
+`docs/architecture/DICTIONARY_ENTRY_SENSE_ARCHITECTURE.md` is therefore no
+longer read-only design vocabulary. `LexicalEntry`/`LexicalEntryForm` and
+Entry↔existing-Concept/Sense runtime seams exist, while the old Concept UUID
+remains the durable Sense identity during compatibility. This does not authorize
+automatic grouping, rekey, merge or semantic-owner creation. Preferred-wording
+synchronization, full destination coverage and other gaps remain governed by
+the active Dictionary contracts and current runtime evidence.
 
 The approved target keeps every Migration015 UUID and uses the safe default
 `1 old Concept → 1 compatibility Entry → 1 Sense`; no rekey, auto-merge,
