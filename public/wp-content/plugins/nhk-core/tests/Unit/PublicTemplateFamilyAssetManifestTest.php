@@ -44,4 +44,14 @@ final class PublicTemplateFamilyAssetManifestTest extends TestCase
         self::assertStringContainsString('.comparison-shell', $comparison);
         self::assertSame(['nhk-v3-style', 'nhk-v3-presentation'], PublicTemplateFamilyAssetManifest::dependencies()['nhk-v3-comparison']);
     }
+
+    public function test_music_entity_detail_declares_the_music_controller_without_changing_generic_entity_assets(): void
+    {
+        $music = PublicTemplateFamilyAssetManifest::forContext(['family' => 'entity', 'entity_type' => 'music']);
+        $generic = PublicTemplateFamilyAssetManifest::forContext(['family' => 'entity', 'entity_type' => 'brand']);
+
+        self::assertContains('nhk-v3-music-dossier', $music['scripts']);
+        self::assertNotContains('nhk-v3-music-dossier', $generic['scripts']);
+        self::assertSame($generic['styles'], $music['styles']);
+    }
 }

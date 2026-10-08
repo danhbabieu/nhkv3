@@ -24,6 +24,7 @@ final class PublicTemplateFamilyAssetManifest
             default => ['nhk-v3-style'],
         };
         $scripts = ['nhk-v3-navigation'];
+        if ($family === 'entity' && strtolower(trim((string) ($context['entity_type'] ?? ''))) === 'music') $scripts[] = 'nhk-v3-music-dossier';
         if ($family === 'article' && ($context['album'] ?? false) === true) $scripts[] = 'nhk-v3-album';
         if ($family === 'article' && ($context['album'] ?? false) === true) $styles[] = 'nhk-v3-album-style';
         if ($family === 'video' && $mode === 'detail') $scripts[] = 'nhk-v3-video-player';

@@ -58,7 +58,8 @@ function nhk_v3_assets(): void
     elseif (is_singular('post')) $family = 'article';
     elseif (is_search()) $family = 'search';
     elseif (is_front_page()) $family = 'homepage';
-    $assetContext = ['family' => $family, 'mode' => $mode, 'album' => nhk_v3_article_has_album_feature()];
+    $entityType = is_array($entityContext) ? trim((string) ($entityContext['entity']['type'] ?? $entityContext['type'] ?? '')) : '';
+    $assetContext = ['family' => $family, 'mode' => $mode, 'album' => nhk_v3_article_has_album_feature(), 'entity_type' => $entityType];
     $manifest = class_exists('NHK\\Core\\Application\\Presentation\\PublicTemplateFamilyAssetManifest')
         ? \NHK\Core\Application\Presentation\PublicTemplateFamilyAssetManifest::forContext($assetContext)
         : ['styles' => ['nhk-v3-style'], 'scripts' => ['nhk-v3-navigation']];
@@ -68,6 +69,7 @@ function nhk_v3_assets(): void
             'nhk-v3-navigation' => 'navigation.js',
             'nhk-v3-album' => 'album.js',
             'nhk-v3-video-player' => 'video-player.js',
+            'nhk-v3-music-dossier' => 'music-dossier.js',
             default => '',
         };
         if ($src !== '') wp_enqueue_script($handle, get_theme_file_uri($src), [], '1.1.1', true);

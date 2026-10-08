@@ -678,6 +678,29 @@ final class FrontendPresentationContractTest extends TestCase
         self::assertStringNotContainsString('MediaUsage', (string) file_get_contents($fallback));
     }
 
+    public function test_music_dossier_is_a_generic_read_only_template_with_safe_playback_hooks(): void
+    {
+        $partial = $this->read('template-parts/presentation/music-dossier.php');
+        $entity = $this->read('entity.php');
+        $script = $this->read('music-dossier.js');
+        $css = $this->read('entity.css');
+        $bootstrap = $this->readCore('src/Infrastructure/Frontend/EntityDossierBootstrap.php');
+
+        foreach (['music_dossier', 'music-score', 'music-audio', 'aria-label', 'data-start-ms', 'AVAILABLE'] as $needle) {
+            self::assertStringContainsString($needle, $partial, $needle . ' missing from music dossier partial');
+        }
+        self::assertStringNotContainsString('Westminster', $partial);
+        self::assertStringContainsString("get_template_part('template-parts/presentation/music-dossier'", $entity);
+        self::assertStringContainsString('$isMusicDossier', $entity);
+        self::assertStringContainsString('MusicDossierProjection', $bootstrap);
+        self::assertStringContainsString('musicProjection->forEntity', $bootstrap);
+        foreach (['data-music-action', 'playbackRate', 'currentTime', 'aria-current'] as $needle) {
+            self::assertStringContainsString($needle, $script, $needle . ' missing from music controller');
+        }
+        self::assertStringContainsString('.music-dossier', $css);
+        self::assertStringNotContainsString('overflow-x:hidden', $css);
+    }
+
     private function read(string $path): string
     {
         $file = $this->theme . '/' . $path;

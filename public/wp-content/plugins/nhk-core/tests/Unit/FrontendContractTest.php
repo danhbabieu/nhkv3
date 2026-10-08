@@ -35,6 +35,15 @@ final class FrontendContractTest extends TestCase
         self::assertStringNotContainsString("home_url('/model/')", $sidebar);
     }
 
+    public function test_music_dossier_asset_is_registered_and_mapped_to_the_entity_surface(): void
+    {
+        $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
+        $functions = (string) file_get_contents($theme . '/functions.php');
+
+        self::assertStringContainsString("'nhk-v3-music-dossier' => 'music-dossier.js'", $functions);
+        self::assertStringContainsString("'entity_type' => $entityType", $functions);
+    }
+
     public function test_search_and_dictionary_are_first_class_public_discovery_surfaces(): void
     {
         $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
