@@ -25458,3 +25458,18 @@ push, approval, controlled apply or public completion was performed. The
 Westminster runtime acceptance remains blocked until the exact committed build
 is deployed, the authorized TEST runtime identity is verified, and a fresh
 server-issued Capture-bound signed scope is available.
+
+# Checkpoint — 2026-10-08 — Universal Capture semantic handoff repair design
+
+PLANNED: Approved design recorded in
+`docs/superpowers/specs/2026-10-08-universal-capture-semantic-handoff-root-cause-repair.md`.
+The design addresses two confirmed shared-path defects: resolved Authority
+subjects being normalized as `FAILED_RETRYABLE`, and retry eligibility bypassing
+terminal lifecycle blockers. It also bounds candidate deduplication, stale
+owner-track reconciliation, Source/Evidence dependency attribution and
+same-Capture retry convergence for all registry-defined Authority types.
+
+BOUNDARY: This checkpoint is documentation-only. No Capture, Knowledge,
+Source, Evidence, Graph, Governance, WordPress, staging or production data was
+mutated. Implementation requires the written-spec review gate; no deployment,
+approval, controlled apply or public completion is claimed.
