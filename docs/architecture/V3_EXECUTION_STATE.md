@@ -66,8 +66,9 @@ asset/public delivery exists; full Unit remains at the pre-existing baseline
 failure set; browser QA of the local build requires deployment or a permitted
 matching local runtime.
 
-COMMITS: `6658797c`, `3f88f535`, `032a34ae`, `73c8bbbd`, and `7a708c01` are the
-local v2 implementation/research commits. Earlier review commits remain
+COMMITS: `6658797c`, `3f88f535`, `032a34ae`, `73c8bbbd`, `7a708c01`,
+`03c588eb` and `78a0f0ac` are the local v2 implementation, research,
+verification and regression-hardening commits. Earlier review commits remain
 unchanged. The working tree's two pre-existing untracked plan files were
 preserved.
 
