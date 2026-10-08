@@ -447,7 +447,7 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
         $apply = static function (): array { throw new \LogicException('apply must not run before approval'); };
         $service = new GovernedCaptureContinuationService($governance, $apply, $this->policies(), static fn (string $capability): bool => true);
 
-        $result = $service->execute('capture-1', 'continuation', ['subject_resolution' => ['resolved' => [['id' => $variant, 'type' => 'variant']]], 'interpretation' => ['user_claim_candidates' => [['text' => 'Côn chữ U màu trắng.', 'provenance' => 'EXPLICIT_USER_KNOWLEDGE']]], 'observations' => []]);
+        $result = $service->execute('capture-1', 'continuation', ['subject_resolution' => ['resolved' => [['id' => $variant, 'type' => 'variant']]], 'interpretation' => ['user_claim_candidates' => [['text' => 'Côn chữ U màu trắng.', 'provenance' => 'EXPLICIT_USER_KNOWLEDGE']], 'structured_interpretation_packet' => ['semantic_assertions' => [['text' => 'Côn chữ U màu trắng.']], 'dictionary_owner_commands' => []]], 'observations' => []]);
 
         self::assertSame('REVIEW_REQUIRED', $result['status']);
         self::assertSame(['GOVERNANCE_APPROVAL_REQUIRED'], $result['blockers']);
@@ -476,7 +476,7 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
             'content_intent' => ['intent' => 'KNOWLEDGE_DELTA'],
             'subject_resolution' => ['resolved' => [['id' => $subject, 'type' => 'classification']]],
             'continuation_delta_text' => 'Đồng hồ công cộng phục vụ nhiều người.',
-            'interpretation' => [],
+            'interpretation' => ['structured_interpretation_packet' => ['semantic_assertions' => [['text' => 'Đồng hồ công cộng phục vụ nhiều người.']], 'dictionary_owner_commands' => []]],
             'observations' => [],
         ]);
 
@@ -750,7 +750,7 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
 
         $result = $service->execute('capture-1', 'capture-1:semantic', [
             'subject_resolution' => ['resolved' => [['id' => $variant, 'type' => 'variant']]],
-            'interpretation' => ['user_claim_candidates' => [['text' => 'Cấu hình 10 côn.', 'provenance' => 'EXPLICIT_USER_KNOWLEDGE']]],
+            'interpretation' => ['user_claim_candidates' => [['text' => 'Cấu hình 10 côn.', 'provenance' => 'EXPLICIT_USER_KNOWLEDGE']], 'structured_interpretation_packet' => ['semantic_assertions' => [['text' => 'Cấu hình 10 côn.']], 'dictionary_owner_commands' => []]],
             'observations' => [],
         ]);
 
@@ -810,7 +810,7 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
             'interpretation' => ['user_claim_candidates' => [
                 ['text' => 'Mặt số màu xanh.', 'facet' => 'identity', 'provenance' => 'EXPLICIT_USER_KNOWLEDGE'],
                 ['text' => 'Có lịch đánh chuông theo giờ.', 'facet' => 'identity', 'provenance' => 'EXPLICIT_USER_KNOWLEDGE'],
-            ]],
+            ], 'structured_interpretation_packet' => ['semantic_assertions' => [['text' => 'Mặt số màu xanh.'], ['text' => 'Có lịch đánh chuông theo giờ.']], 'dictionary_owner_commands' => []]],
             'observations' => [],
         ]);
 
@@ -1448,7 +1448,7 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
         $plans = $method->invoke($service, 'capture-brand', 'continuation', [
             'content_intent' => ['intent' => 'KNOWLEDGE_DELTA'],
             'subject_resolution' => ['resolved' => [['id' => $brand, 'type' => 'brand']]],
-            'interpretation' => ['user_claim_candidates' => [['text' => 'Hermle được thành lập năm 1922.', 'scope' => 'variant', 'facet' => 'identity']]],
+            'interpretation' => ['user_claim_candidates' => [['text' => 'Hermle được thành lập năm 1922.', 'scope' => 'variant', 'facet' => 'identity']], 'structured_interpretation_packet' => ['semantic_assertions' => [['text' => 'Hermle được thành lập năm 1922.']], 'dictionary_owner_commands' => []]],
         ]);
 
         self::assertCount(2, $plans);
@@ -1484,7 +1484,7 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
         $plans = $method->invoke($service, 'capture-brand', 'continuation', [
             'content_intent' => ['intent' => 'KNOWLEDGE_DELTA'],
             'subject_resolution' => ['resolved' => [['id' => $brand, 'type' => 'brand']]],
-            'interpretation' => ['user_claim_candidates' => [['text' => 'Hermle được thành lập năm 1922.', 'facet' => 'identity']]],
+            'interpretation' => ['user_claim_candidates' => [['text' => 'Hermle được thành lập năm 1922.', 'facet' => 'identity']], 'structured_interpretation_packet' => ['semantic_assertions' => [['text' => 'Hermle được thành lập năm 1922.']], 'dictionary_owner_commands' => []]],
         ]);
 
         self::assertSame(['knowledge', 'relation'], array_column($plans, 'entity_type'));
@@ -1514,7 +1514,7 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
         $result = $service->execute('capture-1', 'capture:knowledge', [
             'content_intent' => ['intent' => 'KNOWLEDGE_DELTA'],
             'subject_resolution' => ['resolved' => [['id' => $variant, 'type' => 'variant']]],
-            'interpretation' => ['user_claim_candidates' => [['text' => 'Cấu hình 10 côn.', 'provenance' => 'EXPLICIT_USER_KNOWLEDGE']]],
+            'interpretation' => ['user_claim_candidates' => [['text' => 'Cấu hình 10 côn.', 'provenance' => 'EXPLICIT_USER_KNOWLEDGE']], 'structured_interpretation_packet' => ['semantic_assertions' => [['text' => 'Cấu hình 10 côn.']], 'dictionary_owner_commands' => []]],
         ]);
 
         self::assertSame('APPLIED', $result['status']);
@@ -1754,6 +1754,126 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
         self::assertSame('APPLIED', $result['status'], json_encode($result, JSON_UNESCAPED_UNICODE));
         self::assertSame($subjectId, $result['writes'][0]['canonical_id']);
         self::assertTrue($result['writes'][0]['idempotent']);
+    }
+
+    public function test_empty_semantic_assertions_cannot_plan_knowledge_or_graph_relation(): void
+    {
+        $service = new GovernedCaptureContinuationService($this->createMock(GovernedLifecycle::class), static fn (): array => [], $this->policies(), static fn (): bool => true);
+        $plans = new \ReflectionMethod($service, 'plans');
+        $plans->setAccessible(true);
+        $subject = UuidCodec::newV7();
+
+        $planned = $plans->invoke($service, 'capture-empty-assertions', 'semantic', [
+            'content_intent' => ['intent' => 'KNOWLEDGE_DELTA'],
+            'subject_resolution' => ['resolved' => [['id' => $subject, 'type' => 'model']]],
+            'interpretation' => [
+                'user_claim_candidates' => [['text' => 'Không có dữ kiện mới được khẳng định.', 'provenance' => 'EXPLICIT_USER_KNOWLEDGE']],
+                'structured_interpretation_packet' => ['dictionary_owner_commands' => [], 'semantic_assertions' => []],
+            ],
+        ]);
+
+        self::assertSame([], $planned);
+    }
+
+    public function test_explicit_no_new_fact_continuation_text_cannot_bypass_semantic_admission(): void
+    {
+        $service = new GovernedCaptureContinuationService($this->createMock(GovernedLifecycle::class), static fn (): array => [], $this->policies(), static fn (): bool => true);
+        $plans = new \ReflectionMethod($service, 'plans');
+        $plans->setAccessible(true);
+        $subject = UuidCodec::newV7();
+
+        $planned = $plans->invoke($service, 'capture-no-new-fact', 'semantic', [
+            'content_intent' => ['intent' => 'KNOWLEDGE_DELTA'],
+            'continuation_delta_text' => 'No new fact is asserted; do not create Knowledge.',
+            'subject_resolution' => ['resolved' => [['id' => $subject, 'type' => 'model']]],
+            'interpretation' => [
+                'structured_interpretation_packet' => ['dictionary_owner_commands' => [], 'semantic_assertions' => []],
+            ],
+        ]);
+
+        self::assertSame([], $planned);
+    }
+
+    public function test_missing_knowledge_observation_does_not_materialize_fallback_candidate(): void
+    {
+        $service = new GovernedCaptureContinuationService($this->createMock(GovernedLifecycle::class), static fn (): array => [], $this->policies(), static fn (): bool => true);
+        $result = $service->execute('capture-missing-observation', 'semantic', [
+            'content_intent' => ['intent' => 'KNOWLEDGE_DELTA'],
+            'subject_resolution' => ['resolved' => [['id' => UuidCodec::newV7(), 'type' => 'model']]],
+            'interpretation' => [
+                'user_claim_candidates' => [['text' => 'Fallback prose without an observation.', 'provenance' => 'EXPLICIT_USER_KNOWLEDGE']],
+                'structured_interpretation_packet' => ['dictionary_owner_commands' => [], 'semantic_assertions' => []],
+            ],
+        ]);
+
+        self::assertSame('REVIEW_REQUIRED', $result['status']);
+        self::assertSame(['KNOWLEDGE_SEMANTIC_HANDOFF_REQUIRED'], $result['blockers']);
+        self::assertSame([], $result['writes']);
+    }
+
+    public function test_evidence_backed_structured_observation_remains_a_governed_knowledge_and_relation_plan(): void
+    {
+        $service = new GovernedCaptureContinuationService($this->createMock(GovernedLifecycle::class), static fn (): array => [], $this->policies(), static fn (): bool => true);
+        $plans = new \ReflectionMethod($service, 'plans');
+        $plans->setAccessible(true);
+        $subject = UuidCodec::newV7();
+        $evidence = UuidCodec::newV7();
+
+        $planned = $plans->invoke($service, 'capture-evidence-backed', 'semantic', [
+            'content_intent' => ['intent' => 'KNOWLEDGE_DELTA'],
+            'subject_resolution' => ['resolved' => [['id' => $subject, 'type' => 'model']]],
+            'interpretation' => [
+                'user_claim_candidates' => [[
+                    'text' => 'Odo 24 được ghi nhận trong nguồn kiểm chứng.',
+                    'provenance' => 'EXPLICIT_USER_KNOWLEDGE',
+                    'evidence_refs' => [['evidence_id' => $evidence]],
+                ]],
+                'structured_interpretation_packet' => [
+                    'dictionary_owner_commands' => [],
+                    'semantic_assertions' => [['text' => 'Odo 24 được ghi nhận trong nguồn kiểm chứng.', 'reason' => 'EXPLICIT_OBSERVATION']],
+                ],
+            ],
+        ]);
+
+        self::assertSame(['knowledge', 'relation'], array_column($planned, 'entity_type'));
+        self::assertSame([['evidence_id' => $evidence]], $planned[1]['payload']['evidence_refs']);
+        self::assertArrayNotHasKey('article_id', $planned[0]);
+    }
+
+    public function test_valid_knowledge_delta_uses_reconciled_primary_subject_for_claim_and_about_relation(): void
+    {
+        $service = new GovernedCaptureContinuationService($this->createMock(GovernedLifecycle::class), static fn (): array => [], $this->policies(), static fn (): bool => true);
+        $plans = new \ReflectionMethod($service, 'plans');
+        $plans->setAccessible(true);
+        $oldSubject = UuidCodec::newV7();
+        $reconciledSubject = UuidCodec::newV7();
+
+        $planned = $plans->invoke($service, 'capture-reconciled-subject', 'semantic', [
+            'content_intent' => ['intent' => 'KNOWLEDGE_DELTA'],
+            'subject_reconciliation' => [
+                'status' => 'CONFIRMED',
+                'candidate_uuid' => $reconciledSubject,
+                'source' => 'USER_CONFIRMED_SUBJECT_RECONCILIATION',
+            ],
+            'subject_resolution' => [
+                'primary' => ['id' => $reconciledSubject, 'type' => 'model', 'revision' => 4],
+                'resolved' => [['id' => $reconciledSubject, 'type' => 'model', 'revision' => 4]],
+                'previous' => [['id' => $oldSubject, 'type' => 'model', 'revision' => 3]],
+            ],
+            'interpretation' => [
+                'user_claim_candidates' => [['text' => 'Mặt số màu xanh.', 'provenance' => 'EXPLICIT_USER_KNOWLEDGE']],
+                'structured_interpretation_packet' => [
+                    'dictionary_owner_commands' => [],
+                    'semantic_assertions' => [['text' => 'Mặt số màu xanh.', 'reason' => 'EXPLICIT_OBSERVATION']],
+                ],
+            ],
+        ]);
+
+        self::assertSame(['knowledge', 'relation'], array_column($planned, 'entity_type'));
+        self::assertSame($reconciledSubject, $planned[0]['subject_id']);
+        self::assertSame($reconciledSubject, $planned[0]['payload']['provenance']['metadata']['subject_id']);
+        self::assertSame($reconciledSubject, $planned[1]['payload']['target_uuid']);
+        self::assertNotSame($oldSubject, $planned[1]['payload']['target_uuid']);
     }
 
     public function test_raw_dictionary_sentence_is_blocked_before_knowledge_proposal(): void

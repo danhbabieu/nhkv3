@@ -599,7 +599,7 @@ final class EditorialCaptureSemanticCoreTest extends TestCase
 
         $result = $service->execute('capture-scope-facet', 'capture:scope-facet', [
             'subject_resolution' => ['resolved' => [['id' => $variant, 'type' => 'variant']]],
-            'interpretation' => ['user_claim_candidates' => [['text' => 'Có 8 côn đồng nguyên bản.', 'provenance' => 'EXPLICIT_USER_KNOWLEDGE', 'scope' => 'variant', 'facet' => 'configuration']]],
+            'interpretation' => ['user_claim_candidates' => [['text' => 'Có 8 côn đồng nguyên bản.', 'provenance' => 'EXPLICIT_USER_KNOWLEDGE', 'scope' => 'variant', 'facet' => 'configuration']], 'structured_interpretation_packet' => ['semantic_assertions' => [['text' => 'Có 8 côn đồng nguyên bản.']], 'dictionary_owner_commands' => []]],
         ]);
 
         self::assertSame('REVIEW_REQUIRED', $result['status']);

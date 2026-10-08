@@ -15,14 +15,8 @@ final class SemanticClaimCandidateGuard
         $packet = is_array($interpretation['structured_interpretation_packet'] ?? null)
             ? $interpretation['structured_interpretation_packet']
             : [];
-        $commands = array_values(array_filter((array) ($packet['dictionary_owner_commands'] ?? []), 'is_array'));
-        if ($commands === []) return ['status' => 'ALLOWED', 'reason' => 'NO_DICTIONARY_COMMAND'];
-
         $text = $this->normalize((string) ($candidate['text'] ?? ''));
         if ($text === '') return $this->review('KNOWLEDGE_SEMANTIC_HANDOFF_REQUIRED');
-        if (($candidate['candidate_source'] ?? '') === 'CONTINUATION_DELTA') {
-            return ['status' => 'ALLOWED', 'reason' => 'EXPLICIT_CONTINUATION_DELTA'];
-        }
 
         $assertionTexts = [];
         foreach ((array) ($packet['semantic_assertions'] ?? []) as $assertion) {
