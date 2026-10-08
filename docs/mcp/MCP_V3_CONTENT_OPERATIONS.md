@@ -644,6 +644,19 @@ belong to Graph through the existing Governance proposal/approval/apply path.
 The Dictionary handoff tool emits a validated source/target/predicate packet;
 it does not persist a Graph edge or invent a predicate.
 
+
+**Dictionary creation/research completeness:** before any new Dictionary
+`CREATE_DRAFT`, `CREATE_ENTRY_WITH_SENSE` or equivalent curated new-item
+action, operators and agents must apply §6.1 of
+`DICTIONARY_LEXICAL_KNOWLEDGE_CONTRACT.md`. The structural MCP input schema is
+a write boundary, not a completeness definition. Research must first report the
+existing-identity/duplicate result, bounded Sense meaning, required lexical
+attestation, canonical-owner resolution, missing required/recommended fields,
+a gap-driven search plan and readiness. Missing required research or ambiguity
+keeps the item in Candidate/review/draft state; it must not be presented as a
+complete or public-ready Dictionary item merely because a low-level create call
+can succeed.
+
 The current Dictionary MCP truth remains Concept/Label/Candidate/Mention:
 `ATTACH`, `CREATE_DRAFT`, `AMBIGUOUS`, `REJECT`, `IGNORE` and
 `DO_NOT_SUGGEST` are the current Candidate workflow semantics. The target
