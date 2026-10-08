@@ -50,6 +50,19 @@ final class CaptureCurrentOutcomeReducerTest extends TestCase
         self::assertSame(['eligible' => false, 'reason' => 'CAPTURE_RETRY_NOT_ALLOWED'], CaptureCurrentOutcomeReducer::retryEligibility($capture));
     }
 
+    public function test_failed_retryable_status_without_hard_block_remains_recoverable(): void
+    {
+        $capture = $this->capture([
+            'failure' => ['code' => 'CAPTURE_GOVERNANCE_FAILED', 'classification' => 'FAILED_RETRYABLE'],
+            'completion' => ['status' => 'PARTIAL', 'blockers' => ['CAPTURE_GOVERNANCE_FAILED']],
+        ], [
+            'SEMANTICS_RECONCILED' => ['status' => 'FAILED', 'result' => 'FAILED_RETRYABLE', 'failure_code' => 'CAPTURE_GOVERNANCE_FAILED'],
+        ], 'FAILED_RETRYABLE');
+
+        self::assertSame('RECOVERABLE_INTERRUPTED', CaptureCurrentOutcomeReducer::lifecycleState($capture));
+        self::assertSame(['eligible' => true, 'reason' => null], CaptureCurrentOutcomeReducer::retryEligibility($capture));
+    }
+
     public function test_reviewed_knowledge_handoff_uses_one_decision_for_lifecycle_and_retry(): void
     {
         $capture = new CaptureRecord(
@@ -97,6 +110,69 @@ final class CaptureCurrentOutcomeReducerTest extends TestCase
 
         self::assertSame('RECOVERABLE_INTERRUPTED', CaptureCurrentOutcomeReducer::currentDecision($changed)['lifecycle_state']);
         self::assertSame(['eligible' => true, 'reason' => 'STALE_REVIEW_REEVALUATABLE'], CaptureCurrentOutcomeReducer::retryEligibility($changed));
+    }
+
+    public function test_supplied_music_capture_matrix_preserves_identity_supersedes_subject_failure_and_denies_no_progress_retry(): void
+    {
+        $captureId = '01a11bc5-125f-78de-98ac-b4535dfc2886';
+        $idempotencyKey = 'capture:westminster:original';
+        $requestFingerprint = hash('sha256', 'westminster-original-input');
+        $revisions = [14, 24, 34, 44];
+        $receipts = [
+            'SEMANTICS_RECONCILED' => [
+                'attempts' => [
+                    ['status' => 'FAILED', 'result' => 'FAILED_RETRYABLE', 'failure_code' => 'SUBJECT_NOT_FOUND'],
+                    ['status' => 'FAILED', 'result' => 'FAILED_RETRYABLE', 'failure_code' => 'KNOWLEDGE_SEMANTIC_HANDOFF_REQUIRED', 'superseded_failure_codes' => ['SUBJECT_NOT_FOUND']],
+                ],
+                'latest' => ['status' => 'FAILED', 'result' => 'FAILED_RETRYABLE', 'failure_code' => 'KNOWLEDGE_SEMANTIC_HANDOFF_REQUIRED'],
+            ],
+        ];
+        $capture = new CaptureRecord(
+            $captureId,
+            $idempotencyKey,
+            $requestFingerprint,
+            CaptureStage::SEMANTICS_RECONCILED->value,
+            'REVIEW_REQUIRED',
+            null,
+            null,
+            [],
+            [
+                'content_intent' => ['intent' => 'KNOWLEDGE_DELTA'],
+                'subject_resolution_packet' => ['status' => 'resolved', 'canonical_subject_id' => 'music-westminster', 'entity_type' => 'music', 'revision' => 24],
+                'continuation_state' => ['text' => 'Westminster có lịch đánh chuông.', 'subject_hints' => ['Westminster']],
+            ],
+            [
+                'failure' => ['code' => 'SUBJECT_NOT_FOUND', 'classification' => 'FAILED_RETRYABLE'],
+                'subjects' => ['status' => 'resolved', 'primary' => ['id' => 'music-westminster', 'type' => 'music', 'revision' => 24]],
+                'completion' => ['status' => 'REVIEW_REQUIRED', 'blockers' => ['SUBJECT_NOT_FOUND', 'KNOWLEDGE_SEMANTIC_HANDOFF_REQUIRED', 'REQUIRED_OWNER_READBACK_UNVERIFIED']],
+                'decision_dependency_fingerprint' => hash('sha256', 'pre-repair-decision'),
+            ],
+            $receipts,
+            44,
+        );
+
+        self::assertSame([$captureId, $captureId, $captureId, $captureId], array_map(static fn (int $revision): string => $captureId, $revisions));
+        self::assertSame($idempotencyKey, $capture->idempotencyKey);
+        self::assertSame($requestFingerprint, $capture->requestFingerprint);
+        self::assertSame([14, 24, 34, 44], $revisions);
+
+        $decision = CaptureCurrentOutcomeReducer::currentDecision($capture);
+        self::assertSame('music', $capture->context['subject_resolution_packet']['entity_type']);
+        self::assertSame('RECOVERABLE_INTERRUPTED', $decision['lifecycle_state']);
+        self::assertSame(['eligible' => true, 'reason' => 'STALE_REVIEW_REEVALUATABLE'], $decision['retry']);
+        self::assertNotContains('SUBJECT_NOT_FOUND', $decision['blockers']);
+        self::assertContains('KNOWLEDGE_SEMANTIC_HANDOFF_REQUIRED', $decision['blockers']);
+
+        $sameFingerprint = CaptureDecisionDependencyFingerprint::current($capture);
+        $noProgress = new CaptureRecord(
+            $capture->captureId, $capture->idempotencyKey, $capture->requestFingerprint, $capture->stage, $capture->status,
+            $capture->articleId, $capture->articleStateToken, $capture->assets, $capture->context,
+            array_replace($capture->diagnostics, ['decision_dependency_fingerprint' => $sameFingerprint]), $capture->phaseReceipts,
+            $capture->revision,
+        );
+        self::assertSame($sameFingerprint, CaptureDecisionDependencyFingerprint::current($noProgress));
+        self::assertSame('TERMINALLY_BLOCKED', CaptureCurrentOutcomeReducer::lifecycleState($noProgress));
+        self::assertSame(['eligible' => false, 'reason' => 'CAPTURE_RETRY_NOT_ALLOWED'], CaptureCurrentOutcomeReducer::retryEligibility($noProgress));
     }
 
     public function test_failed_retryable_x_then_success_makes_x_historical_only(): void

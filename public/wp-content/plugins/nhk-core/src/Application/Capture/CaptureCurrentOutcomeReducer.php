@@ -49,7 +49,16 @@ final class CaptureCurrentOutcomeReducer
         }
 
         $blockers = self::currentBlockers($capture->diagnostics, $capture->phaseReceipts, $capture, $input);
-        $lifecycleState = $blockers !== [] && !self::isReevaluatableReview($capture, $input, $blockers)
+        $subjectReconciliation = in_array($capture->status, ['APPLIED', 'REVIEW_REQUIRED'], true)
+            && is_array($input['subject_reconciliation'] ?? null)
+            && ($input['subject_reconciliation']['confirmed'] ?? false) === true;
+        $recoverableRetryableFailure = $capture->status === 'FAILED_RETRYABLE' && !self::isHardBlockedReview($capture);
+        $recoverableVideoCompletion = self::supportsCanonicalVideoCompletionRetry($capture) && !self::isHardBlockedReview($capture);
+        $lifecycleState = $blockers !== []
+            && !self::isReevaluatableReview($capture, $input, $blockers)
+            && !$subjectReconciliation
+            && !$recoverableRetryableFailure
+            && !$recoverableVideoCompletion
             ? 'TERMINALLY_BLOCKED'
             : 'RECOVERABLE_INTERRUPTED';
         $retry = ['eligible' => false, 'reason' => 'CAPTURE_RETRY_NOT_ALLOWED'];
@@ -74,9 +83,7 @@ final class CaptureCurrentOutcomeReducer
         if (in_array('CATEGORY_UNRESOLVED', $completionBlockers, true) || self::failureCode($capture) === 'CATEGORY_UNRESOLVED') {
             return ['lifecycle_state' => $lifecycleState, 'retry' => $retry, 'blockers' => $blockers];
         }
-        if (in_array($capture->status, ['APPLIED', 'REVIEW_REQUIRED'], true)
-            && is_array($input['subject_reconciliation'] ?? null)
-            && ($input['subject_reconciliation']['confirmed'] ?? false) === true) {
+        if ($subjectReconciliation) {
             return [
                 'lifecycle_state' => $lifecycleState,
                 'retry' => ['eligible' => true, 'reason' => null],
@@ -264,6 +271,11 @@ final class CaptureCurrentOutcomeReducer
     /** @param array<string,mixed> $diagnostics */
     private static function isReevaluatableArticleReview(array $diagnostics, array $phaseReceipts = [], ?CaptureRecord $capture = null, array $input = []): bool
     {
+        if ($capture !== null) {
+            $intent = strtoupper(trim((string) (($capture->context['content_intent']['intent'] ?? '') ?: ($diagnostics['content_intent']['intent'] ?? ''))));
+            if ($intent === 'KNOWLEDGE_DELTA' || ($intent !== '' && !in_array($intent, ['TEXT_ARTICLE', 'IMAGE_ARTICLE'], true))) return false;
+            if ($intent === '' && !array_key_exists('ARTICLE_PRE_CREATE_REVIEW', $phaseReceipts)) return false;
+        }
         return ArticleReviewFreshness::isReevaluatable($capture, $diagnostics, $input);
     }
 
@@ -271,13 +283,16 @@ final class CaptureCurrentOutcomeReducer
     private static function isReevaluatableReview(CaptureRecord $capture, array $input, array $blockers): bool
     {
         if (self::isReevaluatableArticleReview($capture->diagnostics, $capture->phaseReceipts, $capture, $input)) return true;
-        if (CapturePhaseReceiptReducer::hasStaleInheritedArticleReview($capture->phaseReceipts)) return true;
+        $intent = strtoupper(trim((string) ($capture->context['content_intent']['intent'] ?? ($capture->diagnostics['content_intent']['intent'] ?? ''))));
+        if (CapturePhaseReceiptReducer::hasStaleInheritedArticleReview($capture->phaseReceipts)
+            && ($intent === '' || in_array($intent, ['TEXT_ARTICLE', 'IMAGE_ARTICLE'], true))) return true;
         if (!in_array($capture->status, ['REVIEW_REQUIRED', 'IN_PROGRESS'], true)) return false;
         if (self::isHardBlockedReview($capture) || in_array('CATEGORY_UNRESOLVED', $blockers, true) || self::hasCurrentArticleOverlapReview($capture)) return false;
         $knownReevaluatableBlockers = array_intersect($blockers, ['KNOWLEDGE_SEMANTIC_HANDOFF_REQUIRED', 'KNOWLEDGE_SCOPE_INCOMPATIBLE', 'KNOWLEDGE_SCOPE_UNRESOLVED', 'KNOWLEDGE_FACET_UNSUPPORTED', 'KNOWLEDGE_SUBJECT_TYPE_UNSUPPORTED', 'REQUIRED_OWNER_READBACK_UNVERIFIED']);
         if ($knownReevaluatableBlockers === [] && $capture->status !== 'REVIEW_REQUIRED') return false;
         $completion = is_array($capture->diagnostics['completion'] ?? null) ? $capture->diagnostics['completion'] : [];
         if (!in_array(strtoupper(trim((string) ($completion['status'] ?? ''))), ['PARTIAL', 'REVIEW_REQUIRED'], true)) return false;
+        if ($intent === 'VIDEO' && (array) (($completion['resume_hints']['resume_children'] ?? $capture->diagnostics['resume_hints']['resume_children'] ?? [])) !== []) return true;
         $persisted = trim((string) ($capture->diagnostics['decision_dependency_fingerprint'] ?? $capture->context['decision_dependency_fingerprint'] ?? ''));
         $current = CaptureDecisionDependencyFingerprint::current($capture, $input);
         return $persisted === '' || !hash_equals($persisted, $current);

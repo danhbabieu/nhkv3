@@ -25487,3 +25487,43 @@ BOUNDARY: Planning-only checkpoint. No production code, Capture, Knowledge,
 Source, Evidence, Graph, Governance, WordPress, staging or production data was
 mutated. No deployment, approval, controlled apply or public completion is
 claimed.
+
+# Checkpoint — 2026-10-08 — Universal Capture semantic handoff repair implementation
+
+IMPLEMENTED: Resolved Authority subject packets now project to the canonical
+`READ_BACK_VERIFIED` owner track with stable ID/revision read-back, while
+unresolved packets retain retryable failure history. Capture reads and
+continuation admission now consume one `currentDecision()` projection for
+lifecycle, blockers and retry. Terminal hard blocks cannot be overridden by a
+generic `FAILED_RETRYABLE` status; unchanged Knowledge dependency fingerprints
+deny same-state retry, while bounded canonical Video completion and explicit
+subject confirmation retain their existing recovery paths.
+
+IMPLEMENTED: Knowledge handoff candidates now use deterministic semantic
+identity including subject scope, facet, provenance and normalized evidence /
+source references. Duplicate candidates yield one Knowledge and relation plan;
+materially distinct provenance remains distinct, and valid Knowledge plans are
+preserved when Source/Evidence dependencies are pending. Completion now
+filters stale unkeyed owner children after a current keyed read-back without
+merging distinct keyed owners.
+
+REGRESSION_COVERAGE: Added the supplied Music Capture identity/revision matrix,
+resolved-subject normalization, terminal-block retry, Knowledge no-progress,
+candidate deduplication, completion-owner reconciliation and bounded retry
+coverage. Task 5 also records the ruling that Article freshness is excluded
+from `KNOWLEDGE_DELTA`; legacy intentless Article receipts remain supported,
+and Video retry remains limited to existing canonical read-back/resume-hint
+paths.
+
+VERIFIED: Focused universal Capture/Governance/completion/retry/read-contract
+selection passes 239 tests / 1,017 assertions. NHK Contract passes 6 tests /
+48 assertions. Full Unit at PHP 512M reaches 3,622 tests / 22,887 assertions
+with the same 14 pre-existing error identities and 5 pre-existing failure
+identities as the repository baseline. Changed PHP lint and `git diff --check`
+pass; changed-scope secret review is clean.
+
+BOUNDARY: The implementation is local and has not been deployed to the
+authorized TEST runtime. No Capture, Knowledge, Source, Evidence, Graph,
+Governance, WordPress, staging or production data was mutated. No migration,
+deployment, signed acceptance packet, controlled apply, push or public
+completion is claimed.
