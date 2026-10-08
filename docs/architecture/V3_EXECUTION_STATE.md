@@ -1,56 +1,79 @@
 # NHK V3 Execution State
 
-# Checkpoint — 2026-10-08 — Universal Music Dossier Westminster-first implementation slice
+# Checkpoint — 2026-10-08 — Westminster universal Music dossier v2 verification
 
-MUSIC_DOSSIER: Added the reusable `music-universal-dossier-v1` profile and
-read-only `MusicDossierProjection` over the existing Authority, Knowledge,
-Source/Evidence, Graph, Media, Video, Dictionary and Article dossier packets.
-The projection is entity-type driven for canonical `music` records and does
-not add an Authority field, Graph predicate, audio owner, migration, fixture,
-or semantic writer. Westminster is not hard-coded and no verified Westminster
-score/audio fact or asset was invented.
+IMPLEMENTED: `MusicReferenceContract` now fails closed on non-VERIFIED score
+references, non-finite timing, invalid octaves, unordered/overlapping events
+and out-of-range segments. `MusicDossierProjection` emits the V2 section
+recipe with strict public allowlists, preserves relation origin and keeps
+Product/Specimen/Variant distinct. Music routing is type/status based and the
+frontend partial iterates the packet `section_order`, renders Media/Video/
+Article library items, and has no Westminster/Sonodo/Ave Maria branch.
 
-REFERENCE_CONTRACT: `MusicReferenceContract` validates versioned score events,
-segments and audio metadata. Public audio requires VERIFIED status and rights;
-invalid or unavailable packets fail closed. The frontend renders score timing
-metadata only when validated and renders no playable source when an eligible
-audio URL is absent.
+TESTED: Focused Music contract/projection suite: 29 tests / 240 assertions.
+Focused frontend presentation/contract suite: 130 tests / 1,237 assertions.
+Contract suite: 6 tests / 48 assertions. Changed PHP lint, JavaScript syntax,
+`git diff --check` and scoped secret review passed. Full Unit at 512M:
+3,579 tests / 22,134 assertions, 14 errors, 5 failures, 28 warnings,
+58 deprecations and 66 PHPUnit deprecations.
 
-FRONTEND: Entity detail now routes an AVAILABLE Music dossier through the
-generic Vietnamese-first `music-dossier.php` partial. Existing generic blocks
-are guarded only for the active Music dossier to avoid duplicate sections.
-`music-dossier.js` is progressive over native audio and synchronizes timing
-highlights when validated event timing exists. The asset manifest loads the
-controller only for entity family + `music` type; no horizontal-overflow hack
-was added.
+REGRESSION_ASSESSMENT: The pre-`912f97ef` checkout (`a9c1fa90`) ran 3,558
+tests / 21,839 assertions with 23 errors and 16 failures. Every one of the
+current 14 error test names and all 5 current failure test names has an exact
+match in that baseline run; all are in unrelated Knowledge, Video, MCP,
+Article, deployment or media-infrastructure tests. The archive baseline lacked
+checkout metadata/uploads and therefore produced additional environment-only
+failures; those were not used to claim causality. No Music/frontend test failed
+in either changed-scope run.
 
-REGRESSION_COVERAGE: Focused Music/projection/frontend verification passed 180
-tests / 1,501 assertions with 3 existing warnings. The Contract suite passed 6
-tests / 48 assertions. The full Unit suite was rerun at 512M and remains
-baseline-red at 3,570 tests with 14 errors, 5 unrelated failures, 26 warnings,
-58 deprecations and 66 PHPUnit deprecations; the same Knowledge/Article
-identity and preview failures reproduce and no Music-related failure appeared.
-Changed-surface PHP lint is clean, JavaScript syntax check is clean,
-`git diff --check` is clean and the credential-like scan is clean.
+WESTMINSTER_RESEARCH: The non-canonical source map is recorded at
+`docs/research/westminster/universal-music-dossier-source-map.md`. It separates
+primary historical statements, notation research, rights review, third-party
+context and unresolved questions. No canonical Westminster Source/Evidence,
+Knowledge, Authority, Graph, Media or clock-model data was created.
 
-RUNTIME_EVIDENCE: UNVERIFIED. No usable local WordPress/browser runtime was
-available in this checkpoint, so canonical Music route resolution, populated
-render output, empty score/audio omission and responsive link/media checks are
-not claimed.
+AUDIO_AND_DATA_READINESS: No Piano, Bell Simulation or Historical Recording
+binary exists under `public/wp-content`, and no governed public Media/MediaAsset
+delivery packet was found. The repository contains no verified Westminster
+score packet, exact pitch/octave/tempo/tuning record, rights-cleared recording,
+or canonical clock-model relation set. The generic UI therefore exposes audio
+metadata but no playable control without an owner-backed MediaAsset delivery.
 
-NO_MUTATION: No V2/production/staging semantic write, migration, import,
-article-body population, deployment, push or cutover occurred. Explicit
-blockers remain: no verified Westminster score/audio asset, no durable audio
-owner/ingestion contract, broader Unit baseline failures, and no deployment.
+RUNTIME_QA: PARTIAL / UNVERIFIED_FOR_LOCAL_BUILD. Read-only Chrome inspection
+of `https://demo.1945.vn/ban-nhac/westminster/` succeeded, but that deployed
+page currently resolves to Dictionary detail (`Westminster chime`) and shows
+no Music dossier, score or audio controls; this confirms the new local build is
+not deployed, not that the local implementation is broken. Sonodo/Ave Maria
+route tabs and controllable viewport checks were unavailable in the current
+browser capability. Local Integration is BLOCKED because the required staging
+identity is absent: environment variables are unset and `wp-config.php`
+falls back to localhost rather than the authorized `erourxcg_nhkv3` / staging
+tuple. No runtime mutation was attempted.
 
-COMMITS: `912f97ef` score/audio contract, `a1106f70` universal projection,
-`03d6adf4` frontend wiring and generic Music dossier, `db94f694` completed
-progressive playback controls and aligned template fields with the validated
-packet.
+VERIFIED: Local changed-scope contracts, projection shape, routing guard,
+generic renderer invariants, PHP/JS syntax and repository hygiene are verified.
+The actual deployed Westminster Music rendering, responsive score/audio
+behavior, SEO JSON-LD for the new dossier, semantic relation output and native
+audio playback remain unverified until a matching build is deployed through
+the approved path and read-only QA is repeated.
 
-STATUS: `UNIVERSAL_MUSIC_DOSSIER_IMPLEMENTED_LOCALLY / FOCUSED_GREEN /
-FULL_UNIT_BASELINE_FAILURES_RECORDED / RUNTIME_UNVERIFIED /
-NO_SEMANTIC_DATA_MUTATION / DEPLOYMENT_PENDING`
+DEPLOYED: NO. No push, deploy, migration, import, seed, production/staging
+semantic write, article-body population or cutover occurred.
+
+BLOCKED: Authorized Integration runtime is unavailable; no canonical
+Westminster research acceptance has occurred; no verified score, Piano or Bell
+asset/public delivery exists; full Unit remains at the pre-existing baseline
+failure set; browser QA of the local build requires deployment or a permitted
+matching local runtime.
+
+COMMITS: `6658797c`, `3f88f535`, `032a34ae`, `73c8bbbd`, and `7a708c01` are the
+local v2 implementation/research commits. Earlier review commits remain
+unchanged. The working tree's two pre-existing untracked plan files were
+preserved.
+
+STATUS: `IMPLEMENTED_LOCALLY / FOCUSED_TESTED_AND_VERIFIED /
+FULL_UNIT_BASELINE_REGRESSIONS_RECORDED / RUNTIME_PARTIAL_UNVERIFIED /
+INTEGRATION_BLOCKED / NOT_DEPLOYED / NO_SEMANTIC_DATA_MUTATION`
 
 # Checkpoint — 2026-10-07 — Media gallery readiness warning identity fix
 
