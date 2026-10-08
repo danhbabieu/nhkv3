@@ -11,6 +11,12 @@ namespace NHK\Core\Application\Entity;
  */
 final class MusicReferenceContract
 {
+    private const PUBLIC_SCORE_VERIFICATION = 'VERIFIED';
+
+    private const MIN_SCORE_OCTAVE = 0;
+
+    private const MAX_SCORE_OCTAVE = 9;
+
     /** @return array{status:string,score:?array<string,mixed>,audio:list<array<string,mixed>>,errors:list<string>} */
     public function normalize(array $packet): array
     {
@@ -56,11 +62,8 @@ final class MusicReferenceContract
         foreach (['version', 'source', 'verification_status', 'tuning'] as $field) {
             if ($this->text($input[$field] ?? null) === '') $errors[] = 'SCORE_' . strtoupper($field) . '_REQUIRED';
         }
-        if (!is_int($input['tempo_bpm'] ?? null) && !is_float($input['tempo_bpm'] ?? null)) {
-            $errors[] = 'SCORE_TEMPO_INVALID';
-        } elseif ((float) $input['tempo_bpm'] <= 0) {
-            $errors[] = 'SCORE_TEMPO_INVALID';
-        }
+        if (!$this->positiveFiniteNumber($input['tempo_bpm'] ?? null)) $errors[] = 'SCORE_TEMPO_INVALID';
+        if ($this->text($input['verification_status'] ?? null) !== self::PUBLIC_SCORE_VERIFICATION) $errors[] = 'SCORE_VERIFICATION_REQUIRED';
 
         $events = $input['events'] ?? null;
         if (!is_array($events) || $events === []) {
@@ -69,6 +72,8 @@ final class MusicReferenceContract
         }
 
         $normalizedEvents = [];
+        $previousStart = null;
+        $previousEnd = null;
         foreach ($events as $event) {
             if (!is_array($event)) {
                 $errors[] = 'SCORE_EVENT_INVALID';
@@ -80,12 +85,16 @@ final class MusicReferenceContract
             $duration = $event['duration_ms'] ?? null;
             $phrase = $this->text($event['phrase'] ?? null);
             if (preg_match('/^[A-G](?:#|b)?$/', $pitch) !== 1) $errors[] = 'SCORE_EVENT_PITCH_INVALID';
-            if (!is_int($octave)) $errors[] = 'SCORE_EVENT_OCTAVE_INVALID';
+            if (!is_int($octave) || $octave < self::MIN_SCORE_OCTAVE || $octave > self::MAX_SCORE_OCTAVE) $errors[] = 'SCORE_EVENT_OCTAVE_INVALID';
             if (!is_int($start) || $start < 0) $errors[] = 'SCORE_EVENT_START_INVALID';
             if (!is_int($duration) || $duration <= 0) $errors[] = 'SCORE_EVENT_DURATION_INVALID';
             if ($phrase === '') $errors[] = 'SCORE_EVENT_PHRASE_REQUIRED';
-            if (preg_match('/^[A-G](?:#|b)?$/', $pitch) !== 1 || !is_int($octave) || !is_int($start) || $start < 0 || !is_int($duration) || $duration <= 0 || $phrase === '') continue;
+            if (preg_match('/^[A-G](?:#|b)?$/', $pitch) !== 1 || !is_int($octave) || $octave < self::MIN_SCORE_OCTAVE || $octave > self::MAX_SCORE_OCTAVE || !is_int($start) || $start < 0 || !is_int($duration) || $duration <= 0 || $phrase === '') continue;
+            if ($previousStart !== null && $start < $previousStart) $errors[] = 'SCORE_EVENT_ORDER_INVALID';
+            if ($previousEnd !== null && $start < $previousEnd) $errors[] = 'SCORE_EVENT_OVERLAP';
             $normalizedEvents[] = ['pitch_class' => $pitch, 'octave' => $octave, 'start_ms' => $start, 'duration_ms' => $duration, 'phrase' => $phrase];
+            $previousStart = $start;
+            $previousEnd = $start + $duration;
         }
 
         $segments = [];
@@ -104,7 +113,8 @@ final class MusicReferenceContract
                     $end = $segment['end_ms'] ?? null;
                     if ($key === '' || $label === '') $errors[] = 'SCORE_SEGMENT_LABEL_REQUIRED';
                     if (!is_int($start) || $start < 0 || !is_int($end) || $end <= $start) $errors[] = 'SCORE_SEGMENT_TIMING_INVALID';
-                    if ($key === '' || $label === '' || !is_int($start) || $start < 0 || !is_int($end) || $end <= $start) continue;
+                    if ($previousEnd !== null && (!is_int($start) || $start < 0 || !is_int($end) || $end > $previousEnd)) $errors[] = 'SCORE_SEGMENT_RANGE_INVALID';
+                    if ($key === '' || $label === '' || !is_int($start) || $start < 0 || !is_int($end) || $end <= $start || ($previousEnd !== null && $end > $previousEnd)) continue;
                     $segments[] = ['key' => $key, 'label' => $label, 'start_ms' => $start, 'end_ms' => $end];
                 }
             }
@@ -135,8 +145,7 @@ final class MusicReferenceContract
         foreach (['score_version', 'instrument', 'render_method', 'tuning', 'pitch_reference', 'source', 'rights', 'verification_status'] as $field) {
             if ($this->text($input[$field] ?? null) === '') $errors[] = 'AUDIO_' . strtoupper($field) . '_REQUIRED';
         }
-        if (!is_int($input['tempo_bpm'] ?? null) && !is_float($input['tempo_bpm'] ?? null)) $errors[] = 'AUDIO_TEMPO_INVALID';
-        elseif ((float) $input['tempo_bpm'] <= 0) $errors[] = 'AUDIO_TEMPO_INVALID';
+        if (!$this->positiveFiniteNumber($input['tempo_bpm'] ?? null)) $errors[] = 'AUDIO_TEMPO_INVALID';
         if (!is_int($input['duration_ms'] ?? null) || $input['duration_ms'] <= 0) $errors[] = 'AUDIO_DURATION_INVALID';
         if ($this->text($input['verification_status'] ?? null) !== 'VERIFIED') $errors[] = 'AUDIO_VERIFICATION_REQUIRED';
 
@@ -146,7 +155,7 @@ final class MusicReferenceContract
             && $this->text($input['render_method'] ?? null) !== ''
             && $this->text($input['tuning'] ?? null) !== ''
             && $this->text($input['pitch_reference'] ?? null) !== ''
-            && is_int($input['tempo_bpm'] ?? null) && $input['tempo_bpm'] > 0
+            && $this->positiveFiniteNumber($input['tempo_bpm'] ?? null)
             && is_int($input['duration_ms'] ?? null) && $input['duration_ms'] > 0
             && $this->text($input['source'] ?? null) !== ''
             && $this->text($input['rights'] ?? null) !== ''
@@ -178,5 +187,10 @@ final class MusicReferenceContract
     private function text(mixed $value): string
     {
         return is_scalar($value) ? trim((string) $value) : '';
+    }
+
+    private function positiveFiniteNumber(mixed $value): bool
+    {
+        return (is_int($value) || is_float($value)) && is_finite((float) $value) && (float) $value > 0;
     }
 }

@@ -14,7 +14,7 @@ final class MusicReferenceContractTest extends TestCase
             'score' => [
                 'version' => 'westminster-v1',
                 'source' => 'Cambridge archive score, edition A',
-                'verification_status' => 'QUALIFIED',
+                'verification_status' => 'VERIFIED',
                 'tuning' => 'A4=440Hz',
                 'tempo_bpm' => 72,
                 'events' => [
@@ -94,6 +94,100 @@ final class MusicReferenceContractTest extends TestCase
         self::assertSame('AVAILABLE', $result['status']);
         self::assertSame(['HISTORICAL_RECORDING', 'BELL_SIMULATION'], array_column($result['audio'], 'mode'));
         self::assertNotSame($result['audio'][0]['mode'], $result['audio'][1]['mode']);
+    }
+
+    public function test_score_is_public_only_when_exactly_verified(): void
+    {
+        foreach (['QUALIFIED', 'DRAFT', 'UNVERIFIED', ''] as $verification) {
+            $score = $this->score();
+            $score['verification_status'] = $verification;
+
+            $result = (new MusicReferenceContract())->normalize(['score' => $score]);
+
+            self::assertSame('INVALID', $result['status'], $verification);
+            self::assertNull($result['score'], $verification);
+            self::assertContains('SCORE_VERIFICATION_REQUIRED', $result['errors']);
+        }
+    }
+
+    public function test_score_rejects_non_finite_tempo_and_unreasonable_octave(): void
+    {
+        foreach ([NAN, INF, -INF] as $tempo) {
+            $score = $this->score();
+            $score['tempo_bpm'] = $tempo;
+
+            $result = (new MusicReferenceContract())->normalize(['score' => $score]);
+
+            self::assertSame('INVALID', $result['status']);
+            self::assertNull($result['score']);
+            self::assertContains('SCORE_TEMPO_INVALID', $result['errors']);
+        }
+
+        $score = $this->score();
+        $score['events'][0]['octave'] = 12;
+        $result = (new MusicReferenceContract())->normalize(['score' => $score]);
+
+        self::assertSame('INVALID', $result['status']);
+        self::assertNull($result['score']);
+        self::assertContains('SCORE_EVENT_OCTAVE_INVALID', $result['errors']);
+    }
+
+    public function test_score_rejects_overlapping_out_of_order_events_and_out_of_range_segments(): void
+    {
+        $overlap = $this->score();
+        $overlap['events'][1]['start_ms'] = 400;
+        $overlapResult = (new MusicReferenceContract())->normalize(['score' => $overlap]);
+        self::assertSame('INVALID', $overlapResult['status']);
+        self::assertNull($overlapResult['score']);
+        self::assertContains('SCORE_EVENT_OVERLAP', $overlapResult['errors']);
+
+        $outOfOrder = $this->score();
+        $outOfOrder['events'][0]['start_ms'] = 700;
+        $outOfOrder['events'][1]['start_ms'] = 100;
+        $outOfOrderResult = (new MusicReferenceContract())->normalize(['score' => $outOfOrder]);
+        self::assertSame('INVALID', $outOfOrderResult['status']);
+        self::assertNull($outOfOrderResult['score']);
+        self::assertContains('SCORE_EVENT_ORDER_INVALID', $outOfOrderResult['errors']);
+
+        $outOfRange = $this->score();
+        $outOfRange['segments'][0]['end_ms'] = 5000;
+        $outOfRangeResult = (new MusicReferenceContract())->normalize(['score' => $outOfRange]);
+        self::assertSame('INVALID', $outOfRangeResult['status']);
+        self::assertNull($outOfRangeResult['score']);
+        self::assertContains('SCORE_SEGMENT_RANGE_INVALID', $outOfRangeResult['errors']);
+    }
+
+    public function test_normalization_discards_arbitrary_fields_and_raw_audio_url(): void
+    {
+        $audio = $this->audio('PIANO', 'Piano reference', 'VERIFIED');
+        $audio['url'] = 'https://example.invalid/private-audio.mp3';
+        $audio['canonical_id'] = 'private-id';
+        $audio['metadata'] = ['private' => true];
+
+        $result = (new MusicReferenceContract())->normalize(['audio' => [$audio]]);
+
+        self::assertSame('AVAILABLE', $result['status']);
+        self::assertArrayNotHasKey('url', $result['audio'][0]);
+        self::assertArrayNotHasKey('canonical_id', $result['audio'][0]);
+        self::assertArrayNotHasKey('metadata', $result['audio'][0]);
+    }
+
+    private function score(): array
+    {
+        return [
+            'version' => 'westminster-v1',
+            'source' => 'Verified score source',
+            'verification_status' => 'VERIFIED',
+            'tuning' => 'A4=440Hz',
+            'tempo_bpm' => 72,
+            'events' => [
+                ['pitch_class' => 'G#', 'octave' => 4, 'start_ms' => 0, 'duration_ms' => 500, 'phrase' => 'quarter-1'],
+                ['pitch_class' => 'F#', 'octave' => 4, 'start_ms' => 600, 'duration_ms' => 500, 'phrase' => 'quarter-1'],
+            ],
+            'segments' => [
+                ['key' => 'quarter-1', 'label' => 'Cụm một', 'start_ms' => 0, 'end_ms' => 1100],
+            ],
+        ];
     }
 
     private function audio(string $mode, string $instrument, string $verification, string $rights = 'NHK reference license'): array
