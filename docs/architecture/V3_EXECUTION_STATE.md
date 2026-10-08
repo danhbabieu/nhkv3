@@ -25473,3 +25473,17 @@ BOUNDARY: This checkpoint is documentation-only. No Capture, Knowledge,
 Source, Evidence, Graph, Governance, WordPress, staging or production data was
 mutated. Implementation requires the written-spec review gate; no deployment,
 approval, controlled apply or public completion is claimed.
+
+# Checkpoint — 2026-10-08 — Universal Capture semantic handoff implementation plan
+
+PLANNED: The approved implementation plan is recorded in
+`docs/superpowers/plans/2026-10-08-universal-capture-semantic-handoff-root-cause-repair.md`.
+It decomposes the repair into TDD tasks for Authority owner normalization,
+shared lifecycle/retry decisions, registry-driven Knowledge candidate
+deduplication, current completion-owner reconciliation and final universal
+verification.
+
+BOUNDARY: Planning-only checkpoint. No production code, Capture, Knowledge,
+Source, Evidence, Graph, Governance, WordPress, staging or production data was
+mutated. No deployment, approval, controlled apply or public completion is
+claimed.
