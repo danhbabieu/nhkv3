@@ -410,6 +410,16 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString("nhk-v3-video-player", $functions);
     }
 
+    public function test_music_entity_asset_family_precedes_dictionary_detail_projection(): void
+    {
+        $functions = (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/functions.php');
+        $musicFamilyGuard = "elseif (is_array(\$entityContext) && \$entityType === 'music') \$family = 'entity';";
+        $dictionaryFamilyGuard = "elseif (is_array(\$dictionaryContext) || (is_array(\$entityContext) && is_array(\$entityContext['entity']['dictionary_detail'] ?? null))) \$family = 'dictionary';";
+
+        self::assertStringContainsString($musicFamilyGuard, $functions);
+        self::assertLessThan(strpos($functions, $dictionaryFamilyGuard), strpos($functions, $musicFamilyGuard));
+    }
+
     public function test_visual_preview_ctas_are_data_driven_and_do_not_render_dead_links(): void
     {
         $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';

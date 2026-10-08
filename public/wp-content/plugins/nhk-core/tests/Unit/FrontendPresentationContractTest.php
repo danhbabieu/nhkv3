@@ -730,6 +730,15 @@ final class FrontendPresentationContractTest extends TestCase
         self::assertStringNotContainsString('MediaAsset', $previewSource);
     }
 
+    public function test_music_dossier_keeps_a_listening_surface_when_public_audio_is_unavailable(): void
+    {
+        $partial = $this->read('template-parts/presentation/music-dossier.php');
+
+        self::assertStringContainsString('$hasMusicAudioSection', $partial);
+        self::assertStringContainsString('music-listening-unavailable', $partial);
+        self::assertStringContainsString('Chưa có tệp âm thanh công khai', $partial);
+    }
+
     public function test_music_detail_precedes_dictionary_detail_for_all_music_entities(): void
     {
         $entity = $this->read('entity.php');

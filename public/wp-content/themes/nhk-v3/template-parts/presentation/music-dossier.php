@@ -17,6 +17,7 @@ $items = static function (mixed $value): array {
     if (!is_array($value)) return [];
     return array_values(array_filter($value, static fn(mixed $item): bool => is_array($item) && trim((string) ($item['text'] ?? $item['title'] ?? $item['name'] ?? $item['source_title'] ?? $item['term'] ?? $item['image_url'] ?? $item['thumbnail_url'] ?? '')) !== ''));
 };
+$hasMusicAudioSection = false;
 $publicUrl = static fn(mixed $value): string => function_exists('nhk_v3_public_url') ? nhk_v3_public_url($value) : (is_string($value) ? trim($value) : '');
 $typeLabel = static fn(mixed $type): string => match ((string) $type) {
     'product' => 'Sản phẩm', 'specimen' => 'Hiện vật', 'variant' => 'Biến thể', 'model' => 'Mẫu đồng hồ',
@@ -83,7 +84,7 @@ $renderCards = static function (array $values, string $class, callable $items, c
     <?php $hasPlayableAudio = false; foreach ((array) ($sections['audio']['items'] ?? []) as $audioItem) { if (!is_array($audioItem)) continue; $audioDelivery = is_array($audioItem['delivery'] ?? null) ? $audioItem['delivery'] : []; if (($audioDelivery['status'] ?? '') === 'AVAILABLE' && ($audioDelivery['source'] ?? '') === 'MEDIA_ASSET' && $publicUrl($audioDelivery['public_url'] ?? null) !== '') { $hasPlayableAudio = true; break; } } $firstScoreEvent = $scoreEvents[0] ?? null; $lastScoreEvent = $scoreEvents[count($scoreEvents) - 1] ?? null; $demoStart = is_array($firstScoreEvent) && is_numeric($firstScoreEvent['start_ms'] ?? null) ? (float) $firstScoreEvent['start_ms'] : null; $demoEnd = is_array($lastScoreEvent) && is_numeric($lastScoreEvent['start_ms'] ?? null) && is_numeric($lastScoreEvent['duration_ms'] ?? null) ? (float) $lastScoreEvent['start_ms'] + (float) $lastScoreEvent['duration_ms'] : null; ?>
     <?php if (!empty($score['segments']) || ($hasPlayableAudio && $demoStart !== null && $demoEnd !== null && $demoEnd > $demoStart)): ?><div class="music-score-segments" aria-label="Các đoạn trong bản nhạc"><?php foreach ((array) $score['segments'] as $segment): if (!is_array($segment)) continue; ?><button type="button" data-music-action="segment" data-start-ms="<?php echo esc_attr((string) ($segment['start_ms'] ?? 0)); ?>" data-end-ms="<?php echo esc_attr((string) ($segment['end_ms'] ?? 0)); ?>"><?php echo esc_html((string) ($segment['label'] ?? 'Đoạn nhạc')); ?></button><?php endforeach; ?><?php if ($hasPlayableAudio && $demoStart !== null && $demoEnd !== null && $demoEnd > $demoStart): ?><button type="button" data-music-action="segment" data-start-ms="<?php echo esc_attr((string) $demoStart); ?>" data-end-ms="<?php echo esc_attr((string) $demoEnd); ?>">Toàn bộ bản trình diễn giáo dục</button><?php endif; ?></div><?php endif; ?>
   </section>
-<?php elseif ($sectionKey === 'audio' && !empty($section['items'])): ?>
+<?php elseif ($sectionKey === 'audio' && !empty($section['items'])): $hasMusicAudioSection = true; ?>
   <section id="music-audio" class="music-dossier-section music-audio" aria-labelledby="music-audio-title">
     <div class="section-head"><div><p class="eyebrow">Âm thanh</p><h3 id="music-audio-title"><?php echo esc_html($heading); ?></h3></div></div>
     <?php $audioItems = $items($section['items']); ?><label class="music-instrument-selector">Nhạc cụ <select data-music-instrument aria-label="Chọn nhạc cụ"><?php foreach ($audioItems as $instrumentAudio): $instrumentLabel = (string) ($instrumentAudio['label'] ?? 'Bản phát tham chiếu'); ?><option value="<?php echo esc_attr(md5($instrumentLabel)); ?>"><?php echo esc_html($instrumentLabel); ?></option><?php endforeach; ?></select></label>
@@ -105,5 +106,11 @@ $renderCards = static function (array $values, string $class, callable $items, c
     <?php $renderCards($section['claims'] ?? [], 'music-claim-stack', $items, $publicUrl, $typeLabel, $relationContext); $renderCards($section['items'] ?? [], 'related-grid', $items, $publicUrl, $typeLabel, $relationContext); $renderCards($section['dictionary'] ?? [], 'related-grid', $items, $publicUrl, $typeLabel, $relationContext); $renderCards($section['evidence'] ?? [], 'evidence-list', $items, $publicUrl, $typeLabel, $relationContext); ?>
   </section>
 <?php endif; endforeach; ?>
+<?php if (!$hasMusicAudioSection): ?>
+  <section id="music-audio" class="music-dossier-section music-audio" aria-labelledby="music-audio-title">
+    <div class="section-head"><div><p class="eyebrow">Âm thanh</p><h3 id="music-audio-title">Nghe tham chiếu</h3></div></div>
+    <div class="music-audio-list"><article class="music-audio-card music-audio-card--unavailable"><h4>Bản phát tham chiếu</h4><p class="music-listening-unavailable">Chưa có tệp âm thanh công khai để phát. Tư liệu âm thanh sẽ xuất hiện sau khi được kiểm tra và công bố theo quy trình tư liệu của NHK.</p></article></div>
+  </section>
+<?php endif; ?>
 </section>
 <?php endif; ?>

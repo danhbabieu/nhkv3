@@ -48,8 +48,10 @@ function nhk_v3_assets(): void
     $mediaContext = $GLOBALS['nhk_core_media_context'] ?? null;
     $knowledgeContext = $GLOBALS['nhk_core_knowledge_context'] ?? null;
     $comparisonContext = $GLOBALS['nhk_core_comparison_context'] ?? null;
+    $entityType = is_array($entityContext) ? trim((string) ($entityContext['entity']['type'] ?? $entityContext['type'] ?? '')) : '';
     $family = 'base'; $mode = '';
     if (is_array($comparisonContext)) $family = 'comparison';
+    elseif (is_array($entityContext) && $entityType === 'music') $family = 'entity';
     elseif (is_array($dictionaryContext) || (is_array($entityContext) && is_array($entityContext['entity']['dictionary_detail'] ?? null))) $family = 'dictionary';
     elseif (is_array($videoContext)) { $family = 'video'; $mode = (string) ($videoContext['mode'] ?? ''); }
     elseif (is_array($mediaContext)) $family = 'media';
@@ -58,7 +60,6 @@ function nhk_v3_assets(): void
     elseif (is_singular('post')) $family = 'article';
     elseif (is_search()) $family = 'search';
     elseif (is_front_page()) $family = 'homepage';
-    $entityType = is_array($entityContext) ? trim((string) ($entityContext['entity']['type'] ?? $entityContext['type'] ?? '')) : '';
     $assetContext = ['family' => $family, 'mode' => $mode, 'album' => nhk_v3_article_has_album_feature(), 'entity_type' => $entityType];
     $manifest = class_exists('NHK\\Core\\Application\\Presentation\\PublicTemplateFamilyAssetManifest')
         ? \NHK\Core\Application\Presentation\PublicTemplateFamilyAssetManifest::forContext($assetContext)
