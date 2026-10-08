@@ -245,6 +245,62 @@ final class CompletionConvergenceTest extends TestCase
         self::assertContains('FRONTEND_READBACK_NOT_VERIFIED', $packet['blockers']);
     }
 
+    public function test_keyed_current_knowledge_readback_supersedes_stale_unkeyed_knowledge_child(): void
+    {
+        $children = [
+            ['completion' => ['owner_type' => 'knowledge', 'owner_id' => '', 'status' => 'PARTIAL', 'complete' => false, 'blockers' => ['REQUIRED_OWNER_READBACK_UNVERIFIED']]],
+            ['current_outcome' => true, 'completion' => ['owner_type' => 'knowledge', 'owner_id' => 'claim-1', 'status' => 'COMPLETE', 'complete' => true, 'canonical_state' => 'COMPLETE', 'canonical_readback' => ['canonical_id' => 'claim-1'], 'canonical_readback_verified' => true, 'blockers' => []]],
+        ];
+        $packet = (new CompletionCoordinator())->aggregateCapture('capture-knowledge-current', $children, [
+            'canonical_state' => 'COMPLETE',
+            'canonical_readback' => ['canonical_id' => 'capture-knowledge-current'],
+            'required_owners' => [['owner_type' => 'knowledge', 'owner_id' => 'claim-1']],
+        ]);
+
+        self::assertCount(1, $packet['children']);
+        self::assertSame('claim-1', $packet['children'][0]['owner_id']);
+        self::assertSame([], $packet['missing_required_owners']);
+        self::assertNotContains('REQUIRED_OWNER_READBACK_UNVERIFIED', $packet['blockers']);
+    }
+
+    public function test_distinct_keyed_knowledge_owners_are_not_merged(): void
+    {
+        $effective = CompletionCoordinator::effectiveChildren([
+            ['current_outcome' => true, 'owner_type' => 'knowledge', 'owner_id' => 'claim-1', 'status' => 'COMPLETE'],
+            ['current_outcome' => true, 'owner_type' => 'knowledge', 'owner_id' => 'claim-2', 'status' => 'COMPLETE'],
+        ]);
+
+        self::assertCount(2, $effective);
+        self::assertSame(['claim-1', 'claim-2'], array_column($effective, 'owner_id'));
+    }
+
+    public function test_historical_unkeyed_child_remains_in_receipts_but_not_current_completion(): void
+    {
+        $historical = ['completion' => ['owner_type' => 'knowledge', 'owner_id' => '', 'status' => 'PARTIAL', 'complete' => false, 'blockers' => ['SUBJECT_NOT_FOUND']]];
+        $current = ['current_outcome' => true, 'completion' => ['owner_type' => 'knowledge', 'owner_id' => 'claim-1', 'status' => 'COMPLETE', 'complete' => true, 'canonical_readback' => ['canonical_id' => 'claim-1'], 'canonical_readback_verified' => true, 'blockers' => []]];
+        $children = [$historical, $current];
+
+        self::assertCount(2, $children);
+        self::assertCount(1, CompletionCoordinator::effectiveChildren($children));
+        self::assertSame('', $children[0]['completion']['owner_id']);
+    }
+
+    public function test_required_owner_readback_blocker_clears_after_current_knowledge_readback(): void
+    {
+        $packet = (new CompletionCoordinator())->aggregateCapture('capture-knowledge-governance', [
+            ['completion' => ['owner_type' => 'knowledge', 'owner_id' => '', 'status' => 'PARTIAL', 'complete' => false, 'blockers' => ['REQUIRED_OWNER_READBACK_UNVERIFIED']]],
+            ['current_outcome' => true, 'completion' => ['owner_type' => 'knowledge', 'owner_id' => 'claim-1', 'status' => 'COMPLETE', 'complete' => true, 'canonical_state' => 'COMPLETE', 'canonical_readback' => ['canonical_id' => 'claim-1'], 'canonical_readback_verified' => true, 'blockers' => ['GOVERNANCE_APPROVAL_REQUIRED']]],
+        ], [
+            'canonical_state' => 'COMPLETE',
+            'canonical_readback' => ['canonical_id' => 'capture-knowledge-governance'],
+            'required_owners' => [['owner_type' => 'knowledge', 'owner_id' => 'claim-1']],
+        ]);
+
+        self::assertSame([], $packet['missing_required_owners']);
+        self::assertNotContains('REQUIRED_OWNER_READBACK_UNVERIFIED', $packet['blockers']);
+        self::assertContains('GOVERNANCE_APPROVAL_REQUIRED', $packet['blockers']);
+    }
+
     public function test_current_completion_fields_recompute_stale_explicit_status(): void
     {
         $packet = (new CompletionCoordinator())->aggregateCapture('capture-1', [

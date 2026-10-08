@@ -277,6 +277,24 @@ final class CompletionCoordinator
      */
     public static function effectiveChildren(array $children): array
     {
+        $currentKeyedTypes = [];
+        foreach ($children as $child) {
+            if (!is_array($child)) continue;
+            $packet = is_array($child['completion'] ?? null) ? $child['completion'] : $child;
+            $ownerType = strtolower(trim((string) ($packet['owner_type'] ?? '')));
+            $ownerId = trim((string) ($packet['owner_id'] ?? ''));
+            $isCurrent = ($child['current_outcome'] ?? false) === true || ($packet['current_outcome'] ?? false) === true;
+            if ($ownerType !== '' && $ownerId !== '' && $isCurrent) $currentKeyedTypes[$ownerType] = true;
+        }
+        if ($currentKeyedTypes !== []) {
+            $children = array_values(array_filter($children, static function (mixed $child) use ($currentKeyedTypes): bool {
+                if (!is_array($child)) return false;
+                $packet = is_array($child['completion'] ?? null) ? $child['completion'] : $child;
+                $ownerType = strtolower(trim((string) ($packet['owner_type'] ?? '')));
+                $ownerId = trim((string) ($packet['owner_id'] ?? ''));
+                return $ownerId !== '' || !isset($currentKeyedTypes[$ownerType]);
+            }));
+        }
         $positions = [];
         $currentPositions = [];
         $effective = [];
