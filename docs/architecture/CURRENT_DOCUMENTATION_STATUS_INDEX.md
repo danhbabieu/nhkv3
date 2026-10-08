@@ -185,6 +185,21 @@ known lexical server-code blocker. The lexical lifecycle itself was not rerun;
 the earlier probe remains historical evidence for that unrerun lifecycle and
 must not be read as a current connector-schema failure.
 
+## 0.0.8 Dictionary authoring data contract — 2026-10-08
+
+`DICTIONARY_AUTHORING_DATA_CONTRACT.md` is the current authoring worksheet and
+review guide for future Dictionary entries. It records the minimum Entry/Form/
+Sense, context, owner-revalidation, lexical-attestation, review, publication
+and read-back data needed to make a term findable later without turning
+Dictionary into a second semantic truth store. Its YAML is documentation-only;
+it does not create a runtime schema or write capability.
+
+The contract includes a fail-closed `Côn hoa thị` example. The current audit
+reference is the Component route `/linh-kien/con-hoa-thi/`; the example is
+`EXAMPLE_ONLY / NO_LIVE_WRITE`, keeps literal international equivalence
+unasserted, and requires exact owner read-back/duplicate review before any
+future mutation. No staging, production or V2 data was changed.
+
 ## 0.1 Governed Conversational Authority — 2026-09-11
 
 The current Capture boundary now has typed purposes `EDITORIAL`, `AUTHORITY`
