@@ -1811,6 +1811,32 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
         self::assertSame([], $result['writes']);
     }
 
+    public function test_review_required_candidate_cannot_materialize_even_when_text_matches_assertion(): void
+    {
+        $service = new GovernedCaptureContinuationService($this->createMock(GovernedLifecycle::class), static fn (): array => [], $this->policies(), static fn (): bool => true);
+        $plans = new \ReflectionMethod($service, 'plans');
+        $plans->setAccessible(true);
+        $subject = UuidCodec::newV7();
+
+        $planned = $plans->invoke($service, 'capture-review-required-candidate', 'semantic', [
+            'content_intent' => ['intent' => 'KNOWLEDGE_DELTA'],
+            'subject_resolution' => ['resolved' => [['id' => $subject, 'type' => 'model']]],
+            'interpretation' => [
+                'user_claim_candidates' => [[
+                    'text' => 'Mặt số màu xanh.',
+                    'status' => 'REVIEW_REQUIRED',
+                    'provenance' => 'EXPLICIT_USER_KNOWLEDGE',
+                ]],
+                'structured_interpretation_packet' => [
+                    'dictionary_owner_commands' => [],
+                    'semantic_assertions' => [['text' => 'Mặt số màu xanh.', 'reason' => 'EXPLICIT_OBSERVATION']],
+                ],
+            ],
+        ]);
+
+        self::assertSame([], $planned);
+    }
+
     public function test_evidence_backed_structured_observation_remains_a_governed_knowledge_and_relation_plan(): void
     {
         $service = new GovernedCaptureContinuationService($this->createMock(GovernedLifecycle::class), static fn (): array => [], $this->policies(), static fn (): bool => true);

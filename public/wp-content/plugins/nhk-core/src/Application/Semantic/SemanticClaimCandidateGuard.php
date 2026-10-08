@@ -17,6 +17,9 @@ final class SemanticClaimCandidateGuard
             : [];
         $text = $this->normalize((string) ($candidate['text'] ?? ''));
         if ($text === '') return $this->review('KNOWLEDGE_SEMANTIC_HANDOFF_REQUIRED');
+        if (($candidate['review_required'] ?? false) === true || strtoupper(trim((string) ($candidate['status'] ?? ''))) === 'REVIEW_REQUIRED') {
+            return $this->review('KNOWLEDGE_SEMANTIC_HANDOFF_REQUIRED', ['candidate_status' => (string) ($candidate['status'] ?? 'REVIEW_REQUIRED')]);
+        }
 
         $assertionTexts = [];
         foreach ((array) ($packet['semantic_assertions'] ?? []) as $assertion) {
