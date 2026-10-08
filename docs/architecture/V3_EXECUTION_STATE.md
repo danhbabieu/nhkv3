@@ -1,5 +1,33 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-08 — independent Grove audio acceptance QA
+
+VERIFIED_READ_ONLY: An independent analysis of both local WAV files confirmed
+41/41 active event windows, JSON phrase counts Q1/Q2/Q3/Q4/Hour of 4/8/12/16/1,
+valid selected-octave MIDI fields and maximum scanned fundamental error of
+0 cents for both renders. The reconstructed schedule ends at 28.25 seconds;
+the 28.650023-second files include a 0.40-second tail. This is a one-pass
+demonstration sequence, not a 60-minute clock-cycle simulation.
+
+QUALITY_BOUNDARY: Pitch/event accuracy passed for the editorial A4=440,
+D4-melody/D3-hour arrangement. Piano timbre is low-realism additive synthesis;
+Bell timbre is synthetic inharmonic synthesis and is not a measured Big Ben,
+Cambridge or Westminster tower-bell model. Independent QA is recorded at
+`docs/research/westminster/reference-audio/independent-qa-v1.md`.
+
+GOVERNANCE: No Capture, signed scope, owner confirmation, authorized TEST
+runtime identity or canonical Media/MediaAsset/MediaUsage target was available.
+No operation was submitted or applied. The deployed Westminster page remains
+read-only with no public audio element; local playback cannot be verified until
+governed public delivery exists.
+
+TESTED: Focused generic Music/Media/frontend/template suite passed 184 tests /
+1,498 assertions with 5 warnings and 57 PHPUnit deprecations. Fixture coverage
+asserts Westminster, Sonodo and Ave Maria share the same profile/section recipe,
+and the theme contains no record-specific Music branches.
+
+STATUS: `INDEPENDENT_AUDIO_QA_VERIFIED / PITCH_ACCURATE / TIMBRE_NON_HISTORICAL / MEDIA_NOT_SUBMITTED / CANONICAL_READBACK_NOT_APPLICABLE / BROWSER_PLAYBACK_BLOCKED / NOT_DEPLOYED`
+
 # Checkpoint — 2026-10-08 — Grove reference edition execution
 
 IMPLEMENTED: The Grove/Cambridge notation witness is now represented by the
