@@ -82,7 +82,7 @@ final readonly class CaptureEnrichmentPlanningEnvelope
         $hasMedia = $assets !== [] || isset($diagnostics['media_enrichment'], $diagnostics['media_usage']);
         $tracks = [
             'lexical' => self::track($diagnostics['dictionary_observation'] ?? $diagnostics['dictionary'] ?? [], []),
-            'authority' => self::track($resolution, []),
+            'authority' => self::authorityTrack($resolution, []),
             'source_evidence' => self::track($diagnostics['source_evidence'] ?? [], ['authority']),
             'knowledge' => self::track($diagnostics['semantic_write_back'] ?? [], ['authority', 'source_evidence']),
             'relations' => self::track($diagnostics['relations'] ?? [], ['authority', 'knowledge']),
@@ -205,6 +205,21 @@ final readonly class CaptureEnrichmentPlanningEnvelope
             'canonical_readback' => $outcome->canonicalReadback,
             'diagnostics' => $outcome->diagnostics,
         ];
+    }
+
+    private static function authorityTrack(mixed $result, array $dependsOn): array
+    {
+        $result = is_array($result) ? $result : [];
+        $primary = is_array($result['primary'] ?? null) ? $result['primary'] : [];
+        if (strtolower(trim((string) ($result['status'] ?? ''))) === 'resolved'
+            && trim((string) ($primary['id'] ?? '')) !== '') {
+            $result['orchestration_status'] = 'READ_BACK_VERIFIED';
+            $result['canonical_readback'] = [
+                'canonical_id' => (string) $primary['id'],
+                'revision' => (int) ($primary['revision'] ?? 0),
+            ];
+        }
+        return self::track($result, $dependsOn);
     }
 
     private static function receiptMap(array $receipts, array $statuses): array

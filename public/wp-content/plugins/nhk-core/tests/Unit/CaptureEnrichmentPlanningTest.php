@@ -27,6 +27,74 @@ final class CaptureEnrichmentPlanningTest extends TestCase
         self::assertArrayHasKey('video', $envelope->ownerTracks);
     }
 
+    public function test_resolved_subject_packet_is_a_successful_authority_owner_track(): void
+    {
+        $envelope = CaptureEnrichmentPlanningEnvelope::fromState(
+            'capture-resolved-authority',
+            hash('sha256', 'resolved-authority'),
+            ['intent' => 'KNOWLEDGE_DELTA'],
+            [],
+            [],
+            [
+                'content_intent' => ['intent' => 'KNOWLEDGE_DELTA'],
+                'subjects' => [
+                    'status' => 'resolved',
+                    'primary' => ['id' => 'music-1', 'type' => 'music', 'revision' => 24],
+                ],
+                'completion' => ['blockers' => []],
+            ],
+        );
+
+        self::assertSame('READ_BACK_VERIFIED', $envelope->ownerTracks['authority']['status']);
+        self::assertSame('music-1', $envelope->ownerTracks['authority']['canonical_readback']['canonical_id']);
+        self::assertSame(24, $envelope->ownerTracks['authority']['canonical_readback']['revision']);
+        self::assertNotContains('SUBJECT_NOT_FOUND', $envelope->blockers);
+    }
+
+    public function test_unresolved_subject_packet_retains_retryable_authority_failure(): void
+    {
+        $envelope = CaptureEnrichmentPlanningEnvelope::fromState(
+            'capture-unresolved-authority',
+            hash('sha256', 'unresolved-authority'),
+            ['intent' => 'KNOWLEDGE_DELTA'],
+            [],
+            [],
+            [
+                'content_intent' => ['intent' => 'KNOWLEDGE_DELTA'],
+                'subjects' => [
+                    'status' => 'unresolved',
+                    'diagnostics' => ['codes' => ['SUBJECT_NOT_FOUND']],
+                ],
+            ],
+        );
+
+        self::assertSame('FAILED_RETRYABLE', $envelope->ownerTracks['authority']['status']);
+        self::assertSame(['codes' => ['SUBJECT_NOT_FOUND']], $envelope->ownerTracks['authority']['diagnostics']);
+    }
+
+    public function test_authority_resolution_does_not_hide_existing_failure_history(): void
+    {
+        $history = ['code' => 'SUBJECT_NOT_FOUND', 'reason' => 'SUPERSEDED_BY_LATEST_PHASE_OUTCOME'];
+        $envelope = CaptureEnrichmentPlanningEnvelope::fromState(
+            'capture-authority-history',
+            hash('sha256', 'authority-history'),
+            ['intent' => 'KNOWLEDGE_DELTA'],
+            [],
+            [],
+            [
+                'content_intent' => ['intent' => 'KNOWLEDGE_DELTA'],
+                'subjects' => [
+                    'status' => 'resolved',
+                    'primary' => ['id' => 'music-1', 'type' => 'music', 'revision' => 24],
+                    'diagnostics' => ['failure_history' => [$history]],
+                ],
+            ],
+        );
+
+        self::assertSame('READ_BACK_VERIFIED', $envelope->ownerTracks['authority']['status']);
+        self::assertSame([$history], $envelope->ownerTracks['authority']['diagnostics']['failure_history']);
+    }
+
     public static function inputSeams(): iterable
     {
         yield 'text-only' => [['kind' => 'text', 'intent' => 'KNOWLEDGE_DELTA'], []];
