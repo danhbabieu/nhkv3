@@ -75,7 +75,56 @@ final class SystemWideDuplicateAuditCoordinator
             'clusters' => $clusters,
             'reconciliation_candidates' => $this->reconciliationCandidates($clusters),
             'counts' => $this->counts($owners, $clusters),
-            'diagnostics' => ['owner_count' => count($ownerList), 'cross_owner_matching' => false, 'automatic_apply' => false],
+            'diagnostics' => $this->globalDiagnostics($owners, $ownerList),
+        ];
+    }
+
+    /**
+     * Keep global execution state separate from owner-level coverage findings.
+     * An unresolved Knowledge identity is a coverage diagnostic; a reader,
+     * cursor or Article model failure is an execution blocker. The aggregate
+     * fields make that distinction observable without weakening fail-closed
+     * status semantics or creating a second audit decision engine.
+     *
+     * @param array<string,array<string,mixed>> $owners
+     * @param list<string> $ownerList
+     * @return array<string,mixed>
+     */
+    private function globalDiagnostics(array $owners, array $ownerList): array
+    {
+        $ownerStatuses = [];
+        $blockingOwners = [];
+        $blockingReasons = [];
+        $coverageGaps = [];
+        foreach ($ownerList as $owner) {
+            $report = is_array($owners[$owner] ?? null) ? $owners[$owner] : [];
+            $status = (string) ($report['status'] ?? 'BLOCKED');
+            $ownerStatuses[$owner] = $status;
+            if ($status === 'BLOCKED') {
+                $blockingOwners[] = $owner;
+                $reason = (string) (($report['diagnostics']['code'] ?? $report['diagnostics']['reason'] ?? 'AUDIT_BLOCKED'));
+                $blockingReasons[$owner] = $reason;
+            }
+            $diagnostics = is_array($report['diagnostics'] ?? null) ? $report['diagnostics'] : [];
+            $unresolved = (int) ($diagnostics['identity_unresolved_rows'] ?? 0);
+            $conflicting = (int) ($diagnostics['identity_conflicting_rows'] ?? 0);
+            if ($unresolved > 0 || $conflicting > 0) {
+                $coverageGaps[$owner] = [
+                    'identity_unresolved_rows' => $unresolved,
+                    'identity_conflicting_rows' => $conflicting,
+                    'duplicate_grouping' => 'EXCLUDED',
+                ];
+            }
+        }
+
+        return [
+            'owner_count' => count($ownerList),
+            'owner_statuses' => $ownerStatuses,
+            'blocking_owners' => $blockingOwners,
+            'blocking_reasons' => $blockingReasons,
+            'coverage_gaps' => $coverageGaps,
+            'cross_owner_matching' => false,
+            'automatic_apply' => false,
         ];
     }
 
@@ -102,8 +151,17 @@ final class SystemWideDuplicateAuditCoordinator
             $combined = $this->dedupeRows(array_merge($state['carry'], array_map(fn (mixed $item): array => $this->row($item), $items)));
             $scanned = $state['scanned'] + count($items);
             if ($owner === 'Article') {
-                $missing = $this->articleModelGap($combined);
-                if ($missing !== []) return $this->blocked('AUDIT_MODEL_GAP', ['missing_identity_fields' => $missing]);
+                $gapRows = $this->articleModelGapRows($combined);
+                if ($gapRows !== []) {
+                    $missing = array_values(array_unique(array_merge(...array_map(static fn (array $row): array => $row['missing_fields'], $gapRows))));
+                    return $this->blocked('AUDIT_MODEL_GAP', [
+                        'blocking_owner' => 'Article',
+                        'blocking_stage' => 'article_semantic_projection',
+                        'coverage_impact' => 'ARTICLE_DUPLICATE_SCAN_UNAVAILABLE',
+                        'missing_identity_fields' => $missing,
+                        'blocking_rows' => $gapRows,
+                    ]);
+                }
             }
             $ownerDiagnostics = [];
             $clusters = match ($owner) {
@@ -398,19 +456,27 @@ final class SystemWideDuplicateAuditCoordinator
         return $clusters;
     }
 
-    /** @param list<array<string,mixed>> $rows @return list<string> */
-    private function articleModelGap(array $rows): array
+    /** @param list<array<string,mixed>> $rows @return list<array{canonical_id:string,missing_fields:list<string>,lifecycle_state:string}> */
+    private function articleModelGapRows(array $rows): array
     {
-        $missing = [];
+        $gaps = [];
         foreach ($rows as $row) {
+            $missing = [];
             if (($row['semantic_identity_available'] ?? false) !== true) $missing[] = 'semantic_identity';
             $subjects = $row['subject_ids'] ?? null;
             if (!is_array($subjects) || array_values(array_filter($subjects, static fn (mixed $value): bool => is_scalar($value) && trim((string) $value) !== '')) === []) $missing[] = 'canonical_subject';
             if ($this->text($row, ['intent', 'title_intent']) === '') $missing[] = 'editorial_intent';
             if ($this->text($row, ['scope']) === '') $missing[] = 'scope';
             if (!array_key_exists('continuation_lineage', $row) && !array_key_exists('lineage', $row)) $missing[] = 'lineage';
+            if ($missing !== []) {
+                $gaps[] = [
+                    'canonical_id' => $this->id($row),
+                    'missing_fields' => array_values(array_unique($missing)),
+                    'lifecycle_state' => strtoupper($this->text($row, ['state', 'status'], [], 'UNKNOWN')),
+                ];
+            }
         }
-        return array_values(array_unique($missing));
+        return $gaps;
     }
 
     /** @param list<mixed> $items @return list<array<string,mixed>> */

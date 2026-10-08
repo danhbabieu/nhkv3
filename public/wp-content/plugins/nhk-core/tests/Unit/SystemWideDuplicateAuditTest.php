@@ -316,6 +316,9 @@ final class SystemWideDuplicateAuditTest extends TestCase
         self::assertSame('BLOCKED', $result['owners']['Article']['status']);
         self::assertSame('AUDIT_MODEL_GAP', $result['owners']['Article']['diagnostics']['code']);
         self::assertSame('AUDIT_MODEL_GAP', $result['owners']['Article']['diagnostics']['reason']);
+        self::assertSame('Article', $result['owners']['Article']['diagnostics']['blocking_owner']);
+        self::assertSame('article_semantic_projection', $result['owners']['Article']['diagnostics']['blocking_stage']);
+        self::assertSame(['p-1', 'p-2'], array_column($result['owners']['Article']['diagnostics']['blocking_rows'], 'canonical_id'));
         self::assertSame([], $result['owners']['Article']['clusters']);
     }
 
@@ -413,6 +416,21 @@ final class SystemWideDuplicateAuditTest extends TestCase
         self::assertFalse($result['mutated']);
         self::assertSame([], $result['reconciliation_candidates']);
         self::assertSame('AUDIT_MODEL_GAP', $result['owners']['Authority']['diagnostics']['code']);
+        self::assertSame(['Dictionary', 'Authority', 'Knowledge', 'Source', 'Evidence', 'Graph', 'Article', 'Media', 'MediaAsset', 'MediaUsage', 'Video'], $result['diagnostics']['blocking_owners']);
+        self::assertSame('AUDIT_MODEL_GAP', $result['diagnostics']['blocking_reasons']['Authority']);
+    }
+
+    public function test_knowledge_identity_coverage_gap_does_not_become_global_execution_blocker(): void
+    {
+        $result = $this->audit('Knowledge', [
+            ['canonical_id' => 'k-unresolved', 'claim_text' => 'Evidence is not a subject.', 'claim_type' => 'fact', 'revision' => 7],
+        ]);
+
+        self::assertSame('COMPLETE', $result['status']);
+        self::assertSame(['Knowledge' => 'COMPLETE'], $result['diagnostics']['owner_statuses']);
+        self::assertSame([], $result['diagnostics']['blocking_owners']);
+        self::assertSame(1, $result['diagnostics']['coverage_gaps']['Knowledge']['identity_unresolved_rows']);
+        self::assertSame([], $result['reconciliation_candidates']);
     }
 
     public function test_missing_video_referents_are_coverage_findings_not_clusters(): void

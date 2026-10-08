@@ -24889,3 +24889,36 @@ and deployed MCP read-back require an available authorized read-only runtime.
 STATUS: `PAGINATION_FIXED_LOCALLY / COMPOSITE_AUDIT_CURSOR_FIXED /
 IDENTITY_DIAGNOSTICS_ADDED / FOCUSED_GREEN / RUNTIME_ACCEPTANCE_PENDING /
 NO_DATA_MUTATION / NO_DEPLOYMENT / COMMIT_PENDING`.
+
+# Checkpoint — 2026-10-08 — System-wide blocker attribution and acceptance boundary
+
+ROOT_CAUSE_CONFIRMED: The Article duplicate-audit reader remains a deliberate
+read-only `wp_posts` projection. It has no active persistence contract for
+semantic identity, canonical subject, editorial intent, scope or continuation
+lineage, so `WpdbDuplicateAuditPageReader::article()` emits unavailable
+identity and `SystemWideDuplicateAuditCoordinator` correctly returns
+`BLOCKED/AUDIT_MODEL_GAP`. No Article identity is inferred from title, body,
+post meta, Evidence, Source or Graph reachability. The live Knowledge record
+and the reported candidate inventory could not be inspected because the
+authorized runtime/API was unavailable.
+
+IMPLEMENTED: The system-wide read-only aggregate now exposes owner execution
+statuses, blocking owners/reasons, and separate Knowledge identity coverage
+gaps. Article model-gap diagnostics now identify the blocking stage, coverage
+impact and bounded Article row IDs with their missing identity fields. Status
+semantics remain fail-closed: a real reader/model/cursor failure blocks, while
+unresolved Knowledge identity remains `COMPLETE` with duplicate grouping
+excluded from coverage. No canonical identity, owner, Graph relation,
+Evidence, Source, Dictionary record or Governance state changed.
+
+VERIFIED: The focused duplicate-audit, WPDB reader, Dictionary candidate
+pagination, MCP catalog/transport, Knowledge identity and contract slice passes
+115 tests / 1,430 assertions. The NHK Contract suite passes 6 tests / 48
+assertions. Full NHK Unit reaches 3,539 tests / 21,888 assertions but retains
+14 environment/baseline errors and 8 unrelated existing failures. Integration
+acceptance is unavailable without `NHK_WP_TEST_PATH=public` and the authorized
+TEST runtime. PHP lint, diff check and changed-scope secret review are clean.
+
+STATUS: `BLOCKER_ATTRIBUTION_FIXED_LOCALLY / FOCUSED_GREEN /
+FULL_UNIT_BASELINE_FAILURES_RECORDED / RUNTIME_ACCEPTANCE_PENDING /
+SEMANTIC_SCAN_BLOCKED_BY_RUNTIME / NO_DATA_MUTATION / NO_DEPLOYMENT`.
