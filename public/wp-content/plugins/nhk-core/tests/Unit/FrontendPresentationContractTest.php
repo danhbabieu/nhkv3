@@ -694,7 +694,7 @@ final class FrontendPresentationContractTest extends TestCase
         self::assertStringContainsString('$isMusicDossier', $entity);
         self::assertStringContainsString('MusicDossierProjection', $bootstrap);
         self::assertStringContainsString('musicProjection->forEntity', $bootstrap);
-        foreach (['data-music-action', 'playbackRate', 'currentTime', 'aria-current'] as $needle) {
+        foreach (['data-music-action', 'playbackRate', 'currentTime', 'aria-current', 'pause', 'repeat', 'reset-rate'] as $needle) {
             self::assertStringContainsString($needle, $script, $needle . ' missing from music controller');
         }
         self::assertStringContainsString('.music-dossier', $css);
