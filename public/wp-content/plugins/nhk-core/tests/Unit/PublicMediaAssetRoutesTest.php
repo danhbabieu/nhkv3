@@ -52,11 +52,50 @@ final class PublicMediaAssetRoutesTest extends TestCase
         }
     }
 
+    public function test_governed_audio_asset_route_returns_playable_bytes_only_after_delivery_validation(): void
+    {
+        $root = sys_get_temp_dir() . '/nhk-audio-route-' . bin2hex(random_bytes(4));
+        mkdir($root);
+        $contents = "RIFF" . pack('V', 36) . "WAVEfmt " . pack('V', 16) . pack('v', 1) . pack('v', 1) . pack('V', 44100) . pack('V', 88200) . pack('v', 2) . pack('v', 16) . "data" . pack('V', 0);
+        $path = $root . '/reference.wav';
+        file_put_contents($path, $contents);
+        $mediaId = UuidCodec::newV7();
+        $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'original', 'reference.wav', hash('sha256', $contents), 'audio/wav', strlen($contents), null, null, 'PUBLIC');
+        $media = new Media($mediaId, 'westminster-audio-route', 'Westminster audio route', 'ready');
+        try {
+            $routes = new PublicMediaAssetRoutes($this->delivery($root, $asset, $media, $path));
+            $response = $routes->responseForAudioAsset($asset->assetId);
+            self::assertSame(200, $response['status'] ?? null);
+            self::assertSame('audio/wav', $response['content_type'] ?? null);
+            self::assertSame($contents, file_get_contents((string) ($response['path'] ?? '')));
+        } finally {
+            unlink($path);
+            rmdir($root);
+        }
+    }
+
+    public function test_audio_byte_range_parser_supports_mobile_seek_and_rejects_invalid_or_multiple_ranges(): void
+    {
+        [$root, $path, $asset, $media] = $this->fixture();
+        try {
+            $routes = new PublicMediaAssetRoutes($this->delivery($root, $asset, $media, $path));
+            self::assertSame([0, 3], $routes->byteRange('bytes=0-3', 10));
+            self::assertSame([6, 9], $routes->byteRange('bytes=-4', 10));
+            self::assertSame([4, 9], $routes->byteRange('bytes=4-', 10));
+            self::assertNull($routes->byteRange('bytes=12-15', 10));
+            self::assertNull($routes->byteRange('bytes=0-3,5-7', 10));
+        } finally {
+            unlink($path);
+            rmdir($root);
+        }
+    }
+
     public function test_route_streams_before_theme_and_uses_the_canonical_anh_rewrite(): void
     {
         $source = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/PublicMediaAssetRoutes.php');
 
         self::assertStringContainsString("add_rewrite_rule('^anh/([^/]+\\.webp)/?$'", $source);
+        self::assertStringContainsString("add_rewrite_rule('^am-thanh/([0-9A-Fa-f-]{36})/?$'", $source);
         self::assertStringContainsString("add_action('template_redirect', [\$this, 'serve'], 0)", $source);
         self::assertStringContainsString('readfile($response[\'path\'])', $source);
         self::assertStringContainsString('exit;', $source);

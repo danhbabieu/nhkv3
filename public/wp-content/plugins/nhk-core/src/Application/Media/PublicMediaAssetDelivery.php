@@ -63,6 +63,27 @@ final class PublicMediaAssetDelivery
     }
 
     /** @return array{asset:MediaAsset,path:string}|null */
+    public function resolveAudio(string $assetId): ?array
+    {
+        $resolved = $this->resolve($assetId);
+        if ($resolved === null || !str_starts_with(strtolower($resolved['asset']->mimeType), 'audio/')) return null;
+        return $this->isValidAudioFile($resolved['path'], strtolower($resolved['asset']->mimeType)) ? $resolved : null;
+    }
+
+    /** @return array{status:string,source:string,public_url:string,mime_type:string}|null */
+    public function publicAudioReference(string $assetId): ?array
+    {
+        $resolved = $this->resolveAudio($assetId);
+        if ($resolved === null) return null;
+        return [
+            'status' => 'AVAILABLE',
+            'source' => 'MEDIA_ASSET',
+            'public_url' => '/am-thanh/' . rawurlencode($resolved['asset']->assetId) . '/',
+            'mime_type' => strtolower($resolved['asset']->mimeType),
+        ];
+    }
+
+    /** @return array{asset:MediaAsset,path:string}|null */
     public function resolveByPublicFilename(string $filename): ?array
     {
         $wanted = basename(str_replace('\\', '/', trim($filename)));
@@ -117,5 +138,17 @@ final class PublicMediaAssetDelivery
         if (!is_array($info) || strtolower((string) ($info['mime'] ?? '')) !== 'image/webp') return false;
         return ($asset->width === null || (int) ($info[0] ?? 0) === $asset->width)
             && ($asset->height === null || (int) ($info[1] ?? 0) === $asset->height);
+    }
+
+    private function isValidAudioFile(string $path, string $mime): bool
+    {
+        $magic = @file_get_contents($path, false, null, 0, 12);
+        if (!is_string($magic)) return false;
+        return match ($mime) {
+            'audio/wav' => strlen($magic) >= 12 && substr($magic, 0, 4) === 'RIFF' && substr($magic, 8, 4) === 'WAVE',
+            'audio/ogg' => str_starts_with($magic, 'OggS'),
+            'audio/mpeg' => str_starts_with($magic, 'ID3') || (strlen($magic) >= 2 && ord($magic[0]) === 0xFF && (ord($magic[1]) & 0xE0) === 0xE0),
+            default => false,
+        };
     }
 }

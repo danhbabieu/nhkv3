@@ -23,7 +23,26 @@ $typeLabel = static fn(mixed $type): string => match ((string) $type) {
     'movement' => 'Bộ máy', 'brand' => 'Thương hiệu', 'video' => 'Video', 'article' => 'Bài viết',
     default => 'Liên quan',
 };
-$renderCards = static function (array $values, string $class, callable $items, callable $publicUrl, callable $typeLabel): void {
+$relationContext = static function (array $item): string {
+    $type = (string) ($item['type'] ?? '');
+    if ($type !== '' && !in_array($type, ['variant', 'movement', 'model', 'brand', 'specimen', 'product', 'article', 'video'], true) && !isset($item['origin'])) return '';
+    $predicates = is_array($item['origin']['predicates'] ?? null) ? $item['origin']['predicates'] : [];
+    $context = match (true) {
+        $type === 'variant' && in_array('configured_with_music', $predicates, true) => 'Cấu hình âm nhạc của biến thể',
+        $type === 'movement' && in_array('supports_music', $predicates, true) => 'Bộ máy hỗ trợ giai điệu',
+        $type === 'model' => 'Mẫu đồng hồ liên quan',
+        $type === 'brand' => 'Thương hiệu liên quan',
+        $type === 'specimen' => 'Hiện vật được ghi nhận',
+        $type === 'product' => 'Sản phẩm/listing liên quan',
+        $type === 'article' => 'Bài viết liên quan',
+        $type === 'video' => 'Video liên quan',
+        $type === 'variant' => 'Biến thể liên quan',
+        default => 'Liên quan',
+    };
+    $origin = ($item['origin']['kind'] ?? '') === 'DERIVED' ? 'Liên hệ suy ra' : (($item['origin']['kind'] ?? '') === 'DIRECT' ? 'Liên hệ trực tiếp' : '');
+    return trim($origin . ($origin !== '' ? ' · ' : '') . $context);
+};
+$renderCards = static function (array $values, string $class, callable $items, callable $publicUrl, callable $typeLabel, callable $relationContext): void {
     $values = $items($values);
     if ($values === []) return;
     echo '<div class="' . esc_attr($class) . '">';
@@ -33,6 +52,8 @@ $renderCards = static function (array $values, string $class, callable $items, c
         if ($title === '') continue;
         echo '<article class="related-card">';
         if (($item['type'] ?? '') !== '') echo '<span class="related-type">' . esc_html($typeLabel($item['type'])) . '</span>';
+        $context = $relationContext($item);
+        if ($context !== '') echo '<span class="related-context">' . esc_html($context) . '</span>';
         if ($url !== '') echo '<a href="' . esc_url($url) . '"><strong>' . esc_html($title) . '</strong></a>'; else echo '<strong>' . esc_html($title) . '</strong>';
         if (($item['excerpt'] ?? '') !== '') echo '<span>' . esc_html((string) $item['excerpt']) . '</span>';
         if (($item['definition'] ?? '') !== '') echo '<span>' . esc_html((string) $item['definition']) . '</span>';
@@ -72,11 +93,11 @@ $renderCards = static function (array $values, string $class, callable $items, c
   </section>
 <?php elseif ($sectionKey === 'library'): ?>
   <section id="music-library" class="music-dossier-section music-section-library" aria-labelledby="music-library-title"><div class="section-head"><div><p class="eyebrow">Hồ sơ âm nhạc</p><h3 id="music-library-title"><?php echo esc_html($heading); ?></h3></div></div>
-    <?php $renderCards($section['videos'] ?? [], 'related-grid music-library-videos', $items, $publicUrl, $typeLabel); $renderCards($section['articles'] ?? [], 'related-grid music-library-articles', $items, $publicUrl, $typeLabel); if (!empty($section['media'])): ?><div class="media-mosaic music-library-media"><?php foreach ($items($section['media']) as $media): $visual = function_exists('nhk_v3_media_presentation') ? nhk_v3_media_presentation($media) : ['url' => '']; if (($visual['url'] ?? '') === '') continue; ?><figure class="media-figure"><img src="<?php echo esc_url((string) $visual['url']); ?>" alt="<?php echo esc_attr((string) ($media['alt'] ?? 'Tư liệu hình ảnh')); ?>" loading="lazy" decoding="async"><figcaption><?php echo esc_html((string) ($media['title'] ?? 'Tư liệu hình ảnh')); ?></figcaption></figure><?php endforeach; ?></div><?php endif; ?>
+    <?php $renderCards($section['videos'] ?? [], 'related-grid music-library-videos', $items, $publicUrl, $typeLabel, $relationContext); $renderCards($section['articles'] ?? [], 'related-grid music-library-articles', $items, $publicUrl, $typeLabel, $relationContext); if (!empty($section['media'])): ?><div class="media-mosaic music-library-media"><?php foreach ($items($section['media']) as $media): $visual = function_exists('nhk_v3_media_presentation') ? nhk_v3_media_presentation($media) : ['url' => '']; if (($visual['url'] ?? '') === '') continue; ?><figure class="media-figure"><img src="<?php echo esc_url((string) $visual['url']); ?>" alt="<?php echo esc_attr((string) ($media['alt'] ?? 'Tư liệu hình ảnh')); ?>" loading="lazy" decoding="async"><figcaption><?php echo esc_html((string) ($media['title'] ?? 'Tư liệu hình ảnh')); ?></figcaption></figure><?php endforeach; ?></div><?php endif; ?>
   </section>
 <?php elseif ($section !== []): ?>
   <section id="music-<?php echo esc_attr($sectionKey); ?>" class="music-dossier-section music-section-<?php echo esc_attr($sectionKey); ?>" aria-labelledby="music-<?php echo esc_attr($sectionKey); ?>-title"><div class="section-head"><div><p class="eyebrow">Hồ sơ âm nhạc</p><h3 id="music-<?php echo esc_attr($sectionKey); ?>-title"><?php echo esc_html($heading); ?></h3></div></div>
-    <?php $renderCards($section['claims'] ?? [], 'music-claim-stack', $items, $publicUrl, $typeLabel); $renderCards($section['items'] ?? [], 'related-grid', $items, $publicUrl, $typeLabel); $renderCards($section['dictionary'] ?? [], 'related-grid', $items, $publicUrl, $typeLabel); $renderCards($section['evidence'] ?? [], 'evidence-list', $items, $publicUrl, $typeLabel); ?>
+    <?php $renderCards($section['claims'] ?? [], 'music-claim-stack', $items, $publicUrl, $typeLabel, $relationContext); $renderCards($section['items'] ?? [], 'related-grid', $items, $publicUrl, $typeLabel, $relationContext); $renderCards($section['dictionary'] ?? [], 'related-grid', $items, $publicUrl, $typeLabel, $relationContext); $renderCards($section['evidence'] ?? [], 'evidence-list', $items, $publicUrl, $typeLabel, $relationContext); ?>
   </section>
 <?php endif; endforeach; ?>
 </section>

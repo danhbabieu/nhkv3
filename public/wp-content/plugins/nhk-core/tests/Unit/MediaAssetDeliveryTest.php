@@ -131,6 +131,48 @@ final class MediaAssetDeliveryTest extends TestCase
         }
     }
 
+    public function test_public_audio_reference_requires_valid_audio_bytes_and_returns_a_governed_route(): void
+    {
+        $root = sys_get_temp_dir() . '/nhk-audio-' . bin2hex(random_bytes(4));
+        mkdir($root);
+        $contents = "RIFF" . pack('V', 36) . "WAVEfmt " . pack('V', 16) . pack('v', 1) . pack('v', 1) . pack('V', 44100) . pack('V', 88200) . pack('v', 2) . pack('v', 16) . "data" . pack('V', 0);
+        $path = $root . '/westminster-reference.wav';
+        file_put_contents($path, $contents);
+        $assetId = UuidCodec::newV7();
+        $mediaId = UuidCodec::newV7();
+        $asset = new MediaAsset($assetId, $mediaId, 'original', basename($path), hash('sha256', $contents), 'audio/wav', strlen($contents), null, null, 'PUBLIC', ['canonical_filename' => 'westminster-reference.wav']);
+        $delivery = new PublicMediaAssetDelivery($this->repository($asset), $this->mediaRepository(new Media($mediaId, 'westminster-audio', 'Westminster reference audio', 'ready')), $root);
+
+        try {
+            $reference = $delivery->publicAudioReference($assetId);
+            self::assertSame('AVAILABLE', $reference['status'] ?? null);
+            self::assertSame('MEDIA_ASSET', $reference['source'] ?? null);
+            self::assertSame('/am-thanh/' . $assetId . '/', $reference['public_url'] ?? null);
+            self::assertSame('audio/wav', $reference['mime_type'] ?? null);
+        } finally {
+            unlink($path);
+            rmdir($root);
+        }
+    }
+
+    public function test_public_audio_reference_rejects_html_bytes_even_when_mime_is_audio(): void
+    {
+        $root = sys_get_temp_dir() . '/nhk-audio-' . bin2hex(random_bytes(4));
+        mkdir($root);
+        $contents = '<!DOCTYPE html><html>not audio</html>';
+        $path = $root . '/wrong.wav';
+        file_put_contents($path, $contents);
+        $asset = new MediaAsset(UuidCodec::newV7(), UuidCodec::newV7(), 'original', basename($path), hash('sha256', $contents), 'audio/wav', strlen($contents), null, null, 'PUBLIC');
+        $delivery = new PublicMediaAssetDelivery($this->repository($asset), $this->mediaRepository(new Media($asset->mediaId, 'wrong-audio', 'Wrong audio', 'ready')), $root);
+
+        try {
+            self::assertNull($delivery->publicAudioReference($asset->assetId));
+        } finally {
+            unlink($path);
+            rmdir($root);
+        }
+    }
+
     private function repository(MediaAsset $asset): MediaAssetRepository
     {
         return new class($asset) implements MediaAssetRepository {

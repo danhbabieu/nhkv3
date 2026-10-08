@@ -1,5 +1,89 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-08 — Westminster music/audio unblock implementation
+
+IMPLEMENTED: The existing v2 Music reference aggregate now distinguishes
+`AVAILABLE`, `PARTIAL`, `INVALID` and `EMPTY` outcomes instead of treating a
+valid component plus invalid input as wholly available. The existing Media
+owner now validates supported audio signatures and produces an opaque governed
+audio delivery reference only after MediaAsset/Media readiness, public
+visibility, MIME, path, size and checksum checks. The public Media route serves
+that validated audio through `/am-thanh/<asset-id>/`; no raw URL or new owner
+was added. The frontend bootstrap reads an optional governed Music reference
+packet filter, and the generic Music renderer now shows direct/derived
+reader-facing relation context while suppressing graph diagnostics.
+
+RESEARCH_DECISION: Grove/Wikisource supports the D-major notation witness,
+written quarter-note group durations and whole-note hour notation; Starmer's
+1907 scan corroborates the Cambridge 1793–94 form, ten-bell/hour-bell
+relationship, Royal Exchange alteration and Parliament's 1859–60 copying.
+This is still a notation-edition candidate, not a canonical VERIFIED score:
+octave, tuning/temperament, unprinted timing, Westminster arrangement mapping
+and the official G-natural/G-sharp conflict remain unresolved.
+
+The non-canonical edition artifact is recorded at
+`docs/research/westminster/score-editions/grove-cambridge-quarters-d-major-v1.md`
+with status `NOTATION_WITNESS_VERIFIED / PERFORMANCE_UNVERIFIED`; it contains
+pitch classes only and no invented octave, milliseconds or rests.
+
+TESTED: Focused Music/Media/frontend suite 210 tests / 1,572 assertions,
+green with 5 warnings. Full Unit at 512M: 3,587 tests / 22,173 assertions,
+14 errors / 5 failures / 28 warnings / 58 deprecations / 66 PHPUnit
+deprecations. Integration: 147 tests, 22 failures and 125 skips because
+`NHK_WP_TEST_PATH=public` and the authorized TEST runtime are unavailable.
+No Governance, migration or semantic mutation path was run.
+
+RUNTIME_QA: The deployed Westminster route was inspected read-only at desktop;
+it has the Music dossier but no score section, audio section or `<audio>`
+element. Prior permitted viewport checks at 390x844 and 768x1024 showed no
+horizontal overflow and the expected main/H1/skip-link structure. These are
+deployed-build observations, not verification of the un-deployed local patch.
+
+STATUS: `IMPLEMENTED_LOCALLY / FOCUSED_VERIFIED / SCORE_UNVERIFIED /
+PIANO_BLOCKED / BELL_SIMULATION_BLOCKED / MEDIA_ASSET_ABSENT /
+INTEGRATION_BLOCKED / NOT_DEPLOYED / NO_SEMANTIC_DATA_MUTATION`
+
+# Checkpoint — 2026-10-08 — Westminster content/audio readiness v2
+
+RESEARCH_READBACK: The existing Westminster Music route is live-readable and
+uses the universal Music dossier. It currently exposes Variant, Movement,
+Brand, Model and Video context, but the Westminster Knowledge section is empty
+and no score event list, audio card, playable `<audio>` element or public
+MediaAsset delivery is present.
+
+RESEARCH_VERIFICATION: Great St Mary's, UK Parliament, W. W. Starmer, Grove
+notation and specialist musicology sources were reviewed. The historical
+Cambridge phrase order is source-derived, but official Parliament pages
+conflict on the first quarter pitch (G sharp versus G natural). Octave, exact
+tuning, mechanical timing and arrangement selection remain unresolved. No
+canonical Source, Evidence, Knowledge, score or audio record was created.
+
+CANDIDATE_REGISTER: Non-canonical atomic Source/Knowledge/Evidence candidates
+and the source-derived score sequence are recorded in
+`docs/research/westminster/content-audio-readiness-v2.md`. The report is not a
+Governance packet and contains no synthetic canonical IDs or apply payload.
+
+AUDIO_READINESS: Piano Reference and Bell Simulation are NOT_RENDERED because
+no score version, instrument/model, rights decision or governed MediaAsset is
+ready. No Historical Recording was reused. The Music metadata validator does
+not prove source authenticity, score correctness, rights, physical delivery or
+playback; its `AVAILABLE` aggregate can coexist with component errors, and the
+current safe audio projection does not carry the template's delivery packet.
+
+TESTED: Focused Music/frontend run 179 tests / 1,548 assertions / 5 warnings;
+Contract 6 / 48 green. Full Unit at 512M: 3,580 tests / 22,134 assertions,
+14 errors, 6 failures, 28 warnings, 58 deprecations and 66 PHPUnit
+deprecations. Integration: 147 tests with 22 environment failures and 125
+skips because the authorized test runtime is unavailable.
+
+RUNTIME_QA: Read-only deployed route checks passed for desktop, 390×844 mobile
+and 768×1024 tablet structure, landmarks, skip link and overflow. Audio count
+was zero at all sizes. JSON-LD contains CollectionPage/BreadcrumbList only.
+
+STATUS: `RESEARCH_COMPLETE / SCORE_UNVERIFIED / PIANO_BLOCKED /
+BELL_SIMULATION_BLOCKED / HISTORICAL_RECORDING_NOT_REUSED /
+RELATION_SCOPE_REVIEW_REQUIRED / NO_SEMANTIC_MUTATION / NOT_DEPLOYED`
+
 # Checkpoint — 2026-10-08 — Westminster universal Music dossier v2 verification
 
 IMPLEMENTED: `MusicReferenceContract` now fails closed on non-VERIFIED score

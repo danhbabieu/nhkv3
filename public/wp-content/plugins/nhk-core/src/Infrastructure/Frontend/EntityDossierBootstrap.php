@@ -6,7 +6,7 @@ namespace NHK\Core\Infrastructure\Frontend;
 use NHK\Core\Application\Entity\{BrandDossierProjection, ClockTypeDossierProjection, EntityMediaProjection, MusicDossierProjection, PublicEntityEligibilityPolicy, PublicIdentityContract, PublicRouteResolver, SemanticDossierQuery};
 use NHK\Core\Application\Graph\{BrandAggregationQuery, ClockTypeDerivedRelationshipQuery, ClockTypeHierarchyProjection, GraphService, PredicateTraversalPolicy, RelatedSemanticQuery, StructuralContextQuery};
 use NHK\Core\Application\Knowledge\{EntityKnowledgeProjection, PublicResearchSourceDisplayPolicy};
-use NHK\Core\Application\Media\{PublicMediaGalleryQuery, SemanticSuitabilityPolicy};
+use NHK\Core\Application\Media\{PublicMediaAssetDelivery, PublicMediaGalleryQuery, SemanticSuitabilityPolicy};
 use NHK\Core\Domain\Authority\{AuthorityEntity, CanonicalEntityTypeCatalog, EntityTypeRegistry};
 use NHK\Core\Domain\Graph\{EndpointTypeRegistry, PredicateRegistry};
 use NHK\Core\Infrastructure\Authority\WpdbAuthorityRepository;
@@ -73,7 +73,10 @@ final class EntityDossierBootstrap
             authority: $authority,
         );
         $brandProjection = new BrandDossierProjection();
-        $musicProjection = new MusicDossierProjection();
+        $publicMediaDelivery = PublicMediaAssetDelivery::fromEnvironment($assets, $media);
+        $musicProjection = new MusicDossierProjection(
+            audioDelivery: $publicMediaDelivery === null ? null : static fn (string $assetId): ?array => $publicMediaDelivery->publicAudioReference($assetId),
+        );
 
         add_filter('nhk_v3_entity_detail_projection', static function (array $value, AuthorityEntity $entity) use ($dossier, $clockTypeDossier, $brandAggregation, $brandProjection, $musicProjection): array {
             $baseDossier = is_array($value['dossier'] ?? null) && (($value['dossier']['status'] ?? '') !== '') ? $value['dossier'] : $dossier->forEntity($entity);
@@ -82,7 +85,8 @@ final class EntityDossierBootstrap
                 $value['dossier'] = $brandProjection->merge($value['dossier'], $brandAggregation->forBrand($entity->canonicalId));
             }
             if ($entity->entityType === 'music' && ($value['dossier']['status'] ?? '') === 'AVAILABLE') {
-                $value['dossier'] = $musicProjection->forEntity($entity, $value['dossier']);
+                $packet = apply_filters('nhk_v3_music_reference_packet', null, $entity, $value['dossier']);
+                $value['dossier'] = $musicProjection->forEntity($entity, $value['dossier'], is_array($packet) ? $packet : null);
             }
             return $value;
         }, 20, 2);

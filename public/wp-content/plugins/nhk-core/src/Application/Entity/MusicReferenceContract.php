@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Entity;
 
+use NHK\Core\Shared\Uuid\UuidCodec;
+
 /**
  * Read-only contract for optional score/audio reference packets.
  *
@@ -43,8 +45,9 @@ final class MusicReferenceContract
             return ['status' => 'EMPTY', 'score' => null, 'audio' => [], 'errors' => []];
         }
 
+        $hasComponent = $score !== null || $audio !== [];
         return [
-            'status' => $score !== null || $audio !== [] ? 'AVAILABLE' : 'INVALID',
+            'status' => !$hasComponent ? 'INVALID' : ($errors === [] ? 'AVAILABLE' : 'PARTIAL'),
             'score' => $score,
             'audio' => $audio,
             'errors' => array_values(array_unique($errors)),
@@ -148,6 +151,8 @@ final class MusicReferenceContract
         if (!$this->positiveFiniteNumber($input['tempo_bpm'] ?? null)) $errors[] = 'AUDIO_TEMPO_INVALID';
         if (!is_int($input['duration_ms'] ?? null) || $input['duration_ms'] <= 0) $errors[] = 'AUDIO_DURATION_INVALID';
         if ($this->text($input['verification_status'] ?? null) !== 'VERIFIED') $errors[] = 'AUDIO_VERIFICATION_REQUIRED';
+        $mediaAssetId = $this->text($input['media_asset_id'] ?? null);
+        if ($mediaAssetId !== '' && !UuidCodec::isValid($mediaAssetId)) $errors[] = 'AUDIO_MEDIA_ASSET_INVALID';
 
         $valid = $mode !== '' && in_array($mode, ['PIANO', 'BELL_SIMULATION', 'HISTORICAL_RECORDING'], true)
             && $this->text($input['score_version'] ?? null) !== ''
@@ -159,6 +164,7 @@ final class MusicReferenceContract
             && is_int($input['duration_ms'] ?? null) && $input['duration_ms'] > 0
             && $this->text($input['source'] ?? null) !== ''
             && $this->text($input['rights'] ?? null) !== ''
+            && ($mediaAssetId === '' || UuidCodec::isValid($mediaAssetId))
             && $this->text($input['verification_status'] ?? null) === 'VERIFIED';
         if (!$valid) return null;
 
@@ -174,6 +180,7 @@ final class MusicReferenceContract
             'source' => $this->text($input['source']),
             'rights' => $this->text($input['rights']),
             'verification_status' => 'VERIFIED',
+            ...($mediaAssetId !== '' ? ['media_asset_id' => $mediaAssetId] : []),
         ];
     }
 

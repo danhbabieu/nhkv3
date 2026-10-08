@@ -697,7 +697,7 @@ final class FrontendPresentationContractTest extends TestCase
         foreach (['data-music-action', 'playbackRate', 'currentTime', 'aria-current', 'pause', 'repeat', 'reset-rate'] as $needle) {
             self::assertStringContainsString($needle, $script, $needle . ' missing from music controller');
         }
-        foreach (['section_order', 'foreach ($sectionOrder as $sectionKey)', "['videos']", "['articles']", 'delivery', 'Sản phẩm', 'Hiện vật'] as $needle) {
+        foreach (['section_order', 'foreach ($sectionOrder as $sectionKey)', "['videos']", "['articles']", 'delivery', 'Sản phẩm', 'Hiện vật', 'Cấu hình âm nhạc của biến thể', 'Bộ máy hỗ trợ giai điệu', 'Liên hệ suy ra'] as $needle) {
             self::assertStringContainsString($needle, $partial, $needle . ' missing from generic music renderer');
         }
         self::assertStringNotContainsString('$sectionLabels = [', $partial);

@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Entity;
 
 use NHK\Core\Domain\Authority\AuthorityEntity;
+use NHK\Core\Shared\Uuid\UuidCodec;
 
 /** Read-only Music presentation over the established public dossier packet. */
 final class MusicDossierProjection
@@ -15,7 +16,12 @@ final class MusicDossierProjection
         'research', 'sources', 'related_melodies',
     ];
 
-    public function __construct(private MusicReferenceContract $references = new MusicReferenceContract()) {}
+    private ?\Closure $audioDelivery;
+
+    public function __construct(private MusicReferenceContract $references = new MusicReferenceContract(), ?callable $audioDelivery = null)
+    {
+        $this->audioDelivery = $audioDelivery === null ? null : \Closure::fromCallable($audioDelivery);
+    }
 
     /** @return array<string,mixed> */
     public function forEntity(AuthorityEntity $entity, array $dossier, ?array $referencePacket = null): array
@@ -72,19 +78,20 @@ final class MusicDossierProjection
             'sections' => $sections,
             'score' => $reference['score'],
             'audio' => $reference['audio'],
-            'warnings' => [],
+            'warnings' => $reference['warnings'],
         ]]);
     }
 
-    /** @return array{score:?array<string,mixed>,audio:list<array<string,mixed>>} */
+    /** @return array{score:?array<string,mixed>,audio:list<array<string,mixed>>,warnings:list<string>} */
     private function reference(?array $packet): array
     {
-        if ($packet === null) return ['score' => null, 'audio' => []];
+        if ($packet === null) return ['score' => null, 'audio' => [], 'warnings' => []];
         $packet = $this->references->normalize($packet);
-        if (($packet['status'] ?? '') !== 'AVAILABLE') return ['score' => null, 'audio' => []];
+        if (!in_array(($packet['status'] ?? ''), ['AVAILABLE', 'PARTIAL'], true)) return ['score' => null, 'audio' => [], 'warnings' => []];
         return [
             'score' => is_array($packet['score'] ?? null) ? $this->safeScore($packet['score']) : null,
             'audio' => $this->safeList($packet['audio'] ?? [], 'audio'),
+            'warnings' => ($packet['errors'] ?? []) === [] ? [] : ['Một số tham chiếu âm nhạc chưa đủ điều kiện hiển thị công khai.'],
         ];
     }
 
@@ -194,13 +201,13 @@ final class MusicDossierProjection
     /** @return array<string,mixed> */
     private function safeVideo(array $value): array
     {
-        return $this->pick($value, ['type', 'title', 'name', 'url', 'excerpt', 'summary']);
+        return $this->withOrigin($this->pick($value, ['type', 'title', 'name', 'url', 'excerpt', 'summary']), $value);
     }
 
     /** @return array<string,mixed> */
     private function safeArticle(array $value): array
     {
-        return $this->pick($value, ['type', 'title', 'name', 'url', 'excerpt', 'summary', 'date']);
+        return $this->withOrigin($this->pick($value, ['type', 'title', 'name', 'url', 'excerpt', 'summary', 'date']), $value);
     }
 
     /** @return array<string,mixed> */
@@ -212,7 +219,30 @@ final class MusicDossierProjection
     /** @return array<string,mixed> */
     private function safeAudio(array $value): array
     {
-        return $this->pick($value, ['mode', 'label', 'score_version', 'instrument', 'render_method', 'tuning', 'pitch_reference', 'tempo_bpm', 'duration_ms', 'source', 'rights', 'verification_status']);
+        $result = $this->pick($value, ['mode', 'label', 'score_version', 'instrument', 'render_method', 'tuning', 'pitch_reference', 'tempo_bpm', 'duration_ms', 'source', 'rights', 'verification_status']);
+        $assetId = is_string($value['media_asset_id'] ?? null) ? trim($value['media_asset_id']) : '';
+        if ($assetId !== '' && UuidCodec::isValid($assetId) && $this->audioDelivery !== null) {
+            $delivery = ($this->audioDelivery)($assetId);
+            if (is_array($delivery) && ($delivery['status'] ?? '') === 'AVAILABLE' && ($delivery['source'] ?? '') === 'MEDIA_ASSET') {
+                $url = is_string($delivery['public_url'] ?? null) ? trim($delivery['public_url']) : '';
+                if (preg_match('#^/am-thanh/[0-9a-f-]{36}/$#i', $url) === 1) {
+                    $result['delivery'] = $this->pick($delivery, ['status', 'source', 'public_url', 'mime_type']);
+                }
+            }
+        }
+        return $result;
+    }
+
+    /** @param array<string,mixed> $result @param array<string,mixed> $value @return array<string,mixed> */
+    private function withOrigin(array $result, array $value): array
+    {
+        if (isset($value['origin']) && is_array($value['origin'])) {
+            $origin = [];
+            $kind = $value['origin']['kind'] ?? null;
+            if (is_string($kind) && in_array($kind, ['DIRECT', 'DERIVED'], true)) $origin['kind'] = $kind;
+            if ($origin !== []) $result['origin'] = $origin;
+        }
+        return $result;
     }
 
     /** @return array<string,mixed> */

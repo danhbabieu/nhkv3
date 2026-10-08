@@ -169,6 +169,34 @@ final class MusicDossierProjectionTest extends TestCase
         self::assertSame('article', $library['articles'][0]['type']);
     }
 
+    public function test_projection_emits_only_governed_audio_delivery_and_keeps_relation_origin_publicly_safe(): void
+    {
+        $assetId = '018f5b74-5f30-7d2e-9a93-c0e7d6dc3341';
+        $audio = $this->audio();
+        $audio['media_asset_id'] = $assetId;
+        $audio['url'] = 'https://example.invalid/untrusted.mp3';
+        $dossier = $this->dossier('Westminster Quarters');
+        $dossier['relation_sections'] = [
+            'videos' => [[
+                'type' => 'video', 'title' => 'Bell mechanism', 'url' => '/video/bell-mechanism/',
+                'origin' => ['kind' => 'DERIVED', 'hop_count' => 2, 'predicates' => ['about'], 'via_types' => ['article']],
+            ]],
+        ];
+
+        $result = (new MusicDossierProjection(
+            audioDelivery: static fn (string $id): ?array => $id === $assetId
+                ? ['status' => 'AVAILABLE', 'source' => 'MEDIA_ASSET', 'public_url' => '/am-thanh/' . $id . '/']
+                : null,
+        ))->forEntity($this->entity('Westminster Quarters'), $dossier, ['audio' => [$audio]]);
+
+        $projectedAudio = $result['music_dossier']['audio'][0];
+        self::assertSame('/am-thanh/' . $assetId . '/', $projectedAudio['delivery']['public_url']);
+        self::assertArrayNotHasKey('media_asset_id', $projectedAudio);
+        self::assertArrayNotHasKey('url', $projectedAudio);
+        self::assertSame('DERIVED', $result['music_dossier']['sections']['library']['videos'][0]['origin']['kind']);
+        self::assertArrayNotHasKey('predicates', $result['music_dossier']['sections']['library']['videos'][0]['origin']);
+    }
+
     public function test_projection_always_normalizes_reference_packets_and_replaces_stale_projection(): void
     {
         $dossier = $this->dossier('Westminster Quarters');

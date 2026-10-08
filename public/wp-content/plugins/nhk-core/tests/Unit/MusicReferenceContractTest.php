@@ -172,6 +172,36 @@ final class MusicReferenceContractTest extends TestCase
         self::assertArrayNotHasKey('metadata', $result['audio'][0]);
     }
 
+    public function test_mixed_valid_and_invalid_components_are_partial_not_unconditionally_available(): void
+    {
+        $audio = $this->audio('PIANO', 'Piano reference', 'VERIFIED');
+        $audio['media_asset_id'] = 'not-a-uuid';
+
+        $result = (new MusicReferenceContract())->normalize([
+            'score' => $this->score(),
+            'audio' => [$audio],
+        ]);
+
+        self::assertSame('PARTIAL', $result['status']);
+        self::assertNotNull($result['score']);
+        self::assertSame([], $result['audio']);
+        self::assertContains('AUDIO_MEDIA_ASSET_INVALID', $result['errors']);
+    }
+
+    public function test_governed_media_asset_identity_is_internal_only_and_not_a_public_audio_url(): void
+    {
+        $assetId = '018f5b74-5f30-7d2e-9a93-c0e7d6dc3341';
+        $audio = $this->audio('PIANO', 'Piano reference', 'VERIFIED');
+        $audio['media_asset_id'] = $assetId;
+        $audio['url'] = 'https://example.invalid/untrusted.mp3';
+
+        $result = (new MusicReferenceContract())->normalize(['audio' => [$audio]]);
+
+        self::assertSame('AVAILABLE', $result['status']);
+        self::assertSame($assetId, $result['audio'][0]['media_asset_id']);
+        self::assertArrayNotHasKey('url', $result['audio'][0]);
+    }
+
     private function score(): array
     {
         return [
