@@ -701,6 +701,19 @@ final class FrontendPresentationContractTest extends TestCase
         self::assertStringNotContainsString('overflow-x:hidden', $css);
     }
 
+    public function test_music_detail_precedes_dictionary_detail_for_all_music_entities(): void
+    {
+        $entity = $this->read('entity.php');
+        self::assertStringContainsString('$detailMusicAvailable', $entity);
+        self::assertStringContainsString("&& !$detailMusicAvailable", $entity);
+        self::assertStringContainsString("get_template_part('template-parts/presentation/music-dossier'", $entity);
+        self::assertStringContainsString('$isMusicDossier', $entity);
+        self::assertStringContainsString("$type === 'music'", $entity);
+        self::assertStringNotContainsString('Westminster', $entity);
+        self::assertStringNotContainsString('Sonodo', $entity);
+        self::assertStringNotContainsString('Ave Maria', $entity);
+    }
+
     private function read(string $path): string
     {
         $file = $this->theme . '/' . $path;

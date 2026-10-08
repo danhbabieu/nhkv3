@@ -13,10 +13,14 @@ $nhkReaderType = static function (array $item): string {
     if (trim((string) ($item['profile_key'] ?? '')) === '') return nhk_v3_public_type((string) ($item['type'] ?? ''));
     return nhk_v3_public_type((string) ($item['type'] ?? ''), (string) $item['profile_key']);
 };
+$detailEntity = is_array($context) && ($context['mode'] ?? '') === 'detail' && is_array($context['entity'] ?? null) ? $context['entity'] : [];
+$detailDossier = is_array($detailEntity['dossier'] ?? null) ? $detailEntity['dossier'] : [];
+$detailMusicDossier = is_array($detailDossier['music_dossier'] ?? null) ? $detailDossier['music_dossier'] : [];
+$detailMusicAvailable = ($detailEntity['type'] ?? '') === 'music' && ($detailMusicDossier['status'] ?? '') === 'AVAILABLE';
 get_header();
 ?>
 <main id="main-content" class="site-main entity-shell entity-v2">
-<?php if (is_array($context) && ($context['mode'] ?? '') === 'detail' && is_array($context['entity']['dictionary_detail'] ?? null)): ?>
+<?php if (is_array($context) && ($context['mode'] ?? '') === 'detail' && is_array($context['entity']['dictionary_detail'] ?? null) && !$detailMusicAvailable): ?>
   <?php get_template_part('template-parts/dictionary/dictionary-detail', null, ['packet' => $context['entity']['dictionary_detail']]); ?>
 <?php elseif (is_array($context) && ($context['mode'] ?? '') === 'detail' && is_array($context['entity'] ?? null)): $entity = $context['entity'];
     $type = (string) ($entity['type'] ?? $type);
