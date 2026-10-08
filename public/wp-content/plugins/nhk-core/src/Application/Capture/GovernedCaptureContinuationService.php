@@ -810,7 +810,7 @@ final class GovernedCaptureContinuationService
     private function knowledgeScope(string $subjectType, string $candidateScope, array $candidate = []): ?string
     {
         $default = match (strtolower(trim($subjectType))) {
-            'classification', 'entity', 'product' => 'entity',
+            'classification', 'entity', 'music', 'product' => 'entity',
             'brand' => 'brand',
             'model' => 'model',
             'variant' => 'variant',

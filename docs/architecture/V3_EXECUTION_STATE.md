@@ -25377,3 +25377,41 @@ read-back and connector `@v59` discovery cannot be verified here. If `@v59`
 still omits `cursor` after the runtime is reachable, refresh/reconnect that
 external connector session and re-run `tools/list`; repository-side parity is
 already enforced by the executable adapter and regression coverage.
+
+# Checkpoint — 2026-10-08 — Westminster Knowledge handoff routing correction
+
+ROOT_CAUSE_CONFIRMED: Capture `01a11bc5-125f-78de-98ac-b4535dfc2886` resolved
+the canonical subject `nhk:music:westminster` as an active `music` Authority
+entity and produced valid semantic candidates, but
+`GovernedCaptureContinuationService::knowledgeScope()` had no `music` branch.
+The planner therefore returned no Knowledge scope and discarded every candidate
+before constructing a Knowledge Proposal. The downstream empty required-owner
+and `REQUIRED_OWNER_READBACK_UNVERIFIED` diagnostics were fail-closed symptoms,
+not evidence of an unresolved subject, missing Source/Evidence record, missing
+signature or unavailable client capability. The `KNOWLEDGE_SEMANTIC_HANDOFF_REQUIRED`
+guard remains intact for candidates that do not match the structured assertion
+contract.
+
+IMPLEMENTED: Added the registry-aligned `music → entity` Knowledge scope
+mapping and a regression requiring a governed music-subject Proposal with
+`subject_type=music` and `scope=entity`. No Governance, Source, Evidence,
+public gate, schema or direct writer path changed.
+
+VERIFIED: The new regression passed red before the fix and green afterward;
+the full `GovernedCaptureContinuationServiceTest` file passes 58 tests / 305
+assertions, PHP lint and `git diff --check` pass. The full PHPUnit command was
+not a clean global signal: it encountered existing failures/errors and then a
+memory-limit fatal in `TrustedProvidedFileMaterializerTest`; no changed-scope
+failure was observed. The live Capture was read back before and after one
+supported idempotent retry on the same Capture (`revision 14 → 24`), with
+`SEMANTICS_RECONCILED`, zero Knowledge proposals, and the original blockers
+unchanged. No Source, Evidence, Knowledge, Governance or public record was
+mutated by this task.
+
+REMAINING_GAP: The corrected code is local and not deployed to the authorized
+TEST runtime. A further same-Capture retry, Proposal→Approval→Eligibility→
+Controlled Apply, canonical Knowledge read-back and public completion remain
+blocked until the exact committed build is deployed and its runtime identity
+is verified, then the server issues the Capture-bound signed staging packet
+for the registered Knowledge operation. Current public browser read-back
+still shows `Tri thức chi tiết đang được cập nhật.`.
