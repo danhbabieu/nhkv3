@@ -15,7 +15,7 @@ $sectionHeadings = [
 ];
 $items = static function (mixed $value): array {
     if (!is_array($value)) return [];
-    return array_values(array_filter($value, static fn(mixed $item): bool => is_array($item) && trim((string) ($item['text'] ?? $item['title'] ?? $item['name'] ?? $item['source_title'] ?? '')) !== ''));
+    return array_values(array_filter($value, static fn(mixed $item): bool => is_array($item) && trim((string) ($item['text'] ?? $item['title'] ?? $item['name'] ?? $item['source_title'] ?? $item['term'] ?? $item['image_url'] ?? $item['thumbnail_url'] ?? '')) !== ''));
 };
 $publicUrl = static fn(mixed $value): string => function_exists('nhk_v3_public_url') ? nhk_v3_public_url($value) : (is_string($value) ? trim($value) : '');
 $typeLabel = static fn(mixed $type): string => match ((string) $type) {

@@ -10,7 +10,7 @@ Product/Specimen/Variant distinct. Music routing is type/status based and the
 frontend partial iterates the packet `section_order`, renders Media/Video/
 Article library items, and has no Westminster/Sonodo/Ave Maria branch.
 
-TESTED: Focused Music contract/projection suite: 29 tests / 240 assertions.
+TESTED: Focused Music contract/projection suite: 30 tests / 243 assertions.
 Focused frontend presentation/contract suite: 130 tests / 1,237 assertions.
 Contract suite: 6 tests / 48 assertions. Changed PHP lint, JavaScript syntax,
 `git diff --check` and scoped secret review passed. Full Unit at 512M:

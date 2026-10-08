@@ -153,6 +153,22 @@ final class MusicDossierProjectionTest extends TestCase
         self::assertSame(['specimen', 'product'], array_column($result['music_dossier']['sections']['related_entities']['items'], 'type'));
     }
 
+    public function test_projection_keeps_media_video_and_article_library_owners_distinct(): void
+    {
+        $dossier = $this->dossier('Westminster Quarters');
+        $dossier['media_gallery'] = [['image_url' => '/anh/westminster.webp', 'alt' => 'Clock detail']];
+        $dossier['relation_sections'] = [
+            'videos' => [['type' => 'video', 'title' => 'Bell mechanism', 'url' => '/video/bell-mechanism/']],
+            'articles' => [['type' => 'article', 'title' => 'Cambridge Quarters', 'url' => '/goc-chia-se/cambridge-quarters/']],
+        ];
+
+        $library = (new MusicDossierProjection())->forEntity($this->entity('Westminster Quarters'), $dossier)['music_dossier']['sections']['library'];
+
+        self::assertSame('/anh/westminster.webp', $library['media'][0]['image_url']);
+        self::assertSame('video', $library['videos'][0]['type']);
+        self::assertSame('article', $library['articles'][0]['type']);
+    }
+
     public function test_projection_always_normalizes_reference_packets_and_replaces_stale_projection(): void
     {
         $dossier = $this->dossier('Westminster Quarters');
