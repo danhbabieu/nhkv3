@@ -1,5 +1,35 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-08 — Grove reference edition execution
+
+IMPLEMENTED: The Grove/Cambridge notation witness is now represented by the
+versioned non-canonical score JSON at
+`docs/research/westminster/score-editions/grove-cambridge-quarters-d-major-v1.json`.
+Its source facts are separated from editorial render assumptions. The source
+sequence is machine-checked as 41 monophonic events: Q1/Q2/Q3/Q4 contain
+4/8/12/16 quarter-note events and Hour is one D whole-note event. The source
+representation and Starmer cross-check do not establish Westminster octave,
+tuning, mechanical timing or the G/G-sharp conflict.
+
+IMPLEMENTED: Two local non-public WAV research outputs were rendered from the
+same normalized event list: `PIANO_REFERENCE` and `BELL_SIMULATION`. Both are
+original synthesis, linked to the score edition, and verified for WAV format,
+event order, frame count, duration and SHA-256. They are not canonical
+MediaAssets, historical recordings or Big Ben acoustic reconstructions.
+
+PREPARED: The non-applied Media/Capture candidate is recorded at
+`docs/research/westminster/media-ingest-packet-grove-reference-v1.md`, and
+the scoped dossier copy at
+`docs/research/westminster/music-dossier-content-candidate-v1.md`. No
+semantic writer, Media owner bypass, Governance apply, migration or public
+delivery was used.
+
+TESTED: Local renderer validation passed. Previous focused Music/Media/frontend
+suite remains 210 tests / 1,572 assertions green; contract suite 6 / 48 green.
+No production or authorized TEST runtime mutation occurred.
+
+STATUS: `IMPLEMENTED_LOCALLY / SCORE_TRANSCRIPTION_VERIFIED_AS_NOTATION_WITNESS / PERFORMANCE_REFERENCE_RENDERED / MEDIA_PACKET_NOT_APPLIED / NOT_DEPLOYED / NO_SEMANTIC_DATA_MUTATION`
+
 # Checkpoint — 2026-10-08 — Westminster music/audio unblock implementation
 
 IMPLEMENTED: The existing v2 Music reference aggregate now distinguishes

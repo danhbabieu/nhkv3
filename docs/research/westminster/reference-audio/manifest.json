@@ -1,0 +1,39 @@
+{
+  "status": "NON_PUBLIC_RESEARCH_OUTPUT",
+  "score_edition": "grove-cambridge-quarters-d-major-v1",
+  "source_facts_vs_render_assumptions": "separated in score JSON",
+  "files": [
+    {
+      "file": "grove-cambridge-quarters-d-major-v1-piano-reference.wav",
+      "label": "PIANO_REFERENCE",
+      "mime_type": "audio/wav",
+      "sha256": "4d31544b3a3246bacabdd1830a6ddce3efb67159885a7b1ee8351916b362cd59",
+      "file_size_bytes": 2526976,
+      "duration_seconds": 28.650023,
+      "sample_rate": 44100,
+      "channels": 1,
+      "frames": 1263466,
+      "event_count": 41,
+      "score_edition": "grove-cambridge-quarters-d-major-v1",
+      "render_engine": "NHK original additive synthesis / Python standard library",
+      "source_audio": "none",
+      "rights_status": "RIGHTS_REVIEW_REQUIRED_BEFORE_GOVERNED_INGEST"
+    },
+    {
+      "file": "grove-cambridge-quarters-d-major-v1-bell-simulation.wav",
+      "label": "BELL_SIMULATION",
+      "mime_type": "audio/wav",
+      "sha256": "0d3e4a273f76ff35697370dfe54e1c5ff761957dabc0fa31276f172cd28adaf7",
+      "file_size_bytes": 2526976,
+      "duration_seconds": 28.650023,
+      "sample_rate": 44100,
+      "channels": 1,
+      "frames": 1263466,
+      "event_count": 41,
+      "score_edition": "grove-cambridge-quarters-d-major-v1",
+      "render_engine": "NHK original additive synthesis / Python standard library",
+      "source_audio": "none",
+      "rights_status": "RIGHTS_REVIEW_REQUIRED_BEFORE_GOVERNED_INGEST"
+    }
+  ]
+}

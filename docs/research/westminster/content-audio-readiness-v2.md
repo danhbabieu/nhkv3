@@ -1,6 +1,6 @@
 # Westminster Content & Audio Readiness v2
 
-Status: RESEARCH_ONLY / GOVERNANCE_CANDIDATES / NON_CANONICAL
+Status: RESEARCH_ONLY / GOVERNANCE_CANDIDATES / NON_CANONICAL / REFERENCE_AUDIO_RENDERED_LOCALLY
 
 Implementation follow-up (2026-10-08): the existing v2 read path now treats
 mixed valid/invalid reference packets as `PARTIAL`, resolves playable audio
@@ -14,6 +14,16 @@ Music entity. It is not a new template, an Authority record, a Knowledge
 record, Source/Evidence record, Graph packet, score asset, Media asset, or
 runtime authorization. No canonical record, file, relation, or production
 data was changed while preparing it.
+
+Execution follow-up (2026-10-08): the Grove D-major notation witness is now
+transcribed into a versioned non-canonical JSON event list and machine-checked
+against the Grove-derived LilyPond representation and Starmer's Cambridge
+Quarters discussion. Original local `PIANO_REFERENCE` and `BELL_SIMULATION`
+WAVs exist as non-public research outputs. They use the same 41-event stream,
+but their octave, A4 reference, tempo, phrase gaps and synthesis models are
+editorial assumptions. They are not a canonical score, historical recording,
+Big Ben tuning model or public MediaAsset. See the score JSON, audio manifest
+and Media candidate packet under `docs/research/westminster/`.
 
 ## Current read-back
 
@@ -160,7 +170,7 @@ against the existing Westminster Music entity before proposal.
 | The detailed Parliament pitch table reports quarter-bell classes G♯, F♯, E, B and Great Bell E | Music: Westminster installation, pitch-class statement only | EXTERNAL_RESEARCH | Parliament Great Bell page | Candidate; conflict review required |
 | The historical Cambridge form is a ten-bell arrangement whose hour bell has the stated octave relationship to the third quarter bell | Music: Cambridge Quarters historical arrangement | EXTERNAL_RESEARCH | Starmer p. 8 and cross-check | Candidate; arrangement-scoped |
 | Royal Exchange preserved four-note groups but altered their sequence | Music: Royal Exchange variant | EXTERNAL_RESEARCH | Starmer p. 9 and Grove article | Candidate; must not be attached to Westminster without arrangement scope |
-| The Grove notation witness contains the Q1–Q4 and hour event sequence recorded above | Music: notation edition candidate | EXTERNAL_RESEARCH | Grove article score locator plus page-image review | Candidate score evidence; not VERIFIED |
+| The Grove notation witness contains the Q1–Q4 and hour event sequence recorded above | Music: notation edition candidate | EXTERNAL_RESEARCH | Grove article score locator plus page-image review | Notation witness verified; runtime score not canonical |
 
 ### Evidence candidates
 
@@ -173,14 +183,14 @@ public route, this report, or a generated summary.
 
 ## Piano reference
 
-Status: BLOCKED / NOT_RENDERED.
+Status: `RENDERED_LOCALLY / NON_PUBLIC / MEDIA_INGEST_BLOCKED`.
 
-No Piano binary exists in the repository or on the read-back route. No score is
-locked, no piano instrument/sample has been selected, and no performer or
-sample license has been recorded. A future Piano Reference must be an original
-render from the accepted score event list, labelled `PIANO_REFERENCE`, with the
-same score version, tempo, tuning reference, render method, instrument/source
-license, checksum and governed MediaAsset delivery.
+The local WAV is an original synthesis render from the edition-specific event
+list, labelled `PIANO_REFERENCE`. Its score linkage, tempo, tuning reference,
+render method, checksum, size, duration and event count are recorded in
+`reference-audio/manifest.json`. It is not a sampled piano, performer
+recording or historical Westminster audio. The governed MediaAsset/public
+delivery step remains pending.
 
 It must not be called a historical Westminster recording and must not imply
 that equal-tempered piano reproduces bell inharmonicity or the current Great
@@ -188,14 +198,13 @@ Bell's slightly-flat behavior.
 
 ## Bell simulation
 
-Status: BLOCKED / NOT_RENDERED.
+Status: `RENDERED_LOCALLY / NON_PUBLIC / MEDIA_INGEST_BLOCKED`.
 
-No Bell Simulation binary exists. No bell model, strike envelope, decay,
-inharmonic partial set, hourly strike separation or pitch-normalization policy
-has been approved. A future original render must be labelled
-`BELL_SIMULATION`, identify the synthetic instrument/model and render method,
-and state explicitly that it is not a historical recording and not a measured
-sample of Big Ben or Great St Mary's.
+The local WAV is an original additive inharmonic synthesis render from the same
+event list, labelled `BELL_SIMULATION`. The manifest identifies its synthetic
+partial model and render method. It is not a tower-bell acoustic reconstruction,
+measured Great Bell sample, Cambridge bell arrangement or historical recording.
+The governed MediaAsset/public delivery step remains pending.
 
 ## Historical recording and media rights
 

@@ -1,0 +1,88 @@
+{
+  "edition_key": "grove-cambridge-quarters-d-major-v1",
+  "status": "NOTATION_WITNESS_VERIFIED_PERFORMANCE_REFERENCE_NON_CANONICAL",
+  "source_facts": {
+    "tonal_witness": "D major",
+    "written_meter": "4/4",
+    "written_event_value": "quarter note for melodic events",
+    "hour_event_value": "whole note",
+    "printed_rests": false,
+    "printed_phrase_order": ["Q1", "Q2", "Q3", "Q4", "Hour"],
+    "source_note_spelling": {
+      "Q1": ["F#", "E", "D", "A"],
+      "Q2": ["D", "F#", "E", "A", "D", "E", "F#", "D"],
+      "Q3": ["F#", "D", "E", "A", "A", "E", "F#", "D", "F#", "E", "D", "A"],
+      "Q4": ["D", "F#", "E", "A", "D", "E", "F#", "D", "F#", "D", "E", "A", "A", "E", "F#", "D"],
+      "Hour": ["D"]
+    },
+    "source_locators": [
+      {
+        "title": "A Dictionary of Music and Musicians — Cambridge Quarters",
+        "url": "https://en.wikisource.org/wiki/A_Dictionary_of_Music_and_Musicians/Cambridge_Quarters",
+        "locator": "score at paragraph containing the Cambridge/Westminster melody; LilyPond transcription and score image"
+      },
+      {
+        "title": "W. W. Starmer — Chimes and Chime Tunes",
+        "url": "https://whitingsociety.org.uk/old-ringing-books/starmer-chimes-and-chime-tunes-file-01.pdf",
+        "locator": "pp. 8–9, Cambridge Quarters engraving and arrangement history"
+      }
+    ],
+    "access_layer_rights": "The Wikisource page states that its text is available under CC BY-SA; verify attribution/share-alike obligations for any distributed score derivative and separately verify the underlying historical edition status."
+  },
+  "render_assumptions": {
+    "reference_pitch": "A4=440 Hz equal temperament",
+    "melody_octave": "written D is D4; F#4, E4 and A3 follow the pitch-class spelling",
+    "hour_octave": "hour D is D3, one octave below the reference melody D4",
+    "tempo_bpm": 100,
+    "quarter_seconds": 0.6,
+    "phrase_gap_seconds": 0.35,
+    "hour_gap_seconds": 0.8,
+    "rendered_duration_policy": "quarter events occupy one quarter slot; Hour occupies four quarter slots; gaps are editorial and are not printed rests",
+    "piano": "original additive equal-tempered synthesis; no external sample",
+    "bell": "original additive inharmonic bell simulation; no external sample",
+    "rights": "No third-party audio copied. Local research output remains non-public and requires governed Media rights/readiness review before ingestion."
+  },
+  "events": [
+    {"id":"q1-01","phrase":"Q1","bar":1,"index":1,"pitch_class":"F#","midi":66,"duration_quarters":1},
+    {"id":"q1-02","phrase":"Q1","bar":1,"index":2,"pitch_class":"E","midi":64,"duration_quarters":1},
+    {"id":"q1-03","phrase":"Q1","bar":1,"index":3,"pitch_class":"D","midi":62,"duration_quarters":1},
+    {"id":"q1-04","phrase":"Q1","bar":1,"index":4,"pitch_class":"A","midi":57,"duration_quarters":1},
+    {"id":"q2-01","phrase":"Q2","bar":1,"index":1,"pitch_class":"D","midi":62,"duration_quarters":1},
+    {"id":"q2-02","phrase":"Q2","bar":1,"index":2,"pitch_class":"F#","midi":66,"duration_quarters":1},
+    {"id":"q2-03","phrase":"Q2","bar":1,"index":3,"pitch_class":"E","midi":64,"duration_quarters":1},
+    {"id":"q2-04","phrase":"Q2","bar":1,"index":4,"pitch_class":"A","midi":57,"duration_quarters":1},
+    {"id":"q2-05","phrase":"Q2","bar":2,"index":1,"pitch_class":"D","midi":62,"duration_quarters":1},
+    {"id":"q2-06","phrase":"Q2","bar":2,"index":2,"pitch_class":"E","midi":64,"duration_quarters":1},
+    {"id":"q2-07","phrase":"Q2","bar":2,"index":3,"pitch_class":"F#","midi":66,"duration_quarters":1},
+    {"id":"q2-08","phrase":"Q2","bar":2,"index":4,"pitch_class":"D","midi":62,"duration_quarters":1},
+    {"id":"q3-01","phrase":"Q3","bar":1,"index":1,"pitch_class":"F#","midi":66,"duration_quarters":1},
+    {"id":"q3-02","phrase":"Q3","bar":1,"index":2,"pitch_class":"D","midi":62,"duration_quarters":1},
+    {"id":"q3-03","phrase":"Q3","bar":1,"index":3,"pitch_class":"E","midi":64,"duration_quarters":1},
+    {"id":"q3-04","phrase":"Q3","bar":1,"index":4,"pitch_class":"A","midi":57,"duration_quarters":1},
+    {"id":"q3-05","phrase":"Q3","bar":2,"index":1,"pitch_class":"A","midi":57,"duration_quarters":1},
+    {"id":"q3-06","phrase":"Q3","bar":2,"index":2,"pitch_class":"E","midi":64,"duration_quarters":1},
+    {"id":"q3-07","phrase":"Q3","bar":2,"index":3,"pitch_class":"F#","midi":66,"duration_quarters":1},
+    {"id":"q3-08","phrase":"Q3","bar":2,"index":4,"pitch_class":"D","midi":62,"duration_quarters":1},
+    {"id":"q3-09","phrase":"Q3","bar":3,"index":1,"pitch_class":"F#","midi":66,"duration_quarters":1},
+    {"id":"q3-10","phrase":"Q3","bar":3,"index":2,"pitch_class":"E","midi":64,"duration_quarters":1},
+    {"id":"q3-11","phrase":"Q3","bar":3,"index":3,"pitch_class":"D","midi":62,"duration_quarters":1},
+    {"id":"q3-12","phrase":"Q3","bar":3,"index":4,"pitch_class":"A","midi":57,"duration_quarters":1},
+    {"id":"q4-01","phrase":"Q4","bar":1,"index":1,"pitch_class":"D","midi":62,"duration_quarters":1},
+    {"id":"q4-02","phrase":"Q4","bar":1,"index":2,"pitch_class":"F#","midi":66,"duration_quarters":1},
+    {"id":"q4-03","phrase":"Q4","bar":1,"index":3,"pitch_class":"E","midi":64,"duration_quarters":1},
+    {"id":"q4-04","phrase":"Q4","bar":1,"index":4,"pitch_class":"A","midi":57,"duration_quarters":1},
+    {"id":"q4-05","phrase":"Q4","bar":2,"index":1,"pitch_class":"D","midi":62,"duration_quarters":1},
+    {"id":"q4-06","phrase":"Q4","bar":2,"index":2,"pitch_class":"E","midi":64,"duration_quarters":1},
+    {"id":"q4-07","phrase":"Q4","bar":2,"index":3,"pitch_class":"F#","midi":66,"duration_quarters":1},
+    {"id":"q4-08","phrase":"Q4","bar":2,"index":4,"pitch_class":"D","midi":62,"duration_quarters":1},
+    {"id":"q4-09","phrase":"Q4","bar":3,"index":1,"pitch_class":"F#","midi":66,"duration_quarters":1},
+    {"id":"q4-10","phrase":"Q4","bar":3,"index":2,"pitch_class":"D","midi":62,"duration_quarters":1},
+    {"id":"q4-11","phrase":"Q4","bar":3,"index":3,"pitch_class":"E","midi":64,"duration_quarters":1},
+    {"id":"q4-12","phrase":"Q4","bar":3,"index":4,"pitch_class":"A","midi":57,"duration_quarters":1},
+    {"id":"q4-13","phrase":"Q4","bar":4,"index":1,"pitch_class":"A","midi":57,"duration_quarters":1},
+    {"id":"q4-14","phrase":"Q4","bar":4,"index":2,"pitch_class":"E","midi":64,"duration_quarters":1},
+    {"id":"q4-15","phrase":"Q4","bar":4,"index":3,"pitch_class":"F#","midi":66,"duration_quarters":1},
+    {"id":"q4-16","phrase":"Q4","bar":4,"index":4,"pitch_class":"D","midi":62,"duration_quarters":1},
+    {"id":"hour-01","phrase":"Hour","bar":1,"index":1,"pitch_class":"D","midi":50,"duration_quarters":4}
+  ]
+}
