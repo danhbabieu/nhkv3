@@ -33,6 +33,7 @@ final class McpDocumentationRegistry
         'article-seo' => ['path' => 'docs/seo/ARTICLE_SEO_PROJECTION_CONTRACT.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'article'],
         'media' => ['path' => 'docs/architecture/04_MEDIA_MODEL.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'media'],
         'visual-support-requirement' => ['path' => 'docs/architecture/VISUAL_SUPPORT_REQUIREMENT_CONTRACT.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'media'],
+        'music-data-collection-standard' => ['path' => 'docs/architecture/MUSIC_DATA_COLLECTION_STANDARD.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'music'],
         'media-video-foundation' => ['path' => 'docs/architecture/22_P6_MEDIA_VIDEO_FOUNDATION.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'media'],
         'admin-media-guidance' => ['path' => 'docs/architecture/ADMIN_MEDIA_INPUT_GUIDANCE.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'admin'],
         'video' => ['path' => 'docs/architecture/VIDEO_SEMANTIC_INGEST_CONTRACT.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'video'],

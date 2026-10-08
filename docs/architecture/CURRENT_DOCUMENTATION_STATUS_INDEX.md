@@ -20,6 +20,18 @@ canonical owner without a competing indexable page, and ambiguous terms fail
 closed. The dated read-only audit is
 `docs/audits/2026-10-06-con-hoa-thi-public-dossier-audit.md`.
 
+## 0.0.8 Music data collection standard — 2026-10-08
+
+`MUSIC_DATA_COLLECTION_STANDARD.md` is the current reusable, read-only Music
+collection contract. It defines the intake-only field metadata, CORE/
+RECOMMENDED/CONDITIONAL/OPTIONAL applicability, explicit uncertainty states,
+Westminster worked-example boundaries and the canonical-owner workflow. The
+executable companion is `MusicDataCollectionStandard` plus the transient
+`MusicCoverageAssessment`; neither creates semantic persistence, a new owner,
+Graph vocabulary, score store, audio writer or Governance bypass. Westminster
+research remains non-canonical until it passes the existing Source/Evidence,
+Knowledge, Media and Governance lifecycles.
+
 ## 0.0.6 Semantic acceptance closeout — 2026-10-05
 
 The Capture-bound semantic staging acceptance is closed as **GO** on the

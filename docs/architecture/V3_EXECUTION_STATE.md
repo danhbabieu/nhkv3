@@ -1,5 +1,79 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-08 — Music data collection standard and coverage assessment
+
+IMPLEMENTED: Added the active, reusable `MUSIC_DATA_COLLECTION_STANDARD.md`
+covering categories A–Z, CORE/RECOMMENDED/CONDITIONAL/OPTIONAL applicability,
+field-level owner/evidence/validation/public-visibility/review metadata,
+explicit uncertainty states and the Westminster worked-example boundaries.
+The executable `MusicDataCollectionStandard` is intake-only; it does not add a
+canonical field, semantic owner, relation, score store or audio writer.
+
+IMPLEMENTED: Added the read-only `MusicCoverageAssessment` for every Music
+Authority entity. It reports per-field/category state, complete sections,
+verified-but-not-public material, research gaps, rights blockers, unsupported
+relation candidates, reusable read-model signals and one deterministic next
+collection task. It does not expose UUID/stable-key diagnostics in its subject
+summary and performs no write.
+
+DOCUMENTATION_RUNTIME: Registered the standard in the canonical MCP
+documentation allowlist and regenerated the immutable local snapshot. The
+generator produced 56 documentation files; the documentation registry and
+coverage tests pass.
+
+TESTED: Focused Music/frontend/MCP suite passed 196 tests / 2,753 assertions
+with 5 warnings and 3 deprecations. Full Unit at 512M completed 3,597 tests /
+22,786 assertions with the same 14 baseline error identities and 5 baseline
+failure identities recorded by the current repository state. Contract suite
+passed 6 tests / 48 assertions. Changed PHP lint, JavaScript syntax and
+`git diff --check` passed.
+
+RUNTIME_QA: Local code/read-model behavior is verified. The authorized TEST
+runtime signals are unset and `wp-config.php` does not contain the required
+staging / `erourxcg_nhkv3` / `https://demo.1945.vn` identity tuple, so
+Integration, governed acceptance, public Media delivery and deployed local
+browser QA remain blocked/unverified. No semantic mutation, migration,
+deployment or push was performed.
+
+STATUS: `MUSIC_STANDARD_IMPLEMENTED / COVERAGE_ASSESSMENT_VERIFIED /
+FOCUSED_VERIFIED / FULL_UNIT_BASELINE_REGRESSIONS_RECORDED /
+INTEGRATION_BLOCKED / DEPLOYED_BUILD_UNVERIFIED / NO_SEMANTIC_MUTATION`
+
+# Checkpoint — 2026-10-08 — Dictionary authoring data contract and page-standardization plan
+
+PLANNED: `DICTIONARY_AUTHORING_DATA_CONTRACT.md` now defines the reusable
+Entry/Form/Sense authoring worksheet, owner/provenance/review/SEO fields and
+the fail-closed `Côn hoa thị` example. The example is documentation-only;
+`/linh-kien/con-hoa-thi/` remains the audited Component owner and no Dictionary
+route, semantic claim or relation was created from it.
+
+IMPLEMENTED: The public Dictionary detail partial now presents one delegated
+canonical-owner callout, keeps lexical meaning primary, and distinguishes
+publicly empty, temporarily unavailable and blocked related projections with
+Vietnamese reader-facing copy. The implementation consumes the existing
+composer packet and adds no vocabulary, schema or writer.
+
+VERIFIED: The focused Dictionary/frontend selection passes 139 tests / 1,312
+assertions with 5 existing warnings. All Dictionary Unit tests reach 336 tests
+/ 1,376 assertions with one pre-existing Knowledge identity fixture error in
+`DictionaryWriteObservationTest`; no Dictionary page test fails. Changed PHP
+files lint clean, diff check and changed-scope secret scan are clean.
+
+REMAINING_GAP: The authorized TEST runtime is unavailable, so no live Côn hoa
+thị read-back, semantic acceptance, staging/production mutation, deployment or
+push is claimed. The authoring contract remains documentation-only and the
+Côn hoa thị example remains `EXAMPLE_ONLY / NO_LIVE_WRITE`.
+
+FULL_SUITE_BASELINE: The 512M full PHPUnit run completed 3,781 tests / 22,847
+assertions with 46 errors, 29 failures, 28 warnings, 58 deprecations, 67
+PHPUnit deprecations and 125 skipped. The failing set is baseline/environmental
+(missing authorized TEST runtime, `NHK_WP_TEST_PATH`, and existing Knowledge/
+Video expectations); the focused Dictionary/frontend selection remains green.
+
+BOUNDARY: No migration, seed, backfill, live read/write acceptance, staging or
+production mutation, deployment, push or pull was performed. Existing dirty
+Music changes are preserved and excluded from this work.
+
 # Checkpoint — 2026-10-08 — post-push/pull Music completion readback
 
 RECONCILED: `HEAD` and `origin/main` are both `2e877ce5` on `main`, with a

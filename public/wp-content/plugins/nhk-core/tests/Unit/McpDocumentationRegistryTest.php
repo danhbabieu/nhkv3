@@ -26,6 +26,7 @@ final class McpDocumentationRegistryTest extends TestCase
         self::assertContains('governance', $keys);
         self::assertContains('media', $keys);
         self::assertContains('visual-support-requirement', $keys);
+        self::assertContains('music-data-collection-standard', $keys);
         self::assertContains('mcp', $keys);
         self::assertContains('dictionary-entry-sense', $keys);
         self::assertContains('dictionary-enrichment-audit', $keys);
