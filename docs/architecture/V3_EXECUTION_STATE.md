@@ -25,7 +25,7 @@ controller only for entity family + `music` type; no horizontal-overflow hack
 was added.
 
 REGRESSION_COVERAGE: Focused Music/projection/frontend verification passed 180
-tests / 1,498 assertions with 3 existing warnings. The Contract suite passed 6
+tests / 1,501 assertions with 3 existing warnings. The Contract suite passed 6
 tests / 48 assertions. The full Unit suite was rerun at 512M and remains
 baseline-red at 3,570 tests with 14 errors, 5 unrelated failures, 26 warnings,
 58 deprecations and 66 PHPUnit deprecations; the same Knowledge/Article
@@ -44,7 +44,9 @@ blockers remain: no verified Westminster score/audio asset, no durable audio
 owner/ingestion contract, broader Unit baseline failures, and no deployment.
 
 COMMITS: `912f97ef` score/audio contract, `a1106f70` universal projection,
-`03d6adf4` frontend wiring and generic Music dossier.
+`03d6adf4` frontend wiring and generic Music dossier, `db94f694` completed
+progressive playback controls and aligned template fields with the validated
+packet.
 
 STATUS: `UNIVERSAL_MUSIC_DOSSIER_IMPLEMENTED_LOCALLY / FOCUSED_GREEN /
 FULL_UNIT_BASELINE_FAILURES_RECORDED / RUNTIME_UNVERIFIED /
