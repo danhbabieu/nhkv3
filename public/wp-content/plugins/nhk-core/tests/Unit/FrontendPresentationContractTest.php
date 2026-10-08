@@ -709,6 +709,27 @@ final class FrontendPresentationContractTest extends TestCase
         self::assertStringNotContainsString('overflow-x:hidden', $css);
     }
 
+    public function test_music_dossier_has_a_generic_staff_renderer_and_loopback_preview_boundary(): void
+    {
+        $partial = $this->read('template-parts/presentation/music-dossier.php');
+        $script = $this->read('music-dossier.js');
+        $preview = dirname(__DIR__, 6) . '/tools/westminster/music-preview-server.py';
+
+        foreach (['data-music-score', 'data-score-events', 'Bản xem dạng khuông nhạc', 'data-local-preview', 'data-music-instrument'] as $needle) {
+            self::assertStringContainsString($needle, $partial, $needle . ' missing from score presentation');
+        }
+        foreach (['renderScore', 'isLoopbackHost', 'data-music-score-note', 'activeSegmentEnd', 'preview-src'] as $needle) {
+            self::assertStringContainsString($needle, $script, $needle . ' missing from generic music controller');
+        }
+        self::assertFileExists($preview);
+        $previewSource = (string) file_get_contents($preview);
+        foreach (['127.0.0.1', 'NON_CANONICAL_TEST_FIXTURE', 'do_POST'] as $needle) {
+            self::assertStringContainsString($needle, $previewSource, $needle . ' missing from local preview boundary');
+        }
+        self::assertStringNotContainsString('wp_insert_post', $previewSource);
+        self::assertStringNotContainsString('MediaAsset', $previewSource);
+    }
+
     public function test_music_detail_precedes_dictionary_detail_for_all_music_entities(): void
     {
         $entity = $this->read('entity.php');

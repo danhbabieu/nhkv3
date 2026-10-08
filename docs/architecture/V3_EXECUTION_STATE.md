@@ -1,5 +1,33 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-08 — Music dossier functional viewer and loopback QA
+
+IMPLEMENTED: The existing generic Music dossier now renders a reusable SVG
+staff view from normalized score events, with clef, 4/4 meter, accidentals,
+phrase/bar boundaries, duration-aware note shapes, edition metadata and
+keyboard-selectable score events. Audio cards now provide instrument selection,
+governed-public delivery only, loopback-only preview sources, seeking,
+progress/time, playback rate, repeat, stop and score synchronization.
+
+PREVIEW_BOUNDARY: Added `tools/westminster/music-preview-server.py` as a
+read-only 127.0.0.1 fixture server for Grove and a clearly non-canonical demo
+fixture. It has no WordPress/semantic persistence path and rejects POST with
+405. No production URL, MediaAsset, Capture or Governance record was created.
+
+VERIFIED: Browser QA on the loopback Grove fixture exposed 41 score buttons,
+Q1/Q2/Q3/Q4/Hour segments, Piano/Bell selector, playable 28-second WAV
+controls, pause/seek/rate, and click-note-to-audio synchronization. The demo
+fixture uses the same renderer. Speaker output was not independently verified.
+Focused Music/Media/frontend tests pass 99 tests / 673 assertions. Full Unit
+at 512M completed 3,588 tests / 22,200 assertions with the same 14 baseline
+error identities and 5 baseline failure identities. Integration completed 147
+tests with 22 environment failures and 125 skips because the authorized TEST
+runtime is unavailable. Renderer score/event/WAV/checksum validation passed.
+
+STATUS: `FUNCTIONALLY_IMPLEMENTED_LOCALLY / GENERIC_VIEWER_VERIFIED /
+LOOPBACK_PLAYER_VERIFIED / MEDIA_NOT_ACCEPTED / CANONICAL_READBACK_NOT_APPLICABLE /
+NOT_DEPLOYED / NOT_PUSHED`
+
 # Checkpoint — 2026-10-08 — universal Music platform mandate review
 
 REVIEWED: The full local Music/Media implementation, Grove research outputs,
