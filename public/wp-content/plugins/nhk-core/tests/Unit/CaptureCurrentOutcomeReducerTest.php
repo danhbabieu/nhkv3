@@ -36,6 +36,69 @@ final class CaptureCurrentOutcomeReducerTest extends TestCase
         self::assertSame('RECOVERABLE_INTERRUPTED', CaptureCurrentOutcomeReducer::lifecycleState($capture));
     }
 
+    public function test_failed_retryable_status_cannot_override_terminal_hard_block(): void
+    {
+        $capture = $this->capture([
+            'failure' => ['code' => 'SUBJECT_NOT_FOUND', 'classification' => 'HARD_BLOCK'],
+            'completion' => ['status' => 'REVIEW_REQUIRED', 'blockers' => ['SUBJECT_NOT_FOUND']],
+            'content_preparation' => ['quality_decision' => 'HARD_BLOCK'],
+        ], [
+            'SEMANTICS_RECONCILED' => ['status' => 'FAILED', 'result' => 'FAILED_RETRYABLE', 'failure_code' => 'SUBJECT_NOT_FOUND'],
+        ], 'FAILED_RETRYABLE');
+
+        self::assertSame('TERMINALLY_BLOCKED', CaptureCurrentOutcomeReducer::lifecycleState($capture));
+        self::assertSame(['eligible' => false, 'reason' => 'CAPTURE_RETRY_NOT_ALLOWED'], CaptureCurrentOutcomeReducer::retryEligibility($capture));
+    }
+
+    public function test_reviewed_knowledge_handoff_uses_one_decision_for_lifecycle_and_retry(): void
+    {
+        $capture = new CaptureRecord(
+            UuidCodec::newV7(), 'knowledge-decision', hash('sha256', 'knowledge-decision'),
+            CaptureStage::SEMANTICS_RECONCILED->value, 'REVIEW_REQUIRED', null, null, [],
+            ['raw_input' => 'Westminster Quarters.', 'content_intent' => ['intent' => 'KNOWLEDGE_DELTA']],
+            ['completion' => ['status' => 'REVIEW_REQUIRED', 'blockers' => ['KNOWLEDGE_SEMANTIC_HANDOFF_REQUIRED']]],
+            ['SEMANTICS_RECONCILED' => ['status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'failure_code' => 'KNOWLEDGE_SEMANTIC_HANDOFF_REQUIRED']],
+        );
+
+        $decision = CaptureCurrentOutcomeReducer::currentDecision($capture);
+
+        self::assertSame($decision['lifecycle_state'], CaptureCurrentOutcomeReducer::lifecycleState($capture));
+        self::assertSame($decision['retry'], CaptureCurrentOutcomeReducer::retryEligibility($capture));
+        self::assertSame($decision['blockers'], CaptureCurrentOutcomeReducer::currentBlockers($capture->diagnostics, $capture->phaseReceipts, $capture));
+    }
+
+    public function test_unchanged_dependency_fingerprint_denies_repeated_retry(): void
+    {
+        $capture = $this->reviewCapture(['content_preparation' => ['quality_decision' => 'READY']]);
+        $fingerprint = CaptureDecisionDependencyFingerprint::current($capture);
+        $persisted = new CaptureRecord(
+            $capture->captureId, $capture->idempotencyKey, $capture->requestFingerprint, $capture->stage, $capture->status,
+            $capture->articleId, $capture->articleStateToken, $capture->assets, $capture->context,
+            $capture->diagnostics + ['decision_dependency_fingerprint' => $fingerprint], $capture->phaseReceipts,
+        );
+
+        self::assertFalse(CaptureCurrentOutcomeReducer::currentDecision($persisted)['retry']['eligible']);
+        self::assertSame(['eligible' => false, 'reason' => 'CAPTURE_RETRY_NOT_ALLOWED'], CaptureCurrentOutcomeReducer::retryEligibility($persisted));
+    }
+
+    public function test_changed_dependency_fingerprint_reopens_only_recoverable_review(): void
+    {
+        $capture = $this->reviewCapture([
+            'canonical_context' => [['id' => 'claim-1', 'revision' => 1]],
+            'content_preparation' => ['quality_decision' => 'READY'],
+        ]);
+        $fingerprint = CaptureDecisionDependencyFingerprint::current($capture);
+        $changed = new CaptureRecord(
+            $capture->captureId, $capture->idempotencyKey, $capture->requestFingerprint, $capture->stage, $capture->status,
+            $capture->articleId, $capture->articleStateToken, $capture->assets,
+            $capture->context + ['canonical_context' => [['id' => 'claim-1', 'revision' => 2]]],
+            $capture->diagnostics + ['decision_dependency_fingerprint' => $fingerprint], $capture->phaseReceipts,
+        );
+
+        self::assertSame('RECOVERABLE_INTERRUPTED', CaptureCurrentOutcomeReducer::currentDecision($changed)['lifecycle_state']);
+        self::assertSame(['eligible' => true, 'reason' => 'STALE_REVIEW_REEVALUATABLE'], CaptureCurrentOutcomeReducer::retryEligibility($changed));
+    }
+
     public function test_failed_retryable_x_then_success_makes_x_historical_only(): void
     {
         $receipts = CapturePhaseReceiptReducer::append([], 'PHASE_X', [

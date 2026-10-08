@@ -20,6 +20,40 @@ use PHPUnit\Framework\TestCase;
 
 final class McpCaptureReadContractTest extends TestCase
 {
+    public function test_capture_get_projects_lifecycle_and_retry_from_one_current_decision(): void
+    {
+        $id = '11111111-1111-4111-8111-111111111111';
+        $record = new CaptureRecord(
+            $id, 'mcp-terminal-retry', hash('sha256', 'mcp-terminal-retry'),
+            'SEMANTICS_RECONCILED', 'FAILED_RETRYABLE', null, null, [],
+            ['content_intent' => ['intent' => 'KNOWLEDGE_DELTA']],
+            [
+                'failure' => ['code' => 'SUBJECT_NOT_FOUND', 'classification' => 'HARD_BLOCK'],
+                'completion' => ['status' => 'REVIEW_REQUIRED', 'blockers' => ['SUBJECT_NOT_FOUND']],
+                'content_preparation' => ['quality_decision' => 'HARD_BLOCK'],
+            ],
+            ['SEMANTICS_RECONCILED' => ['status' => 'FAILED', 'result' => 'FAILED_RETRYABLE', 'failure_code' => 'SUBJECT_NOT_FOUND']],
+        );
+        $captures = new class($record) implements CaptureRepository {
+            public function __construct(private CaptureRecord $record) {}
+            public function findByIdempotencyKey(string $key): ?CaptureRecord { return null; }
+            public function findById(string $captureId): ?CaptureRecord { return $captureId === $this->record->captureId ? $this->record : null; }
+            public function create(CaptureRecord $record): CaptureRecord { return $record; }
+            public function save(CaptureRecord $record): CaptureRecord { return $record; }
+        };
+        $read = new McpReadHandler(
+            $this->createMock(AuthorityRepository::class), new EntityTypeRegistry(),
+            $this->createMock(MediaRepository::class), $this->createMock(MediaAssetRepository::class), $this->createMock(MediaUsageRepository::class),
+            $this->createMock(VideoRepository::class), $this->createMock(KnowledgeRepository::class), $this->createMock(EvidenceRepository::class),
+            captures: $captures,
+        );
+
+        $projection = $read->captureGet($id);
+
+        self::assertSame('TERMINALLY_BLOCKED', $projection['lifecycle_state']);
+        self::assertSame(['eligible' => false, 'reason' => 'CAPTURE_RETRY_NOT_ALLOWED', 'capture_id' => $id], $projection['retry']);
+    }
+
     public function test_live_persisted_shape_is_reconciled_by_real_wpdb_hydration_before_capture_get(): void
     {
         if (!defined('ARRAY_A')) define('ARRAY_A', 'ARRAY_A');

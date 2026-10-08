@@ -93,9 +93,8 @@ final class McpReadHandler
             : (is_array($diagnostics['subject_resolution_packet'] ?? null) ? $diagnostics['subject_resolution_packet'] : null);
         $completion = is_array($diagnostics['completion'] ?? null) ? $diagnostics['completion'] : [];
         $completion = $this->reconcileCurrentCaptureCompletion($capture, $completion);
-        $projectionDiagnostics = $diagnostics;
-        $projectionDiagnostics['completion'] = $completion;
-        $completion['blockers'] = CaptureCurrentOutcomeReducer::currentBlockers($projectionDiagnostics, $capture->phaseReceipts, $capture);
+        $currentDecision = CaptureCurrentOutcomeReducer::currentDecision($capture);
+        $completion['blockers'] = $currentDecision['blockers'];
         $preparation = is_array($diagnostics['content_preparation'] ?? null) ? $diagnostics['content_preparation'] : [];
         $review = null;
         if (strtoupper(trim((string) ($preparation['status'] ?? ''))) === 'REVIEW_REQUIRED') {
@@ -147,7 +146,6 @@ final class McpReadHandler
             $videoId = trim((string) ($asset['video_id'] ?? $asset['canonical_id'] ?? $asset['video_proposal']['payload']['canonical_id'] ?? ''));
             if ($videoId !== '') $videos[] = ['id' => $videoId, 'status' => (string) ($asset['status'] ?? '')];
         }
-        $retry = CaptureCurrentOutcomeReducer::retryEligibility($capture);
         $articleMediaPlan = is_array($diagnostics['media_usage'] ?? null)
             ? $diagnostics['media_usage']
             : (is_array($diagnostics['media_enrichment'] ?? null) ? $diagnostics['media_enrichment'] : []);
@@ -167,7 +165,7 @@ final class McpReadHandler
             'purpose' => (string) ($context['purpose'] ?? 'EDITORIAL'),
             'intent' => is_array($context['content_intent'] ?? null) ? $context['content_intent'] : null,
             'revision' => $capture->revision, 'stage' => $capture->stage, 'capture_status' => $capture->status,
-            'lifecycle_state' => CaptureCurrentOutcomeReducer::lifecycleState($capture),
+            'lifecycle_state' => $currentDecision['lifecycle_state'],
             'subject_resolution_packet' => $packet,
             'article' => $capture->articleId === null ? null : ['post_id' => $capture->articleId, 'state' => (string) ($diagnostics['publication']['status'] ?? '')],
             'article_id' => $capture->articleId,
@@ -190,7 +188,7 @@ final class McpReadHandler
             'publication' => is_array($diagnostics['publication'] ?? null) ? ['eligible' => ($diagnostics['publication']['eligible'] ?? false) === true, 'status' => (string) ($diagnostics['publication']['status'] ?? ''), 'blockers' => array_values(array_map('strval', (array) ($diagnostics['publication']['blockers'] ?? [])))] : null,
             'enrichment' => ['complete' => ($completion['complete'] ?? false) === true, 'deep_enrichment' => $diagnostics['deep_enrichment']['status'] ?? null, 'missing' => $completion['missing_required_owners'] ?? []],
             'result_packet' => $this->resultPacket($capture, $completion, $diagnostics),
-            'retry' => ['eligible' => $retry['eligible'], 'reason' => $retry['reason'], 'capture_id' => $capture->captureId],
+            'retry' => ['eligible' => $currentDecision['retry']['eligible'], 'reason' => $currentDecision['retry']['reason'], 'capture_id' => $capture->captureId],
         ];
     }
 
