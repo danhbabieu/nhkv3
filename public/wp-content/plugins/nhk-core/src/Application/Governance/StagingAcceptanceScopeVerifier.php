@@ -333,7 +333,8 @@ final class StagingAcceptanceScopeVerifier
         $existing = is_array($capture->context['staging_acceptance'] ?? null) ? $capture->context['staging_acceptance'] : null;
         if ($existing !== null && ($existing['operation_family'] ?? '') === 'governed_authority_plan' && ($existing['plan_fingerprint'] ?? '') === $planFingerprint && $this->verifyPacket($existing)) {
             $known = array_map(static fn (array $binding): string => (string) ($binding['candidate_id'] ?? ''), array_values(array_filter((array) ($existing['candidate_bindings'] ?? []), 'is_array')));
-            if (array_diff(array_map('strval', $candidateIds), $known) === []) return $existing;
+            $requestedMutationIds = $this->mutationCandidateIds($plan, $candidateIds);
+            if ($requestedMutationIds !== [] && array_diff($requestedMutationIds, $known) === []) return $existing;
         }
         $all = [];
         foreach (['reuse', 'create_candidates', 'update_candidates', 'relation_candidates', 'relation_reuse'] as $bucket) foreach ((array) ($plan[$bucket] ?? []) as $candidate) {
@@ -371,7 +372,7 @@ final class StagingAcceptanceScopeVerifier
             $all[] = $binding;
         }
         if ($all === []) throw new \RuntimeException('STAGING_CANDIDATE_SCOPE_REQUIRED');
-        $selectedIds = array_values(array_map('strval', $candidateIds));
+        $selectedIds = $this->mutationCandidateIds($plan, $candidateIds);
         sort($selectedIds, SORT_STRING);
         $base = [
             'approved' => true, 'environment' => 'staging', 'capture_id' => $capture->captureId,
@@ -387,6 +388,21 @@ final class StagingAcceptanceScopeVerifier
         if (!(bool) ($this->admission)($base, $capture, $input, [])) throw new \RuntimeException('STAGING_SCOPE_NOT_ADMITTED');
         $fingerprint = hash('sha256', CommandCanonicalizer::canonicalize($base));
         return $base + ['fingerprint' => $fingerprint, 'signature' => hash_hmac('sha256', $fingerprint, $this->secret())];
+    }
+
+    /** @param array<string,mixed> $plan @param list<string> $candidateIds @return list<string> */
+    private function mutationCandidateIds(array $plan, array $candidateIds): array
+    {
+        $selected = array_fill_keys(array_map('strval', $candidateIds), true);
+        $mutationIds = [];
+        foreach (['reuse', 'create_candidates', 'update_candidates', 'relation_candidates', 'relation_reuse'] as $bucket) {
+            foreach ((array) ($plan[$bucket] ?? []) as $candidate) {
+                if (!is_array($candidate)) continue;
+                $candidateId = (string) ($candidate['candidate_id'] ?? '');
+                if ($candidateId !== '' && isset($selected[$candidateId]) && strtoupper((string) ($candidate['action'] ?? 'CREATE')) !== 'REUSE') $mutationIds[] = $candidateId;
+            }
+        }
+        return array_values(array_unique($mutationIds));
     }
 
     /** @param array<string,mixed> $plan @return array<string,mixed> */

@@ -202,16 +202,16 @@ final class CompletionCoordinator
             return true;
         }));
         if ($missingRequiredOwners !== []) $blockers[] = 'REQUIRED_OWNER_READBACK_UNVERIFIED';
-        $relationOnlyReadbackVerified = $requiredOwners === []
-            && $packets !== []
+        $effectiveChildrenReadbackVerified = $packets !== []
             && array_reduce($packets, static function (bool $verified, array $packet): bool {
                 return $verified
-                    && strtolower((string) ($packet['owner_type'] ?? '')) === 'relation'
+                    && trim((string) ($packet['owner_type'] ?? '')) !== ''
+                    && trim((string) ($packet['owner_id'] ?? '')) !== ''
                     && ($packet['complete'] ?? false) === true
                     && ($packet['canonical_readback_verified'] ?? false) === true;
             }, true);
         $canonicalReadbackVerified = $this->readBack($evidence['canonical_readback'] ?? null)
-            || $relationOnlyReadbackVerified;
+            || $effectiveChildrenReadbackVerified;
         $canonical = ($evidence['canonical_state'] ?? null) === 'BLOCKED' || !$canonicalReadbackVerified ? 'BLOCKED' : 'COMPLETE';
         if (!$canonicalReadbackVerified) $blockers[] = 'CANONICAL_READBACK_UNVERIFIED';
         $complete = $canonical === 'COMPLETE' && $packets !== [] && $blockers === [] && array_reduce($packets, static fn (bool $ok, array $packet): bool => $ok && ($packet['complete'] ?? false) === true, true);

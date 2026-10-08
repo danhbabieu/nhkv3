@@ -110,7 +110,9 @@ final class AuthorityCaptureService
             throw new PlanReapprovalRequired($this->reapprovalPacket($record, $plan));
         }
         if (!is_callable($this->applyPlan)) throw new \RuntimeException('AUTHORITY_PLAN_EXECUTOR_UNAVAILABLE');
-        $scope = is_callable($this->scopeIssuer) ? ($this->scopeIssuer)($record, $plan, $approvedIds) : null;
+        $scope = is_callable($this->scopeIssuer) && $this->requiresMutationScope($plan, $approvedIds)
+            ? ($this->scopeIssuer)($record, $plan, $approvedIds)
+            : null;
         $result = $scope === null ? ($this->applyPlan)($record, $plan, $approvedIds) : ($this->applyPlan)($record, $plan, $approvedIds, $scope);
         $result['completion'] = $this->completion->aggregateCapture($record->captureId, $this->completionChildren($plan, $approvedIds, $result));
         $context = $record->context;
@@ -150,6 +152,22 @@ final class AuthorityCaptureService
         sort($left, SORT_STRING); sort($right, SORT_STRING); return $left === $right;
     }
 
+    /** @param array<string,mixed> $plan @param list<string> $approvedIds */
+    private function requiresMutationScope(array $plan, array $approvedIds): bool
+    {
+        $candidates = [];
+        foreach (['reuse', 'create_candidates', 'update_candidates', 'relation_candidates', 'relation_reuse'] as $bucket) {
+            foreach ((array) ($plan[$bucket] ?? []) as $candidate) {
+                if (is_array($candidate)) $candidates[(string) ($candidate['candidate_id'] ?? '')] = $candidate;
+            }
+        }
+        foreach ($approvedIds as $candidateId) {
+            $candidate = $candidates[(string) $candidateId] ?? null;
+            if (!is_array($candidate) || strtoupper((string) ($candidate['action'] ?? '')) !== 'REUSE') return true;
+        }
+        return false;
+    }
+
     /** @return array<string,mixed> */
     private function reapprovalPacket(CaptureRecord $record, array $plan): array
     {
@@ -184,6 +202,10 @@ final class AuthorityCaptureService
                 if (is_array($candidate)) $candidates[(string) ($candidate['candidate_id'] ?? '')] = $candidate;
             }
         }
+        $reused = [];
+        foreach ((array) ($result['reused_candidates'] ?? []) as $reusedCandidate) {
+            if (is_array($reusedCandidate) && trim((string) ($reusedCandidate['candidate_id'] ?? '')) !== '') $reused[(string) $reusedCandidate['candidate_id']] = $reusedCandidate;
+        }
         $children = [];
         $applyCursor = 0;
         foreach ($approvedIds as $candidateId) {
@@ -192,19 +214,35 @@ final class AuthorityCaptureService
             $type = strtolower(trim((string) ($candidate['entity_type'] ?? 'relation')));
             $canonicalId = trim((string) ($candidate['canonical_uuid'] ?? $candidate['canonical_id'] ?? ''));
             $apply = null;
-            if (strtoupper((string) ($candidate['action'] ?? 'REUSE')) !== 'REUSE') {
+            $isReuse = strtoupper((string) ($candidate['action'] ?? 'REUSE')) === 'REUSE';
+            $canonicalReadback = null;
+            if ($isReuse) {
+                $reuse = $reused[(string) $candidateId] ?? [];
+                $canonicalReadback = is_array($reuse['canonical_readback'] ?? null) ? $reuse['canonical_readback'] : (is_array($candidate['canonical_readback'] ?? null) ? $candidate['canonical_readback'] : null);
+                if ($canonicalReadback === null && $canonicalId !== '') {
+                    $revision = max(1, (int) ($candidate['canonical_revision'] ?? $candidate['revision'] ?? 0));
+                    $canonicalReadback = ['canonical_id' => $canonicalId, 'entity_type' => $type, 'revision' => $revision, 'active' => true];
+                }
+                $canonicalId = trim((string) (($canonicalReadback['canonical_id'] ?? '') ?: $canonicalId));
+            }
+            if (!$isReuse) {
                 $applyRows = (array) ($result['apply_results'] ?? []);
                 $apply = is_array($applyRows[$applyCursor] ?? null) ? $applyRows[$applyCursor] : [];
                 ++$applyCursor;
             }
-            if (is_array($apply)) $canonicalId = trim((string) ($apply['canonical_id'] ?? $apply['result_entity_uuid'] ?? ($apply['canonical_readback']['canonical_id'] ?? $canonicalId)));
+            if (is_array($apply)) {
+                $canonicalId = trim((string) ($apply['canonical_id'] ?? $apply['result_entity_uuid'] ?? ($apply['canonical_readback']['canonical_id'] ?? $canonicalId)));
+                $canonicalReadback = is_array($apply['canonical_readback'] ?? null) ? $apply['canonical_readback'] : null;
+            }
+            $verified = is_array($canonicalReadback) && trim((string) ($canonicalReadback['canonical_id'] ?? $canonicalReadback['id'] ?? '')) !== '';
             $children[] = [
                 'owner_type' => $type,
                 'owner_id' => $canonicalId,
-                'canonical_readback' => $canonicalId !== '' ? ['canonical_id' => $canonicalId] : null,
-                'dependency_state' => is_array($apply) && is_array($apply['canonical_readback'] ?? null) ? 'COMPLETE' : 'PARTIAL',
-                'relation_or_usage_state' => $type === 'relation' ? 'COMPLETE' : 'NOT_APPLICABLE',
-                'blockers' => $canonicalId === '' ? ['AUTHORITY_CANONICAL_READBACK_UNAVAILABLE'] : [],
+                'canonical_readback' => $canonicalReadback,
+                'dependency_state' => $verified ? 'COMPLETE' : 'PARTIAL',
+                'relation_or_usage_state' => $type === 'relation' ? ($verified ? 'COMPLETE' : 'PARTIAL') : 'NOT_APPLICABLE',
+                'public_projection_owner' => false,
+                'blockers' => $verified ? [] : ['AUTHORITY_CANONICAL_READBACK_UNAVAILABLE'],
             ];
         }
         return $children;

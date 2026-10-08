@@ -202,6 +202,159 @@ final class ConversationalAuthorityCaptureTest extends TestCase
         }
     }
 
+    public function test_entity_reuse_only_skips_staging_scope_and_completes_from_reuse_readback(): void
+    {
+        $captures = new AuthorityCaptureRepository();
+        $canonicalId = '143ee093-5bc0-409f-a4ce-af559d18f16f';
+        $plannerCalls = 0;
+        $scopeCalls = 0;
+        $applyCalls = 0;
+        $service = new AuthorityCaptureService(
+            $captures,
+            static function (array $input, CaptureRecord $capture) use (&$plannerCalls, $canonicalId): array {
+                ++$plannerCalls;
+                return [
+                'reuse' => [[
+                    'candidate_id' => 'candidate-sonodo',
+                    'action' => 'REUSE',
+                    'entity_type' => 'music',
+                    'canonical_uuid' => $canonicalId,
+                    'canonical_revision' => 3,
+                ]],
+                'create_candidates' => [], 'update_candidates' => [], 'relation_candidates' => [], 'relation_reuse' => [],
+                'plan_fingerprint' => str_repeat('a', 64),
+                ];
+            },
+            null,
+            static function (CaptureRecord $capture, array $plan, array $ids) use (&$applyCalls, $canonicalId): array {
+                ++$applyCalls;
+                return [
+                    'status' => 'APPLIED', 'proposal_ids' => [], 'apply_results' => [], 'idempotent' => true,
+                    'reused_candidates' => [[
+                        'candidate_id' => 'candidate-sonodo', 'entity_type' => 'music', 'status' => 'REUSED_VERIFIED',
+                        'canonical_id' => $canonicalId,
+                        'canonical_readback' => ['canonical_id' => $canonicalId, 'entity_type' => 'music', 'revision' => 3],
+                        'idempotent' => true,
+                    ]],
+                ];
+            },
+            null,
+            null,
+            static function () use (&$scopeCalls): array {
+                ++$scopeCalls;
+                throw new \LogicException('reuse-only plan must not issue a staging scope');
+            },
+        );
+
+        $planned = $service->execute([
+            'idempotency_key' => 'reuse-only-sonodo', 'purpose' => 'AUTHORITY',
+            'authority_intent' => ['mode' => 'PLAN'],
+        ]);
+        $applied = $service->continueWithApproval($planned->captureId, [
+            'authority_intent' => [
+                'mode' => 'APPLY_APPROVED_PLAN',
+                'approved_plan_fingerprint' => str_repeat('a', 64),
+                'approved_candidate_ids' => ['candidate-sonodo'],
+            ],
+        ]);
+
+        self::assertSame(0, $scopeCalls);
+        self::assertSame(1, $applyCalls);
+        self::assertSame('APPLIED', $applied->status);
+        self::assertSame('AUTHORITY_APPLIED', $applied->stage);
+        self::assertSame([], $applied->context['authority_result']['result']['proposal_ids']);
+        self::assertTrue($applied->context['authority_result']['result']['idempotent']);
+        self::assertSame($canonicalId, $applied->context['authority_result']['result']['reused_candidates'][0]['canonical_id']);
+        self::assertTrue($applied->context['authority_result']['result']['completion']['canonical_readback_verified']);
+        self::assertTrue($applied->context['authority_result']['result']['completion']['complete']);
+        $replay = $service->continueWithApproval($planned->captureId, ['authority_intent' => [
+            'mode' => 'APPLY_APPROVED_PLAN', 'approved_plan_fingerprint' => str_repeat('a', 64), 'approved_candidate_ids' => ['candidate-sonodo'],
+        ]]);
+        self::assertSame($applied->revision, $replay->revision);
+        self::assertSame(2, $plannerCalls);
+        self::assertSame(1, $applyCalls);
+    }
+
+    public function test_mixed_reuse_and_update_still_issues_scope_for_the_mutation(): void
+    {
+        $captures = new AuthorityCaptureRepository();
+        $scopeCalls = 0;
+        $scopeSeenByApply = null;
+        $service = new AuthorityCaptureService(
+            $captures,
+            static fn (array $input, CaptureRecord $capture): array => [
+                'reuse' => [['candidate_id' => 'candidate-reuse', 'action' => 'REUSE', 'entity_type' => 'music', 'canonical_uuid' => '143ee093-5bc0-409f-a4ce-af559d18f16f']],
+                'create_candidates' => [],
+                'update_candidates' => [['candidate_id' => 'candidate-update', 'action' => 'UPDATE', 'entity_type' => 'music', 'canonical_uuid' => '143ee093-5bc0-409f-a4ce-af559d18f16f']],
+                'relation_candidates' => [], 'relation_reuse' => [], 'plan_fingerprint' => str_repeat('b', 64),
+            ],
+            null,
+            static function (CaptureRecord $capture, array $plan, array $ids, ?array $scope = null) use (&$scopeSeenByApply): array {
+                $scopeSeenByApply = $scope;
+                return ['status' => 'APPLIED', 'proposal_ids' => ['proposal-update'], 'apply_results' => [['canonical_id' => '143ee093-5bc0-409f-a4ce-af559d18f16f', 'canonical_readback' => ['canonical_id' => '143ee093-5bc0-409f-a4ce-af559d18f16f']]]];
+            },
+            null,
+            null,
+            static function () use (&$scopeCalls): array {
+                ++$scopeCalls;
+                return ['approved' => true, 'operation_family' => 'governed_authority_plan'];
+            },
+        );
+
+        $planned = $service->execute(['idempotency_key' => 'mixed-reuse-update', 'purpose' => 'AUTHORITY', 'authority_intent' => ['mode' => 'PLAN']]);
+        $service->continueWithApproval($planned->captureId, ['authority_intent' => [
+            'mode' => 'APPLY_APPROVED_PLAN', 'approved_plan_fingerprint' => str_repeat('b', 64),
+            'approved_candidate_ids' => ['candidate-reuse', 'candidate-update'],
+        ]]);
+
+        self::assertSame(1, $scopeCalls);
+        self::assertSame(['approved' => true, 'operation_family' => 'governed_authority_plan'], $scopeSeenByApply);
+    }
+
+    public function test_relation_reuse_only_keeps_idempotent_completion_without_scope_or_proposal(): void
+    {
+        $captures = new AuthorityCaptureRepository();
+        $scopeCalls = 0;
+        $edgeId = 'edge-sonodo-brand';
+        $service = new AuthorityCaptureService(
+            $captures,
+            static fn (array $input, CaptureRecord $capture): array => [
+                'reuse' => [], 'create_candidates' => [], 'update_candidates' => [], 'relation_candidates' => [],
+                'relation_reuse' => [[
+                    'candidate_id' => 'relation-reuse-sonodo', 'action' => 'REUSE', 'entity_type' => 'relation',
+                    'canonical_id' => $edgeId, 'revision' => 4, 'source_type' => 'music', 'target_type' => 'brand', 'predicate' => 'about',
+                ]],
+                'plan_fingerprint' => str_repeat('d', 64),
+            ],
+            null,
+            static fn (CaptureRecord $capture, array $plan, array $ids): array => [
+                'status' => 'APPLIED', 'proposal_ids' => [], 'apply_results' => [], 'idempotent' => true,
+                'reused_candidates' => [[
+                    'candidate_id' => 'relation-reuse-sonodo', 'entity_type' => 'relation', 'status' => 'REUSED_VERIFIED',
+                    'canonical_id' => $edgeId, 'canonical_readback' => ['canonical_id' => $edgeId, 'entity_type' => 'relation', 'revision' => 4],
+                ]],
+                'reused_relations' => [['candidate_id' => 'relation-reuse-sonodo']],
+            ],
+            null,
+            null,
+            static function () use (&$scopeCalls): array {
+                ++$scopeCalls;
+                throw new \LogicException('relation reuse must not issue a staging scope');
+            },
+        );
+
+        $planned = $service->execute(['idempotency_key' => 'relation-reuse-only', 'purpose' => 'AUTHORITY', 'authority_intent' => ['mode' => 'PLAN']]);
+        $applied = $service->continueWithApproval($planned->captureId, ['authority_intent' => [
+            'mode' => 'APPLY_APPROVED_PLAN', 'approved_plan_fingerprint' => str_repeat('d', 64), 'approved_candidate_ids' => ['relation-reuse-sonodo'],
+        ]]);
+
+        self::assertSame(0, $scopeCalls);
+        self::assertSame([], $applied->context['authority_result']['result']['proposal_ids']);
+        self::assertTrue($applied->context['authority_result']['result']['idempotent']);
+        self::assertTrue($applied->context['authority_result']['result']['completion']['complete']);
+        self::assertSame('COMPLETE', $applied->context['authority_result']['result']['completion']['canonical_state']);
+    }
+
     public function test_same_approval_is_replanned_when_pending_policy_contract_changes(): void
     {
         $captures = new AuthorityCaptureRepository();

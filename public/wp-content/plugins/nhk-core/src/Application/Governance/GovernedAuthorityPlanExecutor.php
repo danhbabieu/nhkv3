@@ -30,9 +30,11 @@ final class GovernedAuthorityPlanExecutor implements GovernedAuthorityPlanApplie
         $authorityProposalCandidates = [];
         $relationCandidates = [];
         $reusedRelations = [];
+        $reusedCandidates = [];
         foreach ($selected as $candidateId) {
             $candidate = $byId[(string) $candidateId];
             if (strtoupper((string) ($candidate['action'] ?? '')) === 'REUSE') {
+                $reusedCandidates[] = $this->reuseResult($candidate);
                 if ($this->isRelation($candidate)) $reusedRelations[] = $candidate;
                 continue;
             }
@@ -72,7 +74,32 @@ final class GovernedAuthorityPlanExecutor implements GovernedAuthorityPlanApplie
         }
 
         if ($policy === ConversationalAuthorityPolicy::AUTO_APPROVE_AFTER_OWNER_CONFIRMATION) $applyResults = array_merge($applyResults, $this->approveAndApply($relationProposalIds, $actor));
-        return ['status' => $policy === ConversationalAuthorityPolicy::REVIEW_REQUIRED ? 'REVIEW_REQUIRED' : 'APPLIED', 'proposal_ids' => $proposalIds, 'approved_candidate_ids' => $selected, 'apply_results' => $applyResults, 'reused_relations' => $reusedRelations, 'idempotent' => $reusedRelations !== [] && $proposalIds === []];
+        $status = $proposalIds === [] && $reusedCandidates !== []
+            ? 'APPLIED'
+            : ($policy === ConversationalAuthorityPolicy::REVIEW_REQUIRED ? 'REVIEW_REQUIRED' : 'APPLIED');
+        return ['status' => $status, 'proposal_ids' => $proposalIds, 'approved_candidate_ids' => $selected, 'apply_results' => $applyResults, 'reused_candidates' => $reusedCandidates, 'reused_relations' => $reusedRelations, 'idempotent' => $reusedCandidates !== [] && $proposalIds === []];
+    }
+
+    /** @param array<string,mixed> $candidate @return array<string,mixed> */
+    private function reuseResult(array $candidate): array
+    {
+        $isRelation = $this->isRelation($candidate);
+        $canonicalId = trim((string) ($candidate['canonical_uuid'] ?? $candidate['canonical_id'] ?? ''));
+        $entityType = strtolower(trim((string) ($candidate['entity_type'] ?? ($isRelation ? 'relation' : ''))));
+        $readback = is_array($candidate['canonical_readback'] ?? null) ? $candidate['canonical_readback'] : [];
+        if ($canonicalId !== '' && trim((string) ($readback['canonical_id'] ?? '')) === '') $readback['canonical_id'] = $canonicalId;
+        if ($entityType !== '' && !isset($readback['entity_type'])) $readback['entity_type'] = $entityType;
+        $revision = max(1, (int) ($candidate['canonical_revision'] ?? $candidate['revision'] ?? 0));
+        if (!isset($readback['revision'])) $readback['revision'] = $revision;
+        if (!array_key_exists('active', $readback)) $readback['active'] = true;
+        return [
+            'candidate_id' => (string) ($candidate['candidate_id'] ?? ''),
+            'entity_type' => $entityType,
+            'status' => 'REUSED_VERIFIED',
+            'canonical_id' => $canonicalId,
+            'canonical_readback' => $readback,
+            'idempotent' => true,
+        ];
     }
 
     private function isRelation(array $candidate): bool

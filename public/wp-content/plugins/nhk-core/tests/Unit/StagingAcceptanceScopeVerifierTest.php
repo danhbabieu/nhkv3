@@ -477,6 +477,37 @@ final class StagingAcceptanceScopeVerifierTest extends TestCase
         self::assertFalse((new StagingAcceptanceScopeVerifier(static fn (): string => 'staging', 'test-secret', static fn (): bool => true))->verifyProposal($scope, $wrongProposal));
     }
 
+    public function test_mixed_authority_scope_binds_only_mutating_candidates(): void
+    {
+        $capture = new CaptureRecord(UuidCodec::newV7(), 'authority-mixed-scope', hash('sha256', 'authority-mixed-scope'), 'AUTHORITY_PLANNED', 'PLANNED', null, null, [], ['purpose' => 'AUTHORITY', 'planning_input' => ['purpose' => 'AUTHORITY']], [], []);
+        $reuseId = 'music-reuse';
+        $updateId = 'music-update';
+        $target = UuidCodec::newV7();
+        $plan = [
+            'plan_fingerprint' => hash('sha256', 'mixed-authority-plan'),
+            'reuse' => [['candidate_id' => $reuseId, 'action' => 'REUSE', 'entity_type' => 'music', 'canonical_uuid' => $target, 'canonical_revision' => 2]],
+            'update_candidates' => [['candidate_id' => $updateId, 'action' => 'UPDATE', 'entity_type' => 'music', 'canonical_uuid' => $target, 'expected_revision' => 2]],
+        ];
+        $scope = (new StagingAcceptanceScopeVerifier(static fn (): string => 'staging', 'test-secret', static fn (): bool => true))->issueForAuthorityPlan($capture, $plan, [$reuseId, $updateId]);
+
+        self::assertSame([$updateId], $scope['approved_candidate_ids']);
+        self::assertSame([$updateId], array_column($scope['candidate_bindings'], 'candidate_id'));
+    }
+
+    public function test_reuse_only_plan_does_not_reuse_a_previous_mutation_scope(): void
+    {
+        $captureId = UuidCodec::newV7();
+        $capture = new CaptureRecord($captureId, 'authority-reuse-scope', hash('sha256', 'authority-reuse-scope'), 'AUTHORITY_PLANNED', 'PLANNED', null, null, [], ['purpose' => 'AUTHORITY'], [], []);
+        $plan = ['plan_fingerprint' => hash('sha256', 'reuse-only-plan'), 'reuse' => [['candidate_id' => 'music-reuse', 'action' => 'REUSE', 'entity_type' => 'music', 'canonical_uuid' => UuidCodec::newV7(), 'canonical_revision' => 2]]];
+        $capture = new CaptureRecord($captureId, $capture->idempotencyKey, $capture->requestFingerprint, $capture->stage, $capture->status, context: [
+            'purpose' => 'AUTHORITY',
+            'staging_acceptance' => ['operation_family' => 'governed_authority_plan', 'plan_fingerprint' => $plan['plan_fingerprint'], 'candidate_bindings' => [['candidate_id' => 'old-update']], 'approved' => true, 'environment' => 'staging'],
+        ]);
+
+        $this->expectExceptionMessage('STAGING_CANDIDATE_SCOPE_REQUIRED');
+        (new StagingAcceptanceScopeVerifier(static fn (): string => 'staging', 'test-secret', static fn (): bool => true))->issueForAuthorityPlan($capture, $plan, ['music-reuse']);
+    }
+
     public function test_relation_scope_binds_both_endpoints_and_revisions(): void
     {
         $capture = new CaptureRecord(UuidCodec::newV7(), 'relation-scope', hash('sha256', 'relation-scope'), 'AUTHORITY_PLANNED', 'PLANNED', null, null, [], ['purpose' => 'AUTHORITY', 'planning_input' => []], [], []);

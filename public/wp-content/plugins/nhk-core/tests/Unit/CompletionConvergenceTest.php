@@ -429,15 +429,15 @@ final class CompletionConvergenceTest extends TestCase
         self::assertContains('video', $packet['resume_hints']['resume_children']);
     }
 
-    public function test_capture_cannot_be_complete_without_capture_canonical_readback(): void
+    public function test_capture_can_converge_without_capture_readback_when_every_effective_child_is_verified(): void
     {
         $packet = (new CompletionCoordinator())->aggregateCapture('capture-1', [
-            ['owner_type' => 'knowledge', 'owner_id' => 'claim-1', 'canonical_readback' => ['canonical_id' => 'claim-1']],
+            ['owner_type' => 'knowledge', 'owner_id' => 'claim-1', 'canonical_readback' => ['canonical_id' => 'claim-1'], 'public_projection_owner' => false],
         ]);
 
-        self::assertFalse($packet['complete']);
-        self::assertSame('BLOCKED', $packet['canonical_state']);
-        self::assertContains('CANONICAL_READBACK_UNVERIFIED', $packet['blockers']);
+        self::assertTrue($packet['complete']);
+        self::assertSame('COMPLETE', $packet['canonical_state']);
+        self::assertTrue($packet['canonical_readback_verified']);
     }
 
     public function test_relation_only_capture_converges_from_verified_relation_child_readback(): void
@@ -457,6 +457,30 @@ final class CompletionConvergenceTest extends TestCase
     {
         $packet = (new CompletionCoordinator())->aggregateCapture('capture-1', [
             ['owner_type' => 'relation', 'owner_id' => 'edge-1', 'dependency_state' => 'COMPLETE', 'relation_or_usage_state' => 'COMPLETE'],
+        ]);
+
+        self::assertSame('BLOCKED', $packet['canonical_state']);
+        self::assertFalse($packet['canonical_readback_verified']);
+        self::assertFalse($packet['complete']);
+        self::assertContains('CANONICAL_READBACK_UNVERIFIED', $packet['blockers']);
+    }
+
+    public function test_capture_converges_from_verified_entity_reuse_child_readback(): void
+    {
+        $packet = (new CompletionCoordinator())->aggregateCapture('capture-1', [
+            ['owner_type' => 'music', 'owner_id' => 'music-1', 'canonical_readback' => ['canonical_id' => 'music-1', 'revision' => 3], 'dependency_state' => 'COMPLETE', 'relation_or_usage_state' => 'NOT_APPLICABLE', 'public_projection_owner' => false],
+        ]);
+
+        self::assertSame('COMPLETE', $packet['canonical_state']);
+        self::assertTrue($packet['canonical_readback_verified']);
+        self::assertTrue($packet['complete']);
+    }
+
+    public function test_capture_stays_blocked_when_one_effective_child_lacks_canonical_readback(): void
+    {
+        $packet = (new CompletionCoordinator())->aggregateCapture('capture-1', [
+            ['owner_type' => 'music', 'owner_id' => 'music-1', 'canonical_readback' => ['canonical_id' => 'music-1'], 'dependency_state' => 'COMPLETE', 'relation_or_usage_state' => 'NOT_APPLICABLE'],
+            ['owner_type' => 'brand', 'owner_id' => 'brand-1', 'dependency_state' => 'COMPLETE', 'relation_or_usage_state' => 'NOT_APPLICABLE'],
         ]);
 
         self::assertSame('BLOCKED', $packet['canonical_state']);
