@@ -1,5 +1,37 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-08 — universal Music platform mandate review
+
+REVIEWED: The full local Music/Media implementation, Grove research outputs,
+generic renderer, public delivery boundary, relation presentation and
+test/regression state were independently re-read against the Universal Music
+Platform mandate. The detailed review is recorded at
+`docs/research/westminster/universal-music-platform-execution-review-v1.md`.
+
+CURRENT_STATE: One generic type/profile-driven Music dossier serves Westminster,
+Sonodo, Ave Maria and future Music entities. The Grove score JSON and two WAV
+files remain non-canonical research outputs. No new owner, duplicate Music
+identity, semantic writer, Graph store, migration, deployment or push was
+introduced.
+
+READBACK_BOUNDARY: The previously observed stable key
+`nhk:music:westminster` and UUID remain documented, but current revision
+read-back was unavailable because the demo REST endpoint was blocked by the
+browser client and the authorized TEST runtime identity was absent. No current
+revision or canonical mutation is claimed.
+
+QUALITY: Independent audio analysis passed 41/41 event windows and 0-cent
+maximum scanned fundamental error for both renders. This verifies pitch/event
+correspondence for the editorial arrangement, not instrument realism,
+historical tuning, recording authenticity, rights clearance or public delivery.
+
+TESTED: Fresh focused generic Music/Media/frontend/template suite passed 184
+tests / 1,498 assertions. Fresh Full Unit completed 3,587 tests / 22,182
+assertions with 14 baseline error identities and 5 baseline failure identities;
+Integration completed 147 tests with 22 environment failures and 125 skips.
+
+STATUS: `MANDATE_REVIEW_COMPLETE / LOCAL_IMPLEMENTATION_READY_FOR_GOVERNED_HANDOFF / CANONICAL_READBACK_UNAVAILABLE / MEDIA_NOT_ACCEPTED / BROWSER_AUDIO_UNAVAILABLE / NOT_DEPLOYED`
+
 # Checkpoint — 2026-10-08 — independent Grove audio acceptance QA
 
 VERIFIED_READ_ONLY: An independent analysis of both local WAV files confirmed
