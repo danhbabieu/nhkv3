@@ -976,6 +976,7 @@ final class Plugin {
                     return $relationProposalReconciliation->reconcile($proposal, $control);
                 },
                 relationState: $relationState,
+                entityTypes: $types,
                 videoScopeIssuer: static function (string $captureId, array $plan) use ($captureRepository, $stagingScopeVerifier): array {
                     $capture = $captureRepository->findById($captureId);
                     if (!$capture instanceof CaptureRecord) throw new \RuntimeException('STAGING_CAPTURE_NOT_FOUND');

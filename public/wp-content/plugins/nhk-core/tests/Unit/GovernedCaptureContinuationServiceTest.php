@@ -15,6 +15,7 @@ use NHK\Core\Application\Video\{VideoEditorialGenerator, VideoEditorialResumePla
 use NHK\Core\Contracts\Governance\{AutomationPolicyStorage, GovernedLifecycle, PendingVideoProposalLookup, VideoProposalReconciliationPort};
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Governance\{Proposal, ProposalState};
+use NHK\Core\Domain\Authority\CanonicalEntityTypeCatalog;
 use NHK\Core\Domain\Video\{Video, VideoException};
 use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim, Source};
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
@@ -512,6 +513,111 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
 
         self::assertSame('REVIEW_REQUIRED', $result['status']);
         self::assertSame($proposal->id, $result['writes'][0]['proposal_id']);
+    }
+
+    public function test_knowledge_delta_supports_exact_component_subject_with_entity_scope(): void
+    {
+        $subject = UuidCodec::newV7();
+        $proposal = new Proposal(UuidCodec::newV7(), $subject, 'ingest', ['text' => 'Linh kiện này có cấu trúc đặc biệt.'], 'content', null, 'dependency', ProposalState::DRAFT, idempotencyKey: 'continuation:component-knowledge', entityType: 'knowledge');
+        $governance = $this->createMock(GovernedLifecycle::class);
+        $governance->expects(self::once())->method('createFromArguments')->with(self::callback(static function (array $arguments) use ($subject): bool {
+            return ($arguments['entity_type'] ?? '') === 'knowledge'
+                && ($arguments['subject_id'] ?? '') === $subject
+                && ($arguments['payload']['provenance']['metadata']['subject_type'] ?? '') === 'component'
+                && ($arguments['payload']['provenance']['metadata']['scope'] ?? '') === 'entity';
+        }))->willReturn($proposal);
+        $governance->expects(self::exactly(2))->method('review')->with($proposal->id)->willReturnOnConsecutiveCalls(
+            ['state' => 'draft', 'entity_type' => 'knowledge', 'content_fingerprint' => 'content', 'dependency_fingerprint' => 'dependency'],
+            ['state' => 'submitted', 'entity_type' => 'knowledge', 'content_fingerprint' => 'content', 'dependency_fingerprint' => 'dependency'],
+        );
+        $governance->expects(self::once())->method('submit')->with($proposal->id)->willReturn($proposal->transition(ProposalState::SUBMITTED));
+        $service = new GovernedCaptureContinuationService($governance, static fn (): array => [], $this->policies(), static fn (): bool => true);
+
+        $result = $service->execute('capture-component', 'continuation:component', [
+            'content_intent' => ['intent' => 'KNOWLEDGE_DELTA'],
+            'subject_resolution' => ['resolved' => [['id' => $subject, 'type' => 'component']]],
+            'continuation_delta_text' => 'Linh kiện này có cấu trúc đặc biệt.',
+            'interpretation' => ['structured_interpretation_packet' => ['semantic_assertions' => [['text' => 'Linh kiện này có cấu trúc đặc biệt.']], 'dictionary_owner_commands' => []]],
+            'observations' => [],
+        ]);
+
+        self::assertSame('REVIEW_REQUIRED', $result['status']);
+        self::assertSame($proposal->id, $result['writes'][0]['proposal_id']);
+    }
+
+    public function test_knowledge_delta_uses_the_canonical_scope_for_every_registered_entity_type(): void
+    {
+        $service = new GovernedCaptureContinuationService($this->createMock(GovernedLifecycle::class), static fn (): array => [], $this->policies(), static fn (): bool => true);
+        $plans = new \ReflectionMethod($service, 'plans');
+        $plans->setAccessible(true);
+
+        foreach (CanonicalEntityTypeCatalog::definitions() as $definition) {
+            $subject = UuidCodec::newV7();
+            $text = 'Dữ kiện được ghi nhận cho ' . $definition->type . '.';
+            $planned = $plans->invoke($service, 'capture-' . $definition->type, 'continuation:' . $definition->type, [
+                'content_intent' => ['intent' => 'KNOWLEDGE_DELTA'],
+                'subject_resolution' => ['resolved' => [['id' => $subject, 'type' => $definition->type]]],
+                'continuation_delta_text' => $text,
+                'interpretation' => ['structured_interpretation_packet' => ['semantic_assertions' => [['text' => $text]], 'dictionary_owner_commands' => []]],
+                'observations' => [],
+            ]);
+
+            self::assertSame('knowledge', $planned[0]['entity_type'], $definition->type);
+            self::assertSame($definition->knowledgeScope, $planned[0]['payload']['provenance']['metadata']['scope'], $definition->type);
+        }
+    }
+
+    public function test_incompatible_knowledge_scope_reports_the_precise_handoff_blocker(): void
+    {
+        $subject = UuidCodec::newV7();
+        $service = new GovernedCaptureContinuationService($this->createMock(GovernedLifecycle::class), static fn (): array => [], $this->policies(), static fn (): bool => true);
+
+        $result = $service->execute('capture-incompatible-scope', 'continuation:incompatible-scope', [
+            'content_intent' => ['intent' => 'KNOWLEDGE_DELTA'],
+            'subject_resolution' => ['resolved' => [['id' => $subject, 'type' => 'component']]],
+            'interpretation' => [
+                'user_claim_candidates' => [[
+                    'text' => 'Linh kiện này thuộc một biến thể khác.',
+                    'scope' => 'model',
+                    'facet' => 'component',
+                ]],
+                'structured_interpretation_packet' => [
+                    'semantic_assertions' => [['text' => 'Linh kiện này thuộc một biến thể khác.']],
+                    'dictionary_owner_commands' => [],
+                ],
+            ],
+            'observations' => [],
+        ]);
+
+        self::assertSame('REVIEW_REQUIRED', $result['status']);
+        self::assertSame(['KNOWLEDGE_SCOPE_INCOMPATIBLE'], $result['blockers']);
+        self::assertSame([], $result['writes']);
+    }
+
+    public function test_unregistered_knowledge_facet_reports_the_precise_handoff_blocker(): void
+    {
+        $subject = UuidCodec::newV7();
+        $service = new GovernedCaptureContinuationService($this->createMock(GovernedLifecycle::class), static fn (): array => [], $this->policies(), static fn (): bool => true);
+
+        $result = $service->execute('capture-incompatible-facet', 'continuation:incompatible-facet', [
+            'content_intent' => ['intent' => 'KNOWLEDGE_DELTA'],
+            'subject_resolution' => ['resolved' => [['id' => $subject, 'type' => 'component']]],
+            'interpretation' => [
+                'user_claim_candidates' => [[
+                    'text' => 'Linh kiện này có thuộc tính chưa đăng ký.',
+                    'facet' => 'unregistered_facet',
+                ]],
+                'structured_interpretation_packet' => [
+                    'semantic_assertions' => [['text' => 'Linh kiện này có thuộc tính chưa đăng ký.']],
+                    'dictionary_owner_commands' => [],
+                ],
+            ],
+            'observations' => [],
+        ]);
+
+        self::assertSame('REVIEW_REQUIRED', $result['status']);
+        self::assertSame(['KNOWLEDGE_FACET_UNSUPPORTED'], $result['blockers']);
+        self::assertSame([], $result['writes']);
     }
 
     public function test_article_continuation_plans_one_governed_about_relation_for_exact_primary_subject(): void

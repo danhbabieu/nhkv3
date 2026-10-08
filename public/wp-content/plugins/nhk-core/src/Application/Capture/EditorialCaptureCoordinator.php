@@ -1280,14 +1280,15 @@ final class EditorialCaptureCoordinator
     private function rehydrateRetryInput(CaptureRecord $record, array $input): array
     {
         $context = $record->context;
+        $continuation = is_array($context['continuation_state'] ?? null) ? $context['continuation_state'] : [];
         $original = is_array($context['original_request'] ?? null) ? $context['original_request'] : [];
         $intent = is_array($context['content_intent'] ?? null) ? $context['content_intent'] : [];
         $defaults = [
-            'text' => (string) ($context['raw_input'] ?? ''),
+            'text' => (string) ($continuation['raw_input'] ?? $context['raw_input'] ?? ''),
             'title' => (string) ($context['title'] ?? ''),
             'excerpt' => (string) ($context['excerpt'] ?? ''),
-            'subject_hints' => is_array($context['subject_hints'] ?? null) ? array_values($context['subject_hints']) : [],
-            'observations' => is_array($context['observations'] ?? null) ? $context['observations'] : [],
+            'subject_hints' => is_array($continuation['subject_hints'] ?? null) ? array_values($continuation['subject_hints']) : (is_array($context['subject_hints'] ?? null) ? array_values($context['subject_hints']) : []),
+            'observations' => is_array($continuation['observations'] ?? null) ? $continuation['observations'] : (is_array($context['observations'] ?? null) ? $context['observations'] : []),
             'metadata' => is_array($context['metadata'] ?? null) ? $context['metadata'] : [],
             'intent' => (string) ($intent['intent'] ?? ($original['intent'] ?? '')),
             'publish' => ($original['publish'] ?? false) === true,

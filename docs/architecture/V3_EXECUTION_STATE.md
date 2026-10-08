@@ -25415,3 +25415,46 @@ blocked until the exact committed build is deployed and its runtime identity
 is verified, then the server issues the Capture-bound signed staging packet
 for the registered Knowledge operation. Current public browser read-back
 still shows `Tri thức chi tiết đang được cập nhật.`.
+
+# Checkpoint — 2026-10-08 — Universal Knowledge handoff recovery boundary
+
+ROOT_CAUSE_CONFIRMED: The Music routing correction was not a universal
+Knowledge contract. `GovernedCaptureContinuationService` still owned an
+incomplete hard-coded subject-to-scope match, omitted registered Component
+subjects, silently discarded incompatible scopes and collapsed invalid facets
+into the generic semantic handoff outcome. Separately, retry eligibility could
+be true for a reevaluable Knowledge review while `lifecycleState()` still
+reported `TERMINALLY_BLOCKED`; retry rehydration also preferred the original
+Capture text over the persisted latest `continuation_state`.
+
+IMPLEMENTED: Knowledge scope is now declared on the existing canonical
+Authority `EntityTypeDefinition` registry and the Capture Governance service
+consumes the same runtime registry wired by Plugin bootstrap. The canonical
+catalog declares scopes for all nine registered Authority types without adding
+an entity vocabulary or broadening unsupported scopes. Scope, facet and
+subject-type failures now retain precise bounded blockers. Capture retry
+reevaluation uses the shared semantic review decision, bumps the decision
+dependency fingerprint version for implementation upgrades, and rehydrates the
+latest continuation text, subject hints and observations while preserving the
+same Capture/idempotency identity and Governance history.
+
+REGRESSION_COVERAGE: Added Music/Component and all-canonical-type scope
+coverage, incompatible scope/facet diagnostics, reevaluable Knowledge review
+lifecycle, and same-Capture retry from continuation state. The existing
+semantic guard, governed Proposal lifecycle, dependency scope, canonical
+read-back and no-Article Knowledge-only boundaries remain unchanged.
+
+VERIFIED: Focused Capture/Governance/completion/retry/read-contract selection
+passes 192 tests / 952 assertions. NHK Contract passes 6 tests / 48
+assertions. Full NHK Unit reaches 3,605 tests / 22,832 assertions with 14
+pre-existing errors and 5 pre-existing failures; the default 128MB run also
+hits the known TrustedProvidedFileMaterializer memory fatal, while the 512MB
+run completes and reports the same baseline identities. Changed PHP files lint
+clean, `git diff --check` is clean, and the changed-scope secret scan is clean.
+
+BOUNDARY: No Capture, Knowledge, Source, Evidence, Graph, Governance,
+WordPress, staging or production data was mutated. No migration, deployment,
+push, approval, controlled apply or public completion was performed. The
+Westminster runtime acceptance remains blocked until the exact committed build
+is deployed, the authorized TEST runtime identity is verified, and a fresh
+server-issued Capture-bound signed scope is available.

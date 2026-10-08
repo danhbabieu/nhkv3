@@ -27,8 +27,9 @@ final class CaptureCurrentOutcomeReducer
         if ($capture->status === 'IN_PROGRESS' && self::hasActiveExecution($capture)) return 'ACTIVELY_EXECUTING';
 
         $blockers = self::currentBlockers($capture->diagnostics, $capture->phaseReceipts, $capture, $input);
-        if ($blockers !== [] && !self::isReevaluatableArticleReview($capture->diagnostics, $capture->phaseReceipts, $capture, $input)) {
-            return 'TERMINALLY_BLOCKED';
+        if ($blockers !== []) {
+            if (!self::isReevaluatableReview($capture, $input, $blockers)) return 'TERMINALLY_BLOCKED';
+            return 'RECOVERABLE_INTERRUPTED';
         }
         if ($capture->status === 'IN_PROGRESS') return 'RECOVERABLE_INTERRUPTED';
         return $blockers !== [] ? 'TERMINALLY_BLOCKED' : 'RECOVERABLE_INTERRUPTED';
@@ -132,6 +133,20 @@ final class CaptureCurrentOutcomeReducer
     private static function isReevaluatableArticleReview(array $diagnostics, array $phaseReceipts = [], ?CaptureRecord $capture = null, array $input = []): bool
     {
         return ArticleReviewFreshness::isReevaluatable($capture, $diagnostics, $input);
+    }
+
+    /** @param list<string> $blockers */
+    private static function isReevaluatableReview(CaptureRecord $capture, array $input, array $blockers): bool
+    {
+        if (self::isReevaluatableArticleReview($capture->diagnostics, $capture->phaseReceipts, $capture, $input)) return true;
+        if (!in_array($capture->status, ['REVIEW_REQUIRED', 'IN_PROGRESS'], true)) return false;
+        if (self::isHardBlockedReview($capture) || in_array('CATEGORY_UNRESOLVED', $blockers, true) || self::hasCurrentArticleOverlapReview($capture)) return false;
+        if (array_intersect($blockers, ['KNOWLEDGE_SEMANTIC_HANDOFF_REQUIRED', 'KNOWLEDGE_SCOPE_INCOMPATIBLE', 'KNOWLEDGE_SCOPE_UNRESOLVED', 'KNOWLEDGE_FACET_UNSUPPORTED', 'KNOWLEDGE_SUBJECT_TYPE_UNSUPPORTED', 'REQUIRED_OWNER_READBACK_UNVERIFIED']) === []) return false;
+        $completion = is_array($capture->diagnostics['completion'] ?? null) ? $capture->diagnostics['completion'] : [];
+        if (!in_array(strtoupper(trim((string) ($completion['status'] ?? ''))), ['PARTIAL', 'REVIEW_REQUIRED'], true)) return false;
+        $persisted = trim((string) ($capture->diagnostics['decision_dependency_fingerprint'] ?? $capture->context['decision_dependency_fingerprint'] ?? ''));
+        $current = CaptureDecisionDependencyFingerprint::current($capture, $input);
+        return $persisted === '' || !hash_equals($persisted, $current);
     }
 
     public static function effectiveCapture(CaptureRecord $capture): CaptureRecord

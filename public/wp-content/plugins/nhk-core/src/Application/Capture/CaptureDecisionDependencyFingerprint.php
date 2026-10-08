@@ -9,7 +9,7 @@ use NHK\Core\Domain\Governance\CommandCanonicalizer;
 /** Stable dependency identity for deciding whether a review may be re-evaluated. */
 final class CaptureDecisionDependencyFingerprint
 {
-    public const VERSION = 'capture-decision-dependencies-2';
+    public const VERSION = 'capture-decision-dependencies-3';
     public const POLICY_VERSION = 'video-intake-policy-2';
 
     /** @param array<string,mixed> $context @param array<string,mixed> $diagnostics @param array<string,mixed> $input */

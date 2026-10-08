@@ -118,6 +118,32 @@ final class EditorialCaptureContinuationTest extends TestCase
         self::assertSame($capture->idempotencyKey, $events['continuation_idempotency_key']);
     }
 
+    public function test_knowledge_retry_rehydrates_the_latest_continuation_state_without_creating_a_new_capture(): void
+    {
+        $captures = new ContinuationCaptureRepository();
+        $addenda = new ContinuationAddendumRepository();
+        $capture = new CaptureRecord(
+            UuidCodec::newV7(), 'knowledge-continuation-retry', hash('sha256', 'knowledge-continuation-retry'),
+            CaptureStage::SEMANTICS_RECONCILED->value, 'FAILED_RETRYABLE', null, null, [],
+            [
+                'raw_input' => 'Dữ kiện ban đầu.',
+                'continuation_state' => ['raw_input' => "Dữ kiện ban đầu.\n\nBổ sung Westminster Quarters.", 'subject_hints' => ['nhk:music:westminster'], 'observations' => []],
+                'content_intent' => ['intent' => 'KNOWLEDGE_DELTA', 'article_required' => false],
+            ],
+            ['completion' => ['status' => 'PARTIAL', 'blockers' => ['KNOWLEDGE_SEMANTIC_HANDOFF_REQUIRED']]],
+            ['SEMANTICS_RECONCILED' => ['status' => 'FAILED', 'result' => 'FAILED_RETRYABLE', 'failure_code' => 'KNOWLEDGE_SEMANTIC_HANDOFF_REQUIRED']],
+        );
+        $captures->create($capture);
+        $events = [];
+        $service = new EditorialCaptureContinuationService($captures, $addenda, $this->coordinator($captures, $events));
+
+        $result = $service->retry(['capture_id' => $capture->captureId, 'idempotency_key' => $capture->idempotencyKey, 'resume_mode' => 'RETRY']);
+
+        self::assertSame($capture->captureId, $result['capture']['capture_id']);
+        self::assertStringContainsString('Bổ sung Westminster Quarters.', (string) ($events['merged_text'] ?? ''));
+        self::assertCount(1, $captures->records);
+    }
+
     public function test_capture_ingest_retry_uses_effective_legacy_state_before_reentering_coordinator(): void
     {
         $captures = new ContinuationCaptureRepository();

@@ -14,6 +14,7 @@ use NHK\Core\Contracts\Governance\PendingVideoProposalLookup;
 use NHK\Core\Contracts\Governance\VideoProposalReconciliationPort;
 use NHK\Core\Contracts\Knowledge\KnowledgeRepository;
 use NHK\Core\Domain\Governance\{CommandCanonicalizer, Proposal, ProposalState};
+use NHK\Core\Domain\Authority\{CanonicalEntityTypeCatalog, EntityTypeRegistry};
 use NHK\Core\Domain\Governance\ProposalSubjectBindingValidator;
 use NHK\Core\Domain\Knowledge\KnowledgeFacetProfile;
 use NHK\Core\Domain\Knowledge\DependencyValidationException;
@@ -67,9 +68,14 @@ final class GovernedCaptureContinuationService
         private ?CanonicalDependencyValidator $canonicalDependencies = null,
         private ?KnowledgeRepository $knowledgeRepository = null,
         private ?KnowledgeRepairPreviewService $knowledgeRepairPreview = null,
+        private ?EntityTypeRegistry $entityTypes = null,
     ) {
         $this->completion = $completion ?? new CompletionCoordinator();
         $this->semanticClaimCandidateGuard = new SemanticClaimCandidateGuard();
+        if ($this->entityTypes === null) {
+            $this->entityTypes = new EntityTypeRegistry();
+            CanonicalEntityTypeCatalog::registerInto($this->entityTypes);
+        }
     }
 
     public function setVideoEditorialResume(?VideoEditorialResumePlanner $planner): void
@@ -403,13 +409,17 @@ final class GovernedCaptureContinuationService
                     continue;
                 }
                 $scope = $this->knowledgeScope((string) ($subject['type'] ?? ''), (string) ($candidate['scope'] ?? ''), $candidate);
-                if ($scope === null) continue;
+                if ($scope === null) {
+                    $this->semanticGuardFailures[] = $this->knowledgeScopeBlocker((string) ($subject['type'] ?? ''), (string) ($candidate['scope'] ?? ''), $candidate);
+                    continue;
+                }
                 $facet = trim((string) ($candidate['facet'] ?? 'identity')) ?: 'identity';
                 try {
                     new KnowledgeFacetProfile($facet, $scope);
                 } catch (\Throwable) {
                     // Invalid interpreter output is a bounded review gap. Do
                     // not silently coerce it into another semantic facet.
+                    $this->semanticGuardFailures[] = 'KNOWLEDGE_FACET_UNSUPPORTED';
                     continue;
                 }
                 if ($this->claimReuse?->find(['text' => (string) $candidate['text'], 'subject_id' => (string) $subject['id'], 'scope' => $scope], $this->retrievedClaims($context)) !== null) continue;
@@ -809,15 +819,9 @@ final class GovernedCaptureContinuationService
 
     private function knowledgeScope(string $subjectType, string $candidateScope, array $candidate = []): ?string
     {
-        $default = match (strtolower(trim($subjectType))) {
-            'classification', 'entity', 'music', 'product' => 'entity',
-            'brand' => 'brand',
-            'model' => 'model',
-            'variant' => 'variant',
-            'movement' => 'movement',
-            'specimen' => 'specimen_observation',
-            default => null,
-        };
+        $type = strtolower(trim($subjectType));
+        $definition = $this->entityTypes !== null && $this->entityTypes->has($type) ? $this->entityTypes->get($type) : null;
+        $default = $definition?->knowledgeScope;
         if ($default === null) return null;
         $candidateScope = trim($candidateScope);
         if ($candidateScope === '' || strtolower($candidateScope) === 'unspecified') return $default;
@@ -828,6 +832,22 @@ final class GovernedCaptureContinuationService
         // brand/company facets; explicit incompatible scope remains review.
         if (strtolower($subjectType) === 'brand' && $candidateScope === 'variant' && !in_array($basis, ['EXPLICIT', 'EXPLICIT_CONTEXT', 'EXPLICIT_EVIDENCE'], true) && in_array($facet, ['identity', 'history', 'company', 'description'], true)) return $default;
         return $candidateScope === $default ? $default : null;
+    }
+
+    private function knowledgeScopeBlocker(string $subjectType, string $candidateScope, array $candidate): string
+    {
+        $type = strtolower(trim($subjectType));
+        $definition = $this->entityTypes !== null && $this->entityTypes->has($type) ? $this->entityTypes->get($type) : null;
+        if ($definition?->knowledgeScope === null) return 'KNOWLEDGE_SUBJECT_TYPE_UNSUPPORTED';
+        $scope = strtolower(trim($candidateScope));
+        if ($scope !== '' && $scope !== 'unspecified' && $scope !== strtolower((string) $definition->knowledgeScope)) return 'KNOWLEDGE_SCOPE_INCOMPATIBLE';
+        $facet = trim((string) ($candidate['facet'] ?? 'identity')) ?: 'identity';
+        try {
+            new KnowledgeFacetProfile($facet, (string) $definition->knowledgeScope);
+        } catch (\Throwable) {
+            return 'KNOWLEDGE_FACET_UNSUPPORTED';
+        }
+        return 'KNOWLEDGE_SCOPE_UNRESOLVED';
     }
 
     /** @param array<string,mixed> $provenancePlan @param list<array<string,mixed>> $writes @param list<string> $lifecycle */

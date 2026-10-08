@@ -244,6 +244,7 @@ final class EditorialCaptureContinuationService
     private function rehydrateRetryInput(CaptureRecord $capture, array $control): array
     {
         $context = $capture->context;
+        $continuation = is_array($context['continuation_state'] ?? null) ? $context['continuation_state'] : [];
         $intent = is_array($context['content_intent'] ?? null) ? $context['content_intent'] : [];
         $original = is_array($context['original_request'] ?? null) ? $context['original_request'] : [];
         $governance = is_array($control['governance'] ?? null) ? $control['governance'] : [];
@@ -256,11 +257,11 @@ final class EditorialCaptureContinuationService
         return [
             'purpose' => (string) ($context['purpose'] ?? 'EDITORIAL'),
             'idempotency_key' => $capture->idempotencyKey,
-            'text' => (string) ($context['raw_input'] ?? ''),
+            'text' => (string) ($continuation['raw_input'] ?? $context['raw_input'] ?? ''),
             'title' => (string) ($context['title'] ?? ''),
             'excerpt' => (string) ($context['excerpt'] ?? ''),
-            'subject_hints' => is_array($context['subject_hints'] ?? null) ? array_values($context['subject_hints']) : [],
-            'observations' => is_array($context['observations'] ?? null) ? $context['observations'] : [],
+            'subject_hints' => is_array($continuation['subject_hints'] ?? null) ? array_values($continuation['subject_hints']) : (is_array($context['subject_hints'] ?? null) ? array_values($context['subject_hints']) : []),
+            'observations' => is_array($continuation['observations'] ?? null) ? $continuation['observations'] : (is_array($context['observations'] ?? null) ? $context['observations'] : []),
             'metadata' => is_array($context['metadata'] ?? null) ? $context['metadata'] : [],
             'media_bindings' => is_array($context['media_bindings'] ?? null) ? $context['media_bindings'] : [],
             'media_operations' => is_array($context['media_operations'] ?? null) ? $context['media_operations'] : [],

@@ -17,5 +17,6 @@ final readonly class EntityTypeDefinition
         public array $requiredFields = [],
         public array $fieldTypes = [],
         public array $fieldFormats = [],
+        public ?string $knowledgeScope = null,
     ) {}
 }

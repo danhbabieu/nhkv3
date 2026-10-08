@@ -21,6 +21,21 @@ final class CaptureCurrentOutcomeReducerTest extends TestCase
         self::assertSame(['OWNER_PUBLICATION_REQUIRED'], $reconciled['completion']['blockers']);
     }
 
+    public function test_reevaluable_knowledge_review_is_not_reported_as_terminal_when_retry_is_eligible(): void
+    {
+        $capture = new CaptureRecord(
+            UuidCodec::newV7(), 'knowledge-review-retry', hash('sha256', 'knowledge-review-retry'),
+            CaptureStage::SEMANTICS_RECONCILED->value, 'REVIEW_REQUIRED', null, null, [],
+            ['raw_input' => 'Westminster Quarters được ghi nhận.', 'content_intent' => ['intent' => 'KNOWLEDGE_DELTA']],
+            ['completion' => ['status' => 'REVIEW_REQUIRED', 'blockers' => ['KNOWLEDGE_SEMANTIC_HANDOFF_REQUIRED', 'REQUIRED_OWNER_READBACK_UNVERIFIED']]],
+            ['SEMANTICS_RECONCILED' => ['status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'failure_code' => 'KNOWLEDGE_SEMANTIC_HANDOFF_REQUIRED']],
+        );
+
+        self::assertSame(['eligible' => true, 'reason' => 'STALE_REVIEW_REEVALUATABLE'], CaptureCurrentOutcomeReducer::retryEligibility($capture));
+        self::assertSame(['KNOWLEDGE_SEMANTIC_HANDOFF_REQUIRED', 'REQUIRED_OWNER_READBACK_UNVERIFIED'], CaptureCurrentOutcomeReducer::currentBlockers($capture->diagnostics, $capture->phaseReceipts, $capture));
+        self::assertSame('RECOVERABLE_INTERRUPTED', CaptureCurrentOutcomeReducer::lifecycleState($capture));
+    }
+
     public function test_failed_retryable_x_then_success_makes_x_historical_only(): void
     {
         $receipts = CapturePhaseReceiptReducer::append([], 'PHASE_X', [
