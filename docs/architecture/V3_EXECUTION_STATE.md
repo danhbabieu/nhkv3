@@ -1,5 +1,42 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-08 — post-push/pull Music completion readback
+
+RECONCILED: `HEAD` and `origin/main` are both `2e877ce5` on `main`, with a
+clean baseline before this checkpoint. The deployed archive currently exposes
+12 Music routes, including Westminster, Sonodo, Ave Maria Lourdes, Gai
+Carillon, Frère Jacques, Vieux clocher, Sur les flots bleus, La Paimpolaise,
+Angélus de la mer, Normandie, Cloches Comtoises and a synthetic acceptance
+fixture. The deployed Westminster route resolves to the generic Music dossier,
+not Dictionary detail, and exposes direct/derived relation context, but its
+Knowledge section is empty and it has no public score or audio delivery.
+
+IMPLEMENTED: The generic score/segment presentation now adds a separately
+labelled `Toàn bộ bản trình diễn giáo dục` range only when a public
+MediaAsset-backed audio delivery exists. The loopback-only Grove and generic
+demo fixtures expose that same range, while retaining Q1, Q2, Q3, Q4 and Hour,
+Piano/Bell selection, seek/progress and note synchronization. No canonical
+Authority, Knowledge, Source, Evidence, Graph, Media, MediaAsset, MediaUsage,
+Video, WordPress or public record was mutated.
+
+VERIFIED: Focused Music/frontend/profile suite passed 169 tests / 1,529
+assertions with 5 existing warnings. Contract suite passed 6 tests / 48
+assertions. Full Unit under PHP 512M completed 3,588 tests / 22,203 assertions
+with the same 14 baseline errors and 5 baseline failures recorded by the prior
+Music checkpoint. PHP/JavaScript/Python syntax and `git diff --check` passed.
+Loopback browser QA verified 41 Grove events, Q1–Q4/Hour/full-demo controls,
+Piano/Bell switching, playback, seek/progress and score interaction. Speaker
+output remains unverified.
+
+BLOCKED: The authorized TEST RUNTIME identity is unavailable: environment
+signals are unset and `wp-config.php` falls back to localhost rather than the
+required staging / `erourxcg_nhkv3` / `https://demo.1945.vn` tuple. Therefore no
+Integration run, governed Media handoff, canonical Westminster content
+acceptance, public audio, deployment or push was performed. The local Grove
+WAVs remain non-public research outputs with rights review required.
+
+STATUS: `FUNCTIONAL_FULL_DEMO_RANGE_VERIFIED_LOCALLY / DEPLOYED_MUSIC_DOSSIER_READBACK / PUBLIC_SCORE_AUDIO_BLOCKED / GOVERNED_ACCEPTANCE_BLOCKED / NO_SEMANTIC_MUTATION`
+
 # Checkpoint — 2026-10-08 — Music dossier functional viewer and loopback QA
 
 IMPLEMENTED: The existing generic Music dossier now renders a reusable SVG

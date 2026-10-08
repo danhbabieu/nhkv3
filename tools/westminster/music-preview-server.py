@@ -43,6 +43,7 @@ def normalize_grove() -> dict:
         cursor += duration
     if current_phrase is not None:
         segments.append({"label": current_phrase, "start_ms": phrase_start, "end_ms": cursor})
+    segments.append({"label": "Toàn bộ bản trình diễn giáo dục", "start_ms": 0.0, "end_ms": cursor})
     return {"edition_key": source["edition_key"], "events": events, "segments": segments}
 
 
@@ -56,7 +57,8 @@ def demo_fixture() -> dict:
                        "start_ms": index * 500.0, "duration_ms": 500.0})
     return {"edition_key": "NON_CANONICAL_TEST_FIXTURE", "events": events,
             "segments": [{"label": "Demo A", "start_ms": 0, "end_ms": 2000},
-                         {"label": "Demo B", "start_ms": 2000, "end_ms": 4000}]}
+                         {"label": "Demo B", "start_ms": 2000, "end_ms": 4000},
+                         {"label": "Toàn bộ bản trình diễn giáo dục", "start_ms": 0, "end_ms": 4000}]}
 
 
 def event_markup(events: list[dict]) -> str:

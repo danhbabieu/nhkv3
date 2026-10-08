@@ -715,7 +715,7 @@ final class FrontendPresentationContractTest extends TestCase
         $script = $this->read('music-dossier.js');
         $preview = dirname(__DIR__, 6) . '/tools/westminster/music-preview-server.py';
 
-        foreach (['data-music-score', 'data-score-events', 'Bản xem dạng khuông nhạc', 'data-local-preview', 'data-music-instrument'] as $needle) {
+        foreach (['data-music-score', 'data-score-events', 'Bản xem dạng khuông nhạc', 'data-local-preview', 'data-music-instrument', 'Toàn bộ bản trình diễn giáo dục'] as $needle) {
             self::assertStringContainsString($needle, $partial, $needle . ' missing from score presentation');
         }
         foreach (['renderScore', 'isLoopbackHost', 'data-music-score-note', 'activeSegmentEnd', 'preview-src'] as $needle) {
@@ -723,7 +723,7 @@ final class FrontendPresentationContractTest extends TestCase
         }
         self::assertFileExists($preview);
         $previewSource = (string) file_get_contents($preview);
-        foreach (['127.0.0.1', 'NON_CANONICAL_TEST_FIXTURE', 'do_POST'] as $needle) {
+        foreach (['127.0.0.1', 'NON_CANONICAL_TEST_FIXTURE', 'do_POST', 'Toàn bộ bản trình diễn giáo dục'] as $needle) {
             self::assertStringContainsString($needle, $previewSource, $needle . ' missing from local preview boundary');
         }
         self::assertStringNotContainsString('wp_insert_post', $previewSource);
