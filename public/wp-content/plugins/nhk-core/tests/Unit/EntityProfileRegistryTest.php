@@ -58,6 +58,20 @@ final class EntityProfileRegistryTest extends TestCase
         self::assertSame('clock-type-entity-hub-v1', $clockType['related_query_recipe']['key']);
     }
 
+    public function test_music_profile_declares_the_universal_section_recipe(): void
+    {
+        $profile = (new EntityProfileRegistry())->get('music');
+
+        self::assertNotNull($profile);
+        self::assertSame('music-universal-dossier-v1', $profile->relationQueryRecipe);
+        self::assertSame([
+            'identity', 'audio', 'score', 'introduction', 'history', 'structure',
+            'clock_application', 'verified_clocks', 'library', 'research', 'sources', 'related_melodies',
+        ], $profile->presentation['section_order']);
+        self::assertContains('dossier_read', $profile->capabilities);
+        self::assertNotContains('dossier_write', $profile->capabilities);
+    }
+
     public function test_brand_resolves_from_canonical_entity_type_only(): void
     {
         $entity = $this->entity('brand', 'Đồng hồ vai bò', ['description' => 'not a classification']);
