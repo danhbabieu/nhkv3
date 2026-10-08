@@ -65,8 +65,9 @@ final class EntityProfileRegistryTest extends TestCase
         self::assertNotNull($profile);
         self::assertSame('music-universal-dossier-v1', $profile->relationQueryRecipe);
         self::assertSame([
-            'identity', 'audio', 'score', 'introduction', 'history', 'structure',
-            'clock_application', 'verified_clocks', 'library', 'research', 'sources', 'related_melodies',
+            'identity', 'introduction', 'history', 'structure', 'variants',
+            'clock_application', 'related_entities', 'score', 'audio', 'library',
+            'research', 'sources', 'related_melodies',
         ], $profile->presentation['section_order']);
         self::assertContains('dossier_read', $profile->capabilities);
         self::assertNotContains('dossier_write', $profile->capabilities);

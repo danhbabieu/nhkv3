@@ -27,6 +27,22 @@ final class MusicDossierProjectionTest extends TestCase
         self::assertArrayNotHasKey('audio', $sonodo['music_dossier']['sections']);
     }
 
+    public function test_all_music_entities_use_the_v2_section_recipe(): void
+    {
+        $projection = new MusicDossierProjection();
+        $expected = [
+            'identity', 'introduction', 'history', 'structure', 'variants',
+            'clock_application', 'related_entities', 'score', 'audio', 'library',
+            'research', 'sources', 'related_melodies',
+        ];
+
+        foreach (['Westminster Quarters', 'Sonodo', 'Ave Maria', 'Empty Music'] as $name) {
+            $result = $projection->forEntity($this->entity($name), $this->dossier($name));
+
+            self::assertSame($expected, $result['music_dossier']['section_order'], $name);
+        }
+    }
+
     public function test_projection_preserves_scope_and_relation_origin(): void
     {
         $dossier = $this->dossier('Westminster Quarters');
@@ -49,9 +65,9 @@ final class MusicDossierProjectionTest extends TestCase
         $result = (new MusicDossierProjection())->forEntity($this->entity('Westminster Quarters'), $dossier);
 
         self::assertSame('Direct Music claim.', $result['music_dossier']['sections']['introduction']['claims'][0]['text']);
-        self::assertSame('DERIVED', $result['music_dossier']['sections']['clock_application']['items'][0]['origin']['kind']);
-        self::assertSame(['configured_with_music', 'variant_of', 'model_of'], $result['music_dossier']['sections']['clock_application']['items'][0]['origin']['predicates']);
-        self::assertSame('DIRECT', $result['music_dossier']['sections']['clock_application']['items'][1]['origin']['kind']);
+        self::assertSame('DERIVED', $result['music_dossier']['sections']['variants']['items'][0]['origin']['kind']);
+        self::assertSame(['configured_with_music', 'variant_of', 'model_of'], $result['music_dossier']['sections']['variants']['items'][0]['origin']['predicates']);
+        self::assertSame('DIRECT', $result['music_dossier']['sections']['clock_application']['items'][0]['origin']['kind']);
         self::assertArrayNotHasKey('canonical_id', $result['music_dossier']);
         self::assertStringNotContainsString('private-token', json_encode($result['music_dossier'], JSON_THROW_ON_ERROR));
     }
@@ -68,10 +84,92 @@ final class MusicDossierProjectionTest extends TestCase
         $sections = $result['music_dossier']['sections'];
 
         self::assertArrayHasKey('identity', $sections);
-        self::assertArrayHasKey('verified_clocks', $sections);
+        self::assertArrayHasKey('related_entities', $sections);
         self::assertArrayNotHasKey('score', $sections);
         self::assertArrayNotHasKey('audio', $sections);
         self::assertArrayNotHasKey('related_melodies', $sections);
+    }
+
+    public function test_projection_strictly_allowlists_public_claim_and_relation_fields(): void
+    {
+        $dossier = $this->dossier('Westminster Quarters');
+        $dossier['knowledge']['facets']['history'] = [[
+            'text' => 'Public history claim.',
+            'type' => 'historical',
+            'facet' => 'history',
+            'scope' => 'music',
+            'subject_id' => 'private-subject',
+            'claim_id' => 'private-claim',
+            'diagnostics' => ['internal' => true],
+            'evidence' => [[
+                'source_title' => 'Public source',
+                'url' => 'https://example.test/source',
+                'locator' => 'p. 1',
+                'source_id' => 'private-source',
+                'metadata' => ['private' => true],
+            ]],
+        ]];
+        $dossier['relation_sections']['models'] = [[
+            'type' => 'model',
+            'title' => 'Documented model',
+            'url' => '/mau/documented-model/',
+            'origin' => ['kind' => 'DIRECT', 'hop_count' => 1, 'predicates' => ['model_of'], 'via_types' => ['model']],
+            'canonical_id' => 'private-model',
+            'stable_key' => 'private-key',
+            'diagnostics' => ['hidden' => true],
+        ]];
+
+        $result = (new MusicDossierProjection())->forEntity($this->entity('Westminster Quarters'), $dossier);
+        $claim = $result['music_dossier']['sections']['history']['claims'][0];
+        $evidence = $claim['evidence'][0];
+        $relation = $result['music_dossier']['sections']['related_entities']['items'][0];
+
+        self::assertSame('Public history claim.', $claim['text']);
+        self::assertArrayNotHasKey('subject_id', $claim);
+        self::assertArrayNotHasKey('claim_id', $claim);
+        self::assertArrayNotHasKey('diagnostics', $claim);
+        self::assertArrayNotHasKey('source_id', $evidence);
+        self::assertArrayNotHasKey('metadata', $evidence);
+        self::assertArrayNotHasKey('canonical_id', $relation);
+        self::assertArrayNotHasKey('stable_key', $relation);
+        self::assertArrayNotHasKey('diagnostics', $relation);
+    }
+
+    public function test_projection_keeps_product_and_specimen_as_distinct_related_entities(): void
+    {
+        $dossier = $this->dossier('Westminster Quarters');
+        $dossier['relation_sections'] = [
+            'variants' => [[
+                'type' => 'variant', 'title' => 'Variant context', 'url' => '/bien-the/variant/',
+                'origin' => ['kind' => 'DIRECT', 'hop_count' => 1, 'predicates' => ['configured_with_music'], 'via_types' => []],
+            ]],
+            'specimens' => [['type' => 'specimen', 'title' => 'Physical clock', 'url' => '/hien-vat/clock/']],
+            'products' => [['type' => 'product', 'title' => 'Listing offer', 'url' => '/san-pham/listing/']],
+        ];
+
+        $result = (new MusicDossierProjection())->forEntity($this->entity('Westminster Quarters'), $dossier);
+
+        self::assertSame('variant', $result['music_dossier']['sections']['variants']['items'][0]['type']);
+        self::assertSame(['specimen', 'product'], array_column($result['music_dossier']['sections']['related_entities']['items'], 'type'));
+    }
+
+    public function test_projection_always_normalizes_reference_packets_and_replaces_stale_projection(): void
+    {
+        $dossier = $this->dossier('Westminster Quarters');
+        $dossier['music_dossier'] = ['status' => 'AVAILABLE', 'score' => ['source' => 'stale']];
+        $raw = [
+            'status' => 'AVAILABLE',
+            'score' => [
+                'version' => 'v1', 'source' => 'Unverified source', 'verification_status' => 'QUALIFIED',
+                'tuning' => 'A4=440Hz', 'tempo_bpm' => 72,
+                'events' => [['pitch_class' => 'C', 'octave' => 4, 'start_ms' => 0, 'duration_ms' => 100, 'phrase' => 'p']],
+            ],
+        ];
+
+        $result = (new MusicDossierProjection())->forEntity($this->entity('Westminster Quarters'), $dossier, $raw);
+
+        self::assertNull($result['music_dossier']['score']);
+        self::assertSame('music-universal-dossier-v1', $result['music_dossier']['profile_key']);
     }
 
     private function dossier(string $name): array

@@ -10,8 +10,9 @@ final class MusicDossierProjection
 {
     /** @var list<string> */
     private const SECTION_ORDER = [
-        'identity', 'audio', 'score', 'introduction', 'history', 'structure',
-        'clock_application', 'verified_clocks', 'library', 'research', 'sources', 'related_melodies',
+        'identity', 'introduction', 'history', 'structure', 'variants',
+        'clock_application', 'related_entities', 'score', 'audio', 'library',
+        'research', 'sources', 'related_melodies',
     ];
 
     public function __construct(private MusicReferenceContract $references = new MusicReferenceContract()) {}
@@ -36,20 +37,22 @@ final class MusicDossierProjection
         if ($structure !== []) $sections['structure'] = ['claims' => $structure];
 
         $relations = is_array($dossier['relation_sections'] ?? null) ? $dossier['relation_sections'] : [];
-        $clockApplication = $this->relationItems($relations, ['variants', 'movements']);
+        $variants = $this->relationItems($relations, ['variants']);
+        if ($variants !== []) $sections['variants'] = ['items' => $variants];
+        $clockApplication = $this->relationItems($relations, ['movements']);
         if ($clockApplication !== []) $sections['clock_application'] = ['items' => $clockApplication];
-        $verifiedClocks = $this->relationItems($relations, ['brands', 'models', 'variants', 'specimens', 'products']);
-        if ($verifiedClocks !== []) $sections['verified_clocks'] = ['items' => $verifiedClocks];
+        $relatedEntities = $this->relationItems($relations, ['brands', 'models', 'specimens', 'products']);
+        if ($relatedEntities !== []) $sections['related_entities'] = ['items' => $relatedEntities];
 
         $library = [
-            'media' => $this->safeList($dossier['media_gallery'] ?? []),
-            'videos' => $this->safeList($relations['videos'] ?? []),
-            'articles' => $this->safeList($relations['articles'] ?? []),
+            'media' => $this->safeList($dossier['media_gallery'] ?? [], 'media'),
+            'videos' => $this->safeList($relations['videos'] ?? [], 'video'),
+            'articles' => $this->safeList($relations['articles'] ?? [], 'article'),
         ];
         $library = array_filter($library, static fn(array $items): bool => $items !== []);
         if ($library !== []) $sections['library'] = $library;
 
-        $dictionary = $this->safeList($dossier['dictionary_terms'] ?? []);
+        $dictionary = $this->safeList($dossier['dictionary_terms'] ?? [], 'dictionary');
         $research = ['claims' => $this->claims($facets, array_keys($facets))];
         if ($dictionary !== []) $research['dictionary'] = $dictionary;
         if ($research['claims'] !== [] || $dictionary !== []) $sections['research'] = $research;
@@ -57,12 +60,12 @@ final class MusicDossierProjection
         $sources = $this->evidence($research['claims']);
         if ($sources !== []) $sections['sources'] = ['evidence' => $sources];
 
-        $relatedMelodies = $this->safeList($relations['related_melodies'] ?? []);
+        $relatedMelodies = $this->safeList($relations['related_melodies'] ?? [], 'relation');
         if ($relatedMelodies !== []) $sections['related_melodies'] = ['items' => $relatedMelodies];
         if ($reference['score'] !== null) $sections['score'] = ['reference' => $reference['score']];
         if ($reference['audio'] !== []) $sections['audio'] = ['items' => $reference['audio']];
 
-        return $dossier + ['music_dossier' => [
+        return array_replace($dossier, ['music_dossier' => [
             'status' => 'AVAILABLE',
             'profile_key' => 'music-universal-dossier-v1',
             'section_order' => self::SECTION_ORDER,
@@ -70,18 +73,18 @@ final class MusicDossierProjection
             'score' => $reference['score'],
             'audio' => $reference['audio'],
             'warnings' => [],
-        ]];
+        ]]);
     }
 
     /** @return array{score:?array<string,mixed>,audio:list<array<string,mixed>>} */
     private function reference(?array $packet): array
     {
         if ($packet === null) return ['score' => null, 'audio' => []];
-        if (!array_key_exists('status', $packet)) $packet = $this->references->normalize($packet);
-        if (($packet['status'] ?? '') === 'INVALID') return ['score' => null, 'audio' => []];
+        $packet = $this->references->normalize($packet);
+        if (($packet['status'] ?? '') !== 'AVAILABLE') return ['score' => null, 'audio' => []];
         return [
-            'score' => is_array($packet['score'] ?? null) ? $this->safeValue($packet['score']) : null,
-            'audio' => $this->safeList($packet['audio'] ?? []),
+            'score' => is_array($packet['score'] ?? null) ? $this->safeScore($packet['score']) : null,
+            'audio' => $this->safeList($packet['audio'] ?? [], 'audio'),
         ];
     }
 
@@ -105,7 +108,7 @@ final class MusicDossierProjection
             $items = is_array($facets[$key] ?? null) ? $facets[$key] : [];
             foreach ($items as $item) {
                 if (!is_array($item) || trim((string) ($item['text'] ?? '')) === '') continue;
-                $claims[] = $this->safeValue($item);
+                $claims[] = $this->safeClaim($item);
             }
         }
         return $claims;
@@ -115,7 +118,7 @@ final class MusicDossierProjection
     private function relationItems(array $relations, array $groups): array
     {
         $items = [];
-        foreach ($groups as $group) foreach ($this->safeList($relations[$group] ?? []) as $item) $items[] = $item;
+        foreach ($groups as $group) foreach ($this->safeList($relations[$group] ?? [], 'relation') as $item) $items[] = $item;
         return $items;
     }
 
@@ -123,38 +126,130 @@ final class MusicDossierProjection
     private function evidence(array $claims): array
     {
         $items = [];
-        foreach ($claims as $claim) foreach ($this->safeList($claim['evidence'] ?? []) as $evidence) $items[] = $evidence;
+        foreach ($claims as $claim) foreach ($this->safeList($claim['evidence'] ?? [], 'evidence') as $evidence) $items[] = $evidence;
         return $items;
     }
 
     /** @return list<array<string,mixed>> */
-    private function safeList(mixed $value): array
+    private function safeList(mixed $value, string $kind = 'relation'): array
     {
         if (!is_array($value)) return [];
         $items = [];
-        foreach ($value as $item) if (is_array($item)) $items[] = $this->safeValue($item);
+        foreach ($value as $item) if (is_array($item)) {
+            $safe = match ($kind) {
+                'audio' => $this->safeAudio($item),
+                'article' => $this->safeArticle($item),
+                'claim' => $this->safeClaim($item),
+                'dictionary' => $this->safeDictionary($item),
+                'evidence' => $this->safeEvidence($item),
+                'media' => $this->safeMedia($item),
+                'score' => $this->safeScore($item),
+                'video' => $this->safeVideo($item),
+                default => $this->safeRelation($item),
+            };
+            if ($safe !== []) $items[] = $safe;
+        }
         return array_values(array_filter($items, static fn(array $item): bool => $item !== []));
     }
 
     /** @return array<string,mixed> */
-    private function safeValue(array $value): array
+    private function safeClaim(array $value): array
     {
-        foreach (['canonical_id', 'stable_key', 'revision', 'state', 'lifecycle', 'metadata', 'private_metadata', 'provenance'] as $key) unset($value[$key]);
-        foreach ($value as $key => $item) {
-            if (is_array($item)) $value[$key] = array_is_list($item) ? $this->safeSequence($item) : $this->safeValue($item);
-            elseif (is_object($item)) unset($value[$key]);
-        }
-        return $value;
+        $result = $this->pick($value, ['text', 'type', 'facet', 'scope', 'status', 'excerpt']);
+        if (isset($value['evidence'])) $result['evidence'] = $this->safeList($value['evidence'], 'evidence');
+        return $result;
     }
 
-    /** @param list<mixed> $items @return list<mixed> */
-    private function safeSequence(array $items): array
+    /** @return array<string,mixed> */
+    private function safeEvidence(array $value): array
     {
-        $result = [];
-        foreach ($items as $item) {
-            if (is_array($item)) $result[] = $this->safeValue($item);
-            elseif (is_scalar($item)) $result[] = $item;
+        return $this->pick($value, ['source_title', 'title', 'url', 'locator', 'label', 'excerpt', 'status']);
+    }
+
+    /** @return array<string,mixed> */
+    private function safeRelation(array $value): array
+    {
+        $result = $this->pick($value, ['type', 'title', 'name', 'url', 'excerpt', 'summary']);
+        if (isset($value['origin']) && is_array($value['origin'])) {
+            $origin = [];
+            $kind = $value['origin']['kind'] ?? null;
+            if (is_string($kind) && in_array($kind, ['DIRECT', 'DERIVED'], true)) $origin['kind'] = $kind;
+            $hopCount = $value['origin']['hop_count'] ?? null;
+            if (is_int($hopCount) && $hopCount >= 0) $origin['hop_count'] = $hopCount;
+            foreach (['predicates', 'via_types'] as $field) {
+                $items = $this->scalarList($value['origin'][$field] ?? []);
+                if ($items !== []) $origin[$field] = $items;
+            }
+            if ($origin !== []) $result['origin'] = $origin;
         }
         return $result;
+    }
+
+    /** @return array<string,mixed> */
+    private function safeMedia(array $value): array
+    {
+        return $this->pick($value, ['title', 'image_url', 'thumbnail_url', 'alt', 'summary', 'article_url', 'srcset', 'sizes', 'width', 'height', 'has_real_image']);
+    }
+
+    /** @return array<string,mixed> */
+    private function safeVideo(array $value): array
+    {
+        return $this->pick($value, ['type', 'title', 'name', 'url', 'excerpt', 'summary']);
+    }
+
+    /** @return array<string,mixed> */
+    private function safeArticle(array $value): array
+    {
+        return $this->pick($value, ['type', 'title', 'name', 'url', 'excerpt', 'summary', 'date']);
+    }
+
+    /** @return array<string,mixed> */
+    private function safeDictionary(array $value): array
+    {
+        return $this->pick($value, ['term', 'label', 'definition', 'part_of_speech', 'url']);
+    }
+
+    /** @return array<string,mixed> */
+    private function safeAudio(array $value): array
+    {
+        return $this->pick($value, ['mode', 'label', 'score_version', 'instrument', 'render_method', 'tuning', 'pitch_reference', 'tempo_bpm', 'duration_ms', 'source', 'rights', 'verification_status']);
+    }
+
+    /** @return array<string,mixed> */
+    private function safeScore(array $value): array
+    {
+        $result = $this->pick($value, ['version', 'source', 'verification_status', 'tuning', 'tempo_bpm']);
+        $result['events'] = [];
+        foreach (is_array($value['events'] ?? null) ? $value['events'] : [] as $event) {
+            if (!is_array($event)) continue;
+            $safe = $this->pick($event, ['pitch_class', 'octave', 'start_ms', 'duration_ms', 'phrase']);
+            if ($safe !== []) $result['events'][] = $safe;
+        }
+        $result['segments'] = [];
+        foreach (is_array($value['segments'] ?? null) ? $value['segments'] : [] as $segment) {
+            if (!is_array($segment)) continue;
+            $safe = $this->pick($segment, ['key', 'label', 'start_ms', 'end_ms']);
+            if ($safe !== []) $result['segments'][] = $safe;
+        }
+        return $result;
+    }
+
+    /** @return array<string,mixed> */
+    private function pick(array $value, array $fields): array
+    {
+        $result = [];
+        foreach ($fields as $field) {
+            $item = $value[$field] ?? null;
+            if (is_scalar($item) && trim((string) $item) !== '') $result[$field] = $item;
+            elseif (is_bool($item) || is_int($item) || is_float($item)) $result[$field] = $item;
+        }
+        return $result;
+    }
+
+    /** @return list<string> */
+    private function scalarList(mixed $value): array
+    {
+        if (!is_array($value)) return [];
+        return array_values(array_filter(array_map(static fn(mixed $item): string => is_scalar($item) ? trim((string) $item) : '', $value), static fn(string $item): bool => $item !== ''));
     }
 }
