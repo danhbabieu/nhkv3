@@ -6,7 +6,7 @@ namespace NHK\Core\Application\Capture;
 use NHK\Core\Application\Completion\CompletionCoordinator;
 use NHK\Core\Application\Graph\RelationshipOwnerContract;
 use NHK\Core\Contracts\Capture\CaptureRepository;
-use NHK\Core\Domain\Capture\{CaptureRecord, CapturePurpose, CaptureStage};
+use NHK\Core\Domain\Capture\{CaptureRecord, CapturePurpose, CaptureStage, ContentIntent};
 use NHK\Core\Domain\Governance\CommandCanonicalizer;
 use NHK\Core\Shared\Uuid\UuidCodec;
 
@@ -60,7 +60,7 @@ final class AuthorityCaptureService
         }
         $plan = ($this->planner)($input, $record);
         $editorial = [];
-        if ($purpose === CapturePurpose::MIXED && !$hasRelationshipOperations) {
+        if ($purpose === CapturePurpose::MIXED && !$hasRelationshipOperations && $this->requiresEditorialOwner($input)) {
             if (!is_callable($this->mixedEditorial)) throw new \RuntimeException('MIXED_EDITORIAL_OWNER_UNAVAILABLE');
             $editorial = ($this->mixedEditorial)($input, $record);
         }
@@ -150,6 +150,21 @@ final class AuthorityCaptureService
     {
         $left = array_values(array_unique(array_map('strval', $left))); $right = array_values(array_unique(array_map('strval', $right)));
         sort($left, SORT_STRING); sort($right, SORT_STRING); return $left === $right;
+    }
+
+    /**
+     * MIXED may carry a Knowledge/Video/Media child, but those intents do not
+     * own a WordPress Article. Omitted/legacy intent keeps the historical
+     * editorial owner behavior.
+     *
+     * @param array<string,mixed> $input
+     */
+    private function requiresEditorialOwner(array $input): bool
+    {
+        $value = strtoupper(trim((string) ($input['intent'] ?? '')));
+        if ($value === '') return true;
+        $intent = ContentIntent::tryFrom($value);
+        return $intent === null || $intent->requiresArticle();
     }
 
     /** @param array<string,mixed> $plan @param list<string> $approvedIds */

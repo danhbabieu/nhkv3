@@ -1300,12 +1300,18 @@ final class Plugin {
                 },
                 static function (\NHK\Core\Domain\Capture\CaptureRecord $record, array $result) use (&$capture): array {
                     if (!$capture instanceof \NHK\Core\Application\Capture\EditorialCaptureCoordinator) return ['status' => 'RECONCILIATION_PENDING', 'code' => 'EDITORIAL_RECONCILIATION_UNAVAILABLE', 'capture_id' => $record->captureId];
-                    $continued = $capture->continueWithAddendum($record, [
+                    $planningInput = is_array($record->context['planning_input'] ?? null) ? $record->context['planning_input'] : [];
+                    $continuationInput = [
                         'text' => '',
+                        'intent' => (string) ($planningInput['intent'] ?? ''),
+                        'title' => (string) ($planningInput['title'] ?? ''),
                         'subject_hints' => (array) ($record->context['subject_hints'] ?? []),
                         'observations' => (array) ($record->context['observations'] ?? []),
-                        'metadata' => (array) ($record->context['metadata'] ?? []),
-                    ]);
+                        'metadata' => is_array($planningInput['metadata'] ?? null) ? $planningInput['metadata'] : (array) ($record->context['metadata'] ?? []),
+                    ];
+                    if (array_key_exists('knowledge_observation', $planningInput)) $continuationInput['knowledge_observation'] = (string) $planningInput['knowledge_observation'];
+                    if (is_array($planningInput['knowledge_context'] ?? null)) $continuationInput['knowledge_context'] = $planningInput['knowledge_context'];
+                    $continued = $capture->continueWithAddendum($record, $continuationInput);
                     return ['status' => 'RECONCILED', 'capture_id' => $continued->captureId, 'article_id' => $continued->articleId, 'capture_status' => $continued->status, 'capture_stage' => $continued->stage, 'diagnostics' => $continued->diagnostics, 'capture_record' => $continued];
                 },
                 null,

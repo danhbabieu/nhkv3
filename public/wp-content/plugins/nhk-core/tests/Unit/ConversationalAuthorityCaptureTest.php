@@ -139,6 +139,97 @@ final class ConversationalAuthorityCaptureTest extends TestCase
         self::assertSame(1, $posts);
     }
 
+    public function test_mixed_knowledge_delta_does_not_require_an_article_draft(): void
+    {
+        $captures = new AuthorityCaptureRepository();
+        $editorialCalls = 0;
+        $service = new AuthorityCaptureService(
+            $captures,
+            static fn (array $input, CaptureRecord $capture): array => [
+                'reuse' => [],
+                'create_candidates' => [['candidate_id' => 'candidate-knowledge-subject']],
+                'plan_fingerprint' => str_repeat('d', 64),
+            ],
+            static function () use (&$editorialCalls): array {
+                ++$editorialCalls;
+                throw new \LogicException('KNOWLEDGE_DELTA must not invoke the Article owner');
+            },
+        );
+
+        $planned = $service->execute([
+            'idempotency_key' => 'mixed-knowledge-delta',
+            'purpose' => 'MIXED',
+            'intent' => 'KNOWLEDGE_DELTA',
+            'text' => 'ÔĐô 24 có cấu hình côn và búa cần bổ sung.',
+            'subject_hints' => ['ÔĐô 24'],
+            'authority_intent' => ['mode' => 'PLAN'],
+        ]);
+
+        self::assertNull($planned->articleId);
+        self::assertSame('PLANNED', $planned->status);
+        self::assertSame(0, $editorialCalls);
+    }
+
+    public function test_mixed_knowledge_delta_reconciles_on_same_capture_after_authority_apply(): void
+    {
+        $captures = new AuthorityCaptureRepository();
+        $editorialCalls = 0;
+        $continuationCalls = 0;
+        $service = new AuthorityCaptureService(
+            $captures,
+            static fn (array $input, CaptureRecord $capture): array => [
+                'reuse' => [[
+                    'candidate_id' => 'candidate-knowledge-subject',
+                    'action' => 'REUSE',
+                    'entity_type' => 'model',
+                    'canonical_uuid' => '11111111-1111-4111-8111-111111111111',
+                    'canonical_revision' => 2,
+                ]],
+                'plan_fingerprint' => str_repeat('e', 64),
+            ],
+            static function () use (&$editorialCalls): array {
+                ++$editorialCalls;
+                throw new \LogicException('KNOWLEDGE_DELTA must not invoke the Article owner');
+            },
+            static fn (CaptureRecord $capture, array $plan, array $ids): array => [
+                'status' => 'APPLIED',
+                'reused_candidates' => [[
+                    'candidate_id' => 'candidate-knowledge-subject',
+                    'canonical_readback' => [
+                        'canonical_id' => '11111111-1111-4111-8111-111111111111',
+                        'revision' => 2,
+                    ],
+                ]],
+            ],
+            static function (CaptureRecord $capture, array $result) use (&$continuationCalls): array {
+                ++$continuationCalls;
+                return ['status' => 'RECONCILED', 'capture_id' => $capture->captureId];
+            },
+        );
+
+        $planned = $service->execute([
+            'idempotency_key' => 'mixed-knowledge-delta-apply',
+            'purpose' => 'MIXED',
+            'intent' => 'KNOWLEDGE_DELTA',
+            'text' => 'FFR có cấu hình côn và búa cần bổ sung.',
+            'subject_hints' => ['FFR'],
+            'authority_intent' => ['mode' => 'PLAN'],
+        ]);
+        $applied = $service->continueWithApproval($planned->captureId, [
+            'authority_intent' => [
+                'mode' => 'APPLY_APPROVED_PLAN',
+                'approved_plan_fingerprint' => str_repeat('e', 64),
+                'approved_candidate_ids' => ['candidate-knowledge-subject'],
+            ],
+        ]);
+
+        self::assertNull($applied->articleId);
+        self::assertSame('APPLIED', $applied->status);
+        self::assertSame(0, $editorialCalls);
+        self::assertSame(1, $continuationCalls);
+        self::assertSame('RECONCILED', $applied->context['mixed_editorial_reconciliation']['status']);
+    }
+
     public function test_relationship_only_capture_never_invokes_editorial_owner_for_any_admission_purpose(): void
     {
         foreach ([null, 'AUTHORITY', 'MIXED'] as $ordinal => $purpose) {
