@@ -1,5 +1,55 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-08 — Universal Music Dossier Westminster-first implementation slice
+
+MUSIC_DOSSIER: Added the reusable `music-universal-dossier-v1` profile and
+read-only `MusicDossierProjection` over the existing Authority, Knowledge,
+Source/Evidence, Graph, Media, Video, Dictionary and Article dossier packets.
+The projection is entity-type driven for canonical `music` records and does
+not add an Authority field, Graph predicate, audio owner, migration, fixture,
+or semantic writer. Westminster is not hard-coded and no verified Westminster
+score/audio fact or asset was invented.
+
+REFERENCE_CONTRACT: `MusicReferenceContract` validates versioned score events,
+segments and audio metadata. Public audio requires VERIFIED status and rights;
+invalid or unavailable packets fail closed. The frontend renders score timing
+metadata only when validated and renders no playable source when an eligible
+audio URL is absent.
+
+FRONTEND: Entity detail now routes an AVAILABLE Music dossier through the
+generic Vietnamese-first `music-dossier.php` partial. Existing generic blocks
+are guarded only for the active Music dossier to avoid duplicate sections.
+`music-dossier.js` is progressive over native audio and synchronizes timing
+highlights when validated event timing exists. The asset manifest loads the
+controller only for entity family + `music` type; no horizontal-overflow hack
+was added.
+
+REGRESSION_COVERAGE: Focused Music/projection/frontend verification passed 180
+tests / 1,498 assertions with 3 existing warnings. The Contract suite passed 6
+tests / 48 assertions. The full Unit suite was rerun at 512M and remains
+baseline-red at 3,570 tests with 14 errors, 5 unrelated failures, 26 warnings,
+58 deprecations and 66 PHPUnit deprecations; the same Knowledge/Article
+identity and preview failures reproduce and no Music-related failure appeared.
+Changed-surface PHP lint is clean, JavaScript syntax check is clean,
+`git diff --check` is clean and the credential-like scan is clean.
+
+RUNTIME_EVIDENCE: UNVERIFIED. No usable local WordPress/browser runtime was
+available in this checkpoint, so canonical Music route resolution, populated
+render output, empty score/audio omission and responsive link/media checks are
+not claimed.
+
+NO_MUTATION: No V2/production/staging semantic write, migration, import,
+article-body population, deployment, push or cutover occurred. Explicit
+blockers remain: no verified Westminster score/audio asset, no durable audio
+owner/ingestion contract, broader Unit baseline failures, and no deployment.
+
+COMMITS: `912f97ef` score/audio contract, `a1106f70` universal projection,
+`03d6adf4` frontend wiring and generic Music dossier.
+
+STATUS: `UNIVERSAL_MUSIC_DOSSIER_IMPLEMENTED_LOCALLY / FOCUSED_GREEN /
+FULL_UNIT_BASELINE_FAILURES_RECORDED / RUNTIME_UNVERIFIED /
+NO_SEMANTIC_DATA_MUTATION / DEPLOYMENT_PENDING`
+
 # Checkpoint — 2026-10-07 — Media gallery readiness warning identity fix
 
 ROOT_CAUSE_CONFIRMED: `PublicMediaGalleryQuery::cardAssetReady()` emitted the
