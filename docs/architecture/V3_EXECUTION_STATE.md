@@ -24953,3 +24953,38 @@ Dictionary, Governance or Constitution record was mutated.
 REMAINING_GAP: Runtime read-back against the authorized TEST runtime and the
 connector-side `@v59` exposure remain unavailable locally; deployed MCP
 discoverability is therefore not claimed.
+
+# Checkpoint — 2026-10-08 — Article fail-closed boundary and Dictionary cursor exposure proof
+
+ROOT_CAUSE_CONFIRMED: Article semantic identity is split across its lawful
+owners. WordPress owns editorial post state and `_nhk_editorial_intent` when
+persisted; Graph owns the governed `wp_post → about → canonical endpoint`
+binding and relation-context scope; Capture owns a lifecycle
+`SubjectResolutionPacket`, not an Article semantic owner or durable
+continuation-lineage field. The audit reader therefore cannot safely promote
+Capture `content_intent`, title/body, Evidence/Source reachability or any
+synthetic lineage into Article duplicate identity. A bound row missing one of
+the required persisted fields remains `MODEL_GAP`; absent, retired-only or
+ambiguous bindings remain `LEGACY_UNRESOLVED`.
+
+IMPLEMENTED: No Article production mutation was justified. Existing bounded
+WP/Graph projection and coordinator attribution were retained, and a focused
+MCP regression now proves the Dictionary candidate-list `cursor` survives the
+catalog → Ability → stale Easy MCP connector descriptor projection with the
+canonical schema hash. The catalog already exposes `state`, `limit`, `cursor`;
+transport already forwards `cursor` to the keyset repository. No connector-
+specific exception, fake identity, migration, data repair or Governance
+bypass was added.
+
+VERIFIED: Focused Article, duplicate-audit, Dictionary pagination and MCP
+schema/contract tests pass: 66 tests / 3,141 assertions, with 58 existing
+PHPUnit deprecations. Runtime/API read-back is unavailable: DNS for
+`demo.1945.vn` fails in this environment, `NHK_WP_TEST_PATH` is unset and
+local MySQL is unavailable. No Côn hoa thị data, Capture, Graph, Dictionary,
+Governance or WordPress data was mutated.
+
+REMAINING_GAP: The supplied staging revision equals local HEAD, but staging
+read-back and connector `@v59` discovery cannot be verified here. If `@v59`
+still omits `cursor` after the runtime is reachable, refresh/reconnect that
+external connector session and re-run `tools/list`; repository-side parity is
+already enforced by the executable adapter and regression coverage.

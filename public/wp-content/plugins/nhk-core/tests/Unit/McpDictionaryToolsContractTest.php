@@ -28,6 +28,8 @@ final class McpDictionaryToolsContractTest extends TestCase
             self::assertArrayHasKey($name, $tools);
             self::assertTrue(McpDispatchRegistry::hasHandler($name));
         }
+        self::assertSame(['state', 'limit', 'cursor'], array_keys($tools['nhk.dictionary.candidate.list']['inputSchema']['properties']));
+        self::assertSame([], $tools['nhk.dictionary.candidate.list']['inputSchema']['required']);
         self::assertSame('mutation', $tools['nhk.dictionary.concept.update']['kind']);
         self::assertContains('idempotency_key', $tools['nhk.dictionary.concept.update']['inputSchema']['required']);
         self::assertContains('expected_revision', $tools['nhk.dictionary.concept.update']['inputSchema']['required']);
