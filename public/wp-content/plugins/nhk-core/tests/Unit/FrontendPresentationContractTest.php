@@ -104,6 +104,13 @@ final class FrontendPresentationContractTest extends TestCase
         self::assertStringContainsString('.latest-feed-card-image{display:block;width:100%;height:100%;object-fit:contain}', $css);
     }
 
+    public function test_shared_presentation_stylesheet_bounds_dictionary_gallery_images_without_entity_asset(): void
+    {
+        $css = $this->read('presentation.css');
+
+        self::assertStringContainsString('.media-figure img{display:block;width:100%;height:auto;max-width:100%;object-fit:contain}', $css);
+    }
+
     public function test_base_stylesheet_bounds_home_hero_horizontal_layout(): void
     {
         $css = $this->read('style.css');

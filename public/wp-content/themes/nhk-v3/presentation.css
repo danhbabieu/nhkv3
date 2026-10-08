@@ -51,6 +51,7 @@
 .nhk-media--landscape .media-card-image{aspect-ratio:4/3}
 .nhk-media--unknown .media-card-image{aspect-ratio:16/9}
 .visual-frame img,.card-image img,.featured-image img,.entity-card-image img,.entity-hero-visual img,.media-figure img{object-fit:contain}
+.media-figure img{display:block;width:100%;height:auto;max-width:100%;object-fit:contain}
 .visual-frame.nhk-media--portrait{aspect-ratio:4/5;max-width:min(100%,360px);margin-inline:auto}
 .visual-frame.nhk-media--square{aspect-ratio:1}
 .visual-frame.nhk-media--landscape{aspect-ratio:4/3}

@@ -24823,3 +24823,30 @@ requires the existing exact canonical repair packet and Governance lifecycle.
 
 STATUS: `NATURAL_DICTIONARY_SEMANTIC_HANDOFF_FIXED_LOCALLY / REPLAY_FIXED /
 COMPLETION_FIXED / CLEANUP_NO_MUTATION / COMMIT_PENDING`.
+
+# Checkpoint — 2026-10-07 — Dictionary detail gallery intrinsic-image overflow fixed locally
+
+ROOT_CAUSE_CONFIRMED: The Dictionary detail route enqueued `presentation.css`
+and `dictionary.css`, but the intrinsic-image bounds for `.media-figure img`
+were defined only in `entity.css`. Dictionary gallery images therefore fell
+back to their natural 1605–1680px width/height and overflowed the three-column
+gallery; the shared presentation selector only supplied `object-fit`.
+
+IMPLEMENTED: Added a shared `.media-figure img` rule to `presentation.css` with
+block layout, container width, `max-width:100%` and automatic height, then
+bumped the presentation asset version from `1.0.4` to `1.0.5` for cache
+invalidation. Added a regression contract test covering Dictionary routes
+without the Entity asset. No image data, semantic record, staging record or
+production record was changed.
+
+VERIFIED: The red regression test failed before the CSS change and passed after
+it. The focused frontend asset/presentation selection passes 63 tests / 401
+assertions with 2 warnings. Changed PHP files pass lint, `git diff --check`
+passes, and the changed-scope secret scan found no high-signal secret pattern.
+The default full suite reaches 3,692 tests / 21,822 assertions but retains 46
+environment/baseline errors and 29 unrelated existing failures; local HTTP
+runtime is unavailable and no live deployment or push was performed.
+
+STATUS: `DICTIONARY_GALLERY_CSS_OVERFLOW_FIXED_LOCALLY / FOCUSED_GREEN /
+FULL_SUITE_BASELINE_ERRORS_RECORDED / LOCAL_RUNTIME_UNAVAILABLE /
+NO_DATA_MUTATION / NO_DEPLOYMENT / COMMIT_PENDING`.

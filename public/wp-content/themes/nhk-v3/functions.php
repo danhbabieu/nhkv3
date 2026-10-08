@@ -34,7 +34,7 @@ function nhk_v3_assets(): void
     $dependencies = class_exists('NHK\\Core\\Application\\Presentation\\PublicTemplateFamilyAssetManifest')
         ? \NHK\Core\Application\Presentation\PublicTemplateFamilyAssetManifest::dependencies()
         : ['nhk-v3-presentation' => ['nhk-v3-style']];
-    wp_register_style('nhk-v3-presentation', get_theme_file_uri('presentation.css'), $dependencies['nhk-v3-presentation'] ?? ['nhk-v3-style'], '1.0.4');
+    wp_register_style('nhk-v3-presentation', get_theme_file_uri('presentation.css'), $dependencies['nhk-v3-presentation'] ?? ['nhk-v3-style'], '1.0.5');
     wp_register_style('nhk-v3-entity', get_theme_file_uri('entity.css'), $dependencies['nhk-v3-entity'] ?? ['nhk-v3-style'], '1.1.0');
     wp_register_style('nhk-v3-media-video', get_theme_file_uri('media-video.css'), $dependencies['nhk-v3-media-video'] ?? ['nhk-v3-style'], '1.0.3');
     wp_register_style('nhk-v3-knowledge', get_theme_file_uri('knowledge.css'), $dependencies['nhk-v3-knowledge'] ?? ['nhk-v3-style'], '1.0.2');
