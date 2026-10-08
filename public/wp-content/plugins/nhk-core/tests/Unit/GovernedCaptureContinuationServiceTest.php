@@ -567,6 +567,75 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
         }
     }
 
+    public function test_duplicate_candidates_produce_one_knowledge_plan_and_one_relation_plan(): void
+    {
+        $service = new GovernedCaptureContinuationService($this->createMock(GovernedLifecycle::class), static fn (): array => [], $this->policies(), static fn (): bool => true);
+        $plans = new \ReflectionMethod($service, 'plans');
+        $plans->setAccessible(true);
+        $subject = UuidCodec::newV7();
+        $candidate = ['text' => 'Mặt số màu xanh.', 'facet' => 'identity', 'provenance' => 'EXPLICIT_USER_KNOWLEDGE', 'evidence_refs' => ['evidence-1']];
+
+        $planned = $plans->invoke($service, 'capture-duplicate-candidates', 'continuation:duplicate-candidates', [
+            'content_intent' => ['intent' => 'KNOWLEDGE_DELTA'],
+            'subject_resolution' => ['resolved' => [['id' => $subject, 'type' => 'model', 'revision' => 3]]],
+            'interpretation' => [
+                'user_claim_candidates' => [$candidate, $candidate],
+                'structured_interpretation_packet' => ['semantic_assertions' => [['text' => $candidate['text']]], 'dictionary_owner_commands' => []],
+            ],
+        ]);
+
+        self::assertCount(1, array_filter($planned, static fn (array $plan): bool => ($plan['entity_type'] ?? '') === 'knowledge'));
+        self::assertCount(1, array_filter($planned, static fn (array $plan): bool => ($plan['entity_type'] ?? '') === 'relation'));
+    }
+
+    public function test_candidates_with_distinct_provenance_remain_distinct(): void
+    {
+        $service = new GovernedCaptureContinuationService($this->createMock(GovernedLifecycle::class), static fn (): array => [], $this->policies(), static fn (): bool => true);
+        $plans = new \ReflectionMethod($service, 'plans');
+        $plans->setAccessible(true);
+        $subject = UuidCodec::newV7();
+        $text = 'Mặt số màu xanh.';
+        $planned = $plans->invoke($service, 'capture-distinct-provenance', 'continuation:distinct-provenance', [
+            'content_intent' => ['intent' => 'KNOWLEDGE_DELTA'],
+            'subject_resolution' => ['resolved' => [['id' => $subject, 'type' => 'model', 'revision' => 3]]],
+            'interpretation' => [
+                'user_claim_candidates' => [
+                    ['text' => $text, 'facet' => 'identity', 'provenance' => 'EXPLICIT_USER_KNOWLEDGE', 'evidence_refs' => ['evidence-1']],
+                    ['text' => $text, 'facet' => 'identity', 'provenance' => 'OBSERVED_FROM_MEDIA', 'evidence_refs' => ['evidence-2']],
+                ],
+                'structured_interpretation_packet' => ['semantic_assertions' => [['text' => $text]], 'dictionary_owner_commands' => []],
+            ],
+        ]);
+        $knowledge = array_values(array_filter($planned, static fn (array $plan): bool => ($plan['entity_type'] ?? '') === 'knowledge'));
+
+        self::assertCount(2, $knowledge);
+        self::assertNotSame($knowledge[0]['idempotency_key'], $knowledge[1]['idempotency_key']);
+    }
+
+    public function test_valid_knowledge_candidate_survives_missing_source_evidence_as_pending_dependency(): void
+    {
+        $service = new GovernedCaptureContinuationService($this->createMock(GovernedLifecycle::class), static fn (): array => [], $this->policies(), static fn (): bool => true);
+        $plans = new \ReflectionMethod($service, 'plans');
+        $plans->setAccessible(true);
+        $subject = UuidCodec::newV7();
+        $planned = $plans->invoke($service, 'capture-pending-provenance', 'continuation:pending-provenance', [
+            'content_intent' => ['intent' => 'KNOWLEDGE_DELTA'],
+            'subject_resolution' => ['resolved' => [['id' => $subject, 'type' => 'music', 'revision' => 24]]],
+            'interpretation' => [
+                'user_claim_candidates' => [['text' => 'Westminster có lịch đánh chuông.', 'facet' => 'music', 'provenance' => 'EXPLICIT_USER_KNOWLEDGE']],
+                'structured_interpretation_packet' => ['semantic_assertions' => [['text' => 'Westminster có lịch đánh chuông.']], 'dictionary_owner_commands' => []],
+            ],
+            'relation_policy' => ['require_evidence' => true],
+        ]);
+        $knowledge = array_values(array_filter($planned, static fn (array $plan): bool => ($plan['entity_type'] ?? '') === 'knowledge'));
+        $relations = array_values(array_filter($planned, static fn (array $plan): bool => ($plan['entity_type'] ?? '') === 'relation'));
+
+        self::assertCount(1, $knowledge);
+        self::assertCount(1, $relations);
+        self::assertSame([$knowledge[0]['candidate_id']], $relations[0]['dependency_ids']);
+        self::assertNotSame('NOT_APPLICABLE', $knowledge[0]['entity_type']);
+    }
+
     public function test_incompatible_knowledge_scope_reports_the_precise_handoff_blocker(): void
     {
         $subject = UuidCodec::newV7();

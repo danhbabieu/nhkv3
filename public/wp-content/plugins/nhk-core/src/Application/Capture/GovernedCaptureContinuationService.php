@@ -401,6 +401,7 @@ final class GovernedCaptureContinuationService
             $candidates = $deltaText !== ''
                 ? [['text' => $deltaText, 'provenance' => 'EXPLICIT_USER_KNOWLEDGE', 'candidate_source' => 'CONTINUATION_DELTA']]
                 : (array) ($context['interpretation']['user_claim_candidates'] ?? []);
+            $seenKnowledgeCandidates = [];
             foreach ($candidates as $candidate) {
                 if (!is_array($candidate) || trim((string) ($candidate['text'] ?? '')) === '') continue;
                 $candidateGuard = $this->semanticClaimCandidateGuard->evaluate($candidate, (array) ($context['interpretation'] ?? []));
@@ -422,11 +423,29 @@ final class GovernedCaptureContinuationService
                     $this->semanticGuardFailures[] = 'KNOWLEDGE_FACET_UNSUPPORTED';
                     continue;
                 }
+                $normalizedText = preg_replace('/\s+/u', ' ', trim((string) $candidate['text'])) ?: trim((string) $candidate['text']);
+                $provenance = strtoupper(trim((string) ($candidate['provenance'] ?? 'EXPLICIT_USER_KNOWLEDGE')));
+                $evidenceRefs = $this->normalizedCandidateReferences($candidate['evidence_refs'] ?? []);
+                $sourceRefs = $this->normalizedCandidateReferences($candidate['source_refs'] ?? ($candidate['source_ids'] ?? []));
+                $candidateIdentity = [
+                    'capture_id' => $captureId,
+                    'subject_id' => (string) $subject['id'],
+                    'subject_type' => (string) ($subject['type'] ?? ''),
+                    'text' => $normalizedText,
+                    'scope' => $scope,
+                    'facet' => $facet,
+                    'provenance' => $provenance,
+                    'evidence_refs' => $evidenceRefs,
+                    'source_refs' => $sourceRefs,
+                ];
+                $candidateKey = hash('sha256', CommandCanonicalizer::canonicalize($candidateIdentity));
+                if (isset($seenKnowledgeCandidates[$candidateKey])) continue;
+                $seenKnowledgeCandidates[$candidateKey] = true;
                 if ($this->claimReuse?->find(['text' => (string) $candidate['text'], 'subject_id' => (string) $subject['id'], 'scope' => $scope], $this->retrievedClaims($context)) !== null) continue;
                 $payload = [
-                    'stable_key' => 'nhk:knowledge:capture.' . hash('sha256', CommandCanonicalizer::canonicalize([$captureId, $subject['id'], trim((string) $candidate['text'])])),
-                    'text' => trim((string) $candidate['text']), 'claim_type' => 'fact',
-                    'provenance' => ['metadata' => ['facet' => $facet, 'scope' => $scope, 'version' => 1, 'subject_id' => $subject['id'], 'subject_type' => $subject['type']], 'origin' => (string) ($candidate['provenance'] ?? 'EXPLICIT_USER_KNOWLEDGE')],
+                    'stable_key' => 'nhk:knowledge:capture.' . hash('sha256', CommandCanonicalizer::canonicalize($candidateIdentity)),
+                    'text' => $normalizedText, 'claim_type' => 'fact',
+                    'provenance' => ['metadata' => ['facet' => $facet, 'scope' => $scope, 'version' => 1, 'subject_id' => $subject['id'], 'subject_type' => $subject['type']], 'origin' => $provenance],
                 ];
                 $knowledgePlan = $this->arguments('knowledge', 'ingest', (string) $subject['id'], $payload, 'capture:' . $captureId . ':knowledge:' . hash('sha256', (string) $payload['stable_key']));
                 $knowledgePlan['candidate_id'] = 'knowledge-candidate-' . hash('sha256', (string) $payload['stable_key']);
@@ -531,6 +550,30 @@ final class GovernedCaptureContinuationService
             $plans[array_key_last($plans)] = $this->scopeVideoPlan($captureId, $plans[array_key_last($plans)], $context);
         }
         return $plans;
+    }
+
+    /** @return list<mixed> */
+    private function normalizedCandidateReferences(mixed $references): array
+    {
+        $normalized = [];
+        foreach ((array) $references as $reference) {
+            if (is_array($reference)) {
+                $reference = array_intersect_key($reference, array_flip(['evidence_id', 'source_id', 'canonical_id', 'id', 'revision']));
+                if ($reference === []) continue;
+                ksort($reference, SORT_STRING);
+            } elseif (!is_scalar($reference)) {
+                continue;
+            } else {
+                $reference = trim((string) $reference);
+                if ($reference === '') continue;
+            }
+            $normalized[] = $reference;
+        }
+        usort($normalized, static fn (mixed $left, mixed $right): int => strcmp(
+            CommandCanonicalizer::canonicalize($left),
+            CommandCanonicalizer::canonicalize($right),
+        ));
+        return $normalized;
     }
 
     /** @param array<string,mixed> $context @param array<string,mixed> $payload */
