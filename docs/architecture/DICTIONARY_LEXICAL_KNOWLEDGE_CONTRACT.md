@@ -9,7 +9,7 @@ produce a competing indexable Dictionary page, and fail closed when owner
 selection is ambiguous. Standalone kim cương entries remain dedicated and
 indexable when their current eligibility contract passes.
 
-> **APPROVED SUBORDINATE CONTRACT — updated 2026-10-04.**
+> **APPROVED SUBORDINATE CONTRACT — updated 2026-10-08.**
 > This contract is subordinate to `docs/constitution/NHK_V3_CONSTITUTION.md`.
 > It introduces a bounded lexical/curation layer. It does **not** create a new
 > Authority entity type, Graph predicate, semantic evidence source, Article body
@@ -410,6 +410,333 @@ not Evidence and not an approval event.
 Curation should expose enough provenance for the editor to see observed forms,
 where the term appeared, current suggestions, destination candidates and why a
 candidate is ambiguous before deciding.
+
+
+## 6.1 New Dictionary item creation and research completeness contract — 2026-10-08
+
+This section defines what the system must know, what it should research, and
+what may remain optional whenever a genuinely new Dictionary item is being
+considered. It applies to a new Entry with its first Sense, a legacy Concept
+draft that may later materialize as Entry/Sense, and an additional Sense or Form
+proposed for an existing Entry.
+
+This is a **planning and curation completeness contract**, not a new semantic
+owner and not a schema migration. Existing Dictionary owners remain
+Entry/Form/Sense/Concept/Candidate/Mention. Authority, Knowledge, Graph,
+Source/Evidence, Media, Video and WordPress keep their existing ownership.
+Research output may be ephemeral; it must not be copied into lexical storage as
+a second semantic dossier.
+
+The creation law is:
+
+```text
+SEARCH EXISTING LEXICAL IDENTITY
+→ BOUND ONE MEANING
+→ COLLECT REQUIRED LEXICAL RESEARCH
+→ RESOLVE / DELEGATE CANONICAL OWNER WHEN APPLICABLE
+→ CREATE OR ENRICH DRAFT
+→ REPORT REMAINING RESEARCH NEEDS
+→ APPROVE/PUBLISH ONLY WHEN READINESS PASSES
+```
+
+A minimal API payload is not proof of research completeness. In particular,
+the current Entry+first-Sense creation boundary requires a preferred form and a
+non-empty definition, while the legacy Concept draft boundary can technically
+carry less. A legacy minimal draft remains **research-incomplete** until the
+requirements below are satisfied.
+
+### 6.1.1 Field and research priority classes
+
+The following classes are normative for planning:
+
+- **REQUIRED_FOR_DRAFT_IDENTITY** — without this the system must not mint a new
+  Entry/Sense identity; keep or create a private Candidate/review state instead.
+- **REQUIRED_BEFORE_CURATED_READY** — may be completed after a draft exists,
+  but approval/public readiness must not pretend the research is complete while
+  it is missing.
+- **RECOMMENDED_WHEN_APPLICABLE** — the system should actively look for it and
+  report a gap when useful, but absence alone does not invalidate an otherwise
+  clear Sense.
+- **OPTIONAL_ENRICHMENT** — useful presentation/discovery material; never a
+  prerequisite merely to fill a page.
+- **SYSTEM_DERIVED** — produced by the runtime from canonical state; operators
+  and research agents do not invent it.
+
+| Item | Priority | Owner / storage law | Research / creation rule |
+| --- | --- | --- | --- |
+| Preferred headword / preferred form | REQUIRED_FOR_DRAFT_IDENTITY | Entry preferred form; compatibility Concept preferred label during transition | Preserve human-readable Vietnamese wording; do not replace display text with lookup normalization. |
+| Normalized preferred form | SYSTEM_DERIVED | Dictionary lookup/index boundary | Derive deterministically from the preferred form; never use normalization alone to prove same Sense. |
+| One bounded lexical meaning / Sense boundary | REQUIRED_FOR_DRAFT_IDENTITY | Sense/DictionaryConcept | The system must be able to state what this term means in the intended domain/context. If two meanings remain viable, do not collapse them; return ambiguity/review. |
+| Concise definition | REQUIRED_FOR_DRAFT_IDENTITY for Entry+first-Sense; REQUIRED_BEFORE_CURATED_READY for legacy draft | Sense/DictionaryConcept | Explain the lexical meaning, not an encyclopedic dossier. Factual claims discovered while defining the term remain owned by Knowledge/Authority with normal provenance. |
+| Duplicate/reuse decision | REQUIRED_FOR_DRAFT_IDENTITY | Planning/resolution result, not a copied field | Search existing Entry/Form/Sense, Concept/Label, suppressed candidates and applicable canonical owners before create. |
+| Status, lexical UUIDs, revision, timestamps, audit/idempotency | SYSTEM_DERIVED | Dictionary runtime/governance | Never research or hand-author these as semantic content. |
+| Domain/context/usage scope | REQUIRED_BEFORE_CURATED_READY when needed to distinguish meaning; otherwise RECOMMENDED | Bounded Sense/Entry context | Record only the context needed to explain or disambiguate the lexical meaning: technical domain, collector/community register, locale, period or bounded usage scope. |
+| Locale/language | RECOMMENDED; REQUIRED when language/locale affects resolution | Entry/Form/Sense context | Do not assume a foreign, transliterated or regional form is Vietnamese or equivalent without confirmation. |
+| Alternate spelling / synonym forms | RECOMMENDED_WHEN_APPLICABLE | Entry/Form | Same meaning + alternate wording normally becomes a Form, not a new Sense. |
+| Colloquial/community form | RECOMMENDED_WHEN_APPLICABLE | Entry/Form | Community usage can attest wording; it does not by itself prove factual truth or owner identity. |
+| Technical form | RECOMMENDED_WHEN_APPLICABLE | Entry/Form | Prefer documented technical terminology when it is genuinely used for the same Sense. |
+| Phonetic/transliteration form | OPTIONAL_ENRICHMENT unless required for resolution | Entry/Form | Preserve reading/transliteration as lexical presentation; never let phonetic similarity merge Senses. |
+| Usage note / bounded example | RECOMMENDED_WHEN_APPLICABLE | Sense context / lexical presentation | Keep examples short and attributable to source context where available; do not copy long copyrighted passages. |
+| Lexical attestation/provenance | REQUIRED_BEFORE_CURATED_READY | Candidate/Mention/source-context lineage; not Knowledge Evidence | At least one recoverable observation must explain why the term/meaning exists. Human curation can be an attestation source. Independent external lexical sources are preferred for uncommon, disputed or technical terms. |
+| Canonical semantic owner decision | REQUIRED_BEFORE_CURATED_READY | Entry↔Sense semantic_reference when an exact owner exists; otherwise explicit standalone/review outcome | Search Authority/Public Identity, Knowledge and Article destinations. Do not create a semantic owner merely to satisfy Dictionary. |
+| Semantic reference | RECOMMENDED when exact owner exists; otherwise absent is valid | Existing Entry↔Sense mapping | Persist only an exact typed owner reference after resolution. A hint or URL is not mapping truth. |
+| Destination URL | SYSTEM_DERIVED / compatibility only | Public projection / compatibility snapshot | Never research or use URL as semantic identity. Resolve current route from the owner at read time. |
+| Related lexical terms | OPTIONAL_ENRICHMENT | Dictionary lexical relations | Research only after Sense identity is clear. Use registered kinds and review; similarity/co-occurrence never writes a relation automatically. |
+| Owner-backed factual context | OPTIONAL_ENRICHMENT | Authority/Knowledge/Graph owners | Read/project from canonical owners. Never copy their payload into Dictionary merely to make the entry look complete. |
+| Illustrative Media | OPTIONAL_ENRICHMENT | Media/MediaUsage/projection | Search existing eligible Media first. Illustration does not prove the definition or semantic relation. |
+| Video / Article reading material | OPTIONAL_ENRICHMENT | Existing Video/WordPress/public projection | Link/project only through approved existing boundaries; do not create them just to enrich a Dictionary page. |
+| Public slug, canonical URL, SEO/schema/indexability | SYSTEM_DERIVED | Public Identity / SEO projection | Derived only after ownership/readiness. Never a research prerequisite and never identity input. |
+
+### 6.1.2 Definition quality law
+
+A Dictionary definition should answer **what the term means**, not attempt to
+store everything known about the subject. A useful definition normally contains:
+
+1. the general class or role of the term;
+2. the distinguishing characteristic that separates this Sense from nearby
+   meanings;
+3. the bounded domain/context when omission would make the definition
+   ambiguous.
+
+A stable editorial shape is:
+
+```text
+[Preferred term] is [general lexical class/role] used to mean
+[distinguishing meaning] in [bounded context when needed].
+```
+
+This is a writing pattern, not a literal template. Definitions must remain
+Vietnamese-first for the public Vietnamese Dictionary unless the item is
+explicitly a foreign-language form. Marketing claims, unsupported absolutes,
+specimen-specific observations and owner payload dumps are prohibited.
+
+If research uncovers a factual proposition needed beyond the concise lexical
+definition, the system must hand that proposition to the owning
+Knowledge/Authority/Graph workflow rather than expanding the Dictionary
+definition into a second truth store.
+
+### 6.1.3 Mandatory research checklist before creating a new lexical identity
+
+Whenever a new Entry/Sense is contemplated, the research agent/operator must
+check the following in order and report the result explicitly.
+
+**A. Existing lexical identity / duplicate check**
+
+- exact preferred form;
+- normalized form;
+- existing PREFERRED/ALTERNATE/COLLOQUIAL/TECHNICAL/PHONETIC/HIDDEN forms;
+- existing Entry→Sense mappings;
+- existing Concepts/Labels during compatibility;
+- unresolved, rejected and `DO_NOT_SUGGEST` candidates;
+- homographs with different contexts.
+
+The first question is always: **does this already exist as an Entry, Form or
+Sense?** Different wording does not imply a new identity, and identical wording
+does not imply the same Sense.
+
+**B. Meaning and Sense boundary**
+
+Research:
+
+- the concise meaning in the NHK domain;
+- what distinguishes it from near terms;
+- whether the same surface term has more than one meaning;
+- domain, technical/collector register, locale or historical-period context when
+  relevant;
+- conditions under which the term would be misleading or ambiguous.
+
+If one bounded meaning cannot be established, return review/ambiguity rather
+than creating a new Sense.
+
+**C. Forms and real usage**
+
+Look for:
+
+- alternate spellings;
+- synonyms used for the same Sense;
+- collector/community wording;
+- technical/professional wording;
+- foreign-language original or transliteration when genuinely relevant;
+- pronunciation/phonetic form only when useful.
+
+Every proposed Form must answer: **is this another way to name the same Sense,
+or a different Sense?** If uncertain, do not attach automatically.
+
+**D. Canonical owner resolution**
+
+Search internal canonical inventory before external research:
+
+- Authority/Public Identity;
+- Knowledge;
+- Article editorial owner when applicable;
+- existing delegated Dictionary mapping.
+
+The outcome must be explicit:
+
+- an exact owner exists and may be referenced/delegated;
+- no better canonical semantic owner is proven, so Dictionary may remain
+  standalone lexical content;
+- multiple owners/meanings remain viable, so review is required.
+
+A URL, matching title, same normalized label or Graph reachability is not owner
+identity.
+
+**E. Lexical attestation and research sources**
+
+Collect enough source context to explain where the term and meaning came from.
+Use the following research priority:
+
+1. **Internal canonical NHK inventory** for existing identity, prior approved
+   terminology, aliases and owner mapping.
+2. **Primary/authoritative external material** when available: manufacturer
+   manuals/catalogs, museum/archive records, standards, technical publications,
+   official documentation or contemporaneous historical material.
+3. **Reputable specialist secondary material** for terminology explanation,
+   comparison and historical usage.
+4. **Collector/community usage** for colloquial forms and actual vocabulary;
+   useful as lexical attestation, not sufficient by itself for unrelated
+   factual claims.
+5. **Weak discovery signals** such as search snippets, OCR, filenames,
+   marketplace copy, social posts, model recognition or generated text are leads
+   only. They may suggest a query or Candidate but never establish identity or
+   authoritative meaning by themselves.
+
+Dictionary research provenance is lexical provenance. If a discovered factual
+claim needs to be published as truth, it enters the normal Source/Evidence and
+Knowledge/Graph lifecycle separately.
+
+**F. Relations and neighborhood**
+
+Only after Sense identity is clear, look for genuine:
+
+- `RELATED`;
+- `SAME_TERM_FAMILY`;
+- `BROADER`;
+- `NARROWER`;
+- `NEAR_SYNONYM`.
+
+These are optional enrichment. Similarity, embedding distance, frequency and
+co-occurrence are candidate signals only.
+
+**G. Reader-facing completeness**
+
+Check whether the entry would benefit from:
+
+- one clear usage/context note;
+- one or more accepted public Forms;
+- exact canonical-owner link when delegated;
+- an existing illustrative Media item;
+- existing related reading through approved projections.
+
+Do not create fake relations, Media, Video, Articles or Knowledge merely to fill
+missing sections.
+
+### 6.1.4 Research-needs packet
+
+Every planning/research pass for a proposed new Dictionary item should produce a
+bounded **research-needs packet**. This is an ephemeral planning object unless a
+future implementation explicitly persists it; it is not a new owner or schema.
+
+The packet should contain at least:
+
+```text
+term
+candidate_or_entry_reference        if one already exists
+sense_summary
+duplicate_check
+owner_resolution
+
+required:
+  found[]
+  missing[]
+  ambiguous[]
+
+recommended:
+  found[]
+  missing[]
+  not_applicable[]
+
+optional:
+  found[]
+  missing[]
+  not_applicable[]
+
+search_plan:
+  question
+  target_source_family
+  query_seed
+  stop_condition
+
+readiness
+blockers[]
+warnings[]
+```
+
+Allowed planning readiness labels are descriptive only and do not replace the
+persisted Dictionary status:
+
+- `CANDIDATE_ONLY` — lexical identity or Sense is not yet bounded;
+- `DRAFT_MINIMUM` — one non-duplicate lexical identity and concise definition
+  are sufficient to preserve a draft;
+- `RESEARCH_INCOMPLETE` — draft exists but required curation research is
+  missing;
+- `CURATION_READY` — required research is complete and ambiguity/ownership
+  decisions are explicit;
+- `PUBLIC_READY` — persisted approval plus the existing public
+  eligibility/indexability contract passes;
+- `REVIEW_REQUIRED` — ambiguity, ownership conflict, duplicate uncertainty or
+  source/context conflict remains.
+
+The system must not convert a descriptive readiness label into an approval or
+write authorization.
+
+### 6.1.5 Gap-driven search planning
+
+Research must be driven by missing fields, not by generic browsing. At minimum:
+
+| Missing need | Search direction |
+| --- | --- |
+| Existing identity uncertain | Search Dictionary Entry/Form/Sense/Concept/Candidate first; then Authority/Public Identity and canonical internal search. |
+| Definition weak or missing | Search primary technical/historical sources first, then reputable specialist references; compare meanings rather than copying prose. |
+| Sense boundary unclear | Search contrastive uses, domain-specific definitions and real usage contexts; stop at ambiguity if meanings cannot be separated safely. |
+| Alternate/technical/colloquial forms missing | Search catalogs/manuals, specialist literature and collector/community corpora; keep each source family distinct. |
+| Locale/transliteration uncertain | Search language-specific authoritative usage; do not infer equivalence from spelling similarity. |
+| Canonical owner uncertain | Search internal owner inventory and current public identity before any external title/URL matching. |
+| Term is disputed or rare | Require multiple independent source families when practical and expose disagreement; do not force consensus. |
+| Related lexical terms missing | Search only after Sense identity is stable; propose registered lexical relations for review. |
+| Illustration missing | Search existing canonical Media/MediaUsage before considering any new media intake. |
+
+Each search direction must have a stop condition. Typical stop conditions are:
+one exact reusable lexical identity found; one bounded Sense established;
+canonical owner uniquely resolved; required attestation obtained; or ambiguity
+remains and human review is required. Research must not continue merely to make
+every optional slot non-empty.
+
+### 6.1.6 Operational reminder for agents and MCP/Admin workflows
+
+Before any `CREATE_DRAFT`, `CREATE_ENTRY_WITH_SENSE` or equivalent curated
+new-item action, the agent/operator must summarize:
+
+```text
+KNOWN
+MISSING_REQUIRED
+MISSING_RECOMMENDED
+OPTIONAL_GAPS
+DUPLICATE_RESULT
+OWNER_RESOLUTION
+SEARCH_PLAN
+READINESS
+```
+
+If `MISSING_REQUIRED` is non-empty or duplicate/owner resolution is ambiguous,
+the safe action is Candidate/review/draft preservation, not public approval and
+not a second lexical identity.
+
+The existence of a low-level internal/admin create tool does not waive this
+research law. A direct mutation boundary may enforce only structural fields;
+the curation workflow must still apply this completeness contract before
+claiming that a new Dictionary item is complete, approved or public-ready.
+
 
 ## 7. Duplicate prevention
 
