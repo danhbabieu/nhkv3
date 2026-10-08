@@ -154,6 +154,20 @@ final class MusicCoverageAssessmentTest extends TestCase
         self::assertStringContainsString('Neither is a historical Big Ben recording.', $standard);
     }
 
+    public function test_existing_media_without_rights_is_blocked_even_without_audio(): void
+    {
+        $dossier = $this->emptyDossier('Image-only Music');
+        $dossier['media_gallery'] = [[
+            'title' => 'Unlicensed diagram',
+            'image_url' => '/anh/diagram.webp',
+            'rights_status' => 'RIGHTS_REVIEW_REQUIRED',
+        ]];
+
+        $assessment = (new MusicCoverageAssessment())->assess($this->entity('Image-only Music'), $dossier);
+
+        self::assertSame('BLOCKED', $assessment['categories']['X']['status']);
+    }
+
     private function entity(string $name): AuthorityEntity
     {
         return new AuthorityEntity(UuidCodec::newV7(), 'music', 'nhk:music:' . strtolower(str_replace(' ', '-', $name)), $name, 1, [], AuthorityState::ACTIVE, 1);

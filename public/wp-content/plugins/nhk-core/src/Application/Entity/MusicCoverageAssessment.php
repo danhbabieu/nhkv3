@@ -164,6 +164,11 @@ final class MusicCoverageAssessment
         $hasAssets = $audio !== [] || !empty($dossier['media_gallery']);
         if (!$hasAssets) return 'NOT_APPLICABLE';
         foreach ($audio as $item) if (str_contains(strtoupper((string) ($item['rights'] ?? '')), 'REVIEW_REQUIRED')) return 'BLOCKED';
+        foreach (is_array($dossier['media_gallery'] ?? null) ? $dossier['media_gallery'] : [] as $media) {
+            if (!is_array($media)) return 'BLOCKED';
+            $rights = strtoupper(trim((string) ($media['rights_status'] ?? $media['license_status'] ?? $media['rights'] ?? '')));
+            if ($rights === '' || str_contains($rights, 'REVIEW_REQUIRED') || str_contains($rights, 'BLOCKED') || str_contains($rights, 'PRIVATE') || str_contains($rights, 'UNKNOWN')) return 'BLOCKED';
+        }
         return 'VERIFIED';
     }
 
