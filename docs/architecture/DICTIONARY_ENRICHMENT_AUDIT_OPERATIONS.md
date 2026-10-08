@@ -126,6 +126,47 @@ The result is `EXACT_UNIQUE`, `AMBIGUOUS`, `NO_OWNER`, `OWNER_MISSING` or
 `CONFLICT`. Label similarity, keyword overlap, AI similarity, URL, slug,
 filename, OCR, transcript wording and frequency are not sufficient evidence.
 
+## Persisted semantic reference versus owner hint — 2026-10-08
+
+Audit and planning must expose two distinct concepts:
+
+- `persisted_semantic_reference`: mapping-level truth loaded from the
+  Dictionary Entry/Sense mapping repository;
+- `owner_hint`: advisory context/curator metadata that may help owner
+  resolution but is not a persisted mapping.
+
+Operational rules:
+
+| Persisted mapping | Owner hint / resolution | Required plan result |
+|---|---|---|
+| absent | exact unique owner | `SET_SEMANTIC_REFERENCE` may be `READY` |
+| valid + revalidated | same owner | semantic-reference mutation is `NOOP` |
+| stale/invalid | any | fail closed to blocked/review-required |
+| valid | conflicting hint | `REVIEW_REQUIRED`; never silently replace mapping |
+| absent | ambiguous/no owner | review/standalone lexical according to current contract |
+
+Context metadata alone must never be serialized or reported as
+`persisted_semantic_reference`. Conversely, a real mapping remains
+authoritative even when no context hint is present.
+
+### Delegated-detail acceptance
+
+After a valid semantic mapping is applied and revalidated, public read-back must
+agree across hub, resolver, detail presentation and SEO:
+
+- resolver/internal-link destination = canonical owner URL;
+- detail route mode = `DELEGATED`;
+- lexical detail canonical = canonical owner absolute URL;
+- robots = `noindex,follow`;
+- sitemap eligibility = false.
+
+Standalone lexical Entries remain `DEDICATED` and indexability is unchanged.
+
+Runtime acceptance on 2026-10-08 verified both classes with generic behavior:
+delegated Music-backed Dictionary terms resolve to their canonical Music owners,
+while standalone configuration descriptors remain dedicated/indexable. The
+acceptance is evidence of the generic contract, not a term-specific exception.
+
 ## Plan
 
 `nhk.dictionary.enrichment.plan` creates a deterministic plan from an audit

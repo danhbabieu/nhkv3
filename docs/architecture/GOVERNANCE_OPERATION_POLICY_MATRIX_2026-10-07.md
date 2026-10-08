@@ -76,3 +76,37 @@ Every `Y` Capture-scope entry must be registry-supported, family-defined,
 scope-issuable, scope-verifiable, understood by its owner admission and
 executor-supported. Every `N` Capture-scope entry must fail closed at scope
 issuance or have no staging route. Unknown pairs fail closed in all layers.
+
+## Reuse-only Authority Capture clarification — 2026-10-08
+
+A selected Authority plan containing only `REUSE` candidates performs no
+canonical mutation. Therefore:
+
+```text
+all selected candidates = REUSE
+→ no Proposal
+→ no mutation staging scope
+→ canonical reuse read-back
+→ APPLIED / AUTHORITY_APPLIED
+```
+
+This is not a staging bypass. The mutation guard remains fail-closed:
+
+- any selected `CREATE`, `UPDATE`, `RENAME`, `RETIRE`, `REACTIVATE`
+  or relation mutation still requires the normal signed exact staging scope;
+- mixed plans bind only the mutating candidates into the executable scope;
+- unknown candidates, stale fingerprints, invalid revisions/capabilities,
+  expired/HMAC-invalid scopes and production-forbidden staging operations
+  remain blocked;
+- `REUSE` never creates a no-op Proposal or fake update.
+
+Reuse execution is idempotent and must report the canonical UUID/revision from a
+freshly resolved/replanned owner. Capture completion may become complete only
+when every required/effective canonical child has verified canonical read-back.
+Missing read-back remains blocked; public projection is never used as a
+substitute for canonical verification.
+
+The plan fingerprint still binds the approved candidate set and owner revision.
+If the canonical owner changes between planning and continuation, fresh
+replanning changes the fingerprint and requires re-approval before any mutation.
+

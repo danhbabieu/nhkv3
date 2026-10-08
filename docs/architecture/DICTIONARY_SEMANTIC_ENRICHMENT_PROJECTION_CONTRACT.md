@@ -110,6 +110,48 @@ Classification, Media, Video, Post and Knowledge context from canonical owners.
 Those later relationships are enrichment of the canonical owner, not part of
 the minimum Dictionary-entry creation contract.
 
+## 3.2 Persisted mapping, owner hints and delegated public detail — 2026-10-08
+
+The executable runtime now distinguishes canonical Dictionary mapping state from
+curator/context hints.
+
+- `persisted_semantic_reference` is the only Dictionary mapping truth. It must
+  come from the Entry/Sense mapping repository and be revalidated against the
+  canonical owner.
+- `owner_hint` / `context.semantic_reference` is advisory planning metadata
+  only. It may help resolve a candidate owner, but it is never proof that a
+  mapping exists and it must not suppress `SET_SEMANTIC_REFERENCE` when the
+  persisted mapping is absent.
+- If a persisted mapping exists and revalidates, enrichment may return `NOOP`
+  for semantic-reference mutation.
+- If a hint conflicts with persisted mapping, or the persisted mapping is stale,
+  invalid or ambiguous, the flow fails closed to review/blocked state; it must
+  not silently replace canonical ownership.
+
+Public detail projection follows the same persisted/revalidated mapping. An
+approved Entry/Sense with one valid canonical semantic owner is a delegated
+lexical surface:
+
+```text
+Dictionary Entry/Sense
+  → persisted semantic_reference
+  → revalidated canonical owner
+  → delegated public detail
+```
+
+For delegated detail:
+
+- `route.mode=DELEGATED`;
+- `route.delegated=true`;
+- the SEO canonical is the canonical owner's absolute public URL;
+- the Dictionary lexical URL is `noindex,follow` and excluded from sitemap;
+- lexical content may remain viewable when the presentation contract permits,
+  but it must not compete as a second canonical document.
+
+Standalone approved lexical content with no valid persisted semantic mapping
+remains `DEDICATED` and follows the existing Dictionary indexability policy.
+A stale, invalid or conflicting mapping never causes delegation.
+
 ## 4. Semantic Graph relations
 
 Semantic enrichment reuses the existing Graph edge:
