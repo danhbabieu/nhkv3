@@ -48,11 +48,16 @@ final class WpdbDuplicateAuditPageReader implements DuplicateAuditPageReader
 
         $hasMore = count($rows) > $limit;
         $pageRows = array_slice($rows, 0, $limit);
+        $articleBindings = $this->owner === 'Article' ? $this->articleBindings($pageRows) : [];
         $items = [];
         $diagnostics = [];
         foreach ($pageRows as $row) {
             if (!is_array($row)) continue;
             try {
+                if ($this->owner === 'Article') {
+                    $endpointKey = (string) ($row['article_endpoint_key'] ?? '');
+                    $row['_article_bindings'] = $articleBindings[$endpointKey] ?? [];
+                }
                 $item = $this->project($row);
                 if ($item !== null) $items[] = $item;
             } catch (\Throwable $error) {
@@ -121,14 +126,42 @@ final class WpdbDuplicateAuditPageReader implements DuplicateAuditPageReader
         };
     }
 
-    /** @return array{0:string,1:list<int>} */
+    /** @return array{0:string,1:list<int|string>} */
     private function articleQuery(string $prefix, int $after, int $limit): array
     {
         $retired = $this->includeRetired ? '' : " AND post_status NOT IN ('trash','auto-draft')";
+        $blogId = function_exists('get_current_blog_id') ? max(1, (int) get_current_blog_id()) : 1;
         return [
-            "SELECT ID AS _audit_id,ID,post_status,post_title,post_name,post_modified_gmt FROM {$prefix}posts WHERE ID>%d AND post_type='post'{$retired} ORDER BY ID ASC LIMIT %d",
-            [$after, $limit],
+            "SELECT ID AS _audit_id,ID,post_status,post_title,post_name,post_modified_gmt,(SELECT pm.meta_value FROM {$prefix}postmeta pm WHERE pm.post_id={$prefix}posts.ID AND pm.meta_key='_nhk_editorial_intent' ORDER BY pm.meta_id DESC LIMIT 1) AS editorial_intent,CONCAT(%s,':',ID) AS article_endpoint_key FROM {$prefix}posts WHERE ID>%d AND post_type='post'{$retired} ORDER BY ID ASC LIMIT %d",
+            [(string) $blogId, $after, $limit],
         ];
+    }
+
+    /** @param list<array<string,mixed>> $rows @return array<string,list<array<string,mixed>>> */
+    private function articleBindings(array $rows): array
+    {
+        $keys = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) continue;
+            $key = trim((string) ($row['article_endpoint_key'] ?? ''));
+            if ($key !== '') $keys[] = $key;
+        }
+        $keys = array_values(array_unique($keys));
+        if ($keys === []) return [];
+        $p = (string) ($this->database->prefix ?? '');
+        $placeholders = implode(',', array_fill(0, count($keys), '%s'));
+        $sql = "SELECT e.id AS _binding_id,HEX(e.edge_uuid) AS edge_uuid,s.endpoint_key AS source_id,t.endpoint_type AS target_type,t.endpoint_key AS target_id,e.state,e.revision,c.scope_code,c.scope_subject_type,c.scope_subject_id,c.provenance_class,c.state AS context_state,c.revision AS context_revision FROM {$p}nhk_graph_edges e INNER JOIN {$p}nhk_graph_nodes s ON s.id=e.source_node_id INNER JOIN {$p}nhk_graph_nodes t ON t.id=e.target_node_id INNER JOIN {$p}nhk_graph_predicates p ON p.id=e.predicate_id LEFT JOIN {$p}nhk_graph_relation_context c ON c.edge_uuid=e.edge_uuid WHERE s.endpoint_type=%s AND s.endpoint_key IN ({$placeholders}) AND p.predicate_key=%s" . ($this->includeRetired ? '' : ' AND e.state=1') . " ORDER BY e.id ASC";
+        $args = array_merge(['wp_post'], $keys, ['about']);
+        $result = $this->database->get_results($this->database->prepare($sql, ...$args), defined('ARRAY_A') ? ARRAY_A : 'ARRAY_A');
+        if (!is_array($result)) throw new \RuntimeException('AUDIT_READER_UNAVAILABLE');
+        $mapped = [];
+        foreach ($result as $binding) {
+            if (!is_array($binding)) continue;
+            $source = trim((string) ($binding['source_id'] ?? ''));
+            if ($source === '') continue;
+            $mapped[$source][] = $binding;
+        }
+        return $mapped;
     }
 
     /** @return array<string,mixed>|null */
@@ -239,15 +272,63 @@ final class WpdbDuplicateAuditPageReader implements DuplicateAuditPageReader
     private function article(array $row): array
     {
         $status = (string) ($row['post_status'] ?? '');
+        $bindings = [];
+        foreach ((array) ($row['_article_bindings'] ?? []) as $binding) {
+            if (!is_array($binding)) continue;
+            $edgeId = $this->uuid($binding['edge_uuid'] ?? null);
+            $bindings[] = [
+                'edge_id' => $edgeId ?? (string) ($binding['edge_uuid'] ?? ''),
+                'target_type' => (string) ($binding['target_type'] ?? ''),
+                'target_id' => (string) ($binding['target_id'] ?? ''),
+                'scope' => (string) ($binding['scope_code'] ?? ''),
+                'context' => [
+                    'scope_subject_type' => (string) ($binding['scope_subject_type'] ?? ''),
+                    'scope_subject_id' => (string) ($binding['scope_subject_id'] ?? ''),
+                    'provenance_class' => (string) ($binding['provenance_class'] ?? ''),
+                    'revision' => (int) ($binding['context_revision'] ?? 0),
+                ],
+                'state' => (int) ($binding['state'] ?? 0) === 1 ? 'ACTIVE' : 'RETIRED',
+                'context_state' => ($binding['context_state'] ?? null) === null || (int) $binding['context_state'] === 1 ? 'ACTIVE' : 'RETIRED',
+                'revision' => (int) ($binding['revision'] ?? 0),
+            ];
+        }
+        $active = array_values(array_filter($bindings, static fn (array $binding): bool => $binding['state'] === 'ACTIVE' && $binding['context_state'] === 'ACTIVE'));
+        $subjectIds = array_values(array_unique(array_filter(array_map(static fn (array $binding): string => trim((string) ($binding['target_id'] ?? '')), $active))));
+        $intent = trim((string) ($row['editorial_intent'] ?? ''));
+        $scopes = array_values(array_unique(array_filter(array_map(static fn (array $binding): string => trim((string) ($binding['scope'] ?? '')), $active))));
+        $missing = [];
+        $classification = 'AUDITABLE';
+        $reason = '';
+        if (count($subjectIds) > 1) {
+            $classification = 'LEGACY_UNRESOLVED';
+            $reason = 'AMBIGUOUS_ACTIVE_SUBJECT';
+            $missing[] = 'canonical_subject';
+        } elseif ($subjectIds === []) {
+            $classification = 'LEGACY_UNRESOLVED';
+            $reason = $bindings === [] ? 'NO_CANONICAL_SUBJECT_BINDING' : 'NO_ACTIVE_CANONICAL_SUBJECT';
+            $missing[] = 'canonical_subject';
+        } else {
+            if ($intent === '') $missing[] = 'editorial_intent';
+            if (count($scopes) !== 1) $missing[] = 'scope';
+            // Article continuation lineage is not an Article or Graph field in
+            // the active contracts. Never infer it from title, body, Capture
+            // reachability, or an Evidence/Source relationship.
+            $missing[] = 'lineage';
+            if ($missing !== []) {
+                $classification = 'MODEL_GAP';
+                $reason = 'ARTICLE_SEMANTIC_IDENTITY_NOT_FULLY_PERSISTED';
+            }
+        }
+        $resolvedSubjectIds = count($subjectIds) === 1 ? $subjectIds : [];
+        $scope = count($scopes) === 1 ? $scopes[0] : '';
         return [
             'canonical_id' => (string) ((int) ($row['ID'] ?? 0)), 'post_id' => (int) ($row['ID'] ?? 0),
             'post_status' => $status, 'state' => $status === 'trash' ? 'RETIRED' : strtoupper($status),
             'title' => (string) ($row['post_title'] ?? ''), 'topic' => (string) ($row['post_title'] ?? ''),
-            'subject_ids' => [], 'canonical_subject_bindings' => [], 'intent' => '', 'content_kind' => '',
-            'semantic_identity_available' => false,
-            'missing_identity_fields' => ['canonical_subject', 'editorial_intent', 'scope', 'lineage'],
-            'scope' => '',
-            'continuation_lineage' => [], 'revision' => $this->articleRevision($row),
+            'subject_ids' => $resolvedSubjectIds, 'canonical_subject_bindings' => $bindings, 'intent' => $intent, 'content_kind' => '',
+            'semantic_identity_available' => $classification === 'AUDITABLE', 'identity_classification' => $classification,
+            'identity_reason' => $reason, 'missing_identity_fields' => array_values(array_unique($missing)),
+            'scope' => $scope, 'continuation_lineage' => [], 'revision' => $this->articleRevision($row),
         ];
     }
 

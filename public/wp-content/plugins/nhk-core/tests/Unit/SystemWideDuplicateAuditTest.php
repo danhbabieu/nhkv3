@@ -333,6 +333,57 @@ final class SystemWideDuplicateAuditTest extends TestCase
         self::assertSame([], $result['owners']['Article']['clusters']);
     }
 
+    public function test_article_legacy_unresolved_is_partial_and_excluded_from_duplicate_grouping(): void
+    {
+        $result = $this->audit('Article', [
+            ['canonical_id' => 'legacy-article', 'title' => 'Old article', 'identity_classification' => 'LEGACY_UNRESOLVED', 'missing_identity_fields' => ['canonical_subject'], 'identity_reason' => 'NO_ACTIVE_CANONICAL_SUBJECT'],
+        ]);
+
+        self::assertSame('PARTIAL', $result['owners']['Article']['status']);
+        self::assertSame(1, $result['owners']['Article']['diagnostics']['identity_unresolved_rows']);
+        self::assertSame('LEGACY_UNRESOLVED', $result['owners']['Article']['diagnostics']['identity_rows'][0]['classification']);
+        self::assertSame([], $result['owners']['Article']['clusters']);
+        self::assertSame([], $result['reconciliation_candidates']);
+    }
+
+    public function test_article_model_gap_remains_blocked_when_canonical_binding_exists_but_required_field_is_not_persisted(): void
+    {
+        $result = $this->audit('Article', [
+            ['canonical_id' => 'article-with-binding', 'subject_ids' => ['model-1'], 'intent' => 'TEXT_ARTICLE', 'scope' => 'variant', 'identity_classification' => 'MODEL_GAP', 'missing_identity_fields' => ['lineage'], 'identity_reason' => 'ARTICLE_LINEAGE_NOT_PERSISTED'],
+        ]);
+
+        self::assertSame('BLOCKED', $result['owners']['Article']['status']);
+        self::assertSame('AUDIT_MODEL_GAP', $result['owners']['Article']['diagnostics']['code']);
+        self::assertSame(['lineage'], $result['owners']['Article']['diagnostics']['missing_identity_fields']);
+        self::assertSame('article-with-binding', $result['owners']['Article']['diagnostics']['blocking_rows'][0]['canonical_id']);
+    }
+
+    public function test_article_duplicate_identity_is_checked_only_for_auditable_rows(): void
+    {
+        $result = $this->audit('Article', [
+            ['canonical_id' => 'article-1', 'subject_ids' => ['model-1'], 'intent' => 'TEXT_ARTICLE', 'scope' => 'variant', 'continuation_lineage' => [], 'semantic_identity_available' => true, 'identity_classification' => 'AUDITABLE'],
+            ['canonical_id' => 'article-2', 'subject_ids' => ['model-1'], 'intent' => 'TEXT_ARTICLE', 'scope' => 'variant', 'continuation_lineage' => [], 'semantic_identity_available' => true, 'identity_classification' => 'AUDITABLE'],
+            ['canonical_id' => 'article-legacy', 'subject_ids' => ['model-1'], 'intent' => 'TEXT_ARTICLE', 'scope' => 'variant', 'identity_classification' => 'LEGACY_UNRESOLVED', 'missing_identity_fields' => ['canonical_subject']],
+        ]);
+
+        self::assertSame('PARTIAL', $result['owners']['Article']['status']);
+        self::assertCount(1, $result['owners']['Article']['clusters']);
+        self::assertSame(['article-1', 'article-2'], $result['owners']['Article']['clusters'][0]['canonical_ids']);
+        self::assertSame(1, $result['owners']['Article']['diagnostics']['identity_unresolved_rows']);
+    }
+
+    public function test_article_ambiguous_and_retired_bindings_are_legacy_unresolved(): void
+    {
+        $result = $this->audit('Article', [
+            ['canonical_id' => 'ambiguous', 'identity_classification' => 'LEGACY_UNRESOLVED', 'missing_identity_fields' => ['canonical_subject'], 'identity_reason' => 'AMBIGUOUS_ACTIVE_SUBJECT'],
+            ['canonical_id' => 'retired-only', 'identity_classification' => 'LEGACY_UNRESOLVED', 'missing_identity_fields' => ['canonical_subject'], 'identity_reason' => 'NO_ACTIVE_CANONICAL_SUBJECT'],
+        ]);
+
+        self::assertSame('PARTIAL', $result['owners']['Article']['status']);
+        self::assertSame(2, $result['owners']['Article']['diagnostics']['identity_unresolved_rows']);
+        self::assertSame(['AMBIGUOUS_ACTIVE_SUBJECT', 'NO_ACTIVE_CANONICAL_SUBJECT'], array_column($result['owners']['Article']['diagnostics']['identity_rows'], 'reason'));
+    }
+
     public function test_malformed_cursor_is_rejected_deterministically(): void
     {
         $result = $this->coordinator(['Authority' => new AuditPage([])])->audit(1, ['Authority' => 'not-a-cursor'], true, 'Authority');

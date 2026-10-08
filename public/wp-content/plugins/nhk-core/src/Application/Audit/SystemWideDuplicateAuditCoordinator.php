@@ -150,6 +150,7 @@ final class SystemWideDuplicateAuditCoordinator
             $items = array_values(array_filter((array) ($page['items'] ?? []), static fn (mixed $item): bool => is_array($item) || is_object($item)));
             $combined = $this->dedupeRows(array_merge($state['carry'], array_map(fn (mixed $item): array => $this->row($item), $items)));
             $scanned = $state['scanned'] + count($items);
+            $articleIdentity = [];
             if ($owner === 'Article') {
                 $gapRows = $this->articleModelGapRows($combined);
                 if ($gapRows !== []) {
@@ -162,6 +163,7 @@ final class SystemWideDuplicateAuditCoordinator
                         'blocking_rows' => $gapRows,
                     ]);
                 }
+                $articleIdentity = $this->articleIdentityDiagnostics($combined);
             }
             $ownerDiagnostics = [];
             $clusters = match ($owner) {
@@ -187,10 +189,11 @@ final class SystemWideDuplicateAuditCoordinator
             $next = isset($page['next_cursor']) && $page['next_cursor'] !== null ? (string) $page['next_cursor'] : null;
             $boundReached = $next !== null && $scanned >= self::MAX_SCAN_ROWS;
             $nextCursor = $boundReached ? null : ($next === null ? null : $this->encodeCursor($next, array_slice($combined, -self::MAX_CARRY_ROWS), $scanned, $owner, $includeRetired, $emitted));
-            $diagnostics = array_merge((array) ($page['diagnostics'] ?? []), $ownerDiagnostics);
+            $diagnostics = array_merge((array) ($page['diagnostics'] ?? []), $ownerDiagnostics, $articleIdentity);
             if ($boundReached) $diagnostics[] = ['code' => 'AUDIT_MAX_SCAN_BOUND_REACHED', 'max_scan_rows' => self::MAX_SCAN_ROWS];
             $complete = $next === null;
-            return ['status' => $complete ? 'COMPLETE' : 'PARTIAL', 'complete' => $complete, 'clusters' => $this->withPage($clusters, $cursor, $nextCursor, $items), 'next_cursor' => $nextCursor, 'rows_read' => count($items), 'diagnostics' => $diagnostics];
+            $coverageIncomplete = $owner === 'Article' && (int) ($articleIdentity['identity_unresolved_rows'] ?? 0) > 0;
+            return ['status' => $complete && !$coverageIncomplete ? 'COMPLETE' : 'PARTIAL', 'complete' => $complete, 'clusters' => $this->withPage($clusters, $cursor, $nextCursor, $items), 'next_cursor' => $nextCursor, 'rows_read' => count($items), 'diagnostics' => $diagnostics];
         } catch (\InvalidArgumentException $error) {
             if (str_starts_with($error->getMessage(), 'AUDIT_CURSOR_')) return $this->blocked('AUDIT_CURSOR_INVALID', ['reason' => 'AUDIT_CURSOR_INVALID']);
             return $this->blocked('AUDIT_READER_UNAVAILABLE');
@@ -447,6 +450,7 @@ final class SystemWideDuplicateAuditCoordinator
     /** @param list<mixed> $items @return list<array<string,mixed>> */
     private function article(array $items): array
     {
+        $items = array_values(array_filter($items, static fn (array $row): bool => strtoupper(trim((string) ($row['identity_classification'] ?? 'AUDITABLE'))) !== 'LEGACY_UNRESOLVED'));
         $groups = $this->group($items, function (array $row): string { $subjects = (array) ($row['subject_ids'] ?? [$row['subject_id'] ?? '']); sort($subjects, SORT_STRING); return implode('|', [implode(',', array_filter(array_map('strval', $subjects))), $this->normalized($this->text($row, ['intent', 'title_intent'])), $this->normalized($this->text($row, ['scope']))]); });
         $clusters = [];
         foreach ($groups as $key => $rows) if ($key !== '' && count($this->ids($rows)) > 1) {
@@ -461,13 +465,20 @@ final class SystemWideDuplicateAuditCoordinator
     {
         $gaps = [];
         foreach ($rows as $row) {
+            $classification = strtoupper(trim((string) ($row['identity_classification'] ?? '')));
+            if ($classification === 'LEGACY_UNRESOLVED' || $classification === 'AUDITABLE') continue;
             $missing = [];
-            if (($row['semantic_identity_available'] ?? false) !== true) $missing[] = 'semantic_identity';
-            $subjects = $row['subject_ids'] ?? null;
-            if (!is_array($subjects) || array_values(array_filter($subjects, static fn (mixed $value): bool => is_scalar($value) && trim((string) $value) !== '')) === []) $missing[] = 'canonical_subject';
-            if ($this->text($row, ['intent', 'title_intent']) === '') $missing[] = 'editorial_intent';
-            if ($this->text($row, ['scope']) === '') $missing[] = 'scope';
-            if (!array_key_exists('continuation_lineage', $row) && !array_key_exists('lineage', $row)) $missing[] = 'lineage';
+            if ($classification === 'MODEL_GAP') {
+                $missing = array_values(array_filter(array_map('strval', (array) ($row['missing_identity_fields'] ?? [])), static fn (string $value): bool => trim($value) !== ''));
+                if ($missing === []) $missing[] = 'semantic_identity';
+            } else {
+                if (($row['semantic_identity_available'] ?? false) !== true) $missing[] = 'semantic_identity';
+                $subjects = $row['subject_ids'] ?? null;
+                if (!is_array($subjects) || array_values(array_filter($subjects, static fn (mixed $value): bool => is_scalar($value) && trim((string) $value) !== '')) === []) $missing[] = 'canonical_subject';
+                if ($this->text($row, ['intent', 'title_intent']) === '') $missing[] = 'editorial_intent';
+                if ($this->text($row, ['scope']) === '') $missing[] = 'scope';
+                if (!array_key_exists('continuation_lineage', $row) && !array_key_exists('lineage', $row)) $missing[] = 'lineage';
+            }
             if ($missing !== []) {
                 $gaps[] = [
                     'canonical_id' => $this->id($row),
@@ -477,6 +488,38 @@ final class SystemWideDuplicateAuditCoordinator
             }
         }
         return $gaps;
+    }
+
+    /** @param list<array<string,mixed>> $rows @return array<string,mixed> */
+    private function articleIdentityDiagnostics(array $rows): array
+    {
+        $counts = ['AUDITABLE' => 0, 'LEGACY_UNRESOLVED' => 0, 'MODEL_GAP' => 0];
+        $unresolved = [];
+        $conflicting = 0;
+        foreach ($rows as $row) {
+            $classification = strtoupper(trim((string) ($row['identity_classification'] ?? '')));
+            if (!isset($counts[$classification])) {
+                $classification = $this->articleModelGapRows([$row]) === [] ? 'AUDITABLE' : 'MODEL_GAP';
+            }
+            $counts[$classification]++;
+            if ($classification !== 'LEGACY_UNRESOLVED') continue;
+            $reason = trim((string) ($row['identity_reason'] ?? 'LEGACY_ARTICLE_IDENTITY_UNRESOLVED')) ?: 'LEGACY_ARTICLE_IDENTITY_UNRESOLVED';
+            if (str_contains($reason, 'AMBIGUOUS')) $conflicting++;
+            $unresolved[] = [
+                'canonical_id' => $this->id($row),
+                'classification' => $classification,
+                'reason' => $reason,
+                'missing_identity_fields' => array_values(array_unique(array_filter(array_map('strval', (array) ($row['missing_identity_fields'] ?? []))))),
+                'lifecycle_state' => strtoupper($this->text($row, ['state', 'status'], [], 'UNKNOWN')),
+            ];
+        }
+        return [
+            'identity_classification_counts' => $counts,
+            'identity_unresolved_rows' => count($unresolved),
+            'identity_conflicting_rows' => $conflicting,
+            'identity_rows' => $unresolved,
+            'duplicate_grouping' => 'AUDITABLE_ONLY',
+        ];
     }
 
     /** @param list<mixed> $items @return list<array<string,mixed>> */

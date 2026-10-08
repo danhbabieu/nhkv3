@@ -24922,3 +24922,34 @@ TEST runtime. PHP lint, diff check and changed-scope secret review are clean.
 STATUS: `BLOCKER_ATTRIBUTION_FIXED_LOCALLY / FOCUSED_GREEN /
 FULL_UNIT_BASELINE_FAILURES_RECORDED / RUNTIME_ACCEPTANCE_PENDING /
 SEMANTIC_SCAN_BLOCKED_BY_RUNTIME / NO_DATA_MUTATION / NO_DEPLOYMENT`.
+
+# Checkpoint — 2026-10-08 — Article canonical projection classification
+
+ROOT_CAUSE_CONFIRMED: The Article audit reader previously discarded the only
+persisted semantic binding that the active contracts allow it to read: the
+governed Graph `wp_post → about → canonical endpoint` relation. It also did not
+project the existing `_nhk_editorial_intent` WordPress metadata used by the
+Article research inventory. Scope is available only when a real active Graph
+relation-context row exists; Article continuation lineage is not persisted by
+the active Article/Graph model. Therefore a bound Article with missing lineage
+is a `MODEL_GAP`, while an Article without an active binding, with only retired
+binding, or with multiple active subject targets is `LEGACY_UNRESOLVED`.
+
+IMPLEMENTED: `WpdbDuplicateAuditPageReader` now performs a bounded, read-only
+Article page projection and a bounded Graph binding read keyed by the stable
+`wp_post` endpoint. It returns `AUDITABLE`, `LEGACY_UNRESOLVED` or `MODEL_GAP`,
+never infers subject from editorial text or Evidence/Source reachability, and
+never creates an Article semantic owner. `SystemWideDuplicateAuditCoordinator`
+groups only auditable rows, keeps legacy coverage as `PARTIAL`, and retains
+`BLOCKED/AUDIT_MODEL_GAP` for missing required persisted identity. Dictionary
+candidate cursor registration, catalog schema and transport already matched
+the active page contract, so no redundant MCP change was made.
+
+VERIFIED: Article/coordinator and WPDB reader regression tests pass, including
+canonical Graph binding, absent/retired/ambiguous binding, duplicate identity,
+legacy coverage and model-gap fail-closed behavior. No data, Capture, Graph,
+Dictionary, Governance or Constitution record was mutated.
+
+REMAINING_GAP: Runtime read-back against the authorized TEST runtime and the
+connector-side `@v59` exposure remain unavailable locally; deployed MCP
+discoverability is therefore not claimed.

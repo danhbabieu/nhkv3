@@ -43,11 +43,19 @@ and returns `PARTIAL` with `AUDIT_MAX_SCAN_BOUND_REACHED`; it never claims
 the reader query for owners with a lifecycle state; Article excludes `trash`
 and `auto-draft`, and MediaUsage excludes retired usage slots.
 
-Article semantic subject, editorial-intent, scope and lineage fields have no
-proven persistence contract in the bounded WordPress reader. Article rows are
-therefore marked with unavailable semantic identity and return `BLOCKED` with
-`AUDIT_MODEL_GAP`; title equality is never a duplicate assertion. No
-undocumented post-meta keys are invented by the audit.
+Article remains a WordPress editorial owner, not a semantic owner. The bounded
+reader may project only persisted canonical data: the `_nhk_editorial_intent`
+metadata already used by the Article research inventory and active Graph
+`wp_post → about → canonical endpoint` bindings, including relation-context
+scope when that context exists. It never derives identity from title, body,
+Evidence, Source or Graph reachability. Rows are classified as
+`AUDITABLE`, `LEGACY_UNRESOLVED` (no active binding, retired-only binding or
+ambiguous active subject) or `MODEL_GAP` (a binding exists but a required
+identity field such as scope or continuation lineage is not durably persisted).
+Only auditable rows enter duplicate grouping; legacy coverage returns `PARTIAL`
+with bounded diagnostics, while a model gap remains `BLOCKED` with
+`AUDIT_MODEL_GAP`. No Article semantic owner or undocumented post-meta key is
+created by the audit.
 
 The read-only MCP surface is `nhk.system-wide.duplicate-audit`, capability
 gated by `nhk_view_governance`. It accepts an optional owner, opaque cursor,
