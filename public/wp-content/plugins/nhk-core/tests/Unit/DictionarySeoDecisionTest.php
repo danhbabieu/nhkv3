@@ -27,12 +27,12 @@ final class DictionarySeoDecisionTest extends TestCase
         self::assertFalse($result['sitemap']);
     }
 
-    public function test_rich_owner_backed_entry_is_noindex_with_self_canonical(): void
+    public function test_rich_owner_backed_entry_is_noindex_with_owner_canonical(): void
     {
         $result = (new DictionarySeoDecision())->decide('/tu-dien/400-ngay/', [['description' => 'Định nghĩa giàu nội dung.', 'canonical_owner' => ['url' => '/loai-dong-ho/400-ngay/']]]);
 
         self::assertSame('NOINDEX', $result['state']);
-        self::assertSame('/tu-dien/400-ngay/', $result['canonical']);
+        self::assertSame('/loai-dong-ho/400-ngay/', $result['canonical']);
         self::assertSame('noindex,follow', $result['robots']);
         self::assertFalse($result['sitemap']);
     }
@@ -56,5 +56,19 @@ final class DictionarySeoDecisionTest extends TestCase
         self::assertSame('BLOCKED', $result['state']);
         self::assertFalse($result['sitemap']);
         self::assertSame('noindex,follow', $result['robots']);
+    }
+
+    public function test_mapping_owner_mismatch_fails_closed_instead_of_projecting_wrong_canonical(): void
+    {
+        $result = (new DictionarySeoDecision())->decide('/tu-dien/400-ngay/', [[
+            'description' => 'Định nghĩa giàu nội dung.',
+            'semantic_reference' => ['status' => 'AVAILABLE', 'source' => 'MAPPING', 'type' => 'music', 'id' => 'owner-music'],
+            'canonical_owner' => ['type' => 'classification', 'id' => 'owner-other', 'url' => '/phan-loai/owner-other/'],
+        ]]);
+
+        self::assertSame('BLOCKED', $result['state']);
+        self::assertSame('CANONICAL_OWNER_MISMATCH', $result['reason']);
+        self::assertSame('/tu-dien/400-ngay/', $result['canonical']);
+        self::assertFalse($result['sitemap']);
     }
 }

@@ -30,7 +30,10 @@ final class DictionaryEnrichmentPlan
             }
             if (($owner['classification'] ?? '') !== 'EXACT_UNIQUE') $actions[] = ['action_type' => 'REVIEW_REQUIRED', 'status' => 'REVIEW_REQUIRED', 'entry_id' => $item['entry_id'] ?? '', 'sense_id' => $sense['sense_id'] ?? '', 'current_revision' => (int) ($sense['current_revision'] ?? 0), 'target' => $owner['target'] ?? null, 'evidence' => $owner['evidence'] ?? [], 'risk' => 'SEMANTIC_OWNER', 'reason' => $owner['reason'] ?? 'owner resolution is not exact and unique'];
             else {
-                $referenceStatus = strtoupper((string) ($sense['semantic_reference']['status'] ?? $item['semantic_reference']['status'] ?? 'ABSENT'));
+                $reference = array_key_exists('persisted_semantic_reference', $sense)
+                    ? $sense['persisted_semantic_reference']
+                    : ($sense['semantic_reference'] ?? $item['persisted_semantic_reference'] ?? $item['semantic_reference'] ?? ['status' => 'ABSENT']);
+                $referenceStatus = strtoupper((string) (is_array($reference) ? ($reference['status'] ?? 'ABSENT') : 'ABSENT'));
                 if (!in_array($referenceStatus, ['PRESENT_VALID', 'AVAILABLE'], true)) $actions[] = ['action_type' => 'SET_SEMANTIC_REFERENCE', 'status' => $referenceStatus === 'STALE' || $referenceStatus === 'INVALID' ? 'BLOCKED' : 'READY', 'entry_id' => $item['entry_id'] ?? '', 'sense_id' => $sense['sense_id'] ?? '', 'current_revision' => (int) ($sense['current_revision'] ?? 0), 'target' => $owner['target'] ?? null, 'evidence' => $owner['evidence'] ?? [], 'risk' => 'SEMANTIC_REFERENCE', 'reason' => $referenceStatus === 'ABSENT' ? 'exact unique owner reference is absent' : 'existing semantic reference requires review'];
             }
         }

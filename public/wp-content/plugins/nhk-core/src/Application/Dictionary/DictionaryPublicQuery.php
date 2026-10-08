@@ -329,7 +329,9 @@ final class DictionaryPublicQuery
     private function decorateDetail(array $result): array
     {
         if ($this->presentationComposer === null || !is_array($result['item'] ?? null)) return $result;
-        $result['presentation'] = $this->presentationComposer->compose($result);
+        $context = is_array($result['presentation_context'] ?? null) ? $result['presentation_context'] : [];
+        unset($result['presentation_context']);
+        $result['presentation'] = $this->presentationComposer->compose($result, $context);
         $result['seo_projection'] = $result['presentation']['seo'] ?? [];
         return $result;
     }

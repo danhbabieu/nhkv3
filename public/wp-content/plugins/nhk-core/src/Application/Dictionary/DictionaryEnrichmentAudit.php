@@ -28,17 +28,20 @@ final class DictionaryEnrichmentAudit
                 if (!$sense instanceof DictionaryConcept || ($senseId !== null && $sense->conceptId !== $senseId)) continue;
                 if ($publicOnly && !$sense->approved()) continue;
                 $reference = method_exists($this->entries, 'semanticReference') ? (array) $this->entries->semanticReference($entry->entryId, $sense->conceptId) : ['status' => 'ABSENT'];
-                $resolved = is_callable($this->ownerResolver) ? (array) ($this->ownerResolver)($sense, ['semantic_reference' => $reference, 'entry_id' => $entry->entryId]) : (new DictionaryEnrichmentOwnerResolver())->resolve($sense, ['semantic_reference' => $reference]);
-                $ownerType = trim((string) ($resolved['target']['type'] ?? $reference['type'] ?? ''));
-                $ownerId = trim((string) ($resolved['target']['id'] ?? $reference['id'] ?? ''));
+                $persistedReference = $this->reference($reference);
+                $ownerHint = $this->ownerHint($sense);
+                $ownerContext = ['persisted_semantic_reference' => $persistedReference, 'semantic_reference' => $persistedReference, 'owner_hint' => $ownerHint, 'entry_id' => $entry->entryId];
+                $resolved = is_callable($this->ownerResolver) ? (array) ($this->ownerResolver)($sense, $ownerContext) : (new DictionaryEnrichmentOwnerResolver())->resolve($sense, $ownerContext);
+                $ownerType = trim((string) ($resolved['target']['type'] ?? ''));
+                $ownerId = trim((string) ($resolved['target']['id'] ?? ''));
                 $coverage = ($ownerType !== '' && $ownerId !== '' && is_callable($this->coverage)) ? (array) ($this->coverage)($ownerType, $ownerId, ['entry_id' => $entry->entryId, 'sense_id' => $sense->conceptId]) : [];
                 $forms = method_exists($this->entries, 'listForms') ? (array) $this->entries->listForms($entry) : [];
                 $labels = method_exists($this->concepts, 'listLabels') ? (array) $this->concepts->listLabels($sense->conceptId, true) : [];
                 $approvedLegacy = array_values(array_filter((array) ($sense->context['approved_legacy_labels'] ?? []), static fn (mixed $label): bool => is_string($label) || (is_array($label) && in_array((string) ($label['source'] ?? 'approved'), ['approved', 'legacy', 'curated'], true))));
                 $mentions = (array) ($coverage['mentions'] ?? ['status' => 'UNAVAILABLE', 'count' => 0]);
-                $sensePackets[] = ['sense_id' => $sense->conceptId, 'preferred_form' => $sense->preferredLabel, 'definition' => $sense->definition, 'current_revision' => $entry->revision, 'semantic_reference' => $this->reference($reference), 'owner_resolution' => $resolved, 'forms' => $this->forms($forms), 'approved_legacy_labels' => $this->labels($approvedLegacy, $labels), 'coverage' => $coverage, 'mentions' => $mentions, 'related_terms' => $coverage['related_terms'] ?? ['status' => 'UNAVAILABLE', 'count' => 0]];
+                $sensePackets[] = ['sense_id' => $sense->conceptId, 'preferred_form' => $sense->preferredLabel, 'definition' => $sense->definition, 'current_revision' => $entry->revision, 'persisted_semantic_reference' => $persistedReference, 'semantic_reference' => $persistedReference, 'owner_hint' => $ownerHint, 'owner_resolution' => $resolved, 'forms' => $this->forms($forms), 'approved_legacy_labels' => $this->labels($approvedLegacy, $labels), 'coverage' => $coverage, 'mentions' => $mentions, 'related_terms' => $coverage['related_terms'] ?? ['status' => 'UNAVAILABLE']];
             }
-            if ($sensePackets !== []) $items[] = ['entry_id' => $entry->entryId, 'preferred_form' => $entry->preferredForm, 'forms_count' => count($this->forms(method_exists($this->entries, 'listForms') ? (array) $this->entries->listForms($entry) : [])), 'sense_count' => count($sensePackets), 'semantic_reference' => count($sensePackets) === 1 ? $sensePackets[0]['semantic_reference'] : ['status' => 'AMBIGUOUS'], 'coverage' => count($sensePackets) === 1 ? $sensePackets[0]['coverage'] : [], 'mentions' => count($sensePackets) === 1 ? $sensePackets[0]['mentions'] : ['status' => 'AMBIGUOUS'], 'senses' => $sensePackets, 'classification' => $this->classify($sensePackets), 'next_action' => $this->nextAction($sensePackets)];
+            if ($sensePackets !== []) $items[] = ['entry_id' => $entry->entryId, 'preferred_form' => $entry->preferredForm, 'forms_count' => count($this->forms(method_exists($this->entries, 'listForms') ? (array) $this->entries->listForms($entry) : [])), 'sense_count' => count($sensePackets), 'persisted_semantic_reference' => count($sensePackets) === 1 ? $sensePackets[0]['persisted_semantic_reference'] : ['status' => 'AMBIGUOUS'], 'semantic_reference' => count($sensePackets) === 1 ? $sensePackets[0]['persisted_semantic_reference'] : ['status' => 'AMBIGUOUS'], 'coverage' => count($sensePackets) === 1 ? $sensePackets[0]['coverage'] : [], 'mentions' => count($sensePackets) === 1 ? $sensePackets[0]['mentions'] : ['status' => 'AMBIGUOUS'], 'senses' => $sensePackets, 'classification' => $this->classify($sensePackets), 'next_action' => $this->nextAction($sensePackets)];
         }
         return ['status' => 'AVAILABLE', 'read_only' => true, 'mutated' => false, 'items' => $items, 'next_cursor' => $hasMore ? $this->encodeCursor($offset + $limit) : null, 'has_more' => $hasMore];
     }
@@ -54,6 +57,15 @@ final class DictionaryEnrichmentAudit
     }
 
     private function reference(array $reference): array { $status = strtoupper(trim((string) ($reference['status'] ?? 'ABSENT'))); return ['status' => in_array($status, ['AVAILABLE', 'PRESENT_VALID', 'ABSENT', 'STALE', 'INVALID', 'AMBIGUOUS'], true) ? $status : 'INVALID', 'type' => $reference['type'] ?? null, 'id' => $reference['id'] ?? null, 'revision' => $reference['revision'] ?? null, 'source' => $reference['source'] ?? null]; }
+    private function ownerHint(DictionaryConcept $sense): ?array
+    {
+        $hint = $sense->context['owner_hint'] ?? $sense->context['semantic_reference'] ?? null;
+        if (!is_array($hint) || trim((string) ($hint['type'] ?? '')) === '' || trim((string) ($hint['id'] ?? '')) === '') {
+            if ($sense->destinationType === null || $sense->destinationId === null || trim($sense->destinationType) === '' || trim($sense->destinationId) === '') return null;
+            $hint = ['type' => $sense->destinationType, 'id' => $sense->destinationId, 'revision' => null, 'source' => 'LEGACY_CONCEPT_SNAPSHOT'];
+        }
+        return ['type' => trim((string) $hint['type']), 'id' => trim((string) $hint['id']), 'revision' => $hint['revision'] ?? null, 'source' => $hint['source'] ?? 'CONTEXT'];
+    }
     private function forms(array $forms): array
     {
         $mapped = array_map(static fn (mixed $form): ?array => is_object($form)

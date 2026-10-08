@@ -24,6 +24,13 @@ final class DictionarySeoDecision
                 return ['state' => 'BLOCKED', 'canonical' => $url, 'robots' => 'noindex,follow', 'sitemap' => false, 'indexable' => false, 'reason' => 'CANONICAL_OWNER_UNAVAILABLE'];
             }
             $owner = is_array($sense['canonical_owner'] ?? null) ? $sense['canonical_owner'] : null;
+            if ($owner !== null && strtoupper(trim((string) ($reference['source'] ?? ''))) === 'MAPPING' && in_array($referenceStatus, ['AVAILABLE', 'AVAILABLE_WITH_ITEMS', 'PRESENT_VALID'], true)) {
+                $ownerType = trim((string) ($owner['type'] ?? ''));
+                $ownerId = trim((string) ($owner['id'] ?? $owner['canonical_id'] ?? ''));
+                if (($ownerType !== '' && $ownerType !== trim((string) ($reference['type'] ?? ''))) || ($ownerId !== '' && $ownerId !== trim((string) ($reference['id'] ?? '')))) {
+                    return ['state' => 'BLOCKED', 'canonical' => $url, 'robots' => 'noindex,follow', 'sitemap' => false, 'indexable' => false, 'reason' => 'CANONICAL_OWNER_MISMATCH'];
+                }
+            }
             if ($owner !== null) {
                 $key = trim((string) ($owner['type'] ?? '')) . ':' . trim((string) ($owner['id'] ?? $owner['canonical_id'] ?? $owner['url'] ?? ''));
                 $owners[$key !== ':' ? $key : 'owner:' . count($owners)] = true;
@@ -36,7 +43,10 @@ final class DictionarySeoDecision
             if ($ownerUrl === null) return ['state' => 'BLOCKED', 'canonical' => $url, 'robots' => 'noindex,follow', 'sitemap' => false, 'indexable' => false, 'reason' => 'CANONICAL_DESTINATION_INCOMPLETE'];
             return ['state' => 'REDIRECT', 'canonical' => $ownerUrl, 'robots' => 'noindex,follow', 'sitemap' => false, 'indexable' => false];
         }
-        return ['state' => 'NOINDEX', 'canonical' => $url, 'robots' => 'noindex,follow', 'sitemap' => false, 'indexable' => false];
+        if (count($senses) !== 1) return ['state' => 'NOINDEX', 'canonical' => $url, 'robots' => 'noindex,follow', 'sitemap' => false, 'indexable' => false];
+        $ownerUrl = $this->ownerUrl($senses[0]);
+        if ($ownerUrl === null) return ['state' => 'NOINDEX', 'canonical' => $url, 'robots' => 'noindex,follow', 'sitemap' => false, 'indexable' => false];
+        return ['state' => 'NOINDEX', 'canonical' => $ownerUrl, 'robots' => 'noindex,follow', 'sitemap' => false, 'indexable' => false];
     }
 
     private function ownerUrl(array $sense): ?string

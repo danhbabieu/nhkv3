@@ -148,4 +148,31 @@ final class DictionaryEnrichmentAuditTest extends TestCase
         self::assertSame(['k1', 'k2', 'k3', 'k4', 'k5'], array_column($item['coverage']['knowledge']['items'], 'id'));
         self::assertSame($public['items'], $item['coverage']['knowledge']['items']);
     }
+
+    public function test_audit_exposes_context_hint_separately_from_absent_persisted_mapping(): void
+    {
+        $sense = new DictionaryConcept('sense-hint-audit', 'Westminster chime', 'Định nghĩa.', DictionaryConcept::APPROVED, null, null, null, [
+            'semantic_reference' => ['status' => 'AVAILABLE', 'type' => 'music', 'id' => 'owner-hint', 'revision' => 7],
+        ]);
+        $entry = new LexicalEntry('entry-hint-audit', 'Westminster chime', 'westminster chime', DictionaryConcept::APPROVED, 'vi-VN', ['public_slug' => 'westminster-chime'], 2, [$sense->conceptId]);
+        $entries = new class($entry, $sense) {
+            public function __construct(private LexicalEntry $entry, private DictionaryConcept $sense) {}
+            public function listEntries(int $limit): array { return [$this->entry]; }
+            public function listSenses(LexicalEntry $entry): array { return [$this->sense]; }
+            public function listForms(LexicalEntry $entry): array { return []; }
+            public function semanticReference(string $entryId, string $senseId): array { return ['status' => 'ABSENT', 'source' => 'MAPPING']; }
+        };
+        $audit = new DictionaryEnrichmentAudit(
+            $entries,
+            new class { public function listLabels(string $id, bool $active = true): array { return []; } },
+            static fn (): array => [],
+            static fn (DictionaryConcept $sense, array $context = []): array => (new \NHK\Core\Application\Dictionary\DictionaryEnrichmentOwnerResolver())->resolve($sense, $context),
+        );
+
+        $sensePacket = $audit->audit(1)['items'][0]['senses'][0];
+
+        self::assertSame('ABSENT', $sensePacket['persisted_semantic_reference']['status']);
+        self::assertSame('owner-hint', $sensePacket['owner_hint']['id']);
+        self::assertSame('EXACT_UNIQUE', $sensePacket['owner_resolution']['classification']);
+    }
 }

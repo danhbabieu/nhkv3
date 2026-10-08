@@ -18,9 +18,17 @@ final class DictionaryEnrichmentOwnerResolver
             return $this->exact($explicit, ['explicit_legacy_destination'], 'existing explicit legacy destination');
         }
         if (isset($context['label_similarity'])) return ['classification' => count((array) $context['label_similarity']) > 1 ? 'AMBIGUOUS' : 'NO_OWNER', 'target' => null, 'evidence' => ['label_similarity'], 'reason' => 'label similarity is not governed evidence'];
-        $mapping = $context['semantic_reference'] ?? null;
+        $mapping = $context['persisted_semantic_reference'] ?? ($context['semantic_reference'] ?? null);
         if (is_array($mapping) && in_array(strtoupper((string) ($mapping['status'] ?? '')), ['INVALID', 'STALE'], true)) return ['classification' => 'NO_OWNER', 'target' => null, 'evidence' => ['existing_governed_mapping'], 'reason' => 'existing semantic reference is invalid or stale'];
-        if (is_array($mapping) && in_array(strtoupper((string) ($mapping['status'] ?? '')), ['PRESENT_VALID', 'AVAILABLE'], true) && trim((string) ($mapping['type'] ?? '')) !== '' && trim((string) ($mapping['id'] ?? '')) !== '') return $this->exact($mapping, ['existing_governed_mapping'], 'existing mapping-level semantic reference');
+        if (is_array($mapping) && in_array(strtoupper((string) ($mapping['status'] ?? '')), ['PRESENT_VALID', 'AVAILABLE'], true) && trim((string) ($mapping['type'] ?? '')) !== '' && trim((string) ($mapping['id'] ?? '')) !== '') {
+            $hint = $context['owner_hint'] ?? null;
+            if (is_array($hint) && trim((string) ($hint['type'] ?? '')) !== '' && trim((string) ($hint['id'] ?? '')) !== '' && ((string) $hint['type'] !== (string) $mapping['type'] || (string) $hint['id'] !== (string) $mapping['id'])) {
+                return ['classification' => 'CONFLICT', 'target' => null, 'evidence' => ['persisted_mapping', 'owner_hint'], 'reason' => 'owner hint conflicts with persisted semantic reference'];
+            }
+            return $this->exact($mapping, ['persisted_mapping'], 'existing mapping-level semantic reference');
+        }
+        $hint = $context['owner_hint'] ?? null;
+        if (is_array($hint) && trim((string) ($hint['type'] ?? '')) !== '' && trim((string) ($hint['id'] ?? '')) !== '') return $this->exact($hint, ['owner_hint'], 'context owner hint');
         if ($sense->destinationType !== null && $sense->destinationId !== null && trim($sense->destinationType) !== '' && trim($sense->destinationId) !== '') {
             return $this->exact(['type' => $sense->destinationType, 'id' => $sense->destinationId], ['explicit_legacy_destination'], 'existing explicit legacy destination');
         }

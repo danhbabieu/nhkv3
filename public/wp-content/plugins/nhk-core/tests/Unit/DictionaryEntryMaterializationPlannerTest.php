@@ -20,7 +20,7 @@ final class DictionaryEntryMaterializationPlannerTest extends TestCase
             'model',
             'model-1',
             '/stale-route/',
-            ['domain' => 'đồng hồ'],
+            ['domain' => 'đồng hồ', 'semantic_reference' => ['status' => 'AVAILABLE', 'type' => 'music', 'id' => 'context-only-owner']],
             7,
         );
         $repo = new class($concept) implements DictionaryConceptRepository {
@@ -53,6 +53,31 @@ final class DictionaryEntryMaterializationPlannerTest extends TestCase
         self::assertSame('model-1', $result['items'][0]['semantic_reference']['id']);
         self::assertSame([], $result['grouping_candidates']);
         self::assertNotSame('', $result['fingerprint']);
+    }
+
+    public function test_context_semantic_reference_hint_is_not_materialized_as_persisted_mapping(): void
+    {
+        $concept = new DictionaryConcept('44444444-4444-7444-8444-444444444444', 'Bộ nhớ cơ khí', 'Một nghĩa', DictionaryConcept::APPROVED, null, null, null, [
+            'semantic_reference' => ['status' => 'AVAILABLE', 'type' => 'music', 'id' => 'context-only-owner'],
+        ], 1);
+        $repo = new class($concept) implements DictionaryConceptRepository {
+            public function __construct(private DictionaryConcept $concept) {}
+            public function findById(string $conceptId): ?DictionaryConcept { return $conceptId === $this->concept->conceptId ? $this->concept : null; }
+            public function findApprovedByNormalizedLabel(string $normalizedLabel, array $context = []): array { return []; }
+            public function listApproved(int $limit = 500): array { return [$this->concept]; }
+            public function listByStatus(string $status, int $limit = 500): array { return []; }
+            public function listLabels(string $conceptId, bool $includeInactive = false): array { return []; }
+            public function createConcept(DictionaryConcept $concept): DictionaryConcept { throw new \LogicException(); }
+            public function updateConcept(DictionaryConcept $concept, int $expectedRevision): DictionaryConcept { throw new \LogicException(); }
+            public function addLabel(DictionaryLabel $label): DictionaryLabel { throw new \LogicException(); }
+            public function saveLabel(DictionaryLabel $label, string $previousNormalizedLabel, int $expectedConceptRevision): DictionaryLabel { throw new \LogicException(); }
+        };
+        $planner = new DictionaryEntryMaterializationPlanner($repo, static fn (): ?LexicalEntry => null, static fn (): array => []);
+
+        $item = $planner->plan(['concept_id' => $concept->conceptId])['items'][0];
+
+        self::assertNull($item['semantic_reference']['type']);
+        self::assertNull($item['semantic_reference']['id']);
     }
 
     public function test_empty_legacy_destination_fields_are_treated_as_unmapped_not_invalid(): void

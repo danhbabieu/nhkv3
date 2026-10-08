@@ -349,11 +349,11 @@ final class DictionaryRuntime
         $canonicalResolver = new CanonicalAuthoritySubjectResolver($this->authority, $this->types);
         $ownerResolver = new DictionaryEnrichmentOwnerResolver($canonicalResolver);
         $audit = new DictionaryEnrichmentAudit($this->entries, $this->concepts, fn (string $type, string $id, array $context = []): array => $this->enrichmentCoverage->forReference($type, $id, $context), function (DictionaryConcept $sense, array $context = []) use ($ownerResolver): array {
-            $reference = is_array($context['semantic_reference'] ?? null) ? $context['semantic_reference'] : [];
+            $reference = is_array($context['persisted_semantic_reference'] ?? null) ? $context['persisted_semantic_reference'] : [];
             if (in_array(strtoupper((string) ($reference['status'] ?? '')), ['AVAILABLE', 'PRESENT_VALID'], true)) {
                 $validated = $this->revalidateDelegatedDestination((string) ($reference['type'] ?? ''), (string) ($reference['id'] ?? ''), null);
                 if ($validated === null) $reference['status'] = 'INVALID';
-                $context['semantic_reference'] = $reference;
+                $context['persisted_semantic_reference'] = $reference;
             }
             return $ownerResolver->resolve($sense, $context);
         });

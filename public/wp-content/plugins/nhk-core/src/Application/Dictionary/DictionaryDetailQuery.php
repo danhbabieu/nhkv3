@@ -84,7 +84,7 @@ final class DictionaryDetailQuery
         ];
         $seo = $this->seo($item, $sensePackets);
         $pageStatus = $seo['state'] === 'REDIRECT' ? 'REDIRECT' : ($seo['state'] === 'BLOCKED' ? 'INCOMPLETE' : 'READY');
-        return ['status' => $pageStatus, 'item' => $item, 'labels' => $item['labels'], 'canonical_url' => $seo['canonical'], 'destination_url' => $seo['state'] === 'REDIRECT' ? $seo['canonical'] : null, 'seo' => $seo, 'indexable' => $seo['state'] === 'INDEXABLE'];
+        return ['status' => $pageStatus, 'item' => $item, 'labels' => $item['labels'], 'canonical_url' => $seo['canonical'], 'destination_url' => $seo['state'] === 'REDIRECT' ? $seo['canonical'] : null, 'seo' => $seo, 'indexable' => $seo['state'] === 'INDEXABLE', 'presentation_context' => $this->presentationContext($sensePackets, $url)];
     }
 
     /** Consume persisted legacy Dictionary slugs only to preserve owner redirects. */
@@ -237,6 +237,33 @@ final class DictionaryDetailQuery
     private function labels(DictionaryConcept $sense): array { return array_values(array_filter(array_map(static fn (mixed $label): ?array => $label instanceof DictionaryLabel && $label->active ? ['label' => $label->label, 'kind' => $label->kind, 'locale' => $label->locale] : null, (array) $this->concepts->listLabels($sense->conceptId)), 'is_array')); }
     private function forms(LexicalEntry $entry): array { if (!method_exists($this->entries, 'listForms')) return [['form' => $entry->preferredForm, 'kind' => 'PREFERRED', 'locale' => $entry->locale]]; $out = []; foreach ((array) $this->entries->listForms($entry) as $form) { if (is_object($form) && trim((string) ($form->form ?? '')) !== '') $out[] = ['form' => $form->form, 'kind' => $form->kind ?? 'ALTERNATE', 'locale' => $form->locale ?? null]; elseif (is_array($form) && trim((string) ($form['form'] ?? '')) !== '') $out[] = ['form' => $form['form'], 'kind' => $form['kind'] ?? 'ALTERNATE', 'locale' => $form['locale'] ?? null]; } return $out !== [] ? $out : [['form' => $entry->preferredForm, 'kind' => 'PREFERRED', 'locale' => $entry->locale]]; }
     private function seo(array $item, array $senses): array { return (new DictionarySeoDecision())->decide((string) ($item['url'] ?? ''), $senses); }
+    /** @param list<array<string,mixed>> $senses @return array<string,mixed> */
+    private function presentationContext(array $senses, string $dictionaryUrl): array
+    {
+        if (count($senses) !== 1) return ['mode' => 'dedicated', 'canonical_url' => $dictionaryUrl];
+        $sense = $senses[0];
+        $reference = is_array($sense['semantic_reference'] ?? null) ? $sense['semantic_reference'] : [];
+        $status = strtoupper(trim((string) ($reference['status'] ?? '')));
+        $type = trim((string) ($reference['type'] ?? ''));
+        $id = trim((string) ($reference['id'] ?? ''));
+        $owner = is_array($sense['canonical_owner'] ?? null) ? $sense['canonical_owner'] : [];
+        $ownerType = trim((string) ($owner['type'] ?? ''));
+        $ownerId = trim((string) ($owner['id'] ?? $owner['canonical_id'] ?? ''));
+        $ownerUrl = trim((string) ($owner['url'] ?? $owner['canonical_url'] ?? $owner['current_path'] ?? ''));
+        $validStatuses = ['AVAILABLE', 'AVAILABLE_WITH_ITEMS', 'PRESENT_VALID'];
+        if (
+            strtoupper(trim((string) ($reference['source'] ?? ''))) === 'MAPPING'
+            && in_array($status, $validStatuses, true)
+            && $type !== ''
+            && $id !== ''
+            && ($ownerType === '' || $ownerType === $type)
+            && ($ownerId === '' || $ownerId === $id)
+            && $ownerUrl !== ''
+        ) {
+            return ['mode' => 'delegated', 'canonical_url' => $ownerUrl];
+        }
+        return ['mode' => 'dedicated', 'canonical_url' => $dictionaryUrl];
+    }
     private function slug(string $value): string
     {
         $value = trim($value);

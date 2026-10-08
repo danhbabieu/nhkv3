@@ -4,7 +4,9 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Dictionary\DictionaryDetailQuery;
-use NHK\Core\Domain\Dictionary\{DictionaryConcept, LexicalEntry};
+use NHK\Core\Application\Dictionary\{DictionaryDetailPresentationComposer, DictionaryPublicQuery};
+use NHK\Core\Contracts\Dictionary\DictionaryConceptRepository;
+use NHK\Core\Domain\Dictionary\{DictionaryConcept, DictionaryLabel, LexicalEntry};
 use PHPUnit\Framework\TestCase;
 
 final class DictionaryDetailQueryTest extends TestCase
@@ -178,6 +180,55 @@ final class DictionaryDetailQueryTest extends TestCase
         self::assertSame('NOINDEX', $result['seo']['state']);
         self::assertFalse($result['seo']['sitemap']);
         self::assertSame('noindex,follow', $result['seo']['robots']);
+    }
+
+    public function test_direct_detail_projects_revalidated_owner_as_delegated_without_redirecting_lexical_content(): void
+    {
+        $sense = new DictionaryConcept('sense-direct-delegated', 'Westminster chime', 'Định nghĩa âm thanh.', DictionaryConcept::APPROVED);
+        $entry = new LexicalEntry('entry-direct-delegated', 'Westminster chime', 'westminster chime', DictionaryConcept::APPROVED, 'vi-VN', ['public_slug' => 'westminster-chime'], 1, [$sense->conceptId]);
+        $entries = new class($entry, $sense) {
+            public function __construct(private LexicalEntry $entry, private DictionaryConcept $sense) {}
+            public function findByPublicSlug(string $slug): LexicalEntry { return $this->entry; }
+            public function listSenses(LexicalEntry $entry): array { return [$this->sense]; }
+            public function listForms(LexicalEntry $entry): array { return []; }
+            public function semanticReference(string $entryId, string $senseId): array { return ['status' => 'AVAILABLE', 'source' => 'MAPPING', 'type' => 'music', 'id' => 'owner-music', 'revision' => 2]; }
+        };
+        $detail = new DictionaryDetailQuery(
+            new class { public function listLabels(string $id): array { return []; } },
+            $entries,
+            static fn (?string $type, ?string $id, ?string $url): ?string => $type === 'music' && $id === 'owner-music' ? '/ban-nhac/westminster/' : null,
+            static fn (string $type, string $id): array => ['identity' => ['type' => $type, 'id' => $id, 'title' => 'Westminster', 'url' => '/ban-nhac/westminster/'], 'knowledge' => ['items' => []], 'relation_sections' => []],
+        );
+        $query = new DictionaryPublicQuery(
+            new class implements DictionaryConceptRepository {
+                public function findById(string $conceptId): ?DictionaryConcept { return null; }
+                public function findApprovedByNormalizedLabel(string $normalizedLabel, array $context = []): array { return []; }
+                public function listApproved(int $limit = 500): array { return []; }
+                public function listLabels(string $conceptId, bool $includeInactive = false): array { return []; }
+                public function createConcept(DictionaryConcept $concept): DictionaryConcept { return $concept; }
+                public function updateConcept(DictionaryConcept $concept, int $expectedRevision): DictionaryConcept { return $concept; }
+                public function addLabel(DictionaryLabel $label): DictionaryLabel { return $label; }
+                public function saveLabel(DictionaryLabel $label, string $previousNormalizedLabel, int $expectedConceptRevision): DictionaryLabel { return $label; }
+            },
+            null,
+            static fn (?string $type, ?string $id, ?string $url): ?string => $type === 'music' && $id === 'owner-music' ? '/ban-nhac/westminster/' : null,
+            $entries,
+            static fn (): bool => true,
+            null,
+            $detail,
+            new DictionaryDetailPresentationComposer(),
+        );
+
+        $result = $query->detail('westminster-chime');
+
+        self::assertSame('READY', $result['status']);
+        self::assertSame('DELEGATED', $result['presentation']['route']['mode']);
+        self::assertTrue($result['presentation']['route']['delegated']);
+        self::assertSame('/ban-nhac/westminster/', $result['presentation']['route']['canonical_url']);
+        self::assertSame('/ban-nhac/westminster/', $result['presentation']['seo']['canonical']);
+        self::assertSame('noindex,follow', $result['presentation']['seo']['robots']);
+        self::assertFalse($result['presentation']['seo']['sitemap']);
+        self::assertSame('Định nghĩa âm thanh.', $result['presentation']['senses'][0]['definition']);
     }
 
     public function test_semantic_article_mention_is_suppressed_when_article_already_has_a_semantic_section(): void

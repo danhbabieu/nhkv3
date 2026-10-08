@@ -15,8 +15,9 @@ final class DictionaryDetailPresentationComposer
         $rawSenses = array_values(array_filter((array) ($item['senses'] ?? []), 'is_array'));
         $senses = array_map(fn (array $sense): array => $this->sense($sense), $rawSenses);
         $title = trim((string) ($item['title'] ?? ''));
-        $canonical = trim((string) ($options['canonical_url'] ?? $source['seo']['canonical'] ?? $item['canonical_url'] ?? $item['url'] ?? ''));
-        $delegated = ($options['mode'] ?? '') === 'delegated';
+        $context = is_array($source['presentation_context'] ?? null) ? $source['presentation_context'] : [];
+        $canonical = trim((string) ($options['canonical_url'] ?? $context['canonical_url'] ?? $source['seo']['canonical'] ?? $item['canonical_url'] ?? $item['url'] ?? ''));
+        $delegated = ($options['mode'] ?? $context['mode'] ?? '') === 'delegated';
         $forms = $this->forms($item, $title);
         $knowledge = $this->mergeBuckets(array_map(static fn (array $sense): mixed => $sense['knowledge'] ?? null, $rawSenses));
         $media = $this->mergeBuckets(array_map(static fn (array $sense): mixed => $sense['media'] ?? null, $rawSenses));

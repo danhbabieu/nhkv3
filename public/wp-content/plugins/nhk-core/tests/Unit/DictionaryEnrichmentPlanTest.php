@@ -73,6 +73,20 @@ final class DictionaryEnrichmentPlanTest extends TestCase
         self::assertSame(['unique_resolver_result'], $result['evidence']);
     }
 
+    public function test_persisted_valid_mapping_is_noop_even_when_owner_is_exact(): void
+    {
+        $plan = new DictionaryEnrichmentPlan(new class { public function listForms(string $entryId): array { return []; } }, new DictionaryEnrichmentOwnerResolver());
+
+        $result = $plan->build(['items' => [[
+            'entry_id' => 'entry-mapped', 'sense_id' => 'sense-mapped', 'current_revision' => 8,
+            'persisted_semantic_reference' => ['status' => 'PRESENT_VALID', 'source' => 'MAPPING', 'type' => 'music', 'id' => 'owner-mapped', 'revision' => 8],
+            'owner_resolution' => ['classification' => 'EXACT_UNIQUE', 'target' => ['type' => 'music', 'id' => 'owner-mapped', 'revision' => 8], 'evidence' => ['persisted_mapping']],
+        ]] ]);
+
+        self::assertSame('NOOP', $result['status']);
+        self::assertSame([], $result['actions']);
+    }
+
     public function test_hidden_form_is_blocked_and_stale_reference_cannot_be_applied(): void
     {
         $plan = new DictionaryEnrichmentPlan(new class { public function listForms(string $entryId): array { return []; } }, new DictionaryEnrichmentOwnerResolver());
@@ -86,6 +100,39 @@ final class DictionaryEnrichmentPlanTest extends TestCase
         self::assertSame('REVIEW_REQUIRED', $result['status']);
         self::assertNotEmpty(array_filter($result['actions'], static fn (array $action): bool => ($action['status'] ?? '') === 'BLOCKED'));
         self::assertNotEmpty(array_filter($result['actions'], static fn (array $action): bool => ($action['action_type'] ?? '') === 'SET_SEMANTIC_REFERENCE'));
+    }
+
+    public function test_context_owner_hint_with_absent_persisted_mapping_emits_ready_set_reference(): void
+    {
+        $plan = new DictionaryEnrichmentPlan(new class { public function listForms(string $entryId): array { return []; } }, new DictionaryEnrichmentOwnerResolver());
+
+        $result = $plan->build(['items' => [[
+            'entry_id' => 'entry-hint', 'sense_id' => 'sense-hint', 'current_revision' => 3,
+            'persisted_semantic_reference' => ['status' => 'ABSENT', 'source' => 'MAPPING'],
+            'semantic_reference' => ['status' => 'AVAILABLE', 'source' => 'CONTEXT', 'type' => 'music', 'id' => 'owner-from-hint'],
+            'owner_hint' => ['type' => 'music', 'id' => 'owner-from-hint', 'revision' => 7],
+            'owner_resolution' => ['classification' => 'EXACT_UNIQUE', 'target' => ['type' => 'music', 'id' => 'owner-from-hint', 'revision' => 7], 'evidence' => ['owner_hint']],
+        ]] ]);
+
+        $action = array_values(array_filter($result['actions'], static fn (array $item): bool => ($item['action_type'] ?? '') === 'SET_SEMANTIC_REFERENCE'))[0] ?? [];
+        self::assertSame('READY', $result['status']);
+        self::assertSame('READY', $action['status']);
+        self::assertSame('owner-from-hint', $action['target']['id']);
+    }
+
+    public function test_context_hint_conflicting_with_persisted_mapping_requires_review(): void
+    {
+        $plan = new DictionaryEnrichmentPlan(new class { public function listForms(string $entryId): array { return []; } }, new DictionaryEnrichmentOwnerResolver());
+
+        $result = $plan->build(['items' => [[
+            'entry_id' => 'entry-conflict', 'sense_id' => 'sense-conflict', 'current_revision' => 4,
+            'persisted_semantic_reference' => ['status' => 'PRESENT_VALID', 'source' => 'MAPPING', 'type' => 'music', 'id' => 'owner-persisted', 'revision' => 4],
+            'owner_hint' => ['type' => 'music', 'id' => 'owner-hint'],
+            'owner_resolution' => ['classification' => 'CONFLICT', 'target' => null, 'evidence' => ['persisted_mapping', 'owner_hint']],
+        ]] ]);
+
+        self::assertSame('REVIEW_REQUIRED', $result['status']);
+        self::assertSame('REVIEW_REQUIRED', $result['actions'][0]['action_type']);
     }
 
     public function test_locale_is_preserved_on_each_form_action(): void
