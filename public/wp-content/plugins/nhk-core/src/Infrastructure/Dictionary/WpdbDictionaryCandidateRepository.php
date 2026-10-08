@@ -3,11 +3,11 @@ declare(strict_types=1);
 
 namespace NHK\Core\Infrastructure\Dictionary;
 
-use NHK\Core\Contracts\Dictionary\DictionaryCandidateRepository;
+use NHK\Core\Contracts\Dictionary\{DictionaryCandidatePageReader, DictionaryCandidateRepository};
 use NHK\Core\Domain\Dictionary\{DictionaryCandidate, DictionaryCandidateState};
 use NHK\Core\Shared\Uuid\UuidCodec;
 
-final class WpdbDictionaryCandidateRepository implements DictionaryCandidateRepository
+final class WpdbDictionaryCandidateRepository implements DictionaryCandidateRepository, DictionaryCandidatePageReader
 {
     private string $table;
 
@@ -76,6 +76,46 @@ final class WpdbDictionaryCandidateRepository implements DictionaryCandidateRepo
         return array_values(array_filter(array_map(fn (array $row): ?DictionaryCandidate => $this->hydrate($row), $rows)));
     }
 
+    public function pageForReview(int $limit = 100, ?string $cursor = null, ?string $state = null): array
+    {
+        $limit = max(1, min(100, $limit));
+        $state = $state !== null ? strtoupper(trim($state)) : null;
+        if ($state !== null && !DictionaryCandidateState::valid($state)) throw new \InvalidArgumentException('DICTIONARY_CANDIDATE_STATE_INVALID');
+        $reviewStates = [DictionaryCandidateState::DETECTED, DictionaryCandidateState::NEEDS_REVIEW, DictionaryCandidateState::AMBIGUOUS, DictionaryCandidateState::PROPOSED_NEW];
+        $isReviewState = $state === null || in_array($state, $reviewStates, true);
+        $baseWhere = $state === null ? 'candidate_state IN (' . implode(',', array_fill(0, count($reviewStates), '%s')) . ')' : 'candidate_state=%s';
+        $baseArgs = $state === null ? $reviewStates : [$state];
+        $decoded = $this->decodeReviewCursor($cursor, $state);
+        if (!$isReviewState) return ['items' => [], 'total' => 0, 'has_more' => false, 'next_cursor' => null, 'diagnostics' => []];
+        $where = $baseWhere;
+        $args = $baseArgs;
+        if ($decoded !== null) {
+            $where .= ' AND (occurrences<%d OR (occurrences=%d AND candidate_uuid>%s))';
+            array_push($args, $decoded['occurrences'], $decoded['occurrences'], UuidCodec::toBinary($decoded['candidate_id']));
+        }
+        $countQuery = $this->database->prepare("SELECT COUNT(*) FROM {$this->table} WHERE {$baseWhere}", ...$baseArgs);
+        $total = (int) $this->database->get_var($countQuery);
+        $queryArgs = [...$args, $limit + 1];
+        $query = $this->database->prepare("SELECT * FROM {$this->table} WHERE {$where} ORDER BY occurrences DESC,candidate_uuid ASC LIMIT %d", ...$queryArgs);
+        $rows = $this->database->get_results($query, ARRAY_A);
+        if (!is_array($rows)) throw new \RuntimeException('DICTIONARY_CANDIDATE_PAGE_UNAVAILABLE');
+        $hasMore = count($rows) > $limit;
+        $pageRows = array_slice($rows, 0, $limit);
+        $items = [];
+        $diagnostics = [];
+        foreach ($pageRows as $row) {
+            $item = is_array($row) ? $this->hydrate($row) : null;
+            if ($item instanceof DictionaryCandidate) {
+                $items[] = $item;
+                continue;
+            }
+            $diagnostics[] = ['code' => 'DICTIONARY_CANDIDATE_HYDRATION_FAILED'];
+        }
+        $last = $pageRows !== [] ? $pageRows[array_key_last($pageRows)] : null;
+        $next = $hasMore && is_array($last) ? $this->reviewCursorFromRow($last, $state) : null;
+        return ['items' => $items, 'total' => $total, 'has_more' => $hasMore, 'next_cursor' => $next, 'diagnostics' => $diagnostics];
+    }
+
     public function findById(string $candidateId): ?DictionaryCandidate
     {
         try {
@@ -130,6 +170,32 @@ final class WpdbDictionaryCandidateRepository implements DictionaryCandidateRepo
                 (string) $row['last_seen_at'],
                 (int) $row['revision'],
             );
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /** @return array{version:int,sort:string,state:?string,occurrences:int,candidate_id:string}|null */
+    private function decodeReviewCursor(?string $cursor, ?string $state): ?array
+    {
+        if ($cursor === null || trim($cursor) === '') return null;
+        if (strlen($cursor) > 4096) throw new \InvalidArgumentException('DICTIONARY_CANDIDATE_CURSOR_INVALID');
+        $encoded = strtr($cursor, '-_', '+/');
+        $encoded .= str_repeat('=', (4 - strlen($encoded) % 4) % 4);
+        $decoded = base64_decode($encoded, true);
+        $payload = is_string($decoded) && $decoded !== '' ? json_decode($decoded, true) : null;
+        if (!is_array($payload) || ($payload['version'] ?? null) !== 1 || ($payload['sort'] ?? null) !== 'OCCURRENCES_DESC_UUID_ASC_V1' || ($payload['state'] ?? null) !== $state || !is_int($payload['occurrences'] ?? null) || $payload['occurrences'] < 1 || !is_string($payload['candidate_id'] ?? null) || !UuidCodec::isValid($payload['candidate_id'])) {
+            throw new \InvalidArgumentException(($payload['state'] ?? null) !== $state ? 'DICTIONARY_CANDIDATE_CURSOR_FILTER_MISMATCH' : 'DICTIONARY_CANDIDATE_CURSOR_INVALID');
+        }
+        return ['version' => 1, 'sort' => 'OCCURRENCES_DESC_UUID_ASC_V1', 'state' => $state, 'occurrences' => $payload['occurrences'], 'candidate_id' => $payload['candidate_id']];
+    }
+
+    private function reviewCursorFromRow(array $row, ?string $state): ?string
+    {
+        try {
+            $candidateId = UuidCodec::fromBinary((string) ($row['candidate_uuid'] ?? ''));
+            $json = function_exists('wp_json_encode') ? wp_json_encode(['version' => 1, 'sort' => 'OCCURRENCES_DESC_UUID_ASC_V1', 'state' => $state, 'occurrences' => (int) ($row['occurrences'] ?? 0), 'candidate_id' => $candidateId], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : json_encode(['version' => 1, 'sort' => 'OCCURRENCES_DESC_UUID_ASC_V1', 'state' => $state, 'occurrences' => (int) ($row['occurrences'] ?? 0), 'candidate_id' => $candidateId], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            return rtrim(strtr(base64_encode((string) $json), '+/', '-_'), '=');
         } catch (\Throwable) {
             return null;
         }

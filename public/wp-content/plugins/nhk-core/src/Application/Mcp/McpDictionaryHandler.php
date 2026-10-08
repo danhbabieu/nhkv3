@@ -5,6 +5,7 @@ namespace NHK\Core\Application\Mcp;
 
 use NHK\Core\Application\Dictionary\DictionaryRuntime;
 use NHK\Core\Application\Dictionary\DictionaryMutationService;
+use NHK\Core\Contracts\Dictionary\DictionaryCandidatePageReader;
 use NHK\Core\Domain\Dictionary\{DictionaryCandidateState, DictionaryLabel};
 
 final class McpDictionaryHandler
@@ -37,14 +38,29 @@ final class McpDictionaryHandler
 
     public function resolve(string $term, array $context = [], array $hints = []): array { return $this->runtime->resolve($term, $context, $hints); }
 
-    public function candidateList(?string $state = null, int $limit = 100): array
+    public function candidateList(?string $state = null, int $limit = 100, ?string $cursor = null): array
     {
         if (!$this->runtime->available()) return ['status' => 'unavailable', 'reason' => 'DICTIONARY_STORAGE_UNAVAILABLE'];
-        $items = $this->runtime->candidates()->listForReview(max(1, min(100, $limit)));
         $state = $state !== null ? strtoupper(trim($state)) : null;
         if ($state !== null && !DictionaryCandidateState::valid($state)) return ['status' => 'conflict', 'reason' => 'DICTIONARY_CANDIDATE_STATE_INVALID'];
-        $items = array_values(array_filter($items, static fn (mixed $item): bool => $state === null || $item->state === $state));
-        return ['status' => 'available', 'items' => array_map($this->candidate(...), $items), 'count' => count($items)];
+        $repository = $this->runtime->candidates();
+        if ($repository instanceof DictionaryCandidatePageReader) {
+            $page = $repository->pageForReview(max(1, min(100, $limit)), $cursor, $state);
+            $items = array_values(array_filter((array) ($page['items'] ?? []), 'is_object'));
+            return [
+                'status' => 'available',
+                'items' => array_map($this->candidate(...), $items),
+                'count' => count($items),
+                'page_count' => count($items),
+                'total' => (int) ($page['total'] ?? count($items)),
+                'has_more' => (bool) ($page['has_more'] ?? false),
+                'next_cursor' => $page['next_cursor'] ?? null,
+                'diagnostics' => (array) ($page['diagnostics'] ?? []),
+            ];
+        }
+        if ($cursor !== null && trim($cursor) !== '') throw new \RuntimeException('DICTIONARY_CANDIDATE_PAGINATION_UNAVAILABLE');
+        $items = array_values(array_filter($repository->listForReview(max(1, min(100, $limit))), static fn (mixed $item): bool => $state === null || $item->state === $state));
+        return ['status' => 'available', 'items' => array_map($this->candidate(...), $items), 'count' => count($items), 'page_count' => count($items), 'total' => null, 'has_more' => false, 'next_cursor' => null, 'diagnostics' => [['code' => 'DICTIONARY_CANDIDATE_LEGACY_READER_FALLBACK']]];
     }
 
     public function candidateDetail(string $candidateId, int $limit = 50, int $offset = 0): array

@@ -143,12 +143,13 @@ final class WpdbDictionaryEntryRepository implements DictionaryEntryRepository, 
     public function readPage(int $limit = 1000, ?string $cursor = null): array
     {
         $limit = max(1, min(10000, $limit));
-        $after = $cursor !== null ? base64_decode($cursor, true) : '';
-        if (!is_string($after)) $after = '';
-        $where = $after !== '' ? " WHERE f.normalized_form>%s" : '';
-        $args = $after !== '' ? [$after] : [];
+        $after = $this->decodeDuplicateAuditCursor($cursor);
+        $where = $after !== null
+            ? " WHERE (f.normalized_form>%s OR (f.normalized_form=%s AND e.id>%d) OR (f.normalized_form=%s AND e.id=%d AND s.id>%d))"
+            : '';
+        $args = $after !== null ? [$after['normalized_form'], $after['normalized_form'], $after['entry_id'], $after['normalized_form'], $after['entry_id'], $after['sense_id']] : [];
         $args[] = $limit + 1;
-        $sql = "SELECT e.entry_uuid,e.preferred_form,e.status AS entry_status,e.revision AS entry_revision,f.id AS form_id,f.form_text,f.normalized_form,f.state,s.concept_uuid,s.context_json AS sense_context_json,s.semantic_reference_type,s.semantic_reference_id,s.state AS sense_state,c.status AS sense_status,c.revision AS sense_revision,c.context_json AS concept_context_json,c.destination_type,c.destination_id FROM {$this->entries} e INNER JOIN {$this->forms} f ON f.entry_uuid=e.entry_uuid INNER JOIN {$this->senses} s ON s.entry_uuid=e.entry_uuid INNER JOIN {$this->conceptsTable()} c ON c.concept_uuid=s.concept_uuid{$where} ORDER BY f.normalized_form,e.id,s.id LIMIT %d";
+        $sql = "SELECT e.id AS _entry_audit_id,s.id AS _sense_audit_id,e.entry_uuid,e.preferred_form,e.status AS entry_status,e.revision AS entry_revision,f.id AS form_id,f.form_text,f.normalized_form,f.state,s.concept_uuid,s.context_json AS sense_context_json,s.semantic_reference_type,s.semantic_reference_id,s.state AS sense_state,c.status AS sense_status,c.revision AS sense_revision,c.context_json AS concept_context_json,c.destination_type,c.destination_id FROM {$this->entries} e INNER JOIN {$this->forms} f ON f.entry_uuid=e.entry_uuid INNER JOIN {$this->senses} s ON s.entry_uuid=e.entry_uuid INNER JOIN {$this->conceptsTable()} c ON c.concept_uuid=s.concept_uuid{$where} ORDER BY f.normalized_form,e.id,s.id LIMIT %d";
         $rows = $this->database->get_results($this->database->prepare($sql, ...$args), ARRAY_A);
         if (!is_array($rows)) throw new \RuntimeException('DICTIONARY_DUPLICATE_AUDIT_UNAVAILABLE');
         $hasMore = count($rows) > $limit;
@@ -167,7 +168,7 @@ final class WpdbDictionaryEntryRepository implements DictionaryEntryRepository, 
                 'state' => ((int) ($row['state'] ?? 0) === 1 && (int) ($row['sense_state'] ?? 0) === 1) ? 1 : 0,
             ];
         }
-        $next = $hasMore && $mapped !== [] ? base64_encode((string) ($mapped[count($mapped) - 1]['normalized_form'] ?? '')) : null;
+        $next = $hasMore && is_array($rows[array_key_last($rows)] ?? null) ? $this->encodeDuplicateAuditCursor($rows[array_key_last($rows)]) : null;
         return ['rows' => $mapped, 'next_cursor' => $next];
     }
 
@@ -518,6 +519,31 @@ final class WpdbDictionaryEntryRepository implements DictionaryEntryRepository, 
         if ($cursor === null || $cursor === '') return null;
         $value = json_decode((string) base64_decode($cursor, true), true);
         return is_array($value) && isset($value['label'], $value['id']) ? ['label' => (string) $value['label'], 'id' => (int) $value['id']] : null;
+    }
+
+    /** @return array{normalized_form:string,entry_id:int,sense_id:int}|null */
+    private function decodeDuplicateAuditCursor(?string $cursor): ?array
+    {
+        if ($cursor === null || $cursor === '') return null;
+        if (strlen($cursor) > 4096) throw new \InvalidArgumentException('DICTIONARY_DUPLICATE_CURSOR_INVALID');
+        $encoded = strtr($cursor, '-_', '+/');
+        $encoded .= str_repeat('=', (4 - strlen($encoded) % 4) % 4);
+        $decoded = base64_decode($encoded, true);
+        $payload = is_string($decoded) && $decoded !== '' ? json_decode($decoded, true) : null;
+        if (!is_array($payload) || ($payload['version'] ?? null) !== 1 || ($payload['sort'] ?? null) !== 'NORMALIZED_FORM_ENTRY_SENSE_ASC_V1' || !is_string($payload['normalized_form'] ?? null) || !is_int($payload['entry_id'] ?? null) || $payload['entry_id'] < 1 || !is_int($payload['sense_id'] ?? null) || $payload['sense_id'] < 1) {
+            throw new \InvalidArgumentException('DICTIONARY_DUPLICATE_CURSOR_INVALID');
+        }
+        return ['normalized_form' => $payload['normalized_form'], 'entry_id' => $payload['entry_id'], 'sense_id' => $payload['sense_id']];
+    }
+
+    private function encodeDuplicateAuditCursor(array $row): ?string
+    {
+        $entryId = (int) ($row['_entry_audit_id'] ?? 0);
+        $senseId = (int) ($row['_sense_audit_id'] ?? 0);
+        $normalized = (string) ($row['normalized_form'] ?? '');
+        if ($entryId < 1 || $senseId < 1 || $normalized === '') return null;
+        $payload = ['version' => 1, 'sort' => 'NORMALIZED_FORM_ENTRY_SENSE_ASC_V1', 'normalized_form' => $normalized, 'entry_id' => $entryId, 'sense_id' => $senseId];
+        return rtrim(strtr(base64_encode((string) json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)), '+/', '-_'), '=');
     }
 
     private function encodeArchiveCursor(string $label, int $id): string

@@ -23,7 +23,7 @@ final class KnowledgeClaimIdentity
             'proposition' => trim((string) ($metadata['proposition'] ?? $metadata['deterministic_proposition'] ?? '')),
         ];
         $missing = array_keys(array_filter($packet, static fn (mixed $value): bool => trim((string) $value) === ''));
-        if ($missing !== []) return new KnowledgeClaimIdentityResolution(KnowledgeClaimIdentityResolution::UNRESOLVED, $packet, ['KNOWLEDGE_IDENTITY_REQUIRED_FIELD_MISSING']);
+        if ($missing !== []) return new KnowledgeClaimIdentityResolution(KnowledgeClaimIdentityResolution::UNRESOLVED, $packet, ['KNOWLEDGE_IDENTITY_REQUIRED_FIELD_MISSING'], $missing);
         return new KnowledgeClaimIdentityResolution(KnowledgeClaimIdentityResolution::RESOLVED, $packet);
     }
 
@@ -54,7 +54,10 @@ final class KnowledgeClaimIdentity
         $platform = strtolower(trim((string) ($metadata['platform'] ?? '')));
         $externalId = trim((string) ($metadata['external_video_id'] ?? ''));
         $reasons = [];
-        if ($subjectId === '' || $propositionClass === '') $reasons[] = 'KNOWLEDGE_IDENTITY_REQUIRED_FIELD_MISSING';
+        $missing = [];
+        if ($subjectId === '') $missing[] = 'subject_id';
+        if ($propositionClass === '') $missing[] = 'proposition_class';
+        if ($missing !== []) $reasons[] = 'KNOWLEDGE_IDENTITY_REQUIRED_FIELD_MISSING';
         $canonical = null;
         if ($canonicalId !== '') {
             if ($videos === null) $reasons[] = 'VIDEO_CANONICAL_LOOKUP_REQUIRED';
@@ -68,12 +71,14 @@ final class KnowledgeClaimIdentity
             $platform = $canonicalPlatform;
             $externalId = $canonicalExternalId;
         }
+        if ($platform === '') $missing[] = 'video_referent.platform';
+        if ($externalId === '') $missing[] = 'video_referent.external_video_id';
         if ($platform === '' || $externalId === '') $reasons[] = 'VIDEO_REFERENT_UNRESOLVED';
         $packet = ['subject_id' => $subjectId, 'proposition_class' => $propositionClass];
         if ($platform !== '' && $externalId !== '') $packet['video_referent'] = ['platform' => $platform, 'external_video_id' => $externalId];
         if ($reasons !== []) {
             $status = in_array('VIDEO_IDENTITY_CONFLICT', $reasons, true) ? KnowledgeClaimIdentityResolution::CONFLICTING : KnowledgeClaimIdentityResolution::UNRESOLVED;
-            return new KnowledgeClaimIdentityResolution($status, $packet, $reasons);
+            return new KnowledgeClaimIdentityResolution($status, $packet, $reasons, $missing);
         }
         return new KnowledgeClaimIdentityResolution(KnowledgeClaimIdentityResolution::RESOLVED, $packet);
     }

@@ -104,6 +104,11 @@ final class SystemWideDuplicateAuditTest extends TestCase
         self::assertSame(2, $result['owners']['Knowledge']['diagnostics']['identity_unresolved_rows']);
         self::assertSame(0, $result['owners']['Knowledge']['diagnostics']['identity_conflicting_rows']);
         self::assertCount(2, $result['owners']['Knowledge']['diagnostics']['bounded_identity_review_samples']);
+        self::assertSame(['video_referent.platform', 'video_referent.external_video_id'], $result['owners']['Knowledge']['diagnostics']['bounded_identity_review_samples'][0]['missing_fields']);
+        self::assertSame(1, $result['owners']['Knowledge']['diagnostics']['bounded_identity_review_samples'][0]['revision']);
+        self::assertSame('ACTIVE', $result['owners']['Knowledge']['diagnostics']['bounded_identity_review_samples'][0]['lifecycle_state']);
+        self::assertSame('UNKNOWN', $result['owners']['Knowledge']['diagnostics']['bounded_identity_review_samples'][0]['source_class']);
+        self::assertSame('DUPLICATE_GROUPING_EXCLUDED', $result['owners']['Knowledge']['diagnostics']['bounded_identity_review_samples'][0]['coverage_impact']);
     }
 
     public function test_two_unresolved_ordinary_rows_never_form_duplicate_cluster(): void

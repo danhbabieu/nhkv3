@@ -39,6 +39,14 @@ final class KnowledgeClaimIdentityTest extends TestCase
         self::assertSame('UNRESOLVED', $result->status());
         self::assertFalse($result->equivalentTo($result));
         self::assertContains('KNOWLEDGE_IDENTITY_REQUIRED_FIELD_MISSING', $result->reasonCodes());
+        self::assertSame(['facet', 'scope', 'proposition'], $result->missingFields());
+    }
+
+    public function testMissingIdentityDiagnosticsNameAllRequiredFields(): void
+    {
+        $result = KnowledgeClaimIdentity::resolveInput('fact', ['metadata' => []]);
+
+        self::assertSame(['subject_id', 'facet', 'scope', 'proposition'], $result->missingFields());
     }
 
     public function testTwoMissingVideoReferentsNeverCompareEquivalent(): void

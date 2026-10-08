@@ -31,6 +31,7 @@ final class KnowledgeQualityAuditor
     public function audit(KnowledgeClaim $claim): KnowledgeQualityAuditResult
     {
         $metadata = is_array($claim->provenance['metadata'] ?? null) ? $claim->provenance['metadata'] : [];
+        $identity = KnowledgeClaimIdentity::resolveClaim($claim);
         $subject = $this->subject($metadata);
         $scope = strtolower(trim((string) ($metadata['scope'] ?? $subject['entity_type'] ?? '')));
         $facet = strtolower(trim((string) ($metadata['facet'] ?? $metadata['projection_category'] ?? '')));
@@ -89,6 +90,15 @@ final class KnowledgeQualityAuditor
             ['subject_id' => (string) ($subject['canonical_subject_id'] ?? ''), 'facet' => $facet, 'covered' => $findings === ['KEEP_CANONICAL'] && $facet !== '', 'quality' => $quality],
             ['status' => $findings === ['KEEP_CANONICAL'] ? 'READY' : ($subject['status'] === 'resolved' ? 'PARTIAL' : 'BLOCKED'), 'eligible_claim' => $findings === ['KEEP_CANONICAL'], 'excluded_reasons' => $findings === ['KEEP_CANONICAL'] ? [] : $findings],
             $diagnostics,
+            [
+                'status' => $identity->status(),
+                'reason_codes' => $identity->reasonCodes(),
+                'missing_fields' => $identity->missingFields(),
+                'identity_policy' => $identity->policyVersion(),
+                'lifecycle_state' => $claim->active ? 'ACTIVE' : 'RETIRED',
+                'source_class' => $this->sourceClass($metadata),
+                'coverage_impact' => $identity->status() === KnowledgeClaimIdentityResolution::RESOLVED ? 'DUPLICATE_GROUPING_AVAILABLE' : 'DUPLICATE_GROUPING_EXCLUDED',
+            ],
         );
     }
 
@@ -102,6 +112,12 @@ final class KnowledgeQualityAuditor
         if ($input['subject_id'] === '') return ['status' => 'unresolved', 'candidates' => $input['candidates']];
         if (count($input['candidates']) > 1) return ['status' => 'ambiguous', 'candidates' => $input['candidates']];
         return ['status' => 'resolved', 'canonical_subject_id' => $input['subject_id'], 'entity_type' => $input['subject_type'], 'candidates' => $input['candidates']];
+    }
+
+    private function sourceClass(array $metadata): string
+    {
+        $sourceClass = strtoupper(trim((string) ($metadata['source_class'] ?? $metadata['provenance_class'] ?? '')));
+        return in_array($sourceClass, self::PROVENANCE, true) ? $sourceClass : 'UNKNOWN';
     }
 
     /** @return array<string,mixed> */

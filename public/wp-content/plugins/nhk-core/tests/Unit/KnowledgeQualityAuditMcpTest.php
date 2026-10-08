@@ -77,6 +77,26 @@ final class KnowledgeQualityAuditMcpTest extends TestCase
         self::assertSame(0, $repository->writes);
     }
 
+    public function test_evidence_does_not_resolve_missing_knowledge_subject_identity(): void
+    {
+        $claim = new KnowledgeClaim(
+            UuidCodec::newV7(),
+            'nhk:quality:missing-subject',
+            'Lịch sử đồng hồ 400 ngày.',
+            'history',
+            ['metadata' => ['scope' => 'variant', 'facet' => 'history', 'provenance_class' => 'CATALOG_SUPPORTED']],
+        );
+        $source = new Source(UuidCodec::newV7(), 'catalog.400-days', 'Catalog', 'catalog', 'https://example.test/catalog', [], true, 1);
+        $evidence = new Evidence(UuidCodec::newV7(), $claim->canonicalId, $source->canonicalId, 'supports', 'Catalog support', null, true, 1);
+        $response = $this->handler(new QualityAuditMcpClaims([$claim]), [$evidence], [$source])->audit(['limit' => 1]);
+
+        self::assertSame('unresolved', $response['items'][0]['subject_resolution']['status']);
+        self::assertSame('SUPPORTED_WITHIN_SCOPE', $response['items'][0]['evidence_assessment']['status']);
+        self::assertSame('BLOCKED', $response['items'][0]['writer_readiness']['status']);
+        self::assertSame('UNRESOLVED', $response['items'][0]['identity_resolution']['status']);
+        self::assertContains('subject_id', $response['items'][0]['identity_resolution']['missing_fields']);
+    }
+
     public function test_handler_applies_registered_filters_and_rejects_invalid_cursor(): void
     {
         $subject = UuidCodec::newV7();

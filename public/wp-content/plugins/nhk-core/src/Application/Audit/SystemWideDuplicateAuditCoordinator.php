@@ -296,7 +296,7 @@ final class SystemWideDuplicateAuditCoordinator
                 $statusKey = strtolower($identity->status());
                 $coverage['identity_' . ($statusKey === 'conflicting' ? 'conflicting' : 'unresolved') . '_rows']++;
                 if (count($coverage['bounded_identity_review_samples']) < 16) {
-                    $coverage['bounded_identity_review_samples'][] = ['canonical_id' => $id, 'status' => $identity->status(), 'reason_codes' => $identity->reasonCodes()];
+                    $coverage['bounded_identity_review_samples'][] = $this->knowledgeIdentityDiagnostic($row, $identity);
                 }
                 continue;
             }
@@ -327,6 +327,26 @@ final class SystemWideDuplicateAuditCoordinator
             $clusters[] = $this->cluster('Knowledge', $key, $rows, $classification, 'MEDIUM', ['same_subject_facet_scope_with_nonidentical_proposition'], $classification === 'CONTEXTUAL_OR_SCOPED_VARIANT' ? ['qualification_differs'] : [], ['wording differs; equivalence is not proven by lexical similarity'], 'REVIEW_KNOWLEDGE_SEMANTIC_EQUIVALENCE;NO_MUTATION');
         }
         return ['clusters' => $clusters, 'diagnostics' => $coverage];
+    }
+
+    /** @param array<string,mixed> $row */
+    private function knowledgeIdentityDiagnostic(array $row, \NHK\Core\Application\Knowledge\KnowledgeClaimIdentityResolution $identity): array
+    {
+        $provenance = $this->array($row, ['provenance']);
+        $metadata = $this->array($provenance, ['metadata']);
+        $sourceClass = strtoupper($this->text($row, ['source_class'], $metadata));
+        $allowedSourceClasses = ['OBSERVED_FROM_MEDIA', 'EXPLICIT_USER_KNOWLEDGE', 'CATALOG_SUPPORTED', 'EXTERNAL_RESEARCH', 'SYSTEM_INFERENCE'];
+        return [
+            'canonical_id' => $this->id($row),
+            'status' => $identity->status(),
+            'reason_codes' => $identity->reasonCodes(),
+            'missing_fields' => $identity->missingFields(),
+            'identity_policy' => $identity->policyVersion(),
+            'revision' => (int) ($row['revision'] ?? 0),
+            'lifecycle_state' => strtoupper($this->text($row, ['state', 'status'], [], 'ACTIVE')),
+            'source_class' => in_array($sourceClass, $allowedSourceClasses, true) ? $sourceClass : 'UNKNOWN',
+            'coverage_impact' => 'DUPLICATE_GROUPING_EXCLUDED',
+        ];
     }
 
     /** @param list<mixed> $items @return list<array<string,mixed>> */

@@ -12,12 +12,13 @@ final class KnowledgeClaimIdentityResolution
     public const CONFLICTING = 'CONFLICTING';
     public const POLICY_VERSION = 'knowledge-identity-v2';
 
-    /** @param array<string,mixed> $packet @param list<string> $reasonCodes */
-    public function __construct(private string $status, private array $packet, private array $reasonCodes = [])
+    /** @param array<string,mixed> $packet @param list<string> $reasonCodes @param list<string> $missingFields */
+    public function __construct(private string $status, private array $packet, private array $reasonCodes = [], private array $missingFields = [])
     {
         if (!in_array($status, [self::RESOLVED, self::UNRESOLVED, self::CONFLICTING], true)) throw new \InvalidArgumentException('KNOWLEDGE_IDENTITY_STATUS_INVALID');
         ksort($this->packet);
         $this->reasonCodes = array_values(array_unique(array_filter(array_map('strval', $reasonCodes))));
+        $this->missingFields = array_values(array_unique(array_filter(array_map('strval', $missingFields))));
     }
 
     public function status(): string { return $this->status; }
@@ -27,5 +28,7 @@ final class KnowledgeClaimIdentityResolution
     public function fingerprint(): string { return hash('sha256', json_encode(['policy' => self::POLICY_VERSION, 'packet' => $this->packet], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)); }
     /** @return list<string> */
     public function reasonCodes(): array { return $this->reasonCodes; }
+    /** @return list<string> */
+    public function missingFields(): array { return $this->missingFields; }
     public function equivalentTo(self $other): bool { return $this->status === self::RESOLVED && $other->status === self::RESOLVED && hash_equals($this->fingerprint(), $other->fingerprint()); }
 }

@@ -24850,3 +24850,42 @@ runtime is unavailable and no live deployment or push was performed.
 STATUS: `DICTIONARY_GALLERY_CSS_OVERFLOW_FIXED_LOCALLY / FOCUSED_GREEN /
 FULL_SUITE_BASELINE_ERRORS_RECORDED / LOCAL_RUNTIME_UNAVAILABLE /
 NO_DATA_MUTATION / NO_DEPLOYMENT / COMMIT_PENDING`.
+
+# Checkpoint — 2026-10-08 — Dictionary pagination and Knowledge identity audit diagnostics
+
+ROOT_CAUSE_CONFIRMED: The Dictionary candidate MCP path used the bounded legacy
+list reader, so inventories above its page cap could not be scanned completely.
+The duplicate-audit reader used only normalized form as its continuation key
+although its SQL order also included Entry and Sense numeric identities, which
+could skip rows sharing a normalized form. Knowledge identity resolution already
+failed closed under the active identity policy; its audit output did not expose
+the missing fields, lifecycle/source classification or explicit duplicate-coverage
+impact. Evidence remains support/provenance and cannot manufacture a missing
+Knowledge subject identity.
+
+IMPLEMENTED: Added a read-only Dictionary candidate page contract with a stable
+occurrence-descending/UUID-ascending cursor, stable filtered total, has_more and
+filter-bound cursor validation. Restricted the paged queue to review states and
+preserved a diagnostic legacy fallback. Repaired duplicate-audit continuation
+with normalized-form/Entry-id/Sense-id composite ordering. Added bounded
+Knowledge identity diagnostics to quality and system-wide audit projections,
+including missing fields, identity policy, revision, lifecycle, source class and
+duplicate grouping coverage impact. No identity law, canonical ID, lifecycle,
+Graph relation, Evidence, Source or Dictionary record was changed.
+
+VERIFIED: Focused Dictionary/MCP/Knowledge/System-wide selection passes 131
+tests / 859 assertions, with one pre-existing DictionaryPlanningService warning
+(`Array to string conversion` at line 219). Candidate pagination also covers
+inventory sizes 0, 1, 95, 100, 101, 120 and 201, equal-occurrence boundaries,
+state filtering and malformed/mismatched cursors. Changed PHP files lint clean,
+diff check and changed-scope secret review are clean. Runtime database/API
+acceptance remains unavailable and was not mutated; no migration, deployment,
+push or pull was performed.
+
+REMAINING_GAP: Live candidate inventory count (including the reported 95 items),
+live 100/100 Knowledge identity coverage, the named historical Knowledge record,
+and deployed MCP read-back require an available authorized read-only runtime.
+
+STATUS: `PAGINATION_FIXED_LOCALLY / COMPOSITE_AUDIT_CURSOR_FIXED /
+IDENTITY_DIAGNOSTICS_ADDED / FOCUSED_GREEN / RUNTIME_ACCEPTANCE_PENDING /
+NO_DATA_MUTATION / NO_DEPLOYMENT / COMMIT_PENDING`.

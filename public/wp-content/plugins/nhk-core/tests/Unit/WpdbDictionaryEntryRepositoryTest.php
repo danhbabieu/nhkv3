@@ -13,6 +13,22 @@ use PHPUnit\Framework\TestCase;
 
 final class WpdbDictionaryEntryRepositoryTest extends TestCase
 {
+    public function test_duplicate_audit_cursor_preserves_rows_with_same_normalized_form_at_boundary(): void
+    {
+        $database = new CompositeCursorDatabase();
+        $repo = new WpdbDictionaryEntryRepository($database, $this->conceptRepository());
+
+        $first = $repo->readPage(1);
+        $second = $repo->readPage(1, $first['next_cursor']);
+
+        self::assertCount(1, $first['rows']);
+        self::assertCount(1, $second['rows']);
+        self::assertSame('01a00000-0000-7000-8000-000000000001', $first['rows'][0]['entry_id']);
+        self::assertSame('01a00000-0000-7000-8000-000000000002', $second['rows'][0]['entry_id']);
+        self::assertStringContainsString('f.normalized_form=%s', $database->lastQuery);
+        self::assertStringContainsString('e.id>%d', $database->lastQuery);
+    }
+
     public function test_resolved_create_fails_closed_when_same_form_and_context_appears_during_transaction(): void
     {
         $database = new class {
@@ -126,5 +142,46 @@ final class WpdbDictionaryEntryRepositoryTest extends TestCase
             public function addLabel(DictionaryLabel $label): DictionaryLabel { return $label; }
             public function saveLabel(DictionaryLabel $label, string $previousNormalizedLabel, int $expectedConceptRevision): DictionaryLabel { return $label; }
         };
+    }
+}
+
+final class CompositeCursorDatabase
+{
+    public string $prefix = 'wp_';
+    public string $lastQuery = '';
+    public function prepare(string $query, mixed ...$args): string { $this->lastQuery = $query; return $query; }
+    public function get_results(string $query, mixed $output = null): array
+    {
+        if (str_contains($query, 'WHERE (')) return [$this->row(2)];
+        if (str_contains($query, 'normalized_form>%s')) return [];
+        return [$this->row(1), $this->row(2)];
+    }
+    public function get_row(string $query, mixed $output = null): mixed { return null; }
+    public function get_var(string $query): mixed { return null; }
+    private function row(int $number): array
+    {
+        $entryId = sprintf('01a00000-0000-7000-8000-%012d', $number);
+        $senseId = sprintf('01a00000-0000-7000-9000-%012d', $number);
+        return [
+            '_entry_audit_id' => $number,
+            '_sense_audit_id' => $number,
+            'entry_uuid' => UuidCodec::toBinary($entryId),
+            'concept_uuid' => UuidCodec::toBinary($senseId),
+            'form_id' => $number,
+            'form_text' => 'Côn',
+            'normalized_form' => 'côn',
+            'entry_status' => 'APPROVED',
+            'sense_status' => 'APPROVED',
+            'entry_revision' => 1,
+            'sense_revision' => 1,
+            'sense_context_json' => '{}',
+            'concept_context_json' => '{}',
+            'semantic_reference_type' => null,
+            'semantic_reference_id' => null,
+            'state' => 1,
+            'sense_state' => 1,
+            'destination_type' => null,
+            'destination_id' => null,
+        ];
     }
 }

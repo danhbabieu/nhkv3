@@ -8,7 +8,7 @@ use NHK\Core\Domain\Knowledge\KnowledgeClaim;
 /** Ephemeral, read-only audit output. It has no persistence or apply method. */
 final readonly class KnowledgeQualityAuditResult
 {
-    /** @param array<string,mixed> $subjectResolution @param array<string,mixed> $scopeAssessment @param array<string,mixed> $provenanceAssessment @param array<string,mixed> $evidenceAssessment @param array<string,mixed> $structuredInterpretation @param list<array<string,mixed>> $duplicateMatches @param list<string> $reuseCandidates @param list<string> $findings @param list<array<string,mixed>> $repairCandidates @param list<array<string,mixed>> $dictionaryCandidates @param list<array<string,mixed>> $relationCandidates @param array<string,mixed> $facetClassification @param array<string,mixed> $writerReadiness @param list<string> $diagnostics */
+    /** @param array<string,mixed> $subjectResolution @param array<string,mixed> $scopeAssessment @param array<string,mixed> $provenanceAssessment @param array<string,mixed> $evidenceAssessment @param array<string,mixed> $structuredInterpretation @param list<array<string,mixed>> $duplicateMatches @param list<string> $reuseCandidates @param list<string> $findings @param list<array<string,mixed>> $repairCandidates @param list<array<string,mixed>> $dictionaryCandidates @param list<array<string,mixed>> $relationCandidates @param array<string,mixed> $facetClassification @param array<string,mixed> $writerReadiness @param list<string> $diagnostics @param array<string,mixed> $identityResolution */
     public function __construct(
         public string $knowledgeId,
         public int $revision,
@@ -26,6 +26,7 @@ final readonly class KnowledgeQualityAuditResult
         public array $facetClassification,
         public array $writerReadiness,
         public array $diagnostics,
+        public array $identityResolution = [],
     ) {}
 
     /** @return array<string,mixed> */
@@ -48,6 +49,7 @@ final readonly class KnowledgeQualityAuditResult
             'facet_classification' => $this->facetClassification,
             'writer_readiness' => $this->writerReadiness,
             'diagnostics' => $this->diagnostics,
+            'identity_resolution' => $this->identityResolution,
         ];
         if (!$includePrivate) {
             $subject = $result['subject_resolution'];
