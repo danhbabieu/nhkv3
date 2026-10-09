@@ -16,7 +16,8 @@ final class EntityKnowledgeProjection
         private SourceRepository $sources,
         private ?MigrationStatus $status = null,
         private ?PublicResearchSourceDisplayPolicy $sourceDisplayPolicy = null,
-    ) { $this->sourceDisplayPolicy ??= new PublicResearchSourceDisplayPolicy(); }
+        private ?PublicKnowledgeClaimPolicy $claimPolicy = null,
+    ) { $this->sourceDisplayPolicy ??= new PublicResearchSourceDisplayPolicy(); $this->claimPolicy ??= new PublicKnowledgeClaimPolicy(); }
 
     /** @return array<string,mixed> */
     public function forSubject(string $subjectId): array
@@ -38,7 +39,7 @@ final class EntityKnowledgeProjection
         $evidenceCount = 0;
         $coverage = $emptyCoverage;
         foreach ($this->claims->list() as $claim) {
-            if (!$claim instanceof KnowledgeClaim || !$claim->active || !$claim->isPublic()) continue;
+            if (!$claim instanceof KnowledgeClaim || !$claim->active || !$claim->isPublic() || !$this->claimPolicy->allows($claim)) continue;
             $metadata = $claim->provenance['metadata'] ?? null;
             if (!is_array($metadata) || (string) ($metadata['subject_id'] ?? '') !== $subjectId) continue;
             $facet = (string) ($metadata['facet'] ?? '');

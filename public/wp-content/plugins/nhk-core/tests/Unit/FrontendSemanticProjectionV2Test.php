@@ -157,6 +157,24 @@ final class FrontendSemanticProjectionV2Test extends TestCase
         self::assertStringNotContainsString('vangvong.com', json_encode($result, JSON_THROW_ON_ERROR));
     }
 
+    public function test_entity_knowledge_projection_excludes_workflow_and_source_locator_claims_from_public_output(): void
+    {
+        $subjectId = UuidCodec::newV7();
+        $claims = [
+            new KnowledgeClaim(UuidCodec::newV7(), 'workflow-a', 'Source: https://www.greatstmarys.org/bells (Bells, Great St Mary\'s).', 'fact', ['metadata' => ['subject_id' => $subjectId, 'facet' => 'history', 'scope' => 'entity']]),
+            new KnowledgeClaim(UuidCodec::newV7(), 'workflow-b', 'Source: https://www.cam.ac.uk/news/dedication-of-new-bells-at-great-st-marys .', 'fact', ['metadata' => ['subject_id' => $subjectId, 'facet' => 'history', 'scope' => 'entity']]),
+            new KnowledgeClaim(UuidCodec::newV7(), 'workflow-c', 'Source: https://www.parliament.uk/about/living-heritage/building/palace/big-ben/building-clock-tower/constructing-the-most-accurate-clock-in-the-world/ .', 'fact', ['metadata' => ['subject_id' => $subjectId, 'facet' => 'history', 'scope' => 'entity']]),
+            new KnowledgeClaim(UuidCodec::newV7(), 'workflow-d', 'Đây là hồ sơ KNOWLEDGE_DELTA có nguồn quốc tế; không tạo Music hay Article.', 'fact', ['metadata' => ['subject_id' => $subjectId, 'facet' => 'identity', 'scope' => 'entity']]),
+            new KnowledgeClaim(UuidCodec::newV7(), 'workflow-e', 'Tách thành claim nguyên tử, tái sử dụng Source/Knowledge đã có, giữ Source/Evidence theo scope.', 'fact', ['metadata' => ['subject_id' => $subjectId, 'facet' => 'identity', 'scope' => 'entity']]),
+            new KnowledgeClaim(UuidCodec::newV7(), 'supported', 'Cambridge Chimes được ghi nhận trong một source-scoped attribution.', 'history', ['metadata' => ['subject_id' => $subjectId, 'facet' => 'identity', 'scope' => 'entity']]),
+        ];
+
+        $result = (new EntityKnowledgeProjection($this->knowledgeRepository($claims), $this->evidenceRepository([]), $this->sourceRepository([])))->forSubject($subjectId);
+        $texts = array_merge(...array_values($result['facets'] ?? []));
+        self::assertCount(1, $texts);
+        self::assertSame('Cambridge Chimes được ghi nhận trong một source-scoped attribution.', $texts[0]['text']);
+    }
+
     private function mediaRepository(array $items): MediaRepository
     {
         return new class($items) implements MediaRepository {
