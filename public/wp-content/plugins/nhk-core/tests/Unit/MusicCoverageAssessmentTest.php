@@ -216,6 +216,23 @@ final class MusicCoverageAssessmentTest extends TestCase
         self::assertSame('BLOCKED', $assessment['categories']['X']['status']);
     }
 
+    public function test_music_gap_and_public_matrix_documents_preserve_honest_projection_states(): void
+    {
+        $root = dirname(__DIR__, 6);
+        $gap = (string) file_get_contents($root . '/docs/architecture/MUSIC_AZ_CONTRACT_GAP_REPORT.md');
+        $matrix = (string) file_get_contents($root . '/docs/architecture/MUSIC_PUBLIC_DISPLAY_MATRIX.md');
+
+        foreach (['IMPLEMENTED', 'PARTIAL', 'RUNTIME_BLOCKED', 'NO_LIVE_WRITE', 'no public completeness claim'] as $term) {
+            self::assertStringContainsString($term, $gap);
+        }
+        foreach (['canonical owner', 'evidence/readiness', 'public projection', 'frontend component', 'verification', 'missing evidence', 'missing rights', 'temporarily unavailable'] as $term) {
+            self::assertStringContainsString($term, $matrix);
+        }
+        foreach (['UUID', 'stable key', 'private evidence', 'raw storage metadata'] as $term) {
+            self::assertStringContainsString($term, $matrix);
+        }
+    }
+
     private function entity(string $name): AuthorityEntity
     {
         return new AuthorityEntity(UuidCodec::newV7(), 'music', 'nhk:music:' . strtolower(str_replace(' ', '-', $name)), $name, 1, [], AuthorityState::ACTIVE, 1);

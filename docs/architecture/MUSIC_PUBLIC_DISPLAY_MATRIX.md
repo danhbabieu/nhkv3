@@ -4,6 +4,9 @@ This is a read-only mapping from collection input to canonical owner,
 readiness and presentation. It does not create fields, routes, Graph edges or
 public assets.
 
+Every row records the evidence/readiness decision before presentation.
+The frontend component is a consumer of the projection, never a semantic owner.
+
 | Music field/group | Canonical owner | Evidence/readiness gate | Public projection | Frontend component | Verification |
 |---|---|---|---|---|---|
 | Name, preferred title, alias, language | Authority / Public Identity | canonical identity, scope and route revalidated; alias is not a new owner | public-safe name, accepted aliases and canonical route | Music dossier identity | Authority/Public Identity read-back + `MusicDossierProjectionTest` |
@@ -40,4 +43,3 @@ Internal UUIDs, stable keys, revisions, private evidence, raw storage metadata
 and draft diagnostics are never public fields. A URL exists only when the
 canonical owner and public route policy support it; URL existence is not dossier
 completion.
-

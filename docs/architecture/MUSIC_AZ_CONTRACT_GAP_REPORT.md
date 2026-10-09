@@ -13,9 +13,12 @@ Entry/Form/Sense boundaries and a generic public Music dossier. The current
 slice closes the documentation and worksheet parity gap while preserving the
 existing canonical owners.
 
+All examples remain `EXAMPLE_ONLY / NO_LIVE_WRITE`.
+
 The authorized TEST runtime and deployed build identity are not available in
 this workspace. Therefore local tests prove code/documentation behavior only;
 they do not prove live Westminster, Sonodo or Ave Maria acceptance.
+There is no public completeness claim.
 
 ## 2. Gap classifications
 
@@ -53,4 +56,3 @@ The local execution state records the missing authorized TEST identity tuple,
 deployed build verification, signed exact Capture packet and canonical owner
 read-back. These blockers remain fail-closed. No staging/production mutation,
 deployment, push or public completeness claim is made by this report.
-
