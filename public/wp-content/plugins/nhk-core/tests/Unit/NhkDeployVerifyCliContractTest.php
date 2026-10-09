@@ -87,4 +87,16 @@ final class NhkDeployVerifyCliContractTest extends TestCase
             'migration-up must complete before MCP verification',
         );
     }
+
+    public function test_deploy_verifier_requires_the_pre_migration_backup_gate_before_migration(): void
+    {
+        $runner = (string) file_get_contents(dirname(__DIR__, 6) . '/tools/nhk-deploy-verify.php');
+        self::assertStringContainsString("->run(\$context, 'v3-snapshot-pre-migration-export')", $runner);
+        self::assertStringContainsString("'backup' =>", $runner);
+        self::assertLessThan(
+            strpos($runner, "->run(\$context, 'migration-up')"),
+            strpos($runner, "->run(\$context, 'v3-snapshot-pre-migration-export')"),
+            'the pre-migration backup gate must complete before migration-up',
+        );
+    }
 }

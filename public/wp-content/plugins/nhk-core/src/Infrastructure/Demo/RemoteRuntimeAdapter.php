@@ -12,7 +12,7 @@ use NHK\Core\Infrastructure\Migration\SpecimenProductRelationMigration026;
 final class RemoteRuntimeAdapter
 {
     private const OPERATIONS = [
-        'health', 'inventory', 'canonical-inventory', 'graph-inventory', 'relation-dry-run', 'clock-type-audit', 'migration-up', 'dry-run', 'backup/snapshot',
+        'health', 'inventory', 'canonical-inventory', 'graph-inventory', 'relation-dry-run', 'clock-type-audit', 'migration-up', 'dry-run', 'backup/snapshot', 'v3-snapshot-pre-migration-export',
         'governance-plan', 'controlled-apply', 'read-back',
     ];
 
@@ -93,6 +93,9 @@ final class RemoteRuntimeAdapter
             '--source-revision=' . $context->sourceRevision,
             '--json',
         ]);
+        if ($operation === 'v3-snapshot-pre-migration-export') {
+            $command[] = '--output=/tmp/nhk-v3-pre-migration-' . hash('sha256', $context->runId) . '.json';
+        }
         $result = ($this->executor)($command);
         if ($result[0] !== 0) {
             $decoded = json_decode($result[1], true);
@@ -125,10 +128,23 @@ final class RemoteRuntimeAdapter
             if (($payload['dictionary_entry_sense_schema_ready'] ?? false) !== true) return StageResult::failed('DICTIONARY_ENTRY_SENSE_SCHEMA_NOT_READY');
             if (($payload['specimen_product_relation_schema_ready'] ?? false) !== true) return StageResult::failed('SPECIMEN_PRODUCT_RELATION_SCHEMA_NOT_READY');
         }
+        if ($operation === 'v3-snapshot-pre-migration-export') {
+            $manifest = is_array($payload['manifest'] ?? null) ? $payload['manifest'] : [];
+            $migration = is_array($manifest['migration_level'] ?? null) ? $manifest['migration_level'] : [];
+            if (($manifest['export_mode'] ?? null) !== 'pre_migration'
+                || (int) ($migration['current'] ?? -1) !== SpecimenProductRelationMigration026::VERSION - 1
+                || (int) ($migration['target'] ?? -1) !== SpecimenProductRelationMigration026::VERSION
+                || ($manifest['source_environment'] ?? null) !== 'staging'
+                || ($this->migrationConfig !== null && ($manifest['source_database_identity'] ?? null) !== $this->migrationConfig['authorized_database'])) {
+                return StageResult::failed('STAGING_BACKUP_RECEIPT_INVALID');
+            }
+            if (($payload['receipt']['status'] ?? null) !== 'backup_created') return StageResult::failed('STAGING_BACKUP_RECEIPT_INVALID');
+        }
+        $metadata = in_array($operation, ['migration-up', 'v3-snapshot-pre-migration-export'], true) ? $payload : [];
         return StageResult::pass(
             is_string($payload['identifier'] ?? null) ? $payload['identifier'] : 'remote-' . $operation,
             is_string($payload['fingerprint'] ?? null) ? $payload['fingerprint'] : null,
-            $operation === 'migration-up' ? $payload : [],
+            $metadata,
         );
     }
 

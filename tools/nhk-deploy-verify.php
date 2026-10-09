@@ -82,11 +82,22 @@ if (!$deployment->isPass()) finish(['status' => $deployment->status, 'reason_cod
 // identities and are verified independently below.
 if ((string) $deployment->fingerprint === '') finish(['status' => 'failed', 'reason_code' => 'DEPLOYMENT_IDENTITY_UNAVAILABLE'], $json, 2);
 
-$migration = RemoteRuntimeAdapter::fromEnvironment()->run($context, 'migration-up');
+$runtime = RemoteRuntimeAdapter::fromEnvironment();
+$backup = $runtime->run($context, 'v3-snapshot-pre-migration-export');
+if (!$backup->isPass()) {
+    finish([
+        'status' => $backup->status,
+        'reason_code' => $backup->reasonCode === 'REMOTE_RUNTIME_EXECUTION_FAILED' ? 'STAGING_BACKUP_GATE_FAILED' : $backup->reasonCode,
+        'backup' => $backup->metadata,
+    ], $json, 2);
+}
+
+$migration = $runtime->run($context, 'migration-up');
 if (!$migration->isPass()) {
     finish([
         'status' => $migration->status,
         'reason_code' => $migration->reasonCode === 'REMOTE_RUNTIME_EXECUTION_FAILED' ? 'MIGRATION_UP_FAILED' : $migration->reasonCode,
+        'backup' => $backup->metadata,
         'migration' => $migration->metadata,
     ], $json, 2);
 }
@@ -137,6 +148,7 @@ finish([
     'release_identity' => $localBootstrap['release_identity'],
     'documents' => count((array) ($localBootstrap['manifest']['files'] ?? [])),
     'deployment_identifier' => $deployment->identifier,
+    'backup' => $backup->metadata,
     'migration' => $migration->metadata,
     'verification' => 'direct-mcp-bootstrap-and-list',
 ], $json, 0);

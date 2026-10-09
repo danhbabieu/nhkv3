@@ -71,6 +71,35 @@ final class RemoteRuntimeAdapterTest extends TestCase
         self::assertTrue($result->metadata['dictionary_entry_sense_schema_ready']);
     }
 
+    public function test_pre_migration_snapshot_is_allowlisted_and_returns_the_backup_receipt(): void
+    {
+        $commands = [];
+        $sourceRevision = str_repeat('a', 40);
+        $adapter = new RemoteRuntimeAdapter('demo.1945.vn', '/remote/plugin', static function (array $command) use (&$commands): array {
+            $commands[] = $command;
+            return [0, json_encode([
+                'status' => 'pass',
+                'identifier' => 'v3-snapshot-pre-migration-export',
+                'manifest' => [
+                    'export_mode' => 'pre_migration',
+                    'migration_level' => ['current' => 25, 'target' => 26],
+                    'source_environment' => 'staging',
+                    'source_database_identity' => 'erourxcg_nhkv3',
+                    'manifest_hash' => str_repeat('b', 64),
+                ],
+                'receipt' => ['status' => 'backup_created', 'manifest_hash' => str_repeat('b', 64)],
+            ]), ''];
+        });
+
+        $result = $adapter->run(new DemoCutoverContext('demo.1945.vn', 'specimen', $sourceRevision, 'run-backup'), 'v3-snapshot-pre-migration-export');
+
+        self::assertSame('pass', $result->status);
+        self::assertSame('v3-snapshot-pre-migration-export', $result->identifier);
+        self::assertSame('backup_created', $result->metadata['receipt']['status']);
+        self::assertStringContainsString('--operation=v3-snapshot-pre-migration-export', implode(' ', $commands[0]));
+        self::assertStringContainsString('--output=/tmp/nhk-v3-pre-migration-', implode(' ', $commands[0]));
+    }
+
     public function test_migration_up_rejects_stale_source_revision_and_incomplete_schema(): void
     {
         $sourceRevision = str_repeat('a', 40);
