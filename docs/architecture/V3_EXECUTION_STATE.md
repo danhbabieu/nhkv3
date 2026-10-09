@@ -1,5 +1,37 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-09 — Approved Knowledge Repair release gate blocked
+
+AMENDMENT: The Constitutional Owner approval dated 2026-10-09 is recorded in
+`docs/constitution/NHK_V3_CONSTITUTION.md`. Local commit
+`0411610c2134b64d5ff98c63263e69de656e17fb` adds the distinct normative
+`KNOWLEDGE_REPAIR` intent, preserves `KNOWLEDGE_DELTA`, and adds the
+fail-closed relabeling guard. Local MCP documentation identity is source
+revision `0411610c2134b64d5ff98c63263e69de656e17fb`, build identity
+`a85344bb6f4b89336948c858d4b71bccda4c84e08788f334d0662cf02811272e`,
+documentation version
+`93753acd9522913e7433d9a0dc7994bbabbeb89e7ecfd25cc525a9881659984e`,
+manifest hash
+`e77ab51989c0821992aa0c5e658c8281b78040cacb307513721a4d8028fba360`.
+
+RELEASE_GATE: The approved `scripts/nhk-deploy-verify` flow deployed/verified
+the requested local HEAD against the allowlisted staging target
+`demo.1945.vn`, then stopped at the official pre-migration snapshot boundary
+with exact reason `SNAPSHOT_PRE_MIGRATION_LEVEL_INVALID`; no backup receipt was
+issued and the flow did not invoke `migration-up` after that failure.
+
+BLOCKER: Fresh runtime migration state is not the required adjacent
+pre-migration checkpoint for the release gate, so there is no valid backup
+receipt or release-gate completion evidence. Per Constitution, no fresh
+server-issued repair packet was requested, no Human Approval/Eligibility or
+Controlled Apply was executed, no Knowledge/Source/Evidence record was
+mutated, and Score/Audio/Westminster/Public completion remains unverified.
+
+STATUS: `CONSTITUTIONAL_AMENDMENT_RECORDED /
+LOCAL_IMPLEMENTATION_VERIFIED / RELEASE_GATE_BLOCKED:
+SNAPSHOT_PRE_MIGRATION_LEVEL_INVALID / PACKET_NOT_REQUESTED /
+CONTROLLED_APPLY_NOT_RUN / NO_SEMANTIC_MUTATION / PUBLIC_COMPLETE_FALSE`
+
 # Checkpoint — 2026-10-09 — Staging backup gate stopped on runtime drift
 
 RUNTIME_READBACK: The official deployment flow transferred the verified
