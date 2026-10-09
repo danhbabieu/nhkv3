@@ -1,5 +1,32 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-09 — Universal semantic recovery alignment design
+
+PLANNED: The approved design is recorded in
+`docs/superpowers/specs/2026-10-09-universal-semantic-recovery-documentation-alignment-design.md`.
+The implementation boundary is a server-owned semantic admission policy
+version in the Capture dependency fingerprint, bounded one-time policy-change
+re-evaluation, and persistence of the current fingerprint for retryable
+failure states. The reducer remains the single authority for GET/lifecycle/
+retry decisions; hard, authorization, capability, Governance-denied, identity,
+idempotency and CAS failures remain fail-closed.
+
+REQUIRED_FIRST_PROBE: Before runtime implementation, add and run a regression
+that must fail on the current branch for the legacy/current admission-policy
+fingerprint distinction and the retryable-failure no-progress boundary. If the
+probe does not fail, the suspected root cause is not confirmed and the design
+must be revised.
+
+SCOPE: The planned proof path is
+`TextInputInterpreter → SemanticClaimCandidateGuard →
+GovernedCaptureContinuationService → canonical Knowledge read-back`, across
+all nine registered Authority types, with documentation/runtime parity checks.
+No new registry vocabulary, schema, migration, direct writer, staging or
+production mutation is authorized.
+
+STATUS: `DESIGN_APPROVED / SPEC_RECORDED / IMPLEMENTATION_NOT_STARTED /
+REGRESSION_PROBE_REQUIRED / NO_SEMANTIC_MUTATION`
+
 # Checkpoint — 2026-10-08 — Music data collection standard and coverage assessment
 
 IMPLEMENTED: Added the active, reusable `MUSIC_DATA_COLLECTION_STANDARD.md`
