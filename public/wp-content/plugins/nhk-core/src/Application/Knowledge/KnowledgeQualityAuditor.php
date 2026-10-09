@@ -175,7 +175,18 @@ final class KnowledgeQualityAuditor
     }
 
     private function propositionKey(string $text): string { $text = function_exists('mb_strtolower') ? mb_strtolower($text) : strtolower($text); $text = preg_replace('/[^\p{L}\p{N}]+/u', ' ', $text) ?? ''; $tokens = array_values(array_filter(explode(' ', trim($text)), static fn (string $v): bool => $v !== '')); sort($tokens, SORT_STRING); return implode(' ', $tokens); }
-    private function isProcessContamination(string $text, array $metadata): bool { return preg_match('/\b(resolve|parser|parse|normalize|standardize|hệ thống|parser nhận diện|được tạo|được sinh|chuẩn hóa|mô hình nhận diện|ai xác định)\b/ui', $text) === 1 || in_array(strtoupper((string) ($metadata['origin'] ?? '')), ['SYSTEM_WORKFLOW', 'AI_GENERATED', 'DERIVED_TRANSCRIPTION'], true); }
+    private function isProcessContamination(string $text, array $metadata): bool
+    {
+        if (in_array(strtoupper((string) ($metadata['origin'] ?? '')), ['SYSTEM_WORKFLOW', 'AI_GENERATED', 'DERIVED_TRANSCRIPTION'], true)) return true;
+        $normalized = trim($text);
+        // A bare source locator is provenance context, never a factual Knowledge Claim.
+        if (preg_match('~^(?:source|nguồn|reference|citation)\s*:\s*(?:https?://|www\.)~iu', $normalized) === 1) return true;
+        // These are workflow directives, not assertions about the canonical subject.
+        if (preg_match('/\b(?:KNOWLEDGE_DELTA|Source\/Evidence|Capture|Article)\b/u', $normalized) === 1
+            && preg_match('/(?:hồ sơ|không tạo|tái sử dụng|tách thành|giữ|chủ thể|theo scope)/iu', $normalized) === 1) return true;
+        if (preg_match('/^(?:tách thành claim|tái sử dụng source|giữ source\/evidence|không tạo (?:music|article))\b/iu', $normalized) === 1) return true;
+        return preg_match('/\b(resolve|parser|parse|normalize|standardize|hệ thống|parser nhận diện|được tạo|được sinh|chuẩn hóa|mô hình nhận diện|ai xác định)\b/ui', $normalized) === 1;
+    }
     private function isEditorialFragment(string $text, array $metadata): bool { return ($metadata['editorial_only'] ?? false) === true || in_array(strtoupper((string) ($metadata['source_kind'] ?? '')), ['ARTICLE', 'ARTICLE_SUMMARY', 'SEO', 'GENERATED_ARTICLE'], true); }
     private function needsAtomization(string $text): bool { return preg_match('/[,;].*\b(and|và|đồng thời|thường gặp|sản xuất|dùng|có)\b/ui', $text) === 1 || substr_count($text, ',') >= 2; }
     private function narrowestScope(string $scope, array $subject): string { return ($subject['entity_type'] ?? '') === 'specimen' && $scope !== 'specimen_observation' ? 'specimen_observation' : ($scope !== '' ? $scope : 'UNRESOLVED'); }
