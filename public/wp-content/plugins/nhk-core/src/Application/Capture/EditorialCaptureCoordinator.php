@@ -944,7 +944,39 @@ final class EditorialCaptureCoordinator
                 }
                 $diagnostics['semantic_write_back'] = $this->withoutBody($writes);
                 $semanticStatus = (string) ($writes['status'] ?? 'COMPLETED');
-                $record = $this->save($record, CaptureStage::SEMANTICS_RECONCILED, $assets, $diagnostics, $receipts, 'SEMANTICS_RECONCILED', $record->articleId, $record->articleStateToken, $semanticStatus);
+                // Semantic write-back is the owner boundary for Knowledge and
+                // relations. Rebuild the orchestration envelope after it so
+                // the persisted owner tracks describe the current outcome,
+                // rather than the pre-write-back planning snapshot.
+                $planningEnvelope = CaptureEnrichmentPlanningEnvelope::fromState(
+                    $record->captureId,
+                    $record->requestFingerprint,
+                    $input,
+                    $interpretation,
+                    $assets,
+                    $diagnostics,
+                    $receipts,
+                );
+                $planningEnvelopeArray = $planningEnvelope->toArray();
+                $diagnostics['enrichment_planning_envelope'] = [
+                    'version' => $planningEnvelope->version,
+                    'fingerprint' => $planningEnvelope->fingerprint(),
+                    'completion_state' => $planningEnvelope->completionState,
+                    'owner_statuses' => array_map(static fn (array $track): string => (string) ($track['status'] ?? ''), $planningEnvelope->ownerTracks),
+                ];
+                $record = $this->save(
+                    $record,
+                    CaptureStage::SEMANTICS_RECONCILED,
+                    $assets,
+                    $diagnostics,
+                    $receipts,
+                    'SEMANTICS_RECONCILED',
+                    $record->articleId,
+                    $record->articleStateToken,
+                    $semanticStatus,
+                    null,
+                    array_replace($record->context, ['enrichment_planning_envelope' => $planningEnvelopeArray]),
+                );
                 $assets = $record->assets;
                 $diagnostics = $record->diagnostics;
                 $receipts = $record->phaseReceipts;

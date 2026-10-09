@@ -21,6 +21,17 @@ final class SemanticClaimCandidateGuard
             return $this->review('KNOWLEDGE_SEMANTIC_HANDOFF_REQUIRED', ['candidate_status' => (string) ($candidate['status'] ?? 'REVIEW_REQUIRED')]);
         }
 
+        $commands = array_values(array_filter((array) ($packet['dictionary_owner_commands'] ?? []), 'is_array'));
+        $sourceContext = is_array($packet['source_context'] ?? null) ? $packet['source_context'] : [];
+        $rawOrDerived = strtoupper(trim((string) ($candidate['raw_or_derived'] ?? $sourceContext['raw_or_derived'] ?? 'RAW')));
+        if ($commands === []
+            && ($candidate['candidate_kind'] ?? '') === 'user_statement'
+            && strtoupper(trim((string) ($candidate['provenance'] ?? ''))) === 'EXPLICIT_USER_KNOWLEDGE'
+            && $rawOrDerived !== 'DERIVED'
+        ) {
+            return ['status' => 'ALLOWED', 'reason' => 'RAW_EXPLICIT_USER_KNOWLEDGE'];
+        }
+
         $assertionTexts = [];
         foreach ((array) ($packet['semantic_assertions'] ?? []) as $assertion) {
             if (!is_array($assertion)) continue;

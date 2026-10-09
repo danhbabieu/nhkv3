@@ -11,6 +11,7 @@ use NHK\Core\Application\Governance\{CaptureDependencyStagingAdmission, Operatio
 use NHK\Core\Application\Governance\GovernanceAutomationPolicyResolver;
 use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
 use NHK\Core\Application\Semantic\ClaimReusePolicy;
+use NHK\Core\Application\Semantic\TextInputInterpreter;
 use NHK\Core\Application\Video\{VideoEditorialGenerator, VideoEditorialResumePlanner, VideoSearchDocument, VideoSeoProjection, VideoService};
 use NHK\Core\Contracts\Governance\{AutomationPolicyStorage, GovernedLifecycle, PendingVideoProposalLookup, VideoProposalReconciliationPort};
 use NHK\Core\Contracts\Video\VideoRepository;
@@ -513,6 +514,74 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
 
         self::assertSame('REVIEW_REQUIRED', $result['status']);
         self::assertSame($proposal->id, $result['writes'][0]['proposal_id']);
+    }
+
+    public function test_real_text_interpreter_user_statement_reaches_governed_knowledge_plan(): void
+    {
+        $subject = UuidCodec::newV7();
+        $text = 'Westminster Quarters được dùng cho chuông đồng hồ.';
+        $interpretation = (new TextInputInterpreter())->interpret($text);
+
+        self::assertSame('user_statement', $interpretation['user_claim_candidates'][0]['candidate_kind']);
+        self::assertSame([], $interpretation['structured_interpretation_packet']['semantic_assertions']);
+
+        $proposal = new Proposal(
+            UuidCodec::newV7(),
+            $subject,
+            'ingest',
+            ['text' => $text],
+            'content',
+            null,
+            'dependency',
+            ProposalState::DRAFT,
+            idempotencyKey: 'capture:music:real-interpreter',
+            entityType: 'knowledge',
+        );
+        $governance = $this->createMock(GovernedLifecycle::class);
+        $governance->expects(self::once())->method('createFromArguments')->with(self::callback(static function (array $arguments) use ($subject): bool {
+            return ($arguments['entity_type'] ?? '') === 'knowledge'
+                && ($arguments['subject_id'] ?? '') === $subject
+                && ($arguments['payload']['provenance']['metadata']['subject_type'] ?? '') === 'music'
+                && ($arguments['payload']['provenance']['metadata']['scope'] ?? '') === 'entity';
+        }))->willReturn($proposal);
+        $governance->expects(self::exactly(2))->method('review')->with($proposal->id)->willReturnOnConsecutiveCalls(
+            ['state' => 'draft', 'entity_type' => 'knowledge', 'content_fingerprint' => 'content', 'dependency_fingerprint' => 'dependency'],
+            ['state' => 'submitted', 'entity_type' => 'knowledge', 'content_fingerprint' => 'content', 'dependency_fingerprint' => 'dependency'],
+        );
+        $governance->expects(self::once())->method('submit')->with($proposal->id)->willReturn($proposal->transition(ProposalState::SUBMITTED));
+        $service = new GovernedCaptureContinuationService($governance, static fn (): array => [], $this->policies(), static fn (): bool => true);
+
+        $result = $service->execute('capture-music-real-interpreter', 'capture:music:real-interpreter', [
+            'content_intent' => ['intent' => 'KNOWLEDGE_DELTA'],
+            'subject_resolution' => ['resolved' => [['id' => $subject, 'type' => 'music']]],
+            'interpretation' => $interpretation,
+            'observations' => [],
+        ]);
+
+        self::assertSame('REVIEW_REQUIRED', $result['status']);
+        self::assertSame($proposal->id, $result['writes'][0]['proposal_id']);
+    }
+
+    public function test_derived_interpreter_input_cannot_use_raw_user_knowledge_admission(): void
+    {
+        $interpretation = (new TextInputInterpreter())->interpret(
+            'Westminster Quarters được dùng cho chuông đồng hồ.',
+            metadata: ['raw_or_derived' => 'DERIVED'],
+        );
+        $service = new GovernedCaptureContinuationService(
+            $this->createMock(GovernedLifecycle::class),
+            static fn (): array => [],
+            $this->policies(),
+            static fn (): bool => true,
+        );
+        $plans = new \ReflectionMethod($service, 'plans');
+        $plans->setAccessible(true);
+
+        self::assertSame([], $plans->invoke($service, 'capture-derived-input', 'derived', [
+            'content_intent' => ['intent' => 'KNOWLEDGE_DELTA'],
+            'subject_resolution' => ['resolved' => [['id' => UuidCodec::newV7(), 'type' => 'music']]],
+            'interpretation' => $interpretation,
+        ]));
     }
 
     public function test_knowledge_delta_supports_exact_component_subject_with_entity_scope(): void

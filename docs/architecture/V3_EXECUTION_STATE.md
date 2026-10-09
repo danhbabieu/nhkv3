@@ -25527,3 +25527,44 @@ authorized TEST runtime. No Capture, Knowledge, Source, Evidence, Graph,
 Governance, WordPress, staging or production data was mutated. No migration,
 deployment, signed acceptance packet, controlled apply, push or public
 completion is claimed.
+
+# Checkpoint — 2026-10-09 — Universal semantic recovery root cause repair
+
+ROOT_CAUSE_CONFIRMED: The real `TextInputInterpreter` emits an explicit
+`user_statement` / `EXPLICIT_USER_KNOWLEDGE` candidate for ordinary
+declarative input, but `SemanticClaimCandidateGuard` admitted only exact
+matches to structured semantic assertions. The candidate was therefore
+blocked before Knowledge scope planning and before Governance proposal
+creation. The canonical subject, registry scope, proposal lifecycle and retry
+binding were not the failing boundary. A separate orchestration defect
+persisted `CaptureEnrichmentPlanningEnvelope` before semantic write-back,
+leaving the Knowledge owner track falsely `NOT_APPLICABLE` in the saved
+snapshot.
+
+IMPLEMENTED: Raw admission is now limited to interpreter-classified explicit
+user statements with non-derived source context and no dictionary-owner
+commands. Assertion matching remains required for continuation deltas;
+review-required candidates, derived input, unclassified prose and dictionary
+wording without a matching assertion remain blocked. The coordinator rebuilds
+and persists the enrichment envelope after semantic write-back, preserving
+the existing Proposal → Governance lifecycle and canonical read-back gates.
+
+REGRESSION_COVERAGE: Added a real TextInputInterpreter → continuation-service
+→ Governance regression for the Music-shaped input, derived-input rejection,
+dictionary isolation, review-required and no-new-fact safety coverage, plus an
+end-to-end coordinator regression proving the persisted Knowledge owner track
+reflects the post-writeback status. The focused Capture/semantic set passes
+215 tests / 954 assertions.
+
+VERIFIED: Full configured PHPUnit was run with PHP 512M and reached 3,810
+tests / 22,973 assertions with 46 existing environment/fixture errors and 29
+existing failures (including the known missing NHK_WP_TEST_PATH and test
+runtime identity guards). The changed-scope tests pass. Changed PHP files
+lint clean and `git diff --check` is clean; no migration or schema change was
+introduced.
+
+BOUNDARY: No Capture, Knowledge, Source, Evidence, Graph, Governance,
+WordPress, staging or production data was mutated. No live retry, deployment,
+push, approval, controlled apply or public completion was performed. The
+deployed revision remains outside this local repair and requires the existing
+runtime identity and signed-scope gates before any acceptance operation.

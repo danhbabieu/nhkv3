@@ -400,6 +400,36 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
         self::assertSame(['article'], $seen);
     }
 
+    public function test_semantic_writeback_refreshes_persisted_knowledge_owner_track(): void
+    {
+        $captures = new Pr5CaptureRepository();
+        $calls = ['draft' => 0, 'semantic' => 0, 'media' => 0, 'publication' => 0, 'final' => 0];
+        $events = [];
+        $subjectId = '11111111-1111-4111-8111-111111111111';
+        $coordinator = $this->coordinator(
+            $captures,
+            $calls,
+            $events,
+            semanticStatus: 'REVIEW_REQUIRED',
+            semanticExtra: ['blockers' => ['KNOWLEDGE_SEMANTIC_HANDOFF_REQUIRED']],
+            subjectResolver: new SubjectResolutionService(static fn (string $value): array => $value === $subjectId
+                ? [['id' => $subjectId, 'type' => 'music', 'name' => 'Westminster Quarters', 'revision' => 3]]
+                : []),
+        );
+
+        $result = $coordinator->execute([
+            'idempotency_key' => 'knowledge-envelope-refresh',
+            'intent' => 'KNOWLEDGE_DELTA',
+            'text' => 'Westminster Quarters được dùng cho chuông đồng hồ.',
+            'canonical_uuid' => $subjectId,
+        ]);
+
+        $envelope = $result->context['enrichment_planning_envelope'] ?? [];
+        self::assertSame('READ_BACK_VERIFIED', $envelope['owner_tracks']['authority']['status']);
+        self::assertSame('REVIEW_REQUIRED', $envelope['owner_tracks']['knowledge']['status']);
+        self::assertContains('KNOWLEDGE_SEMANTIC_HANDOFF_REQUIRED', $result->diagnostics['semantic_write_back']['blockers'] ?? []);
+    }
+
     public function test_media_enrichment_failure_recovery_preserves_current_media_enrichment_readback(): void
     {
         $captures = new Pr5CaptureRepository();
