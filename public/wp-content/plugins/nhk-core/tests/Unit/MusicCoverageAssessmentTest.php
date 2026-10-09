@@ -166,6 +166,42 @@ final class MusicCoverageAssessmentTest extends TestCase
         self::assertStringContainsString('Neither is a historical Big Ben recording.', $standard);
     }
 
+    public function test_reusable_music_dictionary_and_score_audio_templates_are_transient_and_registry_aligned(): void
+    {
+        $root = dirname(__DIR__, 6);
+        $templates = [
+            'music' => $root . '/docs/architecture/MUSIC_INPUT_TEMPLATE.md',
+            'dictionary' => $root . '/docs/architecture/DICTIONARY_INPUT_TEMPLATE.md',
+            'score_audio' => $root . '/docs/architecture/SCORE_AUDIO_INPUT_TEMPLATE.md',
+        ];
+        foreach ($templates as $name => $path) {
+            self::assertFileExists($path, $name);
+            $content = (string) file_get_contents($path);
+            self::assertStringContainsString('transient', strtolower($content), $name);
+            foreach (['MISSING', 'UNKNOWN', 'DISPUTED', 'BLOCKED', 'CANDIDATE', 'VERIFIED', 'PUBLIC_READY'] as $status) {
+                self::assertStringContainsString($status, $content, $name . ':' . $status);
+            }
+        }
+
+        $music = (string) file_get_contents($templates['music']);
+        foreach (['MusicDataCollectionStandard', 'A–Z', 'identity resolution', 'claim/source/evidence', 'registered relation', 'missing-data report'] as $term) {
+            self::assertStringContainsString($term, $music);
+        }
+        foreach (['user factual assertion', 'source locator', 'evidence excerpt', 'factual research statement', 'historical hypothesis', 'system inference', 'editorial instruction', 'operational instruction', 'media metadata', 'Dictionary lexical observation', 'score/edition metadata', 'audio/recording metadata'] as $inputClass) {
+            self::assertStringContainsString($inputClass, $music);
+        }
+
+        $dictionary = (string) file_get_contents($templates['dictionary']);
+        foreach (['Entry', 'Form', 'Sense', 'lexical attestation', 'semantic_reference', 'ambig', 'Knowledge', 'Graph'] as $term) {
+            self::assertStringContainsString($term, $dictionary);
+        }
+
+        $scoreAudio = (string) file_get_contents($templates['score_audio']);
+        foreach (['rights', 'checksum', 'HISTORICAL_RECORDING', 'BELL_SIMULATION', 'PIANO_REFERENCE', 'MediaAsset', 'MediaUsage', 'governed delivery'] as $term) {
+            self::assertStringContainsString($term, $scoreAudio);
+        }
+    }
+
     public function test_existing_media_without_rights_is_blocked_even_without_audio(): void
     {
         $dossier = $this->emptyDossier('Image-only Music');

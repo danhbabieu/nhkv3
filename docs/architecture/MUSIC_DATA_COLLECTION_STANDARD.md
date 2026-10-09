@@ -176,7 +176,22 @@ The source map and audio/score readiness files under
 `docs/research/westminster/` remain research evidence and are not authorization
 packets.
 
-## 8. Review and approval
+## 8. Reusable preparation worksheets
+
+The transient worksheets below use the executable field metadata without adding
+runtime fields or write capabilities:
+
+- `MUSIC_INPUT_TEMPLATE.md` — identity preflight, A–Z collection, claim/source/
+  evidence, relation, uncertainty and public-readiness worksheet.
+- `DICTIONARY_INPUT_TEMPLATE.md` — Entry/Form/Sense, lexical attestation,
+  owner revalidation, ambiguity and delegated-public projection worksheet.
+- `SCORE_AUDIO_INPUT_TEMPLATE.md` — score edition, recording classification,
+  rights, checksum, Media readiness and governed delivery worksheet.
+
+They are preparation guides only. New submissions still enter through Capture;
+examples are `EXAMPLE_ONLY / NO_LIVE_WRITE` and are never canonical records.
+
+## 9. Review and approval
 
 Researchers and editors review source statements, scope and uncertainty.
 Audio engineers review signal/render metadata and distinguish synthetic output
