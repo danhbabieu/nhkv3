@@ -152,12 +152,10 @@ final class StructuredSemanticInterpreter
         if (preg_match('/^(?:filename|file\s+name|alt(?:\s+text)?|caption|ocr|mime|metadata|media\s+metadata)\s*[:：]/iu', $segment) === 1) {
             return ['class' => 'MEDIA_METADATA', 'value' => $segment];
         }
-        $lower = $this->normalize($segment);
-        $hasAssertion = preg_match('/(?:\brằng\b|\b(?:là|có|được|sinh|thành lập|đặt tại|nằm ở)\b|\b(?:năm|year)\s+\d{3,4})/u', $lower) === 1;
         if (preg_match('/\b(?:có thể|có lẽ|dường như|hình như|suy đoán|nghi là|được cho là|may be|perhaps|apparently|allegedly)\b/iu', $segment) === 1) {
             return ['class' => 'UNVERIFIED_INFERENCE', 'value' => $segment];
         }
-        if (!$hasAssertion && preg_match('/^(?:hãy|please|vui lòng|bổ sung|cập nhật|hoàn thiện|kiểm tra|xác minh|liên kết|gắn|thêm|đính kèm|đồng bộ|tiếp tục|thực hiện|đừng|không được|reuse\b|sửa\b|đưa\b)/iu', $segment) === 1) {
+        if ($this->isOperationalInstruction($segment)) {
             return ['class' => 'OPERATIONAL_INSTRUCTION', 'value' => $segment];
         }
         return ['class' => 'SEMANTIC_OR_EDITORIAL', 'value' => $segment];
@@ -361,11 +359,25 @@ final class StructuredSemanticInterpreter
     private function sourceLocator(string $segment): ?string
     {
         $segment = trim($segment);
-        if (preg_match('/^(?:source|nguồn|reference|ref(?:erence)?|url)\s*[:：]\s*(https?:\/\/\S+|doi:\S+)\s*$/iu', $segment, $match) === 1) {
+        if (preg_match('/^(?:source|nguồn|reference|ref(?:erence)?|url)\s*[:：]\s*((?:https?:\/\/|doi:)\S+?)(?:\s+\([^)]*\))?\s*[.,;:!?。！？]*$/iu', $segment, $match) === 1) {
             return trim((string) $match[1], " \t\n\r.,;:!?。！？");
         }
         if (preg_match('/^https?:\/\/\S+$/iu', $segment) === 1) return trim($segment, " \t\n\r.,;:!?。！？");
         return null;
+    }
+
+    private function isOperationalInstruction(string $segment): bool
+    {
+        if (preg_match('/^(?:hãy|please|vui lòng|bổ sung|cập nhật|hoàn thiện|kiểm tra|xác minh|liên kết|gắn|thêm|đính kèm|đồng bộ|tiếp tục|thực hiện|đừng|không được|reuse\b|sửa\b|đưa\b)/iu', $segment) === 1) {
+            return true;
+        }
+
+        // Workflow prose can contain factual grammar (for example “là” in a
+        // packet description), so classify the explicit internal actions as
+        // instructions before semantic fallback. Keep this vocabulary narrow:
+        // ordinary research sentences containing “source” or “claim” remain
+        // eligible for Knowledge classification.
+        return preg_match('/\b(?:tách thành claim|tái sử dụng (?:source|knowledge)|giữ (?:source|evidence) theo scope|không tạo (?:music|article|entity)|do not create (?:a )?(?:music|article|entity)|split into claims?|reuse (?:source|knowledge)|keep (?:source|evidence) (?:within|by) scope)\b/iu', $segment) === 1;
     }
 
     /** @return list<string> */

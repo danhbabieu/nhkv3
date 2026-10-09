@@ -657,7 +657,6 @@ final class McpContractTest extends TestCase
             'nhk-v3/dictionary-concept-lifecycle',
             'nhk-v3/dictionary-label-save',
             'nhk-v3/dictionary-candidate-review',
-            'nhk-v3/dictionary-relation-handoff',
             'nhk-v3/dictionary-materialization-apply',
             'nhk-v3/dictionary-enrichment-apply',
             'nhk-v3/dictionary-semantic-relation-apply',
@@ -676,6 +675,8 @@ final class McpContractTest extends TestCase
         )));
         self::assertNotContains('nhk-v3/dictionary-seed-audit', McpAbilityRegistration::readAbilityNames());
         self::assertContains('nhk-v3/dictionary-seed-audit', McpAbilityRegistration::capabilityGatedReadAbilityNames());
+        self::assertNotContains('nhk-v3/dictionary-relation-handoff', McpAbilityRegistration::governedAbilityNames());
+        self::assertContains('nhk-v3/dictionary-relation-handoff', McpAbilityRegistration::capabilityGatedReadAbilityNames());
     }
 
     public function test_every_catalog_tool_is_registered_or_has_an_explicit_exclusion_reason(): void

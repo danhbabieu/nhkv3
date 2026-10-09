@@ -66,6 +66,29 @@ final class KnowledgeQualityAuditTest extends TestCase
         self::assertContains('RETIRE_INTERNAL_WORKFLOW_REVIEW', array_column($instructionResult->repairCandidates, 'action'));
     }
 
+    public function test_auditor_classifies_contextual_westminster_workflow_fragments_without_evidence_repairs(): void
+    {
+        $claims = [
+            $this->claim('source-note', "Source: https://www.greatstmarys.org/bells (Bells, Great St Mary's).", [
+                'origin' => 'EXPLICIT_USER_KNOWLEDGE',
+                'metadata' => ['subject_id' => $this->subject, 'subject_type' => 'music', 'facet' => 'history', 'scope' => 'entity'],
+            ]),
+            $this->claim('governance-note', 'Tách thành claim nguyên tử, tái sử dụng Source/Knowledge đã có, giữ Source/Evidence theo scope.', [
+                'origin' => 'EXPLICIT_USER_KNOWLEDGE',
+                'metadata' => ['subject_id' => $this->subject, 'subject_type' => 'music', 'facet' => 'history', 'scope' => 'entity'],
+            ]),
+        ];
+        $auditor = new KnowledgeQualityAuditor(new InMemoryClaims($claims), new InMemoryEvidence(), new InMemorySources(), new StructuredSemanticInterpreter());
+
+        $sourceResult = $auditor->audit($claims[0]);
+        $instructionResult = $auditor->audit($claims[1]);
+
+        self::assertContains('PROCESS_CONTAMINATION', $sourceResult->findings);
+        self::assertNotContains('ADD_EVIDENCE', array_column($sourceResult->repairCandidates, 'action'));
+        self::assertContains('INTERNAL_WORKFLOW_KNOWLEDGE', $instructionResult->findings);
+        self::assertNotContains('ADD_EVIDENCE', array_column($instructionResult->repairCandidates, 'action'));
+    }
+
     public function test_auditor_accepts_capture_origin_as_provenance_class(): void
     {
         $claim = $this->claim('research-origin', 'Joseph Jowett được ghi nhận trong một nghiên cứu lịch sử.', [

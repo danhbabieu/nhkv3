@@ -166,6 +166,23 @@ final class StructuredSemanticInterpreterTest extends TestCase
         self::assertNotContains('NEW_KNOWLEDGE_CANDIDATE', $value['outcomes']);
     }
 
+    public function test_contextual_source_locator_with_label_and_trailing_note_is_not_knowledge(): void
+    {
+        $interpreter = new StructuredSemanticInterpreter();
+
+        self::assertSame('SOURCE_LOCATOR', $interpreter->classifySegment('Source: https://www.greatstmarys.org/bells (Bells, Great St Mary\'s).')['class']);
+        self::assertSame('SOURCE_LOCATOR', $interpreter->classifySegment('Source: https://www.cam.ac.uk/news/dedication-of-new-bells-at-great-st-marys .')['class']);
+        self::assertSame('SEMANTIC_OR_EDITORIAL', $interpreter->classifySegment('The source describes the bells installed in 1793.')['class']);
+    }
+
+    public function test_governance_packet_prose_is_operational_and_not_a_knowledge_claim(): void
+    {
+        $interpreter = new StructuredSemanticInterpreter();
+
+        self::assertSame('OPERATIONAL_INSTRUCTION', $interpreter->classifySegment('Đây là hồ sơ KNOWLEDGE_DELTA có nguồn quốc tế cho chủ thể Music Westminster Quarters hiện hữu; không tạo Music hay Article.')['class']);
+        self::assertSame('OPERATIONAL_INSTRUCTION', $interpreter->classifySegment('Tách thành claim nguyên tử, tái sử dụng Source/Knowledge đã có, giữ Source/Evidence theo scope.')['class']);
+    }
+
     public function test_evidence_excerpt_is_preserved_as_provenance_context(): void
     {
         $value = (new StructuredSemanticInterpreter())->interpret([
