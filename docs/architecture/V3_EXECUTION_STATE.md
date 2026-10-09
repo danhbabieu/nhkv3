@@ -1,5 +1,45 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-09 — Video semantic/public boundary completion
+
+IMPLEMENTED: Completed the local Video boundary slice on `main` without
+runtime/database/deployment/push/pull mutation. Public Video eligibility now
+requires canonical `target_type`/`target_uuid`, registered `about` and exact
+Evidence references; publication verification applies the same strict target
+and Evidence shape. A Video public/frontend obligation now blocks owner Apply
+when its required semantic attachment is empty, while explicit canonical-only
+owner intake remains available as a non-public outcome.
+
+IMPLEMENTED: Video intake preserves an explicitly scoped multi-subject set in
+the existing subject-resolution read model, with deterministic per-target
+attachment candidates. Reader-facing Video projection and page-query payloads
+no longer expose the internal canonical Video UUID; owner-bound frontend
+reconciliation remains read-only and verifies the requested public path.
+
+DOCUMENTATION_RUNTIME: Updated the active Video ingest, relationship and MCP
+frontend contracts and regenerated the local MCP documentation snapshot. No
+Constitution, schema, migration, predicate, owner, seed or live semantic
+record changed.
+
+VERIFIED: Focused Video/public/frontend/reconciliation/evaluator selection
+passed 107 tests / 449 assertions; the cross-domain affected regression
+selection passed 57 tests / 259 assertions. The full Unit suite under PHP
+512M completed 3,689 tests / 24,349 assertions with one error and one failure;
+the Video fixture error from the earlier broad run was normalized and is no
+longer present. The remaining broad baseline identities are
+`WpdbArticleOperationReceiptRepositoryTest` (error) and
+`SemanticSpecificityPropagationTest` (failure). PHP lint and
+`git diff --check` passed for the changed scope.
+
+RUNTIME_QA: The authorized TEST runtime tuple, deployed build identity,
+server-issued signed Capture packet and canonical live Source/Claim/Evidence/
+Graph/Video/Public Identity/frontend read-back remain unavailable. No staging
+or production mutation, migration, deployment, push or pull occurred.
+
+STATUS: `VIDEO_PUBLIC_BOUNDARY_IMPLEMENTED / MULTI_SUBJECT_SCOPE_PRESERVED /
+FOCUSED_TESTS_PASS / FULL_UNIT_BASELINE_RECORDED / RUNTIME_BLOCKED /
+NO_SEMANTIC_MUTATION`
+
 # Checkpoint — 2026-10-09 — Universal Music intake/public display evidence
 
 IMPLEMENTED: Completed the existing Music A–Z intake metadata slice and added

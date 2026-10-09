@@ -39,6 +39,24 @@ final class ProposalEligibilityServiceTest extends TestCase
         self::assertSame([], $service->check($proposal->id)->reasons);
     }
 
+    public function test_video_public_relation_obligation_cannot_reach_apply_without_attachment(): void
+    {
+        $proposal = $this->proposal([
+            'subject_resolution_packet' => ['id' => self::SUBJECT, 'type' => 'variant'],
+            'outcome_obligations' => ['obligations' => ['relations' => ['class' => 'REQUIRED', 'reason' => 'VIDEO_PUBLIC_RELATION_REQUIRED']]],
+            'source' => ['platform' => 'youtube', 'external_video_id' => 'dQw4w9WgXcQ', 'identity_valid' => true, 'availability' => 'available', 'embeddable' => true],
+            'source_rights' => 'PUBLIC_EXTERNAL_REFERENCE',
+            'editorial' => ['title' => 'Video', 'summary' => 'Tóm tắt', 'body' => 'Nội dung'],
+            'embed_url' => 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
+            'semantic_attachments' => [],
+        ]);
+
+        $result = $this->service($proposal)->check($proposal->id);
+
+        self::assertFalse($result->ready);
+        self::assertContains('NO_SEMANTIC_ATTACHMENT', $result->reasons);
+    }
+
     public function test_legacy_user_hint_evidence_is_not_eligible(): void
     {
         $proposal = $this->proposal([

@@ -20,7 +20,7 @@ final class VideoUrlPolicyTest extends TestCase
             'editorial' => ['title' => 'NHK editorial title', 'summary' => 'Summary'],
             'hub' => ['primary' => '06'],
             'provenance' => ['kind' => 'YOUTUBE_SOURCE'],
-            'semantic_attachments' => [['target_id' => '22222222-2222-4222-8222-222222222222']],
+            'semantic_attachments' => [['target_type' => 'variant', 'target_uuid' => '22222222-2222-4222-8222-222222222222', 'predicate' => 'about', 'evidence_refs' => [['evidence_id' => '33333333-3333-4333-8333-333333333333']]]],
         ]);
 
         $result = (new VideoUrlPolicy())->project($video, new VideoPublicContextSelector());
@@ -37,7 +37,7 @@ final class VideoUrlPolicyTest extends TestCase
             'editorial' => ['title' => 'New NHK title', 'summary' => 'Summary'],
             'hub' => ['primary' => '06'],
             'provenance' => ['kind' => 'YOUTUBE_SOURCE'],
-            'semantic_attachments' => [['target_id' => '22222222-2222-4222-8222-222222222222']],
+            'semantic_attachments' => [['target_type' => 'variant', 'target_uuid' => '22222222-2222-4222-8222-222222222222', 'predicate' => 'about', 'evidence_refs' => [['evidence_id' => '33333333-3333-4333-8333-333333333333']]]],
         ]);
 
         self::assertSame(
@@ -54,7 +54,7 @@ final class VideoUrlPolicyTest extends TestCase
             'editorial' => ['title' => 'Title', 'summary' => 'Summary'],
             'hub' => ['primary' => '06'],
             'provenance' => ['kind' => 'YOUTUBE_SOURCE'],
-            'semantic_attachments' => [['target_id' => '22222222-2222-4222-8222-222222222222']],
+            'semantic_attachments' => [['target_type' => 'variant', 'target_uuid' => '22222222-2222-4222-8222-222222222222', 'predicate' => 'about', 'evidence_refs' => [['evidence_id' => '33333333-3333-4333-8333-333333333333']]]],
         ]);
 
         $result = (new VideoUrlPolicy())->project($video, new VideoPublicContextSelector());
@@ -95,7 +95,7 @@ final class VideoUrlPolicyTest extends TestCase
             'editorial' => ['title' => 'Editorial title', 'summary' => 'Summary'],
             'hub' => ['primary' => '06'],
             'provenance' => ['kind' => 'YOUTUBE_SOURCE'],
-            'semantic_attachments' => [['target_id' => '22222222-2222-4222-8222-222222222222']],
+            'semantic_attachments' => [['target_type' => 'variant', 'target_uuid' => '22222222-2222-4222-8222-222222222222', 'predicate' => 'about', 'evidence_refs' => [['evidence_id' => '33333333-3333-4333-8333-333333333333']]]],
         ], null, self::VIDEO_ID);
 
         $result = (new VideoUrlPolicy())->project($video, new VideoPublicContextSelector());
@@ -112,7 +112,7 @@ final class VideoUrlPolicyTest extends TestCase
             'provenance' => ['source_url' => 'https://www.youtube.com/watch?v=truOChTNbwA'],
             'editorial' => ['title' => 'NHK editorial title', 'summary' => 'Summary'],
             'category' => ['primary' => ['key' => '06']],
-            'semantic_attachments' => [['target_id' => '22222222-2222-4222-8222-222222222222']],
+            'semantic_attachments' => [['target_type' => 'variant', 'target_uuid' => '22222222-2222-4222-8222-222222222222', 'predicate' => 'about', 'evidence_refs' => [['evidence_id' => '33333333-3333-4333-8333-333333333333']]]],
         ]);
 
         $result = (new VideoUrlPolicy())->project($video, new VideoPublicContextSelector());

@@ -63,7 +63,7 @@ final class HomeSemanticQueryTest extends TestCase
     public function test_home_video_card_uses_representative_media_before_source_thumbnail(): void
     {
         $mediaId = UuidCodec::newV7();
-        $video = new Video(UuidCodec::newV7(), 'youtube', 'dQw4w9WgXcQ', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'Video đại diện', ['public_identity' => ['current_slug' => 'video-dai-dien'], 'source_snapshot' => ['availability' => 'available', 'embeddable' => true, 'thumbnail_selection' => ['url' => 'https://img.example.test/source.jpg', 'width' => 640, 'height' => 360]], 'editorial' => ['title' => 'Video đại diện', 'summary' => 'Tóm tắt'], 'hub' => ['primary' => '06'], 'provenance' => ['kind' => 'TEST'], 'semantic_attachments' => [['target_id' => UuidCodec::newV7()]]]);
+        $video = new Video(UuidCodec::newV7(), 'youtube', 'dQw4w9WgXcQ', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'Video đại diện', ['public_identity' => ['current_slug' => 'video-dai-dien'], 'source_snapshot' => ['availability' => 'available', 'embeddable' => true, 'thumbnail_selection' => ['url' => 'https://img.example.test/source.jpg', 'width' => 640, 'height' => 360]], 'editorial' => ['title' => 'Video đại diện', 'summary' => 'Tóm tắt'], 'hub' => ['primary' => '06'], 'provenance' => ['kind' => 'TEST'], 'semantic_attachments' => [['target_type' => 'variant', 'target_uuid' => UuidCodec::newV7(), 'predicate' => 'about', 'evidence_refs' => [['evidence_id' => UuidCodec::newV7()]]]]]);
         $usage = new MediaUsage(UuidCodec::newV7(), $mediaId, 'video', $video->canonicalId, 'representative', activeSlot: 'representative', selectionSource: 'USER_EXPLICIT', selectionPolicy: 'PINNED');
         $usages = new class([$usage]) implements MediaUsageRepository {
             public function __construct(private array $items) {}
@@ -259,7 +259,7 @@ final class HomeSemanticQueryTest extends TestCase
                     'availability' => $index === 29 ? 'removed' : 'available',
                     'embeddable' => true,
                     'published_at' => sprintf('2026-02-%02d 00:00:00', min(28, $index + 1)),
-                ], 'editorial' => ['title' => 'Video ' . $index, 'summary' => 'Tóm tắt'], 'hub' => ['primary' => ['key' => 'video']], 'provenance' => ['kind' => 'external'], 'semantic_attachments' => [['type' => 'authority']], 'public_identity' => ['current_slug' => 'video-' . $index]],
+                ], 'editorial' => ['title' => 'Video ' . $index, 'summary' => 'Tóm tắt'], 'hub' => ['primary' => ['key' => 'video']], 'provenance' => ['kind' => 'external'], 'semantic_attachments' => [['target_type' => 'variant', 'target_uuid' => UuidCodec::newV7(), 'predicate' => 'about', 'evidence_refs' => [['evidence_id' => UuidCodec::newV7()]]]], 'public_identity' => ['current_slug' => 'video-' . $index]],
                 null,
                 $index === 28 ? $sharedId : null,
             );

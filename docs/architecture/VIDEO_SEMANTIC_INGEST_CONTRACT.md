@@ -52,6 +52,19 @@ is not `COMPLETE`; completion also requires duplicate check, semantic research,
 relation reconciliation and final verification. Weak/speculative relations are
 not created merely to maximize edge count.
 
+Persisted semantic attachments are public-eligibility input only when they retain
+the canonical `target_type`/`target_uuid`, registered `predicate=about` and one
+or more exact `{"evidence_id":"<canonical Evidence UUID>"}` references.
+Legacy aliases such as `target_id` or `target_key`, arbitrary Evidence objects
+and missing Evidence are compatibility/readback gaps, not public semantic
+attachments. The reader-facing Video projection and page query omit the
+canonical Video UUID; owner-bound frontend reconciliation uses the requested
+owner and canonical public path instead of exposing that internal identifier.
+
+An explicitly scoped comparison may carry multiple resolved `about` targets.
+Each target remains independently typed and Evidence-backed; a single primary
+subject packet must not silently replace or broaden the declared subject set.
+
 ## Subject packet and contradiction gate — 2026-09-17
 
 An exact canonical UUID remains the selected identity, but it is not a reason

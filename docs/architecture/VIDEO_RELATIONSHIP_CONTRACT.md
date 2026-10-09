@@ -9,6 +9,13 @@ predicate, `EXPLICIT_USER_RELATION` or `INFERRED_RELATION`, evidence references,
 confidence and a reason. Ambiguous or unknown targets fail closed. Unknown
 predicate, endpoint or target identity is a typed gap/conflict.
 
+After candidate normalization, the persisted Video attachment projection uses
+`target_uuid` (not the legacy `target_id`/`target_key` aliases), the registered
+`about` predicate and exact Evidence references. Public URL, sitemap and
+frontend eligibility fail closed when that canonical readback shape is absent;
+an owner-only canonical Video may still remain stored when public/frontend
+obligations were not requested.
+
 `evidence_refs` is a non-empty array of exact objects shaped as
 `{"evidence_id":"<canonical Evidence UUID>"}`. The Evidence must resolve
 through the Knowledge/Evidence repository, remain active and be publicly usable

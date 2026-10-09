@@ -20,7 +20,7 @@ final class MediaVideoPageQueryTest extends TestCase
         $retiredMedia = new Media(UuidCodec::newV7(), 'retired', 'Retired', 'ready', [], false);
         $draftMedia = new Media(UuidCodec::newV7(), 'draft', 'Draft', 'draft');
         $activeMedia = new Media($mediaId, 'active', 'Active', 'ready');
-        $video = Video::fromUrl('https://youtu.be/dQw4w9WgXcQ', 'Reference', ['public_identity' => ['current_slug' => 'reference'], 'source_snapshot' => ['availability' => 'available', 'embeddable' => true], 'editorial' => ['title' => 'Reference', 'summary' => 'Summary'], 'hub' => ['primary' => '06'], 'provenance' => ['kind' => 'TEST'], 'semantic_attachments' => [['target_id' => '22222222-2222-4222-8222-222222222222']]]);
+        $video = Video::fromUrl('https://youtu.be/dQw4w9WgXcQ', 'Reference', ['public_identity' => ['current_slug' => 'reference'], 'source_snapshot' => ['availability' => 'available', 'embeddable' => true], 'editorial' => ['title' => 'Reference', 'summary' => 'Summary'], 'hub' => ['primary' => '06'], 'provenance' => ['kind' => 'TEST'], 'semantic_attachments' => [['target_type' => 'variant', 'target_uuid' => '22222222-2222-4222-8222-222222222222', 'predicate' => 'about', 'evidence_refs' => [['evidence_id' => '33333333-3333-4333-8333-333333333333']]]]]);
         $retiredVideo = new Video(UuidCodec::newV7(), 'youtube', '9bZkp7q19f0', 'https://www.youtube.com/watch?v=9bZkp7q19f0', 'Retired', [], null, false);
         $query = $this->query([$retiredMedia, $draftMedia, $activeMedia], [$video, $retiredVideo]);
 
@@ -34,17 +34,17 @@ final class MediaVideoPageQueryTest extends TestCase
         $old = Video::fromUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'Cũ', [
             'public_identity' => ['current_slug' => 'cu'],
             'source_snapshot' => ['availability' => 'available', 'embeddable' => true, 'published_at' => '2026-01-01T00:00:00Z'],
-            'editorial' => ['title' => 'Cũ', 'summary' => 'Tóm tắt'], 'hub' => ['primary' => '01'], 'provenance' => ['kind' => 'TEST'], 'semantic_attachments' => [['target_id' => '22222222-2222-4222-8222-222222222222']],
+            'editorial' => ['title' => 'Cũ', 'summary' => 'Tóm tắt'], 'hub' => ['primary' => '01'], 'provenance' => ['kind' => 'TEST'], 'semantic_attachments' => [['target_type' => 'variant', 'target_uuid' => '22222222-2222-4222-8222-222222222222', 'predicate' => 'about', 'evidence_refs' => [['evidence_id' => '33333333-3333-4333-8333-333333333333']]]],
         ]);
         $middle = Video::fromUrl('https://www.youtube.com/watch?v=9bZkp7q19f0', 'Giữa', [
             'public_identity' => ['current_slug' => 'giua'],
             'source_snapshot' => ['availability' => 'available', 'embeddable' => true, 'published_at' => '2026-02-01T00:00:00Z'],
-            'editorial' => ['title' => 'Giữa', 'summary' => 'Tóm tắt'], 'hub' => ['primary' => '01'], 'provenance' => ['kind' => 'TEST'], 'semantic_attachments' => [['target_id' => '22222222-2222-4222-8222-222222222222']],
+            'editorial' => ['title' => 'Giữa', 'summary' => 'Tóm tắt'], 'hub' => ['primary' => '01'], 'provenance' => ['kind' => 'TEST'], 'semantic_attachments' => [['target_type' => 'variant', 'target_uuid' => '22222222-2222-4222-8222-222222222222', 'predicate' => 'about', 'evidence_refs' => [['evidence_id' => '33333333-3333-4333-8333-333333333333']]]],
         ]);
         $new = Video::fromUrl('https://www.youtube.com/watch?v=aqz-KE-bpKQ', 'Mới', [
             'public_identity' => ['current_slug' => 'moi'],
             'source_snapshot' => ['availability' => 'available', 'embeddable' => true, 'published_at' => '2026-03-01T00:00:00Z'],
-            'editorial' => ['title' => 'Mới', 'summary' => 'Tóm tắt'], 'hub' => ['primary' => '01'], 'provenance' => ['kind' => 'TEST'], 'semantic_attachments' => [['target_id' => '22222222-2222-4222-8222-222222222222']],
+            'editorial' => ['title' => 'Mới', 'summary' => 'Tóm tắt'], 'hub' => ['primary' => '01'], 'provenance' => ['kind' => 'TEST'], 'semantic_attachments' => [['target_type' => 'variant', 'target_uuid' => '22222222-2222-4222-8222-222222222222', 'predicate' => 'about', 'evidence_refs' => [['evidence_id' => '33333333-3333-4333-8333-333333333333']]]],
         ]);
 
         $query = $this->query([], [$old, $new, $middle]);
@@ -58,7 +58,7 @@ final class MediaVideoPageQueryTest extends TestCase
         $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'original', 'uploads/odo/front.jpg', hash('sha256', 'image'), 'image/jpeg', 5, 1200, 800, 'PUBLIC');
         $privateAsset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'original', 'uploads/odo/private.jpg', hash('sha256', 'private-image'), 'image/jpeg', 7, 1200, 800, 'PRIVATE', ['status' => 'private']);
         $usage = new MediaUsage(UuidCodec::newV7(), $mediaId, 'wp_post', '1:42', 'featured');
-        $video = Video::fromUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'Reference', ['public_identity' => ['current_slug' => 'reference'], 'source_snapshot' => ['availability' => 'available', 'embeddable' => true], 'editorial' => ['title' => 'Reference', 'summary' => 'Summary'], 'hub' => ['primary' => '06'], 'provenance' => ['kind' => 'TEST'], 'semantic_attachments' => [['target_id' => '22222222-2222-4222-8222-222222222222']]]);
+        $video = Video::fromUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'Reference', ['public_identity' => ['current_slug' => 'reference'], 'source_snapshot' => ['availability' => 'available', 'embeddable' => true], 'editorial' => ['title' => 'Reference', 'summary' => 'Summary'], 'hub' => ['primary' => '06'], 'provenance' => ['kind' => 'TEST'], 'semantic_attachments' => [['target_type' => 'variant', 'target_uuid' => '22222222-2222-4222-8222-222222222222', 'predicate' => 'about', 'evidence_refs' => [['evidence_id' => '33333333-3333-4333-8333-333333333333']]]]]);
         $query = $this->query([new Media($mediaId, 'odo-front', 'Odo front', 'ready', ['source' => 'v2', 'metadata' => ['legacy_id' => '42']])], [$video], [$asset, $privateAsset], [$usage]);
 
         $media = $query->mediaDetail($mediaId);
@@ -73,6 +73,7 @@ final class MediaVideoPageQueryTest extends TestCase
         self::assertArrayNotHasKey('endpoint_key', $media['usages'][0]);
         self::assertSame($video->canonicalUrl, $query->videoDetail($video->canonicalId)['url']);
         self::assertSame('dQw4w9WgXcQ', $query->videoDetail($video->canonicalId)['external_id']);
+        self::assertArrayNotHasKey('canonical_id', $query->videoDetail($video->canonicalId));
         self::assertArrayNotHasKey('metadata', $query->videoDetail($video->canonicalId));
     }
 
@@ -86,7 +87,9 @@ final class MediaVideoPageQueryTest extends TestCase
             'provenance' => ['kind' => 'YOUTUBE_SOURCE', 'locator' => 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'],
             'semantic_attachments' => [[
                 'target_type' => 'variant',
-                'target_key' => '22222222-2222-4222-8222-222222222222',
+                'target_uuid' => '22222222-2222-4222-8222-222222222222',
+                'predicate' => 'about',
+                'evidence_refs' => [['evidence_id' => '33333333-3333-4333-8333-333333333333']],
                 'knowledge' => [['text' => 'Claim công khai']],
                 'provenance' => ['origin' => 'CANONICAL_SOURCE'],
             ]],
@@ -117,7 +120,7 @@ final class MediaVideoPageQueryTest extends TestCase
             'provenance' => ['source_url' => 'https://www.youtube.com/watch?v=truOChTNbwA'],
             'editorial' => ['title' => 'NHK editorial title', 'summary' => 'Summary'],
             'category' => ['primary' => ['key' => '06']],
-            'semantic_attachments' => [['target_id' => '22222222-2222-4222-8222-222222222222']],
+            'semantic_attachments' => [['target_type' => 'variant', 'target_uuid' => '22222222-2222-4222-8222-222222222222', 'predicate' => 'about', 'evidence_refs' => [['evidence_id' => '33333333-3333-4333-8333-333333333333']]]],
         ]);
 
         $detail = $this->query([], [$video])->videoDetail($video->canonicalId);
@@ -136,7 +139,7 @@ final class MediaVideoPageQueryTest extends TestCase
         $video = Video::fromUrl('https://www.youtube.com/watch?v=truOChTNbwA', 'Stored source title', [
             'public_identity' => ['current_slug' => 'stored-video'],
             'source_snapshot' => ['availability' => 'available', 'embeddable' => true, 'thumbnail_selection' => ['url' => 'https://img.youtube.com/source.jpg', 'width' => 640, 'height' => 360]],
-            'editorial' => ['title' => 'NHK editorial title', 'summary' => 'Summary'], 'hub' => ['primary' => '06'], 'provenance' => ['kind' => 'TEST'], 'semantic_attachments' => [['target_id' => '22222222-2222-4222-8222-222222222222']],
+            'editorial' => ['title' => 'NHK editorial title', 'summary' => 'Summary'], 'hub' => ['primary' => '06'], 'provenance' => ['kind' => 'TEST'], 'semantic_attachments' => [['target_type' => 'variant', 'target_uuid' => '22222222-2222-4222-8222-222222222222', 'predicate' => 'about', 'evidence_refs' => [['evidence_id' => '33333333-3333-4333-8333-333333333333']]]],
         ]);
         $mediaId = UuidCodec::newV7();
         $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'original', 'cover.jpg', hash('sha256', 'cover'), 'image/jpeg', 5, 1200, 675, 'PUBLIC', ['canonical_filename' => 'cover.webp']);

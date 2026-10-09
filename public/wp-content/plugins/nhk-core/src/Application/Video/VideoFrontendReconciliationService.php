@@ -123,9 +123,11 @@ final class VideoFrontendReconciliationService
 
     private function matches(mixed $item, string $ownerId, string $path): bool
     {
-        return is_array($item)
-            && (string) ($item['canonical_id'] ?? '') === $ownerId
-            && (string) ($item['public_url'] ?? ($item['url'] ?? '')) === $path;
+        if (!is_array($item) || (string) ($item['public_url'] ?? ($item['url'] ?? '')) !== $path) return false;
+        // Public read models intentionally omit canonical UUIDs. Older
+        // internal projections may still carry one, which remains checked
+        // when present for owner-bound reconciliation.
+        return !array_key_exists('canonical_id', $item) || (string) $item['canonical_id'] === $ownerId;
     }
 
     private function slugFromPath(string $path): string

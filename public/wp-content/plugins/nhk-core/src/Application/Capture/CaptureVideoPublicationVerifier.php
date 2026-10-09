@@ -11,6 +11,7 @@ use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Governance\CommandCanonicalizer;
 use NHK\Core\Domain\Video\{Video, VideoEditorialEnrichmentContext};
 use NHK\Core\Application\Video\VideoEditorialQualityPolicy;
+use NHK\Core\Shared\Uuid\UuidCodec;
 
 /** Verifies a Capture Video independently from the companion Article gate. */
 final class CaptureVideoPublicationVerifier
@@ -90,7 +91,10 @@ final class CaptureVideoPublicationVerifier
             }
             $videoRelationsValid = true;
             foreach ($attachments as $attachment) {
-                if (!is_array($attachment) || ($attachment['predicate'] ?? '') !== 'about' || trim((string) ($attachment['target_uuid'] ?? '')) === '') {
+                if (!is_array($attachment)
+                    || strtolower(trim((string) ($attachment['predicate'] ?? ''))) !== 'about'
+                    || trim((string) ($attachment['target_type'] ?? '')) === ''
+                    || !UuidCodec::isValid(trim((string) ($attachment['target_uuid'] ?? '')))) {
                     $blockers[] = 'VIDEO_ABOUT_RELATION_READBACK_INVALID';
                     $videoRelationsValid = false;
                     continue;
@@ -102,7 +106,7 @@ final class CaptureVideoPublicationVerifier
                     continue;
                 }
                 foreach ($refs as $ref) {
-                    $evidenceId = is_array($ref) ? trim((string) ($ref['evidence_id'] ?? '')) : '';
+                    $evidenceId = is_array($ref) && array_keys($ref) === ['evidence_id'] ? trim((string) ($ref['evidence_id'] ?? '')) : '';
                     if ($evidenceId === '') {
                         $blockers[] = 'VIDEO_ABOUT_EVIDENCE_INVALID';
                         $videoRelationsValid = false;

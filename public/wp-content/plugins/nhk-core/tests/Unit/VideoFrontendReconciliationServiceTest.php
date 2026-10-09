@@ -88,7 +88,7 @@ final class VideoFrontendReconciliationServiceTest extends TestCase
             'source_snapshot' => array_merge(['availability' => 'available', 'embeddable' => true, 'provenance' => ['kind' => 'youtube']], $sourceDelta),
             'editorial' => ['title' => 'Field watch', 'summary' => 'A public video'],
             'category' => ['primary' => ['key' => '01']],
-            'semantic_attachments' => [['target_type' => 'model', 'target_uuid' => self::VIDEO_ID, 'evidence_refs' => [['evidence_id' => self::IDENTITY_ID]]]],
+            'semantic_attachments' => [['target_type' => 'model', 'target_uuid' => self::VIDEO_ID, 'predicate' => 'about', 'evidence_refs' => [['evidence_id' => self::IDENTITY_ID]]]],
         ]);
         $videos = $this->createMock(VideoRepository::class);
         $videos->method('findByCanonicalId')->with(self::VIDEO_ID)->willReturn($video);

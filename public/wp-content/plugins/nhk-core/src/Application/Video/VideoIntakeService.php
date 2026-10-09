@@ -71,6 +71,27 @@ final class VideoIntakeService
         if ($handoffTarget !== null) $intendedTargets[] = $handoffTarget;
         $intendedTargets = array_values(array_unique(array_map(static fn (array $target): string => $target['type'] . ':' . $target['id'], $intendedTargets)));
         $intendedTargets = array_values(array_map(static function (string $key): array { [$type, $id] = explode(':', $key, 2); return ['id' => $id, 'type' => $type]; }, $intendedTargets));
+        $resolvedSubjects = [];
+        foreach ($candidateObjects as $candidate) {
+            if ($candidate->predicate !== 'about') continue;
+            $resolvedSubjects[$candidate->targetType . ':' . strtolower($candidate->targetId)] = [
+                'id' => $candidate->targetId,
+                'type' => $candidate->targetType,
+                'name' => '',
+                'match' => 'governed_relation_candidate',
+            ];
+        }
+        if (is_array($effectiveSubject) && UuidCodec::isValid((string) ($effectiveSubject['id'] ?? '')) && trim((string) ($effectiveSubject['type'] ?? '')) !== '') {
+            $key = (string) $effectiveSubject['type'] . ':' . strtolower((string) $effectiveSubject['id']);
+            $resolvedSubjects[$key] = array_replace(['match' => 'resolved_subject'], $effectiveSubject);
+        }
+        $resolvedSubjects = array_values($resolvedSubjects);
+        $subjectResolution = [
+            'status' => $resolvedSubjects === [] ? 'unresolved' : 'resolved',
+            'primary' => count($resolvedSubjects) === 1 ? $resolvedSubjects[0] : null,
+            'subjects' => $resolvedSubjects,
+            'resolved' => $resolvedSubjects,
+        ];
         $category = $this->classifier->classify(['source_title' => $snapshot['source_title'] ?? '', 'source_description' => $snapshot['source_description'] ?? '', 'tags' => $snapshot['tags'] ?? [], 'user_hint' => $userHint]);
         if ($intendedCategory !== null) {
             $category['primary'] = ['key' => $intendedCategory, 'label' => VideoHubClassifier::hubs()[$intendedCategory], 'primary' => true, 'score' => 0];
@@ -150,6 +171,7 @@ final class VideoIntakeService
             'category' => $category,
             'semantic_attachments' => $candidatePayloads,
             'subject_resolution_packet' => $effectiveSubject,
+            'subject_resolution' => $subjectResolution,
             'seo' => $seoData,
             'content_quality' => is_object($contentQuality) ? $contentQuality->toArray() : $contentQuality,
             'embed_url' => YouTubeVideoIdentity::privacyEmbedUrl((string) $snapshot['external_video_id']),

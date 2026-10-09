@@ -41,7 +41,7 @@ final class SemanticDossierQueryTest extends TestCase
             'editorial' => ['title' => 'Video âm thanh', 'summary' => 'Ghi nhận âm thanh liên quan.'],
             'hub' => ['primary' => 'movement'],
             'provenance' => ['kind' => 'TEST_SOURCE'],
-            'semantic_attachments' => [['target_id' => $movement->canonicalId]],
+            'semantic_attachments' => [['target_type' => 'movement', 'target_uuid' => $movement->canonicalId, 'predicate' => 'about', 'evidence_refs' => [['evidence_id' => UuidCodec::newV7()]]]],
         ]);
         $newVideo = new Video($newVideoId = UuidCodec::newV7(), 'youtube', 'jNQXAC9IVRw', 'https://www.youtube.com/watch?v=jNQXAC9IVRw', 'Video mới', [
             'public_identity' => ['current_slug' => 'video-moi'],
@@ -49,7 +49,7 @@ final class SemanticDossierQueryTest extends TestCase
             'editorial' => ['title' => 'Video mới', 'summary' => 'Video mới nhất liên quan.'],
             'hub' => ['primary' => 'movement'],
             'provenance' => ['kind' => 'TEST_SOURCE'],
-            'semantic_attachments' => [['target_id' => $movement->canonicalId]],
+            'semantic_attachments' => [['target_type' => 'movement', 'target_uuid' => $movement->canonicalId, 'predicate' => 'about', 'evidence_refs' => [['evidence_id' => UuidCodec::newV7()]]]],
         ], null, true, 1, '2026-09-12T00:00:00Z');
 
         $endpoints = new EndpointTypeRegistry();

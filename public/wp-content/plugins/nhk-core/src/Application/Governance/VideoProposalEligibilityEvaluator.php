@@ -54,11 +54,26 @@ final class VideoProposalEligibilityEvaluator
         $attachments = is_array($attachments) ? $attachments : [];
         $reasons = $this->ownerBlockers($metadata);
 
+        $outcome = is_array($metadata['outcome_obligations'] ?? null) ? $metadata['outcome_obligations'] : [];
+        $relationObligation = is_array($outcome['obligations']['relations'] ?? null) ? $outcome['obligations']['relations'] : [];
+        if (strtoupper(trim((string) ($relationObligation['class'] ?? ''))) === 'REQUIRED' && $attachments === []) {
+            $reasons[] = 'NO_SEMANTIC_ATTACHMENT';
+        }
+
         $packet = is_array($metadata['subject_resolution_packet'] ?? null) ? $metadata['subject_resolution_packet'] : [];
         $subjectId = trim((string) ($packet['id'] ?? ''));
         $subjectType = trim((string) ($packet['type'] ?? ''));
         $explicitSubjectResolved = UuidCodec::isValid($subjectId) && $subjectType !== '';
-        if (!$explicitSubjectResolved) $reasons[] = 'SUBJECT_UNRESOLVED';
+        $subjects = [];
+        if ($explicitSubjectResolved) $subjects[$subjectType . ':' . strtolower($subjectId)] = ['id' => $subjectId, 'type' => $subjectType];
+        $resolution = is_array($metadata['subject_resolution'] ?? null) ? $metadata['subject_resolution'] : [];
+        foreach ((array) ($resolution['subjects'] ?? $resolution['resolved'] ?? []) as $resolved) {
+            if (!is_array($resolved)) continue;
+            $resolvedId = trim((string) ($resolved['id'] ?? $resolved['canonical_subject_id'] ?? ''));
+            $resolvedType = trim((string) ($resolved['type'] ?? $resolved['entity_type'] ?? ''));
+            if (UuidCodec::isValid($resolvedId) && $resolvedType !== '') $subjects[$resolvedType . ':' . strtolower($resolvedId)] = ['id' => $resolvedId, 'type' => $resolvedType];
+        }
+        if ($subjects === []) $reasons[] = 'SUBJECT_UNRESOLVED';
 
         $source = is_array($metadata['source'] ?? null) ? $metadata['source'] : [];
         if (array_key_exists('availability', $source) && (string) $source['availability'] !== 'available') $reasons[] = 'SOURCE_UNAVAILABLE';
@@ -79,7 +94,7 @@ final class VideoProposalEligibilityEvaluator
             $predicate = trim((string) ($attachment['predicate'] ?? 'about'));
             if (!UuidCodec::isValid($targetId) || $targetType === '') {
                 $reasons[] = 'SUBJECT_UNRESOLVED';
-            } elseif ($subjectId !== $targetId || $subjectType !== $targetType) {
+            } elseif (!isset($subjects[$targetType . ':' . strtolower($targetId)])) {
                 $reasons[] = 'SUBJECT_SCOPE_MISMATCH';
             }
             try {

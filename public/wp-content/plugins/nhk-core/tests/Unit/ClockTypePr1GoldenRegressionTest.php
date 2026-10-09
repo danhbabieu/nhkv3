@@ -145,7 +145,7 @@ final class ClockTypePr1GoldenRegressionTest extends TestCase
             'seo' => ['title' => 'Video vai bò', 'description' => 'Mô tả tư liệu.'],
             'hub' => ['primary' => '08'],
             'provenance' => ['kind' => 'YOUTUBE_SOURCE'],
-            'semantic_attachments' => [['target_id' => $variantId, 'target_type' => 'variant']],
+            'semantic_attachments' => [['target_uuid' => $variantId, 'target_type' => 'variant', 'predicate' => 'about', 'evidence_refs' => [['evidence_id' => UuidCodec::newV7()]]]],
             'knowledge_enrichment' => ['subject_id' => $variantId, 'subject_type' => 'variant'],
         ]);
         $beforeVideo = json_encode($video, JSON_THROW_ON_ERROR);

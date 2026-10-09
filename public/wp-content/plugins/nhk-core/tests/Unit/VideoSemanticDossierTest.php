@@ -33,7 +33,7 @@ final class VideoSemanticDossierTest extends TestCase
             'editorial' => ['title' => 'Âm thanh hiện vật', 'summary' => 'Ghi nhận âm thanh.'],
             'hub' => ['primary' => 'movement'],
             'provenance' => ['kind' => 'TEST_SOURCE'],
-            'semantic_attachments' => [['target_id' => $movement->canonicalId]],
+            'semantic_attachments' => [['target_type' => 'movement', 'target_uuid' => $movement->canonicalId, 'predicate' => 'about', 'evidence_refs' => [['evidence_id' => \NHK\Core\Shared\Uuid\UuidCodec::newV7()]]]],
         ]);
 
         $endpoints = new EndpointTypeRegistry();

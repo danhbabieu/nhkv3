@@ -46,7 +46,7 @@ final class BrandPublicDossierAcceptanceTest extends TestCase
             'editorial' => ['title' => 'Video tư liệu', 'summary' => 'Tư liệu liên quan trực tiếp.'],
             'hub' => ['primary' => 'brand'],
             'provenance' => ['kind' => 'TEST_SOURCE'],
-            'semantic_attachments' => [['target_id' => $brand->canonicalId]],
+            'semantic_attachments' => [['target_type' => 'brand', 'target_uuid' => $brand->canonicalId, 'predicate' => 'about', 'evidence_refs' => [['evidence_id' => UuidCodec::newV7()]]]],
         ]);
 
         $source = new Source(UuidCodec::newV7(), 'source-brand-a', 'Catalogue thương hiệu', 'archive', 'box-a', ['visibility' => 'PUBLIC']);

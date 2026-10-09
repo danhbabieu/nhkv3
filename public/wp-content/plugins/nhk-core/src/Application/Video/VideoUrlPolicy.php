@@ -3,13 +3,14 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Video;
 
+use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
 use NHK\Core\Application\PublicIdentity\{CanonicalPublicSlugPolicy, PublicIdentityReadRegistry};
 use NHK\Core\Contracts\PublicIdentity\PublicIdentityRepository;
 use NHK\Core\Domain\Video\Video;
 
 final class VideoUrlPolicy
 {
-    public function __construct(private ?PublicIdentityRepository $publicIdentities = null) {}
+    public function __construct(private ?PublicIdentityRepository $publicIdentities = null, private ?CanonicalDependencyValidator $dependencies = null) {}
     /** @return array{path:?string,eligible:bool,blockers:list<string>,warnings:list<string>} */
     public function project(Video $video, VideoPublicContextSelector $selector): array
     {
@@ -34,7 +35,7 @@ final class VideoUrlPolicy
             $provenance = array_merge($source['provenance'], $provenance);
         }
         if (trim((string) ($provenance['kind'] ?? '')) === '') $blockers[] = 'VIDEO_PROVENANCE_MISSING';
-        if (!is_array($metadata['semantic_attachments'] ?? null) || $metadata['semantic_attachments'] === []) $blockers[] = 'NO_SEMANTIC_ATTACHMENT';
+        array_push($blockers, ...(new VideoPublicAttachmentPolicy($this->dependencies))->blockers($metadata['semantic_attachments'] ?? null));
 
         $context = $this->context($metadata);
         if ($selector->select($context) === null && $slug === '') $blockers[] = 'GOVERNED_CONTEXT_MISSING';

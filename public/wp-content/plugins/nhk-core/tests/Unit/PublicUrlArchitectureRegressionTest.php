@@ -24,7 +24,7 @@ final class PublicUrlArchitectureRegressionTest extends TestCase
             'editorial' => ['title' => 'Video', 'summary' => 'Summary'],
             'hub' => ['primary' => '06'],
             'provenance' => ['kind' => 'YOUTUBE_SOURCE'],
-            'semantic_attachments' => [['target_id' => '22222222-2222-4222-8222-222222222222']],
+            'semantic_attachments' => [['target_type' => 'variant', 'target_uuid' => '22222222-2222-4222-8222-222222222222', 'predicate' => 'about', 'evidence_refs' => [['evidence_id' => '33333333-3333-4333-8333-333333333333']]]],
         ]);
 
         $result = (new VideoUrlPolicy($repository))->project($video, new VideoPublicContextSelector());

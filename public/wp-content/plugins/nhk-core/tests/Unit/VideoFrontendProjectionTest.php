@@ -30,7 +30,7 @@ final class VideoFrontendProjectionTest extends TestCase
         self::assertFalse($projection['frontend_available']);
     }
 
-    public function test_public_projection_is_deterministic_and_contains_one_canonical_owner(): void
+    public function test_public_projection_is_deterministic_without_internal_owner_identifiers(): void
     {
         $video = $this->video([
             'source_snapshot' => ['availability' => 'available', 'embeddable' => true],
@@ -46,9 +46,9 @@ final class VideoFrontendProjectionTest extends TestCase
 
         self::assertTrue($first['frontend_available']);
         self::assertSame($first, $second);
-        self::assertSame($video->canonicalId, $first['item']['canonical_id']);
+        self::assertArrayNotHasKey('canonical_id', $first['item']);
         self::assertSame('/video/video-frontend/', $first['item']['public_url']);
-        self::assertSame(1, substr_count((string) json_encode($first['item']), $video->canonicalId));
+        self::assertStringNotContainsString($video->canonicalId, (string) json_encode($first['item']));
     }
 
     private function video(array $metadata): Video

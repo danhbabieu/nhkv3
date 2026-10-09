@@ -117,6 +117,14 @@ source/provenance/embed references only. Persisted source data under
 approved compatibility shape; no second source record or semantic writer is
 created. “Xem trên web” and “Mở nguồn gốc” remain separate Admin actions.
 
+The reader-facing projection intentionally excludes the canonical Video UUID.
+Frontend reconciliation remains owner-bound because it starts from the exact
+canonical owner and compares the persisted public path; a legacy projection
+that happens to include the UUID is accepted only as an internal compatibility
+readback. Public eligibility also requires the canonical attachment shape and
+exact Evidence references, so a non-empty legacy attachment array cannot make
+an invalid or unsupported Video public.
+
 When a Video note names a visually explainable feature, the workflow records a
 VisualSupportRequirement through existing application orchestration. Normal
 input remains `nhk.capture.ingest`; no direct requirement writer is exposed.

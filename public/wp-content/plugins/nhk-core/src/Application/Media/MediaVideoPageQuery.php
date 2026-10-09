@@ -12,6 +12,7 @@ use NHK\Core\Domain\Video\Video;
 use NHK\Core\Shared\Migration\MigrationStatus;
 use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Core\Application\Video\{VideoFrontendProjection, VideoPublicContextSelector, VideoSeoProjection, VideoUrlPolicy};
+use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
 use NHK\Core\Application\Knowledge\PublicResearchSourceDisplayPolicy;
 use NHK\Core\Application\Video\VideoMediaPresentationResolver;
 use NHK\Core\Application\Presentation\LatestFirstOrder;
@@ -40,7 +41,7 @@ final class MediaVideoPageQuery
         $this->delivery ??= PublicMediaAssetDelivery::fromEnvironment($assets, $media);
         $this->gallery = $gallery ?? new PublicMediaGalleryQuery($media, $assets, $usages, PublicMediaArticleLinkResolver::fromWordPress());
         $this->videoMediaPresentation = $videoMediaPresentation ?? new VideoMediaPresentationResolver($media, $assets, $usages);
-        $this->frontendProjection = new VideoFrontendProjection(null, $this->videoMediaPresentation);
+        $this->frontendProjection = new VideoFrontendProjection(null, $this->videoMediaPresentation, $this->canonicalDependencies());
         $this->sourceDisplayPolicy ??= new PublicResearchSourceDisplayPolicy();
     }
 
@@ -73,7 +74,7 @@ final class MediaVideoPageQuery
         if (!$this->available('video')) return null;
         $slug = trim($slug);
         if ($slug === '') return null;
-        $policy = new VideoUrlPolicy();
+        $policy = new VideoUrlPolicy(null, $this->canonicalDependencies());
         $selector = new VideoPublicContextSelector();
         $matches = array_values(array_filter($this->videos->list(), function (Video $video) use ($policy, $selector, $slug): bool {
             $result = $policy->project($video, $selector);
@@ -143,7 +144,7 @@ final class MediaVideoPageQuery
         $sourceAvailable = !isset($source['availability']) || $source['availability'] === 'available';
         $projection = $this->frontendProjection->project($video);
         $presentation = $this->videoMediaPresentation->resolve($video);
-        $urlResult = (new VideoUrlPolicy())->project($video, new VideoPublicContextSelector());
+        $urlResult = (new VideoUrlPolicy(null, $this->canonicalDependencies()))->project($video, new VideoPublicContextSelector());
         $publicUrl = is_array($projection['item'] ?? null) ? (string) ($projection['item']['public_url'] ?? '') : null;
         $seoProjection = null;
         if ($urlResult['eligible'] && $sourceAvailable && ($source['availability'] ?? 'unknown') === 'available') {
@@ -156,7 +157,6 @@ final class MediaVideoPageQuery
                 : (new VideoSeoProjection())->project(['source' => array_merge($source, ['external_video_id' => $video->externalVideoId]), 'thumbnail' => $presentation['thumbnail'], 'editorial' => $editorial, 'seo' => is_array($metadata['seo'] ?? null) ? $metadata['seo'] : []], function_exists('home_url') ? home_url((string) $publicUrl) : (string) $publicUrl);
         }
         $result = [
-            'canonical_id' => $video->canonicalId,
             'title' => is_array($projection['item'] ?? null) ? (string) ($projection['item']['title'] ?? '') : (string) ($editorial['title'] ?? $video->title),
             'summary' => (string) ($editorial['summary'] ?? ''),
             'body' => (string) ($editorial['body'] ?? ''),
@@ -236,5 +236,12 @@ final class MediaVideoPageQuery
     private function sourceThumbnail(array $source): array
     {
         return (new \NHK\Core\Application\Video\VideoThumbnailSelector())->fromSource($source);
+    }
+
+    private function canonicalDependencies(): ?CanonicalDependencyValidator
+    {
+        return $this->claims !== null && $this->evidence !== null && $this->sources !== null
+            ? new CanonicalDependencyValidator($this->claims, $this->sources, $this->evidence)
+            : null;
     }
 }

@@ -142,7 +142,7 @@ final class SearchSemanticQueryTest extends TestCase
             'category' => ['primary' => ['key' => '06', 'label' => 'Âm thanh đồng hồ cổ']],
             'hub' => ['primary' => '06'],
             'provenance' => ['kind' => 'YOUTUBE_SOURCE'],
-            'semantic_attachments' => [['target_key' => $brand->canonicalId, 'target_type' => 'brand', 'predicate' => 'about']],
+            'semantic_attachments' => [['target_uuid' => $brand->canonicalId, 'target_type' => 'brand', 'predicate' => 'about', 'evidence_refs' => [['evidence_id' => UuidCodec::newV7()]]]],
         ]);
         $videos = new class($video) implements VideoRepository {
             public function __construct(private Video $item) {}

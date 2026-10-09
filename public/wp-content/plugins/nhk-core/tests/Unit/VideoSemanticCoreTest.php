@@ -367,6 +367,38 @@ final class VideoSemanticCoreTest extends TestCase
         self::assertSame([], $preview->package['semantic_attachments'][0]['evidence_refs']);
     }
 
+    public function test_video_intake_preserves_explicit_multi_subject_scope_for_comparison(): void
+    {
+        $firstSubject = '852da54d-457a-4397-a16d-52d9452ba766';
+        $secondSubject = '952da54d-457a-4397-a16d-52d9452ba766';
+        $firstEvidence = '01a0667c-9d0f-7950-8e41-cc432cd2dd20';
+        $secondEvidence = '01a0667c-9d0f-7950-8e41-cc432cd2dd22';
+        $service = new VideoIntakeService(
+            new YouTubeSourceAdapter(static fn (object $identity): array => [
+                'title' => 'So sánh hai biến thể',
+                'description' => 'Video đối chiếu hai chủ thể đã chọn.',
+                'availability' => 'available',
+                'embeddable' => true,
+                'fetched_at' => '2026-09-12T01:00:00Z',
+            ]),
+            $this->emptyVideos(),
+            new VideoHubClassifier(),
+            $this->planner($firstEvidence, $secondEvidence),
+            new VideoEditorialGenerator(),
+            new VideoCompletenessPolicy(),
+            new VideoSeoProjection(),
+        );
+
+        $preview = $service->preview('https://youtu.be/_VWcu0gqg5s', 'So sánh hai chủ thể', null, [
+            ['target_id' => $firstSubject, 'target_type' => 'variant', 'predicate' => 'about', 'origin' => 'EXPLICIT_USER_RELATION', 'evidence_refs' => [['evidence_id' => $firstEvidence]]],
+            ['target_id' => $secondSubject, 'target_type' => 'variant', 'predicate' => 'about', 'origin' => 'EXPLICIT_USER_RELATION', 'evidence_refs' => [['evidence_id' => $secondEvidence]]],
+        ]);
+
+        self::assertNull($preview->package['subject_resolution']['primary']);
+        self::assertCount(2, $preview->package['subject_resolution']['subjects']);
+        self::assertCount(2, $preview->package['semantic_attachments']);
+    }
+
     public function test_existing_active_video_is_reused_without_editorial_regeneration(): void
     {
         $videoId = '11111111-1111-4111-8111-111111111111';
@@ -1102,7 +1134,7 @@ final class VideoSemanticCoreTest extends TestCase
 
     public function test_video_sitemap_contains_only_active_available_indexable_watch_pages(): void
     {
-        $valid = Video::fromUrl('https://youtu.be/dQw4w9WgXcQ', 'NHK title', ['public_identity' => ['current_slug' => 'nha-kho-title'], 'source_snapshot' => ['availability' => 'available', 'embeddable' => true, 'thumbnail_urls' => ['https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg'], 'thumbnail_selection' => ['url' => 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg', 'variant' => 'hqdefault', 'width' => 1280, 'height' => 720]], 'editorial' => ['title' => 'NHK title', 'summary' => 'Summary'], 'hub' => ['primary' => '06'], 'provenance' => ['kind' => 'YOUTUBE_SOURCE'], 'semantic_attachments' => [['target_id' => '22222222-2222-4222-8222-222222222222']]]);
+        $valid = Video::fromUrl('https://youtu.be/dQw4w9WgXcQ', 'NHK title', ['public_identity' => ['current_slug' => 'nha-kho-title'], 'source_snapshot' => ['availability' => 'available', 'embeddable' => true, 'thumbnail_urls' => ['https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg'], 'thumbnail_selection' => ['url' => 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg', 'variant' => 'hqdefault', 'width' => 1280, 'height' => 720]], 'editorial' => ['title' => 'NHK title', 'summary' => 'Summary'], 'hub' => ['primary' => '06'], 'provenance' => ['kind' => 'YOUTUBE_SOURCE'], 'semantic_attachments' => [['target_type' => 'variant', 'target_uuid' => '22222222-2222-4222-8222-222222222222', 'predicate' => 'about', 'evidence_refs' => [['evidence_id' => '33333333-3333-4333-8333-333333333333']]]]]);
         $unavailable = Video::fromUrl('https://youtu.be/9bZkp7q19f0', 'Unavailable', ['source_snapshot' => ['availability' => 'deleted']]);
         $notIndexable = Video::fromUrl('https://youtu.be/aqz-KE-bpKQ', 'No index', ['source_snapshot' => ['availability' => 'available'], 'indexable' => false]);
 
