@@ -123,7 +123,16 @@ final class ContentIntentRouter
     private function assertExplicitIntentIsValid(ContentIntent $intent, array $input, array $assets): void
     {
         if ($intent === ContentIntent::KNOWLEDGE_REPAIR) {
-            KnowledgeRepairIntent::fromArray(is_array($input['knowledge_repair'] ?? null) ? $input['knowledge_repair'] : []);
+            $repairPlan = is_array($input['repair_plan'] ?? null) ? $input['repair_plan'] : [];
+            if ($repairPlan !== []) {
+                $operations = CaptureBoundRepairPlanComposer::operations($repairPlan);
+                if ($operations === []) throw new \InvalidArgumentException('CAPTURE_REPAIR_OPERATIONS_REQUIRED');
+                foreach ($operations as $operation) {
+                    if (!is_array($operation) || trim((string) ($operation['entity_type'] ?? $operation['owner_type'] ?? '')) === '') throw new \InvalidArgumentException('CAPTURE_REPAIR_OPERATION_INVALID');
+                }
+            } else {
+                KnowledgeRepairIntent::fromArray(is_array($input['knowledge_repair'] ?? null) ? $input['knowledge_repair'] : []);
+            }
             if ($assets !== []) throw new \InvalidArgumentException('KNOWLEDGE_REPAIR_ASSETS_FORBIDDEN');
             if (($input['subject_hints'] ?? []) !== []) throw new \InvalidArgumentException('KNOWLEDGE_REPAIR_SUBJECT_INFERENCE_FORBIDDEN');
         }

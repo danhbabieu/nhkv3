@@ -41,6 +41,8 @@ final readonly class StagingOperationDescriptor
         $payload['capture_fingerprint'] = $captureFingerprint;
         $payload = self::normalizeSemanticPayload($payload, $entity);
         $dependencies = array_values(array_unique(array_map('strval', (array) ($payload['dependency_ids'] ?? $plan['dependency_ids'] ?? []))));
+        $dependencyRevisions = self::dependencyRevisions($payload['dependency_revisions'] ?? $plan['dependency_revisions'] ?? []);
+        $dependencies = array_values(array_unique(array_merge($dependencies, array_keys($dependencyRevisions))));
         sort($dependencies, SORT_STRING);
         $policy = (new GovernedOperationPolicyRegistry())->find($entity, $operation);
         $family = $policy?->operationFamily ?? '';
@@ -56,7 +58,7 @@ final readonly class StagingOperationDescriptor
             $expected,
             (string) ($plan['idempotency_key'] ?? ''),
             hash('sha256', CommandCanonicalizer::canonicalize($payload)),
-            hash('sha256', CommandCanonicalizer::canonicalize($dependencies)),
+            hash('sha256', CommandCanonicalizer::canonicalize(array_map(static fn (string $id): array => [$id, $dependencyRevisions[$id] ?? null], $dependencies))),
             $payload,
         );
     }
@@ -87,6 +89,19 @@ final readonly class StagingOperationDescriptor
     {
         foreach (['staging_acceptance', 'signature', 'fingerprint', 'approved', 'scope_fingerprint', 'proposal_command_fingerprint', 'governed_apply', 'proposal_id', 'proposal_fingerprint'] as $key) unset($value[$key]);
         return $value;
+    }
+
+    /** @return array<string,int> */
+    public static function dependencyRevisions(mixed $value): array
+    {
+        $revisions = [];
+        foreach (is_array($value) ? $value : [] as $id => $revision) {
+            $id = trim((string) $id);
+            $revision = (int) $revision;
+            if ($id !== '' && $revision > 0) $revisions[$id] = $revision;
+        }
+        ksort($revisions, SORT_STRING);
+        return $revisions;
     }
 
     /**

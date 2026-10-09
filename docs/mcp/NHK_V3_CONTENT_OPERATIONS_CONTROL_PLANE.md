@@ -261,6 +261,31 @@ lifecycle with GraphRelationContext read-back. Cleanup retirement completed for
 all acceptance-created synthetic records. This is TEST evidence only; no
 production or `Côn hoa thị` operation ran.
 
+## Existing-owner repair plan composition — 2026-10-09
+
+`nhk.capture.ingest` accepts a generic bounded `repair_plan` only as planning
+input. The continuation resolves each registered Knowledge, Source or Evidence
+owner by canonical UUID and current revision, inventories dependencies, binds
+dependency revisions and fingerprints, and creates one idempotent node per
+exact owner/operation. Multiple Knowledge retirements and Source/Evidence
+reconciliation therefore use the same Capture continuation; they are not a
+bulk database operation and do not receive a client-supplied authorization
+allowlist.
+
+The existing
+`StagingAcceptanceScopeVerifier::issueForCaptureDependencyPlan()` signer is
+the sole issuer. Its packet binds canonical owner ID/revision, Capture
+ID/revision, dependency closure, content/dependency fingerprints, registered
+operation family, required capabilities, idempotency and expiry. Eligibility
+reconstructs the persisted proposal descriptor and rejects packet, identity,
+dependency or revision drift. Controlled Apply remains the only mutation path
+and must return exact canonical read-back.
+
+This implementation does not make a Westminster repair executable by itself:
+the deployed runtime must expose a fresh packet for the current Capture and
+the operator must hold the required capabilities. Until then, mutation is
+blocked while read-only audit and projection checks may continue.
+
 ### Universal representative target URL — 2026-09-26
 
 Capture may normalize the registered Vietnamese command `Dùng ảnh <Media URL>

@@ -255,6 +255,8 @@ final class StagingAcceptanceScopeVerifier
         if ($policy === null || !$policy->captureStagingAllowed || !in_array($descriptor->entityType, ['source', 'knowledge', 'evidence'], true)) throw new \RuntimeException('STAGING_DEPENDENCY_OPERATION_INVALID');
         $family = $descriptor->operationFamily;
         $payloadFingerprint = $descriptor->payloadFingerprint;
+        $dependencyRevisions = StagingOperationDescriptor::dependencyRevisions($descriptor->payload['dependency_revisions'] ?? []);
+        $dependencyIds = array_values(array_unique(array_map('strval', array_merge((array) ($descriptor->payload['dependency_ids'] ?? []), array_keys($dependencyRevisions)))));
         $planFingerprint = hash('sha256', CommandCanonicalizer::canonicalize(StagingOperationDescriptor::withoutAuthorization($plan)));
         $base = [
             'approved' => true, 'environment' => 'staging', 'capture_id' => $capture->captureId,
@@ -262,9 +264,16 @@ final class StagingAcceptanceScopeVerifier
             'semantic_write_policy' => 'PROJECT_BUILD', 'operation_family' => $family,
             'entity_type' => $descriptor->entityType, 'operation' => $descriptor->operation, 'writer' => 'canonical_governed',
             'entrypoint' => 'nhk.capture.ingest', 'canonical_entrypoint' => 'nhk.capture.ingest',
-            'subject_id' => $descriptor->subjectId, 'expected_revision' => $descriptor->expectedRevision ?? 0,
+            'subject_id' => $descriptor->subjectId, 'canonical_owner_id' => $descriptor->targetUuid ?? $descriptor->proposedUuid ?? $descriptor->subjectId,
+            'canonical_owner_revision' => $descriptor->expectedRevision ?? 0, 'expected_revision' => $descriptor->expectedRevision ?? 0,
             'plan_fingerprint' => $planFingerprint, 'proposal_command_fingerprint' => $payloadFingerprint,
             'payload_fingerprint' => $payloadFingerprint,
+            'content_fingerprint' => $payloadFingerprint,
+            'dependency_ids' => $dependencyIds,
+            'dependency_revisions' => $dependencyRevisions,
+            'dependency_fingerprint' => $descriptor->dependencyFingerprint,
+            'required_capabilities' => ['nhk_internal_content_operations', 'nhk_apply_proposals'],
+            'idempotency_key' => $descriptor->idempotencyKey,
             'issued_at' => gmdate('c'), 'expires_at' => gmdate('c', time() + max(1, $this->ttlSeconds)),
         ];
         if (!(bool) ($this->admission)($base, $capture, (array) ($capture->context['planning_input'] ?? []), [])) throw new \RuntimeException('STAGING_SCOPE_NOT_ADMITTED');

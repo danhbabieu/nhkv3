@@ -112,6 +112,32 @@ retire operations use `source_evidence_reconciliation`; Knowledge retire uses
 outside their admitted scope. No direct writer, generic WordPress writer,
 direct database write or Governance bypass is authorized.
 
+## Generic Capture-bound existing-owner repair composition — 2026-10-09
+
+The existing `nhk.capture.ingest` continuation composes a bounded repair plan
+for registered existing Knowledge, Source and Evidence owners. Composition is
+planning-only: it never writes an owner and never creates a second signer.
+Each node resolves the canonical owner by UUID, matches its current revision,
+and carries the Capture UUID/revision, exact dependency closure and dependency
+revisions. Content/dependency fingerprints and idempotency are derived from
+that exact node.
+
+Knowledge retire planning performs a read-only dependency inventory followed by
+server-derived identity-binding validation. Source/Evidence reconciliation
+binds the canonical claim/source revisions required by the registered owner
+contract. The existing
+`StagingAcceptanceScopeVerifier::issueForCaptureDependencyPlan()` is the only
+issuer; its packet binds operation family, owner, Capture, closure, required
+capabilities, idempotency and expiry. Eligibility and Controlled Apply
+reconstruct and re-verify the same descriptor. Owner/dependency drift, expiry,
+missing capability, changed Capture or incomplete read-back remains
+fail-closed.
+
+This contract does not authorize a live mutation. A live repair still requires
+a fresh server-issued packet for the current Capture and exact operator
+authorization, followed by Governance apply, canonical read-back, Graph
+verification and public projection read-back.
+
 ### Phase 1 policy-owner clarification — 2026-09-21
 
 Governance policy/services own semantic legality, approvals, materiality,

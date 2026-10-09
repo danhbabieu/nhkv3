@@ -34,6 +34,7 @@ final class GovernedCaptureContinuationService
     private string $currentCaptureId = '';
     private CompletionCoordinator $completion;
     private SemanticClaimCandidateGuard $semanticClaimCandidateGuard;
+    private ?CaptureBoundRepairPlanComposer $repairPlanComposer = null;
     /** @var list<string> */
     private array $semanticGuardFailures = [];
 
@@ -75,6 +76,9 @@ final class GovernedCaptureContinuationService
         if ($this->entityTypes === null) {
             $this->entityTypes = new EntityTypeRegistry();
             CanonicalEntityTypeCatalog::registerInto($this->entityTypes);
+        }
+        if ($this->knowledgeRepository !== null) {
+            $this->repairPlanComposer = new CaptureBoundRepairPlanComposer($this->knowledgeRepository, $this->knowledgeRepairPreview, $this->canonicalDependencies);
         }
     }
 
@@ -338,7 +342,7 @@ final class GovernedCaptureContinuationService
             if ($priorResolved !== []) $resolved = $priorResolved;
         }
         $intent = strtoupper(trim((string) ($context['content_intent']['intent'] ?? '')));
-        if ($intent === 'KNOWLEDGE_REPAIR') return [$this->knowledgeRepairPlan($captureId, $context)];
+        if ($intent === 'KNOWLEDGE_REPAIR') return $this->knowledgeRepairPlans($captureId, $context);
         $subjects = array_values(array_filter($resolved, static fn (mixed $item): bool => is_array($item) && UuidCodec::isValid((string) ($item['id'] ?? '')) && trim((string) ($item['type'] ?? '')) !== '' && ($item['active'] ?? true) === true));
         $variants = array_values(array_filter($subjects, static fn (array $item): bool => ($item['type'] ?? '') === 'variant'));
         $plans = [];
@@ -803,13 +807,48 @@ final class GovernedCaptureContinuationService
         $payload = ['canonical_id' => $repair->targetUuid, 'text' => $repair->text ?? $current->claimText, 'claim_type' => $repair->claimType ?? $current->claimType, 'provenance' => $repair->provenance, 'repair' => ['cleanup_class' => $repair->cleanupClass, 'reason' => $repair->reason, 'target_uuid' => $repair->targetUuid, 'expected_revision' => $repair->expectedRevision]];
         if ($repair->operation === 'retire' && $this->knowledgeRepairPreview !== null) {
             $preview = $this->knowledgeRepairPreview->preview($repair->toArray());
-            $payload['repair']['manual_review_required'] = ($preview['status'] ?? '') === 'REVIEW_REQUIRED';
-            $payload['repair']['dependency_inventory'] = ['graph' => $preview['graph_dependencies'] ?? [], 'evidence' => $preview['evidence_dependencies'] ?? [], 'blockers' => $preview['blockers'] ?? []];
+            $identity = is_array($preview['identity'] ?? null) ? $preview['identity'] : [];
+            $payload['repair']['identity_binding'] = [
+                'policy_version' => (string) ($identity['policy_version'] ?? ''),
+                'identity_fingerprint' => (string) ($identity['fingerprint'] ?? ''),
+                'dependency_fingerprint' => (string) ($preview['dependency_fingerprint'] ?? ''),
+                'classification' => strtoupper((string) ($identity['status'] ?? 'UNRESOLVED')),
+            ];
+            $validated = $this->knowledgeRepairPreview->preview(array_merge($repair->toArray(), ['identity_binding' => $payload['repair']['identity_binding']]));
+            $payload['repair']['manual_review_required'] = ($validated['status'] ?? '') === 'REVIEW_REQUIRED';
+            $payload['repair']['dependency_inventory'] = ['graph' => $validated['graph_dependencies'] ?? [], 'evidence' => $validated['evidence_dependencies'] ?? [], 'blockers' => $validated['blockers'] ?? []];
+            $dependencyIds = [];
+            $dependencyRevisions = [];
+            foreach ((array) ($preview['graph_dependencies'] ?? []) as $dependency) {
+                if (!is_array($dependency)) continue;
+                $id = trim((string) ($dependency['uuid'] ?? ''));
+                if (UuidCodec::isValid($id)) { $dependencyIds[] = $id; $dependencyRevisions[$id] = (int) ($dependency['revision'] ?? 0); }
+            }
+            foreach ((array) ($preview['evidence_dependencies'] ?? []) as $dependency) {
+                if (!is_array($dependency)) continue;
+                $id = trim((string) ($dependency['canonical_id'] ?? ''));
+                if (UuidCodec::isValid($id)) { $dependencyIds[] = $id; $dependencyRevisions[$id] = (int) ($dependency['revision'] ?? 0); }
+            }
+            if ($dependencyIds !== []) $payload['dependency_ids'] = array_values(array_unique($dependencyIds));
+            if ($dependencyRevisions !== []) $payload['dependency_revisions'] = $dependencyRevisions;
         }
         $plan = $this->arguments('knowledge', $repair->operation, $repair->targetUuid, $payload, 'capture:' . $captureId . ':knowledge-repair:' . hash('sha256', CommandCanonicalizer::canonicalize($repair->toArray())), $repair->expectedRevision);
         $plan['target_uuid'] = $repair->targetUuid;
         $plan['repair'] = true;
         return $this->scopeDependencyPlan($captureId, $plan);
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function knowledgeRepairPlans(string $captureId, array $context): array
+    {
+        $request = is_array($context['planning_input']['repair_plan'] ?? null)
+            ? $context['planning_input']['repair_plan']
+            : (is_array($context['repair_plan'] ?? null) ? $context['repair_plan'] : []);
+        if ($request !== []) {
+            if ($this->repairPlanComposer === null) throw new \RuntimeException('CAPTURE_REPAIR_PLAN_COMPOSER_UNAVAILABLE');
+            return array_map(fn (array $plan): array => $this->scopeDependencyPlan($captureId, $plan), $this->repairPlanComposer->compose($captureId, $request));
+        }
+        return [$this->knowledgeRepairPlan($captureId, $context)];
     }
 
     /** @param array<string,mixed> $plan @return array<string,mixed> */

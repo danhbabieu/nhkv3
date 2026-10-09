@@ -26160,3 +26160,41 @@ unavailable (`audio_elements=0`, `score_section=false`).
 STATUS: `GATE_A_B_C_VERIFIED / GATE_D_AUTHORIZATION_BLOCKED /
 GATE_E_NOT_RUN_FAIL_CLOSED / GATE_F_PARTIAL / EXTERNAL_GATE /
 PUBLIC_COMPLETE_FALSE / NO_SEMANTIC_MUTATION`
+
+# Checkpoint — 2026-10-09 — Capture-bound governed repair path implemented locally
+
+IMPLEMENTED: `nhk.capture.ingest` now accepts a generic bounded `repair_plan`
+and routes it through `GovernedCaptureContinuationService`,
+`scopeDependencyPlan()`, the existing
+`StagingAcceptanceScopeVerifier::issueForCaptureDependencyPlan()` signer,
+Proposal Eligibility and Controlled Apply. The composer is planning-only and
+does not add a writer, signer, bypass, entity type, predicate or Westminster
+allowlist. Every node binds canonical owner ID/revision, Capture ID/revision,
+dependency closure/revisions, content/dependency fingerprints, operation family,
+required capabilities, idempotency and expiry. Knowledge retirement uses a
+server-derived two-pass identity/dependency preview; Source/Evidence
+reconciliation binds claim/source revisions.
+
+REGRESSION_COVERAGE: The focused Capture/Governance/MCP suite passed 151 tests
+/ 675 assertions, and the MCP/router/editorial continuation contract suite
+passed 150 tests / 2,329 assertions. Coverage includes five-owner batch
+composition, source/evidence dependency closure, owner revision drift before
+issuance, signed capability/fingerprint/idempotency binding, expiry rejection,
+Capture non-transferability, Proposal Eligibility fail-closed behavior and
+canonical retire read-back contracts. Existing Controlled Apply batch and
+idempotent replay coverage remains unchanged and green in the configured
+focused suites.
+
+BOUNDARY: This is local source and contract evidence only. No deployment,
+Capture retry, packet issuance against the current Westminster runtime,
+Knowledge retire, Source/Evidence reconciliation, Graph mutation, Score/Audio
+mutation, public publish or cutover was performed. The previously observed
+runtime still has no fresh packet for the current Capture: the historical
+packet is bound to Capture revision 50 and expired; the current History
+Capture is revision 52 and the Score Capture is revision 14 with required
+owner read-back incomplete. Runtime source/build parity and operator
+capabilities must be verified through the authorized release gate before any
+mutation.
+
+STATUS: `LOCAL_REPAIR_COMPOSITION_IMPLEMENTED / FOCUSED_VERIFIED /
+RUNTIME_PACKET_PENDING / NO_SEMANTIC_MUTATION / PUBLIC_COMPLETE_FALSE`

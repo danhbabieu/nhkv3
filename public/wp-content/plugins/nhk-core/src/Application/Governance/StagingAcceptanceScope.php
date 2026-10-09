@@ -171,6 +171,17 @@ final class StagingAcceptanceScope
                 || !hash_equals((string) ($scope['proposal_command_fingerprint'] ?? ''), $payloadFingerprint)) {
                 throw new \RuntimeException('STAGING_DEPENDENCY_PAYLOAD_MISMATCH');
             }
+            $scopeOwnerId = (string) ($scope['canonical_owner_id'] ?? $scope['target_uuid'] ?? $scope['subject_id'] ?? '');
+            $proposalOwnerId = (string) ($proposal->targetUuid ?? $proposal->subjectId);
+            if ($scopeOwnerId !== $proposalOwnerId || (int) ($scope['canonical_owner_revision'] ?? $scope['expected_revision'] ?? 0) !== (int) ($proposal->expectedRevision ?? 0)) throw new \RuntimeException('STAGING_CANONICAL_OWNER_BINDING_MISMATCH');
+            $scopeRevisions = StagingOperationDescriptor::dependencyRevisions($scope['dependency_revisions'] ?? []);
+            $descriptorRevisions = StagingOperationDescriptor::dependencyRevisions($descriptor->payload['dependency_revisions'] ?? []);
+            $scopeIds = array_values(array_unique(array_map('strval', (array) ($scope['dependency_ids'] ?? []))));
+            $descriptorIds = array_values(array_unique(array_merge(array_map('strval', (array) ($descriptor->payload['dependency_ids'] ?? [])), array_keys($descriptorRevisions))));
+            sort($scopeIds, SORT_STRING); sort($descriptorIds, SORT_STRING);
+            if ($scopeIds !== $descriptorIds || $scopeRevisions !== $descriptorRevisions || !hash_equals((string) ($scope['dependency_fingerprint'] ?? ''), $descriptor->dependencyFingerprint)) throw new \RuntimeException('STAGING_DEPENDENCY_CLOSURE_MISMATCH');
+            $capabilities = array_values(array_map('strval', (array) ($scope['required_capabilities'] ?? [])));
+            if (!in_array('nhk_internal_content_operations', $capabilities, true) || !in_array('nhk_apply_proposals', $capabilities, true)) throw new \RuntimeException('STAGING_AUTHORIZATION_SCOPE_INVALID');
             self::assertNoFuzzyLocator($scope);
             return;
         }

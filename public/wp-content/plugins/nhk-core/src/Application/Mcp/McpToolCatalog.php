@@ -189,6 +189,38 @@ final class McpToolCatalog
                     'delta' => ['type' => 'object', 'properties' => ['text' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 10000], 'claim_type' => ['type' => 'string', 'enum' => ['fact', 'specification', 'history', 'technical', 'provenance', 'other']]], 'additionalProperties' => false],
                     'reason' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 2000], 'provenance' => ['type' => 'object'], 'cleanup_class' => ['type' => 'string', 'enum' => \NHK\Core\Application\Capture\KnowledgeRepairIntent::CLEANUP_CLASSES],
                 ], 'required' => ['canonical_knowledge_uuid', 'expected_revision', 'operation', 'reason', 'provenance', 'cleanup_class'], 'additionalProperties' => false],
+                'repair_plan' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'operations' => [
+                            'type' => 'array', 'minItems' => 1, 'maxItems' => 50,
+                            'items' => ['type' => 'object', 'properties' => [
+                                'entity_type' => ['type' => 'string', 'enum' => ['knowledge', 'source', 'evidence']],
+                                'owner_type' => ['type' => 'string', 'enum' => ['knowledge', 'source', 'evidence']],
+                                'operation' => ['type' => 'string', 'enum' => ['update', 'retire']],
+                                'canonical_owner_id' => self::uuidField(true),
+                                'canonical_id' => self::uuidField(true),
+                                'canonical_knowledge_uuid' => self::uuidField(true),
+                                'target_uuid' => self::uuidField(true),
+                                'expected_revision' => ['type' => 'integer', 'minimum' => 1],
+                                'canonical_owner_revision' => ['type' => 'integer', 'minimum' => 1],
+                                'reason' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 2000],
+                                'provenance' => ['type' => 'object'],
+                                'cleanup_class' => ['type' => 'string', 'enum' => \NHK\Core\Application\Capture\KnowledgeRepairIntent::CLEANUP_CLASSES],
+                                'payload' => ['type' => 'object'],
+                                'dependency_ids' => ['type' => 'array', 'maxItems' => 50, 'items' => self::uuidField()],
+                                'dependency_revisions' => ['type' => 'object'],
+                                'classification' => ['type' => 'string', 'maxLength' => 64],
+                            ], 'required' => ['operation'], 'additionalProperties' => false],
+                        ],
+                        'knowledge' => ['type' => 'array', 'maxItems' => 50, 'items' => ['type' => 'object']],
+                        'knowledge_repairs' => ['type' => 'array', 'maxItems' => 50, 'items' => ['type' => 'object']],
+                        'source_evidence' => ['type' => 'array', 'maxItems' => 50, 'items' => ['type' => 'object']],
+                        'source_evidence_reconciliation' => ['type' => 'array', 'maxItems' => 50, 'items' => ['type' => 'object']],
+                    ],
+                    'required' => ['operations'],
+                    'additionalProperties' => false,
+                ],
                 'authority_intent' => [
                     'type' => 'object',
                     'properties' => [

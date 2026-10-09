@@ -19,6 +19,7 @@ final readonly class KnowledgeRepairIntent
         public string $reason,
         public array $provenance,
         public string $cleanupClass,
+        public array $identityBinding = [],
     ) {
         if (!UuidCodec::isValid($targetUuid) || $expectedRevision < 1) throw new \InvalidArgumentException('KNOWLEDGE_REPAIR_TARGET_REVISION_INVALID');
         if (!in_array($operation, ['update', 'retire'], true)) throw new \InvalidArgumentException('KNOWLEDGE_REPAIR_OPERATION_INVALID');
@@ -35,11 +36,11 @@ final readonly class KnowledgeRepairIntent
         $delta = is_array($input['delta'] ?? null) ? $input['delta'] : $input;
         $text = array_key_exists('text', $delta) ? trim((string) $delta['text']) : null;
         $claimType = array_key_exists('claim_type', $delta) ? trim((string) $delta['claim_type']) : null;
-        return new self(trim((string) ($input['canonical_knowledge_uuid'] ?? $input['target_uuid'] ?? '')), (int) ($input['expected_revision'] ?? 0), strtolower(trim((string) ($input['operation'] ?? ''))), $text, $claimType, trim((string) ($input['reason'] ?? '')), is_array($input['provenance'] ?? null) ? $input['provenance'] : [], strtoupper(trim((string) ($input['cleanup_class'] ?? ''))));
+        return new self(trim((string) ($input['canonical_knowledge_uuid'] ?? $input['target_uuid'] ?? '')), (int) ($input['expected_revision'] ?? 0), strtolower(trim((string) ($input['operation'] ?? ''))), $text, $claimType, trim((string) ($input['reason'] ?? '')), is_array($input['provenance'] ?? null) ? $input['provenance'] : [], strtoupper(trim((string) ($input['cleanup_class'] ?? ''))), is_array($input['identity_binding'] ?? null) ? $input['identity_binding'] : []);
     }
 
     public function toArray(): array
     {
-        return ['canonical_knowledge_uuid' => $this->targetUuid, 'expected_revision' => $this->expectedRevision, 'operation' => $this->operation, 'delta' => array_filter(['text' => $this->text, 'claim_type' => $this->claimType], static fn (mixed $value): bool => $value !== null), 'reason' => $this->reason, 'provenance' => $this->provenance, 'cleanup_class' => $this->cleanupClass];
+        return ['canonical_knowledge_uuid' => $this->targetUuid, 'expected_revision' => $this->expectedRevision, 'operation' => $this->operation, 'delta' => array_filter(['text' => $this->text, 'claim_type' => $this->claimType], static fn (mixed $value): bool => $value !== null), 'reason' => $this->reason, 'provenance' => $this->provenance, 'cleanup_class' => $this->cleanupClass, 'identity_binding' => $this->identityBinding];
     }
 }

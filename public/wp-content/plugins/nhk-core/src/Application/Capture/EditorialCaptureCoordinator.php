@@ -518,6 +518,7 @@ final class EditorialCaptureCoordinator
                     'raw_input' => $text,
                     'content_intent' => $intent,
                     'knowledge_repair' => is_array($input['knowledge_repair'] ?? null) ? $input['knowledge_repair'] : [],
+                    'repair_plan' => is_array($input['repair_plan'] ?? null) ? $input['repair_plan'] : [],
                     'planning_input' => $input,
                     'subject_resolution' => ['status' => 'not_requested', 'resolved' => [], 'primary' => null],
                     'assets' => [], 'interpretation' => [], 'prior_diagnostics' => $diagnostics,
