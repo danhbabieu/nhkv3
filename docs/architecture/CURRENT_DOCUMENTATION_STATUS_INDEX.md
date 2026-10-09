@@ -1042,3 +1042,17 @@ bounded to existing vocabulary. The change adds no owner, schema, writer,
 predicate or authorization. The authorized TEST runtime identity is still
 unavailable, so Westminster data repair, governed acceptance, deployment and
 public read-back remain unverified.
+
+## Universal MCP outcome completion law — 2026-10-09
+
+STATUS: `ACTIVE_CONTRACT / LOCAL_IMPLEMENTATION_VERIFIED / RUNTIME_ACCEPTANCE_BLOCKED`.
+
+The cross-domain contract is
+`docs/architecture/NHK_V3_UNIVERSAL_OUTCOME_COMPLETION_CONTRACT.md`. It defines
+the shared `OutcomeObligationCompiler` plan, required/conditional/optional and
+not-applicable obligations, canonical/relation/public/frontend read-back,
+Video server/client exposure distinction and fail-closed Capture recovery.
+This index entry is documentation status only; it does not authorize a new
+owner, registry value, writer, fixture mutation, deployment or production
+cutover. The referenced proposal remains `DOCUMENT_UNAVAILABLE` and runtime
+acceptance remains blocked.
