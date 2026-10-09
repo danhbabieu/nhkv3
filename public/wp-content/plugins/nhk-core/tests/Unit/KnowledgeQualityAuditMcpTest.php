@@ -77,6 +77,43 @@ final class KnowledgeQualityAuditMcpTest extends TestCase
         self::assertSame(0, $repository->writes);
     }
 
+    public function test_workflow_instructions_and_source_urls_are_contamination_not_research_claims(): void
+    {
+        $subject = UuidCodec::newV7();
+        $texts = [
+            'Đây là hồ sơ KNOWLEDGE_DELTA có nguồn quốc tế cho chủ thể Music Westminster Quarters hiện hữu; không tạo Music hay Article.',
+            'Tách thành claim nguyên tử, tái sử dụng Source/Knowledge đã có, giữ Source/Evidence theo scope.',
+            'Source: https://www.greatstmarys.org/bells (Bells, Great St Mary’s).',
+            'Source: https://www.cam.ac.uk/news/dedication-of-new-bells-at-great-st-marys .',
+            'Source: https://www.parliament.uk/about/living-heritage/building/palace/big-ben/ .',
+        ];
+        $claims = [];
+        foreach ($texts as $index => $text) {
+            $claims[] = new KnowledgeClaim(
+                UuidCodec::newV7(),
+                'nhk:quality:contamination-' . $index,
+                $text,
+                'fact',
+                ['metadata' => ['subject_id' => $subject, 'subject_type' => 'music', 'scope' => 'entity', 'facet' => 'identity']],
+            );
+        }
+        $claims[] = new KnowledgeClaim(
+            UuidCodec::newV7(),
+            'nhk:quality:valid-research',
+            'University of Cambridge attributes the Cambridge Chimes composition to Joseph Jowett in 1793.',
+            'fact',
+            ['metadata' => ['subject_id' => $subject, 'subject_type' => 'music', 'scope' => 'entity', 'facet' => 'identity']],
+        );
+        $response = $this->handler(new QualityAuditMcpClaims($claims))->audit(['subject_id' => $subject, 'limit' => 20]);
+        $byKey = [];
+        foreach ($response['items'] as $item) $byKey[$item['stable_key']] = $item;
+        for ($index = 0; $index < count($texts); $index++) {
+            self::assertContains('PROCESS_CONTAMINATION', $byKey['nhk:quality:contamination-' . $index]['quality_findings']);
+            self::assertContains('RETIRE_PROCESS_CONTAMINATION_REVIEW', array_column($byKey['nhk:quality:contamination-' . $index]['repair_candidates'], 'action'));
+        }
+        self::assertNotContains('PROCESS_CONTAMINATION', $byKey['nhk:quality:valid-research']['quality_findings']);
+    }
+
     public function test_evidence_does_not_resolve_missing_knowledge_subject_identity(): void
     {
         $claim = new KnowledgeClaim(
