@@ -25731,3 +25731,29 @@ STATUS: `UNIVERSAL_INPUT_CLASSIFICATION_IMPLEMENTED /
 OUTCOME_COMPLETION_CONTRACT_REGISTERED / FOCUSED_VERIFIED /
 FULL_UNIT_ENVIRONMENT_REGRESSIONS_RECORDED / INTEGRATION_BLOCKED /
 WESTMINSTER_ACCEPTANCE_BLOCKED / NO_SEMANTIC_MUTATION`
+
+# Verification follow-up — 2026-10-09 — Native outcome-law checkpoint
+
+VERIFIED: On current HEAD `ea5aa833593d668bb0494d837187c107b5f0dcfd`, the
+focused Outcome/MCP/Capture/Video suite passed 212 tests / 1,618 assertions
+with 10 deprecations and 3 PHPUnit deprecations. The 57-file canonical MCP
+documentation snapshot regenerated successfully and the active outcome
+contract is present in the documentation registry.
+
+VERIFIED: Full configured PHPUnit at PHP 512M completed 3,863 tests / 23,186
+assertions with 46 errors, 29 failures, 30 warnings, 67 deprecations, 69
+PHPUnit deprecations and 125 skipped. The errors/failures include unresolved
+Knowledge identity fixtures, unrelated writer/specificity expectations,
+article-receipt mocks without `query()`, missing `NHK_WP_TEST_PATH=public` and
+the unauthorized TEST runtime identity; none changes the focused outcome-law
+result. `composer lint` passed all 1,480 PHP files, `git diff --check` passed,
+and the scoped secret-marker scan found no credential material.
+
+BOUNDARY: The proposal revision remains `DOCUMENT_UNAVAILABLE` for commit
+`e4352d280a17410fd5e97b7acf591c332b233e08`. No real Video fixture was created,
+replayed or mutated; no staging/production write, migration, deployment, push,
+public read-back or cutover was performed.
+
+STATUS: `OUTCOME_LAW_NATIVE_IMPLEMENTED / FOCUSED_VERIFIED /
+FULL_SUITE_REGRESSIONS_RECORDED / RUNTIME_ACCEPTANCE_BLOCKED /
+NO_SEMANTIC_MUTATION`
