@@ -682,6 +682,41 @@ final class CaptureCurrentOutcomeReducerTest extends TestCase
         self::assertSame(['eligible' => false, 'reason' => 'CAPTURE_RETRY_NOT_ALLOWED'], CaptureCurrentOutcomeReducer::retryEligibility($capture));
     }
 
+    public function test_immutable_governance_and_security_failures_cannot_be_reopened_by_policy_change(): void
+    {
+        foreach ([
+            'SYSTEM_BLOCKED',
+            'GOVERNANCE_REJECTED',
+            'GOVERNANCE_DENIED',
+            'AUTHORIZATION_FAILED',
+            'CAPABILITY_DENIED',
+            'IDENTITY_CONFLICT',
+            'IDEMPOTENCY_CONFLICT',
+            'IDEMPOTENCY_STALE_BINDING',
+            'EDITORIAL_CAS_REQUIRED',
+            'CAS_CONFLICT',
+            'SUBJECT_BINDING_CONFLICT',
+            'INVARIANT_VIOLATION',
+            'CONTRACT_INVALID',
+            'NOT_FOUND',
+        ] as $blocker) {
+            $capture = new CaptureRecord(
+                UuidCodec::newV7(), 'immutable-' . strtolower($blocker), hash('sha256', $blocker),
+                CaptureStage::SEMANTICS_RECONCILED->value, 'FAILED_RETRYABLE', null, null, [],
+                ['raw_input' => 'Một retry bị chặn.', 'content_intent' => ['intent' => 'KNOWLEDGE_DELTA']],
+                [
+                    'failure' => ['code' => $blocker, 'classification' => 'FAILED_RETRYABLE'],
+                    'completion' => ['status' => 'PARTIAL', 'blockers' => [$blocker]],
+                    'decision_dependency_fingerprint' => str_repeat('0', 64),
+                ],
+                ['SEMANTICS_RECONCILED' => ['status' => 'FAILED', 'result' => 'FAILED_RETRYABLE', 'failure_code' => $blocker]],
+            );
+
+            self::assertSame(['eligible' => false, 'reason' => 'CAPTURE_RETRY_NOT_ALLOWED'], CaptureCurrentOutcomeReducer::retryEligibility($capture), $blocker);
+            self::assertSame('TERMINALLY_BLOCKED', CaptureCurrentOutcomeReducer::lifecycleState($capture), $blocker);
+        }
+    }
+
     public function test_current_substantial_overlap_review_stays_current_and_is_not_stale_retryable(): void
     {
         $capture = $this->capture([

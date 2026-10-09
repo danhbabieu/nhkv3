@@ -49,6 +49,13 @@ final class CaptureCurrentOutcomeReducer
         }
 
         $blockers = self::currentBlockers($capture->diagnostics, $capture->phaseReceipts, $capture, $input);
+        if (self::hasImmutableRetryBlocker($capture, $blockers)) {
+            return [
+                'lifecycle_state' => 'TERMINALLY_BLOCKED',
+                'retry' => ['eligible' => false, 'reason' => 'CAPTURE_RETRY_NOT_ALLOWED'],
+                'blockers' => $blockers,
+            ];
+        }
         $subjectReconciliation = in_array($capture->status, ['APPLIED', 'REVIEW_REQUIRED'], true)
             && is_array($input['subject_reconciliation'] ?? null)
             && ($input['subject_reconciliation']['confirmed'] ?? false) === true;
@@ -357,6 +364,25 @@ final class CaptureCurrentOutcomeReducer
         if (strtoupper(trim((string) ($failure['classification'] ?? ''))) === 'HARD_BLOCK') return true;
         if (strtoupper(trim((string) ($preparation['quality_decision'] ?? ''))) === 'HARD_BLOCK') return true;
         return in_array('HARD_BLOCK', array_map('strval', (array) ($preparation['blockers'] ?? [])), true);
+    }
+
+    /** @param list<string> $blockers */
+    private static function hasImmutableRetryBlocker(CaptureRecord $capture, array $blockers): bool
+    {
+        $failure = is_array($capture->diagnostics['failure'] ?? null) ? $capture->diagnostics['failure'] : [];
+        $classification = strtoupper(trim((string) ($failure['classification'] ?? '')));
+        if (in_array($classification, ['HARD_BLOCK', 'SYSTEM_BLOCKED', 'GOVERNANCE_REJECTED', 'GOVERNANCE_DENIED'], true)) return true;
+
+        $failureCode = strtoupper(trim((string) ($failure['code'] ?? '')));
+        $codes = $blockers;
+        if ($failureCode !== '' && in_array($failureCode, $blockers, true)) $codes[] = $failureCode;
+        foreach ($codes as $blocker) {
+            $blocker = strtoupper(trim((string) $blocker));
+            if ($blocker === '' || $blocker === 'GOVERNANCE_APPROVAL_REQUIRED') continue;
+            if (preg_match('/(?:^SYSTEM_BLOCKED$|GOVERNANCE_(?:REJECTED|DENIED)|AUTHORIZATION|CAPABILITY|IDEMPOTENCY|(?:^|_)CAS(?:_|$)|BINDING_CONFLICT|IDENTITY_CONFLICT|SUBJECT_BINDING|INVARIANT|SCHEMA|CONTRACT|NOT_FOUND)/', $blocker) === 1) return true;
+        }
+
+        return false;
     }
 
     private static function hasCurrentArticleOverlapReview(CaptureRecord $capture): bool

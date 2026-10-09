@@ -47,6 +47,28 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
         self::assertSame(['VIDEO_INTENDED_CATEGORY_INVALID'], $invalid['blockers']);
     }
 
+    public function test_governance_rejection_is_immutable_but_approval_required_is_reviewable(): void
+    {
+        $service = new GovernedCaptureContinuationService(
+            $this->createMock(GovernedLifecycle::class),
+            static fn (): array => [],
+            $this->policies(['knowledge']),
+            static fn (): bool => true,
+        );
+        $method = new \ReflectionMethod($service, 'classifiedFailure');
+        $method->setAccessible(true);
+
+        foreach (['GOVERNANCE_REJECTED', 'GOVERNANCE_DENIED'] as $code) {
+            $result = $method->invoke($service, ['proposal_id' => 'proposal-1'], new \RuntimeException($code));
+            self::assertSame('SYSTEM_BLOCKED', $result['status'], $code);
+            self::assertSame([$code], $result['blockers'], $code);
+        }
+
+        $review = $method->invoke($service, ['proposal_id' => 'proposal-1'], new \RuntimeException('GOVERNANCE_APPROVAL_REQUIRED'));
+        self::assertSame('REVIEW_REQUIRED', $review['status']);
+        self::assertSame(['GOVERNANCE_APPROVAL_REQUIRED'], $review['blockers']);
+    }
+
     public function test_video_retry_does_not_reuse_pending_proposal_when_final_dependency_binding_changed(): void
     {
         $captureId = UuidCodec::newV7();
