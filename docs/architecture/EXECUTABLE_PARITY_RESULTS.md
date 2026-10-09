@@ -18,7 +18,16 @@
 
 ## Commands
 
-The final verification record must include exact output for:
+Verified locally on 2026-10-09:
+
+- Combined Music/Dictionary/Score-Audio/structured-intake/public
+  projection/documentation-registry selection: 78 tests / 2,505 assertions,
+  pass; 3 PHPUnit deprecations and 1 PHPUnit deprecation.
+- `composer generate:mcp-docs`: 64 canonical documentation files generated;
+  `source_revision=5eaf21c5a2f4ce63a54fecb7ab07dcc49a5663cd`; the emitted
+  manifest hash is recorded by the generated snapshot.
+
+The closeout check set is:
 
 ```bash
 vendor/bin/phpunit --configuration phpunit.xml.dist public/wp-content/plugins/nhk-core/tests/Unit/MusicCoverageAssessmentTest.php public/wp-content/plugins/nhk-core/tests/Unit/MusicDossierProjectionTest.php public/wp-content/plugins/nhk-core/tests/Unit/McpDocumentationRegistryTest.php
@@ -26,6 +35,11 @@ php -l public/wp-content/plugins/nhk-core/src/Application/Entity/MusicDataCollec
 git diff --check
 composer generate:mcp-docs
 ```
+
+PHP lint and `git diff --check` remain required before the task commit. The
+repository-wide Unit baseline is not used to convert local documentation
+evidence into runtime acceptance; any unrelated baseline identities must remain
+separately classified.
 
 The generated snapshot is immutable release output and must never be hand-edited.
 

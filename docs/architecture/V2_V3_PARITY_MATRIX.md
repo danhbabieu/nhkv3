@@ -23,6 +23,16 @@ because the local WordPress database is currently unavailable.
 `NOT ASSESSED` is intentionally not a parity claim. Mandatory red items block
 the final parity declaration.
 
+## Music intake/public display evidence — 2026-10-09
+
+The Music A–Z collection standard, transient Music/Dictionary/Score-Audio
+worksheets, gap report and public display matrix are now locally registered and
+covered by focused tests. This is documentation/read-model parity evidence
+only: it does not claim V2 migration, canonical data completeness, live public
+acceptance or a new Music/Dictionary/Media owner. Runtime and deployed
+read-back remain environment-gated, and local research files remain
+non-canonical.
+
 ## Semantic acceptance closeout — 2026-10-05
 
 The separate Capture-bound semantic acceptance phase is closed as GO on the

@@ -9,6 +9,22 @@
 > If anything here conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`,
 > the Constitution controls.
 
+## 0.0.9 Universal Music intake and public display evidence — 2026-10-09
+
+The Music A–Z standard now has complete executable intake metadata for its
+existing fields. The reusable Music, Dictionary and Score/Audio worksheets,
+Music A–Z gap report and public display matrix are registered as read-only
+operating evidence. They reuse the existing Capture/interpreter, Dictionary,
+Knowledge/Source/Evidence, Media, Graph, Governance and public dossier
+boundaries; they do not add fields, owners, schema, endpoints, predicates,
+writers or mutation authority.
+
+The local MCP documentation registry/snapshot exposes the seven operating
+documents and focused local verification is green. Runtime identity, deployed
+build verification, governed public audio delivery and live Music owner/evidence
+read-back remain `RUNTIME_BLOCKED`/`UNVERIFIED`; no staging or production
+mutation, deployment or push is claimed.
+
 ## 0.0.7 Public research-source display law — 2026-10-06
 
 `PUBLIC_RESEARCH_SOURCE_DISPLAY_POLICY` is the current cross-cutting public

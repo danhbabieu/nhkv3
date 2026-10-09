@@ -1,5 +1,35 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-09 — Universal Music intake/public display evidence
+
+IMPLEMENTED: Completed the existing Music A–Z intake metadata slice and added
+transient Music, Dictionary and Score/Audio worksheets, the Music A–Z contract
+gap report, public display matrix, documentation ownership map and executable
+parity ledger. The slice preserves the existing 26 categories, field keys,
+status vocabulary and canonical owners. It adds no schema, field, endpoint,
+predicate, semantic owner, writer, seed, backfill or mutation path.
+
+DOCUMENTATION_RUNTIME: Registered seven read-only operating documents in
+`McpDocumentationRegistry` and regenerated the immutable local snapshot with
+`source_revision=5eaf21c5a2f4ce63a54fecb7ab07dcc49a5663cd`; the generator
+emitted the current manifest hash and all 64 canonical files.
+
+VERIFIED: The combined Music/Dictionary/Score-Audio/structured-intake/public
+projection/documentation-registry selection passed 78 tests / 2,505
+assertions with three PHPUnit deprecations and one PHPUnit deprecation. The
+focused registry suite also confirms traversal/path fail-closed behavior after
+snapshot generation.
+
+RUNTIME_QA: The authorized TEST runtime identity, deployed build identity,
+signed exact Capture packet and canonical owner/evidence/revision read-back
+remain unavailable in this workspace. Public audio, historical-recording
+authenticity and live Music/Dictionary acceptance remain blocked or unverified.
+No staging/production mutation, deployment or push occurred.
+
+STATUS: `MUSIC_INTAKE_IMPLEMENTED / WORKSHEETS_REGISTERED /
+DOCUMENTATION_SNAPSHOT_VERIFIED / LOCAL_FOCUSED_TESTS_PASS /
+RUNTIME_BLOCKED / NO_SEMANTIC_MUTATION`
+
 # Checkpoint — 2026-10-09 — Universal public acceptance G0–G5
 
 EXECUTED: Read-only G0–G5 acceptance followed the attached runbook and the
