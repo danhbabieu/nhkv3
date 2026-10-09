@@ -20,9 +20,8 @@
 
 Verified locally on 2026-10-09:
 
-- Combined Music/Dictionary/Score-Audio/structured-intake/public
-  projection/documentation-registry selection: 78 tests / 2,505 assertions,
-  pass; 3 PHPUnit deprecations and 1 PHPUnit deprecation.
+- Music intake/public projection/documentation-registry selection: 43 tests /
+  2,329 assertions, pass; 3 PHPUnit deprecations.
 - `composer generate:mcp-docs`: 64 canonical documentation files generated;
   the generated snapshot records the current source revision and emitted
   manifest hash.

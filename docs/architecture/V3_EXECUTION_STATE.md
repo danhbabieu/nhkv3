@@ -14,9 +14,8 @@ DOCUMENTATION_RUNTIME: Registered seven read-only operating documents in
 the checkpoint commit; the generator emitted the current source revision and
 all 64 canonical files.
 
-VERIFIED: The combined Music/Dictionary/Score-Audio/structured-intake/public
-projection/documentation-registry selection passed 78 tests / 2,505
-assertions with three PHPUnit deprecations and one PHPUnit deprecation. The
+VERIFIED: The Music intake/public projection/documentation-registry selection
+passed 43 tests / 2,329 assertions with three PHPUnit deprecations. The
 focused registry suite also confirms traversal/path fail-closed behavior after
 snapshot generation.
 
