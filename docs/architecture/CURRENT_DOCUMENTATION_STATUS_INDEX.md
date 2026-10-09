@@ -1030,3 +1030,15 @@ parity matrix. The design and execution records are:
 
 This is a status/index entry only. It does not authorize a new registry type,
 schema, migration, semantic mutation, deployment or production cutover.
+
+## Universal knowledge integrity classification — 2026-10-09
+
+STATUS: `LOCAL_IMPLEMENTED / FOCUSED_VERIFIED / RUNTIME_ACCEPTANCE_BLOCKED / NO_MUTATION`.
+
+The shared interpreter separates source locators, operational/editorial
+instructions, media metadata, unverified inference and raw explicit factual
+assertions before semantic fallback. Registered facet inference remains
+bounded to existing vocabulary. The change adds no owner, schema, writer,
+predicate or authorization. The authorized TEST runtime identity is still
+unavailable, so Westminster data repair, governed acceptance, deployment and
+public read-back remain unverified.

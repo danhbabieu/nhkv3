@@ -693,6 +693,23 @@ The lexical connector schema refresh is visible live for
 `.preview` (`relation_uuid`, `expected_revision`). No known lexical server-code
 blocker remains; lexical lifecycle acceptance was not rerun.
 
+## Universal outcome completion law — 2026-10-09
+
+The active cross-domain completion contract is
+`docs/architecture/NHK_V3_UNIVERSAL_OUTCOME_COMPLETION_CONTRACT.md`. Every
+Capture intent is compiled by `OutcomeObligationCompiler` into explicit
+`REQUIRED`, `CONDITIONAL`, `OPTIONAL` or `NOT_APPLICABLE` obligations for
+canonical state, Governance, relations, public projection, frontend read-back,
+homepage placement and publication. The final aggregate is complete only
+after every required obligation has verified canonical read-back.
+
+The plan is Capture/request/idempotency bound and remains fail-closed on stale
+revisions, changed intent, missing applicability, failed public/frontend
+verification or client/server exposure gaps. `nhk.video.frontend.reconcile`
+remains the registered Video verifier; server capability evidence and actual
+client exposure are reported separately. This checkpoint authorizes no direct
+writer, fixture mutation, deployment or production cutover.
+
 ## Universal semantic recovery control boundary — 2026-10-09
 
 Operators have one bounded Capture recovery surface. The retry request must

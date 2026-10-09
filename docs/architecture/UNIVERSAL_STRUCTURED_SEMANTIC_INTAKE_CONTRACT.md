@@ -697,3 +697,31 @@ The active nine-type parity matrix is:
 
 The matrix is a parity check over the existing registry, not permission to add
 types, predicates, fields, relations or writers.
+
+## Universal input classification integrity — 2026-10-09
+
+The shared interpreter classifies each segment before semantic fallback. This
+is transient planning context and never creates a canonical owner:
+
+| Input class | Shared result | Knowledge admission |
+|---|---|---|
+| Verified/reviewable factual assertion | semantic candidate with bounded provenance/scope | only after registry, Source/Evidence and Governance checks |
+| Explicit raw user fact | `user_statement` + `EXPLICIT_USER_KNOWLEDGE` | may enter the governed candidate path |
+| Source locator (`Source: https://...`) | source-context locator | never a Claim or Evidence by itself |
+| Evidence excerpt | provenance/evidence planning context | requires canonical Claim + Source and governed Evidence |
+| Operational/editorial instruction | non-semantic instruction context | never a Claim |
+| Unverified inference (`có thể`, `dường như`, `được cho là`) | derived, review-required candidate | rejected by semantic admission until reviewed |
+| Dictionary terminology | lexical span/candidate | never semantic truth or Evidence |
+| Media metadata (`filename:`, `alt:`, `OCR:`, `caption:`) | metadata context | never a Claim by label alone |
+
+Mixed input is split at this boundary: a URL or instruction cannot contaminate
+a neighboring factual proposition, and an explicit raw fact is not downgraded
+merely because the same Capture contains a locator. The generic examples are:
+“Giai điệu Cambridge Quarters được sử dụng tại một công trình theo quyết định
+của hội đồng” with a source to verify; “Hãy chia thành Claim nguyên tử” and
+“Source: https://example.test/research” are not Knowledge; an historical
+statement supported only by an unreviewed story or locator remains unverified.
+
+The classifier is source-agnostic and contains no Westminster name, UUID,
+stable key, route or fixture branch. It does not relax the existing registry or
+Governance admission rules.

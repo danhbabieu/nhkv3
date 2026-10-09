@@ -93,6 +93,9 @@ final class StructuredSemanticInterpreter
                 'canonical_target_hint' => (array) ($value['canonical_target_hint'] ?? []),
                 'provenance_context' => (array) ($value['provenance_context'] ?? []),
                 'observation_strength' => (string) ($value['observation_strength'] ?? 'NORMAL'),
+                'source_locators' => $this->sourceLocators($text),
+                'evidence_excerpts' => $this->evidenceExcerpts($text),
+                'metadata_signals' => $this->metadataSignals($text),
             ],
             'raw_input_reference' => $value['raw_input_reference'] ?? ($value['source_identity']['raw_input_reference'] ?? null),
             'locale' => (string) ($value['locale'] ?? $metadata['locale'] ?? 'vi-VN'),
@@ -130,6 +133,34 @@ final class StructuredSemanticInterpreter
     public function dictionaryOwnerCommand(string $text): ?array
     {
         return $this->dictionaryOwnerCommandsFromPacket($text)[0] ?? null;
+    }
+
+    /**
+     * Classify one input segment before it reaches a semantic fallback.
+     * This is an ephemeral trust classification, not a canonical owner.
+     *
+     * @return array{class:string,value:?string}
+     */
+    public function classifySegment(string $segment): array
+    {
+        $segment = trim($segment);
+        if ($segment === '') return ['class' => 'EMPTY', 'value' => null];
+        if (($locator = $this->sourceLocator($segment)) !== null) return ['class' => 'SOURCE_LOCATOR', 'value' => $locator];
+        if (preg_match('/^(?:evidence|bằng chứng|excerpt|đoạn trích|trích dẫn|quote)s*[:：]/iu', $segment) === 1) {
+            return ['class' => 'EVIDENCE_EXCERPT', 'value' => $segment];
+        }
+        if (preg_match('/^(?:filename|file\s+name|alt(?:\s+text)?|caption|ocr|mime|metadata|media\s+metadata)\s*[:：]/iu', $segment) === 1) {
+            return ['class' => 'MEDIA_METADATA', 'value' => $segment];
+        }
+        $lower = $this->normalize($segment);
+        $hasAssertion = preg_match('/(?:\brằng\b|\b(?:là|có|được|sinh|thành lập|đặt tại|nằm ở)\b|\b(?:năm|year)\s+\d{3,4})/u', $lower) === 1;
+        if (preg_match('/\b(?:có thể|có lẽ|dường như|hình như|suy đoán|nghi là|được cho là|may be|perhaps|apparently|allegedly)\b/iu', $segment) === 1) {
+            return ['class' => 'UNVERIFIED_INFERENCE', 'value' => $segment];
+        }
+        if (!$hasAssertion && preg_match('/^(?:hãy|please|vui lòng|bổ sung|cập nhật|hoàn thiện|kiểm tra|xác minh|liên kết|gắn|thêm|đính kèm|đồng bộ|tiếp tục|thực hiện|đừng|không được|reuse\b|sửa\b|đưa\b)/iu', $segment) === 1) {
+            return ['class' => 'OPERATIONAL_INSTRUCTION', 'value' => $segment];
+        }
+        return ['class' => 'SEMANTIC_OR_EDITORIAL', 'value' => $segment];
     }
 
     /** @return list<array<string,mixed>> */
@@ -317,8 +348,47 @@ final class StructuredSemanticInterpreter
             $candidate = trim((string) ($observation['text'] ?? $observation['value'] ?? ''));
             if ($candidate !== '') $claims[] = ['text' => $candidate, 'candidate_kind' => 'observation', 'provenance' => strtoupper((string) ($observation['origin'] ?? 'SYSTEM_INFERENCE')), 'scope' => (string) ($observation['scope'] ?? 'UNRESOLVED')];
         }
-        if ($text !== '' && $claims === []) $claims[] = ['text' => $text, 'candidate_kind' => 'derived_candidate', 'provenance' => (string) ($value['provenance']['source_class'] ?? 'UNRESOLVED'), 'scope' => 'UNRESOLVED'];
+        if ($text !== '' && $claims === []) {
+            foreach ($this->segments($text) as $segment) {
+                $classification = $this->classifySegment($segment)['class'];
+                if (in_array($classification, ['SOURCE_LOCATOR', 'EVIDENCE_EXCERPT', 'MEDIA_METADATA', 'OPERATIONAL_INSTRUCTION'], true)) continue;
+                $claims[] = ['text' => $segment, 'candidate_kind' => 'derived_candidate', 'provenance' => (string) ($value['provenance']['source_class'] ?? 'UNRESOLVED'), 'scope' => 'UNRESOLVED'];
+            }
+        }
         return $claims;
+    }
+
+    private function sourceLocator(string $segment): ?string
+    {
+        if (preg_match('/^(?:source|nguồn|reference|ref(?:erence)?|url)\s*[:：]\s*(https?:\/\/\S+|doi:\S+)\s*$/iu', trim($segment), $match) !== 1) return null;
+        return trim((string) $match[1], " \t\n\r.,;:!?。！？");
+    }
+
+    /** @return list<string> */
+    private function sourceLocators(string $text): array
+    {
+        $locators = [];
+        foreach ($this->segments($text) as $segment) {
+            $locator = $this->sourceLocator($segment);
+            if ($locator !== null) $locators[] = $locator;
+        }
+        return array_values(array_unique($locators));
+    }
+
+    /** @return list<string> */
+    private function evidenceExcerpts(string $text): array
+    {
+        $excerpts = [];
+        foreach ($this->segments($text) as $segment) if ($this->classifySegment($segment)['class'] === 'EVIDENCE_EXCERPT') $excerpts[] = $segment;
+        return array_values(array_unique($excerpts));
+    }
+
+    /** @return list<string> */
+    private function metadataSignals(string $text): array
+    {
+        $signals = [];
+        foreach ($this->segments($text) as $segment) if ($this->classifySegment($segment)['class'] === 'MEDIA_METADATA') $signals[] = $segment;
+        return array_values(array_unique($signals));
     }
 
     /** @param list<array<string,mixed>> $assertions @return list<array<string,mixed>> */
@@ -379,7 +449,23 @@ final class StructuredSemanticInterpreter
     /** @param array<string,mixed> $value @param list<array<string,mixed>> $claims @return list<array<string,mixed>> */
     private function reuseMatches(array $value, array $claims): array { return array_values(array_filter((array) ($value['existing_knowledge'] ?? []), static fn (mixed $item): bool => is_array($item) && trim((string) ($item['claim_id'] ?? $item['id'] ?? '')) !== '')); }
     /** @param list<array<string,mixed>> $lexical @param list<array<string,mixed>> $unresolved @return list<array<string,mixed>> */
-    private function dictionaryCandidates(array $lexical, array $unresolved): array { $eligible = $unresolved !== [] ? $unresolved : array_values(array_filter($lexical, static fn (array $item): bool => ($item['resolver_eligible'] ?? true) === true)); return array_values(array_map(static fn (array $item): array => ['term' => $item['term'], 'normalized_term' => $item['normalized_term'], 'status' => 'NEEDS_REVIEW'], $eligible)); }
+    private function dictionaryCandidates(array $lexical, array $unresolved): array
+    {
+        $eligible = $unresolved !== []
+            ? $unresolved
+            : array_values(array_filter($lexical, static fn (array $item): bool => ($item['resolver_eligible'] ?? true) === true));
+        $eligible = array_values(array_filter($eligible, fn (array $item): bool => !$this->isFactualGrammarFragment($item)));
+        return array_values(array_map(static fn (array $item): array => ['term' => $item['term'], 'normalized_term' => $item['normalized_term'], 'status' => 'NEEDS_REVIEW'], $eligible));
+    }
+
+    /** @param array<string,mixed> $item */
+    private function isFactualGrammarFragment(array $item): bool
+    {
+        if (($item['origin'] ?? '') !== 'DOMAIN_PHRASE') return false;
+        $term = $this->normalize((string) ($item['normalized_term'] ?? $item['term'] ?? ''));
+        return preg_match('/^năm\s+\p{L}+$/u', $term) === 1
+            || preg_match('/^(?:sản xuất|ra mắt|phát hành|ghi nhận|thành lập|sinh|xảy ra|ra đời)\s+năm$/u', $term) === 1;
+    }
     /** @param list<array<string,mixed>> $claims @return list<array<string,mixed>> */
     private function knowledgeCandidates(array $claims): array { return array_values(array_map(static fn (array $claim): array => $claim + ['status' => 'REVIEW_REQUIRED'], $claims)); }
     /** @param list<array<string,mixed>> $lexical @param list<array<string,mixed>> $claims @param list<array<string,mixed>> $relations @param list<array<string,mixed>> $ambiguous @param list<array<string,mixed>> $unresolved @return list<string> */

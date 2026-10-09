@@ -502,3 +502,12 @@ rejection/denial, identity, idempotency and CAS outcomes fail-closed. Governed
 proposal, eligibility, controlled apply and canonical read-back are required
 before any projection may consume a Knowledge delta; no generic Article writer
 or direct database path is authorized.
+
+### Shared input classification — 2026-10-09
+
+Article text uses the same semantic classifier as Knowledge-only, Media and
+Video input. Editorial/process instructions, `Source: URL` locator lines and
+file/OCR/caption metadata remain outside Article-derived Knowledge candidates.
+Explicit raw factual assertions may remain candidates for the governed
+semantic branch, while generated prose, unverified inference and source URLs
+alone cannot create Claims, Evidence or a second Article owner.

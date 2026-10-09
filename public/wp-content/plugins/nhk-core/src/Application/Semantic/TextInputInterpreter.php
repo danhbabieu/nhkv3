@@ -63,8 +63,24 @@ final class TextInputInterpreter
             'compliance_notes' => [],
             'editorial_instructions' => [],
             'instruction_classes' => [],
+            'source_locators' => [],
+            'evidence_excerpts' => [],
+            'metadata_signals' => [],
         ];
         foreach ($sentences as $sentence) {
+            $classification = $this->structured->classifySegment($sentence);
+            if ($classification['class'] === 'SOURCE_LOCATOR') {
+                $nonSemantic['source_locators'][] = (string) $classification['value'];
+                continue;
+            }
+            if ($classification['class'] === 'EVIDENCE_EXCERPT') {
+                $nonSemantic['evidence_excerpts'][] = $sentence;
+                continue;
+            }
+            if ($classification['class'] === 'MEDIA_METADATA') {
+                $nonSemantic['metadata_signals'][] = $sentence;
+                continue;
+            }
             $role = $this->sentenceRole($sentence);
             if ($role === 'compliance') {
                 $nonSemantic['compliance_notes'][] = $sentence;
@@ -88,6 +104,7 @@ final class TextInputInterpreter
                 }
                 $claims = $explicitClaims;
                 foreach ($sentences as $sentence) {
+                    if (in_array($this->structured->classifySegment($sentence)['class'], ['SOURCE_LOCATOR', 'EVIDENCE_EXCERPT', 'MEDIA_METADATA'], true)) continue;
                     if ($this->sentenceRole($sentence) !== 'claim') continue;
                     $key = $this->claimKey($sentence);
                     if (($structuredByKey[$key] ?? []) !== []) {
@@ -108,7 +125,7 @@ final class TextInputInterpreter
             $values = is_array($metadata[$key] ?? null) ? $metadata[$key] : [$metadata[$key] ?? null];
             foreach ($values as $value) if (trim((string) $value) !== '') $nonSemantic['editorial_instructions'][] = trim((string) $value);
         }
-        foreach (['instructions', 'compliance_notes', 'editorial_instructions'] as $key) $nonSemantic[$key] = array_values(array_unique($nonSemantic[$key]));
+        foreach (['instructions', 'compliance_notes', 'editorial_instructions', 'source_locators', 'evidence_excerpts', 'metadata_signals'] as $key) $nonSemantic[$key] = array_values(array_unique($nonSemantic[$key]));
         $classes = [];
         foreach ($nonSemantic['instruction_classes'] as $item) {
             $key = (string) ($item['classification'] ?? '') . ':' . (string) ($item['text'] ?? '');
@@ -157,8 +174,27 @@ final class TextInputInterpreter
             $text = trim((string) ($assertion['text'] ?? ''));
             if ($text === '') continue;
             $candidate = $this->userCandidate($text);
-            $candidate['candidate_kind'] = ($assertion['reason'] ?? '') === 'EXPLICIT_OBSERVATION' ? 'observation' : 'derived_candidate';
-            if (trim((string) ($assertion['provenance'] ?? '')) !== '' && strtoupper((string) $assertion['provenance']) !== 'UNRESOLVED') $candidate['provenance'] = strtoupper((string) $assertion['provenance']);
+            $sourceKind = strtolower(trim((string) ($sourceContext['source_kind'] ?? '')));
+            $rawInput = strtoupper(trim((string) ($sourceContext['raw_or_derived'] ?? 'RAW')));
+            $assertionProvenance = strtoupper(trim((string) ($assertion['provenance'] ?? '')));
+            $classification = $this->structured->classifySegment($text)['class'];
+            $isExplicitUserInput = $rawInput !== 'DERIVED'
+                && in_array($sourceKind, ['text', 'human_chat', 'chat', 'user_text', 'knowledge', 'knowledge_text', 'knowledge_delta', 'generic'], true)
+                && in_array($assertionProvenance, ['', 'UNRESOLVED', 'EXPLICIT_USER_KNOWLEDGE'], true)
+                && $classification !== 'UNVERIFIED_INFERENCE';
+            $candidate['candidate_kind'] = ($assertion['reason'] ?? '') === 'EXPLICIT_OBSERVATION'
+                ? 'observation'
+                : ($isExplicitUserInput ? 'user_statement' : 'derived_candidate');
+            if ($classification === 'UNVERIFIED_INFERENCE') {
+                $candidate['candidate_kind'] = 'derived_candidate';
+                $candidate['provenance'] = 'SYSTEM_INFERENCE';
+                $candidate['review_required'] = true;
+                $candidate['status'] = 'REVIEW_REQUIRED';
+            } elseif ($assertionProvenance !== '' && $assertionProvenance !== 'UNRESOLVED') {
+                $candidate['provenance'] = $assertionProvenance;
+            } elseif ($isExplicitUserInput) {
+                $candidate['provenance'] = 'EXPLICIT_USER_KNOWLEDGE';
+            }
             if (trim((string) ($assertion['scope'] ?? '')) !== '' && strtoupper((string) $assertion['scope']) !== 'UNRESOLVED') $candidate['scope'] = (string) $assertion['scope'];
             foreach (['facet', 'attributed', 'review_required', 'status', 'source_span', 'segment_id'] as $field) if (array_key_exists($field, $assertion)) $candidate[$field] = $assertion[$field];
             $candidate['semantic_reason'] = (string) ($assertion['reason'] ?? 'STRUCTURED_SEMANTIC_ASSERTION');
@@ -214,19 +250,29 @@ final class TextInputInterpreter
         $music = str_contains($lower, 'bài nhạc') || str_contains($lower, 'giai điệu') || str_contains($lower, 'chơi 2 bài');
         $specimenObservation = str_contains($lower, 'chiếc đồng hồ') || str_contains($lower, 'trong video') || str_contains($lower, 'trong ảnh') || str_contains($lower, 'vật thể') || str_contains($lower, 'mẫu này') || str_contains($lower, 'cái này') || str_contains($lower, 'người dùng đánh giá');
         $recognition = str_contains($lower, 'yêu thích') || str_contains($lower, 'nữ hoàng') || str_contains($lower, 'cộng đồng') || str_contains($lower, 'nhận xét');
+        $unverifiedInference = $this->structured->classifySegment($sentence)['class'] === 'UNVERIFIED_INFERENCE';
         return [
             'text' => $sentence,
-            'candidate_kind' => 'user_statement',
-            'provenance' => 'EXPLICIT_USER_KNOWLEDGE',
+            'candidate_kind' => $unverifiedInference ? 'derived_candidate' : 'user_statement',
+            'provenance' => $unverifiedInference ? 'SYSTEM_INFERENCE' : 'EXPLICIT_USER_KNOWLEDGE',
             // Configuration/music are intrinsically variant-scoped. General
             // identity/history/company statements stay unresolved until the
             // canonical subject and evidence context are locked.
             'scope' => $specimenObservation ? 'specimen_observation' : (($configuration || $music) ? 'variant' : 'unspecified'),
             'scope_basis' => $specimenObservation ? 'EXPLICIT_MEDIA_CONTEXT' : (($configuration || $music) ? 'FACET_DEFAULT' : 'UNRESOLVED_CANONICAL_SUBJECT'),
-            'facet' => $configuration ? 'configuration' : ($music ? 'music' : ($recognition || $specimenObservation ? 'recognition' : 'identity')),
+            'facet' => $this->inferredFacet($lower, $configuration, $music, $recognition || $specimenObservation),
             'attributed' => $recognition || $specimenObservation,
-            'review_required' => str_contains($lower, 'nữ hoàng'),
-            'status' => 'CANDIDATE',
+            'review_required' => str_contains($lower, 'nữ hoàng') || $unverifiedInference,
+            'status' => $unverifiedInference ? 'REVIEW_REQUIRED' : 'CANDIDATE',
         ];
+    }
+
+    private function inferredFacet(string $text, bool $configuration, bool $music, bool $recognition): string
+    {
+        if ($configuration) return 'configuration';
+        if ($music) return 'music';
+        if (preg_match('/\b(?:thành lập|ra đời|ra mắt|phát hành|sản xuất|năm\s+\d{3,4}|ngày\s+\d{1,2})\b/iu', $text) === 1) return 'chronology';
+        if ($recognition || preg_match('/\b(?:sử dụng|được dùng|gắn với|được gọi|được biết|theo quyết định|phát ra|chơi)\b/iu', $text) === 1) return 'recognition';
+        return 'identity';
     }
 }

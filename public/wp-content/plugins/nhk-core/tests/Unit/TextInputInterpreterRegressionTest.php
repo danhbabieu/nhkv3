@@ -112,6 +112,65 @@ final class TextInputInterpreterRegressionTest extends TestCase
         self::assertCount(1, $result['user_claim_candidates']);
     }
 
+    public function test_source_locator_is_not_a_knowledge_candidate(): void
+    {
+        $result = (new TextInputInterpreter())->interpret('Source: https://example.com/research');
+
+        self::assertSame([], $result['user_claim_candidates']);
+        self::assertSame(['https://example.com/research'], $result['non_semantic_context']['source_locators']);
+        self::assertSame([], $result['structured_interpretation_packet']['knowledge_delta_candidates']);
+    }
+
+    public function test_evidence_excerpt_is_provenance_context_not_a_knowledge_candidate(): void
+    {
+        $result = (new TextInputInterpreter())->interpret('Evidence: “X được ghi nhận trong hồ sơ.”');
+
+        self::assertSame([], $result['user_claim_candidates']);
+        self::assertSame(['Evidence: “X được ghi nhận trong hồ sơ.”'], $result['non_semantic_context']['evidence_excerpts']);
+        self::assertSame([], $result['structured_interpretation_packet']['knowledge_delta_candidates']);
+    }
+
+    public function test_mixed_source_locator_and_fact_keeps_only_the_fact(): void
+    {
+        $result = (new TextInputInterpreter())->interpret(
+            'Source: https://example.com/research. Giai điệu A được sử dụng theo quyết định của hội đồng.',
+        );
+
+        self::assertSame(['Giai điệu A được sử dụng theo quyết định của hội đồng.'], array_column($result['user_claim_candidates'], 'text'));
+        self::assertSame(['https://example.com/research'], $result['non_semantic_context']['source_locators']);
+        self::assertSame('music', $result['user_claim_candidates'][0]['facet']);
+    }
+
+    public function test_unverified_inference_is_derived_and_review_required(): void
+    {
+        $result = (new TextInputInterpreter())->interpret('Có thể X được sử dụng theo quyết định của hội đồng.');
+        $candidate = $result['user_claim_candidates'][0];
+
+        self::assertSame('derived_candidate', $candidate['candidate_kind']);
+        self::assertSame('SYSTEM_INFERENCE', $candidate['provenance']);
+        self::assertTrue($candidate['review_required']);
+        self::assertSame('REVIEW_REQUIRED', $candidate['status']);
+    }
+
+    /** @dataProvider facetInferenceProvider */
+    public function test_facet_inference_uses_registered_semantic_facets(string $text, string $facet): void
+    {
+        $result = (new TextInputInterpreter())->interpret($text);
+
+        self::assertSame($facet, $result['user_claim_candidates'][0]['facet']);
+    }
+
+    /** @return list<array{string,string}> */
+    public static function facetInferenceProvider(): array
+    {
+        return [
+            ['X được thành lập năm 1922.', 'chronology'],
+            ['X được sử dụng theo quyết định của hội đồng.', 'recognition'],
+            ['Giai điệu A được sử dụng trong chương trình.', 'music'],
+            ['Cấu hình gồm 8 côn 8 búa.', 'configuration'],
+        ];
+    }
+
     /** @dataProvider unicodeBoundaryProvider */
     public function test_candidate_generation_preserves_valid_unicode_at_sentence_boundaries(string $text): void
     {

@@ -997,4 +997,32 @@ final class McpContractTest extends TestCase
         self::assertSame('read', $tools['nhk.documentation.get']['kind']);
         self::assertSame('read', $tools['nhk.documentation.list']['kind']);
     }
+
+    public function test_universal_outcome_completion_contract_is_active_and_bootstrap_visible(): void
+    {
+        $root = dirname(__DIR__, 6);
+        $path = $root . '/docs/architecture/NHK_V3_UNIVERSAL_OUTCOME_COMPLETION_CONTRACT.md';
+
+        self::assertFileExists($path);
+        $content = (string) file_get_contents($path);
+        foreach ([
+            'STATUS: `ACTIVE`',
+            'OutcomeObligationCompiler',
+            'REQUIRED',
+            'CONDITIONAL',
+            'OPTIONAL',
+            'NOT_APPLICABLE_REASON',
+            'DOCUMENT_UNAVAILABLE',
+            'nhk.video.frontend.reconcile',
+            'DIRECT_WRITE_BLOCKED',
+        ] as $marker) {
+            self::assertStringContainsString($marker, $content);
+        }
+
+        self::assertContains('universal-outcome-completion', McpDocumentationRegistry::documentKeys());
+        self::assertSame(
+            'docs/architecture/NHK_V3_UNIVERSAL_OUTCOME_COMPLETION_CONTRACT.md',
+            McpDocumentationRegistry::documentDefinitions()['universal-outcome-completion']['path'],
+        );
+    }
 }

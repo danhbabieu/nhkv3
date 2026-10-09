@@ -1417,3 +1417,14 @@ conflict remains fail-closed. `GOVERNANCE_APPROVAL_REQUIRED` is owner review,
 not an automatic denial. Completion still requires a governed proposal,
 controlled apply and canonical read-back; no direct writer, arbitrary payload
 mutation or deployment is authorized by this recovery boundary.
+
+### Universal input classification — 2026-10-09
+
+`nhk.capture.ingest` applies the shared segment classifier before building
+semantic plans. Source locators are retained as source context, not Claims;
+operational/editorial instructions and Media metadata are non-semantic input;
+unverified inference remains review-required; and raw explicit user facts keep
+their explicit provenance. Mixed packets are split without allowing a URL,
+instruction or metadata label to contaminate a neighboring factual candidate.
+The classifier does not grant a write capability or bypass the existing
+Proposal → Approval/Eligibility → Controlled Apply → read-back path.

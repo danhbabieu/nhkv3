@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Tests\Unit;
 
-use NHK\Core\Application\Semantic\SemanticClaimCandidateGuard;
+use NHK\Core\Application\Semantic\{SemanticClaimCandidateGuard, TextInputInterpreter};
 use PHPUnit\Framework\TestCase;
 
 final class SemanticClaimCandidateGuardTest extends TestCase
@@ -44,6 +44,27 @@ final class SemanticClaimCandidateGuardTest extends TestCase
 
         self::assertSame('REVIEW_REQUIRED', $result['status']);
         self::assertSame(['KNOWLEDGE_SEMANTIC_HANDOFF_REQUIRED'], $result['blockers']);
+    }
+
+    public function test_shared_interpreter_preserves_explicit_factual_assertion_for_governed_admission(): void
+    {
+        $interpreted = (new TextInputInterpreter())->interpret('Hermle được thành lập năm 1922.');
+        $candidate = $interpreted['user_claim_candidates'][0];
+
+        self::assertSame('user_statement', $candidate['candidate_kind']);
+        self::assertSame('EXPLICIT_USER_KNOWLEDGE', $candidate['provenance']);
+        self::assertSame('ALLOWED', (new SemanticClaimCandidateGuard())->evaluate($candidate, $interpreted)['status']);
+    }
+
+    public function test_shared_interpreter_keeps_unverified_inference_out_of_governed_admission(): void
+    {
+        $interpreted = (new TextInputInterpreter())->interpret('Có thể Hermle được thành lập năm 1922.');
+        $candidate = $interpreted['user_claim_candidates'][0];
+        $result = (new SemanticClaimCandidateGuard())->evaluate($candidate, $interpreted);
+
+        self::assertSame('derived_candidate', $candidate['candidate_kind']);
+        self::assertSame('SYSTEM_INFERENCE', $candidate['provenance']);
+        self::assertSame('REVIEW_REQUIRED', $result['status']);
     }
 
     /** @param array<string,mixed> $overrides @return array<string,mixed> */

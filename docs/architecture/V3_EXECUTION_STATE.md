@@ -25682,3 +25682,52 @@ public completion was performed.
 STATUS: `SEMANTIC_RECOVERY_IMPLEMENTED / DOCUMENTATION_ALIGNED /
 FOCUSED_VERIFIED / FULL_SUITE_ENVIRONMENT_REGRESSIONS_RECORDED /
 INTEGRATION_BLOCKED / NO_SEMANTIC_MUTATION`
+
+# Checkpoint — 2026-10-09 — Universal input classification and outcome completion alignment
+
+ROOT_CAUSES_CONFIRMED: The shared text fallback treated source locators and
+other non-semantic segments as claim text, while ordinary explicit factual
+sentences were not consistently classified as admissible user statements.
+Unverified inference could therefore be shaped like a Knowledge candidate,
+and generic factual grammar fragments could be surfaced as dictionary
+candidates. These were admission/classification defects, not permission to
+create a new owner or bypass Governance.
+
+IMPLEMENTED: `StructuredSemanticInterpreter` now classifies source locators,
+Evidence excerpts, Media metadata, operational/editorial instructions and
+unverified inference before semantic fallback. Source locators and excerpts
+remain provenance context; they are not Claims or Evidence by themselves.
+The text adapter preserves raw
+explicit factual assertions with `EXPLICIT_USER_KNOWLEDGE`, marks unverified
+inference as `SYSTEM_INFERENCE` / review-required, and infers only existing
+registered facets. Generic factual grammar fragments are excluded from
+dictionary candidates while dictionary semantic assertions remain available.
+Mixed input is split without contaminating a neighboring factual candidate.
+
+IMPLEMENTED: The active universal outcome-completion contract is registered
+and covered by MCP documentation parity tests. Completion remains governed by
+immutable outcome obligations, canonical read-back, relation read-back and
+requested public/frontend read-back; missing applicability, capability,
+binding, revision or read-back remains fail-closed. No direct writer, delete,
+new registry vocabulary or authorization was added.
+
+TESTED: Focused semantic, recovery, quality-audit, MCP and completion suite
+passed 302 tests / 1,973 assertions. NHK Contract passed 6 tests / 48
+assertions. Full Unit at PHP 512M completed 3,676 tests / 23,109 assertions
+with 14 errors, 5 failures and 30 warnings; the remaining identities are
+current repository/environment regressions (Knowledge identity fixtures,
+unrelated writer/specificity expectations and the article receipt mock), not
+failures in the focused classification/completion scope. Changed PHP lint and
+`git diff --check` remain required before commit.
+
+RUNTIME_QA: The authorized TEST runtime tuple remains unavailable:
+`WP_ENVIRONMENT_TYPE=staging`, database `erourxcg_nhkv3`, URL
+`https://demo.1945.vn`, runtime/project identity `nhk-v3`. No semantic
+mutation, Knowledge repair, Westminster acceptance, migration, deployment,
+push or public read-back was performed. Westminster canonical status and
+public route status therefore remain unverified/blocked.
+
+STATUS: `UNIVERSAL_INPUT_CLASSIFICATION_IMPLEMENTED /
+OUTCOME_COMPLETION_CONTRACT_REGISTERED / FOCUSED_VERIFIED /
+FULL_UNIT_ENVIRONMENT_REGRESSIONS_RECORDED / INTEGRATION_BLOCKED /
+WESTMINSTER_ACCEPTANCE_BLOCKED / NO_SEMANTIC_MUTATION`

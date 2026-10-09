@@ -341,3 +341,15 @@ Controlled Apply → canonical Knowledge read-back. Read-back must confirm the
 canonical UUID/stable key, revision, provenance, dependency fingerprint and
 readiness before a public projection can consume the Claim. A replay reads the
 canonical result and does not apply a second mutation.
+
+### Input/provenance separation — 2026-10-09
+
+The shared intake boundary separates factual propositions from source
+locators, excerpts, instructions, metadata and inference. A line such as
+`Source: https://example.test/research` is a locator for a future Source
+workflow; it is not a Claim and is not Evidence until a canonical Source,
+Claim, excerpt/observation and governed Evidence relationship are read back.
+Explicit raw user facts remain admissible candidates, while missing or pending
+Evidence remains dependency/review state rather than being silently dropped or
+promoted to public truth. Derived prose, OCR, transcript text and metadata
+retain lineage and cannot satisfy the Evidence gate by themselves.

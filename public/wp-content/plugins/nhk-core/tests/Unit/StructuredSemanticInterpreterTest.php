@@ -154,6 +154,39 @@ final class StructuredSemanticInterpreterTest extends TestCase
         self::assertSame([], $value['knowledge_delta_candidates']);
     }
 
+    public function test_source_locator_is_preserved_as_context_and_not_emitted_as_knowledge(): void
+    {
+        $value = (new StructuredSemanticInterpreter())->interpret([
+            'raw_text' => 'Source: https://example.com/research',
+        ])->toArray();
+
+        self::assertSame(['https://example.com/research'], $value['source_context']['source_locators']);
+        self::assertSame([], $value['claim_candidates']);
+        self::assertSame([], $value['knowledge_delta_candidates']);
+        self::assertNotContains('NEW_KNOWLEDGE_CANDIDATE', $value['outcomes']);
+    }
+
+    public function test_evidence_excerpt_is_preserved_as_provenance_context(): void
+    {
+        $value = (new StructuredSemanticInterpreter())->interpret([
+            'raw_text' => 'Evidence: “X được ghi nhận trong hồ sơ.”',
+        ])->toArray();
+
+        self::assertSame(['Evidence: “X được ghi nhận trong hồ sơ.”'], $value['source_context']['evidence_excerpts']);
+        self::assertSame([], $value['knowledge_delta_candidates']);
+    }
+
+    public function test_factual_grammar_fragments_are_not_dictionary_candidates(): void
+    {
+        $value = (new StructuredSemanticInterpreter())->interpret([
+            'raw_text' => 'X có A, dùng B, sản xuất năm C và thường gặp tại D.',
+            'owner_or_source_type' => 'KNOWLEDGE',
+        ])->toArray();
+
+        self::assertSame([], $value['dictionary_delta_candidates']);
+        self::assertNotEmpty($value['semantic_assertions']);
+    }
+
     public function test_multi_sentence_input_compiles_only_the_lexical_sentence(): void
     {
         $value = (new StructuredSemanticInterpreter())->interpret([

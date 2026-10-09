@@ -44,6 +44,7 @@ final class McpDocumentationRegistry
         'video-workflow' => ['path' => 'docs/mcp/MCP_V3_VIDEO_WORKFLOW.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'video'],
         'knowledge' => ['path' => 'docs/architecture/06_KNOWLEDGE_SOURCE_MODEL.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'knowledge'],
         'universal-structured-semantic-intake' => ['path' => 'docs/architecture/UNIVERSAL_STRUCTURED_SEMANTIC_INTAKE_CONTRACT.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'knowledge'],
+        'universal-outcome-completion' => ['path' => 'docs/architecture/NHK_V3_UNIVERSAL_OUTCOME_COMPLETION_CONTRACT.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'operator'],
         'dictionary-lexical-knowledge' => ['path' => 'docs/architecture/DICTIONARY_LEXICAL_KNOWLEDGE_CONTRACT.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'knowledge'],
         'dictionary-semantic-enrichment-projection' => ['path' => 'docs/architecture/DICTIONARY_SEMANTIC_ENRICHMENT_PROJECTION_CONTRACT.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'knowledge'],
         'dictionary-entry-sense-architecture' => ['path' => 'docs/architecture/DICTIONARY_ENTRY_SENSE_ARCHITECTURE.md', 'classification' => 'current_evidence', 'status' => 'ACTIVE', 'domain' => 'knowledge'],

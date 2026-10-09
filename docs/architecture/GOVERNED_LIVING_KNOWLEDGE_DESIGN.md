@@ -403,3 +403,12 @@ canonical Knowledge read-back. Idempotent replay reads the existing canonical
 Claim and does not reapply it. Living Knowledge and its projections never
 become a direct semantic writer, Article replacement or authorization for a
 staging/production mutation.
+
+### Integrity classification boundary — 2026-10-09
+
+The shared interpreter sends source locators, operational/editorial
+instructions and media metadata to transient context only. Unverified
+inference remains a derived review candidate. Only a raw explicit user
+assertion with a registered subject/scope/facet can proceed to the governed
+Knowledge proposal path; the public dossier still requires canonical
+Source/Evidence readiness and final read-back.
