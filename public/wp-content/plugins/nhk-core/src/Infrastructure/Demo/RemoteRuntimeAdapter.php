@@ -22,7 +22,7 @@ final class RemoteRuntimeAdapter
         private readonly string $pluginPath,
         private readonly Closure $executor,
         private readonly ?string $sshKey = null,
-        /** @var array{migration_runtime:string,authorized_database:string,environment:string}|null */
+        /** @var array{migration_runtime:string,authorized_database:string,environment:string,wp_home?:string,wp_siteurl?:string}|null */
         private readonly ?array $migrationConfig = null,
     ) {}
 
@@ -43,7 +43,13 @@ final class RemoteRuntimeAdapter
         $migrationConfig = is_string($migrationRuntime) && $migrationRuntime !== ''
             && is_string($authorizedDatabase) && $authorizedDatabase !== ''
             && is_string($environment) && $environment !== ''
-            ? ['migration_runtime' => $migrationRuntime, 'authorized_database' => $authorizedDatabase, 'environment' => $environment]
+            ? array_filter([
+                'migration_runtime' => $migrationRuntime,
+                'authorized_database' => $authorizedDatabase,
+                'environment' => $environment,
+                'wp_home' => is_string($values['wp_home'] ?? null) ? $values['wp_home'] : null,
+                'wp_siteurl' => is_string($values['wp_siteurl'] ?? null) ? $values['wp_siteurl'] : null,
+            ], static fn (mixed $value): bool => is_string($value) && $value !== '')
             : null;
         return new self(
             (string) $values['ssh_target'],
@@ -79,11 +85,13 @@ final class RemoteRuntimeAdapter
         $command = array_merge($command, [
             $this->target,
         ]);
-        if ($operation === 'migration-up') {
+        if (in_array($operation, ['health', 'migration-up'], true) && $this->migrationConfig !== null) {
             $command[] = 'env';
             $command[] = 'NHK_MIGRATION_RUNTIME=' . $this->migrationConfig['migration_runtime'];
             $command[] = 'NHK_AUTHORIZED_MIGRATION_DATABASE=' . $this->migrationConfig['authorized_database'];
             $command[] = 'WP_ENVIRONMENT_TYPE=' . $this->migrationConfig['environment'];
+            if (isset($this->migrationConfig['wp_home'])) $command[] = 'WP_HOME=' . $this->migrationConfig['wp_home'];
+            if (isset($this->migrationConfig['wp_siteurl'])) $command[] = 'WP_SITEURL=' . $this->migrationConfig['wp_siteurl'];
         }
         $command = array_merge($command, [
             'php', $this->pluginPath . '/bin/nhk-core-maintenance.php',
@@ -140,7 +148,7 @@ final class RemoteRuntimeAdapter
             }
             if (($payload['receipt']['status'] ?? null) !== 'backup_created') return StageResult::failed('STAGING_BACKUP_RECEIPT_INVALID');
         }
-        $metadata = in_array($operation, ['migration-up', 'v3-snapshot-pre-migration-export'], true) ? $payload : [];
+        $metadata = in_array($operation, ['health', 'migration-up', 'v3-snapshot-pre-migration-export'], true) ? $payload : [];
         return StageResult::pass(
             is_string($payload['identifier'] ?? null) ? $payload['identifier'] : 'remote-' . $operation,
             is_string($payload['fingerprint'] ?? null) ? $payload['fingerprint'] : null,

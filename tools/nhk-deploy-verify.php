@@ -7,6 +7,7 @@ use NHK\Core\Infrastructure\Demo\RemoteDeploymentAdapter;
 use NHK\Core\Infrastructure\Demo\RemoteRuntimeAdapter;
 use NHK\Core\Infrastructure\Demo\RemoteMcpDocumentationVerifier;
 use NHK\Core\Infrastructure\Demo\PluginHeaderVersionReader;
+use NHK\Core\Infrastructure\Demo\StagingReleasePolicy;
 
 $root = dirname(__DIR__);
 $target = null;
@@ -83,23 +84,55 @@ if (!$deployment->isPass()) finish(['status' => $deployment->status, 'reason_cod
 if ((string) $deployment->fingerprint === '') finish(['status' => 'failed', 'reason_code' => 'DEPLOYMENT_IDENTITY_UNAVAILABLE'], $json, 2);
 
 $runtime = RemoteRuntimeAdapter::fromEnvironment();
-$backup = $runtime->run($context, 'v3-snapshot-pre-migration-export');
-if (!$backup->isPass()) {
+$health = $runtime->run($context, 'health');
+if (!$health->isPass()) {
     finish([
-        'status' => $backup->status,
-        'reason_code' => $backup->reasonCode === 'REMOTE_RUNTIME_EXECUTION_FAILED' ? 'STAGING_BACKUP_GATE_FAILED' : $backup->reasonCode,
-        'backup' => $backup->metadata,
+        'status' => $health->status,
+        'reason_code' => $health->reasonCode,
+        'health' => $health->metadata,
     ], $json, 2);
 }
-
-$migration = $runtime->run($context, 'migration-up');
-if (!$migration->isPass()) {
+$runtimeIdentityReason = StagingReleasePolicy::validateRuntimeHealth($health->metadata);
+if ($runtimeIdentityReason !== null) {
     finish([
-        'status' => $migration->status,
-        'reason_code' => $migration->reasonCode === 'REMOTE_RUNTIME_EXECUTION_FAILED' ? 'MIGRATION_UP_FAILED' : $migration->reasonCode,
-        'backup' => $backup->metadata,
-        'migration' => $migration->metadata,
+        'status' => 'blocked',
+        'reason_code' => $runtimeIdentityReason,
+        'health' => $health->metadata,
     ], $json, 2);
+}
+try {
+    $migrationPlan = StagingReleasePolicy::migrationPlan($health->metadata);
+} catch (Throwable $error) {
+    finish([
+        'status' => 'blocked',
+        'reason_code' => $error->getMessage() !== '' ? $error->getMessage() : 'MIGRATION_STATE_UNSUPPORTED',
+        'health' => $health->metadata,
+    ], $json, 2);
+}
+$backup = ['status' => 'not_required', 'reason_code' => 'MIGRATION_ALREADY_CURRENT'];
+$migration = ['status' => 'not_required', 'reason_code' => 'MIGRATION_ALREADY_CURRENT'];
+if ($migrationPlan['backup_required']) {
+    $backupResult = $runtime->run($context, 'v3-snapshot-pre-migration-export');
+    if (!$backupResult->isPass()) {
+        finish([
+            'status' => $backupResult->status,
+            'reason_code' => $backupResult->reasonCode === 'REMOTE_RUNTIME_EXECUTION_FAILED' ? 'STAGING_BACKUP_GATE_FAILED' : $backupResult->reasonCode,
+            'backup' => $backupResult->metadata,
+        ], $json, 2);
+    }
+    $backup = $backupResult->metadata;
+}
+if ($migrationPlan['migration_required']) {
+    $migrationResult = $runtime->run($context, 'migration-up');
+    if (!$migrationResult->isPass()) {
+        finish([
+            'status' => $migrationResult->status,
+            'reason_code' => $migrationResult->reasonCode === 'REMOTE_RUNTIME_EXECUTION_FAILED' ? 'MIGRATION_UP_FAILED' : $migrationResult->reasonCode,
+            'backup' => $backup,
+            'migration' => $migrationResult->metadata,
+        ], $json, 2);
+    }
+    $migration = $migrationResult->metadata;
 }
 
 $authorizationHeader = null;
@@ -148,8 +181,8 @@ finish([
     'release_identity' => $localBootstrap['release_identity'],
     'documents' => count((array) ($localBootstrap['manifest']['files'] ?? [])),
     'deployment_identifier' => $deployment->identifier,
-    'backup' => $backup->metadata,
-    'migration' => $migration->metadata,
+    'backup' => $backup,
+    'migration' => $migration,
     'verification' => 'direct-mcp-bootstrap-and-list',
 ], $json, 0);
 

@@ -27,6 +27,10 @@ final class HealthCheck {
         return [
             'plugin_version' => defined('NHK_CORE_VERSION') ? NHK_CORE_VERSION : 'unknown', 'api_version' => defined('NHK_CORE_API_VERSION') ? NHK_CORE_API_VERSION : 'unknown',
             'database_reachable' => $database,
+            'environment' => defined('WP_ENVIRONMENT_TYPE') ? (string) WP_ENVIRONMENT_TYPE : (string) (getenv('WP_ENVIRONMENT_TYPE') ?: ''),
+            'database' => $database ? (string) $wpdb->get_var('SELECT DATABASE()') : '',
+            'site_url' => function_exists('home_url') ? (string) home_url('/') : '',
+            'siteurl' => function_exists('site_url') ? (string) site_url('/') : '',
             'migration_current' => $migration['current'], 'migration_target' => $migration['target'],
             'migration_required' => $migration['current'] < $migration['target'] || !$schemaReady,
             'migration_schema_ready' => $schemaReady,

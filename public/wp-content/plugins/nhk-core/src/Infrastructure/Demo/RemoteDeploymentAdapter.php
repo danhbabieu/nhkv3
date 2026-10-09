@@ -53,6 +53,10 @@ final class RemoteDeploymentAdapter
         if ($config['remote_path'] === '') {
             return StageResult::blocked('REMOTE_DEPLOYMENT_PATH_REQUIRED');
         }
+        $identityReason = StagingReleasePolicy::validateDeploymentConfig($config);
+        if ($identityReason !== null) {
+            return StageResult::blocked($identityReason);
+        }
         if ($config['ssh_key'] !== null && !is_readable($config['ssh_key'])) {
             return StageResult::blocked('REMOTE_DEPLOYMENT_CREDENTIAL_UNAVAILABLE');
         }
@@ -109,7 +113,7 @@ final class RemoteDeploymentAdapter
         return StageResult::pass('nhk-core:' . $fingerprint, $fingerprint);
     }
 
-    /** @return array{ssh_target:string,remote_path:string,ssh_key:?string}|null */
+    /** @return array{ssh_target:string,remote_path:string,ssh_key:?string,environment_type:?string,wp_home:?string,wp_siteurl:?string}|null */
     private function loadConfig(): ?array
     {
         if ($this->configPath === null || !is_readable($this->configPath)) {
@@ -125,7 +129,17 @@ final class RemoteDeploymentAdapter
             return null;
         }
         $key = $values['ssh_key'] ?? null;
-        return ['ssh_target' => $target, 'remote_path' => $remotePath, 'ssh_key' => is_string($key) && $key !== '' ? $key : null];
+        $environment = $values['environment_type'] ?? null;
+        $wpHome = $values['wp_home'] ?? null;
+        $wpSiteUrl = $values['wp_siteurl'] ?? null;
+        return [
+            'ssh_target' => $target,
+            'remote_path' => $remotePath,
+            'ssh_key' => is_string($key) && $key !== '' ? $key : null,
+            'environment_type' => is_string($environment) ? $environment : null,
+            'wp_home' => is_string($wpHome) ? $wpHome : null,
+            'wp_siteurl' => is_string($wpSiteUrl) ? $wpSiteUrl : null,
+        ];
     }
 
     private function artifactFingerprint(string $directory, string $muPluginSource, string $themeDirectory): ?string

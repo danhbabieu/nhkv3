@@ -66,3 +66,24 @@ WP_ENVIRONMENT_TYPE=staging
 WP_HOME=https://demo.1945.vn
 WP_SITEURL=https://demo.1945.vn
 ```
+
+The local release verifier also reads `NHK_DEMO_DEPLOY_CONFIG`, an external
+INI file used only for the allowlisted transport and runtime checks. It must
+contain the exact non-secret staging identity below; missing or mismatched
+values fail closed before transport. The verifier never writes WordPress
+`home` or `siteurl` options.
+
+```ini
+ssh_target=demo.1945.vn
+remote_path=/path/to/wordpress/public/wp-content/plugins/nhk-core
+migration_runtime=demo
+authorized_migration_database=erourxcg_nhkv3
+environment_type=staging
+wp_home=https://demo.1945.vn
+wp_siteurl=https://demo.1945.vn
+```
+
+Keep this INI file outside the repository. `wp_home` and `wp_siteurl` must
+also be exported to the server PHP runtime through the untracked WordPress
+bootstrap or PHP-FPM environment so `config/application.php` defines the
+same identity before WordPress starts.

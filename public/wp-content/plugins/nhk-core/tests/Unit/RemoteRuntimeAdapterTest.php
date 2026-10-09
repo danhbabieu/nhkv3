@@ -18,7 +18,7 @@ final class RemoteRuntimeAdapterTest extends TestCase
             '/home/erourxcg/apps/nhkv3/public/wp-content/plugins/nhk-core',
             static function (array $command) use (&$commands): array {
                 $commands[] = $command;
-                return [0, '{"status":"pass","database":"nhk_v3"}', ''];
+                return [0, '{"status":"pass","health":{"database":"erourxcg_nhkv3"}}', ''];
             },
         );
 
@@ -26,6 +26,7 @@ final class RemoteRuntimeAdapterTest extends TestCase
 
         self::assertSame('pass', $result->status);
         self::assertSame('remote-health', $result->identifier);
+        self::assertSame('erourxcg_nhkv3', $result->metadata['health']['database']);
         self::assertSame('ssh', $commands[0][0]);
         self::assertStringContainsString('nhk-core-maintenance.php', implode(' ', $commands[0]));
         self::assertStringContainsString('--operation=health', implode(' ', $commands[0]));

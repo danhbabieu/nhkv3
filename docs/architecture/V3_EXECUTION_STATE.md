@@ -1,5 +1,20 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-09 — Local staging identity and 26/26 release guard
+
+IMPLEMENTED_LOCAL: The deployment configuration now requires the exact
+staging identity `staging` / `erourxcg_nhkv3` / `https://demo.1945.vn` for
+WordPress home and site URL. The remote health receipt exposes only the
+read-only environment, database and URL identity fields needed by the local
+fail-closed release policy. The verifier now plans migration from that health
+receipt: `26/26` skips both the historical 25/26 pre-migration export and
+`migration-up`, while only the exact adjacent `25/26` state may run those
+steps.
+
+SCOPE: This checkpoint changes local source and release contracts only. It
+does not alter WordPress options, execute SSH, run Migration 026, perform
+Capture/Governance/publication, or claim public Video completion.
+
 # Checkpoint — 2026-10-09 — Approved Knowledge Repair release gate blocked
 
 AMENDMENT: The Constitutional Owner approval dated 2026-10-09 is recorded in

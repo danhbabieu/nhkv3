@@ -50,7 +50,7 @@ final class RemoteDeploymentAdapterTest extends TestCase
 
     public function test_transfer_is_deterministic_and_verified_without_semantic_transport(): void
     {
-        file_put_contents($this->configPath, "ssh_target=demo.1945.vn\nremote_path=/srv/wp-content/plugins/nhk-core\nssh_key=/dev/null\n");
+        file_put_contents($this->configPath, "ssh_target=demo.1945.vn\nremote_path=/srv/wp-content/plugins/nhk-core\nssh_key=/dev/null\nenvironment_type=staging\nwp_home=https://demo.1945.vn\nwp_siteurl=https://demo.1945.vn\n");
         $commands = [];
         $adapter = RemoteDeploymentAdapter::fromEnvironment(dirname(__DIR__, 6), static function (array $command) use (&$commands): array { $commands[] = $command; return [0, '', '']; });
 
@@ -92,7 +92,7 @@ final class RemoteDeploymentAdapterTest extends TestCase
 
     public function test_remote_failure_and_verification_failure_are_distinct(): void
     {
-        file_put_contents($this->configPath, "ssh_target=demo.1945.vn\nremote_path=/srv/nhk-core\nssh_key=/dev/null\n");
+        file_put_contents($this->configPath, "ssh_target=demo.1945.vn\nremote_path=/srv/nhk-core\nssh_key=/dev/null\nenvironment_type=staging\nwp_home=https://demo.1945.vn\nwp_siteurl=https://demo.1945.vn\n");
         $adapter = RemoteDeploymentAdapter::fromEnvironment(dirname(__DIR__, 6), static fn (array $command): array => [1, '', 'transport failed']);
         self::assertSame('REMOTE_DEPLOYMENT_FAILED', $adapter->deploy(new DemoCutoverContext('demo.1945.vn', 'odo', 'abc123', 'run-4'))->reasonCode);
 
@@ -103,10 +103,22 @@ final class RemoteDeploymentAdapterTest extends TestCase
 
     public function test_missing_ssh_key_and_agent_fails_closed(): void
     {
-        file_put_contents($this->configPath, "ssh_target=demo.1945.vn\nremote_path=/srv/nhk-core\n");
+        file_put_contents($this->configPath, "ssh_target=demo.1945.vn\nremote_path=/srv/nhk-core\nenvironment_type=staging\nwp_home=https://demo.1945.vn\nwp_siteurl=https://demo.1945.vn\n");
         putenv('SSH_AUTH_SOCK');
         $adapter = RemoteDeploymentAdapter::fromEnvironment(dirname(__DIR__, 6), static fn (): array => [0, '', '']);
 
         self::assertSame('REMOTE_DEPLOYMENT_CREDENTIAL_UNAVAILABLE', $adapter->deploy(new DemoCutoverContext('demo.1945.vn', 'odo', 'abc123', 'run-6'))->reasonCode);
+    }
+
+    public function test_mismatched_wordpress_identity_fails_before_transport(): void
+    {
+        file_put_contents($this->configPath, "ssh_target=demo.1945.vn\nremote_path=/srv/nhk-core\nssh_key=/dev/null\nenvironment_type=staging\nwp_home=http://localhost:8080\nwp_siteurl=http://localhost:8080\n");
+        $called = false;
+        $adapter = RemoteDeploymentAdapter::fromEnvironment(dirname(__DIR__, 6), static function () use (&$called): array { $called = true; return [0, '', '']; });
+
+        $result = $adapter->deploy(new DemoCutoverContext('demo.1945.vn', 'odo', 'abc123', 'run-7'));
+
+        self::assertSame('STAGING_DEPLOYMENT_IDENTITY_MISMATCH', $result->reasonCode);
+        self::assertFalse($called);
     }
 }
