@@ -6,6 +6,7 @@ namespace NHK\Tests\Unit;
 use NHK\Core\Application\Article\ArticleReviewFreshness;
 use NHK\Core\Application\Capture\{CaptureCurrentOutcomeReducer, CaptureDecisionDependencyFingerprint, CapturePhaseReceiptReducer};
 use NHK\Core\Domain\Capture\{CaptureRecord, CaptureStage};
+use NHK\Core\Domain\Governance\CommandCanonicalizer;
 use NHK\Core\Shared\Uuid\UuidCodec;
 use PHPUnit\Framework\TestCase;
 
@@ -121,7 +122,28 @@ final class CaptureCurrentOutcomeReducerTest extends TestCase
             ['completion' => ['status' => 'REVIEW_REQUIRED', 'blockers' => ['KNOWLEDGE_SEMANTIC_HANDOFF_REQUIRED']]],
             ['SEMANTICS_RECONCILED' => ['status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'failure_code' => 'KNOWLEDGE_SEMANTIC_HANDOFF_REQUIRED']],
         );
-        $legacyFingerprint = CaptureDecisionDependencyFingerprint::current($base);
+        $legacyFingerprint = hash('sha256', CommandCanonicalizer::canonicalize([
+            'version' => 'capture-decision-dependencies-3',
+            'policy_version' => CaptureDecisionDependencyFingerprint::POLICY_VERSION,
+            'request_fingerprint' => $base->requestFingerprint,
+            'subject' => [],
+            'dependencies' => [
+                'canonical_context' => [],
+                'evidence_context' => [],
+                'visual_context' => [],
+                'enrichment' => [],
+            ],
+            'input_context' => [
+                'raw_input' => $base->context['raw_input'],
+                'subject_hints' => [],
+                'content_intent' => $base->context['content_intent'],
+                'original_request' => [],
+                'subject_reconciliation' => [],
+                'decision_trace' => [],
+                'constraint_findings' => [],
+                'quality_decision' => '',
+            ],
+        ]));
         $legacy = new CaptureRecord(
             $base->captureId, $base->idempotencyKey, $base->requestFingerprint, $base->stage, $base->status,
             $base->articleId, $base->articleStateToken, $base->assets, $base->context,

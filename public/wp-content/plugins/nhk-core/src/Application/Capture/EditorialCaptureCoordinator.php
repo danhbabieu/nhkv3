@@ -1912,7 +1912,7 @@ final class EditorialCaptureCoordinator
         // be lost when a later phase still holds an older snapshot.
         $receipts = array_replace($receipts, $record->phaseReceipts);
         $nextContext = $context ?? $record->context;
-        if ($status === 'REVIEW_REQUIRED') {
+        if (in_array($status, ['REVIEW_REQUIRED', 'FAILED_RETRYABLE'], true)) {
             $diagnostics['decision_dependency_fingerprint'] = CaptureDecisionDependencyFingerprint::forState(
                 $record->requestFingerprint,
                 $nextContext,

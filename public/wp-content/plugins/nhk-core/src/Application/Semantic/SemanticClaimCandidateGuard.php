@@ -9,6 +9,8 @@ namespace NHK\Core\Application\Semantic;
  */
 final class SemanticClaimCandidateGuard
 {
+    public const POLICY_VERSION = 'semantic-admission-policy-1';
+
     /** @return array<string,mixed> */
     public function evaluate(array $candidate, array $interpretation): array
     {

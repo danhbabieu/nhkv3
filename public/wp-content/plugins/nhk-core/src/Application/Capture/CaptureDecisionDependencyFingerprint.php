@@ -5,11 +5,12 @@ namespace NHK\Core\Application\Capture;
 
 use NHK\Core\Domain\Capture\CaptureRecord;
 use NHK\Core\Domain\Governance\CommandCanonicalizer;
+use NHK\Core\Application\Semantic\SemanticClaimCandidateGuard;
 
 /** Stable dependency identity for deciding whether a review may be re-evaluated. */
 final class CaptureDecisionDependencyFingerprint
 {
-    public const VERSION = 'capture-decision-dependencies-3';
+    public const VERSION = 'capture-decision-dependencies-4';
     public const POLICY_VERSION = 'video-intake-policy-2';
 
     /** @param array<string,mixed> $context @param array<string,mixed> $diagnostics @param array<string,mixed> $input */
@@ -25,6 +26,7 @@ final class CaptureDecisionDependencyFingerprint
         return hash('sha256', CommandCanonicalizer::canonicalize([
             'version' => self::VERSION,
             'policy_version' => self::POLICY_VERSION,
+            'semantic_admission_policy_version' => SemanticClaimCandidateGuard::POLICY_VERSION,
             'request_fingerprint' => $requestFingerprint,
             'subject' => $packet,
             'dependencies' => $dependencies,
