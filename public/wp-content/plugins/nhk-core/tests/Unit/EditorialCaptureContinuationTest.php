@@ -1321,8 +1321,33 @@ final class EditorialCaptureContinuationTest extends TestCase
                 'raw_input' => 'Odo 36/8 trong video.',
                 'subject_hints' => ['Odo 36/8'],
                 'title' => 'Đồng hồ Odo 36/8 mặt số nổi, thùng kính chuông hiếm gặp',
+                'subject_resolution_packet' => [
+                    'status' => 'resolved',
+                    'canonical_subject_id' => $variant,
+                    'entity_type' => 'variant',
+                    'canonical_name' => 'Odo 36/8',
+                    'revision' => 1,
+                    'match_reason' => 'uuid_exact',
+                ],
+                'content_preparation' => [
+                    'status' => 'REVIEW_REQUIRED',
+                    'preparation_fingerprint' => hash('sha256', 'stale-subject-review'),
+                    'subject_resolution_packet' => null,
+                    'review_reasons' => ['PRIMARY_SUBJECT_NOT_RESOLVED'],
+                    'quality_decision' => 'READY',
+                ],
             ],
-            ['subjects' => ['status' => 'resolved', 'primary' => ['id' => $variant, 'type' => 'variant', 'name' => 'Odo 36/8'], 'resolved' => [['id' => $variant, 'type' => 'variant', 'name' => 'Odo 36/8']]], 'composition' => ['title' => 'Đồng hồ Odo 36/8 mặt số nổi, thùng kính chuông hiếm gặp']],
+            [
+                'subjects' => ['status' => 'resolved', 'primary' => ['id' => $variant, 'type' => 'variant', 'name' => 'Odo 36/8'], 'resolved' => [['id' => $variant, 'type' => 'variant', 'name' => 'Odo 36/8']]],
+                'content_preparation' => [
+                    'status' => 'REVIEW_REQUIRED',
+                    'preparation_fingerprint' => hash('sha256', 'stale-subject-review'),
+                    'subject_resolution_packet' => null,
+                    'review_reasons' => ['PRIMARY_SUBJECT_NOT_RESOLVED'],
+                    'quality_decision' => 'READY',
+                ],
+                'composition' => ['title' => 'Đồng hồ Odo 36/8 mặt số nổi, thùng kính chuông hiếm gặp'],
+            ],
             [],
         );
         $captures->create($capture);
@@ -1342,6 +1367,7 @@ final class EditorialCaptureContinuationTest extends TestCase
             static fn (array $context): array => ['status' => 'RECONCILED'],
             static fn (array $context): array => ['eligible' => false, 'blockers' => ['OWNER_PUBLICATION_REQUIRED']],
             static fn (array $context): array => ['status' => 'verified'],
+            contentPreparation: new ContentPreparationOrchestrator(new SubjectResolutionService(static fn (): array => [])),
         );
         $service = new EditorialCaptureContinuationService($captures, $addenda, $coordinator);
 
@@ -1357,6 +1383,15 @@ final class EditorialCaptureContinuationTest extends TestCase
         self::assertIsArray($seenResolution);
         self::assertSame($variant, $seenResolution['primary']['id']);
         self::assertSame('variant', $seenResolution['primary']['type']);
+        self::assertSame('PREPARED', $result['capture']['diagnostics']['content_preparation']['status']);
+        self::assertSame('PREPARED', $result['capture']['context']['content_preparation']['status']);
+        self::assertNotContains('PRIMARY_SUBJECT_NOT_RESOLVED', $result['capture']['diagnostics']['content_preparation']['review_reasons'] ?? []);
+        self::assertContains('PRIMARY_SUBJECT_NOT_RESOLVED', array_column($result['capture']['diagnostics']['failure_history'] ?? [], 'code'));
+        self::assertSame($capture->idempotencyKey, $result['capture']['idempotency_key']);
+        self::assertSame(
+            $capture->assets[0]['video_proposal']['payload']['metadata']['source']['external_video_id'],
+            $result['capture']['assets'][0]['video_proposal']['payload']['metadata']['source']['external_video_id'],
+        );
     }
 
     public function test_ambiguous_video_retry_accepts_only_confirmed_candidate_on_same_capture_and_preserves_video_payload(): void

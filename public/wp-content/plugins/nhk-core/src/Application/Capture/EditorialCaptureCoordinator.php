@@ -543,10 +543,68 @@ final class EditorialCaptureCoordinator
             if ($videoOnlyResume && is_array($record->context['content_preparation'] ?? null)) {
                 // Content preparation is not in the Video-only dependency
                 // closure. Its verified result remains bound to the original
-                // request/interpretation fingerprints and is reused as-is.
+                // request/interpretation fingerprints and is reused as-is,
+                // except for the narrowly scoped stale subject-review repair
+                // below.
                 $preparationResult = ContentPreparationResult::fromArray($record->context['content_preparation']);
-                $minimumOwnerAdmitted = true;
-                $preparationCanContinue = true;
+                $staleSubjectReview = $preparationResult !== null
+                    && $persistedPacket?->status === 'resolved'
+                    && in_array('PRIMARY_SUBJECT_NOT_RESOLVED', $preparationResult->reviewReasons, true);
+                if ($staleSubjectReview && $this->contentPreparation === null) return $record;
+                if ($staleSubjectReview && $this->contentPreparation !== null) {
+                    // A canonical subject read-back supersedes only the old
+                    // subject-review decision. Re-evaluate through the same
+                    // preparation owner boundary so other review/blocker
+                    // findings remain authoritative.
+                    $preparationContext = [
+                        'content_intent' => $intent,
+                        'capture_id' => $record->captureId,
+                        'persisted_subject_resolution_packet' => $persistedPacket->toArray(),
+                        'server_dependency_requirements' => is_array($record->context['server_dependency_requirements'] ?? null)
+                            ? $record->context['server_dependency_requirements']
+                            : [],
+                    ];
+                    $reevaluated = $this->contentPreparation->prepare($input, $interpretation, $assets, $preparationContext);
+                    $preparationArray = $this->withoutBody($reevaluated->toArray());
+                    $diagnostics['content_preparation'] = $preparationArray;
+                    $history = is_array($diagnostics['failure_history'] ?? null) ? $diagnostics['failure_history'] : [];
+                    foreach (array_diff($preparationResult->reviewReasons, $reevaluated->reviewReasons) as $reason) {
+                        $alreadyRecorded = false;
+                        foreach ($history as $item) {
+                            if (is_array($item) && ($item['code'] ?? '') === $reason && ($item['resolution'] ?? '') === 'SUPERSEDED_BY_CANONICAL_SUBJECT_READBACK') {
+                                $alreadyRecorded = true;
+                                break;
+                            }
+                        }
+                        if (!$alreadyRecorded) $history[] = ['code' => $reason, 'resolved_at' => gmdate('c'), 'resolution' => 'SUPERSEDED_BY_CANONICAL_SUBJECT_READBACK'];
+                    }
+                    if ($history !== []) $diagnostics['failure_history'] = $history;
+                    $preparationContext['content_preparation'] = $preparationArray;
+                    $preparationContext['preparation_fingerprint'] = $reevaluated->preparationFingerprint;
+                    $record = $this->save(
+                        $record,
+                        $record->stage,
+                        $assets,
+                        $diagnostics,
+                        $receipts,
+                        'CONTENT_PREPARATION',
+                        $record->articleId,
+                        $record->articleStateToken,
+                        $reevaluated->status === 'PREPARED' ? 'IN_PROGRESS' : $reevaluated->status,
+                        null,
+                        array_replace($record->context, $preparationContext),
+                    );
+                    $assets = $record->assets;
+                    $diagnostics = $record->diagnostics;
+                    $receipts = $record->phaseReceipts;
+                    $preparationResult = $reevaluated;
+                    $minimumOwnerAdmitted = (new PreparationPhaseAdmissionPolicy())->mayAdmitMinimumOwner($intent, $preparationResult);
+                    if (!$minimumOwnerAdmitted) return $record;
+                    $preparationCanContinue = $preparationResult->status === 'PREPARED' || $preparationResult->subjectResolutionPacket?->status === 'resolved';
+                } else {
+                    $minimumOwnerAdmitted = true;
+                    $preparationCanContinue = true;
+                }
             } elseif ($this->contentPreparation !== null) {
                 $storedPreparation = is_array($record->context['content_preparation'] ?? null) ? $record->context['content_preparation'] : [];
                 $storedResult = ContentPreparationResult::fromArray($storedPreparation);
@@ -568,7 +626,7 @@ final class EditorialCaptureCoordinator
                 $diagnostics['content_preparation'] = $this->withoutBody($preparationArray);
                 $preparationContext['content_preparation'] = $this->withoutBody($preparationArray);
                 $preparationContext['preparation_fingerprint'] = $preparationResult->preparationFingerprint;
-                $record = $this->save($record, CaptureStage::INTERPRETED, $assets, $diagnostics, $receipts, 'CONTENT_PREPARATION', $record->articleId, $record->articleStateToken, $preparationResult->status === 'PREPARED' ? 'IN_PROGRESS' : $preparationResult->status, null, $record->context + $preparationContext);
+                $record = $this->save($record, CaptureStage::INTERPRETED, $assets, $diagnostics, $receipts, 'CONTENT_PREPARATION', $record->articleId, $record->articleStateToken, $preparationResult->status === 'PREPARED' ? 'IN_PROGRESS' : $preparationResult->status, null, array_replace($record->context, $preparationContext));
                 $receipts = $record->phaseReceipts;
                 $minimumOwnerAdmitted = (new PreparationPhaseAdmissionPolicy())->mayAdmitMinimumOwner($intent, $preparationResult);
                 if (!$minimumOwnerAdmitted) return $record;
@@ -758,7 +816,7 @@ final class EditorialCaptureCoordinator
             $diagnostics['subject_resolution_packet'] = $subjectPacket->toArray();
             if (!$videoOnlyResume) {
                 $this->beginPhase('SUBJECTS_RESOLVED');
-                $record = $this->save($record, CaptureStage::SUBJECTS_RESOLVED, $assets, $diagnostics, $receipts, 'SUBJECTS_RESOLVED', $record->articleId, $record->articleStateToken, 'IN_PROGRESS', null, $record->context + ['subject_resolution_packet' => $subjectPacket->toArray()]);
+                $record = $this->save($record, CaptureStage::SUBJECTS_RESOLVED, $assets, $diagnostics, $receipts, 'SUBJECTS_RESOLVED', $record->articleId, $record->articleStateToken, 'IN_PROGRESS', null, array_replace($record->context, ['subject_resolution_packet' => $subjectPacket->toArray()]));
             }
 
             $hasVideoAsset = $this->hasVideoAsset($assets);
@@ -803,7 +861,7 @@ final class EditorialCaptureCoordinator
                     $assets[$assetIndex]['video_proposal'] = $proposal;
                 }
                 $diagnostics['video_enrichment'] = $this->withoutBody($videoManifest);
-                $record = $this->save($record, CaptureStage::SUBJECTS_RESOLVED, $assets, $diagnostics, $receipts, 'VIDEO_ENRICHED', $record->articleId, $record->articleStateToken, 'IN_PROGRESS', null, $record->context + ['subject_resolution_packet' => $subjectPacket->toArray()]);
+                $record = $this->save($record, CaptureStage::SUBJECTS_RESOLVED, $assets, $diagnostics, $receipts, 'VIDEO_ENRICHED', $record->articleId, $record->articleStateToken, 'IN_PROGRESS', null, array_replace($record->context, ['subject_resolution_packet' => $subjectPacket->toArray()]));
                 $assets = $record->assets;
                 $diagnostics = $record->diagnostics;
                 $receipts = $record->phaseReceipts;
@@ -913,7 +971,7 @@ final class EditorialCaptureCoordinator
                 $record->articleStateToken,
                 $record->status,
                 null,
-                $record->context + ['enrichment_planning_envelope' => $planningEnvelopeArray],
+                array_replace($record->context, ['enrichment_planning_envelope' => $planningEnvelopeArray]),
             );
             $assets = $record->assets;
             $diagnostics = $record->diagnostics;

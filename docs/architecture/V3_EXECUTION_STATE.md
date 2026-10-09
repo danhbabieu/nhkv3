@@ -1,5 +1,38 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-09 — Capture subject review re-evaluation repair
+
+ROOT_CAUSE_LOCAL: Video-only Capture continuation reused the persisted
+`content_preparation` result without re-evaluating a stale
+`PRIMARY_SUBJECT_NOT_RESOLVED` review against the already persisted canonical
+resolved subject packet. The same coordinator boundary also used PHP array
+union when persisting refreshed preparation/enrichment/subject snapshots, so
+an older context key could win over the newer server-owned result.
+
+IMPLEMENTED_LOCAL: The Video-only retry path now re-enters the existing
+ContentPreparation owner only for that specific stale subject-review shape
+and only when a validated resolved packet is already present. Other findings
+remain authoritative. Superseded review evidence is appended to
+`failure_history`; current diagnostics/context are replaced with the fresh
+preparation result. Relevant Capture subject, Video enrichment and planning
+envelope writes now replace prior context snapshots rather than silently
+retaining stale keys. Capture UUID, request/idempotency identity and Video
+external identity remain unchanged; no direct writer, SQL write or Governance
+bypass was added.
+
+VERIFIED_LOCAL: Focused Capture/subject/retry/planning suite passes 138 tests /
+572 assertions, with only existing PHPUnit deprecations. The new stale-review
+regression passes 11 assertions, including current-reason removal,
+failure-history retention, context/diagnostics convergence and identity
+preservation. PHP lint and `git diff --check` pass. Guarded integration tests
+remain environment-gated because this checkout has no local WordPress runtime
+(`NHK_WP_TEST_PATH=public` is unavailable); no integration/runtime mutation,
+deployment or staging read-back was attempted.
+
+STATUS: `LOCAL_ROOT_CAUSE_CONFIRMED / LOCAL_REPAIR_VERIFIED /
+INTEGRATION_RUNTIME_UNAVAILABLE / DEPLOYMENT_PENDING /
+NO_STAGING_MUTATION / PUBLIC_COMPLETE_FALSE`
+
 # Checkpoint — 2026-10-09 — Local staging identity and 26/26 release guard
 
 IMPLEMENTED_LOCAL: The deployment configuration now requires the exact
