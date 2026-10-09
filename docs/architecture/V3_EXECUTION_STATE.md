@@ -26109,3 +26109,37 @@ completion was performed.
 STATUS: `QUALITY_AUDIT_CLASSIFICATION_FIXED / FOCUSED_VERIFIED /
 RUNTIME_DEPLOYMENT_PENDING / SIGNED_MUTATION_PACKET_PENDING /
 NO_SEMANTIC_MUTATION`
+
+# Checkpoint — 2026-10-09 — Westminster end-to-end Gate A-G ledger
+
+VERIFIED: Westminster Gate A documentation bootstrap, authorized staging
+identity, deployment and canonical Music read-back passed on deployed source
+revision `165ff45c09db33bccad834a4e5137424517f5357`. The deployed build
+identity is `6824a7a746b1ad7410e1596ff69d0d1d1b6b14e3d54089630323694f60fcbd8a`;
+schema migration is ready at version 25.
+
+IMPLEMENTED: Shared semantic classification now handles labeled source
+locators and contextual operational instructions. Public Knowledge projection
+filters source/process contamination. Regression coverage passed 39 tests /
+157 assertions and 81 tests / 1,112 assertions; PHP lint, diff check and the
+scoped secret-marker scan passed. The two implementation commits are
+`55150a966b07635440b98ed2004cbef50f85434e` and
+`165ff45c09db33bccad834a4e5137424517f5357`.
+
+VERIFIED: Read-only live discovery found 11 historical applied proposals, six
+affected Knowledge records and 27 active Westminster Graph edges with no
+dangling endpoints, invalid endpoints or duplicates. The public route returned
+HTTP 200, retained Vietnamese Westminster content, and exposed none of the
+tested internal contamination markers.
+
+BOUNDARY: No semantic mutation, Capture retry, Governance apply, direct
+database write or generic WordPress write was performed. History is locked at
+revision 52 with `CAPTURE_RETRY_NOT_ALLOWED`; Score is revision 14 and remains
+blocked by required owner read-back. The only historical signed packet found
+was bound to History revision 50 and expired; no current server-issued
+Capture-bound packet was available. Score/audio public obligations remain
+unavailable (`audio_elements=0`, `score_section=false`).
+
+STATUS: `GATE_A_B_C_VERIFIED / GATE_D_AUTHORIZATION_BLOCKED /
+GATE_E_NOT_RUN_FAIL_CLOSED / GATE_F_PARTIAL / EXTERNAL_GATE /
+PUBLIC_COMPLETE_FALSE / NO_SEMANTIC_MUTATION`

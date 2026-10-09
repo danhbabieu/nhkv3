@@ -1,0 +1,149 @@
+{
+  "ledger_version": "1.0.0",
+  "runbook": {
+    "path": "/Users/imac24-2125d/Downloads/NHK_V3_Westminster_End_to_End_Master_Runbook_2026-10-09.md",
+    "sha256": "ead463e34e0b39a056dc83d1dea0d0e8cd789d525b9ae3959db065767e793e6f",
+    "execution_date": "2026-10-09"
+  },
+  "subject": {
+    "entity_uuid": "1ffade21-4cb8-44b5-ac1f-16de4ee533f6",
+    "entity_type": "music",
+    "stable_key": "nhk:music:westminster",
+    "public_route": "https://demo.1945.vn/ban-nhac/westminster/"
+  },
+  "final_status": "EXTERNAL_GATE",
+  "public_complete": false,
+  "public_complete_reason": "Required governed semantic repairs and score/audio acceptance cannot proceed without a fresh server-issued signed Capture-bound packet for the current Capture revisions and owner/dependency closure.",
+  "runtime": {
+    "environment": "staging",
+    "database": "erourxcg_nhkv3",
+    "site_url": "https://demo.1945.vn",
+    "project_identity": "nhk-v3",
+    "source_revision": "165ff45c09db33bccad834a4e5137424517f5357",
+    "build_identity": "6824a7a746b1ad7410e1596ff69d0d1d1b6b14e3d54089630323694f60fcbd8a",
+    "documentation_version": "3836eb657d009f28df9b4779c73603c69a8bc26e94f1f820b359a336023d22c3",
+    "manifest_hash": "eca6e9ace8d6b01244383a617a33e67918f60b001b9437ce57fd75a15d697d02",
+    "release_identity": "26e22fd365c5bbe22cadd9f2f7ea29bc1c6d6406b1bd6e2b8ee78b284d9e22b0",
+    "deployment_fingerprint": "fcf5ec915cec52f5f90451b3af614c901132acc9921670674d92edba55e1f976",
+    "migration": {
+      "status": "PASS",
+      "schema_ready": true,
+      "target_version": 25,
+      "run_id": "westminster-cbf3e01d2aa7"
+    }
+  },
+  "gates": {
+    "A": {
+      "status": "PASS",
+      "evidence": [
+        "Active Constitution and required architecture contracts were read in order.",
+        "Live documentation bootstrap and authorized staging runtime identity matched the deployed build.",
+        "Canonical Music read-back matched UUID, type, stable key and name Westminster."
+      ]
+    },
+    "B": {
+      "status": "PASS",
+      "evidence": [
+        "Shared semantic interpreter fixed and regression-tested for source locators and contextual workflow prose.",
+        "Public projection guard excludes source locators, operational instructions and process-contamination claims.",
+        "Focused regression suites passed 39 tests / 157 assertions and 81 tests / 1,112 assertions; PHP lint and diff check passed."
+      ]
+    },
+    "C": {
+      "status": "PASS",
+      "evidence": [
+        "Read-only proposal discovery found 11 historical applied proposals: 6 Knowledge and 5 relation.",
+        "Graph inventory read-back found 27 active Westminster edges with zero dangling endpoints, invalid endpoints or duplicates.",
+        "Quality audit read-back found six affected Knowledge records and classified five as workflow/source contamination; no mutation occurred."
+      ]
+    },
+    "D": {
+      "status": "AUTHORIZATION_BLOCKED",
+      "evidence": [
+        "No current server-issued signed Capture-bound packet was returned for the required repair scope.",
+        "The historical packet was bound to Capture revision 50, while History is now revision 52; its expiry was 2026-10-09T03:45:49Z and it is stale/expired.",
+        "No packet, HMAC, idempotency key or owner/dependency closure was fabricated or reused."
+      ]
+    },
+    "E": {
+      "status": "NOT_RUN_FAIL_CLOSED",
+      "evidence": [
+        "No Governance apply, Capture retry, Knowledge repair or relation retirement was attempted because Gate D did not authorize mutation.",
+        "History retry is locked with CAPTURE_RETRY_NOT_ALLOWED; Score is stale-review-reevaluatable but remains blocked by required owner read-back and missing current authorization."
+      ]
+    },
+    "F": {
+      "status": "PARTIAL",
+      "evidence": [
+        "Public route returned HTTP 200 with title Westminster and Vietnamese content.",
+        "Internal markers KNOWLEDGE_DELTA, PROCESS_CONTAMINATION, INTERNAL_WORKFLOW_KNOWLEDGE and fixture were absent from the route.",
+        "Score and audio obligations were not available in the public read-back: audio_elements=0 and score_section=0."
+      ]
+    },
+    "G": {
+      "status": "EXTERNAL_GATE",
+      "evidence": [
+        "Deployment and non-mutating canonical/frontend read-backs passed, but required semantic completion and score/audio acceptance are outstanding.",
+        "PUBLIC_COMPLETE is intentionally not asserted."
+      ]
+    }
+  },
+  "captures": [
+    {
+      "capture_id": "01a11bc5-125f-78de-98ac-b4535dfc2886",
+      "kind": "history",
+      "revision": 52,
+      "status": "FAILED_RETRYABLE",
+      "lifecycle": "RECOVERABLE_INTERRUPTED",
+      "retry_eligible": false,
+      "retry_reason": "CAPTURE_RETRY_NOT_ALLOWED",
+      "blockers": ["KNOWLEDGE_SEMANTIC_HANDOFF_REQUIRED", "REQUIRED_OWNER_READBACK_UNVERIFIED"]
+    },
+    {
+      "capture_id": "01a11d5a-27de-76bf-80bd-84a20b089baf",
+      "kind": "score",
+      "revision": 14,
+      "status": "REVIEW_REQUIRED",
+      "lifecycle": "RECOVERABLE_INTERRUPTED",
+      "retry_eligible": true,
+      "retry_reason": "STALE_REVIEW_REEVALUATABLE",
+      "blockers": ["KNOWLEDGE_SEMANTIC_HANDOFF_REQUIRED", "REQUIRED_OWNER_READBACK_UNVERIFIED"]
+    }
+  ],
+  "knowledge_quality": {
+    "affected_count": 6,
+    "affected_ids": [
+      {"id": "01a11eb6-ab00-7b94-8c2b-b43b8507760b", "classification": ["INTERNAL_WORKFLOW_KNOWLEDGE", "EVIDENCE_GAP", "DICTIONARY_CANDIDATE"], "required_action": "GOVERNANCE_RETIRE_REVIEW"},
+      {"id": "01a11eb6-aed3-73ab-a6f5-e4ff27e962cf", "classification": ["INTERNAL_WORKFLOW_KNOWLEDGE", "ATOMIZATION_NEEDED", "EVIDENCE_GAP", "DICTIONARY_CANDIDATE"], "required_action": "GOVERNANCE_RETIRE_AND_ATOMIZE_REVIEW"},
+      {"id": "01a11eb6-b1c1-76c0-a2a4-c93040224581", "classification": ["PROCESS_CONTAMINATION", "EVIDENCE_GAP", "DICTIONARY_CANDIDATE"], "required_action": "GOVERNANCE_RETIRE_REVIEW"},
+      {"id": "01a11eb6-baa4-7ec8-a1bb-26023a5f3fe1", "classification": ["PROCESS_CONTAMINATION", "EVIDENCE_GAP", "DICTIONARY_CANDIDATE"], "required_action": "GOVERNANCE_RETIRE_REVIEW"},
+      {"id": "01a11eb6-bbdb-7b87-87fc-ce1dc4705006", "classification": ["PROCESS_CONTAMINATION", "EVIDENCE_GAP", "DICTIONARY_CANDIDATE"], "required_action": "GOVERNANCE_RETIRE_REVIEW"},
+      {"id": "01a11eb6-b2e1-78fe-9234-74a9161f8d7d", "classification": ["EVIDENCE_GAP", "DICTIONARY_CANDIDATE"], "required_action": "QUALIFY_WITH_EVIDENCE_REVIEW"}
+    ],
+    "mutated": false,
+    "read_only": true
+  },
+  "mutation_evidence": {
+    "attempted": false,
+    "mutated": false,
+    "direct_database_write": false,
+    "generic_wordpress_write": false,
+    "governance_bypass": false,
+    "fabricated_or_reused_packet": false
+  },
+  "frontend_readback": {
+    "http_status": 200,
+    "route_title_matches": true,
+    "vietnamese_content_present": true,
+    "internal_marker_counts": {
+      "KNOWLEDGE_DELTA": 0,
+      "PROCESS_CONTAMINATION": 0,
+      "INTERNAL_WORKFLOW_KNOWLEDGE": 0,
+      "fixture": 0
+    },
+    "audio_elements": 0,
+    "score_section_present": false,
+    "research_section_present": true
+  },
+  "next_single_action": "Obtain a fresh server-issued signed Capture-bound packet for the current exact Capture/request, revisions, fingerprints, selected owners, dependency closure, registered operation family, capability, expiry and idempotency; then execute only the governed repair/read-back workflow, qualify the sixth Knowledge record with evidence, and complete score/audio rights and canonical/frontend read-back before reassessing PUBLIC_COMPLETE."
+}
