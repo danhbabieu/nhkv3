@@ -10,9 +10,9 @@ status vocabulary and canonical owners. It adds no schema, field, endpoint,
 predicate, semantic owner, writer, seed, backfill or mutation path.
 
 DOCUMENTATION_RUNTIME: Registered seven read-only operating documents in
-`McpDocumentationRegistry` and regenerated the immutable local snapshot with
-`source_revision=5eaf21c5a2f4ce63a54fecb7ab07dcc49a5663cd`; the generator
-emitted the current manifest hash and all 64 canonical files.
+`McpDocumentationRegistry` and regenerated the immutable local snapshot after
+the checkpoint commit; the generator emitted the current source revision and
+all 64 canonical files.
 
 VERIFIED: The combined Music/Dictionary/Score-Audio/structured-intake/public
 projection/documentation-registry selection passed 78 tests / 2,505

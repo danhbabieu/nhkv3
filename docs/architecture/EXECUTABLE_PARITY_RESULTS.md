@@ -24,8 +24,8 @@ Verified locally on 2026-10-09:
   projection/documentation-registry selection: 78 tests / 2,505 assertions,
   pass; 3 PHPUnit deprecations and 1 PHPUnit deprecation.
 - `composer generate:mcp-docs`: 64 canonical documentation files generated;
-  `source_revision=5eaf21c5a2f4ce63a54fecb7ab07dcc49a5663cd`; the emitted
-  manifest hash is recorded by the generated snapshot.
+  the generated snapshot records the current source revision and emitted
+  manifest hash.
 
 The closeout check set is:
 
