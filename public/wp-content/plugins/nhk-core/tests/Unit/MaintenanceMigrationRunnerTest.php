@@ -48,4 +48,14 @@ final class MaintenanceMigrationRunnerTest extends TestCase
         self::assertStringContainsString("'dictionary_entry_sense_schema_ready' => \$schemaReady", $entrypoint);
         self::assertStringContainsString("'specimen_product_relation_schema_ready' => \$specimenProductRelationSchemaReady", $entrypoint);
     }
+
+    public function test_pre_migration_snapshot_is_a_separate_allowlisted_operation_and_uses_the_registered_target(): void
+    {
+        $entrypoint = (string) file_get_contents(dirname(__DIR__, 2) . '/bin/nhk-core-maintenance.php');
+
+        self::assertStringContainsString("'v3-snapshot-pre-migration-export'", $entrypoint);
+        self::assertStringContainsString('exportPreMigration($source, SpecimenProductRelationMigration026::VERSION)', $entrypoint);
+        self::assertStringContainsString("'status' => 'backup_created'", $entrypoint);
+        self::assertStringContainsString("'manifest_hash' => \$snapshot->manifest['manifest_hash']", $entrypoint);
+    }
 }

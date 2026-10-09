@@ -43,13 +43,13 @@ foreach (array_slice($argv, 1) as $argument) {
     if ($argument === '--apply') { $apply = true; continue; }
     fwrite(STDERR, "UNKNOWN_ARGUMENT\n"); exit(64);
 }
-$allowed = ['health', 'inventory', 'canonical-inventory', 'graph-inventory', 'relation-dry-run', 'clock-type-audit', 'migration-up', 'dry-run', 'backup/snapshot', 'v3-snapshot-export', 'v3-snapshot-import', 'governance-plan', 'controlled-apply', 'read-back', 'collector-facet-maintenance'];
+$allowed = ['health', 'inventory', 'canonical-inventory', 'graph-inventory', 'relation-dry-run', 'clock-type-audit', 'migration-up', 'dry-run', 'backup/snapshot', 'v3-snapshot-export', 'v3-snapshot-pre-migration-export', 'v3-snapshot-import', 'governance-plan', 'controlled-apply', 'read-back', 'collector-facet-maintenance'];
 if (!is_string($operation) || !in_array($operation, $allowed, true)) {
     $payload = ['status' => 'blocked', 'reason_code' => 'REMOTE_OPERATION_NOT_ALLOWLISTED'];
     echo json_encode($payload, JSON_UNESCAPED_SLASHES) . PHP_EOL;
     exit(2);
 }
-if (!in_array($operation, ['collector-facet-maintenance', 'v3-snapshot-export', 'v3-snapshot-import'], true) && ($pack === '' || $runId === '' || $sourceRevision === '')) {
+if (!in_array($operation, ['collector-facet-maintenance', 'v3-snapshot-export', 'v3-snapshot-pre-migration-export', 'v3-snapshot-import'], true) && ($pack === '' || $runId === '' || $sourceRevision === '')) {
     $payload = ['status' => 'blocked', 'reason_code' => 'MAINTENANCE_CONTEXT_REQUIRED'];
     echo json_encode($payload, JSON_UNESCAPED_SLASHES) . PHP_EOL;
     exit(2);
@@ -96,16 +96,32 @@ try {
             $payload = $service->plan($classification);
             $payload['dry_run'] = true;
         }
-    } elseif ($operation === 'v3-snapshot-export') {
+    } elseif (in_array($operation, ['v3-snapshot-export', 'v3-snapshot-pre-migration-export'], true)) {
         if ($output === '') throw new \RuntimeException('SNAPSHOT_OUTPUT_PATH_REQUIRED');
         do_action('rest_api_init');
         $source = apply_filters('nhk_v3_snapshot_source', null);
         if (!$source instanceof CanonicalSnapshotSource) throw new \RuntimeException('SNAPSHOT_SOURCE_ADAPTER_UNAVAILABLE');
-        $snapshot = (new CanonicalSnapshotExportService())->export($source);
+        $exporter = new CanonicalSnapshotExportService();
+        $snapshot = $operation === 'v3-snapshot-pre-migration-export'
+            ? $exporter->exportPreMigration($source, SpecimenProductRelationMigration026::VERSION)
+            : $exporter->export($source);
+        $artifactSha256 = SnapshotArtifactCodec::write($output, $snapshot);
         $payload = [
-            'status' => 'pass', 'identifier' => 'v3-snapshot-export',
+            'status' => 'pass', 'identifier' => $operation,
             'manifest' => $snapshot->manifest, 'snapshot_path' => $output,
-            'snapshot_sha256' => SnapshotArtifactCodec::write($output, $snapshot),
+            'snapshot_sha256' => $artifactSha256,
+            'receipt' => [
+                'status' => 'backup_created',
+                'operation' => $operation,
+                'source_environment' => $snapshot->manifest['source_environment'],
+                'source_site' => $snapshot->manifest['source_site'],
+                'source_database_identity' => $snapshot->manifest['source_database_identity'],
+                'build_identity' => $snapshot->manifest['build_identity'],
+                'documentation_version' => $snapshot->manifest['documentation_version'],
+                'migration_level' => $snapshot->manifest['migration_level'],
+                'manifest_hash' => $snapshot->manifest['manifest_hash'],
+                'snapshot_sha256' => $artifactSha256,
+            ],
         ];
     } elseif ($operation === 'v3-snapshot-import') {
         if ($input === '') throw new \RuntimeException('SNAPSHOT_INPUT_PATH_REQUIRED');
@@ -203,7 +219,7 @@ try {
         $payload = ['status' => 'blocked', 'reason_code' => 'CUTOVER_APPLICATION_WIRING_REQUIRED', 'operation' => $operation];
     }
 } catch (Throwable $error) {
-    $reason = in_array($operation, ['migration-up', 'v3-snapshot-export', 'v3-snapshot-import'], true)
+    $reason = in_array($operation, ['migration-up', 'v3-snapshot-export', 'v3-snapshot-pre-migration-export', 'v3-snapshot-import'], true)
         ? (string) $error->getMessage()
         : 'REMOTE_RUNTIME_BOOTSTRAP_FAILED';
     $payload = ['status' => 'failed', 'reason_code' => $reason !== '' ? $reason : 'REMOTE_RUNTIME_BOOTSTRAP_FAILED'];

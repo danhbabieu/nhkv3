@@ -9,6 +9,16 @@ final class SnapshotIntegrityVerifier
     public static function assertValid(CanonicalSnapshot $snapshot): array
     {
         $manifest = $snapshot->manifest;
+        $exportMode = (string) ($manifest['export_mode'] ?? 'current');
+        if (!in_array($exportMode, ['current', 'pre_migration'], true)) throw new \RuntimeException('SNAPSHOT_EXPORT_MODE_INVALID');
+        if ($exportMode === 'pre_migration') {
+            $migration = $manifest['migration_level'] ?? [];
+            $current = (int) ($migration['current'] ?? -1);
+            $target = (int) ($migration['target'] ?? -2);
+            if ((int) ($manifest['pre_migration_target'] ?? -1) !== $target || $current !== ($target - 1)) {
+                throw new \RuntimeException('SNAPSHOT_PRE_MIGRATION_METADATA_INVALID');
+            }
+        }
         $hashInput = $manifest;
         $actualManifestHash = (string) ($hashInput['manifest_hash'] ?? '');
         unset($hashInput['manifest_hash'], $hashInput['exported_at']);

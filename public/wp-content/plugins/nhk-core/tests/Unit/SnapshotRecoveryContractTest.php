@@ -67,6 +67,47 @@ final class SnapshotRecoveryContractTest extends TestCase
         (new CanonicalSnapshotExportService())->export($source);
     }
 
+    public function test_pre_migration_export_allows_only_the_exact_pending_target_and_marks_the_artifact(): void
+    {
+        $snapshot = (new CanonicalSnapshotExportService())->exportPreMigration($this->source($this->goldenCollections(), 25, 26), 26, '2026-10-09T00:00:00+00:00');
+
+        self::assertSame('pre_migration', $snapshot->manifest['export_mode']);
+        self::assertSame(25, $snapshot->manifest['migration_level']['current']);
+        self::assertSame(26, $snapshot->manifest['migration_level']['target']);
+        self::assertSame(26, $snapshot->manifest['pre_migration_target']);
+        self::assertSame('staging', $snapshot->manifest['source_environment']);
+        self::assertSame('demo_db', $snapshot->manifest['source_database_identity']);
+        self::assertSame($snapshot->manifest['manifest_hash'], SnapshotArtifactCodec::decode(SnapshotArtifactCodec::encode($snapshot))->manifest['manifest_hash']);
+    }
+
+    public function test_pre_migration_export_rejects_any_pending_state_other_than_one_exact_target(): void
+    {
+        $service = new CanonicalSnapshotExportService();
+        foreach ([[24, 26], [25, 27], [26, 26]] as [$current, $target]) {
+            try {
+                $service->exportPreMigration($this->source($this->goldenCollections(), $current, $target), 26);
+                self::fail('Expected exact pre-migration gate for ' . $current . '/' . $target);
+            } catch (\RuntimeException $error) {
+                self::assertSame('SNAPSHOT_PRE_MIGRATION_LEVEL_INVALID', $error->getMessage());
+            }
+        }
+    }
+
+    public function test_pre_migration_artifact_restores_to_disposable_recovery_writer_and_reads_back_idempotently(): void
+    {
+        $snapshot = (new CanonicalSnapshotExportService())->exportPreMigration($this->source($this->goldenCollections(), 25, 26), 26, '2026-10-09T00:00:00+00:00');
+        $writer = new SnapshotTestWriter($this->target());
+        $service = new CanonicalSnapshotImportService(new RecoveryRuntimeGuard(['nhk_v3_recovery']));
+
+        self::assertSame('imported', $service->import($snapshot, $writer, true)['status']);
+        self::assertSame('already_imported', $service->import($snapshot, $writer, true)['status']);
+        self::assertSame($snapshot->manifest['manifest_hash'], $writer->readBackManifestHash());
+        self::assertSame(
+            \NHK\Core\Application\Snapshot\SnapshotCanonicalizer::hashRecords($snapshot->collections['videos']),
+            \NHK\Core\Application\Snapshot\SnapshotCanonicalizer::hashRecords($writer->readBackCollections()['videos']),
+        );
+    }
+
     public function test_export_removes_secret_records_and_fields(): void
     {
         $collections = $this->goldenCollections();
@@ -234,19 +275,24 @@ final class SnapshotRecoveryContractTest extends TestCase
 
     private function export(array $collections): \NHK\Core\Application\Snapshot\CanonicalSnapshot
     {
-        $source = new class($collections) implements CanonicalSnapshotSource {
-            public function __construct(private array $data) {}
+        $source = $this->source($collections, 20, 20);
+        return (new CanonicalSnapshotExportService())->export($source, '2026-09-12T00:00:00+00:00');
+    }
+
+    private function source(array $collections, int $current, int $target): CanonicalSnapshotSource
+    {
+        return new class($collections, $current, $target) implements CanonicalSnapshotSource {
+            public function __construct(private array $data, private int $current, private int $target) {}
             public function environment(): SnapshotEnvironment { return new SnapshotEnvironment('staging', 'https://demo.1945.vn', 'demo_db', 'staging'); }
             public function schemaVersion(): string { return SnapshotCollectionRegistry::SCHEMA_VERSION; }
             public function documentationVersion(): string { return 'docs-test'; }
             public function buildIdentity(): string { return 'build-test'; }
-            public function migrationLevel(): array { return ['current' => 20, 'target' => 20]; }
+            public function migrationLevel(): array { return ['current' => $this->current, 'target' => $this->target]; }
             public function schemaConsistent(): bool { return true; }
             public function isReadOnly(): bool { return true; }
             public function repositoryInventory(): array { return ['capture' => ['adapter' => 'test'], 'video' => ['adapter' => 'test']]; }
             public function collections(): array { return $this->data; }
         };
-        return (new CanonicalSnapshotExportService())->export($source, '2026-09-12T00:00:00+00:00');
     }
 
     private function target(): SnapshotEnvironment

@@ -45,11 +45,30 @@ The manifest hash excludes only `manifest_hash` and the generated
 identity hashes. The old raw `backup/snapshot` maintenance branch is retired
 and returns `LEGACY_RAW_SNAPSHOT_RETIRED`; it is not a semantic recovery path.
 
+### Pre-migration recovery checkpoint
+
+When one registered forward-only migration is pending, the normal export gate
+remains closed. The only supported pre-migration mechanism is the explicit
+`v3-snapshot-pre-migration-export` operation. It is read-only and accepts only
+the exact adjacent state immediately before Migration 026 (`25/26`) from the
+authorized staging source. The resulting logical artifact records its source
+environment/site/database identity, build and documentation identities, exact
+migration tuple, manifest hash and artifact hash. It is a recovery checkpoint,
+not permission to import into staging or production, and it does not replace
+the normal current-schema export after the migration.
+
 The maintenance entrypoint is:
 
 ```text
 php public/wp-content/plugins/nhk-core/bin/nhk-core-maintenance.php \
   --operation=v3-snapshot-export --output=/path/to/artifact.json --json
+```
+
+The bounded pre-migration checkpoint uses:
+
+```text
+php public/wp-content/plugins/nhk-core/bin/nhk-core-maintenance.php \
+  --operation=v3-snapshot-pre-migration-export --output=/path/to/artifact.json --json
 ```
 
 It requires the registered `nhk_v3_snapshot_source` adapter. The production

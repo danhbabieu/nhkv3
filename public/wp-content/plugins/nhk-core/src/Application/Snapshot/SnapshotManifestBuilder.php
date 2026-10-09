@@ -15,6 +15,8 @@ final class SnapshotManifestBuilder
         array $collections,
         string $exportedAt,
         array $historicalConflicts = [],
+        ?string $exportMode = null,
+        ?int $preMigrationTarget = null,
     ): array {
         $inventory = [];
         foreach (SnapshotCollectionRegistry::COLLECTIONS as $name) {
@@ -25,6 +27,7 @@ final class SnapshotManifestBuilder
         $manifest = [
             'schema_version' => SnapshotCollectionRegistry::SCHEMA_VERSION,
             'documentation_version' => $documentationVersion,
+            'build_identity' => $buildIdentity,
             'manifest_hash' => '',
             'source_environment' => $environment->name,
             'source_site' => $environment->site,
@@ -37,6 +40,10 @@ final class SnapshotManifestBuilder
             'repositories' => SnapshotCanonicalizer::sanitize($repositoryInventory),
             'historical_conflicts' => SnapshotCanonicalizer::sanitize($historicalConflicts),
         ];
+        if ($exportMode !== null) {
+            $manifest['export_mode'] = $exportMode;
+            if ($preMigrationTarget !== null) $manifest['pre_migration_target'] = $preMigrationTarget;
+        }
         $hashInput = $manifest;
         unset($hashInput['manifest_hash'], $hashInput['exported_at']);
         $manifest['manifest_hash'] = hash('sha256', SnapshotCanonicalizer::encode($hashInput));

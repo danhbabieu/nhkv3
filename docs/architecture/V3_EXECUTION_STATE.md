@@ -1,5 +1,30 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-09 — Staging pre-migration backup deadlock resolution
+
+IMPLEMENTED_LOCAL: The official normalized snapshot boundary now has a
+separate `v3-snapshot-pre-migration-export` operation. It accepts only the
+authorized staging source at the exact adjacent Migration 026 pre-state
+(`25/26`), preserves read-only source enforcement, and records export mode,
+source runtime identity, build/documentation identity, migration tuple,
+manifest hash and artifact hash in the immutable artifact/receipt. Normal
+`v3-snapshot-export` remains strict at current==target; the retired raw
+`backup/snapshot` branch remains unavailable. Restore remains restricted to the
+existing explicit recovery-mode, isolated database and post-import read-back
+guards.
+
+VERIFIED_LOCAL: Snapshot contract and maintenance tests pass 36 tests / 91
+assertions, including deterministic pre-migration artifact encoding, rejection
+of non-adjacent pending states, disposable recovery-writer restore/read-back
+and idempotent re-import. No staging, production or semantic record was
+mutated. A fresh staging checkpoint and Migration 026 execution remain
+runtime-gated until this checkout is deployed and the remote source export
+receipt passes.
+
+STATUS: `PRE_MIGRATION_BACKUP_CAPABILITY_IMPLEMENTED_LOCAL /
+DISPOSABLE_RESTORE_VERIFIED / STAGING_CHECKPOINT_PENDING /
+MIGRATION_026_NOT_RUN / NO_SEMANTIC_MUTATION`
+
 # Checkpoint — 2026-10-09 — Specimen catalogue relationship implementation
 
 IMPLEMENTED_LOCAL: The approved specimen catalogue slice is implemented on
@@ -26198,3 +26223,37 @@ mutation.
 
 STATUS: `LOCAL_REPAIR_COMPOSITION_IMPLEMENTED / FOCUSED_VERIFIED /
 RUNTIME_PACKET_PENDING / NO_SEMANTIC_MUTATION / PUBLIC_COMPLETE_FALSE`
+
+# Checkpoint — 2026-10-09 — Release parity passed; packet precondition remains blocked
+
+RELEASE_GATE: The authorized `scripts/nhk-deploy-verify` wrapper passed for
+source revision `e92bf9af3c137d420855ed5e052a8c25b205ad36`. Remote migration
+reported `status=pass`, `current=26`, `target=26`,
+`dictionary_entry_sense_schema_ready=true` and
+`specimen_product_relation_schema_ready=true`. Direct MCP bootstrap/list
+verified source revision, runtime version, documentation version, manifest
+hash, catalog/resource versions and build identity. Runtime build identity:
+`b3c297f18b6c79662b7c2ccd12a99e363a994f33c1b06db00e2ba39ed4ba071d`.
+
+READ_ONLY_RUNTIME: MCP `nhk.capture.get` confirmed History Capture
+`01a11bc5-125f-78de-98ac-b4535dfc2886` at revision 52,
+`FAILED_RETRYABLE`/`RECOVERABLE_INTERRUPTED`, with
+`retry.reason=CAPTURE_RETRY_NOT_ALLOWED`, required Knowledge owner empty and
+`REQUIRED_OWNER_READBACK_UNVERIFIED`. Score Capture
+`01a11d5a-27de-76bf-80bd-84a20b089baf` is revision 14,
+`REVIEW_REQUIRED`/`RECOVERABLE_INTERRUPTED`, reevaluable as
+`STALE_REVIEW_REEVALUATABLE`, but its required Knowledge owner is also empty
+and owner read-back remains unverified.
+
+MUTATION_BOUNDARY: No current server-issued repair packet was exposed for
+either exact Capture. The historical packet remains bound to History revision
+50 and expired; it cannot be reused. Therefore Gate D fails before packet
+issuance and Gate E/Governed Apply are not run. No Knowledge retire, Source or
+Evidence reconciliation, Graph mutation, Score/Audio mutation, public publish
+or cutover occurred. Score/audio remains unavailable (`audio_elements=0`,
+`score_section=false`); no research artifact without verified licence and
+checksum was introduced.
+
+STATUS: `RELEASE_PARITY_PASS / PACKET_ISSUANCE_BLOCKED /
+GOVERNED_APPLY_NOT_RUN / SCORE_AUDIO_BLOCKED / PUBLIC_COMPLETE_FALSE /
+NO_SEMANTIC_MUTATION`
