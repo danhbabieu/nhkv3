@@ -1,5 +1,57 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-09 — Westminster staging deploy and public read-back
+
+DEPLOYED: The allowlisted `scripts/nhk-deploy-verify` release gate completed
+successfully for `demo.1945.vn` staging at source revision
+`80b3a6b2dc39188b9e653376c4f60bf61e89dc5`. Build identity is
+`507d71f923a00111acffec7191a65371aed6a763c9dccec085c99ee52ee6e563`;
+documentation version is
+`3ff531e2578ba51cfc8c3e4c26494714cc323bef1bc7e4e05e36c417d9f4ee6a`;
+manifest hash is
+`81c405febac4f8a7d4de373719989f61263ca3ca8daf52ecfa11bccc838e634f`.
+Migration read-back passed at 25/25 with the required deployment pack and
+source binding. No semantic proposal, Governance apply, Capture retry or
+production operation was performed.
+
+QUALITY_RUNTIME_READBACK: The v59 read-only ability
+`mcp__v59__wp_ability_nhk_v3_knowledge_quality_audit` was callable through
+`nhk-v3/knowledge-quality-audit`, but its six-record Westminster read-back
+remained `PARTIAL`: page size 2, three successful pages, all six records
+`ACTIVE` at revision 1, and a later page request failed internally without an
+exposed correlation ID or failure code. The five known contaminated records
+(`01a11eb6-ab00-7b94-8c2b-b43b8507760b`,
+`01a11eb6-aed3-73ab-a6f5-e4ff27e962cf`,
+`01a11eb6-b1c1-76c0-a2a4-c93040224581`,
+`01a11eb6-baa4-7ec8-a1bb-26023a5f3fe1`,
+`01a11eb6-bbdb-7b87-87fc-ce1dc4705006`) were still returned with
+`EVIDENCE_GAP`/`DICTIONARY_CANDIDATE` (the second also
+`ATOMIZATION_NEEDED`) instead of contamination findings. The valid Joseph
+Jowett claim `01a11eb6-b2e1-78fe-9234-74a9161f8d7d` was also revision 1,
+ACTIVE and missing direct Evidence in this read-back. No repair proposal or
+packet was created.
+
+AUTHORIZATION: The connector exposed `nhk_view_governance` for the audit and
+the governed proposal lifecycle (`nhk.proposal.discover`, `.review`,
+`.eligibility`, `.create`, `.approve`, `.apply`), but no dedicated repair-plan
+tool or signed Capture-bound packet issuance tool. Server issuance therefore
+remains `NOT_VERIFIED`; no self-signed or expired packet was used. Existing
+Captures remain History `01a11bc5-125f-78de-98ac-b4535dfc2886` revision 52
+`FAILED_RETRYABLE` with `CAPTURE_RETRY_NOT_ALLOWED`, and Score
+`01a11d5a-27de-76bf-80bd-84a20b089baf` revision 14 `REVIEW_REQUIRED` with
+`STALE_REVIEW_REEVALUATABLE`; neither was retried.
+
+PUBLIC_READBACK: The canonical Music route remains reachable and renders the
+Westminster owner, source-scoped Claim B, three visible source URLs, Music
+relations, 1 video and clock/entity relations. It still renders no detailed
+Knowledge section, no public audio/player, no score, and an explicit missing-
+citation note. Public completion remains unverified and blocked by the live
+quality-audit/runtime error, Governance packet authorization, Source/Evidence
+read-back and MediaAsset/MediaUsage eligibility.
+
+STATUS: `DEPLOY_PARITY_PASS / QUALITY_AUDIT_PARTIAL / GOVERNANCE_PACKET_NOT_VERIFIED /
+NO_SEMANTIC_MUTATION / PUBLIC_NOT_COMPLETE`
+
 # Checkpoint — 2026-10-09 — Video semantic/public boundary completion
 
 IMPLEMENTED: Completed the local Video boundary slice on `main` without
