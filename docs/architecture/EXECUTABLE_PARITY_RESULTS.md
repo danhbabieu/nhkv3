@@ -25,6 +25,15 @@ Verified locally on 2026-10-09:
 - `composer generate:mcp-docs`: 64 canonical documentation files generated;
   the generated snapshot records the current source revision and emitted
   manifest hash.
+- Expanded Music/Dictionary/Score-Audio/structured-intake/public projection
+  selection: 78 tests / 2,505 assertions, pass; 3 PHPUnit deprecations and 1
+  PHPUnit deprecation.
+- Broader `NHK Unit` run with `memory_limit=512M`: 3,685 tests / 24,340
+  assertions; 1 error and 1 failure outside this Music slice, plus 30 warnings,
+  67 deprecations and 68 PHPUnit deprecations. The failing identities are
+  `WpdbArticleOperationReceiptRepositoryTest::test_repository_hydrates_a_receipt_by_idempotency_key`
+  and
+  `SemanticSpecificityPropagationTest::test_broader_context_remains_contextual_through_unit_journey_composer_and_seo`.
 
 The closeout check set is:
 
@@ -36,9 +45,9 @@ composer generate:mcp-docs
 ```
 
 PHP lint and `git diff --check` remain required before the task commit. The
-repository-wide Unit baseline is not used to convert local documentation
-evidence into runtime acceptance; any unrelated baseline identities must remain
-separately classified.
+repository-wide Unit result is not green because of the two unrelated
+identities above; it is not used to convert local documentation evidence into
+runtime acceptance.
 
 The generated snapshot is immutable release output and must never be hand-edited.
 

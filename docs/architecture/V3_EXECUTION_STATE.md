@@ -19,6 +19,15 @@ passed 43 tests / 2,329 assertions with three PHPUnit deprecations. The
 focused registry suite also confirms traversal/path fail-closed behavior after
 snapshot generation.
 
+BROADER_UNIT: The expanded Music/Dictionary/Score-Audio/structured-intake/
+public projection selection passed 78 tests / 2,505 assertions, with three
+PHPUnit deprecations and one PHPUnit deprecation. The `NHK Unit` suite with
+`memory_limit=512M` completed 3,685 tests / 24,340 assertions with one error
+and one failure outside this Music slice, plus 30 warnings, 67 deprecations and
+68 PHPUnit deprecations. The error is
+`WpdbArticleOperationReceiptRepositoryTest::test_repository_hydrates_a_receipt_by_idempotency_key`; the failure is
+`SemanticSpecificityPropagationTest::test_broader_context_remains_contextual_through_unit_journey_composer_and_seo`.
+
 RUNTIME_QA: The authorized TEST runtime identity, deployed build identity,
 signed exact Capture packet and canonical owner/evidence/revision read-back
 remain unavailable in this workspace. Public audio, historical-recording
