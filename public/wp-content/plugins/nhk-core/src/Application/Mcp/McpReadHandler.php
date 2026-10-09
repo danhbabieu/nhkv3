@@ -316,6 +316,7 @@ final class McpReadHandler
                 'canonical_readback' => ['canonical_id' => $capture->captureId],
                 'required_owners' => $requiredOwners,
                 'blockers' => $this->withoutStaleArticleMediaBlockers((array) ($completion['blockers'] ?? [])),
+                'outcome_obligations' => is_array($capture->diagnostics['outcome_obligations'] ?? null) ? $capture->diagnostics['outcome_obligations'] : (array) ($capture->context['outcome_obligations'] ?? []),
             ],
         );
         return $aggregate;

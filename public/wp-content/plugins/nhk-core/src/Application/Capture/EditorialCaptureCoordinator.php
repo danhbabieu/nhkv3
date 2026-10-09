@@ -5,6 +5,7 @@ namespace NHK\Core\Application\Capture;
 
 use NHK\Core\Application\Article\ArticleReviewFreshness;
 use NHK\Core\Application\Completion\CompletionCoordinator;
+use NHK\Core\Application\Completion\OutcomeObligationCompiler;
 use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, EditorialContentProjection, SharedEnrichmentBoundary, SubjectResolutionService, TextInputInterpreter};
 use NHK\Core\Application\Article\ArticleEditorialAdapter;
 use NHK\Core\Contracts\Capture\CaptureRepository;
@@ -34,6 +35,7 @@ final class EditorialCaptureCoordinator
     private array $phaseStartedAt = [];
     private ?string $activeReceiptPhase = null;
     private CompletionCoordinator $completion;
+    private ?OutcomeObligationCompiler $outcomeObligationCompiler = null;
 
     /** @param callable(array<string,mixed>):array $physicalIngest @param callable(array<string,mixed>):array $draftCreator @param callable(array<string,mixed>):array $semanticWriteBack @param callable(array<string,mixed>):array $mediaReconcile @param callable(array<string,mixed>):array $publicationGate @param callable(array<string,mixed>):array $finalReadBack @param (callable(array<string,mixed>):array)|null $draftUpdater @param (callable(array<string,mixed>):array)|null $mediaAdoption @param (callable(array<string,mixed>):array)|null $publisher @param (callable(array<string,mixed>):array)|null $videoEnrichment @param (callable(array<string,mixed>):array)|null $videoPublicationVerifier */
     public function __construct(
@@ -72,7 +74,11 @@ final class EditorialCaptureCoordinator
         private $articlePreCreateResolver = null,
         private bool $articlePreCreateRequired = false,
         private ?CaptureSubjectHandoff $subjectHandoff = null,
-    ) { $this->completion = $completion ?? new CompletionCoordinator(); }
+        ?OutcomeObligationCompiler $outcomeObligationCompiler = null,
+    ) {
+        $this->completion = $completion ?? new CompletionCoordinator();
+        $this->outcomeObligationCompiler = $outcomeObligationCompiler;
+    }
 
     /** @param array<string,mixed> $input */
     public function execute(array $input): CaptureRecord
@@ -136,6 +142,7 @@ final class EditorialCaptureCoordinator
         if (CaptureCurrentOutcomeReducer::lifecycleState($record, $input) === 'ACTIVELY_EXECUTING') {
             throw new \RuntimeException('CAPTURE_EXECUTION_IN_PROGRESS');
         }
+        $this->assertOutcomeObligationBinding($record, $input);
         $this->documentation?->assertCheckpoint((array) ($input['documentation_checkpoint'] ?? []));
         $input = $this->normalizeEditorialInput($this->rehydrateRetryInput($record, $input));
         Utf8Contract::assertValid($input, 'mcp.capture.retry', 'arguments');
@@ -441,6 +448,10 @@ final class EditorialCaptureCoordinator
                     ? $intentRouter->reusePersisted($persistedIntent, $input, $assets)
                     : $intentRouter->route($input, $interpretation, $assets);
                 $diagnostics['content_intent'] = $intent;
+                $obligationPlan = is_array($diagnostics['outcome_obligations'] ?? null)
+                    ? $diagnostics['outcome_obligations']
+                    : (is_array($record->context['outcome_obligations'] ?? null) ? $record->context['outcome_obligations'] : $this->compileOutcomeObligations($record, $input, $intent));
+                $diagnostics['outcome_obligations'] = $obligationPlan;
                 if (($intent['intent_reused'] ?? false) === true) $diagnostics['capture_intent_reused'] = strtoupper((string) ($intent['intent'] ?? ''));
                 $stagingScope = null;
                 $deferredArticleBindings = $this->hasDeferredArticleBindings($input);
@@ -453,7 +464,7 @@ final class EditorialCaptureCoordinator
                         $diagnostics['staging_acceptance'] = ['status' => 'verified', 'fingerprint' => (string) ($stagingScope['fingerprint'] ?? '')];
                     }
                 }
-                $record = $this->save($record, CaptureStage::INTERPRETED, $assets, $diagnostics, $receipts, 'INTERPRETED', $record->articleId, $record->articleStateToken, 'IN_PROGRESS', null, $record->context + ['content_intent' => $intent] + ($stagingScope !== null ? ['staging_acceptance' => $stagingScope] : []));
+                $record = $this->save($record, CaptureStage::INTERPRETED, $assets, $diagnostics, $receipts, 'INTERPRETED', $record->articleId, $record->articleStateToken, 'IN_PROGRESS', null, $record->context + ['content_intent' => $intent, 'outcome_obligations' => $obligationPlan, 'outcome_obligation_fingerprint' => (string) ($obligationPlan['fingerprint'] ?? '')] + ($stagingScope !== null ? ['staging_acceptance' => $stagingScope] : []));
                 $assets = $record->assets;
                 $diagnostics = $record->diagnostics;
                 $receipts = $record->phaseReceipts;
@@ -488,6 +499,12 @@ final class EditorialCaptureCoordinator
                     $diagnostics = $record->diagnostics;
                     $receipts = $record->phaseReceipts;
                 }
+            }
+            if (!is_array($diagnostics['outcome_obligations'] ?? null)) {
+                $obligationPlan = is_array($record->context['outcome_obligations'] ?? null)
+                    ? $record->context['outcome_obligations']
+                    : $this->compileOutcomeObligations($record, $input, $intent);
+                $diagnostics['outcome_obligations'] = $obligationPlan;
             }
             if (($intent['status'] ?? '') !== 'resolved') {
                 return $this->save($record, CaptureStage::INTERPRETED, $assets, $diagnostics, $receipts, 'INTERPRETED', $record->articleId, $record->articleStateToken, 'REVIEW_REQUIRED');
@@ -1256,6 +1273,7 @@ final class EditorialCaptureCoordinator
                 'canonical_state' => 'COMPLETE',
                 'canonical_readback' => ['canonical_id' => $record->captureId],
                 'required_owners' => $this->requiredOwners($intent, $record, $assets, $media, $videoPublication, $writes),
+                'outcome_obligations' => is_array($diagnostics['outcome_obligations'] ?? null) ? $diagnostics['outcome_obligations'] : (array) ($record->context['outcome_obligations'] ?? []),
             ]);
             $diagnostics['completion'] = $completion;
             $diagnostics = $this->settleHistoricalFailure($diagnostics, $receipts);
@@ -1317,6 +1335,7 @@ final class EditorialCaptureCoordinator
                     'canonical_state' => 'COMPLETE',
                     'required_owners' => $this->requiredOwners($intent, $record, $assets, $media, $videoPublication, $writes),
                     'blockers' => [$failureCode],
+                    'outcome_obligations' => is_array($diagnostics['outcome_obligations'] ?? null) ? $diagnostics['outcome_obligations'] : (array) ($record->context['outcome_obligations'] ?? []),
                 ],
             );
             $diagnostics['completion'] = $partialCompletion;
@@ -1686,6 +1705,7 @@ final class EditorialCaptureCoordinator
             'canonical_readback' => ['canonical_id' => $record->captureId],
             'required_owners' => $requiredOwners,
             'semantic_dependency_owner_types' => strtoupper(trim((string) ($intent['intent'] ?? ''))) === 'VIDEO' ? ['source', 'knowledge', 'evidence'] : [],
+            'outcome_obligations' => is_array($diagnostics['outcome_obligations'] ?? null) ? $diagnostics['outcome_obligations'] : (array) ($record->context['outcome_obligations'] ?? []),
         ]);
         $diagnostics['completion'] = $completion;
         // A Capture-level frontend/final callback cannot promote an absent
@@ -1725,6 +1745,55 @@ final class EditorialCaptureCoordinator
             if (array_key_exists($field, $metadata['editorial_fields'] ?? [])) $fields[$field] = $metadata['editorial_fields'][$field];
         }
         return $fields;
+    }
+
+    /** @param array<string,mixed> $input @param array<string,mixed> $intent @return array<string,mixed> */
+    private function compileOutcomeObligations(CaptureRecord $record, array $input, array $intent): array
+    {
+        $intentName = strtoupper(trim((string) ($intent['intent'] ?? $input['intent'] ?? '')));
+        $ownerTypes = is_array($input['owner_types'] ?? null) ? $input['owner_types'] : match ($intentName) {
+            'VIDEO' => ['video'],
+            'MEDIA_ENRICHMENT' => ['media'],
+            'KNOWLEDGE_DELTA' => ['knowledge'],
+            'TEXT_ARTICLE', 'IMAGE_ARTICLE' => ['wp_post'],
+            default => [],
+        };
+        $publicCapableTypes = ['wp_post', 'media', 'video'];
+        $capabilities = [];
+        foreach ($ownerTypes as $ownerType) {
+            $ownerType = strtolower(trim((string) $ownerType));
+            if ($ownerType === '') continue;
+            $capabilities[$ownerType] = ['public_capable' => in_array($ownerType, $publicCapableTypes, true)];
+        }
+        $compiler = $this->outcomeObligationCompiler ??= new OutcomeObligationCompiler();
+        return $compiler->compile($record->captureId, $intent, [
+            'owner_types' => $ownerTypes,
+            'owner_capabilities' => $capabilities,
+            'publish' => ($input['publish'] ?? $record->context['original_request']['publish'] ?? false) === true,
+            'public_request' => ($input['public_request'] ?? false) === true,
+            'frontend_request' => ($input['frontend_request'] ?? false) === true,
+            'homepage_request' => ($input['homepage_request'] ?? false) === true,
+            'homepage_policy_required' => ($input['homepage_policy_required'] ?? false) === true,
+            'governance_requested' => in_array($intentName, ['VIDEO', 'KNOWLEDGE_DELTA'], true),
+        ]);
+    }
+
+    /** @param array<string,mixed> $input */
+    private function assertOutcomeObligationBinding(CaptureRecord $record, array $input): void
+    {
+        $stored = is_array($record->diagnostics['outcome_obligations'] ?? null)
+            ? $record->diagnostics['outcome_obligations']
+            : (is_array($record->context['outcome_obligations'] ?? null) ? $record->context['outcome_obligations'] : []);
+        $storedFingerprint = trim((string) ($stored['fingerprint'] ?? $record->context['outcome_obligation_fingerprint'] ?? ''));
+        $requestedFingerprint = trim((string) ($input['outcome_obligation_fingerprint'] ?? (is_array($input['outcome_obligations'] ?? null) ? ($input['outcome_obligations']['fingerprint'] ?? '') : '')));
+        if ($storedFingerprint !== '' && $requestedFingerprint !== '' && !hash_equals($storedFingerprint, $requestedFingerprint)) {
+            throw new \RuntimeException('OUTCOME_OBLIGATION_BINDING_CHANGED');
+        }
+        $storedIntent = strtoupper(trim((string) (($stored['intent']['intent'] ?? $record->context['content_intent']['intent'] ?? ''))));
+        $requestedIntent = strtoupper(trim((string) ($input['intent'] ?? '')));
+        if ($storedIntent !== '' && $requestedIntent !== '' && $storedIntent !== $requestedIntent) {
+            throw new \RuntimeException('OUTCOME_OBLIGATION_BINDING_CHANGED');
+        }
     }
 
     /**

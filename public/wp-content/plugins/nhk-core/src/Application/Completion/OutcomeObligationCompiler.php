@@ -107,6 +107,7 @@ final class OutcomeObligationCompiler
         return [
             'version' => self::VERSION,
             'capture_id' => $captureId,
+            'intent' => $intent,
             'owner_types' => $ownerTypes,
             'dependency_owner_types' => $dependencyTypes,
             'public_request' => $publicRequested,

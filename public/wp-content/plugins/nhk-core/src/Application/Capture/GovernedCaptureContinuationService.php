@@ -100,7 +100,7 @@ final class GovernedCaptureContinuationService
         } catch (\Throwable $error) {
             $failure = $this->classifiedFailure([], $error);
             $status = (string) ($failure['status'] ?? 'SYSTEM_BLOCKED');
-            return ['status' => $status, 'writes' => [$failure], 'reused_claims' => $reusedClaims, 'video_children' => [], 'blockers' => (array) ($failure['blockers'] ?? ['CAPTURE_PLAN_FAILED']), 'governance' => $this->governanceReadback([$failure], [], $status, []), 'completion' => $this->completion->aggregateCapture($this->currentCaptureId, [], ['canonical_state' => 'COMPLETE', 'blockers' => (array) ($failure['blockers'] ?? [])])];
+            return ['status' => $status, 'writes' => [$failure], 'reused_claims' => $reusedClaims, 'video_children' => [], 'blockers' => (array) ($failure['blockers'] ?? ['CAPTURE_PLAN_FAILED']), 'governance' => $this->governanceReadback([$failure], [], $status, []), 'completion' => $this->completion->aggregateCapture($this->currentCaptureId, [], ['canonical_state' => 'COMPLETE', 'blockers' => (array) ($failure['blockers'] ?? []), 'outcome_obligations' => $this->outcomeObligations($context)])];
         }
         $skippedVideoChildren = [];
         $videoChildren = [];
@@ -152,7 +152,7 @@ final class GovernedCaptureContinuationService
                     ],
                 ],
                 'governance' => $this->governanceReadback([], [], $status, $skippedVideoChildren),
-                'completion' => $this->completion->aggregateCapture($this->currentCaptureId, [], ['canonical_state' => 'COMPLETE', 'blockers' => $blockers]),
+                'completion' => $this->completion->aggregateCapture($this->currentCaptureId, [], ['canonical_state' => 'COMPLETE', 'blockers' => $blockers, 'outcome_obligations' => $this->outcomeObligations($context)]),
             ];
         }
 
@@ -284,6 +284,7 @@ final class GovernedCaptureContinuationService
         $result['completion'] = $this->completion->aggregateCapture($this->currentCaptureId, $this->completionChildren($writes), [
             'canonical_state' => 'COMPLETE',
             'blockers' => $failureBlockers,
+            'outcome_obligations' => $this->outcomeObligations($context),
         ]);
         return $result;
     }
@@ -1644,6 +1645,14 @@ final class GovernedCaptureContinuationService
             $children[] = ['owner_type' => trim((string) ($write['entity_type'] ?? 'knowledge')) ?: 'knowledge', 'owner_id' => $ownerId, 'canonical_readback' => $write['canonical_readback'] ?? null, 'dependency_state' => $this->dependencyWriteCompleted($write) ? 'COMPLETE' : 'PARTIAL', 'blockers' => (array) ($write['blockers'] ?? [])];
         }
         return $children;
+    }
+
+    /** @param array<string,mixed> $context @return array<string,mixed> */
+    private function outcomeObligations(array $context): array
+    {
+        return is_array($context['outcome_obligations'] ?? null)
+            ? $context['outcome_obligations']
+            : (is_array($context['capture']['context']['outcome_obligations'] ?? null) ? $context['capture']['context']['outcome_obligations'] : []);
     }
 
     private function actor(): string { return function_exists('get_current_user_id') ? (string) get_current_user_id() : 'capture-continuation'; }

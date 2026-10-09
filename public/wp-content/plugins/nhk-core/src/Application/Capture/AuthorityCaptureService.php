@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Capture;
 
 use NHK\Core\Application\Completion\CompletionCoordinator;
+use NHK\Core\Application\Completion\OutcomeObligationCompiler;
 use NHK\Core\Application\Graph\RelationshipOwnerContract;
 use NHK\Core\Contracts\Capture\CaptureRepository;
 use NHK\Core\Domain\Capture\{CaptureRecord, CapturePurpose, CaptureStage, ContentIntent};
@@ -17,7 +18,7 @@ use NHK\Core\Shared\Uuid\UuidCodec;
 final class AuthorityCaptureService
 {
     /** @param callable(array<string,mixed>,CaptureRecord):array<string,mixed> $planner @param (callable(array<string,mixed>,CaptureRecord):array<string,mixed>)|null $mixedEditorial @param (callable(CaptureRecord,array<string,mixed>,array<string>):array<string,mixed>)|null $applyPlan @param (callable(CaptureRecord,array<string,mixed>):array<string,mixed>)|null $mixedContinuation */
-    public function __construct(private CaptureRepository $captures, private $planner, private $mixedEditorial = null, private $applyPlan = null, private $mixedContinuation = null, ?CompletionCoordinator $completion = null, private $scopeIssuer = null) { $this->completion = $completion ?? new CompletionCoordinator(); }
+    public function __construct(private CaptureRepository $captures, private $planner, private $mixedEditorial = null, private $applyPlan = null, private $mixedContinuation = null, ?CompletionCoordinator $completion = null, private $scopeIssuer = null, private ?OutcomeObligationCompiler $outcomeObligationCompiler = null) { $this->completion = $completion ?? new CompletionCoordinator(); }
 
     private CompletionCoordinator $completion;
 
@@ -71,6 +72,15 @@ final class AuthorityCaptureService
         $articleId = $editorial === [] ? null : (int) ($editorial['post_id'] ?? 0);
         if ($editorial !== [] && $articleId < 1) throw new \RuntimeException('ARTICLE_DRAFT_READBACK_UNAVAILABLE');
         if ($editorial !== []) $context['mixed_editorial'] = ['status' => 'PENDING_AUTHORITY', 'post_id' => $articleId];
+        $ownerTypes = $articleId > 0 ? ['wp_post'] : (array) ($input['outcome_owner_types'] ?? []);
+        $context['outcome_obligations'] = ($this->outcomeObligationCompiler ?? new OutcomeObligationCompiler())->compile($record->captureId, [
+            'intent' => strtoupper($purpose->value),
+            'mode' => strtoupper((string) ($intent['mode'] ?? 'PLAN')),
+        ], [
+            'owner_types' => $ownerTypes,
+            'owner_capabilities' => $articleId > 0 ? ['wp_post' => ['public_capable' => true]] : [],
+            'publish' => ($input['publish'] ?? false) === true,
+        ]);
         return $this->captures->save(new CaptureRecord(
             $record->captureId, $record->idempotencyKey, $record->requestFingerprint,
             CaptureStage::AUTHORITY_PLANNED->value, 'PLANNED', $articleId,
@@ -114,7 +124,9 @@ final class AuthorityCaptureService
             ? ($this->scopeIssuer)($record, $plan, $approvedIds)
             : null;
         $result = $scope === null ? ($this->applyPlan)($record, $plan, $approvedIds) : ($this->applyPlan)($record, $plan, $approvedIds, $scope);
-        $result['completion'] = $this->completion->aggregateCapture($record->captureId, $this->completionChildren($plan, $approvedIds, $result));
+        $result['completion'] = $this->completion->aggregateCapture($record->captureId, $this->completionChildren($plan, $approvedIds, $result), [
+            'outcome_obligations' => is_array($record->context['outcome_obligations'] ?? null) ? $record->context['outcome_obligations'] : [],
+        ]);
         $context = $record->context;
         if ($scope !== null) $context['staging_acceptance'] = $scope;
         $saveBase = $record;

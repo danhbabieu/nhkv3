@@ -5,6 +5,7 @@ namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Capture\{CaptureCurrentOutcomeReducer, CapturePhaseReceiptReducer, ContentPreparationOrchestrator, EditorialCaptureContinuationService, EditorialCaptureCoordinator};
 use NHK\Core\Application\Capture\ContentIntentRouter;
+use NHK\Core\Application\Completion\OutcomeObligationCompiler;
 use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, EditorialClaimRetrievalService, EditorialKnowledgeSelector, SharedEnrichmentBoundary, SubjectResolutionService, TextInputInterpreter};
 use NHK\Core\Contracts\Capture\{CaptureAddendumRepository, CaptureRepository};
 use NHK\Core\Domain\Capture\CaptureAddendumRecord;
@@ -19,6 +20,75 @@ use PHPUnit\Framework\TestCase;
  */
 final class EditorialCaptureConvergenceE2ETest extends TestCase
 {
+    public function test_capture_admission_compiles_and_persists_public_outcome_obligation_shape(): void
+    {
+        $coordinator = (new \ReflectionClass(EditorialCaptureCoordinator::class))->newInstanceWithoutConstructor();
+        $method = new \ReflectionMethod($coordinator, 'compileOutcomeObligations');
+        $method->setAccessible(true);
+        $capture = new CaptureRecord(
+            UuidCodec::newV7(),
+            'outcome-admission-plan',
+            hash('sha256', 'outcome-admission-plan'),
+            CaptureStage::RECEIVED->value,
+            'RECEIVED',
+        );
+
+        $plan = $method->invoke($coordinator, $capture, ['publish' => true], ['intent' => 'VIDEO']);
+
+        self::assertSame($capture->captureId, $plan['capture_id']);
+        self::assertSame('REQUIRED', $plan['obligations']['publication']['class']);
+        self::assertSame('REQUIRED', $plan['obligations']['frontend']['class']);
+        self::assertMatchesRegularExpression('/^[a-f0-9]{64}$/', $plan['fingerprint']);
+    }
+
+    public function test_capture_recovery_fails_closed_when_stored_obligation_binding_changes(): void
+    {
+        $compiler = new OutcomeObligationCompiler();
+        $plan = $compiler->compile('capture-binding-1', ['intent' => 'VIDEO'], [
+            'owner_types' => ['video'],
+            'owner_capabilities' => ['video' => ['public_capable' => true]],
+            'publish' => true,
+        ]);
+        $capture = new CaptureRecord(
+            'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+            'outcome-binding-recovery',
+            hash('sha256', 'outcome-binding-recovery'),
+            CaptureStage::SEMANTICS_RECONCILED->value,
+            'FAILED_RETRYABLE',
+            context: ['content_intent' => ['intent' => 'VIDEO'], 'outcome_obligations' => $plan],
+        );
+        $coordinator = (new \ReflectionClass(EditorialCaptureCoordinator::class))->newInstanceWithoutConstructor();
+        $method = new \ReflectionMethod($coordinator, 'assertOutcomeObligationBinding');
+        $method->setAccessible(true);
+
+        $this->expectExceptionMessage('OUTCOME_OBLIGATION_BINDING_CHANGED');
+        $method->invoke($coordinator, $capture, ['outcome_obligation_fingerprint' => str_repeat('f', 64)]);
+    }
+
+    public function test_capture_recovery_rejects_changed_resolved_intent_binding(): void
+    {
+        $compiler = new OutcomeObligationCompiler();
+        $plan = $compiler->compile('capture-binding-2', ['intent' => 'VIDEO'], [
+            'owner_types' => ['video'],
+            'owner_capabilities' => ['video' => ['public_capable' => true]],
+            'publish' => true,
+        ]);
+        $capture = new CaptureRecord(
+            'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+            'outcome-binding-intent',
+            hash('sha256', 'outcome-binding-intent'),
+            CaptureStage::SEMANTICS_RECONCILED->value,
+            'FAILED_RETRYABLE',
+            context: ['content_intent' => ['intent' => 'VIDEO'], 'outcome_obligations' => $plan],
+        );
+        $coordinator = (new \ReflectionClass(EditorialCaptureCoordinator::class))->newInstanceWithoutConstructor();
+        $method = new \ReflectionMethod($coordinator, 'assertOutcomeObligationBinding');
+        $method->setAccessible(true);
+
+        $this->expectExceptionMessage('OUTCOME_OBLIGATION_BINDING_CHANGED');
+        $method->invoke($coordinator, $capture, ['intent' => 'TEXT_ARTICLE']);
+    }
+
     public function test_retry_success_then_article_pre_create_review_does_not_reuse_historical_failure(): void
     {
         $captures = new Pr5CaptureRepository();
@@ -1008,6 +1078,8 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
         self::assertGreaterThan(18, $result['capture']['revision']);
         self::assertSame('PREPARED', $result['capture']['diagnostics']['content_preparation']['status']);
         self::assertSame($subjectId, $result['capture']['context']['subject_resolution_packet']['canonical_subject_id']);
+        self::assertArrayHasKey('outcome_obligations', $result['capture']['diagnostics']);
+        self::assertSame($capture->captureId, $result['capture']['diagnostics']['outcome_obligations']['capture_id']);
         self::assertSame('COMPLETED', $result['capture']['phase_receipts']['CONTENT_PREPARATION']['status']);
         self::assertContains('VIDEO_EDITORIAL_QUALITY_BLOCKED', $result['capture']['phase_receipts']['CONTENT_PREPARATION']['superseded_failure_codes']);
         self::assertNotSame('STALE_REVIEW_REEVALUATABLE', $result['retry']['code']);
