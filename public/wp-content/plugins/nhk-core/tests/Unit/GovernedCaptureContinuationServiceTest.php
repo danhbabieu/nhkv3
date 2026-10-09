@@ -584,6 +584,83 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
         self::assertSame($proposal->id, $result['writes'][0]['proposal_id']);
     }
 
+    public function test_real_text_interpreter_reaches_canonical_knowledge_readback_without_reapply(): void
+    {
+        $subject = UuidCodec::newV7();
+        $text = 'Đối tượng có mặt số màu xanh.';
+        $interpretation = (new TextInputInterpreter())->interpret($text);
+        $proposal = new Proposal(
+            UuidCodec::newV7(),
+            $subject,
+            'ingest',
+            ['stable_key' => 'nhk:knowledge:real-readback', 'text' => $text],
+            'content',
+            null,
+            'dependency',
+            ProposalState::DRAFT,
+            idempotencyKey: 'capture:real-readback',
+            entityType: 'knowledge',
+        );
+        $relationProposal = new Proposal(
+            UuidCodec::newV7(),
+            'relation',
+            'relation_create',
+            ['predicate' => 'about'],
+            'relation-content',
+            null,
+            'relation-dependency',
+            ProposalState::DRAFT,
+            idempotencyKey: 'capture:real-readback:relation',
+            entityType: 'relation',
+        );
+        $claim = new KnowledgeClaim($subject, 'nhk:knowledge:real-readback', $text, revision: 4);
+        $governance = $this->createMock(GovernedLifecycle::class);
+        $governance->expects(self::exactly(2))->method('createFromArguments')->with(self::callback(static function (array $arguments) use ($subject): bool {
+            return (($arguments['entity_type'] ?? '') === 'knowledge' && ($arguments['subject_id'] ?? '') === $subject && str_starts_with((string) ($arguments['idempotency_key'] ?? ''), 'capture:capture-real-readback:knowledge:'))
+                || (($arguments['entity_type'] ?? '') === 'relation' && ($arguments['subject_id'] ?? '') === 'relation');
+        }))->willReturnOnConsecutiveCalls($proposal, $relationProposal);
+        $governance->expects(self::exactly(5))->method('review')->willReturnOnConsecutiveCalls(
+            ['state' => 'draft', 'entity_type' => 'knowledge', 'content_fingerprint' => 'content', 'dependency_fingerprint' => 'dependency'],
+            ['state' => 'submitted', 'entity_type' => 'knowledge', 'content_fingerprint' => 'content', 'dependency_fingerprint' => 'dependency'],
+            ['state' => 'draft', 'entity_type' => 'relation', 'content_fingerprint' => 'relation-content', 'dependency_fingerprint' => 'relation-dependency'],
+            ['state' => 'submitted', 'entity_type' => 'relation', 'content_fingerprint' => 'relation-content', 'dependency_fingerprint' => 'relation-dependency'],
+            ['state' => 'applied', 'entity_type' => 'knowledge', 'operation' => 'ingest', 'subject_id' => $subject, 'payload' => ['stable_key' => $claim->stableKey, 'text' => $claim->claimText], 'content_fingerprint' => 'content', 'dependency_fingerprint' => 'dependency'],
+        );
+        $governance->expects(self::exactly(2))->method('submit')->willReturnOnConsecutiveCalls($proposal->transition(ProposalState::SUBMITTED), $relationProposal->transition(ProposalState::SUBMITTED));
+        $governance->expects(self::exactly(2))->method('approve')->willReturnOnConsecutiveCalls($proposal->transition(ProposalState::APPROVED, 'capture-continuation'), $relationProposal->transition(ProposalState::APPROVED, 'capture-continuation'));
+        $governance->expects(self::exactly(2))->method('eligibility')->willReturn(['ready' => true]);
+        $applyCalls = 0;
+        $claims = $this->createMock(KnowledgeRepository::class);
+        $claims->expects(self::once())->method('findByStableKey')->with($claim->stableKey)->willReturn($claim);
+        $service = new GovernedCaptureContinuationService(
+            $governance,
+            static function (string $proposalId) use (&$applyCalls, $proposal, $subject): array {
+                ++$applyCalls;
+                $isKnowledge = $proposalId === $proposal->id;
+                $canonicalId = $isKnowledge ? $subject : 'edge-real-readback';
+                return ['canonical_id' => $canonicalId, 'canonical_readback' => ['canonical_id' => $canonicalId, 'entity_type' => $isKnowledge ? 'knowledge' : 'relation', 'active' => true, 'revision' => 4]];
+            },
+            $this->policies(['knowledge', 'relation'], ['knowledge' => 'AUTO_PUBLISH', 'relation' => 'AUTO_PUBLISH']),
+            static fn (): bool => true,
+            knowledgeRepository: $claims,
+        );
+
+        $result = $service->execute('capture-real-readback', 'capture:real-readback', [
+            'content_intent' => ['intent' => 'KNOWLEDGE_DELTA'],
+            'subject_resolution' => ['resolved' => [['id' => $subject, 'type' => 'model']]],
+            'interpretation' => $interpretation,
+            'observations' => [],
+        ]);
+        $replay = $service->execute('capture-real-readback', 'retry:real-readback', [], ['proposal_ids' => [$proposal->id]]);
+
+        self::assertSame('APPLIED', $result['status']);
+        self::assertSame('APPLIED', $replay['status']);
+        self::assertSame($subject, $result['writes'][0]['canonical_id']);
+        self::assertSame($subject, $replay['writes'][0]['canonical_id']);
+        self::assertTrue($replay['writes'][0]['idempotent']);
+        self::assertSame(2, $applyCalls);
+    }
+
     public function test_derived_interpreter_input_cannot_use_raw_user_knowledge_admission(): void
     {
         $interpretation = (new TextInputInterpreter())->interpret(

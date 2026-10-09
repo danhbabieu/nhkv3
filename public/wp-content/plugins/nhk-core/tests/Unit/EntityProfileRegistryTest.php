@@ -90,6 +90,8 @@ final class EntityProfileRegistryTest extends TestCase
         \NHK\Core\Domain\Authority\CanonicalEntityTypeCatalog::registerInto($types);
         $registry = new EntityProfileRegistry();
 
+        self::assertSame(['brand', 'model', 'variant', 'movement', 'music', 'component', 'classification', 'specimen', 'product'], array_map(static fn ($definition): string => $definition->type, $types->all()));
+
         foreach ($types->all() as $definition) {
             $profile = $registry->get($definition->type);
             self::assertNotNull($profile, $definition->type);
