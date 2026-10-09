@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Capture;
 
 use NHK\Core\Contracts\Capture\{CaptureAddendumRepository, CaptureRepository};
-use NHK\Core\Domain\Capture\{CaptureAddendumRecord, CaptureRecord, CaptureStage, SubjectResolutionPacket};
+use NHK\Core\Domain\Capture\{CaptureAddendumRecord, CaptureRecord, CaptureStage, ResolvedSubjectReconciliationPacket, SubjectResolutionPacket};
 use NHK\Core\Domain\Governance\CommandCanonicalizer;
 use NHK\Core\Shared\Uuid\UuidCodec;
 
@@ -300,6 +300,19 @@ final class EditorialCaptureContinuationService
         if (!in_array($intent, ['VIDEO', 'IMAGE_ARTICLE', 'TEXT_ARTICLE'], true)) return [$capture, 'CAPTURE_SUBJECT_RECONCILIATION_INTENT_NOT_SUPPORTED'];
         if (!is_array($selection) || ($selection['confirmed'] ?? false) !== true) return [$capture, 'CAPTURE_SUBJECT_RECONCILIATION_CONFIRMATION_REQUIRED'];
         $authority = strtoupper(trim((string) ($selection['authority'] ?? $selection['source'] ?? '')));
+        $serverPacket = ResolvedSubjectReconciliationPacket::fromArray(is_array($selection['reconciliation_packet'] ?? null) ? $selection['reconciliation_packet'] : []);
+        if (is_array($selection['reconciliation_packet'] ?? null)) {
+            if (!in_array($authority, ['USER_CONFIRMED_SUBJECT_RECONCILIATION', 'GOVERNED_SUBJECT_RECONCILIATION'], true)) return [$capture, 'CAPTURE_SUBJECT_RECONCILIATION_AUTHORITY_REQUIRED'];
+            if ($serverPacket === null) return [$capture, 'CAPTURE_SUBJECT_RECONCILIATION_PACKET_INVALID'];
+            if (!$serverPacket->matches($capture)) return [$capture, 'CAPTURE_SUBJECT_RECONCILIATION_PACKET_STALE'];
+            return [$this->persistResolvedReconciliation($capture, $serverPacket->subject, [
+                'status' => 'CONFIRMED',
+                'source' => $authority,
+                'packet_fingerprint' => $serverPacket->fingerprint(),
+                'capture_revision' => $serverPacket->captureRevision,
+                'evidence_refs' => $serverPacket->evidenceRefs,
+            ]), null];
+        }
         $explicitPacket = SubjectResolutionPacket::fromArray(is_array($selection['packet'] ?? null) ? $selection['packet'] : (is_array($selection['subject_resolution_packet'] ?? null) ? $selection['subject_resolution_packet'] : []));
         if (in_array($capture->status, ['REVIEW_REQUIRED', 'APPLIED'], true) && $explicitPacket instanceof SubjectResolutionPacket
             && $explicitPacket->status === 'resolved'

@@ -7,16 +7,17 @@ use NHK\Core\Application\Authority\AuthorityService;
 use NHK\Core\Application\Authority\SemanticMergeService;
 use NHK\Core\Application\Authority\SemanticRekeyMediaIsolation;
 use NHK\Core\Application\Graph\GraphService;
-use NHK\Core\Application\Graph\ClassifiedAsPolicy;
+use NHK\Core\Application\Graph\{ClassifiedAsPolicy, GraphRelationContextPolicy, SpecimenProductRelationPolicy};
 use NHK\Core\Application\Media\{ArticleMediaSubjectBindingApplyResult, ArticleMediaSubjectReverseReconciliation, MediaBindingService, MediaIngestGateway, MediaService};
 use NHK\Core\Infrastructure\Media\WordPressMediaAttachmentBridge;
 use NHK\Core\Application\Video\{HistoricalVideoRelationEvidenceReconciliation, VideoCompletenessPolicy, VideoCompletenessReconciliationService, VideoService};
 use NHK\Core\Application\Knowledge\KnowledgeService;
 use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
 use NHK\Core\Contracts\Governance\ApprovedRelationProposalRepository;
+use NHK\Core\Contracts\Graph\GraphRelationContextRepository;
 use NHK\Core\Domain\Authority\AuthorityEntity;
 use NHK\Core\Domain\Governance\Proposal;
-use NHK\Core\Domain\Graph\GraphEdge;
+use NHK\Core\Domain\Graph\{GraphEdge, PredicateRegistry};
 use NHK\Core\Domain\Graph\NodeReference;
 use NHK\Core\Domain\Media\Media;
 use NHK\Core\Domain\Video\Video;
@@ -24,7 +25,7 @@ use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim, Source};
 
 final class AuthorityProposalExecutor
 {
-    public function __construct(private AuthorityService $authority, private ?GraphService $graph = null, private ?MediaService $media = null, private ?VideoService $video = null, private ?KnowledgeService $knowledge = null, private ?MediaIngestGateway $mediaGateway = null, private ?SemanticMergeService $merge = null, private ?OperationCompatibility $operationCompatibility = null, private ?CanonicalDependencyValidator $dependencies = null, private ?VideoCompletenessPolicy $completeness = null, private ?ApprovedRelationProposalRepository $relationProposals = null, private ?HistoricalVideoRelationEvidenceReconciliation $historicalEvidence = null, private $collectorFacetExecutor = null, private ?VideoCompletenessReconciliationService $videoCompletenessReconciliation = null, private ?ClassifiedAsPolicy $classifiedAs = null, private ?MediaBindingService $mediaBinding = null, private ?WordPressMediaAttachmentBridge $mediaProjection = null, private ?ArticleMediaSubjectReverseReconciliation $articleMediaSubjectBinding = null) {}
+    public function __construct(private AuthorityService $authority, private ?GraphService $graph = null, private ?MediaService $media = null, private ?VideoService $video = null, private ?KnowledgeService $knowledge = null, private ?MediaIngestGateway $mediaGateway = null, private ?SemanticMergeService $merge = null, private ?OperationCompatibility $operationCompatibility = null, private ?CanonicalDependencyValidator $dependencies = null, private ?VideoCompletenessPolicy $completeness = null, private ?ApprovedRelationProposalRepository $relationProposals = null, private ?HistoricalVideoRelationEvidenceReconciliation $historicalEvidence = null, private $collectorFacetExecutor = null, private ?VideoCompletenessReconciliationService $videoCompletenessReconciliation = null, private ?ClassifiedAsPolicy $classifiedAs = null, private ?MediaBindingService $mediaBinding = null, private ?WordPressMediaAttachmentBridge $mediaProjection = null, private ?ArticleMediaSubjectReverseReconciliation $articleMediaSubjectBinding = null, private ?GraphRelationContextRepository $relationContexts = null) {}
 
     public function __invoke(Proposal $proposal): AuthorityEntity|GraphEdge|Media|Video|KnowledgeClaim|Source|Evidence|MediaRepresentativeApplyResult|MediaUsageApplyResult|ArticleMediaSubjectBindingApplyResult|\NHK\Core\Domain\Authority\SemanticMergeReceipt
     {
@@ -237,25 +238,73 @@ final class AuthorityProposalExecutor
                     'target_family' => (string) ($proposal->payload['target_family'] ?? ''),
                 ]);
             }
-            return $this->graph->create(
+            $predicate = (string) ($proposal->payload['predicate'] ?? '');
+            if (in_array($predicate, ['specimen_of', 'lists_specimen'], true)) {
+                $errors = SpecimenProductRelationPolicy::validate($proposal->payload, new PredicateRegistry());
+                if ($errors !== []) throw new \RuntimeException($errors[0]);
+                if (!$this->relationContexts) throw new \RuntimeException('GRAPH_RELATION_CONTEXT_REPOSITORY_UNAVAILABLE');
+            }
+            $edge = $this->graph->create(
                 new NodeReference($sourceType, $sourceKey),
-                (string) ($proposal->payload['predicate'] ?? ''),
+                $predicate,
                 new NodeReference($targetType, $targetKey),
             );
+            if (in_array($predicate, ['specimen_of', 'lists_specimen'], true)) {
+                $evidenceResolver = $this->dependencies === null ? null : fn (string $id): bool => (bool) $this->dependencies->evidence($id);
+                $context = GraphRelationContextPolicy::create([
+                    'edge_uuid' => $edge->edge_uuid,
+                    'source_revision' => (int) $proposal->payload['source_revision'],
+                    'target_revision' => (int) $proposal->payload['target_revision'],
+                    'scope_code' => (string) $proposal->payload['scope_code'],
+                    'scope_subject_type' => $sourceType,
+                    'scope_subject_id' => $sourceKey,
+                    'provenance_class' => (string) $proposal->payload['provenance'],
+                    'evidence_refs' => (array) $proposal->payload['evidence_refs'],
+                    'approval_fingerprint' => $proposal->bindingFingerprint(),
+                    'idempotency_key' => $proposal->idempotencyKey,
+                ], $evidenceResolver);
+                $this->relationContexts->create($context);
+            }
+            return $edge;
         }
         if ($proposal->operation === 'relation_replace') {
             $oldId = trim((string) ($proposal->payload['current_relation_id'] ?? $proposal->targetUuid ?? ''));
             $old = $this->graph->findByUuid($oldId);
             if ($old === null || !$old->isActive()) throw new \RuntimeException('RELATION_NOT_FOUND');
             if ($old->revision !== (int) ($proposal->payload['expected_edge_revision'] ?? 0)) throw new \RuntimeException('REVISION_CONFLICT');
+            $predicate = (string) ($proposal->payload['predicate'] ?? '');
+            $catalogueRelation = in_array($predicate, ['specimen_of', 'lists_specimen'], true);
+            if ($catalogueRelation) {
+                $errors = SpecimenProductRelationPolicy::validate($proposal->payload, new PredicateRegistry());
+                if ($errors !== []) throw new \RuntimeException($errors[0]);
+                if (!$this->relationContexts) throw new \RuntimeException('GRAPH_RELATION_CONTEXT_REPOSITORY_UNAVAILABLE');
+            }
+            $oldContext = $catalogueRelation && $this->relationContexts !== null ? $this->relationContexts->findByEdgeUuid($oldId) : null;
             $this->graph->retire($oldId, $old->revision);
+            if ($catalogueRelation && $oldContext !== null) $this->relationContexts->retire($oldContext, $oldContext->revision);
             try {
                 $desired = new NodeReference((string) ($proposal->payload['target_type'] ?? ''), (string) ($proposal->payload['target_uuid'] ?? ''));
                 $source = new NodeReference((string) ($proposal->payload['source_type'] ?? ''), (string) ($proposal->payload['source_uuid'] ?? ''));
-                $existing = $this->graph->findEdge($source, (string) ($proposal->payload['predicate'] ?? ''), $desired);
+                $existing = $this->graph->findEdge($source, $predicate, $desired);
                 if ($existing !== null && !$existing->isActive()) $new = $this->graph->reactivate($existing->edge_uuid, $existing->revision);
                 elseif ($existing !== null) throw new \RuntimeException('CARDINALITY_CONFLICT');
-                else $new = $this->graph->create($source, (string) ($proposal->payload['predicate'] ?? ''), $desired);
+                else $new = $this->graph->create($source, $predicate, $desired);
+                if ($catalogueRelation) {
+                    $evidenceResolver = $this->dependencies === null ? null : fn (string $id): bool => (bool) $this->dependencies->evidence($id);
+                    $context = GraphRelationContextPolicy::create([
+                        'edge_uuid' => $new->edge_uuid,
+                        'source_revision' => (int) $proposal->payload['source_revision'],
+                        'target_revision' => (int) $proposal->payload['target_revision'],
+                        'scope_code' => (string) $proposal->payload['scope_code'],
+                        'scope_subject_type' => (string) $proposal->payload['source_type'],
+                        'scope_subject_id' => (string) $proposal->payload['source_uuid'],
+                        'provenance_class' => (string) $proposal->payload['provenance'],
+                        'evidence_refs' => (array) $proposal->payload['evidence_refs'],
+                        'approval_fingerprint' => $proposal->bindingFingerprint(),
+                        'idempotency_key' => $proposal->idempotencyKey,
+                    ], $evidenceResolver);
+                    $this->relationContexts->create($context);
+                }
                 return $new;
             } catch (\Throwable $error) {
                 // ControlledApply owns the enclosing transaction; this throw
@@ -264,9 +313,19 @@ final class AuthorityProposalExecutor
             }
         }
         $edgeId = $proposal->targetUuid ?: $proposal->subjectId;
-        return $proposal->operation === 'relation_retire'
+        $updated = $proposal->operation === 'relation_retire'
             ? $this->graph->retire($edgeId, $proposal->expectedRevision)
             : $this->graph->reactivate($edgeId, $proposal->expectedRevision);
+        $edge = $this->graph->findByUuid($edgeId);
+        if ($edge !== null && in_array($edge->predicate, ['specimen_of', 'lists_specimen'], true)) {
+            if (!$this->relationContexts) throw new \RuntimeException('GRAPH_RELATION_CONTEXT_REPOSITORY_UNAVAILABLE');
+            $context = $this->relationContexts->findByEdgeUuid($edgeId);
+            if ($context === null) throw new \RuntimeException('GRAPH_RELATION_CONTEXT_NOT_FOUND');
+            $context = $proposal->operation === 'relation_retire'
+                ? $this->relationContexts->retire($context, $context->revision)
+                : $this->relationContexts->reactivate($context, $context->revision);
+        }
+        return $updated;
     }
 
     /** @return list<array<string,mixed>> */

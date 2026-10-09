@@ -11,6 +11,7 @@ use NHK\Core\Domain\Authority\{AuthorityEntity, EntityTypeRegistry};
 use NHK\Core\Application\Presentation\LatestFirstOrder;
 use NHK\Core\Application\Presentation\PresentationReadiness;
 use NHK\Core\Application\Presentation\ClockTypeNavigationProjection;
+use NHK\Core\Application\Catalogue\SpecimenCatalogueQuery;
 
 final class PublicEntityCollectionQuery
 {
@@ -26,6 +27,7 @@ final class PublicEntityCollectionQuery
         private ?EntityKnowledgeProjection $entityKnowledge = null,
         private ?\Closure $presentationSignals = null,
         private ?ClockTypeNavigationProjection $navigation = null,
+        private ?SpecimenCatalogueQuery $catalogue = null,
     ) {}
 
     public function types(): EntityTypeRegistry { return $this->types; }
@@ -46,6 +48,7 @@ final class PublicEntityCollectionQuery
         $type = $definition instanceof EntityProfileDefinition ? (string) ($definition->matchingRule['entity_type'] ?? '') : '';
         $empty = ['available' => $this->isAvailable(), 'type' => $type, 'profile_key' => $profileKey, 'page' => $page, 'per_page' => $perPage, 'total' => 0, 'query' => $query, 'items' => []];
         if (!$this->isAvailable() || !$definition instanceof EntityProfileDefinition || $type === '') return $empty;
+        if ($this->catalogue !== null && in_array($type, ['specimen', 'product'], true) && $query === '') return $this->catalogueResult($this->catalogue->archive($type, $page, $perPage), $profileKey, $query);
 
         // Search is a permitted semantic surface for non-curated Classification; the LOẠI index itself never takes this branch because it has no query.
         if ($profileKey === 'clock_type' && $query === '') return $this->navigation === null ? $empty : $this->buildCuratedClockTypeArchive($empty);
@@ -90,6 +93,7 @@ final class PublicEntityCollectionQuery
     {
         $page = max(1, $page); $perPage = min(100, max(1, $perPage)); $query = trim($query); $items = [];
         if (!$this->isAvailable() || !$this->types->has($type)) return ['available' => $this->isAvailable(), 'type' => $type, 'page' => $page, 'per_page' => $perPage, 'total' => 0, 'query' => $query, 'items' => []];
+        if ($this->catalogue !== null && in_array($type, ['specimen', 'product'], true) && $query === '') return $this->catalogueResult($this->catalogue->archive($type, $page, $perPage), null, $query);
         foreach ($this->authority->listByType($type, true) as $entity) {
             $item = $this->item($entity, $query, false);
             if ($item !== null) $items[] = $item;
@@ -103,6 +107,7 @@ final class PublicEntityCollectionQuery
     public function detail(string $type, string $key): ?array
     {
         if (!$this->isAvailable() || !$this->types->has($type)) return null;
+        if ($this->catalogue !== null && in_array($type, ['specimen', 'product'], true)) return $this->catalogue->detail($type, $key);
         $entity = $this->resolvePublicSlug($type, $key);
         $item = $entity === null ? null : $this->item($entity, '', true);
         return $item === null ? null : $this->withoutOrderingMetadata($item);
@@ -213,6 +218,22 @@ final class PublicEntityCollectionQuery
             'title' => (string) ($item['title'] ?? ''),
             'caption' => (string) ($item['caption'] ?? ''),
             'article_url' => $item['article_url'] ?? null,
+        ];
+    }
+
+    /** @param array<string,mixed> $result @return array<string,mixed> */
+    private function catalogueResult(array $result, ?string $profileKey, string $query): array
+    {
+        return [
+            'available' => ($result['status'] ?? '') === 'available',
+            'type' => (string) ($result['type'] ?? ''),
+            'profile_key' => $profileKey,
+            'page' => (int) ($result['page'] ?? 1),
+            'per_page' => (int) ($result['per_page'] ?? 24),
+            'total' => (int) ($result['total'] ?? 0),
+            'query' => $query,
+            'filters' => $result['filters'] ?? [],
+            'items' => is_array($result['items'] ?? null) ? $result['items'] : [],
         ];
     }
 

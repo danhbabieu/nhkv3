@@ -14,7 +14,21 @@ final class GraphService implements GraphReader {
         if (!$definition->allows($source->endpoint_type,$target->endpoint_type)) { if(!in_array($source->endpoint_type,$definition->allowed_source_types,true)) throw new InvalidRelationSourceType('Invalid relation source type.'); throw new InvalidRelationTargetType('Invalid relation target type.'); }
         if (!$definition->allow_self_relation && $source->key()===$target->key()) throw new InvalidRelationTargetType('Self relation is not allowed.');
         if ($definition->key === 'subtype_of') ($this->hierarchy ?? throw new \RuntimeException('CLASSIFICATION_HIERARCHY_POLICY_UNAVAILABLE'))->assertCanCreate($source, $target);
-        $edge=$this->repository->createEdge($this->repository->resolveNode($source),$definition,$this->repository->resolveNode($target)); $this->audit->record('RelationCreated',$edge); return $edge;
+        $sourceNode = $this->repository->resolveNode($source);
+        $targetNode = $this->repository->resolveNode($target);
+        $existing = $this->repository->findEdge($source, $definition->key, $target);
+        if ($existing !== null && $existing->isActive()) {
+            $this->audit->record('RelationCreated', $existing);
+            return $existing;
+        }
+        if ($definition->constraints['one_active_target_across_target_types'] ?? false) {
+            foreach ((array) ($this->repository->outgoing($sourceNode, $definition->key, 0, 200, false)['items'] ?? []) as $candidate) {
+                if ($candidate instanceof GraphEdge && $candidate->isActive() && $candidate->target->reference->key() !== $target->key()) {
+                    throw new \NHK\Core\Graph\Exception\RelationCardinalityViolation('SPECIMEN_IDENTITY_CONFLICT');
+                }
+            }
+        }
+        $edge=$this->repository->createEdge($sourceNode,$definition,$targetNode); $this->audit->record('RelationCreated',$edge); return $edge;
     }
     public function findOutgoing(NodeReference $source, ?string $predicate=null, int $after=0, int $limit=50, bool $includeRetired=false, ?string $targetType=null): array { $ref=$this->endpoints->assertExists($source); $node=$this->repository->findNode($ref); return $node ? $this->repository->outgoing($node,$predicate,max(0,$after),min(200,max(1,$limit)),$includeRetired,$targetType) : ['items'=>[],'next_cursor'=>null]; }
     public function findIncoming(NodeReference $target, ?string $predicate=null, int $after=0, int $limit=50, bool $includeRetired=false, ?string $sourceType=null): array { $ref=$this->endpoints->assertExists($target); $node=$this->repository->findNode($ref); return $node ? $this->repository->incoming($node,$predicate,max(0,$after),min(200,max(1,$limit)),$includeRetired,$sourceType) : ['items'=>[],'next_cursor'=>null]; }

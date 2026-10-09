@@ -4,10 +4,10 @@ namespace NHK\Core\Application\Graph;
 use NHK\Core\Application\Graph\SemanticEnrichmentRelationRegistry;
 use NHK\Core\Contracts\Shared\TransactionManager;
 use NHK\Core\Shared\Uuid\UuidCodec;
-use NHK\Core\Domain\Graph\NodeReference;
+use NHK\Core\Domain\Graph\{NodeReference, PredicateRegistry};
 final class SemanticRelationGovernanceAdapter
 {
-    public function __construct(private string $registryVersion, private string $registryHash, private $endpointState, private $relationState, private $graph = null, private $contexts = null, private ?TransactionManager $transactions = null, private $invalidate = null) {}
+    public function __construct(private string $registryVersion, private string $registryHash, private $endpointState, private $relationState, private $graph = null, private $contexts = null, private ?TransactionManager $transactions = null, private $invalidate = null, private ?PredicateRegistry $predicates = null) {}
     public function preview(array $input): array
     {
         $operation = strtoupper(trim((string) ($input['operation'] ?? '')));
@@ -23,6 +23,21 @@ final class SemanticRelationGovernanceAdapter
         foreach ([[$sourceState,'OWNER_NOT_FOUND'],[$targetState,'OWNER_NOT_FOUND']] as [$state,$code]) if (!is_array($state) || ($state['exists'] ?? true) === false) return $this->blocked($base,$code);
         if (($sourceState['active'] ?? false) !== true || ($targetState['active'] ?? false) !== true) return $this->blocked($base,'OWNER_INACTIVE');
         $context = (array) ($input['context'] ?? []);
+        if (in_array($predicate, ['specimen_of', 'lists_specimen'], true) && in_array($operation, ['ADD', 'REPLACE'], true)) {
+            $relationErrors = SpecimenProductRelationPolicy::validate([
+                'predicate' => $predicate,
+                'source_type' => $source['type'],
+                'source_uuid' => $source['id'],
+                'target_type' => $target['type'],
+                'target_uuid' => $target['id'],
+                'source_revision' => $input['source_revision'] ?? $sourceState['revision'] ?? 0,
+                'target_revision' => $input['target_revision'] ?? $targetState['revision'] ?? 0,
+                'scope_code' => $input['scope_code'] ?? ($context['scope_code'] ?? ''),
+                'provenance' => $input['provenance'] ?? '',
+                'evidence_refs' => $input['evidence_refs'] ?? [],
+            ], $this->predicates);
+            if ($relationErrors !== []) return $this->blocked($base, $relationErrors[0]);
+        }
         if (trim((string) ($input['scope_code'] ?? $context['scope_code'] ?? '')) === '') return $this->blocked($base,'SCOPE_INVALID');
         $lifecycle = in_array($operation,['RETIRE','REACTIVATE'],true);
         $existingContext = null;

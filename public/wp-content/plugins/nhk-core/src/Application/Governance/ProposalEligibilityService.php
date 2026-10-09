@@ -6,6 +6,8 @@ namespace NHK\Core\Application\Governance;
 use NHK\Core\Contracts\Governance\{EligibilityReader, ProposalRepository};
 use NHK\Core\Contracts\Media\MediaUsageRepository;
 use NHK\Core\Application\Graph\ClassifiedAsPolicy;
+use NHK\Core\Application\Graph\SpecimenProductRelationPolicy;
+use NHK\Core\Domain\Graph\PredicateRegistry;
 use NHK\Core\Application\Knowledge\KnowledgeClaimIdentityResolution;
 use NHK\Core\Domain\Governance\{DependencyGraph, EligibilityResult, ProposalState, ProposalSubjectBindingValidator};
 
@@ -137,6 +139,10 @@ final class ProposalEligibilityService
             if ($proposal->subjectId !== '' && $this->reader->targetRevision($proposal->subjectId) !== $sourceRevision) $reasons[] = 'SOURCE_REVISION_CHANGED';
             if ($proposal->targetUuid !== null && $this->reader->targetRevision($proposal->targetUuid) !== $targetRevision) $reasons[] = 'TARGET_REVISION_CHANGED';
         } elseif (in_array($proposal->operation, ['relation_create', 'relation_retire', 'relation_reactivate', 'relation_replace'], true)) {
+            if (in_array((string) ($proposal->payload['predicate'] ?? ''), ['specimen_of', 'lists_specimen'], true)
+                && in_array($proposal->operation, ['relation_create', 'relation_replace'], true)) {
+                foreach (SpecimenProductRelationPolicy::validate($proposal->payload, new PredicateRegistry()) as $reason) $reasons[] = $reason;
+            }
             if (($proposal->payload['predicate'] ?? '') === 'classified_as') {
                 try {
                     ($this->classifiedAs ?? new ClassifiedAsPolicy())->assertCandidate([

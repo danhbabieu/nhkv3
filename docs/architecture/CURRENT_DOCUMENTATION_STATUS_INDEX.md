@@ -9,6 +9,17 @@
 > If anything here conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`,
 > the Constitution controls.
 
+## 0.1.0 Specimen catalogue relationship implementation — 2026-10-09
+
+The approved local implementation now registers `specimen_of` and
+`lists_specimen` in the executable Graph vocabulary, validates their typed
+cardinality and relation-context requirements, and exposes a bounded public
+read model for `/hien-vat/` and `/san-pham/`. The implementation is local-only:
+the additive registry migration is prepared but not wired or executed, and no
+Capture, Video, Specimen, Product, staging or production record was mutated.
+The server-bound resolved-subject packet is available for the existing Capture
+continuation path; the supplied ÔĐô case remains runtime-unverified.
+
 ## 0.0.9 Universal Music intake and public display evidence — 2026-10-09
 
 The Music A–Z standard now has complete executable intake metadata for its
@@ -535,7 +546,7 @@ Available`, `Frontend Available`, `Frontend Blocked`.
 | Entity Profile / Clock Type | `ENTITY_PROFILE_CLOCK_TYPE_CONTRACT.md` | Brand and Clock Type are independent profiles; Clock Type is `classification + family=clock_type`; current public detail namespace is `/dong-ho-{type-slug}/` while Brand remains `/{brand-slug}/`; the prefix is presentation-only and does not alter semantic identity. PR3 adds shared dossier/root read foundation, PR4.1 wires shadow diagnostics and a Graph-backed membership reader, PR5 adds a locally tested Governance-only new-data membership candidate/apply seam plus bounded derived Brand↔Type read recipe, PR6 adds a read-only legacy target/source dry-run audit, and PR6.1 adds production-owner Knowledge/Evidence and cursor-inventory read bridges. Legacy `clock-type` remains compatibility-read only; no shadow/candidate/audit result is Graph/Knowledge/Evidence/Video truth, and staging/live apply remains prohibited. |
 | Graph | only semantic relation persistence | current executable predicate vocabulary includes `about`, `depicts`, `model_of`, `variant_of`, `uses_movement`, `supports_music`, `configured_with_music`, `observed_playing_music`, `subtype_of` and `classified_as`; hierarchy is ACTIVE/same-family/cycle-free and membership is scope-bound; physical row completeness/family audit remains a separate runtime/data question |
 | Public Entity Dossier | `docs/architecture/PUBLIC_ENTITY_DOSSIER_PROJECTION_CONTRACT.md`; detail-only read model over existing canonical owners | shared dossier seam is wired through `nhk_v3_entity_detail_projection`; Brand is the first complete typed path-recipe projection; direct subject Knowledge remains subject-scoped, deep Brand context keeps origin path, archives stay outside the heavy dossier path, and no display shortcut relation is persisted |
-| Product–Specimen | no approved canonical persistence relation | payload fields, taxonomy, post meta or broad `about` are not ownership substitutes; contract/registry extension required before canonical linkage |
+| Product–Specimen | `lists_specimen` Graph relation and `GraphRelationContext` are implemented locally; migration/runtime activation remains pending | payload fields, taxonomy, post meta or broad `about` remain invalid substitutes; governed apply and exact-object Evidence are required |
 | Public Identity | persisted identity/history implementation plus shared public-slug policy exist in code | `PublicIdentityService`, `CanonicalPublicSlugPolicy`, repository/WPDB boundary, migration 014 and exact one-hop history resolver are implemented; compatibility routes now reuse the shared normalizer/collision candidates; bounded owner-scoped audit/reprojection reuses the same maintenance service with canonical read-back, while live re-projection remains runtime-unverified |
 | Knowledge / Source / Evidence | atomic canonical claim + provenance/support contexts; Collector Profile maintenance is defined by `docs/architecture/COLLECTOR_PROFILE_CONTRACT.md` and executable `CollectorFacetRegistry` | governed writes only; reuse canonical IDs/revisions; Collector facet maintenance is metadata-only and facet-allowlisted; Article prose, Video transcript, OCR, captions and generated copy are not automatic Evidence; Article reuse retains Claim revision/path trace rather than duplicating claim text into semantic storage; `nhk.knowledge.quality-audit` is a bounded internal/admin read-only projection of the existing quality auditor with privacy-safe output, deterministic pagination/filters and no apply/write path; full corpus remains runtime-gated |
 | Living Knowledge | read/plan/resolve then governed mutation | no silent semantic rewrite; downstream reuse must preserve scope and provenance; Dictionary labels may assist lexical matching but never mint claims/evidence |

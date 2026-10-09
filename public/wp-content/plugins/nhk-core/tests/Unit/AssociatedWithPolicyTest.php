@@ -14,7 +14,7 @@ final class AssociatedWithPolicyTest extends TestCase
         $registry = new PredicateRegistry();
         $predicate = $registry->get('associated_with');
 
-        self::assertSame('1.1.0', PredicateRegistry::VERSION);
+        self::assertSame('1.2.0', PredicateRegistry::VERSION);
         self::assertSame(['component', 'movement', 'variant'], $predicate->allowed_source_types);
         self::assertSame(['brand', 'movement', 'music', 'classification'], $predicate->allowed_target_types);
         self::assertSame('REQUIRED', $predicate->evidence_requirement);

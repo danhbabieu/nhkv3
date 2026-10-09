@@ -555,6 +555,26 @@ and `Côn hoa thị` were not touched.
 | Provenance/support | `Source` + `Evidence` | reuse canonical source/evidence chain | treat generated prose, OCR, caption or transcript as Evidence by itself |
 | Typed semantic relation | Graph | reuse registered endpoint IDs + predicate | infer relation from placement/upload/prose alone |
 
+### Physical catalogue relation descriptors — 2026-10-09
+
+The executable `PredicateRegistry` exposes the bounded catalogue predicates
+`specimen_of` (Specimen → Model or Variant) and `lists_specimen` (Product →
+Specimen). MCP/admin relation descriptors must use the existing semantic
+relation preview/apply/read lifecycle with the exact endpoint UUIDs, current
+revisions, scope, approved provenance, Evidence references, proposal
+fingerprint and idempotency key. The predicates are not payload fields and are
+not writable through generic Product, WordPress, taxonomy or `about` paths.
+
+`specimen_of` permits one active identity target across Model and Variant; a
+replacement is high-impact and retains the retired edge. `lists_specimen`
+permits one active specimen per Product while retaining historical Product
+links. A multi-object listing, missing exact-object Evidence, stale revision or
+unresolved Capture subject returns a blocker and remains non-public. The
+catalogue read model exposes only Public Identity, direct/derived labels and
+eligible routes; UUIDs, stable keys, revisions and internal packets are not
+public output. The canonical owning contract is
+`docs/architecture/SPECIMEN_PRODUCT_RELATIONSHIP_CONTRACT.md`.
+
 Every write must be read back from its owning store. MCP never becomes a second
 canonical store, and Admin/WordPress adapters never become parallel semantic
 writers.

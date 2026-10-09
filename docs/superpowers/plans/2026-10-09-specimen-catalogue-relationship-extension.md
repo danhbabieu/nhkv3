@@ -1,8 +1,12 @@
 # Specimen Catalogue Relationship Extension — Implementation Plan
 
 Design baseline: adae28f08267ed479e8d2d6a4f966e7a94ca5bbb
-Status: plan only; implementation is blocked at design approval
+Status: local implementation completed; migration/runtime acceptance remain gated
 Companion: docs/superpowers/specs/2026-10-09-specimen-catalogue-relationship-extension-design.md
+
+Checkpoint 2026-10-09: approved local code, tests and ACTIVE contract docs are
+implemented on `main`. The additive registry migration is intentionally not
+wired into the pending runner and no runtime mutation was performed.
 
 ## 1. Registry and schema impact
 

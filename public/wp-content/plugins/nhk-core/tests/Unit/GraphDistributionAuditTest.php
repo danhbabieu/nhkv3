@@ -21,6 +21,6 @@ final class GraphDistributionAuditTest extends TestCase
 
         self::assertSame([['source_type' => 'wp_post', 'predicate' => 'about', 'target_type' => 'brand', 'edge_count' => 2]], $result['distribution']);
         self::assertSame(2, $result['active_edge_total']);
-        self::assertSame(11, $result['registered_predicate_count']);
+        self::assertSame(13, $result['registered_predicate_count']);
     }
 }

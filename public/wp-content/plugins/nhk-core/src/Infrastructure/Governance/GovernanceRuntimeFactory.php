@@ -17,7 +17,7 @@ use NHK\Core\Domain\Graph\{EndpointTypeRegistry, NodeReference, PredicateRegistr
 use NHK\Core\Domain\Governance\DependencyGraph;
 use NHK\Core\Infrastructure\Authority\{WpdbAuthorityRepository, WpdbSemanticMergeReceiptRepository};
 use NHK\Core\Infrastructure\Database\WpdbTransactionManager;
-use NHK\Core\Infrastructure\Graph\{CoreEndpointResolverRegistrar, SemanticMergeGraphAdapter, WpdbAuditSink as GraphAuditSink, WpdbGraphRepository};
+use NHK\Core\Infrastructure\Graph\{CoreEndpointResolverRegistrar, SemanticMergeGraphAdapter, WpdbAuditSink as GraphAuditSink, WpdbGraphRepository, WpdbGraphRelationContextRepository};
 use NHK\Core\Infrastructure\Governance\WpdbAuditSink as GovernanceAuditSink;
 use NHK\Core\Infrastructure\Knowledge\{WpdbEvidenceRepository, WpdbKnowledgeRepository, WpdbSourceRepository};
 use NHK\Core\Infrastructure\Media\{WpdbArticleMediaBlueprintRepository, WpdbMediaAssetRepository, WpdbMediaRepository, WpdbMediaUsageRepository, WordPressAttachmentUrlResolver, WordPressMediaAttachmentBridge};
@@ -223,7 +223,7 @@ final class GovernanceRuntimeFactory
             $proposalRepository,
             $applyAttempts = new WpdbApplyAttemptRepository($wpdb),
             $transactionManager,
-            new AuthorityProposalExecutor($authorityService, $graphService, $mediaService, new VideoService($videos), $knowledgeService, new MediaIngestGateway($mediaService, $attachmentBridge), $merge, dependencies: $dependencyValidator, completeness: new VideoCompletenessPolicy(), relationProposals: $proposalRepository, historicalEvidence: $historicalEvidence, collectorFacetExecutor: $collectorExecutor, videoCompletenessReconciliation: $videoCompleteness, classifiedAs: $classifiedAsPolicy, mediaBinding: $mediaBinding, mediaProjection: $attachmentBridge, articleMediaSubjectBinding: $articleMediaSubjectBinding),
+            new AuthorityProposalExecutor($authorityService, $graphService, $mediaService, new VideoService($videos), $knowledgeService, new MediaIngestGateway($mediaService, $attachmentBridge), $merge, dependencies: $dependencyValidator, completeness: new VideoCompletenessPolicy(), relationProposals: $proposalRepository, historicalEvidence: $historicalEvidence, collectorFacetExecutor: $collectorExecutor, videoCompletenessReconciliation: $videoCompleteness, classifiedAs: $classifiedAsPolicy, mediaBinding: $mediaBinding, mediaProjection: $attachmentBridge, articleMediaSubjectBinding: $articleMediaSubjectBinding, relationContexts: new WpdbGraphRelationContextRepository($wpdb)),
             $governanceAudit,
             $eligibility,
             new NoOpApplyExecutionHook(),

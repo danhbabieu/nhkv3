@@ -59,6 +59,7 @@ final class McpDocumentationRegistry
         'living-knowledge' => ['path' => 'docs/architecture/GOVERNED_LIVING_KNOWLEDGE_DESIGN.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'knowledge'],
         'collector-profile' => ['path' => 'docs/architecture/COLLECTOR_PROFILE_CONTRACT.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'knowledge'],
         'graph' => ['path' => 'docs/architecture/11_GRAPH_CORE_CONTRACT.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'graph'],
+        'specimen-product-relationship' => ['path' => 'docs/architecture/SPECIMEN_PRODUCT_RELATIONSHIP_CONTRACT.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'catalogue'],
         'related-semantic-projection' => ['path' => 'docs/architecture/RELATED_SEMANTIC_PROJECTION_CONTRACT.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'graph'],
         'governance' => ['path' => 'docs/architecture/16_P4_GOVERNANCE_CORE_CONTRACT.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'governance'],
         'governance-retry' => ['path' => 'docs/architecture/18_GOVERNANCE_FAILURE_AND_RETRY.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'governance'],

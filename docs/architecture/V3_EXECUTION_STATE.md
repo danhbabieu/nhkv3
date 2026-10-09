@@ -1,5 +1,42 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-09 — Specimen catalogue relationship implementation
+
+IMPLEMENTED_LOCAL: The approved specimen catalogue slice is implemented on
+local `main`. `PredicateRegistry` version `1.2.0` now contains the typed
+`specimen_of` (Specimen → Model|Variant) and `lists_specimen` (Product →
+Specimen) predicates. Graph admission enforces one active identity target and
+the existing ONE outbound listing cardinality; Governance proposal eligibility,
+relation context creation/lifecycle, Evidence/provenance/scope/revision checks,
+idempotency binding and canonical read-back remain the mutation boundary.
+Product and Specimen remain distinct owners and no direct Specimen → Brand edge
+is admitted.
+
+PUBLIC_READ_MODEL: A bounded `SpecimenCatalogueQuery` backs the separate
+`/hien-vat/` and `/san-pham/` identity surfaces in local contract tests, with
+derived Variant/Model/Brand traversal, Product history, deterministic paging,
+historical-offer filtering and UUID/stable-key omission. Media, Video,
+Knowledge and Dictionary remain their existing owners and are extension points
+of the read model, not copied payload fields.
+
+CAPTURE_VIDEO: `ResolvedSubjectReconciliationPacket` is immutable, evidence-
+required and bound to exact Capture/request/idempotency/revision values. The
+supplied Capture `01a120b2-6987-7f78-bb74-20640cdddfad`, Variant
+`852da54d-457a-4397-a16d-52d9452ba766` and YouTube case were not read or
+mutated; the runtime continuation remains review/runtime-blocked.
+
+MIGRATION: `SpecimenProductRelationMigration026` is forward-only and prepared
+to seed the two registry dictionary entries, but is deliberately not wired into
+the pending migration runner and was not executed on any runtime.
+
+VERIFIED: Focused catalogue/Graph/Product/packet tests pass. The full Unit
+suite under PHP `memory_limit=512M` completed 3,703 tests / 24,397 assertions
+with one existing Article repository error and one existing semantic
+specificity failure; the default 128M run additionally hits the known test
+fixture memory ceiling. No integration/runtime mutation was attempted.
+
+STATUS: `SPECIMEN_CATALOGUE_IMPLEMENTED_LOCAL / RELATION_MIGRATION_PREPARED_NOT_EXECUTED / CAPTURE_RUNTIME_UNVERIFIED / FULL_UNIT_BASELINE_RECORDED / NO_SEMANTIC_MUTATION`
+
 # Checkpoint — 2026-10-09 — Real specimen catalogue boundary audit
 
 AUDIT: Continued the local `main` audit for the real antique-clock specimen

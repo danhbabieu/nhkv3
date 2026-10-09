@@ -1,13 +1,19 @@
-# Specimen Catalogue Relationship Extension — Approved-Design Candidate
+# Specimen Catalogue Relationship Extension — Approved Design / Local Implementation
 
 Ngày: 2026-10-09
 Baseline: adae28f08267ed479e8d2d6a4f966e7a94ca5bbb (main)
-Trạng thái: DESIGN_CANDIDATE / NOT_ACTIVE / NO_RUNTIME_MUTATION
+Trạng thái: APPROVED_DESIGN / ACTIVE_LOCAL_CONTRACT / NO_RUNTIME_MUTATION
+
+Local implementation checkpoint: `specimen_of` and `lists_specimen` are now
+registered in code and covered by the local Graph/Governance/read-model tests.
+The registry migration remains prepared-but-not-executed and the supplied
+runtime Capture/Video case remains unverified; this document does not authorize
+staging or production mutation.
 
 ## 1. Phạm vi và địa vị
 
-Đây là candidate cho thiết kế được phê duyệt, không phải ACTIVE contract,
-registry snapshot hay quyền ghi dữ liệu. Tài liệu này không thay Constitution,
+Đây là thiết kế đã được phê duyệt và có local ACTIVE contract implementation,
+nhưng không phải quyền ghi runtime. Tài liệu này không thay Constitution,
 không đăng ký predicate, không thêm schema field, không migrate và không tạo
 dữ liệu nghiệm thu.
 
@@ -28,8 +34,8 @@ Owner hiện hành không đổi:
 
 ## 2. Kết luận kiến trúc
 
-Hai quan hệ dưới đây là tên candidate được đề xuất. Chưa predicate nào là
-ACTIVE ở checkpoint này.
+Hai quan hệ dưới đây là tên predicate ACTIVE trong local executable registry.
+Runtime activation vẫn phụ thuộc migration/deployed build/acceptance gates.
 
 | Quan hệ candidate | Source → target | Cardinality | Ý nghĩa |
 |---|---|---|---|

@@ -83,6 +83,7 @@ use NHK\Core\Application\Home\HomeSemanticQuery;
 use NHK\Core\Application\Presentation\{ClockTypeNavigationProjection, NavigationTreeProjector};
 use NHK\Core\Application\Search\SearchSemanticQuery;
 use NHK\Core\Application\Knowledge\{EntityKnowledgeProjection, KnowledgePageQuery, PublicResearchSourceDisplayPolicy};
+use NHK\Core\Application\Catalogue\SpecimenCatalogueQuery;
 use NHK\Core\Application\Knowledge\KnowledgeService;
 use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
 use NHK\Core\Application\Collector\{CollectorFacetMaintenanceExecutor, CollectorFacetMaintenanceService};
@@ -228,11 +229,13 @@ final class Plugin {
             $publicSources = new WpdbSourceRepository($wpdb);
             $publicEvidence = new WpdbEvidenceRepository($wpdb);
             $publicKnowledge = new EntityKnowledgeProjection($publicClaims, $publicEvidence, $publicSources, $publicStatus, $publicSourceDisplayPolicy);
+            $publicEntityMedia = new EntityMediaProjection($publicMedia, $publicAssets, $publicUsages, new SemanticSuitabilityPolicy(), new \NHK\Core\Infrastructure\Media\WpdbArticleMediaBlueprintRepository($wpdb));
+            $publicCatalogue = new SpecimenCatalogueQuery($publicAuthority, $publicTypes, $publicGraph, $publicRoutes, knowledge: static fn (string $type, string $id): array => $publicKnowledge->forSubject($id), media: static fn (string $type, string $id): array => $publicEntityMedia->forEntity($type, $id));
             $navigationProjection = new ClockTypeNavigationProjection(new NavigationTreeProjector(new WpdbNavigationRepository($wpdb, static function (\NHK\Core\Domain\PresentationNavigation\NavigationNode $node) use ($publicAuthority): bool {
                 $entity = $publicAuthority->findByCanonicalId($node->canonicalUuid);
                 return $entity !== null && $entity->entityType === 'classification' && $entity->active() && (($entity->payload['family'] ?? null) === 'clock_type');
             })));
-            $publicCollection = new PublicEntityCollectionQuery($publicAuthority, $publicTypes, new PublicIdentityContract($publicTypes), $publicEligibility, $publicRoutes, $publicAggregation, static fn (): bool => $publicStatus->authorityStorageReady(), new EntityMediaProjection($publicMedia, $publicAssets, $publicUsages, new SemanticSuitabilityPolicy(), new \NHK\Core\Infrastructure\Media\WpdbArticleMediaBlueprintRepository($wpdb)), $publicKnowledge, null, $navigationProjection);
+            $publicCollection = new PublicEntityCollectionQuery($publicAuthority, $publicTypes, new PublicIdentityContract($publicTypes), $publicEligibility, $publicRoutes, $publicAggregation, static fn (): bool => $publicStatus->authorityStorageReady(), $publicEntityMedia, $publicKnowledge, null, $navigationProjection, $publicCatalogue);
             add_filter('nhk_v3_clock_type_navigation_items', static function (array $items, string $placement) use ($navigationProjection, $publicAuthority, $publicRoutes, $publicEligibility): array {
                 foreach ($navigationProjection->menu($placement) as $node) {
                     $entity = $publicAuthority->findByCanonicalId((string) ($node['canonical_uuid'] ?? ''));
@@ -373,7 +376,8 @@ final class Plugin {
                     return ($representative['media_id'] ?? '') === $mediaId ? ['status' => 'verified', 'media_id' => $mediaId, 'route' => $publicRoutes->path($owner)] : ['status' => 'stale', 'media_id' => $mediaId];
                 },
             );
-            $publicCollection = new PublicEntityCollectionQuery($authority, $types, new PublicIdentityContract($types), $publicEligibility, $publicRoutes, new BrandAggregationQuery($graphService, $authority, $types, $publicRoutes, $publicEligibility), static fn (): bool => $publicStatus->authorityStorageReady(), $entityMediaProjection, new EntityKnowledgeProjection($claims, $evidence, $sources, $publicStatus, $publicSourceDisplayPolicy));
+            $publicCatalogue = new SpecimenCatalogueQuery($authority, $types, $graphService, $publicRoutes);
+            $publicCollection = new PublicEntityCollectionQuery($authority, $types, new PublicIdentityContract($types), $publicEligibility, $publicRoutes, new BrandAggregationQuery($graphService, $authority, $types, $publicRoutes, $publicEligibility), static fn (): bool => $publicStatus->authorityStorageReady(), $entityMediaProjection, new EntityKnowledgeProjection($claims, $evidence, $sources, $publicStatus, $publicSourceDisplayPolicy), null, null, $publicCatalogue);
             $governanceRuntime = GovernanceRuntimeFactory::fromWordPress($wpdb, $sharedAttachmentBridge);
             $stagingScopeVerifier = $governanceRuntime->stagingScopeVerifier ?? new \NHK\Core\Application\Governance\StagingAcceptanceScopeVerifier(
                 static function (): string { return defined('WP_ENVIRONMENT_TYPE') ? strtolower((string) constant('WP_ENVIRONMENT_TYPE')) : (function_exists('wp_get_environment_type') ? strtolower((string) wp_get_environment_type()) : strtolower((string) (getenv('WP_ENVIRONMENT_TYPE') ?: 'unknown'))); },

@@ -69,6 +69,19 @@ Post-to-Knowledge links remain Graph relations and must be applied through
 Governance/Controlled Apply when part of Article Ingest. A direct mutation path
 outside that boundary is a `CONSTITUTION_CONFLICT` to be audited and closed.
 
+### Physical catalogue relations — 2026-10-09
+
+The active local registry also defines `specimen_of` (Specimen → Model or
+Variant, one active identity target) and `lists_specimen` (Product → Specimen,
+one active listing target with historical reverse links). They are Graph-owned,
+not Product payload, postmeta, taxonomy or `about` substitutes. New governed
+operations require exact endpoint revisions, scope, approved provenance,
+Evidence, proposal/idempotency binding and `GraphRelationContext`; replacement
+retires the previous edge and preserves its audit history. Public Brand context
+is derived through the existing Variant → Model → Brand or Model → Brand chain.
+The detailed public/read and Capture handoff contract is
+`SPECIMEN_PRODUCT_RELATIONSHIP_CONTRACT.md`.
+
 ## Storage migration 001
 
 ### `{$wpdb->prefix}nhk_graph_nodes`

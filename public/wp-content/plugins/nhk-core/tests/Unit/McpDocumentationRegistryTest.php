@@ -23,6 +23,7 @@ final class McpDocumentationRegistryTest extends TestCase
         self::assertContains('dictionary-semantic-enrichment-projection', $keys);
         self::assertContains('collector-profile', $keys);
         self::assertContains('graph', $keys);
+        self::assertContains('specimen-product-relationship', $keys);
         self::assertContains('governance', $keys);
         self::assertContains('media', $keys);
         self::assertContains('visual-support-requirement', $keys);
