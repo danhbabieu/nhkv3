@@ -2,10 +2,11 @@
 declare(strict_types=1);
 namespace NHK\Core\Shared\Migration;
 use NHK\Core\Infrastructure\Migration\DictionaryEntrySenseMigration024;
+use NHK\Core\Infrastructure\Migration\SpecimenProductRelationMigration026;
 final class MigrationStatus {
     private ?bool $projectionReady = null;
     public function status(): array {
-        return ['current' => (int) get_option('nhk_core_migration_current', 0), 'target' => max((int) get_option('nhk_core_migration_target', 0), DictionaryEntrySenseMigration024::VERSION)];
+        return ['current' => (int) get_option('nhk_core_migration_current', 0), 'target' => max((int) get_option('nhk_core_migration_target', 0), DictionaryEntrySenseMigration024::VERSION, SpecimenProductRelationMigration026::VERSION)];
     }
     /** Runtime writes fail closed when the ledger is current but a required table/column is missing. */
     public function runtimeSchemaReady(): bool {
@@ -19,7 +20,7 @@ final class MigrationStatus {
             'SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name=%s AND column_name=%s',
             $wpdb->prefix . 'nhk_proposals', 'subject_id',
         )) === 1;
-        return $governanceReady && $this->dictionaryEntrySenseSchemaReady();
+        return $governanceReady && $this->dictionaryEntrySenseSchemaReady() && SpecimenProductRelationMigration026::schemaReady($wpdb);
     }
     public function dictionaryEntrySenseSchemaReady(): bool { global $wpdb; if (!isset($wpdb) || !is_object($wpdb)) return false; try { return DictionaryEntrySenseMigration024::schemaReady($wpdb); } catch (\Throwable) { return false; } }
     public function graphStorageReady(): bool { global $wpdb; if (!isset($wpdb) || !is_object($wpdb)) return false; $prefix=$wpdb->prefix; foreach (["nhk_graph_nodes","nhk_graph_predicates","nhk_graph_edges"] as $table) if ($wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s",$prefix.$table)) !== $prefix.$table) return false; return true; }

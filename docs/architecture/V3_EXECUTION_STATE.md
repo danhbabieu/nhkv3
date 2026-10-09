@@ -25,17 +25,34 @@ supplied Capture `01a120b2-6987-7f78-bb74-20640cdddfad`, Variant
 `852da54d-457a-4397-a16d-52d9452ba766` and YouTube case were not read or
 mutated; the runtime continuation remains review/runtime-blocked.
 
-MIGRATION: `SpecimenProductRelationMigration026` is forward-only and prepared
-to seed the two registry dictionary entries, but is deliberately not wired into
-the pending migration runner and was not executed on any runtime.
+MIGRATION: `SpecimenProductRelationMigration026` is forward-only, idempotent,
+and wired into `Plugin::runPendingMigrations()`, `MigrationStatus`, the
+maintenance receipt and the remote migration verifier. It seeds only the two
+Graph predicate-dictionary rows and does not create semantic entities or edges.
+It was not deployed or executed on any runtime in this checkpoint.
 
-VERIFIED: Focused catalogue/Graph/Product/packet tests pass. The full Unit
-suite under PHP `memory_limit=512M` completed 3,703 tests / 24,397 assertions
-with one existing Article repository error and one existing semantic
-specificity failure; the default 128M run additionally hits the known test
-fixture memory ceiling. No integration/runtime mutation was attempted.
+VERIFIED: Focused catalogue/Graph/Product/packet tests pass (307 tests /
+2,178 assertions) and the Contract suite passes (6 tests / 48 assertions).
+The full Unit suite under PHP `memory_limit=512M` completed 3,704 tests /
+24,404 assertions with one existing Article repository error and one existing
+semantic specificity failure; the known integration/runtime guard failures
+remain environment-gated. PHP lint and `git diff --check` pass for the changed
+scope. No integration/runtime mutation was attempted.
 
-STATUS: `SPECIMEN_CATALOGUE_IMPLEMENTED_LOCAL / RELATION_MIGRATION_PREPARED_NOT_EXECUTED / CAPTURE_RUNTIME_UNVERIFIED / FULL_UNIT_BASELINE_RECORDED / NO_SEMANTIC_MUTATION`
+RUNTIME_PREFLIGHT: Read-only staging maintenance confirmed deployed source
+revision `aff71a29161d3ea334cce1e2bf565aa9f63c5378`, database
+`erourxcg_nhkv3`, migration `25/25`, healthy storage/hydration/application/
+REST layers, 422 Authority rows, 25 Videos, 950 Graph edges and no existing
+Specimen/Product rows in the inspected inventory. The deployed package still
+does not contain the new runner wiring because this local checkpoint is not
+deployed.
+
+BLOCKER: The repository contains only historical local/test backup-rehearsal
+evidence, not a fresh staging backup/recovery checkpoint bound to this run.
+Per the Constitution and the requested acceptance policy, deployment and
+Migration 026 execution stop here; no staging or production mutation occurred.
+
+STATUS: `SPECIMEN_CATALOGUE_IMPLEMENTED_LOCAL / MIGRATION_026_WIRED_NOT_DEPLOYED / STAGING_BACKUP_GATE_BLOCKED / CAPTURE_RUNTIME_UNVERIFIED / FULL_UNIT_BASELINE_RECORDED / NO_SEMANTIC_MUTATION`
 
 # Checkpoint — 2026-10-09 — Real specimen catalogue boundary audit
 

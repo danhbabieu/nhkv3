@@ -6,9 +6,9 @@ namespace NHK\Core\Infrastructure\Migration;
 /**
  * Forward-only registry-data preparation for the specimen catalogue.
  *
- * This migration is intentionally not wired into Plugin::runPendingMigrations
- * in the local implementation checkpoint. Deployment/acceptance must opt into
- * it explicitly after the release gate and registry snapshot are verified.
+ * This migration is wired into the official forward-only UP runner. It only
+ * extends the Graph predicate dictionary; semantic entities and edges remain
+ * untouched.
  */
 final class SpecimenProductRelationMigration026
 {
@@ -26,6 +26,8 @@ final class SpecimenProductRelationMigration026
                 gmdate('Y-m-d H:i:s.u'),
             ));
         }
+        update_option('nhk_core_migration_current', max((int) get_option('nhk_core_migration_current', 0), self::VERSION), false);
+        update_option('nhk_core_migration_target', max((int) get_option('nhk_core_migration_target', 0), self::VERSION), false);
     }
 
     public static function schemaReady(object $database): bool

@@ -42,9 +42,10 @@ final class MaintenanceMigrationRunnerTest extends TestCase
     public function test_migration_receipt_uses_canonical_current_target_and_machine_readable_schema_failure(): void
     {
         $entrypoint = (string) file_get_contents(dirname(__DIR__, 2) . '/bin/nhk-core-maintenance.php');
-        self::assertStringContainsString("DictionaryLexicalRelationMigration025::VERSION", $entrypoint);
+        self::assertStringContainsString("SpecimenProductRelationMigration026::VERSION", $entrypoint);
         self::assertStringNotContainsString("\$current !== 24 || \$target !== 24", $entrypoint);
         self::assertStringContainsString("'DICTIONARY_ENTRY_SENSE_SCHEMA_NOT_READY'", $entrypoint);
         self::assertStringContainsString("'dictionary_entry_sense_schema_ready' => \$schemaReady", $entrypoint);
+        self::assertStringContainsString("'specimen_product_relation_schema_ready' => \$specimenProductRelationSchemaReady", $entrypoint);
     }
 }

@@ -14,9 +14,10 @@
 The approved local implementation now registers `specimen_of` and
 `lists_specimen` in the executable Graph vocabulary, validates their typed
 cardinality and relation-context requirements, and exposes a bounded public
-read model for `/hien-vat/` and `/san-pham/`. The implementation is local-only:
-the additive registry migration is prepared but not wired or executed, and no
-Capture, Video, Specimen, Product, staging or production record was mutated.
+read model for `/hien-vat/` and `/san-pham/`. Migration 026 is now wired into
+the official forward-only UP runner and maintenance receipt, but has not been
+deployed or executed on any runtime. No Capture, Video, Specimen, Product,
+staging or production record was mutated.
 The server-bound resolved-subject packet is available for the existing Capture
 continuation path; the supplied ÔĐô case remains runtime-unverified.
 

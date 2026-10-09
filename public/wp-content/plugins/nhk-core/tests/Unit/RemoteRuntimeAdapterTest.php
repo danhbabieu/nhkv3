@@ -5,7 +5,7 @@ namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Demo\DemoCutoverContext;
 use NHK\Core\Infrastructure\Demo\RemoteRuntimeAdapter;
-use NHK\Core\Infrastructure\Migration\DictionaryLexicalRelationMigration025;
+use NHK\Core\Infrastructure\Migration\SpecimenProductRelationMigration026;
 use PHPUnit\Framework\TestCase;
 
 final class RemoteRuntimeAdapterTest extends TestCase
@@ -59,15 +59,15 @@ final class RemoteRuntimeAdapterTest extends TestCase
     {
         $sourceRevision = str_repeat('a', 40);
         $adapter = new RemoteRuntimeAdapter('demo.1945.vn', '/remote/plugin', static fn (): array => [0, json_encode([
-            'status' => 'pass', 'identifier' => 'remote-migration-up', 'current' => 25, 'target' => 25,
-            'dictionary_entry_sense_schema_ready' => true, 'pack' => 'dictionary', 'run_id' => 'run-7',
+            'status' => 'pass', 'identifier' => 'remote-migration-up', 'current' => 26, 'target' => 26,
+            'dictionary_entry_sense_schema_ready' => true, 'specimen_product_relation_schema_ready' => true, 'pack' => 'dictionary', 'run_id' => 'run-7',
             'source_revision' => $sourceRevision,
         ]), ''], null, ['migration_runtime' => 'demo', 'authorized_database' => 'nhk_v3', 'environment' => 'staging']);
 
         $result = $adapter->run(new DemoCutoverContext('demo.1945.vn', 'dictionary', $sourceRevision, 'run-7'), 'migration-up');
 
         self::assertSame('pass', $result->status);
-        self::assertSame(DictionaryLexicalRelationMigration025::VERSION, $result->metadata['current']);
+        self::assertSame(SpecimenProductRelationMigration026::VERSION, $result->metadata['current']);
         self::assertTrue($result->metadata['dictionary_entry_sense_schema_ready']);
     }
 
@@ -76,13 +76,13 @@ final class RemoteRuntimeAdapterTest extends TestCase
         $sourceRevision = str_repeat('a', 40);
         $stale = new RemoteRuntimeAdapter('demo.1945.vn', '/remote/plugin', static fn (): array => [0, json_encode([
             'status' => 'pass', 'pack' => 'dictionary', 'run_id' => 'run-8', 'source_revision' => str_repeat('b', 40),
-            'current' => DictionaryLexicalRelationMigration025::VERSION - 1, 'target' => DictionaryLexicalRelationMigration025::VERSION, 'dictionary_entry_sense_schema_ready' => true,
+            'current' => SpecimenProductRelationMigration026::VERSION - 1, 'target' => SpecimenProductRelationMigration026::VERSION, 'dictionary_entry_sense_schema_ready' => true, 'specimen_product_relation_schema_ready' => true,
         ]), ''], null, ['migration_runtime' => 'demo', 'authorized_database' => 'nhk_v3', 'environment' => 'staging']);
         self::assertSame('REMOTE_SOURCE_REVISION_MISMATCH', $stale->run(new DemoCutoverContext('demo.1945.vn', 'dictionary', $sourceRevision, 'run-8'), 'migration-up')->reasonCode);
 
         $incomplete = new RemoteRuntimeAdapter('demo.1945.vn', '/remote/plugin', static fn (): array => [0, json_encode([
             'status' => 'pass', 'pack' => 'dictionary', 'run_id' => 'run-9', 'source_revision' => $sourceRevision,
-            'current' => DictionaryLexicalRelationMigration025::VERSION - 1, 'target' => DictionaryLexicalRelationMigration025::VERSION, 'dictionary_entry_sense_schema_ready' => false,
+            'current' => SpecimenProductRelationMigration026::VERSION - 1, 'target' => SpecimenProductRelationMigration026::VERSION, 'dictionary_entry_sense_schema_ready' => false, 'specimen_product_relation_schema_ready' => true,
         ]), ''], null, ['migration_runtime' => 'demo', 'authorized_database' => 'nhk_v3', 'environment' => 'staging']);
         self::assertSame('MIGRATION_TARGET_NOT_REACHED', $incomplete->run(new DemoCutoverContext('demo.1945.vn', 'dictionary', $sourceRevision, 'run-9'), 'migration-up')->reasonCode);
     }
@@ -102,7 +102,7 @@ final class RemoteRuntimeAdapterTest extends TestCase
         $commands = [];
         $adapter = RemoteRuntimeAdapter::fromEnvironment(static function (array $command) use (&$commands): array {
             $commands[] = $command;
-            return [0, json_encode(['status' => 'pass', 'pack' => 'dictionary', 'run_id' => 'run-10', 'source_revision' => str_repeat('a', 40), 'current' => 25, 'target' => 25, 'dictionary_entry_sense_schema_ready' => true]), ''];
+            return [0, json_encode(['status' => 'pass', 'pack' => 'dictionary', 'run_id' => 'run-10', 'source_revision' => str_repeat('a', 40), 'current' => 26, 'target' => 26, 'dictionary_entry_sense_schema_ready' => true, 'specimen_product_relation_schema_ready' => true]), ''];
         });
 
         $result = $adapter->run(new DemoCutoverContext('demo.1945.vn', 'dictionary', str_repeat('a', 40), 'run-10'), 'migration-up');

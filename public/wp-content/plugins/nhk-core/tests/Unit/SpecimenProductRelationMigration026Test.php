@@ -25,9 +25,11 @@ final class SpecimenProductRelationMigration026Test extends TestCase
         self::assertTrue(SpecimenProductRelationMigration026::schemaReady($database));
     }
 
-    public function test_plugin_does_not_auto_wire_the_unexecuted_registry_migration(): void
+    public function test_plugin_wires_the_forward_only_registry_migration_after_existing_migrations(): void
     {
-        $plugin = (string) file_get_contents(dirname(__DIR__, 3) . '/src/Plugin.php');
-        self::assertStringNotContainsString('SpecimenProductRelationMigration026::up()', $plugin);
+        $plugin = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Plugin.php');
+        self::assertStringContainsString('SpecimenProductRelationMigration026::VERSION', $plugin);
+        self::assertStringContainsString('(new SpecimenProductRelationMigration026())->up()', $plugin);
+        self::assertStringContainsString('SpecimenProductRelationMigration026::schemaReady($wpdb)', $plugin);
     }
 }

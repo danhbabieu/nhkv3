@@ -5,7 +5,7 @@ use NHK\Core\Shared\Health\HealthCheck;
 use NHK\Core\Shared\Migration\MigrationStatus;
 use NHK\Core\Plugin;
 use NHK\Core\Infrastructure\Maintenance\MaintenanceCapabilityBridge;
-use NHK\Core\Infrastructure\Migration\DictionaryLexicalRelationMigration025;
+use NHK\Core\Infrastructure\Migration\SpecimenProductRelationMigration026;
 use NHK\Core\Application\Collector\CollectorFacetMaintenanceService;
 use NHK\Core\Application\Snapshot\{CanonicalSnapshotExportService, CanonicalSnapshotImportService, RecoveryRuntimeGuard, SnapshotArtifactCodec};
 use NHK\Core\Contracts\Snapshot\{CanonicalSnapshotSource, CanonicalSnapshotWriter};
@@ -126,11 +126,13 @@ try {
         $status = new MigrationStatus();
         $current = (int) get_option('nhk_core_migration_current', 0);
         $target = (int) get_option('nhk_core_migration_target', 0);
-        $expectedTarget = DictionaryLexicalRelationMigration025::VERSION;
+        $expectedTarget = SpecimenProductRelationMigration026::VERSION;
         if ($current !== $expectedTarget || $target !== $expectedTarget) throw new \RuntimeException('MIGRATION_TARGET_NOT_REACHED');
         $schemaReady = $status->dictionaryEntrySenseSchemaReady();
         if (!$schemaReady) throw new \RuntimeException('DICTIONARY_ENTRY_SENSE_SCHEMA_NOT_READY');
-        $payload = ['status' => 'pass', 'identifier' => 'remote-migration-up', 'current' => $current, 'target' => $target, 'dictionary_entry_sense_schema_ready' => $schemaReady, 'pack' => $pack, 'run_id' => $runId, 'source_revision' => $sourceRevision];
+        $specimenProductRelationSchemaReady = SpecimenProductRelationMigration026::schemaReady($wpdb);
+        if (!$specimenProductRelationSchemaReady) throw new \RuntimeException('SPECIMEN_PRODUCT_RELATION_SCHEMA_NOT_READY');
+        $payload = ['status' => 'pass', 'identifier' => 'remote-migration-up', 'current' => $current, 'target' => $target, 'dictionary_entry_sense_schema_ready' => $schemaReady, 'specimen_product_relation_schema_ready' => $specimenProductRelationSchemaReady, 'pack' => $pack, 'run_id' => $runId, 'source_revision' => $sourceRevision];
     } elseif (in_array($operation, ['canonical-inventory', 'graph-inventory', 'relation-dry-run'], true)) {
         do_action('rest_api_init');
         $request = new \WP_REST_Request('POST', '/nhk/v1/mcp');
