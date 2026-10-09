@@ -25,7 +25,7 @@ final class GovernedLivingKnowledgeE2ETest extends TestCase
             $subject = UuidCodec::newV7();
             $provenance = [];
             if ($relation !== null) {
-                $claim = $fixture['knowledge']->createClaim('e2e:claim:' . $relation, 'Claim for ' . $relation . '.', 'fact');
+                $claim = $this->seedClaim($fixture['knowledge'], 'e2e:claim:' . $relation, 'Claim for ' . $relation . '.');
                 $source = $fixture['knowledge']->createSource('e2e:source:' . $relation, 'Source for ' . $relation, 'website', null, ['visibility' => 'PUBLIC']);
                 $provenance = ['claim_id' => $claim->canonicalId, 'source_id' => $source->canonicalId, 'relation' => $relation];
             }
@@ -81,7 +81,7 @@ final class GovernedLivingKnowledgeE2ETest extends TestCase
     {
         $fixture = $this->fixture();
         $subject = UuidCodec::newV7();
-        $claim = $fixture['knowledge']->createClaim('e2e:stale:claim', 'Stale dependency claim.', 'fact');
+        $claim = $this->seedClaim($fixture['knowledge'], 'e2e:stale:claim', 'Stale dependency claim.');
         $source = $fixture['knowledge']->createSource('e2e:stale:source', 'Stale dependency source', 'website');
         $candidate = new KnowledgeEnrichmentCandidate('add_evidence', $subject, new KnowledgeFacetProfile('recognition', 'variant'), 'Stale source observation.', ['claim_id' => $claim->canonicalId, 'source_id' => $source->canonicalId, 'claim_revision' => $claim->revision, 'source_revision' => $source->revision, 'relation' => 'supports']);
         $arguments = $fixture['factory']->arguments($candidate, 'e2e-stale');
@@ -127,7 +127,7 @@ final class GovernedLivingKnowledgeE2ETest extends TestCase
     public function test_same_evidence_candidate_twice_returns_one_proposal_and_one_canonical_evidence(): void
     {
         $fixture = $this->fixture();
-        $claim = $fixture['knowledge']->createClaim('e2e:idem:claim', 'Idempotent claim.', 'fact');
+        $claim = $this->seedClaim($fixture['knowledge'], 'e2e:idem:claim', 'Idempotent claim.');
         $source = $fixture['knowledge']->createSource('e2e:idem:source', 'Idempotent source', 'website');
         $candidate = new KnowledgeEnrichmentCandidate('add_evidence', UuidCodec::newV7(), new KnowledgeFacetProfile('recognition', 'variant'), 'Idempotent evidence.', ['claim_id' => $claim->canonicalId, 'source_id' => $source->canonicalId, 'claim_revision' => $claim->revision, 'source_revision' => $source->revision, 'relation' => 'supports']);
         $firstArguments = $fixture['factory']->arguments($candidate, 'e2e-cross-proposal-evidence');
@@ -146,7 +146,7 @@ final class GovernedLivingKnowledgeE2ETest extends TestCase
         $fixture = $this->fixture();
         $subjectA = UuidCodec::newV7();
         $subjectB = UuidCodec::newV7();
-        $claim = $fixture['knowledge']->createClaim('e2e:distinct:claim', 'Distinct claim.', 'fact');
+        $claim = $this->seedClaim($fixture['knowledge'], 'e2e:distinct:claim', 'Distinct claim.');
         $sourceA = $fixture['knowledge']->createSource('e2e:distinct:source-a', 'Distinct source A', 'website');
         $sourceB = $fixture['knowledge']->createSource('e2e:distinct:source-b', 'Distinct source B', 'website');
         $candidates = [
@@ -190,6 +190,11 @@ final class GovernedLivingKnowledgeE2ETest extends TestCase
     private function proposalFrom(array $arguments): Proposal
     {
         return new Proposal(UuidCodec::newV7(), $arguments['subject_id'], $arguments['operation'], $arguments['payload'], $arguments['content_fingerprint'], $arguments['expected_revision'], $arguments['dependency_fingerprint'], ProposalState::DRAFT, 'owner', null, null, $arguments['idempotency_key'], 1, null, null, null, $arguments['entity_type']);
+    }
+
+    private function seedClaim(KnowledgeService $knowledge, string $stableKey, string $text): KnowledgeClaim
+    {
+        return $knowledge->createClaim($stableKey, $text, 'fact', ['metadata' => ['subject_id' => UuidCodec::newV7(), 'facet' => 'recognition', 'scope' => 'variant']]);
     }
 
     /** @return array<string,mixed> */

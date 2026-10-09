@@ -40,7 +40,10 @@ final class KnowledgeEnrichmentProposalFactory
     /** @return array<string,mixed> */
     private function payload(KnowledgeEnrichmentCandidate $candidate): array
     {
-        if ($candidate->classification === 'new_claim') return ['stable_key' => 'nhk:knowledge:' . hash('sha256', CommandCanonicalizer::canonicalize([$candidate->subjectId, $candidate->profile->toMetadata(), $candidate->observation])), 'text' => $candidate->observation, 'claim_type' => (string) ($candidate->provenance['claim_type'] ?? 'fact'), 'provenance' => ['metadata' => $candidate->profile->toMetadata()] + $candidate->provenance];
+        if ($candidate->classification === 'new_claim') {
+            $metadata = ['subject_id' => $candidate->subjectId] + $candidate->profile->toMetadata();
+            return ['stable_key' => 'nhk:knowledge:' . hash('sha256', CommandCanonicalizer::canonicalize([$candidate->subjectId, $metadata, $candidate->observation])), 'text' => $candidate->observation, 'claim_type' => (string) ($candidate->provenance['claim_type'] ?? 'fact'), 'provenance' => ['metadata' => $metadata] + $candidate->provenance];
+        }
         if (!in_array($candidate->classification, ['add_evidence', 'qualify', 'contradict'], true)) throw new KnowledgeEnrichmentProposalException('UNSUPPORTED', 'Candidate classification cannot become a proposal.');
         $claimId = (string) ($candidate->provenance['claim_id'] ?? ''); $sourceId = (string) ($candidate->provenance['source_id'] ?? '');
         if ($claimId === '' || $sourceId === '') throw new KnowledgeEnrichmentProposalException('UNSUPPORTED', 'Evidence candidate requires resolved claim_id and source_id.');

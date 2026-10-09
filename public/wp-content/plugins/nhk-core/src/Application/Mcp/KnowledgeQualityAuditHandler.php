@@ -13,7 +13,16 @@ final class KnowledgeQualityAuditHandler
     private const SCOPES = ['entity', 'brand', 'model', 'variant', 'movement', 'specimen', 'specimen_observation', 'observation', 'editorial_experience', 'hypothesis', 'unresolved'];
     private const READINESS = ['READY', 'PARTIAL', 'BLOCKED'];
 
-    public function __construct(private KnowledgeQualityAuditCoordinator $coordinator) {}
+    private \Closure $diagnosticSink;
+
+    public function __construct(private KnowledgeQualityAuditCoordinator $coordinator, ?callable $diagnosticSink = null)
+    {
+        $this->diagnosticSink = $diagnosticSink === null
+            ? static function (array $diagnostic): void {
+                error_log('NHK knowledge quality audit failure ' . json_encode($diagnostic, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+            }
+            : \Closure::fromCallable($diagnosticSink);
+    }
 
     /** @return array<string,mixed> */
     public function audit(array $input): array
@@ -29,8 +38,26 @@ final class KnowledgeQualityAuditHandler
 
         try {
             $batch = $this->coordinator->auditBatch($limit, $cursor, true, $filters);
-        } catch (\Throwable) {
-            return ['status' => 'UNAVAILABLE', 'read_only' => true, 'mutated' => false, 'total' => 0, 'items' => [], 'aggregate' => $this->emptyAggregate(), 'next_cursor' => null, 'has_more' => false, 'reason' => 'KNOWLEDGE_QUALITY_AUDIT_UNAVAILABLE'];
+        } catch (\Throwable $error) {
+            $diagnostic = [
+                'code' => 'KNOWLEDGE_QUALITY_AUDIT_INTERNAL_ERROR',
+                'correlation_id' => UuidCodec::newV7(),
+                'exception_class' => get_class($error),
+            ];
+            ($this->diagnosticSink)($diagnostic);
+            return [
+                'status' => 'UNAVAILABLE',
+                'result_state' => 'RUNTIME_ERROR',
+                'read_only' => true,
+                'mutated' => false,
+                'total' => null,
+                'items' => [],
+                'aggregate' => null,
+                'next_cursor' => null,
+                'has_more' => false,
+                'reason' => 'KNOWLEDGE_QUALITY_AUDIT_UNAVAILABLE',
+                'diagnostics' => ['error' => $diagnostic],
+            ];
         }
         $items = $batch['results'];
         if (!$includeRepairs) foreach ($items as &$item) unset($item['repair_candidates']);

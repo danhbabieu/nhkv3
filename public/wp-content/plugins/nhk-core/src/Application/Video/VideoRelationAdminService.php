@@ -11,7 +11,7 @@ use NHK\Core\Contracts\Knowledge\{EvidenceRepository,KnowledgeRepository,SourceR
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Governance\{CommandCanonicalizer,Proposal};
 use NHK\Core\Domain\Video\Video;
-use NHK\Core\Domain\Knowledge\Evidence;
+use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeFacetProfile};
 use NHK\Core\Infrastructure\Admin\VideoRelationAdminContract;
 use NHK\Core\Shared\Uuid\UuidCodec;
 
@@ -44,7 +44,7 @@ final class VideoRelationAdminService
     {
         $sourceData = $this->provenance($video); $sourceKey = 'nhk:video-source:' . hash('sha256', CommandCanonicalizer::canonicalize(['youtube', $video->externalVideoId, $video->canonicalUrl])); $sourceMetadata = ['visibility' => 'PRIVATE', 'origin' => 'VIDEO_CANONICAL_PROVENANCE', 'video_uuid' => $video->canonicalId, 'platform' => 'youtube', 'external_video_id' => $video->externalVideoId];
         $source = $this->sources->findByStableKey($sourceKey); if ($source !== null) { if (!$source->active || $source->locator !== $video->canonicalUrl || $source->metadata !== $sourceMetadata) throw new \RuntimeException('WRONG_SOURCE_PROVENANCE'); } else { $this->knowledge->createSource($sourceKey, $sourceData['source_title'] ?: 'YouTube video source', 'website', $video->canonicalUrl, $sourceMetadata); $source = $this->sources->findByStableKey($sourceKey) ?? throw new \RuntimeException('CANONICAL_SOURCE_REQUIRED'); }
-        $claimKey = 'nhk:video-relation-claim:' . hash('sha256', CommandCanonicalizer::canonicalize([$video->canonicalId, $targetType, $targetId, 'about'])); $claimProvenance = ['metadata' => ['origin' => 'VIDEO_RELATION_RECONCILIATION'], 'video_uuid' => $video->canonicalId, 'target_type' => $targetType, 'target_uuid' => $targetId, 'predicate' => 'about'];
+        $claimKey = 'nhk:video-relation-claim:' . hash('sha256', CommandCanonicalizer::canonicalize([$video->canonicalId, $targetType, $targetId, 'about'])); $claimProvenance = ['metadata' => ['origin' => 'VIDEO_RELATION_RECONCILIATION', 'subject_id' => $targetId, 'facet' => 'provenance', 'scope' => in_array($targetType, KnowledgeFacetProfile::SCOPES, true) ? $targetType : 'entity'], 'video_uuid' => $video->canonicalId, 'target_type' => $targetType, 'target_uuid' => $targetId, 'predicate' => 'about'];
         $claim = $this->claims->findByStableKey($claimKey); if ($claim !== null) { if (!$claim->active || $claim->provenance !== $claimProvenance) throw new \RuntimeException('WRONG_CLAIM_PROVENANCE'); } else { $this->knowledge->createClaim($claimKey, 'Video ' . $video->canonicalId . ' has a registered about relation to ' . $targetType . ' ' . $targetId . '.', 'provenance', $claimProvenance); $claim = $this->claims->findByStableKey($claimKey) ?? throw new \RuntimeException('CANONICAL_CLAIM_REQUIRED'); }
         $fingerprint = hash('sha256', CommandCanonicalizer::canonicalize([$claimKey, $source->stableKey, $video->canonicalId, $targetType, $targetId, 'about'])); $evidenceId = UuidCodec::v5('nhk:video-relation-evidence:' . $fingerprint); $metadata = ['visibility' => 'PRIVATE', 'origin' => 'VIDEO_CANONICAL_PROVENANCE', 'video_uuid' => $video->canonicalId, 'reconciliation_fingerprint' => $fingerprint];
         $existing = $this->evidence->findByCanonicalId($evidenceId); if ($existing !== null) { if (!$existing->active || $existing->claimId !== $claim->canonicalId || $existing->sourceId !== $source->canonicalId || $existing->metadata !== $metadata || $existing->locator !== $video->canonicalUrl) throw new \RuntimeException('WRONG_EVIDENCE_PROVENANCE'); return $existing; }

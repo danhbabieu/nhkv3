@@ -8,7 +8,7 @@ use NHK\Core\Application\Knowledge\KnowledgeService;
 use NHK\Core\Contracts\Governance\ProposalRepository;
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
 use NHK\Core\Domain\Governance\{CommandCanonicalizer, Proposal, ProposalState};
-use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim, Source};
+use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim, KnowledgeFacetProfile, Source};
 use NHK\Core\Shared\Uuid\UuidCodec;
 
 /** Reconciles pre-evidence Video relation proposals inside an existing governed transaction. */
@@ -109,7 +109,7 @@ final class HistoricalVideoRelationEvidenceReconciliation
         if ($targetType === '' || $targetId === '' || $predicate === '') throw new \RuntimeException('RELATION_BINDING_REQUIRED');
         $key = 'nhk:video-relation-claim:' . hash('sha256', CommandCanonicalizer::canonicalize([$videoId, $targetType, $targetId, $predicate]));
         $claim = $this->claims->findByStableKey($key);
-        if ($claim === null) $claim = $this->knowledge->createClaim($key, 'Video ' . $videoId . ' has a registered ' . $predicate . ' relation to ' . $targetType . ' ' . $targetId . '.', 'provenance', ['metadata' => ['origin' => 'VIDEO_RELATION_RECONCILIATION'], 'video_uuid' => $videoId, 'target_type' => $targetType, 'target_uuid' => $targetId, 'predicate' => $predicate]);
+        if ($claim === null) $claim = $this->knowledge->createClaim($key, 'Video ' . $videoId . ' has a registered ' . $predicate . ' relation to ' . $targetType . ' ' . $targetId . '.', 'provenance', ['metadata' => ['origin' => 'VIDEO_RELATION_RECONCILIATION', 'subject_id' => $targetId, 'facet' => 'provenance', 'scope' => in_array($targetType, KnowledgeFacetProfile::SCOPES, true) ? $targetType : 'entity'], 'video_uuid' => $videoId, 'target_type' => $targetType, 'target_uuid' => $targetId, 'predicate' => $predicate]);
         else {
             $claimProvenance = $claim->provenance;
             $claimMetadata = is_array($claimProvenance['metadata'] ?? null) ? $claimProvenance['metadata'] : [];

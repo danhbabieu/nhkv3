@@ -165,6 +165,27 @@ final class KnowledgeQualityAuditMcpTest extends TestCase
         self::assertSame(0, $repository->writes);
     }
 
+    public function test_internal_audit_failure_is_not_returned_as_an_empty_corpus_and_is_correlated(): void
+    {
+        $diagnostics = [];
+        $repository = new QualityAuditMcpClaims([], true);
+        $handler = $this->handler($repository, diagnosticSink: static function (array $diagnostic) use (&$diagnostics): void {
+            $diagnostics[] = $diagnostic;
+        });
+
+        $response = $handler->audit(['limit' => 1]);
+
+        self::assertSame('UNAVAILABLE', $response['status']);
+        self::assertSame('RUNTIME_ERROR', $response['result_state']);
+        self::assertSame('KNOWLEDGE_QUALITY_AUDIT_INTERNAL_ERROR', $response['diagnostics']['error']['code']);
+        self::assertMatchesRegularExpression('/^[0-9a-f-]{36}$/', $response['diagnostics']['error']['correlation_id']);
+        self::assertSame('RuntimeException', $response['diagnostics']['error']['exception_class']);
+        self::assertSame($response['diagnostics']['error'], $diagnostics[0]);
+        self::assertNull($response['total']);
+        self::assertSame([], $response['items']);
+        self::assertSame(0, $repository->writes);
+    }
+
     private function transport(callable $can, KnowledgeQualityAuditHandler $handler): McpTransport
     {
         $read = new McpReadHandler(
@@ -192,12 +213,12 @@ final class KnowledgeQualityAuditMcpTest extends TestCase
     }
 
     /** @param list<KnowledgeClaim> $claims @param list<Evidence> $evidence @param list<Source> $sources */
-    private function handler(QualityAuditMcpClaims $claims, array $evidence = [], array $sources = []): KnowledgeQualityAuditHandler
+    private function handler(QualityAuditMcpClaims $claims, array $evidence = [], array $sources = [], ?callable $diagnosticSink = null): KnowledgeQualityAuditHandler
     {
         return new KnowledgeQualityAuditHandler(new KnowledgeQualityAuditCoordinator(
             new KnowledgeQualityAuditor($claims, new QualityAuditMcpEvidence($evidence), new QualityAuditMcpSources($sources), new StructuredSemanticInterpreter()),
             $claims,
-        ));
+        ), $diagnosticSink);
     }
 
     /** @return list<KnowledgeClaim> */
@@ -212,7 +233,7 @@ final class QualityAuditMcpClaims implements KnowledgeRepository, KnowledgePageR
     public int $writes = 0;
 
     /** @param list<KnowledgeClaim> $items */
-    public function __construct(private array $items) {}
+    public function __construct(private array $items, private bool $failOnPage = false) {}
     public function findByCanonicalId(string $id): ?KnowledgeClaim { foreach ($this->items as $item) if ($item->canonicalId === $id) return $item; return null; }
     public function findByStableKey(string $stableKey): ?KnowledgeClaim { foreach ($this->items as $item) if ($item->stableKey === $stableKey) return $item; return null; }
     public function create(KnowledgeClaim $claim): KnowledgeClaim { $this->writes++; throw new \LogicException('quality audit must not write'); }
@@ -220,6 +241,7 @@ final class QualityAuditMcpClaims implements KnowledgeRepository, KnowledgePageR
     public function list(bool $includeRetired = false): array { return $this->items; }
     public function page(bool $includeRetired, ?string $afterStableKey, int $limit): array
     {
+        if ($this->failOnPage) throw new \RuntimeException('QUALITY_AUDIT_STORAGE_FAILURE');
         $items = array_values(array_filter($this->items, static fn (KnowledgeClaim $item): bool => $afterStableKey === null || $item->stableKey > $afterStableKey));
         usort($items, static fn (KnowledgeClaim $a, KnowledgeClaim $b): int => strcmp($a->stableKey, $b->stableKey));
         return ['items' => array_slice($items, 0, $limit), 'has_more' => count($items) > $limit];

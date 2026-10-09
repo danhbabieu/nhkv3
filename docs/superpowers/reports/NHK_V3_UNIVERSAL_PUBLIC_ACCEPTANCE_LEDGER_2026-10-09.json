@@ -1,0 +1,81 @@
+{
+  "ledger_version": "nhk-v3-universal-public-acceptance-1",
+  "runbook": "/Users/imac24-2125d/Downloads/NHK_V3_Universal_Public_Acceptance_Execution.md",
+  "executed_at": "2026-10-09T04:40:28+00:00",
+  "current_checkout": {
+    "branch": "main",
+    "head": "e7b94b6f1b0c71a0054b6d03176cc8e9f4a8fd7a",
+    "worktree_clean_before_run": true,
+    "deploy_performed": false,
+    "push_performed": false,
+    "semantic_mutation_performed": false
+  },
+  "documentation": {
+    "active_registry_entries": 49,
+    "source_revision": "e7b94b6f1b0c71a0054b6d03176cc8e9f4a8fd7a",
+    "documentation_version": "1505c191dcd3c775af951bbe53c385c7d2255bfbe26aa350f9fd22edd765d966",
+    "runtime_version": "0.1.0",
+    "manifest_hash": "a262f6358023548df90cbf21a38d34fabf5453e51e870c97edb9684684396144",
+    "snapshot_generated_at": "2026-10-09T04:40:28+00:00",
+    "deployed_identity_verified": false,
+    "historical_runtime_evidence_conflicts_with_current_head": true
+  },
+  "authorized_test_runtime": {
+    "required": "WP_ENVIRONMENT_TYPE=staging; database=erourxcg_nhkv3; site=https://demo.1945.vn; project=nhk-v3",
+    "observed_environment_tuple": "unset_or_unproven",
+    "wordpress_bootstrap": "FAILED_WORDPRESS_BOOTSTRAP_FAILED",
+    "rest_bootstrap": "BLOCKED_BY_WORDPRESS_BOOTSTRAP",
+    "mutation_scope": "ABSENT_SIGNED_CAPTURE_BOUND_PACKET",
+    "authorization": "AUTHORIZATION_BLOCKED"
+  },
+  "gates": {
+    "G0": {
+      "status": "BLOCKED",
+      "evidence": ["local HEAD and canonical snapshot parity verified", "preflight failed WordPress/bootstrap/schema/REST checks", "no current signed exact packet"],
+      "mutation": "NOT_ATTEMPTED"
+    },
+    "G1": {
+      "status": "PASS_LOCAL",
+      "evidence": ["quality-audit internal failure returns UNAVAILABLE/RUNTIME_ERROR with correlation_id", "nine registered Authority types share guard matrix", "source/process/metadata/inference inputs remain non-factual or review-only"],
+      "focused_tests": {"tests": 110, "assertions": 1130, "result": "PASS"}
+    },
+    "G2": {
+      "status": "READ_ONLY_BLOCKED",
+      "evidence": ["Knowledge identity guard remains fail-closed", "no six-claim canonical read-back available", "no governed repair proposal was applied"],
+      "invalid_claim_plan": "KEEP_PENDING_EVIDENCE_OR_RETIRE_PROCESS_CONTAMINATION_REQUIRES_CANONICAL_IDS_AND_OWNER_PACKET"
+    },
+    "G3": {
+      "status": "PASS_LOCAL_BLOCKED_RUNTIME",
+      "evidence": ["Capture dependency fingerprint/reducer/convergence/semantic-core tests pass", "Knowledge proposal factory now binds candidate subject_id into canonical provenance metadata", "video relation callers now bind subject/facet/scope before governed evidence flow", "no replay of applied proposals"],
+      "focused_tests": {"tests": 215, "assertions": 1005, "result": "PASS"},
+      "outcome_tests": {"tests": 97, "assertions": 325, "result": "PASS"}
+    },
+    "G4": {
+      "status": "PASS_LOCAL_PUBLIC_PARTIAL",
+      "evidence": ["generic Music dossier tests pass for Westminster/Sonodo/Ave Maria shape", "score/audio/rights contracts fail closed for unverified or non-public material", "public page shows governed dossier and no public audio file"],
+      "focused_tests": {"tests": 222, "assertions": 2285, "result": "PASS"},
+      "westminster_completion": "BLOCKED_BY_MISSING_GOVERNED_SCORE_AUDIO_AND_EVIDENCE_READBACK"
+    },
+    "G5": {
+      "status": "PARTIAL_BLOCKED",
+      "public_url": "https://demo.1945.vn/ban-nhac/westminster/",
+      "anonymous_browser_readback": "OBSERVED",
+      "observed_public_state": ["Music dossier renders", "6 knowledge records and 1 video indicator visible", "no public audio file available", "detailed Knowledge section says it is being updated", "some public records lack displayed citations"],
+      "frontend_readback_gate": "FRONTEND_READBACK_UNVERIFIED_FOR_DEPLOYED_BUILD_IDENTITY",
+      "no_done_claim": true
+    }
+  },
+  "changed_shared_boundaries": [
+    "KnowledgeQualityAuditHandler preserves runtime failure state and correlation diagnostics",
+    "KnowledgeEnrichmentProposalFactory preserves canonical candidate subject identity",
+    "Video relation Knowledge provenance writers provide subject/facet/scope required by identity contract"
+  ],
+  "verification": {
+    "unit_suite": {"tests": 3680, "assertions": 23285, "errors": 1, "failures": 1, "result": "BASELINE_NOT_GREEN", "remaining": ["WpdbArticleOperationReceiptRepositoryTest type mismatch", "SemanticSpecificityPropagationTest expected BACKGROUND_CONTEXT missing"]},
+    "integration_suite": "BLOCKED_BY_TEST_RUNTIME_IDENTITY_AND_WP_BOOTSTRAP",
+    "contract_suite": {"tests": 6, "assertions": 48, "result": "PASS"},
+    "lint_diff_secret_review": "PASS"
+  },
+  "final_status": "PARTIAL / BLOCKED",
+  "next_single_action": "Obtain a fresh server-issued signed Capture-bound exact packet and matching deployed source/build identity for the authorized TEST runtime; then perform canonical read-only owner/evidence/revision read-back before any Governance mutation is considered."
+}

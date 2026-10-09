@@ -9,6 +9,7 @@ use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, Sourc
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim, Source};
 use NHK\Core\Domain\Video\Video;
+use NHK\Core\Shared\Uuid\UuidCodec;
 use PHPUnit\Framework\TestCase;
 
 final class DictionaryWriteObservationTest extends TestCase
@@ -33,7 +34,7 @@ final class DictionaryWriteObservationTest extends TestCase
             public function listByClaim(string $claimId, bool $includeRetired = false): array { return []; } public function listBySource(string $sourceId, bool $includeRetired = false): array { return []; }
         };
         $service = new KnowledgeService($claims, $sources, $evidence, static function (string $kind, string $id, string $text, array $context) use (&$events): void { $events[] = compact('kind','id','text','context'); });
-        $claim = $service->createClaim('clock.term', 'Côn lòng máng là cách gọi đang được nghiên cứu.', 'technical', ['subject_id' => 'subject-1']);
+        $claim = $service->createClaim('clock.term', 'Côn lòng máng là cách gọi đang được nghiên cứu.', 'technical', ['metadata' => ['subject_id' => UuidCodec::newV7(), 'facet' => 'identity', 'scope' => 'component']]);
         self::assertSame('KNOWLEDGE', $events[0]['kind']);
         self::assertSame($claim->canonicalId, $events[0]['id']);
         self::assertStringContainsString('Côn lòng máng', $events[0]['text']);

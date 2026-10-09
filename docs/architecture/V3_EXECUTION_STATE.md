@@ -1,5 +1,35 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-09 — Universal public acceptance G0–G5
+
+EXECUTED: Read-only G0–G5 acceptance followed the attached runbook and the
+49-entry ACTIVE documentation registry. Local HEAD, regenerated canonical-docs
+snapshot and source revision are `e7b94b6f1b0c71a0054b6d03176cc8e9f4a8fd7a`.
+The local preflight failed closed at WordPress/bootstrap/schema/REST because
+the authorized TEST identity tuple and deployed build identity were not proven;
+no server-issued signed Capture-bound packet or mutation scope was available.
+
+FIXED: The MCP Knowledge quality-audit adapter now distinguishes internal
+runtime failure from an empty corpus with `UNAVAILABLE`, `RUNTIME_ERROR`, a
+privacy-safe correlation ID and diagnostic sink. The shared Knowledge proposal
+factory now preserves candidate `subject_id` in canonical provenance metadata.
+Video relation provenance writers now provide the required subject/facet/scope
+identity context. Strict identity and Governance boundaries were not weakened.
+
+VERIFIED: G1 classifier/quality tests passed 110/1,130; Capture/Outcome tests
+passed 215/1,005 and 97/325; Music/frontend/public projection tests passed
+222/2,285. The independent in-app browser read-back of
+`https://demo.1945.vn/ban-nhac/westminster/` renders the generic Music dossier,
+but shows no public audio, incomplete Knowledge detail and missing displayed
+citation for some records. Local score/WAV research outputs were not promoted
+to canonical MediaAsset or public media.
+
+STATUS: `PARTIAL / BLOCKED / NO_SEMANTIC_MUTATION / NO_DEPLOY`; see the
+machine-checkable ledger at
+`docs/superpowers/reports/NHK_V3_UNIVERSAL_PUBLIC_ACCEPTANCE_LEDGER_2026-10-09.json`.
+The next action is a fresh signed exact packet plus deployed build/runtime
+identity, followed by canonical read-only owner/evidence/revision read-back.
+
 # Checkpoint — 2026-10-09 — Universal semantic recovery alignment design
 
 PLANNED: The approved design is recorded in

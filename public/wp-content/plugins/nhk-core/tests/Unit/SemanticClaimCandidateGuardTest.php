@@ -67,6 +67,39 @@ final class SemanticClaimCandidateGuardTest extends TestCase
         self::assertSame('REVIEW_REQUIRED', $result['status']);
     }
 
+    public function test_all_registered_authority_types_share_the_same_integrity_matrix(): void
+    {
+        $types = ['brand', 'model', 'variant', 'movement', 'music', 'component', 'classification', 'specimen', 'product'];
+        $guard = new SemanticClaimCandidateGuard();
+
+        foreach ($types as $type) {
+            $interpreted = (new TextInputInterpreter())->interpret('Được thành lập năm 1922.');
+            $candidate = $interpreted['user_claim_candidates'][0] + [
+                'subject_type' => $type,
+                'scope' => $type === 'specimen' ? 'specimen_observation' : $type,
+                'facet' => 'identity',
+            ];
+
+            self::assertSame('ALLOWED', $guard->evaluate($candidate, $interpreted)['status'], $type);
+            self::assertSame('EXPLICIT_USER_KNOWLEDGE', $candidate['provenance'], $type);
+        }
+
+        foreach ([
+            'Source: https://example.test/catalog',
+            'Hãy kiểm tra lại nguồn trước khi ghi.',
+            'Evidence: “Được ghi nhận trong hồ sơ.”',
+            'Metadata: filename=clock.webp',
+            'Có thể được thành lập năm 1922.',
+            'Bổ sung định nghĩa cho carillon: một bộ chuông nhiều cao độ.',
+        ] as $input) {
+            $interpreted = (new TextInputInterpreter())->interpret($input);
+            foreach ($interpreted['user_claim_candidates'] as $candidate) {
+                self::assertSame('REVIEW_REQUIRED', $guard->evaluate($candidate, $interpreted)['status'], $input);
+            }
+            if ($interpreted['user_claim_candidates'] === []) self::assertSame([], $interpreted['user_claim_candidates'], $input);
+        }
+    }
+
     /** @param array<string,mixed> $overrides @return array<string,mixed> */
     private function interpretation(array $overrides = []): array
     {

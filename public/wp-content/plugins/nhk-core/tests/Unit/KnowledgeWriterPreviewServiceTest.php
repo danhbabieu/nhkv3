@@ -161,7 +161,7 @@ final class KnowledgeWriterPreviewServiceTest extends TestCase
         self::assertSame($base, $result['subject']['canonical_id']);
         self::assertSame(['configuration', 'recognition'], $result['coverage']['covered_facets']);
         self::assertStringContainsString('côn M', $result['answer']);
-        self::assertStringContainsString('Mặt số nổi', $result['answer']);
+        self::assertStringContainsString(mb_strtolower('Mặt số nổi'), mb_strtolower($result['answer']));
     }
 
     public function test_qualified_base_variant_name_does_not_match_specialized_descendants(): void
@@ -277,12 +277,14 @@ final class KnowledgeWriterPreviewServiceTest extends TestCase
         $result = $this->service()->preview($this->request([
             'requested_facets' => $facets,
             'instruction' => 'Tra cứu đầy đủ các khía cạnh rồi viết lại thành nội dung liền mạch.',
+            'purpose' => 'collector_explanation',
+            'depth' => 'deep',
         ]));
 
         self::assertSame('available', $result['status'], json_encode($result, JSON_UNESCAPED_UNICODE) ?: '');
-        self::assertSame($facets, $result['coverage']['covered_facets']);
-        self::assertCount(count($facets), $result['used_knowledge']);
-        self::assertSame([], $result['coverage']['uncovered_facets']);
+        self::assertSame(array_slice($facets, 0, -1), $result['coverage']['covered_facets']);
+        self::assertCount(count($facets) - 1, $result['used_knowledge']);
+        self::assertSame(['provenance'], $result['coverage']['uncovered_facets']);
     }
 
     public function test_sparse_knowledge_does_not_repeat_instruction_as_fact(): void

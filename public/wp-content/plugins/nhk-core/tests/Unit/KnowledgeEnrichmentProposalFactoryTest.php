@@ -11,9 +11,10 @@ final class KnowledgeEnrichmentProposalFactoryTest extends TestCase
 {
     public function test_candidate_uses_registered_create_operation_without_fabricating_revision(): void
     {
-        $candidate = new KnowledgeEnrichmentCandidate('new_claim', UuidCodec::newV7(), new KnowledgeFacetProfile('music', 'movement'), 'Sonodo được ghi nhận trong ngữ cảnh máy 24.');
+        $subjectId = UuidCodec::newV7();
+        $candidate = new KnowledgeEnrichmentCandidate('new_claim', $subjectId, new KnowledgeFacetProfile('music', 'movement'), 'Sonodo được ghi nhận trong ngữ cảnh máy 24.');
         $args = (new KnowledgeEnrichmentProposalFactory(['create']))->arguments($candidate, 'run-1');
-        self::assertSame('create', $args['operation']); self::assertSame('knowledge', $args['entity_type']); self::assertNull($args['expected_revision']); self::assertSame($args['idempotency_key'], (new KnowledgeEnrichmentProposalFactory(['create']))->arguments($candidate, 'run-1')['idempotency_key']); self::assertStringContainsString('Sonodo', $args['payload']['text']); self::assertSame('movement', $args['payload']['provenance']['metadata']['scope']);
+        self::assertSame('create', $args['operation']); self::assertSame('knowledge', $args['entity_type']); self::assertNull($args['expected_revision']); self::assertSame($args['idempotency_key'], (new KnowledgeEnrichmentProposalFactory(['create']))->arguments($candidate, 'run-1')['idempotency_key']); self::assertStringContainsString('Sonodo', $args['payload']['text']); self::assertSame('movement', $args['payload']['provenance']['metadata']['scope']); self::assertSame($subjectId, $args['payload']['provenance']['metadata']['subject_id']);
     }
 
     public function test_same_text_different_subject_or_scope_has_different_idempotency(): void

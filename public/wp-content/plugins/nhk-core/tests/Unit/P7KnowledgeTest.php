@@ -61,16 +61,17 @@ final class P7KnowledgeTest extends TestCase
             public function listBySource(string $sourceId, bool $includeRetired = false): array { return array_values(array_filter($this->items, fn (Evidence $item): bool => $item->sourceId === $sourceId)); }
         };
         $service = new KnowledgeService($claims, $sources, $evidence);
-        $claim = $service->createClaim('odo-history-1', 'The clock was made in the early twentieth century.', 'history', ['origin' => 'catalog']);
+        $claimProvenance = ['origin' => 'catalog', 'metadata' => ['subject_id' => UuidCodec::newV7(), 'facet' => 'chronology', 'scope' => 'variant']];
+        $claim = $service->createClaim('odo-history-1', 'The clock was made in the early twentieth century.', 'history', $claimProvenance);
         $source = $service->createSource('catalog-1', 'Archive catalogue', 'catalog', 'https://example.test/catalog/1');
-        $sameClaim = $service->createClaim('odo-history-1', 'The clock was made in the early twentieth century.', 'history', ['origin' => 'catalog']);
+        $sameClaim = $service->createClaim('odo-history-1', 'The clock was made in the early twentieth century.', 'history', $claimProvenance);
         $citation = $service->cite($claim->canonicalId, $source->canonicalId, 'Early twentieth century', 'supports', null, ['visibility' => 'PUBLIC']);
         self::assertSame($claim->canonicalId, $sameClaim->canonicalId);
         self::assertSame($claim->canonicalId, $citation->claimId);
         self::assertSame(['visibility' => 'PUBLIC'], $citation->metadata);
         self::assertCount(1, $service->evidenceForClaim($claim->canonicalId));
 
-        $claim = $service->updateClaim($claim->canonicalId, 'The clock was made around 1905.', 'history', ['origin' => 'catalog', 'reviewed' => true], 1);
+        $claim = $service->updateClaim($claim->canonicalId, 'The clock was made around 1905.', 'history', $claimProvenance + ['reviewed' => true], 1);
         $source = $service->updateSource($source->canonicalId, 'Reviewed archive catalogue', 'catalog', 'https://example.test/catalog/1', ['reviewed' => true], 1);
         $citation = $service->updateEvidence($citation->canonicalId, 'qualifies', 'Circa 1905', 'https://example.test/catalog/1#date', ['reviewed' => true], 1);
         self::assertSame('The clock was made around 1905.', $claim->claimText);
