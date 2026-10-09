@@ -112,6 +112,27 @@ final class CaptureCurrentOutcomeReducerTest extends TestCase
         self::assertSame(['eligible' => true, 'reason' => 'STALE_REVIEW_REEVALUATABLE'], CaptureCurrentOutcomeReducer::retryEligibility($changed));
     }
 
+    public function test_legacy_semantic_policy_fingerprint_gets_one_bounded_reevaluation(): void
+    {
+        $base = new CaptureRecord(
+            UuidCodec::newV7(), 'semantic-policy-recovery', hash('sha256', 'semantic-policy-recovery'),
+            CaptureStage::SEMANTICS_RECONCILED->value, 'REVIEW_REQUIRED', null, null, [],
+            ['raw_input' => 'Người dùng nêu một dữ kiện.', 'content_intent' => ['intent' => 'KNOWLEDGE_DELTA']],
+            ['completion' => ['status' => 'REVIEW_REQUIRED', 'blockers' => ['KNOWLEDGE_SEMANTIC_HANDOFF_REQUIRED']]],
+            ['SEMANTICS_RECONCILED' => ['status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'failure_code' => 'KNOWLEDGE_SEMANTIC_HANDOFF_REQUIRED']],
+        );
+        $legacyFingerprint = CaptureDecisionDependencyFingerprint::current($base);
+        $legacy = new CaptureRecord(
+            $base->captureId, $base->idempotencyKey, $base->requestFingerprint, $base->stage, $base->status,
+            $base->articleId, $base->articleStateToken, $base->assets, $base->context,
+            $base->diagnostics + ['decision_dependency_fingerprint' => $legacyFingerprint], $base->phaseReceipts,
+        );
+
+        self::assertSame($base->captureId, $legacy->captureId);
+        self::assertSame($base->idempotencyKey, $legacy->idempotencyKey);
+        self::assertSame(['eligible' => true, 'reason' => 'STALE_REVIEW_REEVALUATABLE'], CaptureCurrentOutcomeReducer::retryEligibility($legacy));
+    }
+
     public function test_supplied_music_capture_matrix_preserves_identity_supersedes_subject_failure_and_denies_no_progress_retry(): void
     {
         $captureId = '01a11bc5-125f-78de-98ac-b4535dfc2886';

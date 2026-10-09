@@ -316,6 +316,7 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
         self::assertSame('SEMANTICS_RECONCILED', $result->diagnostics['failure']['phase']);
         self::assertArrayHasKey('input_shape', $result->diagnostics['failure']);
         self::assertArrayNotHasKey('trace', $result->diagnostics['failure']);
+        self::assertArrayHasKey('decision_dependency_fingerprint', $result->diagnostics);
     }
 
     public static function imageCounts(): iterable
