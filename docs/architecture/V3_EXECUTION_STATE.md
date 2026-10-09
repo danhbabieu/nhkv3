@@ -26281,3 +26281,68 @@ checksum was introduced.
 STATUS: `RELEASE_PARITY_PASS / PACKET_ISSUANCE_BLOCKED /
 GOVERNED_APPLY_NOT_RUN / SCORE_AUDIO_BLOCKED / PUBLIC_COMPLETE_FALSE /
 NO_SEMANTIC_MUTATION`
+
+# Checkpoint — 2026-10-09 — Local Knowledge Repair contract completion
+
+IMPLEMENTED: Recorded the approved existing-owner `KNOWLEDGE_REPAIR` intent
+across the Constitution, Article/Capture, Knowledge/Source, MCP and status
+contracts. Added the fail-closed router guard so `repair_plan` and
+`knowledge_repair` payloads require explicit `KNOWLEDGE_REPAIR`, including when
+heuristic routing would otherwise select another intent.
+
+GENERATED: Local canonical MCP documentation was regenerated from current HEAD
+with source revision `635e5665cf1220c49c74f7bdc53fc4852b53d658` and manifest
+hash `bacc9788a770ee718f6d3f61f35b3a3326d140b23b01398ac0d7b08a35516954`.
+
+VERIFIED: Focused router, repair composition, MCP contract/registry,
+Governance, staging-scope and documentation verifier tests passed 214 tests /
+2,134 assertions. PHP lint and diff checks pass. The full 512M PHPUnit run
+still records the repository's existing integration/runtime failures and one
+unrelated specificity failure; no new failure was observed in the focused
+scope.
+
+BOUNDARY: This checkpoint is local-only. No SSH, staging/production deployment,
+Capture retry, server-issued packet, Governance apply, migration, publication,
+public read-back, push or server mutation was performed.
+
+STATUS: `KNOWLEDGE_REPAIR_CONTRACT_COMPLETE / FOCUSED_VERIFIED /
+FULL_SUITE_BASELINE_FAILURES_RECORDED / SERVER_ACCEPTANCE_NOT_RUN /
+NO_SERVER_MUTATION`
+
+# Checkpoint — 2026-10-09 — Constitutional Knowledge Repair amendment implemented locally
+
+APPROVAL: The Constitutional Owner explicitly approved the 2026-10-09
+amendment adding `KNOWLEDGE_REPAIR` as a distinct normative Content Intent for
+existing-owner Knowledge/Source/Evidence repair. The Constitution record stores
+the approving authority by role because no personal name was supplied.
+
+IMPLEMENTED_LOCAL: The amendment record, Constitution Content Intent list,
+Article/MCP/Universal Intake/Knowledge/Living Knowledge active contracts and
+non-normative status index now distinguish `KNOWLEDGE_REPAIR` from
+`KNOWLEDGE_DELTA`. The Capture router rejects `repair_plan` or
+`knowledge_repair` payloads presented under another intent with
+`KNOWLEDGE_REPAIR_INTENT_REQUIRED`; the existing catalog derives the six-intent
+schema from `ContentIntent::values()` and retains the repair-plan schema.
+
+VERIFIED_LOCAL: TDD red/green guard verification passed. Focused Capture,
+repair, staging admission, MCP contract/documentation, Governance and
+continuation tests passed 206 tests / 3,327 assertions. Canonical MCP
+documentation generation passed for 65 files with local source revision
+`635e5665cf1220c49c74f7bdc53fc4852b53d658` and manifest hash
+`bacc9788a770ee718f6d3f61f35b3a3326d140b23b01398ac0d7b08a35516954`.
+
+FULL_SUITE: With `memory_limit=512M`, PHPUnit completed 3,901 tests with 33
+environment/bootstrap errors and 25 failures, matching the known broad
+baseline classes: WPDB test doubles/runtime guard failures and the existing
+`SemanticSpecificityPropagationTest` failure. No failure was attributed to the
+Knowledge Repair amendment; the focused changed-boundary suite is green.
+
+RUNTIME_BOUNDARY: No deployment, fresh packet issuance, Capture retry,
+Knowledge retire, Source/Evidence reconciliation, Graph mutation, Score/Audio
+mutation, publication or public completion was performed. Staging release
+parity and exact Westminster target read-back remain mandatory before any
+Controlled Apply.
+
+STATUS: `CONSTITUTIONAL_AMENDMENT_APPROVED / REPAIR_INTENT_ALIGNED_LOCAL /
+FOCUSED_VERIFIED / FULL_BASELINE_CLASSIFIED / STAGING_GATE_PENDING /
+FRESH_PACKET_PENDING / NO_SEMANTIC_MUTATION / PUBLIC_COMPLETE_FALSE`

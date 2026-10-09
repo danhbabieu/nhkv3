@@ -43,6 +43,9 @@ Capture resolves Content Intent before creating an Article. For
 `KNOWLEDGE_DELTA`, it resolves canonical subjects, inspects bounded Graph
 context, retrieves and evaluates Claims, then returns semantic write-back
 through Governance without creating an Article or requiring an image.
+`KNOWLEDGE_REPAIR` is a separate Capture intent for exact existing Knowledge,
+Source and Evidence owner repair; it does not create an Article, infer a new
+subject or change the semantics of `KNOWLEDGE_DELTA`.
 `nhk.knowledge.ingest`, Source and Evidence
 writers remain internal/admin governed compatibility boundaries, not normal
 operator entry points; direct calls without the dedicated internal capability

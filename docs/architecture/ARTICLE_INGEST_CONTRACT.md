@@ -35,11 +35,18 @@ New Article/Post submissions do not begin at a draft writer, Article writer or
 publication writer. The only normal entry point is `nhk.capture.ingest`, which
 accepts text-only, knowledge-only text, images and the registered Video adapter.
 Capture first resolves the registered Content Intent (`VIDEO`, `IMAGE_ARTICLE`,
-`TEXT_ARTICLE`, `KNOWLEDGE_DELTA` or `MEDIA_ENRICHMENT`); only Article intents
+`TEXT_ARTICLE`, `KNOWLEDGE_DELTA`, `KNOWLEDGE_REPAIR` or
+`MEDIA_ENRICHMENT`); only Article intents
 create one native draft. `MEDIA_ENRICHMENT` accepts one or more validated Media
 references, never creates an Article, and completes only after Media
 reconciliation and canonical read-back. Capture then runs the shared semantic
 core before Article composition and publication when an Article owner exists.
+
+`KNOWLEDGE_REPAIR` is an existing-owner lifecycle for exact canonical
+Knowledge, Source and Evidence targets. It does not create an Article or
+require assets, and its bounded repair plan remains subject to the existing
+Capture-bound Proposal → Approval → Eligibility → Controlled Apply →
+canonical read-back chain. It is not a relabeled `KNOWLEDGE_DELTA`.
 
 `nhk.article.ingest` and typed native draft/publication operations remain
 internal/admin lifecycle boundaries for existing records or Capture-controlled
@@ -312,7 +319,8 @@ payload, documentation checkpoint or non-retryable Capture state fails closed.
 ## Capture composition and current-state reconciliation — 2026-09-09
 
 Một Capture tạo Article draft chỉ khi Content Intent là `IMAGE_ARTICLE` hoặc
-`TEXT_ARTICLE`; `MEDIA_ENRICHMENT` là media-only và không tạo Article. N assets tạo N canonical Media/MediaAsset identities nhưng
+`TEXT_ARTICLE`; `MEDIA_ENRICHMENT`, `KNOWLEDGE_DELTA` và
+`KNOWLEDGE_REPAIR` là non-Article intents. N assets tạo N canonical Media/MediaAsset identities nhưng
 không tạo N Article. `VIDEO` giữ owner Video riêng và `KNOWLEDGE_DELTA` giữ
 semantic owner riêng, không yêu cầu Article hay image. Mỗi asset giữ caption, alt,
 description, observation và relation context riêng. Composition chỉ dùng ba

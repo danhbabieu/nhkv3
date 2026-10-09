@@ -56,7 +56,7 @@ or live acceptance is implied.
 It accepts text-only, knowledge-only text, text with one or more multipart
 images, and the registered Video adapter. Capture resolves Content Intent before
 creating an Article: `TEXT_ARTICLE` and `IMAGE_ARTICLE` create one native draft;
-`VIDEO`, `KNOWLEDGE_DELTA` and `MEDIA_ENRICHMENT` do not create an Article
+`VIDEO`, `KNOWLEDGE_DELTA`, `KNOWLEDGE_REPAIR` and `MEDIA_ENRICHMENT` do not create an Article
 unless a valid explicit Article intent is supplied. All intents then follow the shared semantic and
 final read-back boundary, with Article composition/publication only when
 required by the resolved intent. `MEDIA_ENRICHMENT` requires Media
@@ -64,6 +64,12 @@ reconciliation/read-back without an Article owner.
 `physical ingest when applicable → interpret → Content Intent resolution →
 resolve → Graph discovery → Claim retrieval → governed semantic write-back/apply/read-back → Article composition when
 required → publication gate when applicable → final read-back`.
+
+`KNOWLEDGE_REPAIR` is a distinct, explicit existing-owner repair intent. Its
+bounded `repair_plan` may contain only exact Knowledge, Source or Evidence
+owners and uses one Capture-bound plan node per owner/operation. It preserves
+the existing signer, capability, dependency, fingerprint, expiry, idempotency
+and Governance gates; it must never be relabeled as `KNOWLEDGE_DELTA`.
 
 Article Media reconciliation preserves the current Capture publication-unit
 selection as a typed explicit binding. `USER_EXPLICIT` + `PINNED` selections
@@ -731,7 +737,7 @@ IMPLEMENTATION GAP and is not READY.
 | Create Knowledge claim | `nhk.knowledge.ingest` + lifecycle | READY |
 | Read/create relation | Governed `relation_create`; raw Graph inventory and relation dry-run are read-only MCP tools; relation creation remains governed | PARTIAL / IMPLEMENTATION_GAP |
 | Create/update/publish Post | typed Article draft create/update plus gated publish/trash/restore boundary; exact live catalog/runtime still requires discovery/read-back | PARTIAL / RUNTIME-GATED |
-| Capture editorial text/images | `nhk.capture.ingest` | PR1 routes `TEXT_ARTICLE`/`IMAGE_ARTICLE` to Article; `VIDEO`/`KNOWLEDGE_DELTA` remain non-Article unless explicitly overridden; publication remains owner-policy gated |
+| Capture editorial text/images | `nhk.capture.ingest` | PR1 routes `TEXT_ARTICLE`/`IMAGE_ARTICLE` to Article; `VIDEO`/`KNOWLEDGE_DELTA`/`KNOWLEDGE_REPAIR` remain non-Article unless explicitly overridden; publication remains owner-policy gated |
 | Upload/find Media | governed metadata ingest plus direct multipart image attachment and attachment read-back | READY for current image contract |
 | Attach MediaUsage | nested in Media ingest only | PARTIAL |
 | Product / Specimen | registered Authority types via generic paths | PARTIAL |

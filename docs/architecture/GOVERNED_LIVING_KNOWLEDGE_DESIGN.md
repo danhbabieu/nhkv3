@@ -324,6 +324,11 @@ Per-record output is privacy-safe and repair candidates remain planning-only;
 applying any candidate still requires the already registered Capture/Governance
 lifecycle. Runtime unavailability is explicit and fail-closed.
 
+Existing-owner cleanup uses the distinct `KNOWLEDGE_REPAIR` Capture intent. It
+is not a `KNOWLEDGE_DELTA` alias: each exact Knowledge, Source or Evidence
+operation retains its own owner revision, dependency closure, operation family,
+idempotency and signed-scope binding.
+
 ## Governed apply boundary
 
 The effective operation vocabulary is read from the current runtime catalog

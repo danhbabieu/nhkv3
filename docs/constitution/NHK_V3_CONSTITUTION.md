@@ -229,8 +229,10 @@ Media completion a dependency of non-Article work.
 **WHAT LAW CHANGES:** `nhk.capture.ingest` remains the sole canonical new
 submission boundary and still creates exactly one durable Capture. Before any
 Article draft is created, Capture must resolve a registered Content Intent:
-`VIDEO`, `IMAGE_ARTICLE`, `TEXT_ARTICLE`, `KNOWLEDGE_DELTA` or
-`MEDIA_ENRICHMENT`. `IMAGE_ARTICLE` and `TEXT_ARTICLE` create at most one
+`VIDEO`, `IMAGE_ARTICLE`, `TEXT_ARTICLE`, `KNOWLEDGE_DELTA`,
+`KNOWLEDGE_REPAIR` or `MEDIA_ENRICHMENT`. `KNOWLEDGE_REPAIR` is a distinct
+existing-owner repair intent defined by the 2026-10-09 amendment below. `IMAGE_ARTICLE` and
+`TEXT_ARTICLE` create at most one
 native WordPress Article draft and then follow the Article/Media rules. `VIDEO` preserves or resolves the canonical
 Video owner and does not create an Article unless a valid explicit Article
 intent is supplied. `KNOWLEDGE_DELTA` resolves and reuses the canonical
@@ -1941,6 +1943,68 @@ shared contract incrementally.
 
 **DECISION OWNER / DATE:** NHK V3 architecture approval, 2026-09-30.
 
+## Amendment record — 2026-10-09 — Existing-owner Knowledge Repair Content Intent
+
+**WHY:** The executable Capture and Governance contracts already provide a
+bounded repair lifecycle for existing Knowledge, Source and Evidence owners,
+but the normative Content Intent list did not name that lifecycle. Treating a
+repair plan as `KNOWLEDGE_DELTA` would conflate new semantic delta planning with
+identity-bound cleanup and weaken the fail-closed repair guards.
+
+**APPROVAL:** Explicit architectural approval was given by the Constitutional
+Owner in the implementation decision dated 2026-10-09. The approving authority
+is recorded by role because no personal name was supplied in the approval
+record.
+
+**WHAT LAW CHANGES:** Add `KNOWLEDGE_REPAIR` as a distinct registered Content
+Intent. It is limited to existing canonical Knowledge, Source and Evidence
+owners, exact UUID/revision targets, and bounded `repair_plan` operations. It
+does not create an Article, Media, Authority or new semantic identity and does
+not change the meaning or admission rules of `KNOWLEDGE_DELTA`.
+
+Repair remains one Capture-bound lifecycle. Each owner/operation is planned as
+an idempotent node with canonical owner revision, dependency closure and
+dependency revisions. Knowledge operations use the registered
+`knowledge_delta` Governance family; Source/Evidence operations use
+`source_evidence_reconciliation`. These family names do not authorize
+relabeling the top-level Content Intent.
+
+The existing single server signer remains the only packet issuer. A mutation
+requires server-issued signed scope bound to Capture/request identity,
+canonical owner IDs and revisions, dependency closure, content/dependency
+fingerprints, registered operation family, capabilities, idempotency and
+expiry, followed by Proposal → Human Approval → Eligibility → Controlled Apply
+→ canonical read-back. Missing capability, packet/HMAC/expiry failure,
+identity/dependency/revision drift, ambiguous repair identity, or retry
+prohibition fails closed.
+
+`KNOWLEDGE_REPAIR` forbids physical assets, subject inference and Capture retry.
+`resume_mode=RETRY` cannot be used to reopen a terminal or authorization
+failure, replay physical ingest or change the original request. A completed
+replay is read-only; a governed continuation uses its own idempotency and
+fingerprint binding.
+
+**AFFECTED SUBSYSTEMS:** Constitution, Capture Content Intent routing, MCP
+catalog/schema, Knowledge/Source/Evidence contracts, Governance staging scope,
+canonical documentation snapshot, runtime contract tests and operator release
+gates.
+
+**COMPATIBILITY AND ROLLOUT:** Existing `KNOWLEDGE_DELTA` behavior, canonical
+identities, revisions, provenance and public projections remain unchanged.
+No migration, backfill, seed, merge, hard delete or automatic repair is
+authorized by this record. Existing repair implementation is admitted only
+through the exact registered Capture/Governance lifecycle.
+
+**GOVERNANCE, TEST AND DEPLOYMENT:** Tests must prove mixed five-owner repair
+composition, operation-family separation, provenance, dependency closure,
+revision drift, capability binding, HMAC expiry, idempotency, retry
+prohibition, failure atomicity and canonical read-back. Staging requires the
+normal release gate and a fresh server-issued packet; production remains
+fail-closed and Public completion remains blocked until all required obligations
+are verified.
+
+**DECISION OWNER / EFFECTIVE DATE:** Constitutional Owner, 2026-10-09.
+
 ### 20.0.2 Canonical submission entry point
 
 Runtime phải expose đúng một entry point cho submission mới:
@@ -2274,7 +2338,7 @@ editorial, semantic and verification stages.
 92. Text-only, image, multi-image, Video và knowledge-only input đều phải đi qua cùng Capture orchestration boundary.
 93. Direct Media/Video/Knowledge/Source/Evidence/Article/Graph/publication mutation chỉ được internal/admin với capability guard riêng hoặc bị block fail-closed.
 94. Direct mutation bị block phải trả `DIRECT_WRITE_BLOCKED` và `USE_CANONICAL_CAPTURE_FLOW`, không tạo partial semantic/editorial side effect.
-95. Một submission mới tạo đúng một Capture; chỉ `IMAGE_ARTICLE` và `TEXT_ARTICLE` tạo native Article draft, còn `VIDEO`, `KNOWLEDGE_DELTA` và `MEDIA_ENRICHMENT` không tạo Article nếu không có explicit Article intent; physical Media/Video identities vẫn do owner riêng sở hữu.
+95. Một submission mới tạo đúng một Capture; chỉ `IMAGE_ARTICLE` và `TEXT_ARTICLE` tạo native Article draft, còn `VIDEO`, `KNOWLEDGE_DELTA`, `KNOWLEDGE_REPAIR` và `MEDIA_ENRICHMENT` không tạo Article nếu không có explicit Article intent; physical Media/Video identities vẫn do owner riêng sở hữu.
 96. Publication là chặng cuối của Capture; direct publish không phải entry point cho submission mới.
 97. Một visually explainable semantic feature có requirement exact, và requirement thiếu ảnh được giữ durable ở `MISSING` hoặc `REVIEW_REQUIRED`.
 98. Feature-level technical/contextual visual support không bị đồng nhất với node-level representative image.

@@ -16,6 +16,11 @@ final class ContentIntentRouter
     public function route(array $input, array $interpretation, array $assets): array
     {
         $explicit = strtoupper(trim((string) ($input['intent'] ?? '')));
+        $repairPlan = is_array($input['repair_plan'] ?? null) ? $input['repair_plan'] : [];
+        $knowledgeRepair = is_array($input['knowledge_repair'] ?? null) ? $input['knowledge_repair'] : [];
+        if ($explicit === '' && ($repairPlan !== [] || $knowledgeRepair !== [])) {
+            throw new \InvalidArgumentException('KNOWLEDGE_REPAIR_INTENT_REQUIRED');
+        }
         if ($explicit !== '') {
             $intent = ContentIntent::tryFrom($explicit);
             if (!$intent instanceof ContentIntent) throw new \InvalidArgumentException('CONTENT_INTENT_INVALID');
@@ -122,8 +127,12 @@ final class ContentIntentRouter
 
     private function assertExplicitIntentIsValid(ContentIntent $intent, array $input, array $assets): void
     {
+        $repairPlan = is_array($input['repair_plan'] ?? null) ? $input['repair_plan'] : [];
+        $knowledgeRepair = is_array($input['knowledge_repair'] ?? null) ? $input['knowledge_repair'] : [];
+        if ($intent !== ContentIntent::KNOWLEDGE_REPAIR && ($repairPlan !== [] || $knowledgeRepair !== [])) {
+            throw new \InvalidArgumentException('KNOWLEDGE_REPAIR_INTENT_REQUIRED');
+        }
         if ($intent === ContentIntent::KNOWLEDGE_REPAIR) {
-            $repairPlan = is_array($input['repair_plan'] ?? null) ? $input['repair_plan'] : [];
             if ($repairPlan !== []) {
                 $operations = CaptureBoundRepairPlanComposer::operations($repairPlan);
                 if ($operations === []) throw new \InvalidArgumentException('CAPTURE_REPAIR_OPERATIONS_REQUIRED');

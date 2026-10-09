@@ -21,6 +21,16 @@ staging or production record was mutated.
 The server-bound resolved-subject packet is available for the existing Capture
 continuation path; the supplied ÔĐô case remains runtime-unverified.
 
+## 0.1.1 Approved existing-owner Knowledge Repair intent — 2026-10-09
+
+The Constitutional Owner explicitly approved `KNOWLEDGE_REPAIR` as a distinct
+normative Content Intent for exact existing Knowledge, Source and Evidence
+repair. `KNOWLEDGE_DELTA` retains its ordinary semantic-delta meaning.
+`KNOWLEDGE_REPAIR` remains Capture-bound and uses the existing single signer,
+Governance lifecycle, dependency closure, fingerprints, capability binding,
+expiry, idempotency and canonical read-back. This status entry is evidence and
+does not itself authorize packet issuance or mutation.
+
 ## 0.0.9 Universal Music intake and public display evidence — 2026-10-09
 
 The Music A–Z standard now has complete executable intake metadata for its

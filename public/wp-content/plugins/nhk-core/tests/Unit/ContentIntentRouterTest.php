@@ -103,6 +103,44 @@ final class ContentIntentRouterTest extends TestCase
         self::assertFalse($route['article_required']);
     }
 
+    public function test_repair_plan_cannot_be_relabelled_as_knowledge_delta(): void
+    {
+        $this->expectExceptionMessage('KNOWLEDGE_REPAIR_INTENT_REQUIRED');
+
+        (new ContentIntentRouter())->route(
+            [
+                'intent' => 'KNOWLEDGE_DELTA',
+                'repair_plan' => [
+                    'operations' => [[
+                        'entity_type' => 'knowledge',
+                        'operation' => 'retire',
+                    ]],
+                ],
+            ],
+            [],
+            [],
+        );
+    }
+
+    public function test_repair_plan_cannot_enter_heuristic_routing_without_explicit_repair_intent(): void
+    {
+        $this->expectExceptionMessage('KNOWLEDGE_REPAIR_INTENT_REQUIRED');
+
+        (new ContentIntentRouter())->route(
+            [
+                'text' => 'Bài viết cần kiểm tra lại.',
+                'repair_plan' => [
+                    'operations' => [[
+                        'entity_type' => 'knowledge',
+                        'operation' => 'retire',
+                    ]],
+                ],
+            ],
+            [],
+            [],
+        );
+    }
+
     public function test_heuristic_knowledge_delta_does_not_require_an_article(): void
     {
         $text = '57 có bản 10 côn.';

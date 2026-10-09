@@ -34,6 +34,12 @@ Video, Article, Capture, Content Intent or Governance.
 Direct domain writers remain guarded internal/admin lifecycle boundaries under
 the Constitution and their owning contracts.
 
+`KNOWLEDGE_DELTA` and `KNOWLEDGE_REPAIR` are separate Content Intents. Delta
+planning handles ordinary semantic reuse/addition; repair planning handles
+existing-owner Knowledge/Source/Evidence cleanup with exact canonical target
+identity, revision and dependency closure. A repair plan cannot be admitted by
+renaming its intent to `KNOWLEDGE_DELTA`.
+
 ## 2. Ownership and non-persistence
 
 The shared result is an ephemeral/read-planning DTO contract, referred to here

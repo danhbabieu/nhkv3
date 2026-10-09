@@ -89,7 +89,8 @@ contract.
 The operator-facing creation flow is `nhk.capture.ingest` only. Text, images,
 Video and knowledge-only input share one Capture coordinator. Capture resolves
 Content Intent before mapping to an Article draft: `IMAGE_ARTICLE` and
-`TEXT_ARTICLE` create one draft, while `VIDEO`, `KNOWLEDGE_DELTA` and
+`TEXT_ARTICLE` create one draft, while `VIDEO`, `KNOWLEDGE_DELTA`,
+`KNOWLEDGE_REPAIR` and
 `MEDIA_ENRICHMENT` do not
 create an Article unless a valid explicit Article intent is supplied. Direct Media, Video, Knowledge, Source/Evidence,
 Article, relation and publication mutations are not normal operator paths.
