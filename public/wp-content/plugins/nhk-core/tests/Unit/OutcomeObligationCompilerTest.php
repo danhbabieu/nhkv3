@@ -31,7 +31,32 @@ final class OutcomeObligationCompilerTest extends TestCase
         $this->assertTrue($plan['public_request']);
         $this->assertSame('REQUIRED', $plan['obligations']['public']['class']);
         $this->assertSame('REQUIRED', $plan['obligations']['frontend']['class']);
+        $this->assertSame('REQUIRED', $plan['obligations']['relations']['class']);
+        $this->assertSame('VIDEO_PUBLIC_RELATION_REQUIRED', $plan['obligations']['relations']['reason']);
         $this->assertSame('REQUIRED', $plan['obligations']['publication']['class']);
+    }
+
+    public function test_video_frontend_request_requires_relation_even_without_publication_request(): void
+    {
+        $plan = (new OutcomeObligationCompiler())->compile('capture-video-frontend', ['intent' => 'VIDEO'], [
+            'owner_types' => ['video'],
+            'owner_capabilities' => ['video' => ['public_capable' => true]],
+            'frontend_request' => true,
+        ]);
+
+        $this->assertSame('REQUIRED', $plan['obligations']['relations']['class']);
+        $this->assertSame('VIDEO_PUBLIC_RELATION_REQUIRED', $plan['obligations']['relations']['reason']);
+    }
+
+    public function test_canonical_only_video_keeps_relation_optional(): void
+    {
+        $plan = (new OutcomeObligationCompiler())->compile('capture-video-canonical', ['intent' => 'VIDEO'], [
+            'owner_types' => ['video'],
+            'owner_capabilities' => ['video' => ['public_capable' => true]],
+        ]);
+
+        $this->assertSame('OPTIONAL', $plan['obligations']['relations']['class']);
+        $this->assertSame('RELATIONS_NOT_REQUIRED', $plan['obligations']['relations']['reason']);
     }
 
     public function test_private_semantic_dependencies_are_not_forced_public(): void

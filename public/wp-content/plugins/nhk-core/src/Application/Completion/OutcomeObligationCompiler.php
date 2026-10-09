@@ -21,6 +21,7 @@ final class OutcomeObligationCompiler
         $captureId = trim($captureId);
         if ($captureId === '') throw new \InvalidArgumentException('OUTCOME_OBLIGATION_CAPTURE_ID_REQUIRED');
 
+        $intent = $this->normalizeIntent($intent);
         $ownerTypes = $this->strings($signals['owner_types'] ?? []);
         $dependencyTypes = $this->strings($signals['dependency_owner_types'] ?? []);
         $ownerCapabilities = is_array($signals['owner_capabilities'] ?? null) ? $signals['owner_capabilities'] : [];
@@ -65,6 +66,10 @@ final class OutcomeObligationCompiler
                     ? $this->obligation('CONDITIONAL', 'FRONTEND_NOT_REQUESTED')
                     : $this->obligation('NOT_APPLICABLE', 'OWNER_NOT_FRONTEND_CAPABLE')));
 
+        $videoPublicRelationRequired = strtoupper(trim((string) ($intent['intent'] ?? ''))) === 'VIDEO'
+            && in_array('video', $ownerTypes, true)
+            && $publicRequested;
+
         $obligations = [
             'canonical' => $this->obligation('REQUIRED', 'CANONICAL_OWNER_ACCEPTED'),
             'governance' => $this->obligation(
@@ -72,8 +77,12 @@ final class OutcomeObligationCompiler
                 ($signals['governance_requested'] ?? false) === true ? 'SEMANTIC_MUTATION_REQUESTED' : 'NO_GOVERNANCE_MUTATION_REQUESTED',
             ),
             'relations' => $this->obligation(
-                ($signals['relations_required'] ?? false) === true ? 'REQUIRED' : (($signals['relations_requested'] ?? false) === true ? 'CONDITIONAL' : 'OPTIONAL'),
-                ($signals['relations_required'] ?? false) === true ? 'REGISTERED_RELATION_REQUIRED' : 'RELATIONS_NOT_REQUIRED',
+                $videoPublicRelationRequired || ($signals['relations_required'] ?? false) === true
+                    ? 'REQUIRED'
+                    : (($signals['relations_requested'] ?? false) === true ? 'CONDITIONAL' : 'OPTIONAL'),
+                $videoPublicRelationRequired
+                    ? 'VIDEO_PUBLIC_RELATION_REQUIRED'
+                    : (($signals['relations_required'] ?? false) === true ? 'REGISTERED_RELATION_REQUIRED' : 'RELATIONS_NOT_REQUIRED'),
             ),
             'public' => $public,
             'frontend' => $frontend,
@@ -87,7 +96,6 @@ final class OutcomeObligationCompiler
             ),
         ];
 
-        $intent = $this->normalizeIntent($intent);
         $ownerTypes = array_values(array_unique($ownerTypes));
         sort($ownerTypes, SORT_STRING);
         $dependencyTypes = array_values(array_unique($dependencyTypes));
