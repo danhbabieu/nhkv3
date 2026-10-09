@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Completion\CompletionCoordinator;
+use NHK\Core\Application\Completion\OutcomeObligationCompiler;
 use NHK\Core\Application\Capture\EditorialCaptureCoordinator;
 use NHK\Core\Domain\Capture\CaptureRecord;
 use PHPUnit\Framework\TestCase;
@@ -111,6 +112,103 @@ final class CompletionConvergenceTest extends TestCase
         self::assertTrue($packet['complete']);
         self::assertSame('COMPLETE', $packet['canonical_existence']['status']);
         self::assertSame('BLOCKED', $packet['publication_readiness']['status']);
+    }
+
+    public function test_required_public_outcome_blocks_canonical_only_completion(): void
+    {
+        $plan = (new OutcomeObligationCompiler())->compile('capture-public-1', ['intent' => 'VIDEO'], [
+            'owner_types' => ['video'],
+            'owner_capabilities' => ['video' => ['public_capable' => true]],
+            'publish' => true,
+        ]);
+        $packet = (new CompletionCoordinator())->finalize('video', 'video-1', [
+            'canonical_readback' => ['canonical_id' => 'video-1'],
+            'outcome_obligations' => $plan,
+        ]);
+
+        self::assertSame('REQUIRED', $packet['outcome_obligations']['obligations']['public']['class']);
+        self::assertSame('BLOCKED', $packet['public_state']);
+        self::assertContains('PUBLIC_ELIGIBILITY_NOT_VERIFIED', $packet['blockers']);
+        self::assertFalse($packet['complete']);
+    }
+
+    public function test_required_frontend_outcome_blocks_public_without_exact_frontend_readback(): void
+    {
+        $plan = (new OutcomeObligationCompiler())->compile('capture-public-2', ['intent' => 'VIDEO'], [
+            'owner_types' => ['video'],
+            'owner_capabilities' => ['video' => ['public_capable' => true]],
+            'publish' => true,
+        ]);
+        $packet = (new CompletionCoordinator())->finalize('video', 'video-1', [
+            'canonical_readback' => ['canonical_id' => 'video-1'],
+            'public_eligible' => true,
+            'outcome_obligations' => $plan,
+        ]);
+
+        self::assertSame('READY', $packet['public_state']);
+        self::assertSame('BLOCKED', $packet['frontend_state']);
+        self::assertContains('FRONTEND_READBACK_NOT_VERIFIED', $packet['blockers']);
+        self::assertFalse($packet['complete']);
+    }
+
+    public function test_private_dependency_keeps_truthful_not_applicable_surface_reasons(): void
+    {
+        $plan = (new OutcomeObligationCompiler())->compile('capture-private-1', ['intent' => 'VIDEO'], [
+            'owner_types' => ['knowledge'],
+            'dependency_owner_types' => ['knowledge'],
+            'owner_capabilities' => ['knowledge' => ['public_capable' => false]],
+        ]);
+        $packet = (new CompletionCoordinator())->finalize('knowledge', 'claim-1', [
+            'canonical_readback' => ['canonical_id' => 'claim-1'],
+            'owner_role' => 'semantic_dependency',
+            'public_projection_owner' => false,
+            'outcome_obligations' => $plan,
+        ]);
+
+        self::assertTrue($packet['complete']);
+        self::assertSame('NOT_APPLICABLE', $packet['public_state']);
+        self::assertNotSame('', $packet['public_state_reason']);
+        self::assertNotSame('', $packet['frontend_state_reason']);
+    }
+
+    public function test_optional_homepage_does_not_block_required_detail_and_frontend(): void
+    {
+        $plan = (new OutcomeObligationCompiler())->compile('capture-public-3', ['intent' => 'VIDEO'], [
+            'owner_types' => ['video'],
+            'owner_capabilities' => ['video' => ['public_capable' => true]],
+            'publish' => true,
+        ]);
+        $packet = (new CompletionCoordinator())->finalize('video', 'video-1', [
+            'canonical_readback' => ['canonical_id' => 'video-1'],
+            'public_eligible' => true,
+            'frontend_verified' => true,
+            'outcome_obligations' => $plan,
+        ]);
+
+        self::assertSame('OPTIONAL', $packet['outcome_obligations']['obligations']['homepage']['class']);
+        self::assertTrue($packet['complete']);
+    }
+
+    public function test_aggregate_preserves_obligation_fingerprint_and_blocks_required_surface_gap(): void
+    {
+        $plan = (new OutcomeObligationCompiler())->compile('capture-public-4', ['intent' => 'VIDEO'], [
+            'owner_types' => ['video'],
+            'owner_capabilities' => ['video' => ['public_capable' => true]],
+            'publish' => true,
+        ]);
+        $packet = (new CompletionCoordinator())->aggregateCapture('capture-public-4', [[
+            'owner_type' => 'video',
+            'owner_id' => 'video-1',
+            'canonical_readback' => ['canonical_id' => 'video-1'],
+        ]], [
+            'canonical_readback' => ['canonical_id' => 'capture-public-4'],
+            'required_owners' => [['owner_type' => 'video', 'owner_id' => 'video-1']],
+            'outcome_obligations' => $plan,
+        ]);
+
+        self::assertSame($plan['fingerprint'], $packet['outcome_obligations']['fingerprint']);
+        self::assertSame('BLOCKED', $packet['publication_readiness']['status']);
+        self::assertFalse($packet['complete']);
     }
 
     public function test_public_video_is_complete_only_after_all_readbacks(): void

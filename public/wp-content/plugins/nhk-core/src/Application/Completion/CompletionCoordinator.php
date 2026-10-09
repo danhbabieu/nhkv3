@@ -29,6 +29,7 @@ final class CompletionCoordinator
     {
         $ownerType = strtolower(trim($ownerType));
         $ownerId = trim($ownerId);
+        $outcomeObligations = is_array($evidence['outcome_obligations'] ?? null) ? $evidence['outcome_obligations'] : [];
         $capability = is_callable($this->capabilityResolver) ? ($this->capabilityResolver)($ownerType) : null;
         $publicCapable = (is_array($capability) ? (($capability['public_capable'] ?? $capability['requires_public_surface'] ?? false) === true) : in_array($ownerType, self::PUBLIC_CAPABLE, true))
             && ($evidence['public_projection_owner'] ?? true) !== false
@@ -68,7 +69,15 @@ final class CompletionCoordinator
             $projectionConsistency = $this->state($evidence['projection_consistency'], null, 'COMPLETE', 'BLOCKED', 'PARTIAL');
         }
 
-        if (!$publicCapable) {
+        $publicObligation = $this->obligation($outcomeObligations, 'public');
+        $frontendObligation = $this->obligation($outcomeObligations, 'frontend');
+        if (($publicObligation['class'] ?? '') === 'NOT_APPLICABLE' || ($frontendObligation['class'] ?? '') === 'NOT_APPLICABLE') {
+            $public = 'NOT_APPLICABLE';
+            $frontend = 'NOT_APPLICABLE';
+        } elseif ($outcomeObligations !== []) {
+            $public = $this->surfaceState($evidence['public_state'] ?? null, $evidence['public_eligible'] ?? null, (string) ($publicObligation['class'] ?? 'OPTIONAL'), 'READY');
+            $frontend = $this->surfaceState($evidence['frontend_state'] ?? null, $evidence['frontend_verified'] ?? null, (string) ($frontendObligation['class'] ?? 'OPTIONAL'), 'VERIFIED');
+        } elseif (!$publicCapable) {
             $public = 'NOT_APPLICABLE';
             $frontend = 'NOT_APPLICABLE';
         } else {
@@ -94,8 +103,9 @@ final class CompletionCoordinator
         if ($dependencies === 'BLOCKED' && $blockers === []) $blockers[] = 'DEPENDENCY_READBACK_UNVERIFIED';
         if ($relations === 'BLOCKED' && $blockers === []) $blockers[] = 'RELATION_OR_USAGE_RECONCILIATION_FAILED';
         $enrichment = $this->enrichmentReadiness($evidence, $content, $dependencies, $relations);
-        $publication = $this->publicationReadiness($evidence, $public, $frontend, $projectionConsistency, $publicCapable);
+        $publication = $this->publicationReadiness($evidence, $public, $frontend, $projectionConsistency, $publicCapable, $outcomeObligations);
         $ownerBlockers = $this->ownerBlockers($blockers);
+        array_push($ownerBlockers, ...$this->requiredSurfaceBlockers($outcomeObligations, $public, $frontend));
         if ($canonical !== 'COMPLETE' && $ownerBlockers === []) $ownerBlockers[] = 'CANONICAL_READBACK_UNVERIFIED';
         $complete = $canonical === 'COMPLETE' && $ownerBlockers === [];
 
@@ -116,7 +126,10 @@ final class CompletionCoordinator
             'content_state' => $content,
             'projection_consistency' => $projectionConsistency,
             'public_state' => $public,
+            'public_state_reason' => $this->surfaceReason($outcomeObligations, 'public', $public),
             'frontend_state' => $frontend,
+            'frontend_state_reason' => $this->surfaceReason($outcomeObligations, 'frontend', $frontend),
+            'outcome_obligations' => $outcomeObligations !== [] ? $outcomeObligations : null,
             'enrichment_readiness' => $enrichment,
             'publication_readiness' => $publication,
             'complete' => $complete,
@@ -144,12 +157,17 @@ final class CompletionCoordinator
     }
 
     /** @return array<string,mixed> */
-    private function publicationReadiness(array $evidence, string $public, string $frontend, string $projectionConsistency, bool $publicCapable): array
+    private function publicationReadiness(array $evidence, string $public, string $frontend, string $projectionConsistency, bool $publicCapable, array $outcomeObligations = []): array
     {
         $readiness = is_array($evidence['publication_readiness'] ?? null) ? $evidence['publication_readiness'] : [];
         $status = strtoupper(trim((string) ($readiness['status'] ?? '')));
+        $publicationObligation = $this->obligation($outcomeObligations, 'publication');
         if ($status === '') {
-            $status = !$publicCapable ? 'NOT_APPLICABLE' : ($public === 'READY' && $frontend === 'VERIFIED' && $projectionConsistency !== 'BLOCKED' ? 'READY' : 'BLOCKED');
+            $status = ($publicationObligation['class'] ?? '') === 'NOT_APPLICABLE'
+                ? 'NOT_APPLICABLE'
+                : (($publicationObligation['class'] ?? '') !== 'REQUIRED' && $outcomeObligations !== [] && $public === 'NOT_APPLICABLE' && $frontend === 'NOT_APPLICABLE'
+                    ? 'NOT_APPLICABLE'
+                    : (!$publicCapable ? 'NOT_APPLICABLE' : ($public === 'READY' && $frontend === 'VERIFIED' && $projectionConsistency !== 'BLOCKED' ? 'READY' : 'BLOCKED')));
         }
         $blockers = $this->strings($readiness['blockers'] ?? []);
         if ($publicCapable && $public === 'BLOCKED' && !in_array('PUBLIC_ELIGIBILITY_NOT_VERIFIED', $blockers, true)) $blockers[] = 'PUBLIC_ELIGIBILITY_NOT_VERIFIED';
@@ -161,6 +179,40 @@ final class CompletionCoordinator
             'warnings' => $this->strings($readiness['warnings'] ?? []),
             'surface' => trim((string) ($readiness['surface'] ?? '')),
         ];
+    }
+
+    /** @return array{class:string,reason:string} */
+    private function obligation(array $plan, string $dimension): array
+    {
+        $obligation = is_array($plan['obligations'][$dimension] ?? null) ? $plan['obligations'][$dimension] : [];
+        return [
+            'class' => strtoupper(trim((string) ($obligation['class'] ?? ''))),
+            'reason' => trim((string) ($obligation['reason'] ?? '')),
+        ];
+    }
+
+    private function surfaceState(mixed $explicit, mixed $fallback, string $obligationClass, string $readyState): string
+    {
+        $allowed = [$readyState, 'BLOCKED', 'PARTIAL', 'NOT_APPLICABLE'];
+        if (is_string($explicit) && in_array(strtoupper(trim($explicit)), $allowed, true)) return strtoupper(trim($explicit));
+        if (is_bool($fallback)) return $fallback ? $readyState : 'BLOCKED';
+        return $obligationClass === 'REQUIRED' ? 'BLOCKED' : 'NOT_APPLICABLE';
+    }
+
+    /** @return list<string> */
+    private function requiredSurfaceBlockers(array $plan, string $public, string $frontend): array
+    {
+        $blockers = [];
+        if ($this->obligation($plan, 'public')['class'] === 'REQUIRED' && $public !== 'READY') $blockers[] = 'PUBLIC_ELIGIBILITY_NOT_VERIFIED';
+        if ($this->obligation($plan, 'frontend')['class'] === 'REQUIRED' && $frontend !== 'VERIFIED') $blockers[] = 'FRONTEND_READBACK_NOT_VERIFIED';
+        return $blockers;
+    }
+
+    private function surfaceReason(array $plan, string $dimension, string $state): string
+    {
+        $reason = $this->obligation($plan, $dimension)['reason'];
+        if ($reason !== '') return $reason;
+        return $state === 'NOT_APPLICABLE' ? 'NO_APPLICABLE_PUBLIC_SURFACE' : '';
     }
 
     /** @param list<string> $blockers @return list<string> */
@@ -177,6 +229,7 @@ final class CompletionCoordinator
     /** @param list<array<string,mixed>> $children @return array<string,mixed> */
     public function aggregateCapture(string $captureId, array $children, array $evidence = []): array
     {
+        $outcomeObligations = is_array($evidence['outcome_obligations'] ?? null) ? $evidence['outcome_obligations'] : [];
         $children = $this->normalizeSemanticDependencyChildren($children, (array) ($evidence['semantic_dependency_owner_types'] ?? []));
         $children = self::effectiveChildren($children);
         $packets = [];
@@ -230,6 +283,12 @@ final class CompletionCoordinator
             if (in_array('PARTIAL', $states, true)) return 'PARTIAL';
             return in_array($complete, $states, true) || in_array('READY', $states, true) || in_array('VERIFIED', $states, true) ? $complete : 'NOT_APPLICABLE';
         };
+        $aggregatePublicState = $aggregateState($publicStates, 'READY');
+        $aggregateFrontendState = $aggregateState($frontendStates, 'VERIFIED');
+        if ($this->obligation($outcomeObligations, 'public')['class'] === 'REQUIRED' && $aggregatePublicState === 'NOT_APPLICABLE') $aggregatePublicState = 'BLOCKED';
+        if ($this->obligation($outcomeObligations, 'frontend')['class'] === 'REQUIRED' && $aggregateFrontendState === 'NOT_APPLICABLE') $aggregateFrontendState = 'BLOCKED';
+        array_push($blockers, ...$this->requiredSurfaceBlockers($outcomeObligations, $aggregatePublicState, $aggregateFrontendState));
+        $complete = $canonical === 'COMPLETE' && $packets !== [] && $blockers === [] && array_reduce($packets, static fn (bool $ok, array $packet): bool => $ok && ($packet['complete'] ?? false) === true, true);
         return [
             'owner_type' => 'capture',
             'owner_id' => trim($captureId),
@@ -244,8 +303,10 @@ final class CompletionCoordinator
             'missing_required_owners' => $missingRequiredOwners,
             'dependency_state' => $complete ? 'COMPLETE' : 'PARTIAL',
             'relation_or_usage_state' => $aggregateState($relationStates, 'COMPLETE'),
-            'public_state' => $aggregateState($publicStates, 'READY'),
-            'frontend_state' => $aggregateState($frontendStates, 'VERIFIED'),
+            'public_state' => $aggregatePublicState,
+            'public_state_reason' => $this->surfaceReason($outcomeObligations, 'public', $aggregatePublicState),
+            'frontend_state' => $aggregateFrontendState,
+            'frontend_state_reason' => $this->surfaceReason($outcomeObligations, 'frontend', $aggregateFrontendState),
             'enrichment_readiness' => [
                 'status' => $complete ? 'RICH' : 'PARTIAL',
                 'blockers' => [],
@@ -253,11 +314,14 @@ final class CompletionCoordinator
                 'gaps' => $resumeChildren,
             ],
             'publication_readiness' => [
-                'status' => 'NOT_APPLICABLE',
-                'blockers' => [],
+                'status' => $outcomeObligations !== [] && ($this->obligation($outcomeObligations, 'publication')['class'] === 'REQUIRED')
+                    ? (($aggregatePublicState === 'READY' && $aggregateFrontendState === 'VERIFIED') ? 'READY' : 'BLOCKED')
+                    : 'NOT_APPLICABLE',
+                'blockers' => $outcomeObligations !== [] && ($this->obligation($outcomeObligations, 'publication')['class'] === 'REQUIRED') ? $this->requiredSurfaceBlockers($outcomeObligations, $aggregatePublicState, $aggregateFrontendState) : [],
                 'warnings' => [],
                 'surface' => '',
             ],
+            'outcome_obligations' => $outcomeObligations !== [] ? $outcomeObligations : null,
             'complete' => $complete,
             'status' => $complete ? 'COMPLETE' : ($canonical === 'BLOCKED' ? 'BLOCKED' : 'PARTIAL'),
             'blockers' => array_values(array_unique($blockers)),
