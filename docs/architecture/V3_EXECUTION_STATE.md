@@ -1,5 +1,42 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-09 — Resolved subject retry-control repair
+
+ROOT_CAUSE_LOCAL: The stale-review repair correctly re-evaluated a persisted
+resolved subject packet, but the retry boundary still treated a repeated
+`subject_reconciliation` confirmation as an ambiguous-candidate selection.
+That made a valid server-owned resolved handoff fail closed as
+`CAPTURE_SUBJECT_RECONCILIATION_NOT_AMBIGUOUS` (and the staging symptom was
+reported as `CAPTURE_RETRY_PAYLOAD_NOT_ALLOWED`).
+
+IMPLEMENTED_LOCAL: `EditorialCaptureContinuationService` now accepts a
+candidate-only reconciliation confirmation as idempotent retry control when a
+validated persisted packet is already `resolved` and the candidate UUID is
+the same canonical subject. A different UUID remains fail-closed. No new
+packet, Capture revision, Video identity, direct writer, SQL write or
+Governance bypass is introduced. Regression fixtures cover both supplied
+Capture IDs, their resolved subject UUID, stable Video UUIDs and YouTube
+external identities; replay is asserted idempotent.
+
+VERIFIED_LOCAL: The focused Capture/ContentPreparation suite passes 69 tests /
+367 assertions. The combined Capture, Video, Governance, MCP, frontend and
+contract-focused suite passes 209 tests / 1,547 assertions; the plugin
+contract suite passes 6 tests / 48 assertions. `composer lint` and
+`git diff --check` pass. The full PHPUnit run executes 3,910 tests / 24,688
+assertions but retains 33 environment/legacy errors, 25 unrelated baseline
+failures, 31 warnings, 67 deprecations, 70 PHPUnit deprecations and 125
+skips; the local WordPress integration gates require `NHK_WP_TEST_PATH=public`
+and the authorized runtime identity, which are unavailable in this checkout.
+
+RUNTIME_BOUNDARY: No staging server/database mutation, Governance apply,
+canonical Video read-back or public HTTPS read-back was performed. Therefore
+the two staging Captures and canonical Video/public frontend remain
+unverified from this local checkout.
+
+STATUS: `LOCAL_RETRY_CONTROL_REPAIRED / LOCAL_REGRESSION_VERIFIED /
+WP_INTEGRATION_RUNTIME_UNAVAILABLE / NO_SERVER_OR_DATABASE_MUTATION /
+PUBLIC_VERIFIED_FALSE`
+
 # Checkpoint — 2026-10-09 — Staging release identity transport repair
 
 ROOT_CAUSE: The authorized staging database and WordPress options were already

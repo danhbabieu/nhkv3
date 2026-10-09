@@ -1394,6 +1394,120 @@ final class EditorialCaptureContinuationTest extends TestCase
         );
     }
 
+    /** @dataProvider resolvedVideoCaptureFixtures */
+    public function test_resolved_subject_reconciliation_is_a_retry_control_and_preserves_video_identity(string $captureId, string $videoId, string $externalVideoId, string $sourceUrl): void
+    {
+        $captures = new ContinuationCaptureRepository();
+        $addenda = new ContinuationAddendumRepository();
+        $subjectId = '01a09e44-539a-7f1a-938a-d7d91bb689a3';
+        $packet = [
+            'status' => 'resolved',
+            'canonical_subject_id' => $subjectId,
+            'entity_type' => 'classification',
+            'stable_key' => 'nhk:classification:clock-type.dong-ho-cong-cong',
+            'canonical_name' => 'Đồng hồ công cộng',
+            'revision' => 1,
+            'match_reason' => 'uuid_exact',
+        ];
+        $assets = [[
+            'kind' => 'video',
+            'video_id' => $videoId,
+            'video_proposal' => [
+                'entity_type' => 'video',
+                'operation' => 'ingest',
+                'payload' => ['canonical_id' => $videoId, 'metadata' => [
+                    'source' => [
+                        'platform' => 'youtube',
+                        'external_video_id' => $externalVideoId,
+                        'source_url' => $sourceUrl,
+                    ],
+                    'subject_resolution_packet' => $packet,
+                ]],
+            ],
+        ]];
+        $capture = new CaptureRecord(
+            $captureId,
+            'capture-' . $externalVideoId,
+            hash('sha256', 'capture-' . $externalVideoId),
+            CaptureStage::SUBJECTS_RESOLVED->value,
+            'REVIEW_REQUIRED',
+            null,
+            null,
+            $assets,
+            [
+                'purpose' => 'EDITORIAL',
+                'raw_input' => 'Đồng hồ công cộng trong video.',
+                'subject_hints' => ['Đồng hồ công cộng'],
+                'content_intent' => ['intent' => 'VIDEO', 'article_required' => false],
+                'original_request' => ['intent' => 'VIDEO', 'video' => ['url' => $sourceUrl]],
+                'subject_resolution_packet' => $packet,
+                'content_preparation' => [
+                    'status' => 'REVIEW_REQUIRED',
+                    'preparation_fingerprint' => hash('sha256', 'stale-subject-review-' . $externalVideoId),
+                    'subject_resolution_packet' => null,
+                    'review_reasons' => ['PRIMARY_SUBJECT_NOT_RESOLVED'],
+                    'quality_decision' => 'READY',
+                ],
+            ],
+            [
+                'subject_resolution_packet' => $packet,
+                'subjects' => ['status' => 'resolved', 'primary' => ['id' => $subjectId, 'type' => 'classification']],
+                'content_preparation' => [
+                    'status' => 'REVIEW_REQUIRED',
+                    'preparation_fingerprint' => hash('sha256', 'stale-subject-review-' . $externalVideoId),
+                    'subject_resolution_packet' => null,
+                    'review_reasons' => ['PRIMARY_SUBJECT_NOT_RESOLVED'],
+                    'quality_decision' => 'READY',
+                ],
+                'completion' => ['status' => 'REVIEW_REQUIRED', 'resume_hints' => ['resume_children' => ['video']]],
+            ],
+            [],
+            revision: 7,
+        );
+        $captures->create($capture);
+        $events = [];
+        $service = new EditorialCaptureContinuationService(
+            $captures,
+            $addenda,
+            $this->coordinator(
+                $captures,
+                $events,
+                preparation: new ContentPreparationOrchestrator(new SubjectResolutionService(static fn (): array => [])),
+            ),
+        );
+
+        $retryInput = [
+            'capture_id' => $capture->captureId,
+            'idempotency_key' => $capture->idempotencyKey,
+            'resume_mode' => 'RETRY',
+            'resume_children' => ['video'],
+            'subject_reconciliation' => ['confirmed' => true, 'candidate_uuid' => $subjectId],
+        ];
+        $result = $service->retry($retryInput);
+        $replay = $service->retry($retryInput);
+
+        self::assertNotSame('CAPTURE_RETRY_PAYLOAD_NOT_ALLOWED', $result['retry']['code'] ?? null);
+        self::assertNotSame('CAPTURE_SUBJECT_RECONCILIATION_NOT_AMBIGUOUS', $result['retry']['code'] ?? null);
+        self::assertSame($capture->captureId, $result['capture']['capture_id']);
+        self::assertSame($capture->idempotencyKey, $result['capture']['idempotency_key']);
+        self::assertSame($videoId, $result['capture']['assets'][0]['video_id']);
+        self::assertSame($externalVideoId, $result['capture']['assets'][0]['video_proposal']['payload']['metadata']['source']['external_video_id']);
+        self::assertSame($subjectId, $result['capture']['context']['subject_resolution_packet']['canonical_subject_id']);
+        self::assertSame($capture->captureId, $replay['capture']['capture_id']);
+        self::assertSame($capture->idempotencyKey, $replay['capture']['idempotency_key']);
+        self::assertSame($videoId, $replay['capture']['assets'][0]['video_id']);
+        self::assertCount(1, $replay['capture']['assets']);
+    }
+
+    /** @return array<string,list<string>> */
+    public static function resolvedVideoCaptureFixtures(): array
+    {
+        return [
+            'shorts' => ['01a12159-810c-7177-b2d3-444a02415fac', '01a12159-810c-7177-b2d3-444a02415fad', '5CqjJDgzFcI', 'https://www.youtube.com/shorts/5CqjJDgzFcI'],
+            'long-form' => ['01a12152-62e8-72b4-a8f5-1943eee56a9c', '01a12152-62e8-72b4-a8f5-1943eee56a9d', 'P4KaHX3LBOw', 'https://www.youtube.com/watch?v=P4KaHX3LBOw'],
+        ];
+    }
+
     public function test_ambiguous_video_retry_accepts_only_confirmed_candidate_on_same_capture_and_preserves_video_payload(): void
     {
         $captures = new ContinuationCaptureRepository();

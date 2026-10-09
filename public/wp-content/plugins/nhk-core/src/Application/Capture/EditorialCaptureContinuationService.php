@@ -299,6 +299,19 @@ final class EditorialCaptureContinuationService
         $intent = strtoupper(trim((string) (($capture->context['content_intent']['intent'] ?? ''))));
         if (!in_array($intent, ['VIDEO', 'IMAGE_ARTICLE', 'TEXT_ARTICLE'], true)) return [$capture, 'CAPTURE_SUBJECT_RECONCILIATION_INTENT_NOT_SUPPORTED'];
         if (!is_array($selection) || ($selection['confirmed'] ?? false) !== true) return [$capture, 'CAPTURE_SUBJECT_RECONCILIATION_CONFIRMATION_REQUIRED'];
+        $candidateId = trim((string) ($selection['candidate_uuid'] ?? ''));
+        $persistedPacket = SubjectResolutionPacket::fromArray(
+            is_array($capture->context['subject_resolution_packet'] ?? null)
+                ? $capture->context['subject_resolution_packet']
+                : (is_array($capture->diagnostics['subject_resolution_packet'] ?? null) ? $capture->diagnostics['subject_resolution_packet'] : []),
+        );
+        if ($persistedPacket?->status === 'resolved' && UuidCodec::isValid($candidateId)) {
+            if (!hash_equals(strtolower($persistedPacket->canonicalSubjectId), strtolower($candidateId))) return [$capture, 'CAPTURE_SUBJECT_RECONCILIATION_CANDIDATE_NOT_ALLOWED'];
+            // A resolved server-owned packet is already the canonical handoff.
+            // Treat a repeated confirmation as retry control, not a new
+            // candidate-selection payload and do not increment Capture state.
+            return [$capture, null];
+        }
         $authority = strtoupper(trim((string) ($selection['authority'] ?? $selection['source'] ?? '')));
         $serverPacket = ResolvedSubjectReconciliationPacket::fromArray(is_array($selection['reconciliation_packet'] ?? null) ? $selection['reconciliation_packet'] : []);
         if (is_array($selection['reconciliation_packet'] ?? null)) {
@@ -320,7 +333,6 @@ final class EditorialCaptureContinuationService
         ) {
             return [$this->persistResolvedReconciliation($capture, $explicitPacket), null];
         }
-        $candidateId = trim((string) ($selection['candidate_uuid'] ?? ''));
         if (!UuidCodec::isValid($candidateId)) return [$capture, 'CAPTURE_SUBJECT_RECONCILIATION_CANDIDATE_NOT_ALLOWED'];
         $rawPacket = is_array($capture->context['subject_resolution_packet'] ?? null)
             ? $capture->context['subject_resolution_packet']
