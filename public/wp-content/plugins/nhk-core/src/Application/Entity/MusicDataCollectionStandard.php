@@ -54,6 +54,14 @@ final class MusicDataCollectionStandard
                     'westminster_example' => $field['westminster_example'],
                     'missing_data_behavior' => $field['missing_data_behavior'],
                     'review_requirement' => $field['review_requirement'],
+                    'uncertainty_states' => $field['uncertainty_states'],
+                    'duplicate_rule' => $field['duplicate_rule'],
+                    'review_rule' => $field['review_rule'],
+                    'frontend_consumer' => $field['frontend_consumer'],
+                    'public_display_states' => $field['public_display_states'],
+                    'example_valid' => $field['example_valid'],
+                    'example_invalid' => $field['example_invalid'],
+                    'example_missing' => $field['example_missing'],
                     'category_key' => $letter,
                     'intake_only' => true,
                 ];
@@ -192,7 +200,55 @@ final class MusicDataCollectionStandard
             'westminster_example' => $example,
             'missing_data_behavior' => 'Keep MISSING, UNKNOWN, NOT_APPLICABLE or BLOCKED explicit; never fabricate a value.',
             'review_requirement' => 'Research/editorial review; governed apply is required for canonical mutation.',
+            'uncertainty_states' => self::STATUSES,
+            'duplicate_rule' => $this->duplicateRule($name, $owner),
+            'review_rule' => $this->reviewRule($name, $owner),
+            'frontend_consumer' => $this->frontendConsumer($name, $owner),
+            'public_display_states' => [
+                'CANONICAL_DATA_AVAILABLE', 'PUBLIC_ELIGIBILITY_REQUIRED', 'RENDERED_FRONTEND_DATA',
+                'MISSING_FEATURE', 'MISSING_EVIDENCE', 'MISSING_RIGHTS', 'TEMPORARILY_UNAVAILABLE',
+            ],
+            'example_valid' => $example,
+            'example_invalid' => 'Unscoped, guessed or unsupported input without a source/locator is rejected.',
+            'example_missing' => 'MISSING; do not infer a value from a title, alias, URL, file name or related entity.',
             'applicability_override' => $applicability,
         ];
+    }
+
+    private function duplicateRule(string $fieldName, string $owner): string
+    {
+        if ($fieldName === 'canonical_name' || $fieldName === 'preferred_title') {
+            return 'Resolve and reuse the existing Music Authority identity by canonical scope; display-name equality never creates an owner.';
+        }
+        if (str_contains($owner, 'Dictionary')) {
+            return 'Search and reuse the existing Entry/Form/Sense and preserve ambiguity; an alias is not a new semantic owner.';
+        }
+        if (str_contains($owner, 'Media') || str_contains($owner, 'Score')) {
+            return 'Reuse an exact canonical Media/MediaAsset identity by governed read-back, checksum and scope; a URL or local file is not identity.';
+        }
+        return 'Reuse an existing scoped claim, source, relation or owner after canonical read-back; do not create a duplicate from wording alone.';
+    }
+
+    private function reviewRule(string $fieldName, string $owner): string
+    {
+        if ($fieldName === 'registered_relation' || str_contains($owner, 'Graph')) {
+            return 'Review endpoint types, registered predicate, direction, scope, provenance and evidence before any Governance proposal.';
+        }
+        if (str_contains($owner, 'Dictionary')) {
+            return 'Review lexical meaning, locale, usage scope, attestation and owner revalidation; unresolved ambiguity remains review-required.';
+        }
+        if (str_contains($owner, 'Media') || str_contains($owner, 'Score')) {
+            return 'Review provenance, integrity, rights, readiness and public delivery separately; local preview never approves publication.';
+        }
+        return 'Review subject identity, scope, source/locator, uncertainty and evidence; canonical mutation uses the existing Governance lifecycle.';
+    }
+
+    private function frontendConsumer(string $fieldName, string $owner): string
+    {
+        if (str_contains($owner, 'Dictionary')) return 'Dictionary public projection or delegated canonical-owner link; no Music template inference.';
+        if (str_contains($owner, 'Media') || str_contains($owner, 'Score')) return 'MusicDossierProjection score/audio/library sections when owner readiness and public delivery pass.';
+        if (str_contains($owner, 'Graph')) return 'MusicDossierProjection related-entities section with direct/derived origin and public-safe path.';
+        if (str_contains($owner, 'Public Projection') || str_contains($owner, 'WordPress')) return 'Generic Music dossier identity, section or SEO projection through the existing route/read model.';
+        return 'MusicCoverageAssessment for readiness; MusicDossierProjection only after the owning public eligibility policy passes.';
     }
 }

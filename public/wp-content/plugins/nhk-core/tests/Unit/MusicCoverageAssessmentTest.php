@@ -31,10 +31,22 @@ final class MusicCoverageAssessmentTest extends TestCase
                 'evidence_requirements', 'allowed_source_types',
                 'validation_rules', 'public_visibility_rule',
                 'related_entity_types', 'westminster_example',
-                'missing_data_behavior', 'review_requirement',
+                'missing_data_behavior', 'review_requirement', 'uncertainty_states',
+                'duplicate_rule', 'review_rule', 'frontend_consumer',
+                'public_display_states', 'example_valid', 'example_invalid',
+                'example_missing', 'intake_only',
             ] as $key) {
                 self::assertArrayHasKey($key, $field, (string) ($field['field_name'] ?? 'field'));
             }
+            self::assertTrue($field['intake_only'], (string) ($field['field_name'] ?? 'field'));
+            self::assertIsArray($field['uncertainty_states'], (string) ($field['field_name'] ?? 'field'));
+            self::assertNotEmpty($field['uncertainty_states'], (string) ($field['field_name'] ?? 'field'));
+            foreach (['duplicate_rule', 'review_rule', 'frontend_consumer', 'example_valid', 'example_invalid', 'example_missing'] as $key) {
+                self::assertIsString($field[$key], (string) ($field['field_name'] ?? 'field'));
+                self::assertNotSame('', trim($field[$key]), (string) ($field['field_name'] ?? 'field'));
+            }
+            self::assertIsArray($field['public_display_states'], (string) ($field['field_name'] ?? 'field'));
+            self::assertNotEmpty($field['public_display_states'], (string) ($field['field_name'] ?? 'field'));
         }
         self::assertGreaterThanOrEqual(35, count($standard->fields()));
     }
