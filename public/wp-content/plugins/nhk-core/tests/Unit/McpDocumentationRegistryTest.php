@@ -32,6 +32,30 @@ final class McpDocumentationRegistryTest extends TestCase
         self::assertContains('dictionary-enrichment-audit', $keys);
     }
 
+    public function test_universal_music_operating_documents_are_allowlisted_and_readable(): void
+    {
+        $expected = [
+            'music-contract-gap-report' => 'docs/architecture/MUSIC_AZ_CONTRACT_GAP_REPORT.md',
+            'music-input-template' => 'docs/architecture/MUSIC_INPUT_TEMPLATE.md',
+            'dictionary-input-template' => 'docs/architecture/DICTIONARY_INPUT_TEMPLATE.md',
+            'score-audio-input-template' => 'docs/architecture/SCORE_AUDIO_INPUT_TEMPLATE.md',
+            'music-public-display-matrix' => 'docs/architecture/MUSIC_PUBLIC_DISPLAY_MATRIX.md',
+            'documentation-changes' => 'docs/architecture/DOCUMENTATION_CHANGES.md',
+            'executable-parity-results' => 'docs/architecture/EXECUTABLE_PARITY_RESULTS.md',
+        ];
+        $registry = new McpDocumentationRegistry();
+
+        foreach ($expected as $key => $path) {
+            self::assertContains($key, McpDocumentationRegistry::documentKeys());
+            self::assertContains($path, McpDocumentationRegistry::documentPaths());
+            $document = $registry->get($key);
+            self::assertSame($path, $document['path']);
+            self::assertSame('ACTIVE', $document['status']);
+            self::assertNotSame('', trim((string) $document['content']));
+            self::assertSame(hash_file('sha256', dirname(__DIR__, 6) . '/' . $path), $document['document_hash']);
+        }
+    }
+
     public function test_semantic_enrichment_contract_is_allowlisted_and_snapshot_verified(): void
     {
         $path = 'docs/architecture/DICTIONARY_SEMANTIC_ENRICHMENT_PROJECTION_CONTRACT.md';
