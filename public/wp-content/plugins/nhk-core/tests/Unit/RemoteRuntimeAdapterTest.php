@@ -100,6 +100,16 @@ final class RemoteRuntimeAdapterTest extends TestCase
         self::assertStringContainsString('--output=/tmp/nhk-v3-pre-migration-', implode(' ', $commands[0]));
     }
 
+    public function test_pre_migration_snapshot_preserves_the_exact_remote_gate_reason(): void
+    {
+        $adapter = new RemoteRuntimeAdapter('demo.1945.vn', '/remote/plugin', static fn (): array => [2, '{"status":"failed","reason_code":"SNAPSHOT_PRE_MIGRATION_LEVEL_INVALID"}', '']);
+
+        self::assertSame(
+            'SNAPSHOT_PRE_MIGRATION_LEVEL_INVALID',
+            $adapter->run(new DemoCutoverContext('demo.1945.vn', 'specimen', str_repeat('a', 40), 'run-backup-failed'), 'v3-snapshot-pre-migration-export')->reasonCode,
+        );
+    }
+
     public function test_migration_up_rejects_stale_source_revision_and_incomplete_schema(): void
     {
         $sourceRevision = str_repeat('a', 40);

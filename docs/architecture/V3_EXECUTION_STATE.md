@@ -1,5 +1,29 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-09 — Staging backup gate stopped on runtime drift
+
+RUNTIME_READBACK: The official deployment flow transferred the verified
+release `49da723661f2a679ecf9ba36f78cdd1a696e3daf` to `demo.1945.vn`, then
+invoked the new official pre-migration snapshot operation before any
+`migration-up` call. The backup runner failed closed with
+`SNAPSHOT_PRE_MIGRATION_LEVEL_INVALID`. A subsequent read-only official health
+receipt reported the authorized staging identity reachable and healthy at
+migration `26/26` with `migration_schema_ready=true` and storage, hydration,
+application and REST layers all true.
+
+BLOCKER: The approved pre-migration source checkpoint was `25/26`, but the
+fresh staging read-back is already `26/26`; no valid 25/26 artifact/restore
+receipt was produced in this run. The cause and timing of the runtime state
+change are not established by the read-only receipts. Migration 026 was not
+invoked by this release flow after the backup gate failed. Per fail-closed
+policy, no second migration attempt, semantic Capture retry, Governance apply,
+publication or public URL claim is authorized from this state.
+
+STATUS: `STAGING_BACKUP_GATE_FAILED /
+RUNTIME_DRIFT_25_26_TO_26_26_OBSERVED /
+MIGRATION_026_NOT_INVOKED_BY_THIS_RUN /
+CAPTURE_BLOCKED / GOVERNANCE_BLOCKED / PUBLIC_READBACK_BLOCKED`
+
 # Checkpoint — 2026-10-09 — Staging pre-migration backup deadlock resolution
 
 IMPLEMENTED_LOCAL: The official normalized snapshot boundary now has a

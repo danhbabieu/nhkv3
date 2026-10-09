@@ -102,7 +102,7 @@ final class RemoteRuntimeAdapter
             if ($operation === 'clock-type-audit' && is_array($decoded) && in_array(($decoded['reason_code'] ?? null), ['REMOTE_OPERATION_NOT_ALLOWLISTED', 'LIVE_AUDIT_SURFACE_NOT_EXPOSED'], true)) {
                 return StageResult::blocked('LIVE_AUDIT_SURFACE_NOT_EXPOSED');
             }
-            if ($operation === 'migration-up' && is_array($decoded) && is_string($decoded['reason_code'] ?? null) && $decoded['reason_code'] !== '') {
+            if (in_array($operation, ['migration-up', 'v3-snapshot-pre-migration-export'], true) && is_array($decoded) && is_string($decoded['reason_code'] ?? null) && $decoded['reason_code'] !== '') {
                 return StageResult::failed($decoded['reason_code']);
             }
             return StageResult::failed('REMOTE_RUNTIME_EXECUTION_FAILED');
