@@ -360,8 +360,12 @@ final class StructuredSemanticInterpreter
 
     private function sourceLocator(string $segment): ?string
     {
-        if (preg_match('/^(?:source|nguồn|reference|ref(?:erence)?|url)\s*[:：]\s*(https?:\/\/\S+|doi:\S+)\s*$/iu', trim($segment), $match) !== 1) return null;
-        return trim((string) $match[1], " \t\n\r.,;:!?。！？");
+        $segment = trim($segment);
+        if (preg_match('/^(?:source|nguồn|reference|ref(?:erence)?|url)\s*[:：]\s*(https?:\/\/\S+|doi:\S+)\s*$/iu', $segment, $match) === 1) {
+            return trim((string) $match[1], " \t\n\r.,;:!?。！？");
+        }
+        if (preg_match('/^https?:\/\/\S+$/iu', $segment) === 1) return trim($segment, " \t\n\r.,;:!?。！？");
+        return null;
     }
 
     /** @return list<string> */

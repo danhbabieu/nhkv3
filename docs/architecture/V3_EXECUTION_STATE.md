@@ -25865,3 +25865,35 @@ public read-back or cutover was performed.
 STATUS: `OUTCOME_LAW_NATIVE_IMPLEMENTED / FOCUSED_VERIFIED /
 FULL_SUITE_REGRESSIONS_RECORDED / RUNTIME_ACCEPTANCE_BLOCKED /
 NO_SEMANTIC_MUTATION`
+
+# Checkpoint — 2026-10-09 — Westminster Quality Audit repair classification
+
+ROOT_CAUSE_CONFIRMED: The Knowledge quality auditor ignored Capture provenance
+stored in the top-level `origin` field, producing false `PROVENANCE_GAP`
+findings. It also sent source locators and operational instructions through the
+generic claim path, allowing repair planning to suggest `ADD_EVIDENCE` for
+non-Knowledge records. Bare HTTP(S) locators were not classified as source
+locators by the shared interpreter.
+
+IMPLEMENTED: The auditor now accepts registered provenance from metadata or the
+Capture `origin`, classifies source locators as process contamination and
+operational instructions as internal workflow Knowledge, and suppresses
+Evidence/dictionary/relation enrichment repairs when contamination is present.
+Bare HTTP(S) locators now use the existing source-locator classification. No
+new owner, finding vocabulary, writer or permission was introduced.
+
+REGRESSION_COVERAGE: Added tests proving source locators and instructions are
+retire-review candidates rather than Evidence candidates, and that
+`EXTERNAL_RESEARCH` Capture origin is not reported as a provenance gap. Focused
+Knowledge quality, MCP, Structured Semantic Interpreter and text-input tests
+pass 60 tests / 236 assertions. Changed PHP lint and `git diff --check` pass.
+
+RUNTIME_BOUNDARY: This fix is local and has not been deployed. The exact
+staging source/build identity supplied by the live audit remains separate from
+the local checkout. No Capture retry, Knowledge repair, Evidence write, signed
+packet issuance, Governance apply, staging/production mutation or public
+completion was performed.
+
+STATUS: `QUALITY_AUDIT_CLASSIFICATION_FIXED / FOCUSED_VERIFIED /
+RUNTIME_DEPLOYMENT_PENDING / SIGNED_MUTATION_PACKET_PENDING /
+NO_SEMANTIC_MUTATION`

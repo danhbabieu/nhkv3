@@ -35,7 +35,7 @@ final class KnowledgeQualityAuditor
         $subject = $this->subject($metadata);
         $scope = strtolower(trim((string) ($metadata['scope'] ?? $subject['entity_type'] ?? '')));
         $facet = strtolower(trim((string) ($metadata['facet'] ?? $metadata['projection_category'] ?? '')));
-        $provenance = strtoupper(trim((string) ($metadata['provenance_class'] ?? $claim->provenance['source_class'] ?? '')));
+        $provenance = strtoupper(trim((string) ($metadata['provenance_class'] ?? $metadata['source_class'] ?? $claim->provenance['source_class'] ?? $claim->provenance['origin'] ?? '')));
         $evidence = $this->evidenceAssessment($claim, $scope);
         $packet = $this->interpreter->interpret([
             'raw_text' => $claim->claimText,
@@ -53,6 +53,9 @@ final class KnowledgeQualityAuditor
         if (($subject['status'] ?? '') !== 'resolved') $findings[] = (($subject['status'] ?? '') === 'ambiguous' ? 'SUBJECT_AMBIGUOUS' : 'SUBJECT_UNRESOLVED');
         if (!in_array($scope, self::SCOPES, true) || (($subject['entity_type'] ?? '') === 'specimen' && $scope !== 'specimen_observation')) $findings[] = 'SCOPE_PROBLEM';
         if (!in_array($provenance, self::PROVENANCE, true)) $findings[] = 'PROVENANCE_GAP';
+        $inputClass = $this->interpreter->classifySegment($claim->claimText)['class'] ?? 'SEMANTIC_OR_EDITORIAL';
+        if ($inputClass === 'SOURCE_LOCATOR') $findings[] = 'PROCESS_CONTAMINATION';
+        if ($inputClass === 'OPERATIONAL_INSTRUCTION') $findings[] = 'INTERNAL_WORKFLOW_KNOWLEDGE';
         if (!$this->lineageGuard->isIndependent(['source_kind' => $metadata['source_kind'] ?? 'KNOWLEDGE', 'lineage' => $metadata['lineage'] ?? []])) $findings[] = 'DERIVED_CONTENT_CONTAMINATION';
         if ($this->isProcessContamination($claim->claimText, $metadata)) $findings[] = 'PROCESS_CONTAMINATION';
         if ($this->isEditorialFragment($claim->claimText, $metadata)) $findings[] = 'EDITORIAL_FRAGMENT';
@@ -180,5 +183,27 @@ final class KnowledgeQualityAuditor
     private function needsAtomization(string $text): bool { return preg_match('/[,;].*\b(and|và|đồng thời|thường gặp|sản xuất|dùng|có)\b/ui', $text) === 1 || substr_count($text, ',') >= 2; }
     private function narrowestScope(string $scope, array $subject): string { return ($subject['entity_type'] ?? '') === 'specimen' && $scope !== 'specimen_observation' ? 'specimen_observation' : ($scope !== '' ? $scope : 'UNRESOLVED'); }
     /** @param list<string> $findings @return list<array<string,mixed>> */
-    private function repairs(array $findings): array { $map = ['DUPLICATE_OR_REUSE' => 'REUSE_CANONICAL', 'EVIDENCE_GAP' => 'ADD_EVIDENCE', 'QUALIFICATION_REVIEW' => 'QUALIFY_CLAIM', 'ATOMIZATION_NEEDED' => 'ATOMIZE', 'SCOPE_PROBLEM' => 'SCOPE_NARROW_REVIEW', 'PROCESS_CONTAMINATION' => 'RETIRE_PROCESS_CONTAMINATION_REVIEW', 'EDITORIAL_FRAGMENT' => 'RETIRE_EDITORIAL_FRAGMENT_REVIEW', 'DICTIONARY_CANDIDATE' => 'DICTIONARY_REVIEW', 'RELATION_CANDIDATE' => 'RELATION_REVIEW']; return array_values(array_map(static fn (string $finding): array => ['action' => $map[$finding] ?? 'NO_ACTION', 'finding' => $finding, 'planning_only' => true], array_filter($findings, static fn (string $finding): bool => isset($map[$finding])))); }
+    private function repairs(array $findings): array
+    {
+        $map = [
+            'DUPLICATE_OR_REUSE' => 'REUSE_CANONICAL',
+            'EVIDENCE_GAP' => 'ADD_EVIDENCE',
+            'QUALIFICATION_REVIEW' => 'QUALIFY_CLAIM',
+            'ATOMIZATION_NEEDED' => 'ATOMIZE',
+            'SCOPE_PROBLEM' => 'SCOPE_NARROW_REVIEW',
+            'PROCESS_CONTAMINATION' => 'RETIRE_PROCESS_CONTAMINATION_REVIEW',
+            'EDITORIAL_FRAGMENT' => 'RETIRE_EDITORIAL_FRAGMENT_REVIEW',
+            'INTERNAL_WORKFLOW_KNOWLEDGE' => 'RETIRE_INTERNAL_WORKFLOW_REVIEW',
+            'DICTIONARY_CANDIDATE' => 'DICTIONARY_REVIEW',
+            'RELATION_CANDIDATE' => 'RELATION_REVIEW',
+        ];
+        $contamination = ['PROCESS_CONTAMINATION', 'EDITORIAL_FRAGMENT', 'INTERNAL_WORKFLOW_KNOWLEDGE', 'DERIVED_CONTENT_CONTAMINATION'];
+        if (array_intersect($contamination, $findings) !== []) {
+            $findings = array_values(array_diff($findings, ['EVIDENCE_GAP', 'QUALIFICATION_REVIEW', 'DICTIONARY_CANDIDATE', 'RELATION_CANDIDATE']));
+        }
+        return array_values(array_map(
+            static fn (string $finding): array => ['action' => $map[$finding] ?? 'NO_ACTION', 'finding' => $finding, 'planning_only' => true],
+            array_filter($findings, static fn (string $finding): bool => isset($map[$finding])),
+        ));
+    }
 }

@@ -42,6 +42,43 @@ final class KnowledgeQualityAuditTest extends TestCase
         self::assertCount(1, $claims->list());
     }
 
+    public function test_auditor_retires_source_locators_and_instructions_instead_of_requesting_evidence(): void
+    {
+        $sourceLocator = $this->claim('source-locator', 'https://example.test/westminster', [
+            'origin' => 'EXPLICIT_USER_KNOWLEDGE',
+            'metadata' => ['subject_id' => $this->subject, 'subject_type' => 'music', 'facet' => 'history', 'scope' => 'entity'],
+        ]);
+        $instruction = $this->claim('instruction', 'Bổ sung Evidence cho nguồn Westminster.', [
+            'origin' => 'EXPLICIT_USER_KNOWLEDGE',
+            'metadata' => ['subject_id' => $this->subject, 'subject_type' => 'music', 'facet' => 'history', 'scope' => 'entity'],
+        ]);
+        $claims = new InMemoryClaims([$sourceLocator, $instruction]);
+        $auditor = new KnowledgeQualityAuditor($claims, new InMemoryEvidence(), new InMemorySources(), new StructuredSemanticInterpreter());
+
+        $sourceResult = $auditor->audit($sourceLocator);
+        $instructionResult = $auditor->audit($instruction);
+
+        self::assertContains('PROCESS_CONTAMINATION', $sourceResult->findings);
+        self::assertNotContains('ADD_EVIDENCE', array_column($sourceResult->repairCandidates, 'action'));
+        self::assertContains('RETIRE_PROCESS_CONTAMINATION_REVIEW', array_column($sourceResult->repairCandidates, 'action'));
+        self::assertContains('INTERNAL_WORKFLOW_KNOWLEDGE', $instructionResult->findings);
+        self::assertNotContains('ADD_EVIDENCE', array_column($instructionResult->repairCandidates, 'action'));
+        self::assertContains('RETIRE_INTERNAL_WORKFLOW_REVIEW', array_column($instructionResult->repairCandidates, 'action'));
+    }
+
+    public function test_auditor_accepts_capture_origin_as_provenance_class(): void
+    {
+        $claim = $this->claim('research-origin', 'Joseph Jowett được ghi nhận trong một nghiên cứu lịch sử.', [
+            'origin' => 'EXTERNAL_RESEARCH',
+            'metadata' => ['subject_id' => $this->subject, 'subject_type' => 'music', 'facet' => 'history', 'scope' => 'entity'],
+        ]);
+
+        $result = (new KnowledgeQualityAuditor(new InMemoryClaims([$claim]), new InMemoryEvidence(), new InMemorySources(), new StructuredSemanticInterpreter()))->audit($claim);
+
+        self::assertSame('EXTERNAL_RESEARCH', $result->provenanceAssessment['class']);
+        self::assertNotContains('PROVENANCE_GAP', $result->findings);
+    }
+
     public function test_auditor_separates_exact_duplicate_from_same_claim_with_new_evidence(): void
     {
         $first = $this->claim('first', 'Variant A dùng bộ máy M.', ['metadata' => ['subject_id' => $this->subject, 'subject_type' => 'variant', 'facet' => 'movement', 'scope' => 'variant', 'provenance_class' => 'CATALOG_SUPPORTED']]);
