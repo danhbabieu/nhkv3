@@ -1,5 +1,72 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-09 — Real specimen catalogue boundary audit
+
+AUDIT: Continued the local `main` audit for the real antique-clock specimen
+catalogue. Read the Constitution, active contracts, registries, route/public
+identity documents, execution state and the relevant Product/Specimen,
+Graph, Media, Video, Knowledge, Source/Evidence and Article boundaries. No
+schema, migration, runtime, database, semantic record, Graph relation,
+deployment, push or pull mutation was performed.
+
+CURRENT_CAPABILITIES: The canonical registry contains the independent
+`specimen` physical-object owner and `product` listing/offer owner. Specimen
+supports its registered physical/provenance/observation fields; Product
+supports its registered commercial/listing fields. The existing application
+provides separate `/hien-vat/` and `/san-pham/` public route families,
+Public Identity based projection, generic archive/detail/search read models,
+read-only canonical and Graph inventory, governed `classified_as` support,
+and the existing Media, Video, Knowledge, Source/Evidence and Article read
+boundaries. This is capability evidence from code and tests, not a claim that
+the unavailable WordPress runtime is populated.
+
+ARCHITECTURE_DECISION: Preserve one Specimen record per concrete physical
+clock. Do not create 100 Model/Variant records as physical inventory, and do
+not use Product payload fields, post meta, taxonomy or broad `about` as a
+Product–Specimen ownership substitute. The current registry has no approved
+Product–Specimen relation/persistence mechanism and no direct Specimen-to-
+Variant/Model physical-identity predicate. `model_uuid` on Specimen remains a
+compatibility payload boundary, not canonical Graph truth. Any new relation,
+field, owner or commercial history must first receive a contract/registry
+extension.
+
+VIDEO_MJ82AHKAWLK_DIAGNOSIS: The supplied Video URL, Capture UUID and
+Variant UUID are not present in this checkout and could not be read back from
+the unavailable WordPress runtime. From the current code path, an explicit
+canonical subject remains authoritative; a conflicting same-type source
+candidate produces `SUBJECT_CONFLICT_REVIEW_REQUIRED` and a `conflict`
+packet. Generic candidate continuation only accepts an `ambiguous` packet,
+which explains `CAPTURE_SUBJECT_RECONCILIATION_NOT_AMBIGUOUS` for the
+reported continuation path. The compliant next path is an explicit governed
+resolved-subject packet bound to the exact Capture/request, not duplicate
+creation or a hardcoded case exception. No claim of live Video, Variant,
+Evidence or relation state is made.
+
+VERIFIED: The focused Product/Specimen, Graph, public route/profile,
+inventory, Video and Capture selection passed 180 tests / 832 assertions.
+The Contract suite passed 6 tests / 48 assertions. The full Unit suite under
+PHP `memory_limit=512M` completed 3,691 tests / 24,357 assertions with one
+error and one failure: `WpdbArticleOperationReceiptRepositoryTest` and
+`SemanticSpecificityPropagationTest`, both existing broad-baseline failures
+outside this audit. Composer PHP lint and `git diff --check` passed.
+
+RUNTIME_QA: Read-only deployment preflight passed 6 of 11 checks and failed
+closed at WordPress bootstrap, NHK core bootstrap, schema migration,
+authority hydration and REST bootstrap. Structural diagnostics reported
+`WORDPRESS_DATABASE_UNAVAILABLE`. Therefore runtime inventory counts, schema
+read-back, route read-back, exact Capture/Video/Variant reconciliation and
+live acceptance remain unverified. No runtime mutation was attempted.
+
+APPROVAL_REQUIRED: A dedicated Product–Specimen relation contract and
+registered persistence/Graph/read model are required before listing-to-object
+links can be implemented. A governed physical Specimen-to-Variant/Model
+relation, if desired beyond the existing compatibility field and approved
+relation paths, likewise requires an explicit contract/registry decision.
+
+STATUS: `SPECIMEN_CATALOGUE_AUDITED / PRODUCT_SPECIMEN_REGISTRY_GAP /
+VIDEO_CASE_RUNTIME_UNVERIFIED / FOCUSED_TESTS_PASS / FULL_UNIT_BASELINE_RECORDED /
+RUNTIME_BLOCKED / NO_SEMANTIC_MUTATION`
+
 # Checkpoint — 2026-10-09 — Westminster staging deploy and public read-back
 
 DEPLOYED: The allowlisted `scripts/nhk-deploy-verify` release gate completed
