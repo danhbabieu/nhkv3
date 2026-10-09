@@ -46,6 +46,28 @@ final class SharedEnrichmentBoundaryTest extends TestCase
         self::assertSame(3000, $rich['content']['pack']->diagnostics['context_budget']);
     }
 
+    public function test_article_media_and_video_profiles_share_the_same_relevance_fail_closed_gate(): void
+    {
+        $claim = ['id' => 'unrelated', 'claim_id' => 'unrelated', 'subject_id' => self::SUBJECT, 'subject_type' => 'model', 'facet' => 'distribution', 'text' => 'Odo 36 có lịch sử phân phối tại một thị trường khác.', 'scope' => 'model', 'provenance' => 'CATALOG_SUPPORTED', 'evidence_status' => 'SUPPORTED_WITHIN_SCOPE', 'relevance' => 0.08, 'topic_relevance' => 'IRRELEVANT'];
+        $boundary = new SharedEnrichmentBoundary(
+            new EditorialClaimRetrievalService(new ClaimRetrievalEngine(
+                static fn (array $subject): array => ['status' => 'available', 'items' => []],
+                static function (array $subject, array $neighborhood) use ($claim): array { return [$claim]; },
+            )),
+            new EditorialKnowledgeSelector(),
+        );
+
+        foreach (['article', 'media', 'video'] as $profile) {
+            $result = $boundary->enrich([
+                'profile' => $profile,
+                'subject_resolution' => ['primary' => ['id' => self::SUBJECT, 'type' => 'model']],
+                'topic' => 'vách máy Odo 36',
+            ]);
+            self::assertSame([], $result['content']['selected_claims'], $profile);
+            self::assertSame(1, $result['content']['pack']->diagnostics['relevance_excluded_count'], $profile);
+        }
+    }
+
     public function test_prepared_subject_context_bounds_shared_content_and_sparse_content_is_local(): void
     {
         $boundary = $this->boundary();

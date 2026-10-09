@@ -343,3 +343,20 @@ owner receives a regenerated `metadata.editorial` package and the matching
 surfaces. The update preserves the source identity, external ID, relations and
 other current metadata. Completion is based on the canonical Video read-back,
 not on Capture addendum persistence or a proposal response alone.
+
+## Shared Capture subject handoff and interrupted recovery — 2026-10-09
+
+The adapter-to-Capture subject handoff is a shared Capture boundary. When an
+adapter returns a validated `subject_resolution_packet` during enrichment,
+Capture adopts it before returning a review/interrupted checkpoint, persists
+the same packet in Capture context and diagnostics, and carries the packet into
+the child proposal metadata. An already locked subject is immutable; a missing
+or contradictory packet fails closed. This is a Capture handoff mechanism,
+not a second Video parser or a Video-specific identity rule.
+
+The current decision reducer treats a resolved packet as canonical recovery
+evidence and retires a stale `PRIMARY_SUBJECT_NOT_RESOLVED` blocker. One
+bounded recovery retry is exposed for the reconciled checkpoint; a no-progress
+replay remains ineligible. The original Capture and Video identities,
+idempotency key, source identity, Evidence requirements, Graph direction and
+Governance Controlled Apply lifecycle are unchanged.

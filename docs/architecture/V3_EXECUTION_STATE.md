@@ -25568,3 +25568,50 @@ WordPress, staging or production data was mutated. No live retry, deployment,
 push, approval, controlled apply or public completion was performed. The
 deployed revision remains outside this local repair and requires the existing
 runtime identity and signed-scope gates before any acceptance operation.
+
+# Checkpoint — 2026-10-09 — Shared Capture subject handoff and semantic preflight repair
+
+ROOT_CAUSE_CONFIRMED: In the interrupted Video preview path, the adapter
+returned a valid classification / subject-resolution packet inside the Video
+enrichment result, but `EditorialCaptureCoordinator` returned from the
+preparation-review branch without adopting that packet into Capture context,
+diagnostics and proposal metadata. The saved revision therefore retained a
+null `subject_resolution_packet`, reported `PRIMARY_SUBJECT_NOT_RESOLVED`, and
+incorrectly denied the bounded recovery path. This was a shared orchestration
+checkpoint-loss defect, not a Video identifier defect or a missing semantic
+parser.
+
+IMPLEMENTED: Added a shared adapter-to-Capture subject handoff that validates
+and preserves one canonical subject packet across adapter, Capture,
+enrichment and Governance boundaries. Recovery now retires stale subject
+blockers only after canonical packet validation and exposes one bounded
+recovery token; consumed/no-progress replays remain fail-closed and existing
+Capture/Video UUID and idempotency paths are retained. Added normalized
+read-only preflight diagnostics for intent, source, identity, duplicate/reuse,
+subject compatibility, provenance, scope, Evidence, Graph eligibility and
+editorial relevance. Added a shared relevance gate so explicitly unrelated or
+low-relevance candidates cannot be selected merely because they are reachable
+through Graph; transcript, hints and generated prose remain non-automatic
+Knowledge/Evidence. No registry, schema, Constitution or publication bypass
+was introduced.
+
+REGRESSION_COVERAGE: Added interrupted preview recovery with same Capture and
+one owner asset, stale-blocker reconciliation, preflight state distinctions,
+explicit relevance exclusion, and cross-adapter Article/Media/Video relevance
+coverage. Existing Video frontend reconciliation/projection and SEO contract
+tests remain green.
+
+VERIFIED: Focused Capture/semantic/Video/frontend set passes 193 tests / 811
+assertions. Related intake, Video, MCP, Graph, Governance, frontend and SEO
+tests pass 249 tests / 1,862 assertions (5 warnings, 3 deprecations). NHK
+Contract passes 6 tests / 48 assertions. Full Unit at PHP 512M completes
+3,630 tests / 22,916 assertions with 14 existing environment/fixture errors
+and 6 existing failures; the default 128M run also hit the repository's large
+materializer fixture. Capture recovery integration remains blocked by its
+required `NHK_WP_TEST_PATH=public` guard. Changed PHP lint and `git diff
+--check` pass.
+
+BOUNDARY: The repair is local only. No Capture, Video, Knowledge, Source,
+Evidence, Graph, Governance, WordPress, staging or production data was
+mutated. No migration, deployment, signed acceptance, controlled apply, push
+or public completion was performed.

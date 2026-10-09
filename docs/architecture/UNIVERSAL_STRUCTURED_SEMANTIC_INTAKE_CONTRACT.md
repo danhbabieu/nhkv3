@@ -645,3 +645,20 @@ IDs and the serialized result contains lexical planning data only. The legacy
 Dictionary candidate queue may be compared after current interpretation for
 planning-only cleanup/review, but it never changes the current packet or Seed
 v1 result.
+
+## Shared Capture preflight and editorial relevance gate — 2026-10-09
+
+Every Capture adapter now receives one read-only preflight vocabulary covering
+intent, source identity, canonical identity, duplicate/reuse, subject
+compatibility, provenance, scope, Evidence, Graph eligibility and content
+relevance. Each check retains its own `READY`, `INCOMPLETE`, `BLOCKED`,
+`UNAVAILABLE` or `NOT_APPLICABLE` state and reason codes; a pending or missing
+check is never collapsed into an empty success. The preflight is diagnostics
+and planning state only and does not authorize a semantic write.
+
+Shared editorial selection applies an explicit relevance gate before
+KnowledgeUnit selection. Low/irrelevant candidates are excluded with
+`TOPIC_IRRELEVANT`; Graph reachability alone is not content applicability.
+Evidence and provenance remain separate eligibility checks. Article, Media and
+Video profiles use the same gate, and generated prose, transcript text and
+user hints remain outside automatic Knowledge/Evidence creation.

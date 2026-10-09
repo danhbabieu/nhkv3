@@ -167,3 +167,20 @@ new Video. The operation is deterministic and retry-safe. If the frontend
 projection is absent or invalid, readiness remains `REVIEW_REQUIRED` until a
 canonical lifecycle-owned projection becomes readable from the same source
 queried by `/video/` and the homepage.
+
+## Capture-first interrupted handoff repair — 2026-10-09
+
+The normal entry remains `nhk.capture.ingest`. If the Video adapter discovers a
+canonical subject after Capture preparation has entered review, Capture adopts
+the adapter packet through the shared subject handoff, stores it in the same
+Capture context/diagnostic packet and reuses it in the Video proposal. The
+workflow does not infer a new Model, Variant or Brand and does not create a
+second parser.
+
+On a `REVIEW_REQUIRED`/interrupted checkpoint, canonical packet read-back is
+reconciled before retry. The existing Capture and Video UUIDs are reused; a
+repeated external identity does not create a duplicate. `OUTCOME_UNKNOWN`
+still requires owner read-back before replay. A resolved subject only repairs
+the identity handoff: Source/Evidence, registered `Video → about → target`
+Graph relation, Governance Controlled Apply, canonical Video read-back and
+frontend read-back remain independent gates.

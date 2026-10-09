@@ -14,12 +14,14 @@ final class EditorialKnowledgeSelector
         private ?KnowledgeUnitBuilder $unitBuilder = null,
         private ?EditorialCoveragePolicy $coveragePolicy = null,
         private ?EditorialUsageMemory $usageMemory = null,
+        private ?EditorialRelevancePolicy $relevancePolicy = null,
     ) {
         $this->topicFulfillment ??= new TopicFulfillment();
         $this->rolePolicy ??= new EditorialSemanticRolePolicy();
         $this->unitBuilder ??= new KnowledgeUnitBuilder();
         $this->coveragePolicy ??= new EditorialCoveragePolicy();
         $this->usageMemory ??= new EditorialUsageMemory();
+        $this->relevancePolicy ??= new EditorialRelevancePolicy();
     }
 
     /** @param array<string,mixed> $retrieval @param array<string,mixed> $primarySubject @param array<string,mixed> $profile @param array<string,mixed> $inputContext */
@@ -40,6 +42,12 @@ final class EditorialKnowledgeSelector
         $eligible = [];
         $excluded = [];
         foreach ($all as $order => $candidate) {
+            $relevance = $this->relevancePolicy->evaluate($candidate, $topic, $primarySubject);
+            if (($relevance['eligible'] ?? false) !== true) {
+                $candidate['exclusion_reasons'] = array_values(array_unique(array_merge((array) ($candidate['exclusion_reasons'] ?? []), [(string) ($relevance['reason'] ?? 'TOPIC_IRRELEVANT')] )));
+                $excluded[] = $candidate;
+                continue;
+            }
             $classified = $this->rolePolicy->classify($candidate, $primarySubject, ['profile' => $profileName, 'topic' => $topic, 'input' => $inputContext]);
             if (($classified['eligibility'] ?? '') !== 'eligible' || ($classified['applicability'] ?? '') !== 'applicable') {
                 $classified['exclusion_reasons'] = array_values(array_unique(array_merge((array) ($classified['exclusion_reasons'] ?? []), [($classified['applicability'] ?? '') !== 'applicable' ? 'INAPPLICABLE' : 'INELIGIBLE'])));
@@ -160,6 +168,7 @@ final class EditorialKnowledgeSelector
             'selected_unit_count' => count($selected),
             'selected_count' => count($selected),
             'excluded_count' => count($excluded),
+            'relevance_excluded_count' => count(array_filter($excluded, static fn (array $candidate): bool => in_array('TOPIC_IRRELEVANT', (array) ($candidate['exclusion_reasons'] ?? []), true))),
             'coverage_achieved' => $covered,
             'relaxed_coverage' => array_values(array_unique($relaxedCoverage)),
             'contextual_coverage' => array_values(array_unique($contextualCoverage)),

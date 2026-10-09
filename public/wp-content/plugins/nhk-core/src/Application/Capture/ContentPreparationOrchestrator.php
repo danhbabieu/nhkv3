@@ -76,6 +76,13 @@ final class ContentPreparationOrchestrator
         $diagnostics['decision_trace_count'] = count($decisionTrace);
         $diagnostics['dependency_findings'] = $dependencyFindings;
         $diagnostics['continuation_decision'] = $continuationDecision->toArray();
+        $diagnostics['preflight'] = (new CaptureSemanticPreflight())->evaluate(
+            $input,
+            $interpretation,
+            is_array($context['content_intent'] ?? null) ? $context['content_intent'] : ['intent' => $input['intent'] ?? ''],
+            $resolution,
+            $context,
+        );
         $enrichment = ['status' => 'NOT_REQUESTED', 'items' => []];
         $reviewReasons = array_values(array_unique(array_map(
             static fn (array $finding): string => (string) ($finding['code'] ?? ''),

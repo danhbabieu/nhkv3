@@ -4,6 +4,9 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Capture\EditorialCaptureCoordinator;
+use NHK\Core\Application\Capture\ContentPreparationOrchestrator;
+use NHK\Core\Application\Capture\CaptureSubjectBindingRecovery;
+use NHK\Core\Application\Capture\CaptureCurrentOutcomeReducer;
 use NHK\Core\Application\Dictionary\DictionaryObservationRegistry;
 use NHK\Core\Application\Article\ArticleEditorialAdapter;
 use NHK\Core\Application\Semantic\{ArticleComposer, CanonicalAuthoritySubjectResolver, ClaimRetrievalEngine, SubjectResolutionService, TextInputInterpreter};
@@ -808,6 +811,70 @@ final class EditorialCaptureSemanticCoreTest extends TestCase
         self::assertSame($variant['id'], $seen['semantic']['primary']['id']);
         self::assertSame($variant['id'], $seen['assets'][0]['video_proposal']['payload']['metadata']['subject_resolution_packet']['id']);
         self::assertSame($variant['id'], $result->diagnostics['subjects']['primary']['id']);
+    }
+
+    public function test_interrupted_video_preview_persists_adapter_subject_packet_for_capture_recovery(): void
+    {
+        $repository = new InMemoryCaptureRepository();
+        $classification = [
+            'id' => '5c1cb4f1-3e5f-4c0e-9b4c-3dc6d7f1e4f7',
+            'type' => 'classification',
+            'stable_key' => 'nhk:classification:mantel-clock',
+            'name' => 'Đồng hồ để bàn',
+            'revision' => 4,
+            'match' => 'video_classification_exact',
+        ];
+        $enrichmentCalls = 0;
+        $coordinator = new EditorialCaptureCoordinator(
+            captures: $repository,
+            physicalIngest: static fn (array $input): array => ['items' => []],
+            draftCreator: static fn (array $input): array => ['post_id' => 0],
+            interpreter: new TextInputInterpreter(),
+            subjects: new SubjectResolutionService(static fn (string $hint): array => []),
+            claims: new ClaimRetrievalEngine(static fn (array $subject): array => ['status' => 'available', 'items' => []], static fn (array $subject, array $neighborhood): array => []),
+            semanticWriteBack: static fn (array $context): array => ['status' => 'REVIEW_REQUIRED', 'writes' => []],
+            composer: new ArticleComposer(),
+            mediaReconcile: static fn (array $context): array => ['status' => 'RECONCILED'],
+            publicationGate: static fn (array $context): array => ['eligible' => false, 'blockers' => ['OWNER_PUBLICATION_REQUIRED']],
+            finalReadBack: static fn (array $context): array => ['status' => 'verified'],
+            videoEnrichment: static function (array $context) use ($classification, &$enrichmentCalls): array {
+                $enrichmentCalls++;
+                return [
+                    'status' => 'verified',
+                    'video_preview' => ['package' => ['subject_resolution_packet' => $classification]],
+                    'items' => [[
+                        'kind' => 'video',
+                        'video_id' => 'aBcDeFgHiJk',
+                        'video_preview' => ['package' => ['subject_resolution_packet' => $classification]],
+                        'video_proposal' => ['entity_type' => 'video', 'operation' => 'ingest', 'payload' => ['metadata' => []]],
+                    ]],
+                ];
+            },
+            contentPreparation: new ContentPreparationOrchestrator(new SubjectResolutionService(static fn (string $hint): array => [])),
+            subjectBinding: new CaptureSubjectBindingRecovery($repository),
+        );
+
+        $result = $coordinator->execute([
+            'idempotency_key' => 'capture-interrupted-preview-subject-handoff',
+            'intent' => 'VIDEO',
+            'text' => 'Bản ghi video về đồng hồ để bàn.',
+            'video' => ['url' => 'https://youtu.be/aBcDeFgHiJk'],
+        ]);
+        $replay = $coordinator->execute([
+            'idempotency_key' => 'capture-interrupted-preview-subject-handoff',
+            'intent' => 'VIDEO',
+            'text' => 'Bản ghi video về đồng hồ để bàn.',
+            'video' => ['url' => 'https://youtu.be/aBcDeFgHiJk'],
+        ]);
+
+        self::assertSame('resolved', $result->diagnostics['subject_resolution_packet']['status'] ?? null, json_encode($result->toArray(), JSON_UNESCAPED_UNICODE));
+        self::assertSame($classification['id'], $result->context['subject_resolution_packet']['canonical_subject_id'] ?? null);
+        self::assertSame($classification['id'], $result->diagnostics['subjects']['primary']['id'] ?? null);
+        self::assertSame($classification['id'], $result->assets[0]['video_proposal']['payload']['metadata']['subject_resolution_packet']['canonical_subject_id'] ?? null);
+        self::assertTrue(CaptureCurrentOutcomeReducer::retryEligibility($result)['eligible'], json_encode(CaptureCurrentOutcomeReducer::currentDecision($result), JSON_UNESCAPED_UNICODE));
+        self::assertSame($result->captureId, $replay->captureId);
+        self::assertCount(1, $replay->assets);
+        self::assertSame(1, $enrichmentCalls);
     }
 
     public function test_fresh_video_subject_handoff_mismatch_fails_explicitly(): void

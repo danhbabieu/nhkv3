@@ -196,7 +196,10 @@ final class CaptureCurrentOutcomeReducer
         $current = [];
         foreach ($currentByPhase as $phase => $codes) {
             if ($reevaluableArticleReview && strtoupper(trim($phase)) === 'ARTICLE_PRE_CREATE_REVIEW') continue;
-            $current = array_merge($current, $codes);
+            foreach ($codes as $code) {
+                if ($capture !== null && self::hasResolvedSubjectPacket($capture) && strtoupper(trim((string) $code)) === 'PRIMARY_SUBJECT_NOT_RESOLVED') continue;
+                $current[] = $code;
+            }
         }
         $current = array_values(array_unique($current));
         $superseded = CapturePhaseReceiptReducer::supersededFailureCodes($phaseReceipts);
@@ -210,6 +213,7 @@ final class CaptureCurrentOutcomeReducer
         foreach ($candidates as $candidate) {
             $candidate = trim($candidate);
             if ($candidate === '') continue;
+            if ($capture !== null && self::hasResolvedSubjectPacket($capture) && strtoupper($candidate) === 'PRIMARY_SUBJECT_NOT_RESOLVED') continue;
             if ($reevaluableArticleReview && !in_array(strtoupper($candidate), ['OWNER_REVIEW_REQUIRED', 'SYSTEM_BLOCKED'], true)) continue;
             if (in_array($candidate, $superseded, true) && !in_array($candidate, $current, true)) continue;
             $blockers[] = $candidate;
@@ -288,6 +292,7 @@ final class CaptureCurrentOutcomeReducer
             && ($intent === '' || in_array($intent, ['TEXT_ARTICLE', 'IMAGE_ARTICLE'], true))) return true;
         if (!in_array($capture->status, ['REVIEW_REQUIRED', 'IN_PROGRESS'], true)) return false;
         if (self::isHardBlockedReview($capture) || in_array('CATEGORY_UNRESOLVED', $blockers, true) || self::hasCurrentArticleOverlapReview($capture)) return false;
+        if (($capture->diagnostics['subject_handoff']['recovery_ready'] ?? false) === true && self::hasResolvedSubjectPacket($capture)) return true;
         $knownReevaluatableBlockers = array_intersect($blockers, ['KNOWLEDGE_SEMANTIC_HANDOFF_REQUIRED', 'KNOWLEDGE_SCOPE_INCOMPATIBLE', 'KNOWLEDGE_SCOPE_UNRESOLVED', 'KNOWLEDGE_FACET_UNSUPPORTED', 'KNOWLEDGE_SUBJECT_TYPE_UNSUPPORTED', 'REQUIRED_OWNER_READBACK_UNVERIFIED']);
         if ($knownReevaluatableBlockers === [] && $capture->status !== 'REVIEW_REQUIRED') return false;
         $completion = is_array($capture->diagnostics['completion'] ?? null) ? $capture->diagnostics['completion'] : [];
@@ -296,6 +301,20 @@ final class CaptureCurrentOutcomeReducer
         $persisted = trim((string) ($capture->diagnostics['decision_dependency_fingerprint'] ?? $capture->context['decision_dependency_fingerprint'] ?? ''));
         $current = CaptureDecisionDependencyFingerprint::current($capture, $input);
         return $persisted === '' || !hash_equals($persisted, $current);
+    }
+
+    private static function hasResolvedSubjectPacket(CaptureRecord $capture): bool
+    {
+        foreach ([
+            $capture->context['subject_resolution_packet'] ?? null,
+            $capture->diagnostics['subject_resolution_packet'] ?? null,
+            $capture->diagnostics['subjects'] ?? null,
+        ] as $candidate) {
+            if (!is_array($candidate)) continue;
+            $packet = \NHK\Core\Domain\Capture\SubjectResolutionPacket::fromArray($candidate);
+            if ($packet?->status === 'resolved') return true;
+        }
+        return false;
     }
 
     public static function effectiveCapture(CaptureRecord $capture): CaptureRecord

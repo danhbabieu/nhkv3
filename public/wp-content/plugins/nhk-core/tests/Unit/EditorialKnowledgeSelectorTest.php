@@ -121,6 +121,25 @@ final class EditorialKnowledgeSelectorTest extends TestCase
         self::assertSame('domain', $pack->readerFacts[0]['claim_id']);
     }
 
+    public function test_explicitly_low_relevance_knowledge_is_excluded_instead_of_padding_completion(): void
+    {
+        $candidate = $this->claim('unrelated', 'Odo 36 có lịch sử phân phối tại một thị trường khác.', 1, 'direct');
+        $candidate['relevance'] = 0.08;
+        $candidate['topic_relevance'] = 'IRRELEVANT';
+
+        $pack = $this->selector()->select(
+            ['status' => 'available', 'eligible_claims' => [$candidate], 'items' => [$candidate]],
+            'vách máy Odo 36',
+            ['id' => self::SUBJECT, 'type' => 'model'],
+            ['profile' => 'video'],
+        );
+
+        self::assertSame([], $pack->selectedClaims);
+        self::assertSame('TOPIC_IRRELEVANT', $pack->excludedCandidates[0]['exclusion_reasons'][0]);
+        self::assertSame('no_applicable_reader_knowledge', $pack->diagnostics['stop_reason']);
+        self::assertSame(1, $pack->diagnostics['relevance_excluded_count']);
+    }
+
     private function selector(): EditorialKnowledgeSelector
     {
         return new EditorialKnowledgeSelector();

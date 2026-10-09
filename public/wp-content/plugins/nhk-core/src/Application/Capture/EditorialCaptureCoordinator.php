@@ -71,6 +71,7 @@ final class EditorialCaptureCoordinator
         private ?DictionaryPreCreateResolver $dictionaryPreCreateResolver = null,
         private $articlePreCreateResolver = null,
         private bool $articlePreCreateRequired = false,
+        private ?CaptureSubjectHandoff $subjectHandoff = null,
     ) { $this->completion = $completion ?? new CompletionCoordinator(); }
 
     /** @param array<string,mixed> $input */
@@ -336,6 +337,10 @@ final class EditorialCaptureCoordinator
         $assets = $this->normalizeAssetManifest($record->assets);
         $diagnostics = $record->diagnostics;
         $receipts = $record->phaseReceipts;
+        if (($diagnostics['subject_handoff']['recovery_ready'] ?? false) === true) {
+            $diagnostics['subject_handoff']['recovery_ready'] = false;
+            $diagnostics['subject_handoff']['recovery_consumed_at'] = gmdate('c');
+        }
         try {
             $checkpointResult = $this->resumeFromSemanticsCheckpoint($record, $input, $text, $assets, $diagnostics, $receipts);
             if ($checkpointResult instanceof CaptureRecord) return $checkpointResult;
@@ -639,8 +644,43 @@ final class EditorialCaptureCoordinator
                     ]);
                     $videoItems = is_array($videoManifest['items'] ?? null) ? array_values(array_filter($videoManifest['items'], 'is_array')) : [];
                     if ($videoItems !== []) $assets = array_merge($assets, $videoItems);
+                    $handoff = ($this->subjectHandoff ??= new CaptureSubjectHandoff())->adopt(
+                        $preflightResolution,
+                        $videoManifest,
+                        $videoItems,
+                        false,
+                        'VIDEO_SUBJECT_HANDOFF_INVARIANT_FAILED',
+                    );
+                    $nextContext = $record->context;
+                    if ($handoff !== null) {
+                        $preflightResolution = $handoff;
+                        $subjectPacket = SubjectResolutionPacket::fromResolution($preflightResolution);
+                        $diagnostics['subjects'] = $preflightResolution;
+                        $diagnostics['subject_resolution_packet'] = $subjectPacket->toArray();
+                        $diagnostics['subject_handoff'] = [
+                            'status' => 'RECONCILED',
+                            'source' => 'ADAPTER_PACKET',
+                            'recovery_ready' => true,
+                            'canonical_subject_id' => $subjectPacket->canonicalSubjectId,
+                            'entity_type' => $subjectPacket->entityType,
+                        ];
+                        foreach ($assets as $assetIndex => $asset) {
+                            if (!is_array($asset) || ($asset['kind'] ?? '') !== 'video' || !is_array($asset['video_proposal'] ?? null)) continue;
+                            $proposal = $asset['video_proposal'];
+                            $payload = is_array($proposal['payload'] ?? null) ? $proposal['payload'] : [];
+                            $metadata = is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [];
+                            $metadata['subject_resolution_packet'] = $subjectPacket->toArray();
+                            $payload['metadata'] = $metadata;
+                            $proposal['payload'] = $payload;
+                            $assets[$assetIndex]['video_proposal'] = $proposal;
+                        }
+                        $nextContext['subject_resolution_packet'] = $subjectPacket->toArray();
+                    }
                     $diagnostics['video_enrichment'] = $this->withoutBody($videoManifest);
-                    $record = $this->save($record, CaptureStage::INTERPRETED, $assets, $diagnostics, $receipts, 'VIDEO_ENRICHED', $record->articleId, $record->articleStateToken, 'REVIEW_REQUIRED');
+                    $record = $this->save($record, $handoff !== null ? CaptureStage::SUBJECTS_RESOLVED : CaptureStage::INTERPRETED, $assets, $diagnostics, $receipts, 'VIDEO_ENRICHED', $record->articleId, $record->articleStateToken, 'REVIEW_REQUIRED', null, $nextContext);
+                    if ($handoff !== null && $this->subjectBinding !== null) {
+                        $record = $this->subjectBinding->persist($record, (int) ($record->articleId ?? 0), $preflightResolution);
+                    }
                 }
                 if ($record->status === 'IN_PROGRESS') {
                     $record = $this->save($record, $record->stage, $assets, $diagnostics, $receipts, 'CONTENT_PREPARATION_SAFE_CONTINUE', $record->articleId, $record->articleStateToken, 'REVIEW_REQUIRED', 'REVIEW_REQUIRED');
@@ -2120,32 +2160,13 @@ final class EditorialCaptureCoordinator
     /** @param array<string,mixed> $resolution @param array<string,mixed> $manifest @param list<array<string,mixed>> $items @return array<string,mixed>|null */
     private function videoSubjectHandoff(array $resolution, array $manifest, array $items, bool $preferCurrent = false): ?array
     {
-        // Retry resolution is current executable state. A persisted preview is
-        // historical derived metadata and must not overwrite a valid current
-        // Classification handoff after Video contracts evolve.
-        $current = is_array($resolution['primary'] ?? null) ? $resolution['primary'] : [];
-        if ($preferCurrent && UuidCodec::isValid((string) ($current['id'] ?? '')) && trim((string) ($current['type'] ?? '')) !== '') return $resolution;
-        $previewWasReturned = array_key_exists('video_preview', $manifest) || isset($items[0]['video_preview']);
-        $preview = is_array($manifest['video_preview']['package']['subject_resolution_packet'] ?? null)
-            ? $manifest['video_preview']['package']['subject_resolution_packet']
-            : [];
-        $proposal = is_array($items[0]['video_proposal']['payload']['metadata']['subject_resolution_packet'] ?? null)
-            ? $items[0]['video_proposal']['payload']['metadata']['subject_resolution_packet']
-            : [];
-        $packet = $preview !== [] ? $preview : $proposal;
-        if ($packet === []) {
-            if ($previewWasReturned && is_array($resolution['primary'] ?? null) && UuidCodec::isValid((string) ($resolution['primary']['id'] ?? ''))) throw new \RuntimeException('VIDEO_SUBJECT_HANDOFF_INVARIANT_FAILED');
-            return null;
-        }
-        $packetId = trim((string) ($packet['id'] ?? ''));
-        $packetType = strtolower(trim((string) ($packet['type'] ?? '')));
-        if (!UuidCodec::isValid($packetId) || $packetType === '') throw new \RuntimeException('VIDEO_SUBJECT_HANDOFF_INVARIANT_FAILED');
-
-        if ($current !== [] && (strtolower((string) ($current['id'] ?? '')) !== strtolower($packetId) || strtolower((string) ($current['type'] ?? '')) !== $packetType)) {
-            throw new \RuntimeException('VIDEO_SUBJECT_HANDOFF_INVARIANT_FAILED');
-        }
-        if ($current !== []) return $resolution;
-        return ['status' => 'resolved', 'primary' => $packet, 'subjects' => [$packet], 'resolved' => [$packet], 'candidates' => [], 'unresolved' => [], 'diagnostics' => []];
+        return ($this->subjectHandoff ??= new CaptureSubjectHandoff())->adopt(
+            $resolution,
+            $manifest,
+            $items,
+            $preferCurrent,
+            'VIDEO_SUBJECT_HANDOFF_INVARIANT_FAILED',
+        );
     }
 
     /** @return list<array<string,mixed>> */

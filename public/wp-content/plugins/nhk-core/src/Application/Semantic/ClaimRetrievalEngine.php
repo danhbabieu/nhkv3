@@ -341,6 +341,8 @@ final class ClaimRetrievalEngine
             'relation_path' => $path, 'hop_count' => $hop, 'score' => round($score, 6),
             'decision' => $decision, 'reason' => $reason, 'warnings' => $warnings,
             'source_ids' => array_values((array) ($row['source_ids'] ?? [])), 'evidence_ids' => array_values((array) ($row['evidence_ids'] ?? [])),
+            'relevance' => is_numeric($row['relevance'] ?? null) ? (float) $row['relevance'] : null,
+            'topic_relevance' => (string) ($row['topic_relevance'] ?? ''),
         ];
     }
 

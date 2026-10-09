@@ -52,6 +52,7 @@ final class CaptureDecisionDependencyFingerprint
         $packet = is_array($context['subject_resolution_packet'] ?? null)
             ? $context['subject_resolution_packet']
             : (is_array($diagnostics['subject_resolution_packet'] ?? null) ? $diagnostics['subject_resolution_packet'] : []);
+        if (isset($packet['primary_source']) && !isset($packet['source'])) $packet['source'] = $packet['primary_source'];
         return array_intersect_key($packet, array_flip(['status', 'canonical_subject_id', 'entity_type', 'stable_key', 'canonical_name', 'revision', 'source']));
     }
 

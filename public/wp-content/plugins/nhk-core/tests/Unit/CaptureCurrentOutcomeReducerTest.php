@@ -540,6 +540,30 @@ final class CaptureCurrentOutcomeReducerTest extends TestCase
         self::assertSame(['eligible' => false, 'reason' => 'CAPTURE_RETRY_NOT_ALLOWED'], CaptureCurrentOutcomeReducer::retryEligibility($capture, ['resume_children' => ['video']]));
     }
 
+    public function test_resolved_subject_packet_reconciles_stale_primary_subject_blocker_and_reopens_retry(): void
+    {
+        $subjectId = UuidCodec::newV7();
+        $capture = new CaptureRecord(
+            UuidCodec::newV7(), 'video-subject-recovered', hash('sha256', 'video-subject-recovered'), CaptureStage::INTERPRETED->value, 'REVIEW_REQUIRED', null, null, [],
+            [
+                'content_intent' => ['intent' => 'VIDEO'],
+                'subject_resolution_packet' => ['status' => 'resolved', 'canonical_subject_id' => $subjectId, 'entity_type' => 'classification', 'revision' => 4],
+            ],
+            [
+                'subjects' => ['status' => 'resolved', 'primary' => ['id' => $subjectId, 'type' => 'classification', 'revision' => 4]],
+                'completion' => ['status' => 'REVIEW_REQUIRED', 'blockers' => ['PRIMARY_SUBJECT_NOT_RESOLVED']],
+                'decision_dependency_fingerprint' => hash('sha256', 'before-subject-handoff'),
+            ],
+            ['CONTENT_PREPARATION' => ['status' => 'REVIEW_REQUIRED', 'result' => 'REVIEW_REQUIRED', 'failure_code' => 'PRIMARY_SUBJECT_NOT_RESOLVED']],
+        );
+
+        $decision = CaptureCurrentOutcomeReducer::currentDecision($capture);
+
+        self::assertNotContains('PRIMARY_SUBJECT_NOT_RESOLVED', $decision['blockers']);
+        self::assertSame(['eligible' => true, 'reason' => 'STALE_REVIEW_REEVALUATABLE'], $decision['retry']);
+        self::assertSame('RECOVERABLE_INTERRUPTED', $decision['lifecycle_state']);
+    }
+
     public function test_legacy_review_without_dependency_fingerprint_gets_one_bounded_reevaluation(): void
     {
         $capture = $this->reviewCapture(['content_preparation' => ['quality_decision' => 'READY']]);
