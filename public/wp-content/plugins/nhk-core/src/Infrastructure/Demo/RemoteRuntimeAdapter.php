@@ -92,6 +92,7 @@ final class RemoteRuntimeAdapter
             $command[] = 'WP_ENVIRONMENT_TYPE=' . $this->migrationConfig['environment'];
             if (isset($this->migrationConfig['wp_home'])) $command[] = 'WP_HOME=' . $this->migrationConfig['wp_home'];
             if (isset($this->migrationConfig['wp_siteurl'])) $command[] = 'WP_SITEURL=' . $this->migrationConfig['wp_siteurl'];
+            $command[] = 'HTTPS=on';
         }
         $command = array_merge($command, [
             'php', $this->pluginPath . '/bin/nhk-core-maintenance.php',

@@ -20,6 +20,8 @@ final class RemoteRuntimeAdapterTest extends TestCase
                 $commands[] = $command;
                 return [0, '{"status":"pass","health":{"database":"erourxcg_nhkv3"}}', ''];
             },
+            null,
+            ['migration_runtime' => 'demo', 'authorized_database' => 'erourxcg_nhkv3', 'environment' => 'staging', 'wp_home' => 'https://demo.1945.vn', 'wp_siteurl' => 'https://demo.1945.vn'],
         );
 
         $result = $adapter->run(new DemoCutoverContext('demo.1945.vn', 'odo', 'abc123', 'run-1'), 'health');
@@ -30,6 +32,7 @@ final class RemoteRuntimeAdapterTest extends TestCase
         self::assertSame('ssh', $commands[0][0]);
         self::assertStringContainsString('nhk-core-maintenance.php', implode(' ', $commands[0]));
         self::assertStringContainsString('--operation=health', implode(' ', $commands[0]));
+        self::assertContains('HTTPS=on', $commands[0]);
     }
 
     public function test_unknown_operation_fails_before_transport(): void

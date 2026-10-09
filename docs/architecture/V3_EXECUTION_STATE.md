@@ -1,5 +1,30 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-09 — Staging release identity transport repair
+
+ROOT_CAUSE: The authorized staging database and WordPress options were already
+`erourxcg_nhkv3`, `26/26`, `home=https://demo.1945.vn` and
+`siteurl=https://demo.1945.vn`. The maintenance CLI bootstrap nevertheless
+reported `site_url=http://demo.1945.vn/` because the remote command did not
+provide an HTTPS request context; this correctly triggered
+`STAGING_RUNTIME_IDENTITY_MISMATCH` before the 26/26 migration branch.
+
+IMPLEMENTED_LOCAL: The existing `RemoteRuntimeAdapter` now passes
+`HTTPS=on` together with the already-bound staging environment and URL values
+for health and migration operations. No Constitution, signer, migration,
+snapshot receipt, History Capture or semantic record was changed.
+
+VERIFIED_LOCAL: The red test reproduced the missing transport binding; after
+the minimal fix the focused adapter suite passes 9 tests / 28 assertions.
+The official release gate was not rerun after this local repair yet. The
+external deployment config remains unchanged because the path is outside this
+workspace; a non-secret temporary config was used only for diagnostics.
+
+STATUS: `LOCAL_TRANSPORT_REPAIR_VERIFIED /
+STAGING_GATE_BLOCKED_IDENTITY_CONTEXT /
+MIGRATION_ALREADY_CURRENT_NOT_YET_ACCEPTED /
+NO_SEMANTIC_MUTATION / PUBLIC_COMPLETE_FALSE`
+
 # Checkpoint — 2026-10-09 — Capture subject review re-evaluation repair
 
 ROOT_CAUSE_LOCAL: Video-only Capture continuation reused the persisted
