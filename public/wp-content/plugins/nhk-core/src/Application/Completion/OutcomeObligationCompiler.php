@@ -92,9 +92,19 @@ final class OutcomeObligationCompiler
         sort($ownerTypes, SORT_STRING);
         $dependencyTypes = array_values(array_unique($dependencyTypes));
         sort($dependencyTypes, SORT_STRING);
+        $domain = $this->domain($ownerTypes);
+        $recipe = [
+            'domain' => $domain,
+            'canonical' => $obligations['canonical'],
+            'public' => $obligations['public'],
+            'frontend' => $obligations['frontend'],
+            'homepage' => $obligations['homepage'],
+        ];
         $binding = [
             'capture_id' => $captureId,
             'intent' => $intent,
+            'domain' => $domain,
+            'recipe' => $recipe,
             'owner_types' => $ownerTypes,
             'dependency_owner_types' => $dependencyTypes,
             'owner_revisions' => $ownerRevisions,
@@ -108,6 +118,8 @@ final class OutcomeObligationCompiler
             'version' => self::VERSION,
             'capture_id' => $captureId,
             'intent' => $intent,
+            'domain' => $domain,
+            'recipe' => $recipe,
             'owner_types' => $ownerTypes,
             'dependency_owner_types' => $dependencyTypes,
             'public_request' => $publicRequested,
@@ -130,6 +142,22 @@ final class OutcomeObligationCompiler
             if (array_key_exists($key, $normalized)) $normalized[$key] = strtoupper(trim((string) $normalized[$key]));
         }
         return $normalized;
+    }
+
+    /** @param list<string> $ownerTypes */
+    private function domain(array $ownerTypes): string
+    {
+        foreach ($ownerTypes as $ownerType) {
+            $ownerType = strtolower(trim($ownerType));
+            if (str_starts_with($ownerType, 'dictionary_') || $ownerType === 'dictionary') return 'dictionary';
+            if (in_array($ownerType, ['media', 'media_asset', 'media_usage'], true)) return 'media';
+            if ($ownerType === 'video') return 'video';
+            if ($ownerType === 'wp_post') return 'article';
+            if (in_array($ownerType, ['brand', 'model', 'variant', 'movement', 'music', 'component', 'classification', 'product', 'specimen', 'authority'], true)) return 'authority';
+            if (in_array($ownerType, ['knowledge', 'source', 'evidence'], true)) return 'knowledge';
+            if (in_array($ownerType, ['graph', 'relation'], true)) return 'graph';
+        }
+        return 'generic';
     }
 
     /** @return list<string> */
