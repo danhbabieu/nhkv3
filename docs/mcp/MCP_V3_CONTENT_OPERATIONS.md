@@ -1398,3 +1398,22 @@ lexical relations. Public Dictionary reads use dynamic registered facets only;
 they never expose private Evidence, internal IDs or duplicated owner payload.
 Generic predicate writers, Dictionary Graph endpoints, hard-delete and
 `Côn hoa thị`-specific operations are prohibited.
+
+## Universal semantic recovery boundary — 2026-10-09
+
+Capture remains the sole semantic entry point through `nhk.capture.ingest`.
+Retry reuses the Capture UUID, request fingerprint and idempotency key together
+with the latest continuation state; a changed server-owned
+`SemanticClaimCandidateGuard::POLICY_VERSION` is part of the
+`CaptureDecisionDependencyFingerprint`. A policy change may open one bounded,
+recoverable re-evaluation. The coordinator persists the current fingerprint
+for both `REVIEW_REQUIRED` and `FAILED_RETRYABLE`; an unchanged current
+fingerprint denies another retry.
+
+Phase receipts are append-only and superseded failures remain historical. A
+completed Capture, hard or terminal failure, authorization/capability failure,
+Governance rejection or denial, identity failure, idempotency conflict or CAS
+conflict remains fail-closed. `GOVERNANCE_APPROVAL_REQUIRED` is owner review,
+not an automatic denial. Completion still requires a governed proposal,
+controlled apply and canonical read-back; no direct writer, arbitrary payload
+mutation or deployment is authorized by this recovery boundary.

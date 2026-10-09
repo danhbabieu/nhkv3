@@ -488,3 +488,17 @@ Managed Article sections carry explicit origin, semantic owner, editorial
 purpose and regeneration policy. Knowledge/Source/Evidence validity alone does
 not grant public-prose eligibility: provenance, internal diagnostics,
 non-applicable claims and unsupported evidence remain trace-only or review-only.
+
+### Capture recovery and Article boundary — 2026-10-09
+
+An Article Knowledge delta remains a semantic dependency and never creates or
+rewrites an Article. WordPress native Posts remain the sole editorial source
+of truth for title, body, author, dates and editorial URLs. Semantic recovery
+reuses the same Capture UUID, request fingerprint and idempotency key; a
+server-owned admission-policy change may open one bounded re-evaluation only.
+
+The reducer keeps completed, hard, authorization/capability, Governance
+rejection/denial, identity, idempotency and CAS outcomes fail-closed. Governed
+proposal, eligibility, controlled apply and canonical read-back are required
+before any projection may consume a Knowledge delta; no generic Article writer
+or direct database path is authorized.

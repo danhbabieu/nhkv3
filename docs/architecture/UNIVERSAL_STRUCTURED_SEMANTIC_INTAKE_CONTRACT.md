@@ -662,3 +662,38 @@ KnowledgeUnit selection. Low/irrelevant candidates are excluded with
 Evidence and provenance remain separate eligibility checks. Article, Media and
 Video profiles use the same gate, and generated prose, transcript text and
 user hints remain outside automatic Knowledge/Evidence creation.
+
+## Universal semantic recovery and Authority parity — 2026-10-09
+
+The Capture contract distinguishes an explicit user statement from derived
+interpretation. A candidate with `user_statement`, the registered
+`EXPLICIT_USER_KNOWLEDGE` provenance and a permitted non-derived admission may
+enter the governed Knowledge proposal path. Dictionary-only or otherwise
+derived interpretation remains review-gated with
+`KNOWLEDGE_SEMANTIC_HANDOFF_REQUIRED`; it is not silently promoted to user
+knowledge. `SemanticClaimCandidateGuard::POLICY_VERSION` is server-owned and
+cannot be supplied by a client or fixture.
+
+The guard applies registered scope/facet rules and the governed sequence is
+Capture → Proposal → Approval/Eligibility → Controlled Apply → canonical
+Knowledge read-back. Pending, rejected or missing Source/Evidence dependencies
+remain explicit dependency state; they do not become evidence by inference. A Knowledge delta
+never creates or rewrites an Article: WordPress native Posts remain editorial
+truth.
+
+The active nine-type parity matrix is:
+
+| Authority type | Document contract | Canonical registry | Admission boundary | Governed result | Canonical read-back | Public projection |
+|---|---|---|---|---|---|---|
+| `brand` | Universal intake | `EntityTypeRegistry` + `CanonicalEntityTypeCatalog` | subject + registered scope/facet | Knowledge proposal | Knowledge UUID/stable key/revision | dossier only when eligible |
+| `model` | Universal intake | `EntityTypeRegistry` + `CanonicalEntityTypeCatalog` | subject + registered scope/facet | Knowledge proposal | Knowledge UUID/stable key/revision | dossier only when eligible |
+| `variant` | Universal intake | `EntityTypeRegistry` + `CanonicalEntityTypeCatalog` | subject + registered scope/facet | Knowledge proposal | Knowledge UUID/stable key/revision | dossier only when eligible |
+| `movement` | Universal intake | `EntityTypeRegistry` + `CanonicalEntityTypeCatalog` | subject + registered scope/facet | Knowledge proposal | Knowledge UUID/stable key/revision | dossier only when eligible |
+| `music` | Universal intake | `EntityTypeRegistry` + `CanonicalEntityTypeCatalog` | subject + registered scope/facet | Knowledge proposal | Knowledge UUID/stable key/revision | dossier only when eligible |
+| `component` | Universal intake | `EntityTypeRegistry` + `CanonicalEntityTypeCatalog` | subject + registered scope/facet | Knowledge proposal | Knowledge UUID/stable key/revision | dossier only when eligible |
+| `classification` | Universal intake | `EntityTypeRegistry` + `CanonicalEntityTypeCatalog` | subject + registered scope/facet | Knowledge proposal | Knowledge UUID/stable key/revision | dossier only when eligible |
+| `specimen` | Universal intake | `EntityTypeRegistry` + `CanonicalEntityTypeCatalog` | subject + registered scope/facet | Knowledge proposal | Knowledge UUID/stable key/revision | dossier only when eligible |
+| `product` | Universal intake | `EntityTypeRegistry` + `CanonicalEntityTypeCatalog` | subject + registered scope/facet | Knowledge proposal | Knowledge UUID/stable key/revision | dossier only when eligible |
+
+The matrix is a parity check over the existing registry, not permission to add
+types, predicates, fields, relations or writers.

@@ -283,3 +283,18 @@ The consumer must not flatten arbitrary relation groups, infer classification
 family from display labels, recursively traverse descendants or persist a
 reverse Dictionary edge. Country facets accept only Classification targets
 with `family=country`; clock-type facets use the registered clock-type family.
+
+## Canonical Knowledge readiness gate — 2026-10-09
+
+Public dossier projection requires a direct canonical Knowledge read for the
+subject, with canonical identity, readiness and public-eligibility state
+verified by the application service. Review, private, unavailable or
+dependency-incomplete Knowledge is omitted or represented by the existing
+fail-closed state; it is never inferred from a fixture, relation traversal or
+derived summary.
+
+A derived relation can enrich a public dossier only after its own registered
+Graph and readiness checks; it does not create a direct owner Claim for the
+subject. The projection therefore consumes canonical Knowledge/readiness and
+public eligibility, not a proposal, raw Capture payload or internal
+`SemanticClaimCandidate`.

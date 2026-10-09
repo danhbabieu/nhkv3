@@ -1016,3 +1016,17 @@ runtime data remain unchanged. Planned migrations, code seams, Governance
 packets, registry additions and tests are specified in the contract but are not
 created or authorized by this checkpoint. `Côn hoa thị` remains a read-only
 reference dataset and is not an authorization or implementation special case.
+
+## Universal semantic recovery alignment — 2026-10-09
+
+The active MCP and architecture contracts now align with the implemented,
+server-owned semantic admission policy version, bounded retry re-evaluation,
+append-only receipts, governed Knowledge read-back and nine-type Authority
+parity matrix. The design and execution records are:
+
+- Design: `docs/superpowers/specs/2026-10-09-universal-semantic-recovery-documentation-alignment-design.md`
+- Plan: `docs/superpowers/plans/2026-10-09-universal-semantic-recovery-documentation-alignment.md`
+- Execution evidence: `docs/architecture/V3_EXECUTION_STATE.md`
+
+This is a status/index entry only. It does not authorize a new registry type,
+schema, migration, semantic mutation, deployment or production cutover.

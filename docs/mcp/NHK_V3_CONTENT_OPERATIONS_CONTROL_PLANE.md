@@ -692,3 +692,21 @@ The lexical connector schema refresh is visible live for
 `nhk.dictionary.lexical_relation.read` (`relation_uuid`, `idempotency_key`) and
 `.preview` (`relation_uuid`, `expected_revision`). No known lexical server-code
 blocker remains; lexical lifecycle acceptance was not rerun.
+
+## Universal semantic recovery control boundary — 2026-10-09
+
+Operators have one bounded Capture recovery surface. The retry request must
+reuse the Capture UUID, request fingerprint and idempotency key; the server
+binds it to the latest continuation state and the versioned
+`CaptureDecisionDependencyFingerprint`. A changed
+`SemanticClaimCandidateGuard::POLICY_VERSION` can authorize at most one
+recoverable re-evaluation. Current fingerprints are persisted for review and
+retryable failure states, so unchanged retry state is a no-progress denial.
+
+Receipts are append-only and historical failures are not current blockers when
+the reducer has superseded them. Completed, hard/terminal,
+authorization/capability, Governance rejection/denial, identity, idempotency
+and CAS outcomes remain fail-closed. Approval-required outcomes remain an
+owner-review state. The control plane reports proposal, controlled apply and
+canonical read-back separately; it does not provide a generic writer or permit
+live mutation outside the governed Capture lifecycle.

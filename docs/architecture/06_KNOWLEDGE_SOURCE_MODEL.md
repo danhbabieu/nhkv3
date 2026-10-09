@@ -325,3 +325,19 @@ reactivated by the identity resolver. An unresolved or conflicting legacy row
 is an identity-coverage finding, not a duplicate cluster; the audit exposes
 bounded resolved/unresolved/conflicting counts and review samples while
 remaining `COMPLETE` when the bounded corpus is exhausted.
+
+### Semantic recovery dependency law — 2026-10-09
+
+Knowledge Claim, Source and Evidence remain separate boundaries. A governed
+Knowledge candidate may carry a pending, rejected or missing Source/Evidence
+dependency as explicit dependency state, but a derived interpretation is never
+relabeled as evidence and no dependency is fabricated to make a candidate
+public. Scope,
+facet and admission are resolved from the registered Authority contract; the
+client cannot select a new semantic type or policy version.
+
+The recovery path is Capture → governed Proposal → Approval/Eligibility →
+Controlled Apply → canonical Knowledge read-back. Read-back must confirm the
+canonical UUID/stable key, revision, provenance, dependency fingerprint and
+readiness before a public projection can consume the Claim. A replay reads the
+canonical result and does not apply a second mutation.

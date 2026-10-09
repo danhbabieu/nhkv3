@@ -25642,3 +25642,43 @@ BOUNDARY: The repair is local only. No Capture, Video, Knowledge, Source,
 Evidence, Graph, Governance, WordPress, staging or production data was
 mutated. No migration, deployment, signed acceptance, controlled apply, push
 or public completion was performed.
+
+# Checkpoint — 2026-10-09 — Universal semantic recovery and documentation alignment
+
+IMPLEMENTED: The server-owned `SemanticClaimCandidateGuard::POLICY_VERSION`
+is included in `CaptureDecisionDependencyFingerprint` version 4. Retryable
+review and failure states persist the current fingerprint. The reducer permits
+one bounded policy-change re-evaluation, denies unchanged no-progress retries,
+and keeps completed, hard, authorization/capability, Governance-denied,
+identity, idempotency and CAS outcomes fail-closed. Superseded historical
+failure codes do not re-block a resolved current state.
+
+IMPLEMENTED: The governed continuation proof reaches canonical Knowledge and
+relation read-back through the real text interpreter/service path. Idempotent
+replay returns canonical state without a second apply. Public Knowledge and
+dossier projections remain blocked until canonical readiness and public
+eligibility are satisfied. The active documentation contracts now describe the
+same Capture boundary, Source/Evidence dependencies, Article boundary, Music
+read-only boundary and nine-type Authority parity matrix.
+
+TESTED: Focused recovery, governance, public projection, registry and MCP
+documentation suite passed 195 tests / 1,578 assertions with 31 deprecations
+and 2 PHPUnit deprecations. The 56-file canonical MCP documentation generator
+completed successfully. Changed PHP lint, secret scan for private-key/API-key
+patterns and `git diff --check` passed; no JavaScript files changed.
+
+FULL_SUITE_OBSERVATION: The 512M PHPUnit run completed 3,825 tests / 23,053
+assertions with 46 errors, 30 failures, 30 warnings, 64 deprecations, 67
+PHPUnit deprecations and 125 skipped. The failures/errors are the current
+repository/environment set, including unresolved Knowledge identity fixtures,
+unrelated content expectation failures, missing `NHK_WP_TEST_PATH` and the
+unauthorized TEST runtime; the focused recovery/documentation suite is green.
+
+RUNTIME_QA: The authorized TEST runtime identity remains unavailable. No live
+Capture, Knowledge, Source, Evidence, Graph, Governance or Article mutation,
+migration, deployment, signed acceptance, staging/production write, push or
+public completion was performed.
+
+STATUS: `SEMANTIC_RECOVERY_IMPLEMENTED / DOCUMENTATION_ALIGNED /
+FOCUSED_VERIFIED / FULL_SUITE_ENVIRONMENT_REGRESSIONS_RECORDED /
+INTEGRATION_BLOCKED / NO_SEMANTIC_MUTATION`

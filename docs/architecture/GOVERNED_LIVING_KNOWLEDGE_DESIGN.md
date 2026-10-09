@@ -388,3 +388,18 @@ dependency input must include the visual requirement binding and revision when
 the section consumes it, so a later Media reverse reconciliation invalidates
 the affected read model. `RESOLVED` is semantic/internal only; public output
 still applies MediaAsset eligibility and never leaks private or review Media.
+
+### Universal Capture recovery boundary — 2026-10-09
+
+Living Knowledge consumes only the governed Capture path. Explicit user
+statements and derived interpretations remain distinct; the server-owned
+semantic-admission policy version participates in the dependency fingerprint,
+and a policy change can trigger only one bounded re-evaluation. Retryable
+states persist the current fingerprint, while unchanged retries are denied as
+no-progress and terminal or Governance-denied outcomes stay fail-closed.
+
+Completion requires governed proposal/eligibility, controlled apply and
+canonical Knowledge read-back. Idempotent replay reads the existing canonical
+Claim and does not reapply it. Living Knowledge and its projections never
+become a direct semantic writer, Article replacement or authorization for a
+staging/production mutation.

@@ -187,3 +187,17 @@ Eligibility → Controlled Apply → canonical read-back.
 
 No value is public merely because it exists in this standard, a fixture, a
 local JSON file, a WAV checksum, a browser preview or a source URL.
+
+## Universal Capture recovery boundary — 2026-10-09
+
+This standard remains read-only intake guidance. Music candidates enter through
+Capture and the same governed Proposal/Approval/Eligibility/Controlled Apply
+and canonical read-back lifecycle as other registered Authority types; this
+document adds no Music field, owner, relation, score store or writer. Explicit
+user statements, derived interpretation, Source/Evidence and readiness remain
+separate decisions.
+
+Notation, audio, and rights are distinct dependencies. A Westminster worked
+example is noncanonical research context until the registered contracts make a
+candidate eligible. It cannot authorize a public dossier, live semantic write,
+or direct media/score persistence.
