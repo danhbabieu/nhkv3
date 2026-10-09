@@ -159,6 +159,62 @@ STATUS: `VIDEO_PUBLIC_BOUNDARY_IMPLEMENTED / MULTI_SUBJECT_SCOPE_PRESERVED /
 FOCUSED_TESTS_PASS / FULL_UNIT_BASELINE_RECORDED / RUNTIME_BLOCKED /
 NO_SEMANTIC_MUTATION`
 
+# Checkpoint — 2026-10-09 — Specimen Catalogue Relationship Extension design candidate
+
+DESIGN_DOCUMENTS: Added
+docs/superpowers/specs/2026-10-09-specimen-catalogue-relationship-extension-design.md
+and
+docs/superpowers/plans/2026-10-09-specimen-catalogue-relationship-extension.md.
+Both documents are design candidates only; they do not activate contracts,
+registry vocabulary, schema, runtime permissions or semantic writes.
+
+RELATIONSHIP_DECISIONS: Proposed specimen_of as Specimen → exactly one active
+Model-or-Variant identity target, with Variant → Model → Brand only derived
+through existing parent edges. Proposed lists_specimen as Product → 0..1
+Specimen and Specimen → 0..N Products over time. Product history, relisting,
+sold/archive, reassignment, evidence, revision, conflict and idempotency rules
+are defined. Compatibility model_uuid remains non-canonical. No about shortcut,
+Brand shortcut, reverse edge or parallel owner is approved.
+
+REGISTRY_SCHEMA_IMPACT: Current PredicateRegistry, RelationPolicy,
+GraphRelationContext, Governance operation policy, public traversal policy and
+MCP/admin parity would require a coordinated future extension. Existing Graph
+context/indexes are the recommended persistence boundary. A future implementation
+would need an additive predicate-dictionary migration; no new Authority type,
+owner, Product field or Specimen field is approved. No registry or schema was
+changed in this checkpoint.
+
+MIGRATION_ROLLBACK: Design phase requires no migration or runtime action.
+Implementation may require a forward-only registry-data migration after
+approval. Rollback must gate apply/read paths and retain dictionary rows, edges,
+contexts and audit history; no DOWN, DROP, TRUNCATE, reset or semantic delete.
+
+VIDEO_CAPTURE_RECOVERY_DESIGN: For the supplied ÔĐô 36/8 concrete-object case,
+SUBJECT_CONFLICT_REVIEW_REQUIRED remains fail-closed. A valid continuation uses
+the existing server-owned resolved reconciliation packet path with exact
+Capture/request, Specimen target, Evidence, revisions and idempotency, then
+canonical Video → Specimen read-back. A generic candidate route on a resolved
+packet remains CAPTURE_SUBJECT_RECONCILIATION_NOT_AMBIGUOUS. No local fixture,
+runtime read-back, Video, Specimen, relation or staging mutation was performed.
+
+SCALE_AND_PUBLIC_DESIGN: The design reuses Variant/Model/Knowledge/Media,
+supports many Videos and historical Products per Specimen, and proposes
+cursor/batched Graph traversal before any additive index. /hien-vat/ remains
+physical-object public identity; /san-pham/ remains commercial listing identity.
+Filters, Dictionary facets, direct/derived labels, SEO and no-UUID projection
+rules are documented.
+
+APPROVAL_REQUIRED: Explicit approval is required for predicate names and exact
+semantics, GraphRelationContext use, model_uuid compatibility treatment,
+Product relist/history policy, provenance/Evidence/scope rules, public history
+visibility, scale budget/index decision, exact acceptance packet and registry
+migration/rollback. This checkpoint stops at design approval; implementation is
+not authorized.
+
+VERIFIED: Documentation-only change. No code, registry, schema, migration,
+runtime, Music, Côn hoa thị, V2, production or staging data was changed.
+
+
 # Checkpoint — 2026-10-09 — Universal Music intake/public display evidence
 
 IMPLEMENTED: Completed the existing Music A–Z intake metadata slice and added
