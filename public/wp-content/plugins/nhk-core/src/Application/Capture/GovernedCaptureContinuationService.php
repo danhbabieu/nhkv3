@@ -503,7 +503,8 @@ final class GovernedCaptureContinuationService
                 // would skip the provenance dependency validator and make the
                 // historical receipt authoritative. Rebuild the provenance
                 // plan so Source/Claim/Evidence are validated before reuse.
-                $pending = $this->historicalEvidenceRecoveryRequired($context, $payload)
+                $pending = $this->requiresVideoProvenanceRecovery($payload)
+                    || $this->historicalEvidenceRecoveryRequired($context, $payload)
                     || $this->finalVideoPlanRebuildRequired($payload)
                     ? null
                     : $this->pendingVideoProposal($context, $video, $payload, $subjectId);
