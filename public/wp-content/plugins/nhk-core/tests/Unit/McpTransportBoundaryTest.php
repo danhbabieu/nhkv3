@@ -146,6 +146,22 @@ final class McpTransportBoundaryTest extends TestCase
         self::assertSame('CAPTURE_NOT_FOUND', $response['body']['result']['structuredContent']['reason']);
     }
 
+    public function test_read_only_null_result_is_structured_as_not_found(): void
+    {
+        $id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+        $response = $this->transport($this->read())->dispatch([
+            'jsonrpc' => '2.0', 'id' => 2, 'method' => 'tools/call',
+            'params' => ['name' => 'nhk.source.get', 'arguments' => ['id' => $id]],
+        ], ['Mcp-Name' => 'nhk.source.get']);
+
+        self::assertSame(200, $response['status'], json_encode($response, JSON_UNESCAPED_SLASHES));
+        self::assertFalse($response['body']['result']['isError']);
+        self::assertSame('NOT_FOUND', $response['body']['result']['structuredContent']['status']);
+        self::assertSame('NOT_FOUND', $response['body']['result']['structuredContent']['result_state']);
+        self::assertTrue($response['body']['result']['structuredContent']['read_only']);
+        self::assertFalse($response['body']['result']['structuredContent']['mutated']);
+    }
+
     public function test_empty_mutation_result_is_structured_as_unknown_and_preserves_identity(): void
     {
         $method = new \ReflectionMethod(McpTransport::class, 'normalizeMutationResult');

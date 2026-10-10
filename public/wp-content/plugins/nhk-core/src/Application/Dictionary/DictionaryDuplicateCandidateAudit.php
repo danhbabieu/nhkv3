@@ -15,8 +15,10 @@ final class DictionaryDuplicateCandidateAudit
         try {
             if (method_exists($this->reader, 'readPage')) {
                 $page = $this->reader->readPage($limit, $cursor);
-                $rows = is_array($page['rows'] ?? null) ? $page['rows'] : [];
-                $nextCursor = isset($page['next_cursor']) ? (string) $page['next_cursor'] : null;
+                if (!is_array($page) || !array_key_exists('rows', $page) || !is_array($page['rows']) || !array_key_exists('next_cursor', $page)) throw new \RuntimeException('DICTIONARY_DUPLICATE_AUDIT_RESPONSE_INVALID');
+                if ($page['next_cursor'] !== null && (!is_string($page['next_cursor']) || $page['next_cursor'] === '')) throw new \RuntimeException('DICTIONARY_DUPLICATE_AUDIT_RESPONSE_INVALID');
+                $rows = $page['rows'];
+                $nextCursor = $page['next_cursor'];
                 $complete = $nextCursor === null;
             } else {
                 $rows = $this->reader->read($limit);

@@ -321,10 +321,23 @@ final class McpTransport
         return ['content' => [['type' => 'text', 'text' => $text]], 'structuredContent' => $result, 'isError' => false];
     }
 
-    /** @param array<string,mixed> $arguments @param array<string,mixed> $result @return array<string,mixed> */
-    private function normalizeMutationResult(string $name, array $arguments, bool $mutation, array $result): array
+    /** @param array<string,mixed> $arguments @return array<string,mixed> */
+    private function normalizeMutationResult(string $name, array $arguments, bool $mutation, mixed $result): array
     {
-        if (!$mutation || $result !== []) return $result;
+        if (!$mutation && is_array($result) && $result !== []) return $result;
+        if (!$mutation && $result === null) {
+            return [
+                'status' => 'NOT_FOUND',
+                'result_state' => 'NOT_FOUND',
+                'read_only' => true,
+                'mutated' => false,
+                'found' => false,
+                'reason' => 'CANONICAL_RECORD_NOT_FOUND',
+                'operation' => $name,
+            ];
+        }
+        if (!$mutation) return is_array($result) ? $result : [];
+        if (is_array($result) && $result !== []) return $result;
         $outcome = (new MutationOutcomeClassifier())->classify((object) [], [
             'dispatched' => true,
             'idempotency_key' => (string) ($arguments['idempotency_key'] ?? ''),

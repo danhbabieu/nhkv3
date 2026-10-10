@@ -3,12 +3,12 @@ declare(strict_types=1);
 
 namespace NHK\Core\Infrastructure\Knowledge;
 
-use NHK\Core\Contracts\Knowledge\{KnowledgePageReader, KnowledgeRepository};
+use NHK\Core\Contracts\Knowledge\{KnowledgePageReader, KnowledgeQualityCandidateReader, KnowledgeRepository};
 use NHK\Core\Contracts\Home\BoundedLatestFeedReader;
 use NHK\Core\Domain\Knowledge\{KnowledgeClaim, KnowledgeException};
 use NHK\Core\Shared\Uuid\UuidCodec;
 
-final class WpdbKnowledgeRepository implements KnowledgeRepository, KnowledgePageReader, BoundedLatestFeedReader
+final class WpdbKnowledgeRepository implements KnowledgeRepository, KnowledgePageReader, KnowledgeQualityCandidateReader, BoundedLatestFeedReader
 {
     private string $table;
     public function __construct(private object $database) { $this->table = $database->prefix . 'nhk_knowledge_claims'; }
@@ -65,6 +65,28 @@ final class WpdbKnowledgeRepository implements KnowledgeRepository, KnowledgePag
         $nextCursor = $pageRows !== [] ? trim((string) ($pageRows[count($pageRows) - 1]['stable_key'] ?? '')) : null;
         $hasMore = count($rows) > $limit;
         return ['items' => $items, 'has_more' => $hasMore, 'next_cursor' => $nextCursor, 'diagnostics' => $diagnostics];
+    }
+
+    /** @return list<KnowledgeClaim> */
+    public function qualityCandidates(KnowledgeClaim $claim, int $limit): array
+    {
+        $metadata = is_array($claim->provenance['metadata'] ?? null) ? $claim->provenance['metadata'] : [];
+        $subjectId = trim((string) ($metadata['subject_id'] ?? ''));
+        $scope = strtolower(trim((string) ($metadata['scope'] ?? '')));
+        $facet = strtolower(trim((string) ($metadata['facet'] ?? $metadata['projection_category'] ?? '')));
+        if ($subjectId === '' || $scope === '' || $facet === '') return [];
+
+        $limit = max(1, min(128, $limit));
+        $rows = $this->database->get_results($this->database->prepare(
+            "SELECT * FROM {$this->table} WHERE canonical_uuid<>%s AND state=1
+             AND JSON_UNQUOTE(JSON_EXTRACT(provenance_json,'$.metadata.subject_id'))=%s
+             AND LOWER(JSON_UNQUOTE(JSON_EXTRACT(provenance_json,'$.metadata.scope')))=LOWER(%s)
+             AND LOWER(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(provenance_json,'$.metadata.facet')),JSON_UNQUOTE(JSON_EXTRACT(provenance_json,'$.metadata.projection_category'))))=LOWER(%s)
+             ORDER BY stable_key ASC LIMIT %d",
+            UuidCodec::toBinary($claim->canonicalId), $subjectId, $scope, $facet, $limit,
+        ), ARRAY_A) ?: [];
+
+        return array_values(array_filter(array_map(fn (array $row): ?KnowledgeClaim => $this->hydrate($row), $rows), static fn (?KnowledgeClaim $candidate): bool => $candidate !== null));
     }
     public function latestFeedCandidates(int $limit): array { $limit = max(1, min(100, $limit)); $rows = $this->database->get_results($this->database->prepare("SELECT * FROM {$this->table} WHERE state=1 ORDER BY created_at DESC, id DESC LIMIT %d", $limit), ARRAY_A); return array_values(array_filter(array_map(fn (array $row): ?KnowledgeClaim => $this->hydrate($row), $rows ?: []), static fn (?KnowledgeClaim $claim): bool => $claim !== null)); }
     private function hydrate(?array $row, bool $allowRetired = false): ?KnowledgeClaim { if (!$row) return null; try { $provenance = json_decode((string) ($row['provenance_json'] ?? ''), true, 512, JSON_THROW_ON_ERROR); if (!is_array($provenance) || preg_match('/^[01]$/', (string) ($row['state'] ?? '')) !== 1 || (!$allowRetired && (int) $row['state'] !== 1)) return null; return new KnowledgeClaim(UuidCodec::fromBinary($row['canonical_uuid']), (string) $row['stable_key'], (string) $row['claim_text'], (string) $row['claim_type'], $provenance, (int) $row['state'] === 1, (int) $row['revision'], $row['created_at'] ?? null, $row['updated_at'] ?? null); } catch (\Throwable) { return null; } }

@@ -39,15 +39,16 @@ final class KnowledgeQualityAuditHandler
         try {
             $batch = $this->coordinator->auditBatch($limit, $cursor, true, $filters);
         } catch (\Throwable $error) {
+            $timeout = preg_match('/timeout|timed[ -]?out|maximum execution time/i', $error->getMessage()) === 1;
             $diagnostic = [
-                'code' => 'KNOWLEDGE_QUALITY_AUDIT_INTERNAL_ERROR',
+                'code' => $timeout ? 'KNOWLEDGE_QUALITY_AUDIT_TIMEOUT' : 'KNOWLEDGE_QUALITY_AUDIT_INTERNAL_ERROR',
                 'correlation_id' => UuidCodec::newV7(),
                 'exception_class' => get_class($error),
             ];
             ($this->diagnosticSink)($diagnostic);
             return [
                 'status' => 'UNAVAILABLE',
-                'result_state' => 'RUNTIME_ERROR',
+                'result_state' => $timeout ? 'TIMEOUT' : 'RUNTIME_ERROR',
                 'read_only' => true,
                 'mutated' => false,
                 'total' => null,
@@ -55,7 +56,7 @@ final class KnowledgeQualityAuditHandler
                 'aggregate' => null,
                 'next_cursor' => null,
                 'has_more' => false,
-                'reason' => 'KNOWLEDGE_QUALITY_AUDIT_UNAVAILABLE',
+                'reason' => $timeout ? 'KNOWLEDGE_QUALITY_AUDIT_TIMEOUT' : 'KNOWLEDGE_QUALITY_AUDIT_UNAVAILABLE',
                 'diagnostics' => ['error' => $diagnostic],
             ];
         }

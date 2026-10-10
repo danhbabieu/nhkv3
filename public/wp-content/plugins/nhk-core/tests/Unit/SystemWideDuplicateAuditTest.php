@@ -156,6 +156,31 @@ final class SystemWideDuplicateAuditTest extends TestCase
         self::assertSame($result['owners']['Authority']['next_cursor'], $result['owners']['Authority']['cursor_page_provenance']['next_cursor']);
     }
 
+    public function test_malformed_page_envelope_is_blocked_instead_of_reported_complete(): void
+    {
+        $reader = new class implements DuplicateAuditPageReader {
+            public function page(?string $after, int $limit): array { return ['next_cursor' => null]; }
+        };
+
+        $result = $this->coordinator(['Authority' => $reader])->audit(1, [], true, 'Authority');
+
+        self::assertSame('BLOCKED', $result['owners']['Authority']['status']);
+        self::assertSame('AUDIT_PAGE_RESPONSE_INVALID', $result['owners']['Authority']['diagnostics']['code']);
+    }
+
+    public function test_dictionary_malformed_page_rows_are_unavailable_not_empty_complete(): void
+    {
+        $reader = new class implements \NHK\Core\Contracts\Dictionary\DictionaryDuplicateAuditReader {
+            public function read(int $limit = 1000): array { return []; }
+            public function readPage(int $limit = 1000, ?string $cursor = null): array { return ['rows' => 'malformed']; }
+        };
+
+        $result = (new DictionaryDuplicateAuditAdapter(new DictionaryDuplicateCandidateAudit($reader)))->run(10, null);
+
+        self::assertSame('BLOCKED', $result['status']);
+        self::assertSame('DICTIONARY_DUPLICATE_AUDIT_UNAVAILABLE', $result['diagnostics']['code']);
+    }
+
     public function test_duplicate_cluster_crosses_page_boundary_without_losing_retired_state(): void
     {
         $reader = new BoundaryAuditPage([

@@ -26488,3 +26488,33 @@ Controlled Apply.
 STATUS: `CONSTITUTIONAL_AMENDMENT_APPROVED / REPAIR_INTENT_ALIGNED_LOCAL /
 FOCUSED_VERIFIED / FULL_BASELINE_CLASSIFIED / STAGING_GATE_PENDING /
 FRESH_PACKET_PENDING / NO_SEMANTIC_MUTATION / PUBLIC_COMPLETE_FALSE`
+
+# Checkpoint — 2026-10-10 — Read-only release blockers repaired locally
+
+IMPLEMENTED_LOCAL: Bounded Knowledge quality candidate reads now use a
+canonical read-only candidate contract instead of an unbounded full-list read
+per claim. Knowledge quality timeout failures retain a distinct timeout result
+state, diagnostic code and correlation ID. MCP read-only null results now
+return a structured `NOT_FOUND` envelope without manufacturing a canonical
+record. Duplicate-audit and dictionary-audit page envelopes are validated
+before aggregation, so malformed pagination is blocked rather than reported
+complete.
+
+VERIFIED_LOCAL: The focused boundary suite passed 60 tests / 451 assertions.
+Changed PHP files lint clean and `git diff --check` passes. The wider Unit
+suite completed with two unrelated existing failures (WPDB receipt test-double
+type mismatch and `SemanticSpecificityPropagationTest`) plus existing PHPUnit
+warnings/deprecations; no changed-boundary failure remained. The default
+128M run also hit the existing 52MB payload test, so the wider result was
+repeated at 512M.
+
+STAGING_BOUNDARY: The external deploy config already exposed
+`environment_type=staging`; the requested `wp_home` and `wp_siteurl` values
+are verified inputs but could not be written from this sandbox because its
+filesystem policy forbids writes outside the repository writable root. No
+deployment, migration, Capture retry, packet issuance, Governance apply,
+Source/Evidence mutation, Score/Audio mutation or public publish occurred.
+
+STATUS: `READ_ONLY_BLOCKERS_REPAIRED_LOCAL / FOCUSED_VERIFIED /
+STAGING_CONFIG_WRITE_BLOCKED / RELEASE_PARITY_PENDING /
+FRESH_PACKET_PENDING / NO_SEMANTIC_MUTATION / PUBLIC_COMPLETE_FALSE`

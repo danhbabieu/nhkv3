@@ -186,7 +186,7 @@ final class SystemWideDuplicateAuditCoordinator
             $clusters = $this->dedupeClusters($clusters);
             $clusters = array_values(array_filter($clusters, static fn (array $cluster): bool => !in_array((string) ($cluster['cluster_id'] ?? ''), $state['emitted'], true)));
             $emitted = array_values(array_unique(array_merge($state['emitted'], array_values(array_filter(array_map(static fn (array $cluster): string => (string) ($cluster['cluster_id'] ?? ''), $clusters))))));
-            $next = isset($page['next_cursor']) && $page['next_cursor'] !== null ? (string) $page['next_cursor'] : null;
+            $next = $page['next_cursor'];
             $boundReached = $next !== null && $scanned >= self::MAX_SCAN_ROWS;
             $nextCursor = $boundReached ? null : ($next === null ? null : $this->encodeCursor($next, array_slice($combined, -self::MAX_CARRY_ROWS), $scanned, $owner, $includeRetired, $emitted));
             $diagnostics = array_merge((array) ($page['diagnostics'] ?? []), $ownerDiagnostics, $articleIdentity);
@@ -196,8 +196,10 @@ final class SystemWideDuplicateAuditCoordinator
             return ['status' => $complete && !$coverageIncomplete ? 'COMPLETE' : 'PARTIAL', 'complete' => $complete, 'clusters' => $this->withPage($clusters, $cursor, $nextCursor, $items), 'next_cursor' => $nextCursor, 'rows_read' => count($items), 'diagnostics' => $diagnostics];
         } catch (\InvalidArgumentException $error) {
             if (str_starts_with($error->getMessage(), 'AUDIT_CURSOR_')) return $this->blocked('AUDIT_CURSOR_INVALID', ['reason' => 'AUDIT_CURSOR_INVALID']);
+            if ($error->getMessage() === 'AUDIT_PAGE_RESPONSE_INVALID') return $this->blocked('AUDIT_PAGE_RESPONSE_INVALID');
             return $this->blocked('AUDIT_READER_UNAVAILABLE');
         } catch (\Throwable $error) {
+            if ($error->getMessage() === 'AUDIT_PAGE_RESPONSE_INVALID') return $this->blocked('AUDIT_PAGE_RESPONSE_INVALID');
             return $this->blocked('AUDIT_READER_UNAVAILABLE', ['message' => $error->getMessage()]);
         }
     }
@@ -205,14 +207,16 @@ final class SystemWideDuplicateAuditCoordinator
     /** @return array<string,mixed> */
     private function page(mixed $reader, int $limit, ?string $cursor, bool $includeRetired): array
     {
-        if ($reader instanceof DuplicateAuditPageReader) return $reader->page($cursor, $limit);
-        if (is_callable($reader)) {
+        if ($reader instanceof DuplicateAuditPageReader) $page = $reader->page($cursor, $limit);
+        elseif (is_callable($reader)) {
             $page = $reader($cursor, $limit, $includeRetired);
-            if (!is_array($page)) throw new \RuntimeException('AUDIT_PAGE_INVALID');
-            return $page;
-        }
-        if (method_exists($reader, 'page')) return $reader->page($cursor, $limit, $includeRetired);
-        return $reader->readPage($limit, $cursor, $includeRetired);
+            if (!is_array($page)) throw new \RuntimeException('AUDIT_PAGE_RESPONSE_INVALID');
+        } elseif (method_exists($reader, 'page')) $page = $reader->page($cursor, $limit, $includeRetired);
+        else $page = $reader->readPage($limit, $cursor, $includeRetired);
+        if (!is_array($page) || !array_key_exists('items', $page) || !is_array($page['items']) || !array_key_exists('next_cursor', $page)) throw new \RuntimeException('AUDIT_PAGE_RESPONSE_INVALID');
+        if ($page['next_cursor'] !== null && (!is_string($page['next_cursor']) || $page['next_cursor'] === '')) throw new \RuntimeException('AUDIT_PAGE_RESPONSE_INVALID');
+        if (array_key_exists('diagnostics', $page) && !is_array($page['diagnostics'])) throw new \RuntimeException('AUDIT_PAGE_RESPONSE_INVALID');
+        return ['items' => $page['items'], 'next_cursor' => $page['next_cursor'], 'diagnostics' => (array) ($page['diagnostics'] ?? [])];
     }
 
     /** @return array{after:?string,carry:list<array<string,mixed>>,scanned:int,emitted:list<string>} */

@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Knowledge;
 
 use NHK\Core\Application\Semantic\{DerivedLineageGuard, StructuredSemanticInterpreter};
-use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
+use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeQualityCandidateReader, KnowledgeRepository, SourceRepository};
 use NHK\Core\Domain\Knowledge\{CollectorFacetRegistry, KnowledgeClaim, KnowledgeFacetProfile};
 
 /**
@@ -13,6 +13,7 @@ use NHK\Core\Domain\Knowledge\{CollectorFacetRegistry, KnowledgeClaim, Knowledge
  */
 final class KnowledgeQualityAuditor
 {
+    private const MAX_CANDIDATE_ROWS = 128;
     private const PROVENANCE = ['OBSERVED_FROM_MEDIA', 'EXPLICIT_USER_KNOWLEDGE', 'CATALOG_SUPPORTED', 'EXTERNAL_RESEARCH', 'SYSTEM_INFERENCE'];
     private const SCOPES = ['entity', 'brand', 'model', 'variant', 'movement', 'specimen', 'specimen_observation', 'observation', 'editorial_experience', 'hypothesis', 'unresolved'];
 
@@ -61,6 +62,7 @@ final class KnowledgeQualityAuditor
         if ($this->isEditorialFragment($claim->claimText, $metadata)) $findings[] = 'EDITORIAL_FRAGMENT';
         if ($this->needsAtomization($claim->claimText)) $findings[] = 'ATOMIZATION_NEEDED';
         if ($facet === '' || (!in_array($facet, KnowledgeFacetProfile::FACETS, true) && !CollectorFacetRegistry::isValid($facet))) $diagnostics[] = 'FACET_UNRESOLVED';
+        if ($this->claims instanceof KnowledgeQualityCandidateReader || method_exists($this->claims, 'qualityCandidates')) $diagnostics[] = 'QUALITY_CANDIDATES_BOUNDED';
         $matches = $this->duplicateMatches($claim, $subject, $scope, $facet);
         if ($evidence['status'] === 'MISSING' && $this->hasSupportedCanonicalMatch($matches)) {
             $evidence['status'] = 'SUPPORTED_BY_REUSABLE_CANONICAL';
@@ -143,7 +145,7 @@ final class KnowledgeQualityAuditor
     {
         $matches = [];
         $key = $this->propositionKey($claim->claimText);
-        foreach ($this->claims->list(true) as $other) {
+        foreach ($this->candidateClaims($claim) as $other) {
             if (!$other instanceof KnowledgeClaim || $other->canonicalId === $claim->canonicalId) continue;
             $metadata = is_array($other->provenance['metadata'] ?? null) ? $other->provenance['metadata'] : [];
             if ((string) ($metadata['subject_id'] ?? '') !== (string) ($subject['canonical_subject_id'] ?? '') || strtolower((string) ($metadata['scope'] ?? '')) !== $scope || strtolower((string) ($metadata['facet'] ?? $metadata['projection_category'] ?? '')) !== $facet) continue;
@@ -174,7 +176,18 @@ final class KnowledgeQualityAuditor
     /** @return list<array<string,mixed>> */
     private function candidateRows(KnowledgeClaim $claim, array $subject, string $scope, string $facet): array
     {
-        return array_map(static fn (KnowledgeClaim $item): array => ['claim_id' => $item->canonicalId, 'text' => $item->claimText, 'subject_id' => $subject['canonical_subject_id'] ?? '', 'scope' => $scope, 'facet' => $facet], array_values(array_filter($this->claims->list(true), static fn ($item): bool => $item instanceof KnowledgeClaim && $item->canonicalId !== $claim->canonicalId)));
+        return array_map(static fn (KnowledgeClaim $item): array => ['claim_id' => $item->canonicalId, 'text' => $item->claimText, 'subject_id' => $subject['canonical_subject_id'] ?? '', 'scope' => $scope, 'facet' => $facet], $this->candidateClaims($claim));
+    }
+
+    /** @return list<KnowledgeClaim> */
+    private function candidateClaims(KnowledgeClaim $claim): array
+    {
+        if ($this->claims instanceof KnowledgeQualityCandidateReader) return $this->claims->qualityCandidates($claim, self::MAX_CANDIDATE_ROWS);
+        if (method_exists($this->claims, 'qualityCandidates')) {
+            $candidates = $this->claims->qualityCandidates($claim, self::MAX_CANDIDATE_ROWS);
+            return is_array($candidates) ? array_values(array_filter($candidates, static fn (mixed $candidate): bool => $candidate instanceof KnowledgeClaim)) : [];
+        }
+        return array_values(array_filter(array_slice($this->claims->list(true), 0, self::MAX_CANDIDATE_ROWS), static fn ($item): bool => $item instanceof KnowledgeClaim && $item->canonicalId !== $claim->canonicalId));
     }
 
     private function propositionKey(string $text): string { $text = function_exists('mb_strtolower') ? mb_strtolower($text) : strtolower($text); $text = preg_replace('/[^\p{L}\p{N}]+/u', ' ', $text) ?? ''; $tokens = array_values(array_filter(explode(' ', trim($text)), static fn (string $v): bool => $v !== '')); sort($tokens, SORT_STRING); return implode(' ', $tokens); }

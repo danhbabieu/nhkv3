@@ -186,6 +186,33 @@ final class KnowledgeQualityAuditMcpTest extends TestCase
         self::assertSame(0, $repository->writes);
     }
 
+    public function test_timeout_is_distinguished_from_a_generic_audit_failure_and_is_correlated(): void
+    {
+        $diagnostics = [];
+        $repository = new QualityAuditMcpClaims([], true, 'KNOWLEDGE_QUALITY_AUDIT_TIMEOUT');
+        $handler = $this->handler($repository, diagnosticSink: static function (array $diagnostic) use (&$diagnostics): void {
+            $diagnostics[] = $diagnostic;
+        });
+
+        $response = $handler->audit(['limit' => 1]);
+
+        self::assertSame('UNAVAILABLE', $response['status']);
+        self::assertSame('TIMEOUT', $response['result_state']);
+        self::assertSame('KNOWLEDGE_QUALITY_AUDIT_TIMEOUT', $response['diagnostics']['error']['code']);
+        self::assertMatchesRegularExpression('/^[0-9a-f-]{36}$/', $response['diagnostics']['error']['correlation_id']);
+        self::assertSame($response['diagnostics']['error'], $diagnostics[0]);
+    }
+
+    public function test_quality_audit_uses_a_bounded_candidate_reader_for_duplicate_and_interpreter_context(): void
+    {
+        $repository = new QualityAuditMcpClaims($this->claims(3));
+        $result = (new KnowledgeQualityAuditor($repository, new QualityAuditMcpEvidence([]), new QualityAuditMcpSources([]), new StructuredSemanticInterpreter()))->audit($repository->items()[0]);
+
+        self::assertNotEmpty($result->diagnostics);
+        self::assertGreaterThan(0, $repository->qualityCandidateReads);
+        self::assertLessThanOrEqual(128, $repository->lastQualityCandidateLimit);
+    }
+
     private function transport(callable $can, KnowledgeQualityAuditHandler $handler): McpTransport
     {
         $read = new McpReadHandler(
@@ -231,9 +258,13 @@ final class KnowledgeQualityAuditMcpTest extends TestCase
 final class QualityAuditMcpClaims implements KnowledgeRepository, KnowledgePageReader
 {
     public int $writes = 0;
+    public int $qualityCandidateReads = 0;
+    public int $lastQualityCandidateLimit = 0;
 
     /** @param list<KnowledgeClaim> $items */
-    public function __construct(private array $items, private bool $failOnPage = false) {}
+    public function __construct(private array $items, private bool $failOnPage = false, private ?string $pageFailure = null) {}
+    /** @return list<KnowledgeClaim> */
+    public function items(): array { return $this->items; }
     public function findByCanonicalId(string $id): ?KnowledgeClaim { foreach ($this->items as $item) if ($item->canonicalId === $id) return $item; return null; }
     public function findByStableKey(string $stableKey): ?KnowledgeClaim { foreach ($this->items as $item) if ($item->stableKey === $stableKey) return $item; return null; }
     public function create(KnowledgeClaim $claim): KnowledgeClaim { $this->writes++; throw new \LogicException('quality audit must not write'); }
@@ -241,10 +272,18 @@ final class QualityAuditMcpClaims implements KnowledgeRepository, KnowledgePageR
     public function list(bool $includeRetired = false): array { return $this->items; }
     public function page(bool $includeRetired, ?string $afterStableKey, int $limit): array
     {
-        if ($this->failOnPage) throw new \RuntimeException('QUALITY_AUDIT_STORAGE_FAILURE');
+        if ($this->failOnPage) throw new \RuntimeException($this->pageFailure ?? 'QUALITY_AUDIT_STORAGE_FAILURE');
         $items = array_values(array_filter($this->items, static fn (KnowledgeClaim $item): bool => $afterStableKey === null || $item->stableKey > $afterStableKey));
         usort($items, static fn (KnowledgeClaim $a, KnowledgeClaim $b): int => strcmp($a->stableKey, $b->stableKey));
         return ['items' => array_slice($items, 0, $limit), 'has_more' => count($items) > $limit];
+    }
+
+    /** @return list<KnowledgeClaim> */
+    public function qualityCandidates(KnowledgeClaim $claim, int $limit): array
+    {
+        ++$this->qualityCandidateReads;
+        $this->lastQualityCandidateLimit = $limit;
+        return array_slice($this->items, 0, $limit);
     }
 }
 
