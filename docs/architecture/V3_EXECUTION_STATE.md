@@ -1,5 +1,42 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-10 — Fresh governed Video acceptance re-audit
+
+READ_ONLY_RUNTIME: Authenticated MCP read-back against the authorized TEST
+runtime confirms source revision `e6d6aa25292e0787308bd10c2626a6fa4ad5c6df`,
+staging identity, and the registered `nhk.capture.recover`,
+`nhk.video.frontend.reconcile`, and `nhk.public-url.audit` capabilities. No
+deployment, migration, Governance Apply, Capture recovery, frontend
+reconciliation, re-projection or other semantic mutation was performed.
+
+CAPTURE_A: Exact Capture `01a12152-62e8-72b4-a8f5-1943eee56a9c` is revision 71,
+`FAILED_RETRYABLE` / `RECOVERABLE_INTERRUPTED` despite COMPLETE Source,
+Knowledge, Evidence and Video owner read-backs. Its retry response is
+`CAPTURE_RETRY_NOT_ALLOWED`; the stale public copy still contains the guarded
+provenance sentence. The canonical Video and YouTube identity read back.
+
+CAPTURE_B: Exact Capture `01a120b2-6987-7f78-bb74-20640cdddfad` is revision
+124 and `COMPLETE` with the exact resolved Variant `852da54d-457a-4397-a16d-52d9452ba766`
+and frontend state `VERIFIED`, but its persisted review still contains
+`SUBJECT_CONFLICT_REVIEW_REQUIRED`. Its canonical Video and YouTube identity
+read back; no duplicate owner was observed.
+
+PUBLIC_READBACK: Browser HTTPS read-back showed Video A HTTP content with
+`the source identifies this Video...` contamination. Video B's requested URL
+returned a blank page in the browser session. `nhk.public-url.audit` returned
+`CHANGE` for both existing paths and proposed shorter slugs, so no reproject or
+slug mutation was attempted because the approved scope requires preserving the
+current public URLs.
+
+LOCAL_VERIFICATION: Focused Video/Capture/Governance/MCP/SEO suite passes 202
+tests / 1,711 assertions; PHP lint and `git diff --check` pass. The current
+worktree retains one unrelated user modification in
+`facebook_statistics_2016-01-01_to_2026-07-10.md`.
+
+STATUS: `RUNTIME_READBACK_PASS / CAPTURE_A_RECOVERY_BLOCKED /
+CAPTURE_B_STALE_REVIEW / PUBLIC_COPY_FAIL / PUBLIC_B_ROUTE_UNVERIFIED /
+PUBLIC_URL_PLAN_CONFLICT / NO_SEMANTIC_MUTATION`
+
 # Checkpoint — 2026-10-10 — Canonical Score Admission implementation slice
 
 IMPLEMENTATION: Added the generic `music:score_admit` governed operation and

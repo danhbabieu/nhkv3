@@ -18,6 +18,8 @@ The currently available exports contain 1,776 source rows, but their parsed post
 
 Meta report history now records the requested bounded report `01/01/2025–05/09/2025` as `Không tìm thấy kết quả nào` (no results). This is evidence for that exact bounded interval, but the older yearly intervals still need their own no-result or CSV confirmation before the whole 2016–2025 period can be marked covered.
 
+The next report `01/01/2024–31/12/2024` is visible in Meta report history but remains `Đang xuất 0%`. Meta permits only one report in this queue, so later yearly reports cannot be started until this queued report resolves.
+
 | Interval | Status | Evidence |
 |---|---|---|
 | 01/01/2016–31/12/2016 | NOT_EXPORTED | No CSV evidence |
