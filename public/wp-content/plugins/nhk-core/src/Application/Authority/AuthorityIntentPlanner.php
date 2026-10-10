@@ -7,6 +7,7 @@ use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Domain\Authority\{AuthorityEntity, EntityTypeRegistry};
 use NHK\Core\Application\Entity\EntityProfileResolver;
 use NHK\Core\Application\Graph\ExplicitRelationIntentPlanner;
+use NHK\Core\Domain\Governance\CommandCanonicalizer;
 use NHK\Core\Application\PublicIdentity\CanonicalPublicSlugPolicy;
 use NHK\Core\Shared\Uuid\UuidCodec;
 
@@ -256,6 +257,13 @@ final class AuthorityIntentPlanner
         // Classification candidate.
         $definition = $this->types->get($type);
         $payloadDelta = $this->payloadDelta($request);
+        // Score admission is a registered Music operation, not a generic
+        // Authority payload update. Keep the exact packet on the existing
+        // Music owner while routing it through Governance as score_admit.
+        if ($type === 'music' && is_array($payloadDelta['score_admission'] ?? null)) {
+            $this->scoreAdmissionCandidate($request, $payloadDelta['score_admission'], $plan);
+            return;
+        }
         $unsupported = array_values(array_diff(array_keys($payloadDelta), $definition->allowedFields));
         if ($unsupported !== []) {
             $plan['blockers'][] = ['code' => 'UNSUPPORTED_AUTHORITY_FIELD', 'entity_type' => $type, 'fields' => $unsupported];
@@ -356,6 +364,43 @@ final class AuthorityIntentPlanner
         $candidate = ['candidate_id' => $this->candidateId('CREATE', $type, $stableKey), 'action' => 'CREATE', 'entity_type' => $type, 'family' => $family !== '' ? $family : null, 'proposed_canonical_name' => $name, 'name' => $name, 'aliases' => [], 'description' => (string) ($entityPayload['description'] ?? ''), 'entity_payload' => $entityPayload, 'stable_key_preview' => $stableKey, 'proposed_stable_key' => $stableKey, 'scope' => 'capture', 'provenance' => 'EXPLICIT_USER_KNOWLEDGE', 'ambiguities' => [], 'blockers' => [], 'dependencies' => [], 'review_diagnostics' => []];
         $plan['create_candidates'][] = $candidate;
         if (is_array($structuralParent)) $this->planStructuralRelation($plan, $candidate, $structuralParent);
+    }
+
+    /** @param array<string,mixed> $request @param array<string,mixed> $packet @param array<string,mixed> $plan */
+    private function scoreAdmissionCandidate(array $request, array $packet, array &$plan): void
+    {
+        $uuid = trim((string) ($request['canonical_uuid'] ?? ''));
+        if (!UuidCodec::isValid($uuid)) {
+            $plan['blockers'][] = ['code' => 'SCORE_MUSIC_UUID_REQUIRED'];
+            return;
+        }
+        $entity = $this->authority->findByCanonicalId($uuid);
+        if (!$entity instanceof AuthorityEntity || $entity->entityType !== 'music') {
+            $plan['blockers'][] = ['code' => 'SCORE_MUSIC_UUID_NOT_FOUND', 'canonical_uuid' => $uuid];
+            return;
+        }
+        if (!$entity->active()) {
+            $plan['blockers'][] = ['code' => 'SCORE_MUSIC_OWNER_INACTIVE', 'canonical_uuid' => $uuid];
+            return;
+        }
+        $candidate = [
+            'candidate_id' => $this->candidateId('SCORE_ADMIT', 'music', $uuid . '|' . hash('sha256', CommandCanonicalizer::canonicalize($packet))),
+            'action' => 'SCORE_ADMIT',
+            'entity_type' => 'music',
+            'canonical_uuid' => $entity->canonicalId,
+            'canonical_revision' => $entity->revision,
+            'expected_revision' => $entity->revision,
+            'canonical_name' => $entity->canonicalName,
+            'score_admission' => $packet,
+            'entity_payload' => ['score_admission' => $packet],
+            'scope' => 'capture',
+            'provenance' => 'EXTERNAL_RESEARCH',
+            'dependencies' => [],
+            'blockers' => [],
+            'ambiguities' => [],
+        ];
+        $plan['update_candidates'][] = $candidate;
+        $this->reuse($plan, $entity, 'uuid_exact', '', 'SCORE_ADMISSION_TARGET');
     }
 
     /** @param array<string,mixed> $payloadDelta @param array<string,mixed> $plan @return array{predicate:string,target_type:string,target:AuthorityEntity}|null|false */

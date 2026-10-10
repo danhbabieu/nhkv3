@@ -477,6 +477,24 @@ final class StagingAcceptanceScopeVerifierTest extends TestCase
         self::assertFalse((new StagingAcceptanceScopeVerifier(static fn (): string => 'staging', 'test-secret', static fn (): bool => true))->verifyProposal($scope, $wrongProposal));
     }
 
+    public function test_score_admission_scope_uses_its_registered_family_and_exact_music_revision(): void
+    {
+        $capture = new CaptureRecord(UuidCodec::newV7(), 'music-score-scope', hash('sha256', 'music-score-scope'), 'AUTHORITY_PLANNED', 'PLANNED', null, null, [], ['purpose' => 'AUTHORITY', 'planning_input' => ['purpose' => 'AUTHORITY']], [], []);
+        $musicId = UuidCodec::newV7();
+        $candidateId = 'score-admit-westminster';
+        $plan = ['plan_fingerprint' => hash('sha256', 'score-plan'), 'update_candidates' => [[
+            'candidate_id' => $candidateId, 'action' => 'SCORE_ADMIT', 'entity_type' => 'music',
+            'canonical_uuid' => $musicId, 'expected_revision' => 7,
+            'score_admission' => ['score_edition_id' => UuidCodec::newV7(), 'edition_key' => 'westminster-v2'],
+        ]]];
+        $scope = (new StagingAcceptanceScopeVerifier(static fn (): string => 'staging', 'test-secret', static fn (): bool => true))->issueForAuthorityPlan($capture, $plan, [$candidateId]);
+
+        self::assertSame('music_score_admission', $scope['operation_family']);
+        self::assertSame('score_admit', $scope['candidate_bindings'][0]['operation']);
+        self::assertSame($musicId, $scope['candidate_bindings'][0]['target_uuid']);
+        self::assertSame(7, $scope['candidate_bindings'][0]['expected_revision']);
+    }
+
     public function test_mixed_authority_scope_binds_only_mutating_candidates(): void
     {
         $capture = new CaptureRecord(UuidCodec::newV7(), 'authority-mixed-scope', hash('sha256', 'authority-mixed-scope'), 'AUTHORITY_PLANNED', 'PLANNED', null, null, [], ['purpose' => 'AUTHORITY', 'planning_input' => ['purpose' => 'AUTHORITY']], [], []);

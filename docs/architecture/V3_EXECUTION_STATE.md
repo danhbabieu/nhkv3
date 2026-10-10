@@ -26913,3 +26913,35 @@ deployment or public completion was claimed.
 STATUS: `GROVE_RELATIVE_OCTAVE_VALIDATED / EVENT_PACKET_NON_CANONICAL /
 FOCUSED_REGRESSION_PASS / LIVE_PUBLIC_SCORE_ABSENT /
 FRESH_SIGNED_PACKET_REQUIRED / PUBLIC_COMPLETE_FALSE`
+
+# Checkpoint — 2026-10-10 — Score Admission Capture/Governance binding
+
+IMPLEMENTED_LOCAL: Structured existing-Music requests carrying the registered
+`score_admission` packet now plan a `SCORE_ADMIT` candidate. The governed plan
+materializer emits `music:score_admit` with exact Music UUID/revision, and the
+existing `AuthorityProposalExecutor` remains the sole score owner writer. The
+server-issued Authority scope verifier now labels this packet family
+`music_score_admission`; proposal scope validation accepts that registered
+family while preserving Capture, candidate, capability, signature and
+idempotency bindings. No direct Authority update path was added.
+
+VERIFIED_LOCAL: Focused planner, scope, score, Music schema, and Governance
+tests pass: 107 tests / 481 assertions. Changed-file PHP lint and
+`git diff --check` pass. The full PHP 8.5 diagnostic suite completed at 512 MB
+with 3,967 tests, 25,016 assertions, 33 baseline/infrastructure errors, 25
+unrelated failures, 29 warnings, 70 deprecations and 125 skips. The errors are
+primarily missing WPDB/test-runtime fixtures; the unrelated unit failure is
+`KnowledgeWriterPreviewServiceTest::test_broader_context_cannot_satisfy_requested_exact_facet_coverage`.
+The default 128 MB run additionally fatals in the unrelated
+`TrustedProvidedFileMaterializerTest` fixture while allocating 52,428,801
+bytes. These are not treated as Score Admission passes.
+
+RUNTIME_BLOCKER: Deployment, fresh live source/build verification, Westminster
+Music revision read-back, source-rights clearance, signed Capture scope
+issuance, governed score admission, checksum read-back and public/browser
+playback remain unverified. No staging mutation, duplicate Music identity,
+Governance apply, or audio PASS was claimed.
+
+STATUS: `LOCAL_SCORE_ADMISSION_CAPTURE_BOUND / FOCUSED_REGRESSION_PASS /
+GLOBAL_BASELINE_ISOLATED / DEPLOYMENT_AND_RIGHTS_UNVERIFIED /
+PUBLIC_COMPLETE_FALSE`

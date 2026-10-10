@@ -169,6 +169,30 @@ final class GovernedAuthorityPlanExecutor implements GovernedAuthorityPlanApplie
         $payload = $candidate;
         $payload['candidate_id'] = (string) ($candidate['candidate_id'] ?? '');
         if (!$isRelation) {
+            if ($action === 'SCORE_ADMIT') {
+                $payload = is_array($candidate['score_admission'] ?? null) ? $candidate['score_admission'] : [];
+                $payload['candidate_id'] = (string) ($candidate['candidate_id'] ?? '');
+            }
+            if ($action === 'SCORE_ADMIT') {
+                $payload['project_build_audit'] = [
+                    'capture_id' => trim((string) ($auditContext['capture_id'] ?? '')),
+                    'policy_mode' => strtoupper(trim((string) ($auditContext['policy_mode'] ?? ''))),
+                    'approval_mode' => strtoupper(trim((string) ($auditContext['approval_mode'] ?? ''))),
+                    'plan_fingerprint' => $planFingerprint,
+                    'actor' => $actor,
+                    'target_uuid' => trim((string) ($candidate['canonical_uuid'] ?? '')),
+                    'entity_type' => 'music',
+                    'operation' => 'score_admit',
+                    'previous_revision' => (int) ($candidate['expected_revision'] ?? $candidate['canonical_revision'] ?? 0),
+                ];
+            }
+            if ($action === 'SCORE_ADMIT' && $stagingAcceptance !== null) $payload['staging_acceptance'] = $stagingAcceptance;
+            if ($action === 'SCORE_ADMIT') {
+                $contentFingerprint = hash('sha256', CommandCanonicalizer::canonicalize($payload));
+                $dependencyIds = array_values(array_filter(array_map('strval', (array) ($candidate['dependencies'] ?? []))));
+                $targetUuid = trim((string) ($candidate['canonical_uuid'] ?? ''));
+                return ['operation' => 'score_admit', 'entity_type' => 'music', 'subject_id' => $targetUuid, 'target_uuid' => $targetUuid, 'expected_revision' => max(1, (int) ($candidate['expected_revision'] ?? $candidate['canonical_revision'] ?? 0)), 'payload' => $payload, 'content_fingerprint' => $contentFingerprint, 'dependency_fingerprint' => hash('sha256', CommandCanonicalizer::canonicalize($dependencyIds)), 'dependency_ids' => $dependencyIds, 'idempotency_key' => 'authority-plan:' . $planFingerprint . ':' . (string) ($candidate['candidate_id'] ?? '') . ($stagingAcceptance === null ? '' : ':' . hash('sha256', CommandCanonicalizer::canonicalize($stagingAcceptance))), 'actor' => $actor];
+            }
             $entityPayload = is_array($candidate['entity_payload'] ?? null)
                 ? $candidate['entity_payload']
                 : array_filter(['family' => $candidate['family'] ?? null, 'aliases' => $candidate['aliases'] ?? null, 'description' => $candidate['description'] ?? null], static fn (mixed $value): bool => $value !== null && $value !== '' && $value !== []);

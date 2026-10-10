@@ -386,7 +386,7 @@ final class StagingAcceptanceScopeVerifier
         $base = [
             'approved' => true, 'environment' => 'staging', 'capture_id' => $capture->captureId,
             'capture_fingerprint' => $capture->requestFingerprint, 'request_fingerprint' => $capture->requestFingerprint,
-            'operation_family' => 'governed_authority_plan', 'writer' => 'canonical_governed',
+            'operation_family' => $this->authorityPlanFamily($plan, $candidateIds), 'writer' => 'canonical_governed',
             'entrypoint' => 'nhk.capture.ingest', 'intent' => (string) ($capture->context['purpose'] ?? 'AUTHORITY'),
             'plan_fingerprint' => $planFingerprint, 'approved_candidate_ids' => $selectedIds,
             'candidate_bindings' => $all,
@@ -412,6 +412,18 @@ final class StagingAcceptanceScopeVerifier
             }
         }
         return array_values(array_unique($mutationIds));
+    }
+
+    /** @param array<string,mixed> $plan @param list<string> $candidateIds */
+    private function authorityPlanFamily(array $plan, array $candidateIds): string
+    {
+        foreach (['reuse', 'create_candidates', 'update_candidates', 'relation_candidates', 'relation_reuse'] as $bucket) {
+            foreach ((array) ($plan[$bucket] ?? []) as $candidate) {
+                if (!is_array($candidate) || !in_array((string) ($candidate['candidate_id'] ?? ''), $candidateIds, true)) continue;
+                if (strtoupper((string) ($candidate['action'] ?? '')) === 'SCORE_ADMIT') return 'music_score_admission';
+            }
+        }
+        return 'governed_authority_plan';
     }
 
     /** @param array<string,mixed> $plan @return array<string,mixed> */

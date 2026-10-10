@@ -165,6 +165,28 @@ final class AuthorityIntentPlannerTest extends TestCase
         self::assertSame([], $plan['update_candidates']);
     }
 
+    public function test_music_score_admission_is_planned_as_registered_governed_operation(): void
+    {
+        $musicId = UuidCodec::newV7();
+        $packet = ['score_edition_id' => UuidCodec::newV7(), 'edition_key' => 'westminster-v2', 'score_checksum' => str_repeat('a', 64)];
+        $plan = (new AuthorityIntentPlanner(new PlannerAuthorityRepository([
+            $this->entity('music', 'nhk:music:westminster', 'Westminster', [], $musicId),
+        ]), $this->types))->plan([
+            'purpose' => 'AUTHORITY',
+            'authority_intent' => ['mode' => 'PLAN', 'requests' => [[
+                'entity_type' => 'music',
+                'canonical_uuid' => $musicId,
+                'payload_delta' => ['score_admission' => $packet],
+            ]]],
+        ], ['capture_id' => UuidCodec::newV7(), 'capture_revision' => 3]);
+
+        self::assertCount(1, $plan['update_candidates']);
+        self::assertSame('SCORE_ADMIT', $plan['update_candidates'][0]['action']);
+        self::assertSame($musicId, $plan['update_candidates'][0]['canonical_uuid']);
+        self::assertSame($packet, $plan['update_candidates'][0]['score_admission']);
+        self::assertSame([], $plan['blockers']);
+    }
+
     public function test_registry_unsupported_update_field_is_reviewed_without_mutating_plan(): void
     {
         $entity = $this->entity('classification', 'nhk:classification:clock-type.public-clock', 'Đồng hồ công cộng', ['family' => 'clock_type', 'description' => 'Mô tả.']);

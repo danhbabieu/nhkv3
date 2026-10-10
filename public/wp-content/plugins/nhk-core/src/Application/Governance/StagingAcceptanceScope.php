@@ -66,7 +66,7 @@ final class StagingAcceptanceScope
         if ($expectedFamily === null || ((string) ($scope['operation_family'] ?? '') !== $expectedFamily && !$authorityPlanPacket)) throw new \RuntimeException('STAGING_OPERATION_SCOPE_MISMATCH');
         if ((string) ($scope['writer'] ?? '') !== 'canonical_governed') throw new \RuntimeException('STAGING_DIRECT_WRITER_BLOCKED');
 
-        if ($expectedFamily === 'governed_authority_plan' || $authorityPlanPacket) {
+        if ($expectedFamily === 'governed_authority_plan' || $expectedFamily === 'music_score_admission' || $authorityPlanPacket) {
             self::assertAuthorityBinding($proposal, $scope);
             self::assertNoFuzzyLocator($scope);
             return;
