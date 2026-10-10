@@ -193,6 +193,7 @@ final class CaptureVideoPublicationVerifier
                 'public_eligible' => $publicEligible,
                 'frontend_verified' => $frontendVerified,
                 'content_quality' => $contentQuality->status,
+                'outcome_obligations' => is_array($context['outcome_obligations'] ?? null) ? $context['outcome_obligations'] : [],
                 'blockers' => array_values(array_unique($blockers)),
             ]);
             $items[] = ['video_id' => $video->canonicalId, 'platform' => $video->platform, 'external_id' => $video->externalVideoId, 'external_video_id' => $video->externalVideoId, 'status' => ($completion['complete'] ?? false) === true ? 'verified' : 'REVIEW_REQUIRED', 'completion' => $completion, 'public_identity' => ['identity_id' => $identity['identity_id'] ?? null, 'slug' => $identity['current_slug'], 'path' => $path]];

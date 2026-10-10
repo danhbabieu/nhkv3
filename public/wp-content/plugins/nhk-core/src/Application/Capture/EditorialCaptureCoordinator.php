@@ -177,6 +177,9 @@ final class EditorialCaptureCoordinator
             'assets' => $record->assets,
             'subject_resolution' => $resolution,
             'semantic_write_back' => $writes,
+            'outcome_obligations' => is_array($record->diagnostics['outcome_obligations'] ?? null)
+                ? $record->diagnostics['outcome_obligations']
+                : (array) ($record->context['outcome_obligations'] ?? []),
             'existing_capture_continuation' => true,
             'resume_mode' => 'RETRY',
         ]);
@@ -1106,7 +1109,16 @@ final class EditorialCaptureCoordinator
                 }
 
                 $videoPublication = $isVideoIntent && ($videoInput !== [] || $hasVideoAsset || $this->videoOwnerId($assets, [], $writes) !== '') && is_callable($this->videoPublicationVerifier)
-                    ? ($this->videoPublicationVerifier)(['capture_id' => $record->captureId, 'assets' => $assets, 'subject_resolution' => $resolution, 'semantic_write_back' => $writes, 'shared_enrichment' => $sharedEnrichment])
+                    ? ($this->videoPublicationVerifier)([
+                        'capture_id' => $record->captureId,
+                        'assets' => $assets,
+                        'subject_resolution' => $resolution,
+                        'semantic_write_back' => $writes,
+                        'shared_enrichment' => $sharedEnrichment,
+                        'outcome_obligations' => is_array($diagnostics['outcome_obligations'] ?? null)
+                            ? $diagnostics['outcome_obligations']
+                            : (array) ($record->context['outcome_obligations'] ?? []),
+                    ])
                     : ['status' => 'not_requested', 'items' => [], 'blockers' => []];
                 $diagnostics['video_publication'] = $this->withoutBody($videoPublication);
                 $diagnostics['deep_enrichment'] = $this->deepEnrichment($retrieved, $writes, [], $visualOpportunities, $sharedEnrichment);
