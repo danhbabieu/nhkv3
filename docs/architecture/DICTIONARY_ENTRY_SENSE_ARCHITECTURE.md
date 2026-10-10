@@ -112,10 +112,13 @@ they can be edited independently; runtime must not be described as having
 solved their synchronization. `DictionaryConcept.preferred_label` is therefore
 kept as a migration compatibility field, not a second long-term owner.
 
-**CURRENT IMPLEMENTATION GAP:** preferred wording has two independently
-mutable runtime paths. A future implementation must define one Entry-owned
-source of truth and an explicit read precedence before enabling any migration
-write.
+**IMPLEMENTED LOCAL CURATOR RULE:** Entry `preferred_form` is the sole
+headword owner in `ENTRY_SENSE_MODE`. The guarded Entry curation writer updates
+the Entry and exactly one active `PREFERRED` projection in one transaction;
+`DictionaryConcept.preferred_label` remains Sense-scoped compatibility data.
+Entry detail reads prefer the Entry wording, and a headword change never
+rewrites unrelated Sense labels. The rule is local source code only until a
+matching deployed runtime is verified.
 
 ### 3.3 References, destinations and provenance
 

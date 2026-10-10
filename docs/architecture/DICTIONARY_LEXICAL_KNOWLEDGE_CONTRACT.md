@@ -184,8 +184,11 @@ semantic reason. Runtime currently has both
 which can be edited independently. `DictionaryConcept.preferred_label` is a
 compatibility field during migration, not a second long-term owner.
 
-**CURRENT IMPLEMENTATION GAP:** preferred wording synchronization is not
-solved by the current runtime.
+**IMPLEMENTED LOCAL CURATOR RULE:** Entry `preferred_form` owns the long-term
+headword in `ENTRY_SENSE_MODE`. The internal/admin Entry update transaction
+retires the previous `PREFERRED` projection, writes exactly one replacement,
+and keeps Sense labels explicit. CAS, idempotency and canonical curator
+read-back apply; deployed/runtime acceptance remains unverified.
 
 The safe migration default is `1 old Concept → 1 compatibility Entry → 1
 Sense`; the old Concept UUID remains durable. This target does not permit

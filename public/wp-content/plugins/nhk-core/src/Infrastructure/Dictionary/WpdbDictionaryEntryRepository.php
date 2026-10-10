@@ -356,15 +356,123 @@ final class WpdbDictionaryEntryRepository implements DictionaryEntryRepository, 
     {
         if (!in_array($status, [DictionaryConcept::DRAFT, DictionaryConcept::APPROVED, DictionaryConcept::RETIRED], true)) throw new \InvalidArgumentException('DICTIONARY_ENTRY_STATUS_INVALID');
         $entry = $this->findDurableForConcept($senseId);
-        if (!$entry instanceof LexicalEntry || $entry->status === $status) return $entry;
+        if (!$entry instanceof LexicalEntry) return null;
+        // Sense lifecycle is derived from all eligible senses. An explicit
+        // Entry retirement is sticky until the curator reactivates the Entry.
+        $explicit = (($entry->context['_nhk_entry_lifecycle'] ?? '') === 'EXPLICIT_RETIRED');
+        $approved = $this->database->get_var($this->database->prepare(
+            "SELECT c.concept_uuid FROM {$this->senses} s INNER JOIN {$this->conceptsTable()} c ON c.concept_uuid=s.concept_uuid WHERE s.entry_uuid=%s AND s.state=1 AND c.status=%s LIMIT 1",
+            UuidCodec::toBinary($entry->entryId), DictionaryConcept::APPROVED,
+        ));
+        $derived = $approved !== null ? DictionaryConcept::APPROVED : DictionaryConcept::RETIRED;
+        if ($explicit && $derived === DictionaryConcept::APPROVED) $derived = DictionaryConcept::RETIRED;
+        if ($entry->status === $derived) return $entry;
         $ok = $this->database->query($this->database->prepare(
             "UPDATE {$this->entries} SET status=%s,revision=revision+1,updated_at=%s WHERE entry_uuid=%s AND revision=%d",
-            $status, gmdate('Y-m-d H:i:s.u'), UuidCodec::toBinary($entry->entryId), $entry->revision,
+            $derived, gmdate('Y-m-d H:i:s.u'), UuidCodec::toBinary($entry->entryId), $entry->revision,
         ));
         if ($ok !== 1) throw new \RuntimeException('DICTIONARY_ENTRY_REVISION_CONFLICT');
         $updated = $this->findById($entry->entryId);
-        if (!$updated instanceof LexicalEntry || $updated->status !== $status) throw new \RuntimeException('DICTIONARY_ENTRY_READBACK_FAILED');
+        if (!$updated instanceof LexicalEntry || $updated->status !== $derived) throw new \RuntimeException('DICTIONARY_ENTRY_READBACK_FAILED');
         return $updated;
+    }
+
+    /** @return array<string,mixed> */
+    public function curatorRead(string $entryId): array
+    {
+        $entry = $this->findById($entryId);
+        if (!$entry instanceof LexicalEntry) throw new \RuntimeException('DICTIONARY_ENTRY_NOT_FOUND');
+        $senses = [];
+        foreach ($this->listSenses($entry) as $sense) {
+            $senses[] = [
+                'sense_id' => $sense->conceptId,
+                'preferred_label' => $sense->preferredLabel,
+                'definition' => $sense->definition,
+                'status' => $sense->status,
+                'context' => $this->boundedCuratorContext($sense->context),
+                'revision' => $sense->revision,
+                'semantic_reference' => $this->semanticReference($entry->entryId, $sense->conceptId),
+            ];
+        }
+        return [
+            'entry_id' => $entry->entryId,
+            'preferred_form' => $entry->preferredForm,
+            'normalized_preferred_form' => $entry->normalizedPreferredForm,
+            'status' => $entry->status,
+            'locale' => $entry->locale,
+            'context' => $this->boundedCuratorContext($entry->context),
+            'revision' => $entry->revision,
+            'forms' => array_map(static fn (LexicalEntryForm $form): array => ['form' => $form->form, 'normalized_form' => $form->normalizedForm, 'kind' => $form->kind, 'locale' => $form->locale, 'context' => $form->context], $this->listForms($entry)),
+            'senses' => $senses,
+            'public_identity' => ['slug' => $entry->context['public_slug'] ?? null],
+        ];
+    }
+
+    /** Apply Entry and optional Sense changes in one transaction. */
+    public function updateCuration(array $input): array
+    {
+        $entryId = (string) $input['entry_id'];
+        $entry = $this->findById($entryId);
+        if (!$entry instanceof LexicalEntry) throw new \RuntimeException('DICTIONARY_ENTRY_NOT_FOUND');
+        $expectedEntry = (int) $input['expected_entry_revision'];
+        if ($entry->revision !== $expectedEntry) throw new \RuntimeException('DICTIONARY_ENTRY_REVISION_CONFLICT');
+        $sensePatch = is_array($input['sense_patch'] ?? null) ? $input['sense_patch'] : null;
+        $sense = null;
+        if ($sensePatch !== null) {
+            $sense = $this->concepts->findById((string) ($sensePatch['sense_id'] ?? ''));
+            if (!$sense instanceof DictionaryConcept || !in_array($sense->conceptId, $entry->senseIds, true)) throw new \RuntimeException('DICTIONARY_SENSE_NOT_MAPPED_TO_ENTRY');
+            if ($sense->revision !== (int) ($sensePatch['expected_revision'] ?? 0)) throw new \RuntimeException('DICTIONARY_SENSE_REVISION_CONFLICT');
+        }
+        $this->database->query('START TRANSACTION');
+        try {
+            $preferred = array_key_exists('preferred_form', $input) ? trim((string) $input['preferred_form']) : $entry->preferredForm;
+            $normalized = $this->normalize($preferred);
+            if ($preferred === '' || $normalized === '') throw new \InvalidArgumentException('DICTIONARY_ENTRY_PREFERRED_FORM_REQUIRED');
+            if ($normalized !== $entry->normalizedPreferredForm) {
+                $collision = $this->database->get_var($this->database->prepare("SELECT f.id FROM {$this->forms} f INNER JOIN {$this->entries} e ON e.entry_uuid=f.entry_uuid WHERE f.normalized_form=%s AND f.state=1 AND e.entry_uuid<>%s LIMIT 1 FOR UPDATE", $normalized, UuidCodec::toBinary($entryId)));
+                if ($collision !== null) throw new \RuntimeException('DICTIONARY_ENTRY_PREFERRED_FORM_COLLISION');
+            }
+            $locale = array_key_exists('locale', $input) ? $input['locale'] : $entry->locale;
+            $context = array_key_exists('entry_context', $input) ? (array) $input['entry_context'] : $entry->context;
+            $ok = $this->database->query($this->database->prepare("UPDATE {$this->entries} SET preferred_form=%s,normalized_preferred_form=%s,locale=%s,context_json=%s,revision=revision+1,updated_at=%s WHERE entry_uuid=%s AND revision=%d", $preferred, $normalized, $locale, $this->json($context), gmdate('Y-m-d H:i:s.u'), UuidCodec::toBinary($entryId), $expectedEntry));
+            if ($ok !== 1) throw new \RuntimeException('DICTIONARY_ENTRY_REVISION_CONFLICT');
+            // The old preferred projection is retired, never silently reclassified.
+            $this->database->query($this->database->prepare("UPDATE {$this->forms} SET state=0,updated_at=%s WHERE entry_uuid=%s AND form_kind=%s AND state=1", gmdate('Y-m-d H:i:s.u'), UuidCodec::toBinary($entryId), LexicalEntryForm::PREFERRED));
+            $this->addForm(new LexicalEntryForm($entryId, $preferred, $normalized, LexicalEntryForm::PREFERRED, $locale !== null ? (string) $locale : null, $context));
+            if ($sense instanceof DictionaryConcept) {
+                $label = array_key_exists('preferred_label', $sensePatch) ? trim((string) $sensePatch['preferred_label']) : $sense->preferredLabel;
+                $definition = array_key_exists('definition', $sensePatch) ? trim((string) $sensePatch['definition']) : $sense->definition;
+                if ($label === '') throw new \InvalidArgumentException('DICTIONARY_SENSE_PREFERRED_LABEL_REQUIRED');
+                $senseContext = array_key_exists('context', $sensePatch) ? (array) $sensePatch['context'] : $sense->context;
+                $updated = $this->database->query($this->database->prepare("UPDATE {$this->conceptsTable()} SET preferred_label=%s,definition=%s,context_json=%s,revision=revision+1,updated_at=%s WHERE concept_uuid=%s AND revision=%d", $label, $definition, $this->json($senseContext), gmdate('Y-m-d H:i:s.u'), UuidCodec::toBinary($sense->conceptId), $sense->revision));
+                if ($updated !== 1) throw new \RuntimeException('DICTIONARY_SENSE_REVISION_CONFLICT');
+            }
+            $read = $this->curatorRead($entryId);
+            $this->database->query('COMMIT');
+            return $read;
+        } catch (\Throwable $e) { $this->database->query('ROLLBACK'); throw $e; }
+    }
+
+    /** @return array<string,mixed> */
+    public function lifecycleCuration(string $entryId, int $expectedRevision, string $status): array
+    {
+        if (!in_array($status, [DictionaryConcept::DRAFT, DictionaryConcept::APPROVED, DictionaryConcept::RETIRED], true)) throw new \InvalidArgumentException('DICTIONARY_ENTRY_STATUS_INVALID');
+        $entry = $this->findById($entryId);
+        if (!$entry instanceof LexicalEntry) throw new \RuntimeException('DICTIONARY_ENTRY_NOT_FOUND');
+        if ($status !== DictionaryConcept::RETIRED) {
+            $collision = $this->database->get_var($this->database->prepare("SELECT f.id FROM {$this->forms} f INNER JOIN {$this->entries} e ON e.entry_uuid=f.entry_uuid WHERE f.normalized_form=%s AND f.state=1 AND e.entry_uuid<>%s LIMIT 1", $entry->normalizedPreferredForm, UuidCodec::toBinary($entryId)));
+            if ($collision !== null) throw new \RuntimeException('DICTIONARY_ENTRY_PREFERRED_FORM_COLLISION');
+            $slug = trim((string) ($entry->context['public_slug'] ?? ''));
+            if ($slug !== '' && $this->publicSlugTaken($slug, $entryId)) throw new \RuntimeException('DICTIONARY_ENTRY_PUBLIC_IDENTITY_COLLISION');
+        }
+        $context = $entry->context;
+        if ($status === DictionaryConcept::RETIRED) $context['_nhk_entry_lifecycle'] = 'EXPLICIT_RETIRED';
+        else unset($context['_nhk_entry_lifecycle']);
+        $ok = $this->database->query($this->database->prepare("UPDATE {$this->entries} SET status=%s,context_json=%s,revision=revision+1,updated_at=%s WHERE entry_uuid=%s AND revision=%d", $status, $this->json($context), gmdate('Y-m-d H:i:s.u'), UuidCodec::toBinary($entryId), $expectedRevision));
+        if ($ok !== 1) throw new \RuntimeException('DICTIONARY_ENTRY_REVISION_CONFLICT');
+        $read = $this->curatorRead($entryId);
+        if (($read['status'] ?? null) !== $status) throw new \RuntimeException('DICTIONARY_ENTRY_READBACK_FAILED');
+        return $read;
     }
 
     public function ensurePublicIdentityForSense(string $senseId): ?LexicalEntry
@@ -579,5 +687,6 @@ final class WpdbDictionaryEntryRepository implements DictionaryEntryRepository, 
     private function normalize(string $value): string { return function_exists('mb_strtolower') ? mb_strtolower(trim($value), 'UTF-8') : strtolower(trim($value)); }
     private function json(array $value): string { return function_exists('wp_json_encode') ? (string) wp_json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : (json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '{}'); }
     private function decode(string $json): array { $value = json_decode($json, true); return is_array($value) ? $value : []; }
+    private function boundedCuratorContext(array $context): array { $out = []; foreach ($context as $key => $value) if (is_string($key) && !str_starts_with($key, '_') && strlen($key) <= 64) $out[$key] = $value; return $out; }
     private function sort(mixed $value): mixed { if (!is_array($value)) return $value; if (!array_is_list($value)) ksort($value); foreach ($value as $key => $item) $value[$key] = $this->sort($item); return $value; }
 }

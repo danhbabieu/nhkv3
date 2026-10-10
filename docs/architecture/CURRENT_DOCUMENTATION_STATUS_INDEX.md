@@ -1,5 +1,16 @@
 # NHK V3 Current Documentation Status Index
 
+## 0.0.11 Dictionary curator Entry CRUD local implementation — 2026-10-10
+
+The local source now exposes bounded `nhk.dictionary.entry.get` read-back and
+internal/admin `entry.update` / `entry.lifecycle` boundaries over the existing
+Entry/Sense schema. Entry-owned preferred wording, separate Entry/Sense CAS,
+soft retirement, explicit-retirement stickiness and multi-Sense lifecycle
+derivation are implemented with idempotent canonical read-back. Typed Capture
+Dictionary owner commands are re-planned server-side before apply. This is a
+local checkpoint only; no deployment, connector acceptance or live mutation is
+claimed. Remaining Dictionary gaps are unchanged.
+
 ## 0.0.10 Canonical Score Admission implementation slice — 2026-10-10
 
 The local executable runtime now registers generic `music:score_admit` under

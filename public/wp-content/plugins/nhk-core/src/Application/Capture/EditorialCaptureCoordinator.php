@@ -428,7 +428,16 @@ final class EditorialCaptureCoordinator
                 $diagnostics['interpretation'] = $this->withoutBody($interpretation);
                 $dictionaryObservation = DictionaryObservationRegistry::observe('CAPTURE', $record->captureId, $text, $this->dictionaryObservationContext($record, $input), $this->dictionaryLexicalHints($input));
                 $diagnostics['dictionary_observation'] = $this->withoutBody($dictionaryObservation);
-                if (!is_array($input['dictionary_owner_plan'] ?? null) || $input['dictionary_owner_plan'] === []) {
+                if (is_array($input['dictionary_owner_plan'] ?? null) && $input['dictionary_owner_plan'] !== []) {
+                    // Typed input is a bounded command only. Ignore caller
+                    // status/resolution/revision fields and re-plan through
+                    // the canonical Dictionary owner before apply.
+                    $typed = $input['dictionary_owner_plan'];
+                    $command = ['operation' => strtoupper(trim((string) ($typed['operation'] ?? ''))), 'term' => (string) ($typed['term'] ?? $typed['preferred_form'] ?? ''), 'form' => (string) ($typed['form'] ?? ''), 'definition' => (string) ($typed['definition'] ?? ''), 'enrichment_field' => (string) ($typed['enrichment_field'] ?? 'definition_refinement')];
+                    $naturalOwnerPlan = DictionaryObservationRegistry::ownerPlan('CAPTURE', $record->captureId, $text, $this->dictionaryObservationContext($record, $input), $dictionaryObservation + ['natural_owner_command' => $command]);
+                    $input['dictionary_owner_plan'] = $naturalOwnerPlan;
+                    $diagnostics['dictionary_typed_owner_plan'] = $this->withoutBody($naturalOwnerPlan);
+                } else {
                     $naturalOwnerPlan = DictionaryObservationRegistry::ownerPlan('CAPTURE', $record->captureId, $text, $this->dictionaryObservationContext($record, $input), $dictionaryObservation);
                     if (in_array(strtoupper(trim((string) ($naturalOwnerPlan['operation'] ?? ''))), ['CREATE', 'ADD_FORM', 'ADD_SENSE', 'ENRICH', 'REUSE'], true)) {
                         $input['dictionary_owner_plan'] = $naturalOwnerPlan;

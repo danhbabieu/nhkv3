@@ -61,6 +61,8 @@ final class SingleEntryPointPolicy
         'nhk.relation.backfill.apply',
         'nhk.dictionary.concept.create',
         'nhk.dictionary.entry.create-with-sense',
+        'nhk.dictionary.entry.update',
+        'nhk.dictionary.entry.lifecycle',
         'nhk.dictionary.entry.form.add',
         'nhk.dictionary.entry.sense.add',
         'nhk.dictionary.concept.update',

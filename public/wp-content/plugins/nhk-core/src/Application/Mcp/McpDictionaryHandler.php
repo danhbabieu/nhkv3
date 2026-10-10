@@ -92,6 +92,16 @@ final class McpDictionaryHandler
 
     public function createConcept(array $input): array { return ($this->mutationOverride ?? $this->runtime->mutation())->createDraft((string) ($input['preferred_label'] ?? ''), (string) ($input['definition'] ?? ''), (array) ($input['context'] ?? []), (string) ($input['idempotency_key'] ?? '')); }
     public function createEntryWithSense(array $input): array { return $this->runtime->mutation()->createEntryWithSense((string) ($input['preferred_form'] ?? ''), (string) ($input['definition'] ?? ''), (array) ($input['context'] ?? []), (string) ($input['idempotency_key'] ?? '')); }
+    public function entryGet(array $input): array
+    {
+        if (!$this->runtime->available()) return ['status' => 'unavailable', 'reason' => 'DICTIONARY_STORAGE_UNAVAILABLE'];
+        $id = trim((string) ($input['entry_id'] ?? ''));
+        if ($id === '' || !method_exists($this->runtime->entries(), 'curatorRead')) throw new \RuntimeException('DICTIONARY_ENTRY_REPOSITORY_UNAVAILABLE');
+        try { return ['status' => 'available', 'entry' => $this->runtime->entries()->curatorRead($id)]; }
+        catch (\RuntimeException $e) { if ($e->getMessage() === 'DICTIONARY_ENTRY_NOT_FOUND') return ['status' => 'not_found', 'reason' => $e->getMessage()]; throw $e; }
+    }
+    public function entryUpdate(array $input): array { return ['status' => 'available', 'entry' => $this->runtime->mutation()->updateEntry($input)['entry'] ?? []]; }
+    public function entryLifecycle(array $input): array { return ['status' => 'available', 'entry' => $this->runtime->mutation()->lifecycleEntry((string) ($input['entry_id'] ?? ''), (int) ($input['expected_revision'] ?? 0), (string) ($input['status'] ?? ''), (string) ($input['idempotency_key'] ?? ''))['entry'] ?? []]; }
     public function addFormToEntry(array $input): array { return $this->runtime->mutation()->addFormToEntry((string) $input['entry_id'], (int) $input['expected_revision'], (string) $input['form'], (array) ($input['context'] ?? []), (string) $input['idempotency_key'], (string) ($input['kind'] ?? 'ALTERNATE'), isset($input['locale']) ? (string) $input['locale'] : null); }
     public function addSenseToEntry(array $input): array { return $this->runtime->mutation()->addSenseToEntry((string) $input['entry_id'], (int) $input['expected_revision'], (string) $input['concept_id'], (array) ($input['context'] ?? []), (string) $input['idempotency_key']); }
     public function updateConcept(array $input): array { return $this->runtime->mutation()->updateConcept((string) $input['concept_id'], (int) $input['expected_revision'], (string) $input['preferred_label'], (string) ($input['definition'] ?? ''), (array) ($input['context'] ?? []), (string) $input['idempotency_key']); }

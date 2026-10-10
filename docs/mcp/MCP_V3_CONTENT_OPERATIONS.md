@@ -641,7 +641,9 @@ availability; local HTTP wire smoke remains an environment check.
 | `nhk.dictionary.candidate.list` | Private Dictionary review queue | READ | No | N/A | No raw edge | READY; candidates are never public truth |
 | `nhk.dictionary.candidate.get` / `nhk.dictionary.mentions.list` | Candidate detail and mention/source context | READ | No | N/A | No raw edge | READY; source context is lexical provenance only |
 | `nhk.dictionary.concept.create` / `nhk.dictionary.concept.update` / `nhk.dictionary.concept.lifecycle` | Dictionary Concept lexical curation | WRITE / INTERNAL | Yes | Expected concept revision + idempotency + audit/read-back | No Graph write | READY through `nhk_curate_dictionary` + `nhk_internal_content_operations`; lifecycle retires/reactivates, never hard-deletes |
+| `nhk.dictionary.entry.get` | Bounded curator read of one exact Entry, Forms and mapped Sense revisions | READ | No | Exact Entry UUID; private unrelated owner payloads excluded | No semantic owner/Graph write | PRESENT in local catalog; deployed connector exposure remains unverified |
 | `nhk.dictionary.entry.create-with-sense` | Create one Entry with its first durable Sense | WRITE / INTERNAL | Yes | Preferred form + non-empty definition + idempotency; research completeness still follows Dictionary §6.1 | No semantic owner/Graph write | PRESENT in current catalog; target-runtime connector exposure must still be verified |
+| `nhk.dictionary.entry.update` / `nhk.dictionary.entry.lifecycle` | Guarded Entry-owned curation and soft lifecycle | WRITE / INTERNAL | Yes | Separate Entry/Sense CAS, idempotency, transaction, collision checks and canonical read-back; no hard delete | No semantic owner/Graph write | PRESENT locally; requires `nhk_curate_dictionary` + `nhk_internal_content_operations`; deployed connector exposure remains unverified |
 | `nhk.dictionary.entry.form.add` | Add one non-colliding Form to an existing Entry | WRITE / INTERNAL | Yes | Entry revision/CAS + idempotency | No semantic owner/Graph write | PRESENT in current catalog; same-Sense decision remains curator-controlled |
 | `nhk.dictionary.entry.sense.add` | Attach an existing durable Sense to an Entry | WRITE / INTERNAL | Yes | Entry revision/CAS + existing Sense UUID + idempotency | No semantic owner/Graph write | PRESENT in current catalog; no implicit grouping/merge |
 | `nhk.dictionary.enrichment.audit` / `nhk.dictionary.enrichment.plan` / `nhk.dictionary.enrichment.apply` | Entry/Sense lexical and owner-backed completeness/enrichment | READ / PLAN / INTERNAL APPLY | Apply only | Bounded audit; reviewed plan fingerprint; CAS/idempotency/read-back on apply | Existing owners remain authoritative | PRESENT in current catalog; apply never substitutes for missing owner truth |
@@ -1381,9 +1383,12 @@ future MCP read operation may delegate to the same resolver, but current
 resolver path is `normalized Form → Entry → approved Concept-as-Sense →
 revalidated owner route`; multiple viable Senses remain ambiguous. It does not
 register Dictionary endpoints or predicates, copy Knowledge/Evidence payloads,
-or create Media/Video relations. Entry preferred-wording writes and
-Entry/Sense MCP capabilities remain deferred until CAS, idempotency,
-capability, bounded read-back and compatibility identifiers are specified.
+or create Media/Video relations. The local source checkpoint now provides
+`nhk.dictionary.entry.get`, guarded `entry.update` and `entry.lifecycle`.
+Entry wording is Entry-owned, one active PREFERRED projection is maintained,
+Sense patches use independent Sense CAS, and lifecycle retirement is soft.
+These are source-level capabilities only; deployment and connector read-back
+are not claimed here.
 
 Dictionary Entry/Sense materialization exposes bounded read-only
 `nhk.dictionary.materialization.profile` and

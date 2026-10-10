@@ -80,6 +80,9 @@ final class McpContractTest extends TestCase
             'nhk.dictionary.lexical-relation.read',
             'nhk.dictionary.lexical-relation.preview',
             'nhk.dictionary.lexical-relation.apply',
+            'nhk.dictionary.entry.get',
+            'nhk.dictionary.entry.update',
+            'nhk.dictionary.entry.lifecycle',
             'nhk.search',
             'nhk.canonical.inventory',
             'nhk.graph.inventory',
@@ -652,6 +655,7 @@ final class McpContractTest extends TestCase
             'nhk-v3/dictionary-profile',
             'nhk-v3/dictionary-materialization-profile',
             'nhk-v3/dictionary-materialization-plan',
+            'nhk-v3/dictionary-entry-get',
             'nhk-v3/knowledge-writer-preview',
         ], McpAbilityRegistration::readAbilityNames());
         self::assertSame('nhk-v3/entity-get', McpAbilityRegistration::abilityNameForTool('nhk.entity.get'));
@@ -699,6 +703,8 @@ final class McpContractTest extends TestCase
             'nhk-v3/relation-backfill-apply',
             'nhk-v3/dictionary-concept-create',
             'nhk-v3/dictionary-entry-create-with-sense',
+            'nhk-v3/dictionary-entry-update',
+            'nhk-v3/dictionary-entry-lifecycle',
             'nhk-v3/dictionary-entry-form-add',
             'nhk-v3/dictionary-entry-sense-add',
             'nhk-v3/dictionary-concept-update',

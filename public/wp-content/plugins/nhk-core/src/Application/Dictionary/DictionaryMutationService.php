@@ -172,6 +172,31 @@ final class DictionaryMutationService
         return $this->mutateResolved($idempotencyKey, ['operation' => 'entry.create-with-sense'] + $payload, fn (): DictionaryPreCreateResolution => $this->preCreateResolver->resolveEntryCreate($preferredForm, $context), $operation);
     }
 
+    /** @return array<string,mixed> */
+    public function updateEntry(array $input): array
+    {
+        $entryId = trim((string) ($input['entry_id'] ?? ''));
+        $expected = (int) ($input['expected_entry_revision'] ?? 0);
+        $key = trim((string) ($input['idempotency_key'] ?? ''));
+        if ($entryId === '' || $expected < 1 || $key === '') throw new \InvalidArgumentException('DICTIONARY_ENTRY_UPDATE_INPUT_INVALID');
+        $hasEntry = array_key_exists('preferred_form', $input) || array_key_exists('locale', $input) || array_key_exists('entry_context', $input);
+        $sense = $input['sense_patch'] ?? null;
+        if (!$hasEntry && !is_array($sense)) throw new \InvalidArgumentException('DICTIONARY_ENTRY_UPDATE_NO_MUTABLE_FIELDS');
+        if (is_array($sense) && trim((string) ($sense['sense_id'] ?? '')) === '') throw new \InvalidArgumentException('DICTIONARY_SENSE_PATCH_ID_REQUIRED');
+        if (!is_object($this->entryRepository) || !method_exists($this->entryRepository, 'updateCuration')) throw new \RuntimeException('DICTIONARY_ENTRY_REPOSITORY_UNAVAILABLE');
+        $payload = ['entry_id' => $entryId, 'expected_entry_revision' => $expected, 'preferred_form' => $input['preferred_form'] ?? null, 'locale' => array_key_exists('locale', $input) ? $input['locale'] : null, 'entry_context' => $input['entry_context'] ?? null, 'sense_patch' => $sense];
+        return $this->mutate($key, ['operation' => 'entry.update'] + $payload, fn (): array => ['entry' => ($this->entryRepository)->updateCuration($payload)]);
+    }
+
+    /** @return array<string,mixed> */
+    public function lifecycleEntry(string $entryId, int $expectedRevision, string $status, string $idempotencyKey): array
+    {
+        if (!is_object($this->entryRepository) || !method_exists($this->entryRepository, 'lifecycleCuration')) throw new \RuntimeException('DICTIONARY_ENTRY_REPOSITORY_UNAVAILABLE');
+        $entryId = trim($entryId); $status = strtoupper(trim($status));
+        if ($entryId === '' || $expectedRevision < 1 || $idempotencyKey === '') throw new \InvalidArgumentException('DICTIONARY_ENTRY_LIFECYCLE_INPUT_INVALID');
+        return $this->mutate($idempotencyKey, ['operation' => 'entry.lifecycle', 'entry_id' => $entryId, 'expected_revision' => $expectedRevision, 'status' => $status], fn (): array => ['entry' => ($this->entryRepository)->lifecycleCuration($entryId, $expectedRevision, $status)]);
+    }
+
     public function addFormToEntry(string $entryId, int $expectedRevision, string $form, array $context, string $idempotencyKey, string $kind = LexicalEntryForm::ALTERNATE, ?string $locale = 'vi-VN'): array
     {
         $this->assertEntrySenseReady();

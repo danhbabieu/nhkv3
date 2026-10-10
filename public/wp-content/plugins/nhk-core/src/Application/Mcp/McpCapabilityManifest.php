@@ -35,6 +35,12 @@ final class McpCapabilityManifest
             'specimen' => ['owner' => 'authority', 'endpoint_types' => ['specimen'], 'tools' => ['nhk.entity.get'], 'seo_preflight' => false, 'relation_support' => true, 'media_support' => false, 'read_back' => true],
         ];
 
+        // Keep the curator Entry read/lifecycle surface in the same manifest
+        // projection as the pre-existing Dictionary tools.
+        $definitions['dictionary']['tools'] = array_values(array_unique(array_merge(
+            ['nhk.dictionary.entry.get', 'nhk.dictionary.entry.update', 'nhk.dictionary.entry.lifecycle'],
+            $definitions['dictionary']['tools'],
+        )));
         $manifest = [];
         foreach ($definitions as $kind => $definition) {
             $reads = [];

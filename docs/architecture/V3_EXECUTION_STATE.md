@@ -1,5 +1,29 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-10 — Guarded Dictionary curator Entry CRUD (LOCAL)
+
+IMPLEMENTATION: Added the bounded `nhk.dictionary.entry.get` read model and
+internal/admin `entry.update` / `entry.lifecycle` operations over Migration024
+Entry/Form/Sense tables. Entry preferred wording is the sole headword owner;
+the update transaction performs separate Entry and optional Sense CAS, retires
+the prior PREFERRED projection, keeps one active PREFERRED form, checks lexical
+collisions, preserves UUIDs and returns canonical read-back. Entry retirement
+is soft and explicit retirement is represented in bounded Entry context so
+unrelated Sense lifecycle changes cannot reactivate it. Sense-derived Entry
+status now considers all eligible mapped Senses.
+
+CAPTURE: A typed `dictionary_owner_plan` is converted to a server-owned
+Dictionary owner command and re-planned through the existing natural Capture
+planner before the existing apply boundary; caller-supplied READY/resolution
+metadata is not trusted. No new Content Intent was added.
+
+LOCAL_VERIFICATION: Focused Dictionary/MCP/Capture contract suite passed 55
+tests / 3,194 assertions with two existing deprecations. PHP lint passed for
+the changed PHP files. No migration, staging/production mutation, deployment
+or push was performed.
+
+STATUS: `LOCAL_SOURCE_GREEN / DEPLOYMENT_PENDING / LIVE_ACCEPTANCE_NOT_RUN`
+
 # Checkpoint — 2026-10-10 — Fresh governed Video acceptance re-audit
 
 READ_ONLY_RUNTIME: Authenticated MCP read-back against the authorized TEST
