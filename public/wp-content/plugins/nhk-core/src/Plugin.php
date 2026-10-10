@@ -1402,10 +1402,18 @@ final class Plugin {
                     $owner = $videos->findByCanonicalId($videoId);
                     $routeOwner = is_array($route) ? $videos->findByExternalReference('youtube', (string) ($route['external_id'] ?? '')) : null;
                     $archive = $videoFrontendReader->videoArchive(1, 100);
-                    $archiveItems = array_values(array_filter((array) ($archive['items'] ?? []), static fn (mixed $item): bool => is_array($item) && (string) ($item['canonical_id'] ?? '') === $videoId));
                     if (!is_array($route) || !is_array($canonical) || !$owner instanceof \NHK\Core\Domain\Video\Video) {
                         return ['public_eligible' => false, 'frontend_verified' => false, 'blockers' => ['VIDEO_FRONTEND_READBACK_UNAVAILABLE']];
                     }
+                    // Public archive projections intentionally omit internal
+                    // canonical UUIDs.  Bind the readback to the owner by its
+                    // public path and exact external identity instead of
+                    // treating the redaction as a missing owner.
+                    $archiveItems = array_values(array_filter((array) ($archive['items'] ?? []), static function (mixed $item) use ($owner, $path): bool {
+                        if (!is_array($item) || (string) ($item['public_url'] ?? '') !== $path) return false;
+                        if (array_key_exists('canonical_id', $item)) return (string) ($item['canonical_id'] ?? '') === $owner->canonicalId;
+                        return (string) ($item['external_id'] ?? '') === $owner->externalVideoId;
+                    }));
                     $editorial = is_array($owner->metadata['editorial'] ?? null) ? $owner->metadata['editorial'] : [];
                     $title = (string) ($editorial['title'] ?? $owner->title);
                     $externalId = $owner->externalVideoId;
