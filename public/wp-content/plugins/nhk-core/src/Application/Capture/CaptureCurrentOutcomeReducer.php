@@ -418,7 +418,6 @@ final class CaptureCurrentOutcomeReducer
         $semantic = is_array($capture->diagnostics['semantic_write_back'] ?? null)
             ? $capture->diagnostics['semantic_write_back']
             : [];
-        if (!in_array(strtoupper(trim((string) ($semantic['status'] ?? ''))), ['APPLIED', 'IDEMPOTENT', 'REUSED', 'REUSED_VERIFIED', 'ALREADY_APPLIED'], true)) return false;
         $hasReadback = is_array($semantic['canonical_readback'] ?? null)
             && trim((string) ($semantic['canonical_readback']['canonical_id'] ?? '')) !== '';
         foreach ((array) ($semantic['writes'] ?? []) as $write) {
@@ -429,9 +428,33 @@ final class CaptureCurrentOutcomeReducer
                 break;
             }
         }
-        if (!$hasReadback) return false;
+        $semanticStatus = strtoupper(trim((string) ($semantic['status'] ?? '')));
+        if (in_array($semanticStatus, ['APPLIED', 'IDEMPOTENT', 'REUSED', 'REUSED_VERIFIED', 'ALREADY_APPLIED'], true) && $hasReadback) {
+            foreach ($capture->assets as $asset) {
+                if (is_array($asset) && strtolower(trim((string) ($asset['kind'] ?? ''))) === 'video') return true;
+            }
+        }
+
+        // A prior governed child may have completed and been read back even
+        // when the aggregate semantic receipt was left FAILED_RETRYABLE by a
+        // later provenance/read-back phase. That is a recoverable checkpoint:
+        // re-enter the existing Video planner and Governance update, rather
+        // than treating the stale aggregate receipt as an immutable block.
+        $videoId = '';
         foreach ($capture->assets as $asset) {
-            if (is_array($asset) && strtolower(trim((string) ($asset['kind'] ?? ''))) === 'video') return true;
+            if (!is_array($asset) || strtolower(trim((string) ($asset['kind'] ?? ''))) !== 'video') continue;
+            $videoId = trim((string) ($asset['video_id'] ?? ($asset['video_proposal']['payload']['canonical_id'] ?? '')));
+            if ($videoId !== '') break;
+        }
+        if ($videoId === '') return false;
+        $children = is_array($capture->diagnostics['completion']['children'] ?? null) ? $capture->diagnostics['completion']['children'] : [];
+        foreach ($children as $child) {
+            if (!is_array($child) || strtolower(trim((string) ($child['owner_type'] ?? ''))) !== 'video') continue;
+            $readback = is_array($child['canonical_readback'] ?? null) ? $child['canonical_readback'] : [];
+            if (($child['complete'] ?? false) === true
+                && strtoupper(trim((string) ($child['status'] ?? ''))) === 'COMPLETE'
+                && hash_equals(strtolower($videoId), strtolower(trim((string) ($child['owner_id'] ?? $readback['canonical_id'] ?? ''))))
+                && hash_equals(strtolower($videoId), strtolower(trim((string) ($readback['canonical_id'] ?? ''))))) return true;
         }
         return false;
     }

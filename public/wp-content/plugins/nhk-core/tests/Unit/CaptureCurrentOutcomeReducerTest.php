@@ -40,6 +40,27 @@ final class CaptureCurrentOutcomeReducerTest extends TestCase
         self::assertSame(['eligible' => true, 'reason' => 'RECOVERY_GOVERNED_REENTRY'], CaptureCurrentOutcomeReducer::retryEligibility($capture, ['_recovery_mode' => true, 'resume_children' => ['video']]));
     }
 
+    public function test_internal_recovery_reopens_failed_aggregate_when_video_child_has_canonical_readback(): void
+    {
+        $videoId = UuidCodec::newV7();
+        $capture = new CaptureRecord(
+            UuidCodec::newV7(), 'failed-video-readback-recovery', hash('sha256', 'failed-video-readback-recovery'),
+            CaptureStage::SEMANTICS_RECONCILED->value, 'FAILED_RETRYABLE', null, null,
+            [['kind' => 'video', 'video_id' => $videoId]],
+            ['content_intent' => ['intent' => 'VIDEO']],
+            [
+                'semantic_write_back' => ['status' => 'FAILED_RETRYABLE'],
+                'failure' => ['code' => 'CANONICAL_READBACK_REQUIRED_AFTER_APPLIED', 'classification' => 'FAILED_RETRYABLE'],
+                'completion' => ['status' => 'COMPLETE', 'complete' => true, 'children' => [[
+                    'owner_type' => 'video', 'owner_id' => $videoId, 'status' => 'COMPLETE', 'complete' => true,
+                    'canonical_readback' => ['canonical_id' => $videoId],
+                ]]],
+            ],
+        );
+
+        self::assertSame(['eligible' => true, 'reason' => 'RECOVERY_GOVERNED_REENTRY'], CaptureCurrentOutcomeReducer::retryEligibility($capture, ['_recovery_mode' => true, 'resume_children' => ['video']]));
+    }
+
     public function test_confirmed_subject_packet_reopens_failed_video_handoff(): void
     {
         $capture = new CaptureRecord(

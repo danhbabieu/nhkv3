@@ -36,6 +36,13 @@ final class EditorialCaptureContinuationService
         if ($intent !== '' && $storedIntent !== '' && $intent !== $storedIntent) return $this->retryFailure($captureId, 'CAPTURE_RETRY_INTENT_MISMATCH', $capture);
         $purpose = strtoupper(trim((string) ($input['purpose'] ?? '')));
         if ($purpose !== '' && $purpose !== strtoupper(trim((string) ($capture->context['purpose'] ?? 'EDITORIAL')))) return $this->retryFailure($captureId, 'CAPTURE_RETRY_PURPOSE_MISMATCH', $capture);
+        $requestedChildren = array_values(array_unique(array_map('strtolower', array_map('strval', (array) ($input['resume_children'] ?? [])))));
+        $subjectReconciliationProvided = array_key_exists('subject_reconciliation', $input);
+        $completedVideoRecovery = ($input['_recovery_mode'] ?? false) === true
+            && $capture->status === 'COMPLETE'
+            && $subjectReconciliationProvided
+            && ($requestedChildren === [] || $requestedChildren === ['video'])
+            && CaptureCurrentOutcomeReducer::supportsCanonicalVideoCompletionRetry($capture);
         if (array_key_exists('subject_reconciliation', $input)) {
             [$capture, $reconciliationError] = $this->reconcileSubject($capture, $input['subject_reconciliation']);
             if ($reconciliationError !== null) return $this->retryFailure($captureId, $reconciliationError, $capture);
@@ -43,14 +50,13 @@ final class EditorialCaptureContinuationService
             // again from a retried client. Reconciliation has already
             // fail-closed checked that it matches the persisted authority;
             // return the canonical read-back without reopening the pipeline.
-            if ($capture->status === 'COMPLETE') {
+            if ($capture->status === 'COMPLETE' && !$completedVideoRecovery) {
                 return ['capture' => $capture->toArray(), 'retry' => ['mode' => 'RETRY', 'status' => 'REPLAYED', 'code' => null, 'eligible' => false, 'reason' => null]];
             }
         }
-        $requestedChildren = array_values(array_unique(array_map('strtolower', array_map('strval', (array) ($input['resume_children'] ?? [])))));
-        $subjectReconciliationProvided = array_key_exists('subject_reconciliation', $input);
         $videoCompletionRetry = !$subjectReconciliationProvided
             && ($input['_recovery_mode'] ?? false) !== true
+            && $capture->status !== 'FAILED_RETRYABLE'
             && CaptureCurrentOutcomeReducer::supportsCanonicalVideoCompletionRetry($capture)
             && ($requestedChildren === [] || $requestedChildren === ['video']);
         if ($videoCompletionRetry) {
@@ -75,7 +81,7 @@ final class EditorialCaptureContinuationService
         if (!$completionResumable && in_array($capture->stage, [CaptureStage::READY_FOR_PUBLICATION->value, CaptureStage::PUBLISHED->value], true)) {
             return ['capture' => $capture->toArray(), 'retry' => ['mode' => 'RETRY', 'status' => 'REPLAYED', 'code' => null]];
         }
-        if (!$retryDecision['eligible']) return $this->retryFailure($captureId, (string) ($retryDecision['reason'] ?? 'CAPTURE_RETRY_NOT_ALLOWED'), $capture);
+        if (!$retryDecision['eligible'] && !$completedVideoRecovery) return $this->retryFailure($captureId, (string) ($retryDecision['reason'] ?? 'CAPTURE_RETRY_NOT_ALLOWED'), $capture);
 
         $retryInput = $this->rehydrateRetryInput($capture, $input);
         try {
