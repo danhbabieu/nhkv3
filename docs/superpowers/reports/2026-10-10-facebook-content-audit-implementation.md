@@ -27,6 +27,8 @@ as the real Meta Page ID.
 
 The fixture CLI was exercised successfully and emitted a valid workbook with
 the nine required sheets. It reported `read_only=true` and `mutated=false`.
+The reproducible synthetic workbook is
+`docs/superpowers/reports/2026-10-10-facebook-content-audit-fixture.xlsx`.
 
 ## Verification results
 
