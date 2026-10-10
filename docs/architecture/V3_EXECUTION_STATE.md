@@ -1,5 +1,52 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-10 — Supplied Capture A/B Video recovery baseline
+
+SCOPE: Fresh read-only baseline for the supplied Video recovery request. The
+local HEAD, `origin/main` and deployed MCP documentation bootstrap all report
+source revision `493386ce0c2c996a22176a05ff4f1e83efe40396`; the deployed build
+identity is `216954e0a0ee6e6bde6df9aa513c0e49954f093cea6117629e452860ee0f5f51`.
+The deployed runtime is `staging`, with documentation version
+`b7ab7fcca3ddec0d63c62d9a60afee750a1e893e73bb25d0fc225e6f50de0cb7` and
+manifest hash `f44f7c42444cd7d72e14b1d03ae6d1717d0cbad76ea9533aec42ed031fe60532`.
+
+CAPTURE_A: `01a12152-62e8-72b4-a8f5-1943eee56a9c` read back as revision 8,
+`SUBJECTS_RESOLVED`, `REVIEW_REQUIRED`, `RECOVERABLE_INTERRUPTED`, intent
+`VIDEO`, with a server-owned resolved classification packet for
+`01a09e44-539a-7f1a-938a-d7d91bb689a3` (`nhk:classification:clock-type.dong-ho-cong-cong`,
+revision 2). Its current review still contains `PRIMARY_SUBJECT_NOT_RESOLVED`,
+so the known stale-review symptom is present. The referenced Video
+`01a12152-6c7b-7b2a-8a77-5fb22ca9b0a5` returns `null`; Proposal discovery for
+the Capture returns `not_found`; Public URL audit returns
+`PUBLIC_URL_OWNER_NOT_FOUND`. No canonical owner, proposal, public identity or
+public route was inferred.
+
+CAPTURE_B: `01a120b2-6987-7f78-bb74-20640cdddfad` read back as revision 4,
+`INTERPRETED`, `REVIEW_REQUIRED`, `RECOVERABLE_INTERRUPTED`, intent `VIDEO`,
+with no subject packet, no Video child and review reason
+`SUBJECT_CONFLICT_REVIEW_REQUIRED`. Candidates include `ÔĐô 36/8`, `Odo 36`
+and `8 côn`; no candidate was selected. Proposal discovery returns
+`not_found`. This remains an identity gate, not a retryable stale-review case.
+
+LOCAL_VERIFICATION: The focused Capture/Video/Governance/publication suite
+passes 114 tests / 576 assertions; Contract passes 6 tests / 48 assertions;
+PHP lint and `git diff --check` pass. The two Capture Video recovery
+integration files cannot bootstrap because `NHK_WP_TEST_PATH=public` and the
+guarded WordPress/MySQL runtime are unavailable in this checkout.
+
+RUNTIME_BOUNDARY: The v59 connector exposes Capture get/ingest, Video get,
+Proposal discovery/eligibility/apply, Graph inventory, Public URL audit and
+frontend reconciliation. The supplied original Capture idempotency keys are
+intentionally not exposed by `capture_get`; no approved persisted/recovery
+surface returned them. No mutation, deployment, Proposal Apply, Public
+Identity reprojection or direct database/WordPress write was attempted. Public
+HTTPS probes from this sandbox could not resolve `demo.1945.vn`, so no HTTP
+status or frontend read-back is claimed.
+
+STATUS: `LOCAL_REPAIRS_DEPLOYED_SOURCE_MATCH / CAPTURE_A_STALE_REVIEW_OWNER_MISSING /
+CAPTURE_B_SUBJECT_CONFLICT / ORIGINAL_IDEMPOTENCY_KEYS_UNAVAILABLE /
+LIVE_MUTATION_AND_PUBLIC_READBACK_BLOCKED / NO_EXTERNAL_MUTATION`
+
 # Checkpoint — 2026-10-10 — Facebook Content Audit CLI fixture-first slice
 
 IMPLEMENTED_LOCAL: Added a bounded, read-only Facebook Content Audit CLI for
