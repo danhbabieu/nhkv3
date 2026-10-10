@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
+use ZipArchive;
 
 final class FacebookAuditCliContractTest extends TestCase
 {
@@ -26,5 +27,24 @@ final class FacebookAuditCliContractTest extends TestCase
         self::assertStringNotContainsString('wp_delete_post', $source);
         self::assertStringNotContainsString('DELETE FROM', strtoupper($source));
         self::assertStringNotContainsString('wp_remote_post', $source);
+    }
+
+    public function testFixtureCliProducesRequiredOverviewKeysAndValidatedWorkbook(): void
+    {
+        $root = dirname(__DIR__, 6);
+        $output = tempnam(sys_get_temp_dir(), 'facebook-audit-e2e-') . '.xlsx';
+        $checkpoint = tempnam(sys_get_temp_dir(), 'facebook-audit-e2e-') . '.json';
+        $fixture = $root . '/public/wp-content/plugins/nhk-core/tests/Fixtures/facebook-audit-pilot.json';
+        $command = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($root . '/tools/facebook-content-audit.php') . ' --mode=fixture --fixture=' . escapeshellarg($fixture) . ' --output=' . escapeshellarg($output) . ' --checkpoint=' . escapeshellarg($checkpoint) . ' 2>&1';
+        exec($command, $lines, $status);
+
+        self::assertSame(0, $status, implode("\n", $lines));
+        $zip = new ZipArchive();
+        self::assertSame(true, $zip->open($output));
+        $overview = (string) $zip->getFromName('xl/worksheets/sheet1.xml');
+        foreach (['PAGE_ID_VERIFIED', 'PAGE_ACCESS_STATUS', 'PAGE_POSTS_FOUND', 'GROUPS_DISCOVERED', 'GROUP_POSTS_VERIFIED', 'INACCESSIBLE_GROUPS', 'LOW_ENGAGEMENT_COUNT', 'TRADEMARK_REVIEW_COUNT', 'DELETE_CANDIDATES_COUNT', 'REPORT_LOCATION', 'BLOCKERS', 'NEXT_ACTION', 'SCOPE_LOCK_VERIFIED', 'READ_ONLY_VERIFIED', 'WORKBOOK_VALIDATED'] as $key) self::assertStringContainsString($key, $overview);
+        $zip->close();
+        @unlink($output);
+        @unlink($checkpoint);
     }
 }

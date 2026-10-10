@@ -64,4 +64,32 @@ final class MetaFacebookAuditReadAdapterTest extends TestCase
         self::assertSame('UNSUPPORTED', $access->status('known_groups'));
         self::assertFalse(array_filter($calls, static fn (string $url): bool => str_contains($url, '/groups')) !== []);
     }
+
+    public function testPageResponseMapsGraphFieldsAndNestedMetricSummaries(): void
+    {
+        $adapter = new MetaFacebookAuditReadAdapter(new MetaGraphHttpClient(static fn (): array => [
+            'data' => [[
+                'id' => 'p-1',
+                'permalink_url' => FacebookAuditScope::TARGET_URL . '/posts/p-1',
+                'created_time' => '2026-01-01T10:00:00+07:00',
+                'message' => 'Bài thử nghiệm',
+                'type' => 'photo',
+                'reactions' => ['summary' => ['total_count' => 0]],
+                'comments' => ['summary' => ['total_count' => 2]],
+                'shares' => ['count' => 3],
+                'views' => 4,
+            ]],
+            'paging' => ['cursors' => ['after' => 'next-1']],
+        ]), 'test-token');
+
+        $page = $adapter->pagePosts(FacebookAuditScope::forTarget(FacebookAuditScope::TARGET_URL, '987654321'), null, 10);
+
+        self::assertSame('p-1', $page->rows[0]['post_id']);
+        self::assertSame('https://www.facebook.com/donghonhakho.vn/posts/p-1', $page->rows[0]['post_url']);
+        self::assertSame(0, $page->rows[0]['reaction_count']);
+        self::assertSame(2, $page->rows[0]['comment_count']);
+        self::assertSame(3, $page->rows[0]['share_count']);
+        self::assertSame(4, $page->rows[0]['video_views']);
+        self::assertSame('next-1', $page->nextCursor);
+    }
 }

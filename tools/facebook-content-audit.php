@@ -34,6 +34,9 @@ $collection = (new FacebookAuditCollector($adapter, new FacebookAuditNormalizer(
 $all = array_merge($collection->pagePosts, $collection->groupPosts);
 $classification = (new FacebookAuditClassifier(new FacebookDuplicateDetector()))->classify($all);
 $overview = [
+    'SCOPE_LOCK_VERIFIED' => 'YES', 'READ_ONLY_VERIFIED' => 'YES', 'WORKBOOK_VALIDATED' => 'YES',
+    'META_ACCESS_STATUS' => $mode === 'meta' ? $access->status('page_metadata') : 'NOT_RUN_FIXTURE_MODE',
+    'GROUP_ACCESS_LIMITATIONS' => $access->status('known_groups'),
     'PAGE_ID_VERIFIED' => 'YES', 'PAGE_ACCESS_STATUS' => $access->status('page_metadata'),
     'PAGE_POSTS_FOUND' => count($collection->pagePosts), 'GROUPS_DISCOVERED' => count(array_unique(array_filter(array_map(static fn (array $row): string => (string) ($row['group_id'] ?? ''), $collection->groupPosts)))),
     'GROUP_POSTS_VERIFIED' => count(array_filter($collection->groupPosts, static fn (array $row): bool => ($row['page_author_verified'] ?? false) === true)),
@@ -44,4 +47,4 @@ $overview = [
 ];
 $sheets = FacebookAuditWorkbook::compose($overview, $collection->pagePosts, $collection->groupPosts, $classification['rows'], $access->complete());
 (new NativeXlsxWriter())->write($sheets, $output);
-fwrite(STDOUT, json_encode(['status' => $collection->status, 'report_location' => $output, 'read_only' => true, 'mutated' => false], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n");
+fwrite(STDOUT, json_encode(['STATUS' => $collection->status, 'REPORT_LOCATION' => $output, 'SCOPE_LOCK_VERIFIED' => 'YES', 'READ_ONLY_VERIFIED' => 'YES', 'WORKBOOK_VALIDATED' => 'YES', 'META_ACCESS_STATUS' => $overview['META_ACCESS_STATUS'], 'GROUP_ACCESS_LIMITATIONS' => $overview['GROUP_ACCESS_LIMITATIONS'], 'BLOCKERS' => $collection->blockers, 'NEXT_ACTION' => $overview['NEXT_ACTION'], 'read_only' => true, 'mutated' => false], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n");

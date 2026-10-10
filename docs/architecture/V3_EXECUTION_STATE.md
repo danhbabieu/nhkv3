@@ -1,5 +1,36 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-10 — Facebook Content Audit CLI fixture-first slice
+
+IMPLEMENTED_LOCAL: Added a bounded, read-only Facebook Content Audit CLI for
+the exact pilot URL `https://www.facebook.com/donghonhakho.vn`. The slice has
+scope/identity locking, typed missing-value states, fixture pagination and
+checkpoint/retry, Page-authored/Page-shared/third-party group labels,
+deterministic classification/duplicate review, native OOXML workbook export,
+and a GET-only Meta adapter. No semantic owner, schema, table, migration,
+Governance path, Admin UI, MCP endpoint or existing business pipeline was
+changed.
+
+VERIFIED_LOCAL: The Facebook focused suite passes 31 tests / 119 assertions
+after the Meta nested-metric mapping regression. Fixture CLI E2E produces a
+valid `.xlsx` with nine required sheets, direct hyperlinks, Unicode text,
+formula-injection escaping and no credentials. Changed-file PHP lint and
+`git diff --check` pass. Full PHPUnit remains environment/baseline blocked:
+with 512 MB it reports 3,946 tests / 24,831 assertions, 25 unrelated baseline
+failures, 33 integration errors, 31 warnings, 67 deprecations, 70 PHPUnit
+deprecations and 125 skips; the default 128 MB run also hits the existing
+`TrustedProvidedFileMaterializerTest` memory allocation at its 52 MB fixture.
+
+RUNTIME_BOUNDARY: No Meta token, verified Page ID, Page access grant or live
+Facebook collection was available or attempted. The public URL fetch also
+returned a tool-level cache miss. Groups API discovery remains explicitly
+`UNSUPPORTED`/`INACCESSIBLE`; no inference of absence was made. The fixture
+Page ID is synthetic test data and is not the real target Page ID.
+
+STATUS: `LOCAL_FIXTURE_AUDIT_IMPLEMENTED / READ_ONLY_VERIFIED /
+SCOPE_LOCK_VERIFIED / LIVE_META_IDENTITY_UNVERIFIED /
+WP_FULL_SUITE_ENVIRONMENT_BLOCKED / NO_EXTERNAL_MUTATION`
+
 # Checkpoint — 2026-10-09 — Resolved subject retry-control repair
 
 ROOT_CAUSE_LOCAL: The stale-review repair correctly re-evaluated a persisted
