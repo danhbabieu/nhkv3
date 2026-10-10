@@ -7,6 +7,7 @@ use NHK\Core\Application\Knowledge\KnowledgeClaimIdentity;
 use NHK\Core\Domain\Governance\CommandCanonicalizer;
 use NHK\Core\Infrastructure\Admin\VideoRelationAdminContract;
 use NHK\Core\Contracts\Video\VideoIdentityReader;
+use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Core\Application\Video\VideoThumbnailSelector;
 
@@ -17,7 +18,7 @@ use NHK\Core\Application\Video\VideoThumbnailSelector;
  */
 final class CaptureVideoProvenancePlanner
 {
-    public function __construct(private ?VideoThumbnailSelector $thumbnailSelector = null, private ?VideoIdentityReader $videoIdentityReader = null)
+    public function __construct(private ?VideoThumbnailSelector $thumbnailSelector = null, private ?VideoIdentityReader $videoIdentityReader = null, private ?VideoRepository $videos = null)
     {
     }
 
@@ -68,6 +69,14 @@ final class CaptureVideoProvenancePlanner
         $claimKey = $identity->status() === 'RESOLVED' ? 'nhk:knowledge:video-provenance:' . hash('sha256', CommandCanonicalizer::canonicalize($identity->packet())) : '';
         $evidenceKey = 'video-provenance:evidence:' . hash('sha256', CommandCanonicalizer::canonicalize([$sourceKey, $claimKey]));
         $emptyVideo = $this->withAttachments($video, []);
+        $existing = $this->existingCanonicalVideo($emptyVideo);
+        if ($existing !== null) {
+            $emptyVideo['operation'] = 'update';
+            $emptyVideo['entity_type'] = 'video';
+            $emptyVideo['subject_id'] = $existing->canonicalId;
+            $emptyVideo['target_uuid'] = $existing->canonicalId;
+            $emptyVideo['expected_revision'] = $existing->revision;
+        }
 
         $identityFields = $this->sourceIdentityFields($sourceSnapshot);
         $identityMatches = $this->identityMatchesSubject($identityFields, $resolvedSubject);
@@ -402,6 +411,14 @@ final class CaptureVideoProvenancePlanner
         $payload['metadata'] = $metadata;
         $video['payload'] = $payload;
         return $video;
+    }
+
+    private function existingCanonicalVideo(array $video): ?\NHK\Core\Domain\Video\Video
+    {
+        if ($this->videos === null) return null;
+        $payload = is_array($video['payload'] ?? null) ? $video['payload'] : [];
+        $id = trim((string) ($payload['canonical_id'] ?? $video['subject_id'] ?? ''));
+        return UuidCodec::isValid($id) ? $this->videos->findByCanonicalId($id) : null;
     }
 
     /** @return array<string,mixed> */

@@ -940,7 +940,7 @@ final class Plugin {
                 $automationResolver,
                 static fn (string $capability): bool => current_user_can($capability),
                 $captureClaimReuse,
-                new CaptureVideoProvenancePlanner(new \NHK\Core\Application\Video\VideoThumbnailSelector(\NHK\Core\Application\Video\VideoThumbnailSelector::wordpressProbe(...))),
+                new CaptureVideoProvenancePlanner(new \NHK\Core\Application\Video\VideoThumbnailSelector(\NHK\Core\Application\Video\VideoThumbnailSelector::wordpressProbe(...)), null, $videos),
                 $governanceRuntime->videoReconciliation,
                 static function (array $plan) use ($sources, $claims, $evidence, $videos, $proposalRepository): array {
                     $provenance = is_array($plan['capture_video_provenance'] ?? null) ? $plan['capture_video_provenance'] : $plan;

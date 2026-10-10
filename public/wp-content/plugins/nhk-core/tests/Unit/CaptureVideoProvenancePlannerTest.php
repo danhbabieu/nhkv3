@@ -10,9 +10,11 @@ use NHK\Core\Application\Video\{VideoRelationCandidatePlanner, VideoThumbnailSel
 use NHK\Core\Contracts\Governance\{AutomationPolicyStorage, GovernedLifecycle};
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
 use NHK\Core\Contracts\Video\VideoIdentityReader;
+use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Governance\{Proposal, ProposalState};
 use NHK\Core\Domain\Graph\PredicateRegistry;
 use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim, Source};
+use NHK\Core\Domain\Video\Video;
 use NHK\Core\Shared\Uuid\UuidCodec;
 use PHPUnit\Framework\TestCase;
 
@@ -36,6 +38,38 @@ final class CaptureVideoProvenancePlannerTest extends TestCase
 
         self::assertSame($videoId, $plan['video_proposal']['subject_id']);
         self::assertSame($videoId, $plan['video_proposal']['payload']['canonical_id']);
+    }
+
+    public function test_existing_canonical_video_is_reconciled_as_governed_update_with_cas_revision(): void
+    {
+        $videoId = UuidCodec::newV7();
+        $videos = $this->createMock(VideoRepository::class);
+        $videos->expects(self::once())->method('findByCanonicalId')->with($videoId)->willReturn(new Video(
+            $videoId,
+            'youtube',
+            'abcdefghijk',
+            'https://www.youtube.com/watch?v=abcdefghijk',
+            'Old title',
+            ['editorial' => ['title' => 'Old title']],
+            null,
+            true,
+            3,
+        ));
+
+        $plan = (new CaptureVideoProvenancePlanner(null, new \NHK\Core\Application\Knowledge\VideoRepositoryIdentityReader($videos), $videos))->plan(
+            'capture-existing-owner',
+            ['operation' => 'ingest', 'entity_type' => 'video', 'subject_id' => $videoId, 'payload' => [
+                'canonical_id' => $videoId,
+                'url' => 'https://www.youtube.com/watch?v=abcdefghijk',
+                'metadata' => ['source' => ['platform' => 'youtube', 'external_video_id' => 'abcdefghijk', 'source_title' => 'Variant A – tốt nhất – zin tuyệt đối – cực hay']],
+            ]],
+            ['platform' => 'youtube', 'external_video_id' => 'abcdefghijk', 'canonical_source_url' => 'https://www.youtube.com/watch?v=abcdefghijk', 'source_title' => 'Variant A – tốt nhất – zin tuyệt đối – cực hay'],
+            ['id' => self::VARIANT, 'type' => 'variant', 'name' => 'Variant A'],
+        );
+
+        self::assertSame('update', $plan['video_proposal']['operation']);
+        self::assertSame($videoId, $plan['video_proposal']['target_uuid']);
+        self::assertSame(3, $plan['video_proposal']['expected_revision']);
     }
 
     public function test_capture_video_rejects_conflicting_proposal_and_payload_identity(): void

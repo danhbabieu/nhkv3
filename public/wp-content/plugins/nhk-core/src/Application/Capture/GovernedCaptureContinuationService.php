@@ -507,6 +507,9 @@ final class GovernedCaptureContinuationService
                     || $this->finalVideoPlanRebuildRequired($payload)
                     ? null
                     : $this->pendingVideoProposal($context, $video, $payload, $subjectId);
+                if ($pending !== null && !$this->pendingVideoPayloadMatchesCapture((array) ($pending['payload'] ?? []), $payload)) {
+                    $pending = null;
+                }
                 if ($pending !== null) {
                     $plans[] = [
                         'proposal_id' => $pending['proposal_id'],
@@ -518,7 +521,7 @@ final class GovernedCaptureContinuationService
                     continue;
                 }
             }
-            if (!$includeSemanticChildren && $this->videoEditorialResume !== null && $entityType === 'video') {
+            if (!$includeSemanticChildren && $this->videoEditorialResume !== null && $entityType === 'video' && !$this->requiresVideoProvenanceRecovery($payload)) {
                 $resume = $this->videoEditorialResume->plan($video, $context + ['capture_id' => $captureId]);
                 if (($resume['status'] ?? '') === 'REUSE_EDITORIAL') {
                     $plans[] = ['video_editorial_reuse' => $resume];
@@ -610,7 +613,7 @@ final class GovernedCaptureContinuationService
      * The receipt is only a locator: runGovernedPlan() performs the canonical
      * Governance read-back by UUID before any lifecycle transition.
      *
-     * @return array{proposal_id:string,target_uuid:string,platform:string,external_video_id:string}|null
+     * @return array{proposal_id:string,target_uuid:string,platform:string,external_video_id:string,payload:array<string,mixed>}|null
      */
     private function pendingVideoProposal(array $context, array $video, array $payload, string $subjectId): ?array
     {
@@ -643,7 +646,7 @@ final class GovernedCaptureContinuationService
                 $proposal = $candidates[0];
                 $metadata = is_array($proposal->payload['metadata'] ?? null) ? $proposal->payload['metadata'] : [];
                 $source = is_array($metadata['source'] ?? null) ? $metadata['source'] : (is_array($metadata['source_snapshot'] ?? null) ? $metadata['source_snapshot'] : []);
-                return ['proposal_id' => $proposal->id, 'target_uuid' => $proposal->targetUuid, 'platform' => (string) ($source['platform'] ?? ''), 'external_video_id' => (string) ($source['external_video_id'] ?? '')];
+                return ['proposal_id' => $proposal->id, 'target_uuid' => $proposal->targetUuid, 'platform' => (string) ($source['platform'] ?? ''), 'external_video_id' => (string) ($source['external_video_id'] ?? ''), 'payload' => $proposal->payload];
             }
             return null;
         }
@@ -669,7 +672,7 @@ final class GovernedCaptureContinuationService
             if (($target !== '' && $target !== $canonicalId)
                 || ($rowPlatform !== '' && $platform !== '' && $rowPlatform !== $platform)
                 || ($rowExternalId !== '' && $externalId !== '' && $rowExternalId !== $externalId)) continue;
-            return ['proposal_id' => $proposalId, 'target_uuid' => $target, 'platform' => $rowPlatform, 'external_video_id' => $rowExternalId];
+            return ['proposal_id' => $proposalId, 'target_uuid' => $target, 'platform' => $rowPlatform, 'external_video_id' => $rowExternalId, 'payload' => $payload];
         }
         return null;
     }
@@ -745,6 +748,30 @@ final class GovernedCaptureContinuationService
         $plan['payload']['capture_revision'] = (int) ($scope['capture_revision'] ?? 0);
         $plan['payload']['staging_acceptance'] = $scope;
         return $plan;
+    }
+
+    private function pendingVideoPayloadMatchesCapture(array $pending, array $capture): bool
+    {
+        foreach (['staging_acceptance', 'capture_id', 'capture_fingerprint', 'scope_fingerprint', 'proposal_command_fingerprint', 'capture_revision'] as $volatile) {
+            unset($pending[$volatile], $capture[$volatile]);
+        }
+        return CommandCanonicalizer::canonicalize($pending) === CommandCanonicalizer::canonicalize($capture);
+    }
+
+    private function hasVideoProvenanceAttachment(array $payload): bool
+    {
+        $metadata = is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [];
+        foreach ((array) ($metadata['semantic_attachments'] ?? []) as $attachment) {
+            if (!is_array($attachment) || strtolower(trim((string) ($attachment['predicate'] ?? ''))) !== 'about') continue;
+            if ((array) ($attachment['evidence_refs'] ?? []) !== []) return true;
+        }
+        return false;
+    }
+
+    private function requiresVideoProvenanceRecovery(array $payload): bool
+    {
+        $metadata = is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [];
+        return array_key_exists('intake_version', $metadata) && !$this->hasVideoProvenanceAttachment($payload);
     }
 
     /**
@@ -1051,7 +1078,7 @@ final class GovernedCaptureContinuationService
         $videoPayload = is_array($videoProposal['payload'] ?? null) ? $videoProposal['payload'] : [];
         $videoId = trim((string) ($videoPayload['canonical_id'] ?? $videoProposal['subject_id'] ?? ''));
         $videoProposal['entity_type'] = 'video';
-        $videoProposal['operation'] = 'ingest';
+        $videoProposal['operation'] = (string) ($videoProposal['operation'] ?? 'ingest');
         $videoProposal['subject_id'] = $videoId;
         // Bind the final command to the exact canonical Source/Claim/Evidence
         // closure just read back. These are server-derived identities.
@@ -1064,7 +1091,7 @@ final class GovernedCaptureContinuationService
         // Leave create expected_revision null; the staging descriptor
         // normalizes Video ingest to revision zero without violating the
         // Proposal domain's positive-revision invariant.
-        unset($videoProposal['expected_revision']);
+        if ($videoProposal['operation'] === 'ingest') unset($videoProposal['expected_revision']);
         $videoProposal['idempotency_key'] = $this->finalVideoCommandIdempotencyKey($this->currentCaptureId, $videoProposal);
         $videoProposal = $this->scopeVideoPlan($this->currentCaptureId, $videoProposal, []);
         $videoWrite = $this->runGovernedChild($videoProposal, $control, $lifecycle, 'VIDEO_GOVERNANCE');
