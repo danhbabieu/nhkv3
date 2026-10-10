@@ -521,12 +521,13 @@ final class EditorialCaptureContinuationService
 
     private function promoteDocumentationCheckpoint(CaptureRecord $capture, array $checkpoint): CaptureRecord
     {
-        if ($checkpoint === []) return $capture;
+        if (trim((string) ($checkpoint['manifest_hash'] ?? '')) === '' || trim((string) ($checkpoint['documentation_version'] ?? '')) === '') return $capture;
         $context = $capture->context;
         $current = is_array($context['documentation_checkpoint'] ?? null) ? $context['documentation_checkpoint'] : [];
-        if ($current !== [] && CommandCanonicalizer::canonicalize($current) !== CommandCanonicalizer::canonicalize($checkpoint)) {
+        if (CommandCanonicalizer::canonicalize($current) === CommandCanonicalizer::canonicalize($checkpoint)) return $capture;
+        if ($current !== []) {
             $history = is_array($context['documentation_checkpoint_history'] ?? null) ? $context['documentation_checkpoint_history'] : [];
-            $history[] = $current;
+            if (!in_array($current, $history, true)) $history[] = $current;
             $context['documentation_checkpoint_history'] = array_values($history);
         }
         $context['documentation_checkpoint'] = $checkpoint;
