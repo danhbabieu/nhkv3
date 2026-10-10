@@ -1,5 +1,56 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-10 — Westminster score admission/live playback re-audit
+
+READ_ONLY_CONTRACT_AUDIT: The current `MusicReferenceContract` is a
+read-only presentation validator. `MusicDossierProjection` receives an
+optional packet only through the existing `nhk_v3_music_reference_packet`
+owner hook. No executable score repository, persistence/admission operation,
+signed score packet issuer, or runtime filter implementation exists. The
+Constitution and active Music worksheets explicitly prohibit treating a local
+JSON/WAV as a canonical score or adding a parallel score store/semantic owner.
+
+SCORE_INPUT: The supplied 41-event Grove D-major packet remains structurally
+consistent with the local validator and the existing score-driven Web Audio
+engine can synthesize Piano, Bell and Gong/Côn directly. Its 100 BPM / 600 ms
+quarter timing, 50–150% tempo control and pitch-preserving event scheduling
+are code-side capabilities; they do not establish canonical admission or
+historical authenticity.
+
+RIGHTS_REVIEW: The Wikisource witness identifies the Cambridge Quarters
+transcription and displays CC BY-SA terms. Any distributed derivative must
+carry attribution, license link, modification notice and ShareAlike treatment;
+the underlying historical edition and any score-image rights remain a separate
+review. No historical recording, bell tuning or historical performance is
+claimed. The local synthetic WAVs remain non-public and are not required for
+score-event playback.
+
+LOCAL_VERIFICATION: Focused Music/reference/projection/frontend tests passed
+84 tests / 585 assertions with four existing warnings. PHP lint, JavaScript
+syntax and `git diff --check` passed. `.git/index` is writable; no unrelated
+changes were discarded.
+
+STAGING_DEPLOYMENT: The one authorized verifier invocation was run after
+network escalation. A read-only SSH check confirmed the deployed theme
+`music-dossier.js` SHA-256 matches local HEAD `12907df92ea8b268809f091b6aeba8ab094c9ed8`; full verifier JSON/read-back was not emitted because of PHP 8.5 deprecation output, so release identity/documentation parity is not claimed. No semantic mutation, score admission, MediaAsset upload or Governance Apply occurred.
+
+PUBLIC_READBACK: Browser acceptance of
+`https://demo.1945.vn/ban-nhac/westminster/` still shows the canonical Music
+route/title and scoped relations, but no score renderer, score events, Web
+Audio controls or public audio element. `PUBLIC_COMPLETE` remains false.
+
+STATUS: `CONTRACTS_PASS / RIGHTS_REVIEW_REQUIRED / CODE_DEPLOY_READBACK_PASS / PUBLIC_SCORE_AUDIO_FAIL / CANONICAL_SCORE_ADMISSION_UNAVAILABLE / NO_SEMANTIC_MUTATION`
+
+EXACT_REMAINING_BLOCKER: A current server-issued, signed, Capture-bound
+Governance scope and registered canonical score admission/read capability for
+Music UUID `1ffade21-4cb8-44b5-ac1f-16de4ee533f6` are missing. The scope must
+bind the current Capture/request, Music revision, score packet/checksum,
+source/rights review, operation family, dependency closure, capability,
+expiry and idempotency. Until that runtime capability and authority exist,
+adding the 41 events in code, reusing the stale Capture packet, calling the
+owner hook from a fixture, or claiming public playback would violate the
+Constitution.
+
 # Checkpoint — 2026-10-10 — Westminster public completion re-audit
 
 READ_ONLY_REAUDIT: The requested Westminster end-to-end completion was
