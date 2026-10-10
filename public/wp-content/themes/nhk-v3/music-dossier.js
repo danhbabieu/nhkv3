@@ -33,7 +33,7 @@
     events.forEach((event, index) => {
       const phrase = String(event.phrase || '');
       if (index > 0 && phrase !== previousPhrase) x += phraseGap;
-      const pitch = String(event.pitch_class || 'C');
+      const pitch = String(event.pitch_class || '');
       const letter = pitch.charAt(0).toUpperCase();
       const octave = Number(event.octave || 4);
       const diatonic = octave * 7 + (stepByLetter[letter] ?? 0);
@@ -65,15 +65,21 @@
       const barChanged = previousBar !== null && String(event.bar ?? '') !== String(previousBar ?? '');
       if (prior && (phrase !== prior || barChanged)) svg.appendChild(svgElement('line', { x1: noteX - (phrase !== prior ? phraseGap : 2), y1: staffTop - 8, x2: noteX - (phrase !== prior ? phraseGap : 2), y2: staffTop + 4 * lineGap + 8, class: 'music-score-barline' }));
       const durationLabel = Number(event.duration_quarters) >= 4 ? 'whole note' : `${event.duration_quarters || 1} beat`;
-      const group = svgElement('g', { class: 'music-score-note', 'data-music-score-note': '', 'data-start-ms': Number(event.start_ms), 'data-end-ms': Number(event.start_ms) + Number(event.duration_ms), tabindex: '0', role: 'button', 'aria-label': `${event.pitch_class || ''}${event.octave || ''}, ${event.phrase || ''}, ${durationLabel}` });
-      const pitch = String(event.pitch_class || '');
-      if (pitch.includes('#') || pitch.includes('b')) {
+      const isRest = event.rest === true;
+      const group = svgElement('g', { class: 'music-score-note', 'data-music-score-note': '', 'data-start-ms': Number(event.start_ms), 'data-end-ms': Number(event.start_ms) + Number(event.duration_ms), tabindex: '0', role: 'button', 'aria-label': `${isRest ? 'rest' : `${event.pitch_class || ''}${event.octave || ''}`}, ${event.phrase || ''}, ${durationLabel}` });
+      if (isRest) {
+        const rest = svgElement('text', { x: noteX - 7, y: y + 7, class: 'music-score-clef', 'aria-hidden': 'true' });
+        rest.textContent = '𝄽';
+        group.appendChild(rest);
+      } else if (pitch.includes('#') || pitch.includes('b')) {
         const accidental = svgElement('text', { x: noteX - 15, y: y + 5, class: 'music-score-accidental', 'aria-hidden': 'true' });
         accidental.textContent = pitch.includes('#') ? '♯' : '♭';
         group.appendChild(accidental);
       }
-      group.appendChild(svgElement('ellipse', { cx: noteX, cy: y, rx: 6, ry: 4, transform: `rotate(-20 ${noteX} ${y})`, class: 'music-score-note-head' }));
-      if (Number(event.duration_quarters) < 4) group.appendChild(svgElement('line', { x1: noteX + 5, y1: y, x2: noteX + 5, y2: y - 28, class: 'music-score-stem' }));
+      if (!isRest) {
+        group.appendChild(svgElement('ellipse', { cx: noteX, cy: y, rx: 6, ry: 4, transform: `rotate(-20 ${noteX} ${y})`, class: 'music-score-note-head' }));
+        if (Number(event.duration_quarters) < 4) group.appendChild(svgElement('line', { x1: noteX + 5, y1: y, x2: noteX + 5, y2: y - 28, class: 'music-score-stem' }));
+      }
       const label = svgElement('text', { x: noteX - 9, y: 112, class: 'music-score-event-label', 'aria-hidden': 'true' });
       label.textContent = String(event.phrase || '');
       group.appendChild(label);

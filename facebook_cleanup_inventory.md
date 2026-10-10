@@ -116,6 +116,13 @@ Phạm vi báo cáo liên tục hiện tại: `13/07/2025–10/10/2026`; vẫn �
 
 Tổng dữ liệu nguồn đã thu thập: **1.776 bài thực tế**. Sau khi loại hashtag khỏi phép dò từ khóa, tổng ID duy nhất khớp `A hoặc B`: **709**; điều kiện A: **687**, từ khóa B: **30** (có giao nhau). Chưa xóa bài nào.
 
+Báo cáo Meta cho khoảng **13/04/2025–12/07/2025** đã được tạo nhưng vẫn hiển thị `Đang xuất 0%`; chưa thể coi khoảng này là đã kiểm tra vì chưa có CSV để đối chiếu ID, nội dung và lượt xem.
+
+## Lọc theo mốc kết thúc 10/07/2026
+
+- [facebook_cleanup_matches_through_2026-07-10.csv](facebook_cleanup_matches_through_2026-07-10.csv): 687 ID duy nhất khớp trong dữ liệu đã thu thập, gồm 679 bài theo A và 16 bài theo B.
+- File này **chưa phải toàn lịch sử Fanpage**: dữ liệu CSV hiện có sớm nhất là 06/09/2025; phần từ ngày tạo Fanpage đến trước mốc đó vẫn chưa có dữ liệu xác minh.
+
 ## Cập nhật quy tắc hashtag
 
 Đã tính lại toàn bộ các file match và file master. Mọi chuỗi dạng hashtag (`#...`) được loại khỏi văn bản trước khi so khớp. Vì vậy các kết quả từ khóa giảm từ 62 xuống 30 ID duy nhất; điều kiện A không thay đổi.

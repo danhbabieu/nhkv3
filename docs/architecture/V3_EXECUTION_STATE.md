@@ -26763,3 +26763,38 @@ canonical read-back or production publish was performed.
 STATUS: `INTERACTIVE_PLAYBACK_ENGINE_IMPLEMENTED_LOCAL /
 FOCUSED_VERIFIED / PUBLIC_AUDIO_NOT_AVAILABLE / STAGING_NOT_DEPLOYED /
 PUBLIC_COMPLETE_FALSE`
+
+# Checkpoint — 2026-10-10 — Westminster source review and playback hardening
+
+SOURCE_REVIEW: Read-only review of the Grove-derived Cambridge Quarters witness
+and W. W. Starmer's 1907 specialist scan confirms the Q1–Q4 phrase order,
+D-major notation, written quarter/whole values, Cambridge ten-bell context and
+the distinction from the Royal Exchange arrangement. LilyPond relative-octave
+notation is understood, but the Westminster installation mapping, exact
+sounding octave/tuning, mechanical timing and the official G-natural/G-sharp
+conflict remain unresolved. The research artifact therefore remains
+`NOTATION_WITNESS_VERIFIED / PERFORMANCE_UNVERIFIED / NON_CANONICAL`.
+
+IMPLEMENTED_LOCAL: Score display now renders explicit rest events as rests
+instead of silently turning them into C4 notes; accessible event labels also
+identify rests. Interactive playback continues to omit rests from synthesis
+while preserving them in sequence timing, so display and playback consume the
+same event packet without inventing sound.
+
+VERIFIED_LOCAL: PHP lint, JavaScript syntax, `git diff --check` and the changed
+Music/frontend suite pass: 184 tests / 1,489 assertions. Five PHPUnit warnings
+were traced to pre-existing test interpolation notices in
+`FrontendPresentationContractTest.php` and `FrontendContractTest.php`
+(`$type`, `$itemUrl`, `$detailMusicAvailable`, `$entityType`); none is in the
+Music implementation or caused by this checkpoint.
+
+RUNTIME_BLOCKER: The temporary local browser harness could not be reached
+because this environment terminates loopback HTTP servers. No PCM claim is
+made from that attempt. The public Westminster page still has no verified
+canonical score/read-model packet, governed MediaAsset delivery or public
+playback controls. No score packet was promoted from research JSON/WAV, no
+Governance apply was attempted, and no deployment was performed.
+
+STATUS: `SOURCE_REVIEW_COMPLETE / PLAYBACK_REST_HANDLING_HARDENED /
+FOCUSED_REGRESSION_PASS / PUBLIC_AUDIO_NOT_AVAILABLE /
+REAL_BROWSER_PCM_BLOCKED_BY_RUNTIME / PUBLIC_COMPLETE_FALSE`
