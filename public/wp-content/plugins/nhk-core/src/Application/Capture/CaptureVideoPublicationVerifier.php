@@ -151,7 +151,13 @@ final class CaptureVideoPublicationVerifier
             }
             $path = (string) ($identity['current_path'] ?? '');
             $desiredProjectionPath = trim((string) ($payload['metadata']['seo_projection']['canonical'] ?? ''));
-            if ($desiredProjectionPath !== '' && $desiredProjectionPath !== $path) {
+            // An ingest projection is computed before Public Identity
+            // allocation.  If the desired short slug is occupied, the
+            // canonical allocator may legitimately choose a qualified slug;
+            // frontend/SEO read models derive their final URL from that
+            // persisted identity.  Existing-owner updates remain strict so a
+            // stale projection cannot silently pass as a new route.
+            if ($desiredProjectionPath !== '' && $desiredProjectionPath !== $path && $operation !== 'ingest') {
                 $blockers[] = 'PUBLIC_IDENTITY_PROJECTION_MISMATCH';
                 continue;
             }

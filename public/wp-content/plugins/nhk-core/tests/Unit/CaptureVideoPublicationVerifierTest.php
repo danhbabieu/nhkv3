@@ -273,6 +273,44 @@ final class CaptureVideoPublicationVerifierTest extends TestCase
         self::assertNotContains('CONTENT_NEEDS_REVIEW', $result['blockers']);
     }
 
+    public function test_ingest_accepts_allocator_qualified_public_path_and_uses_identity_as_route_authority(): void
+    {
+        $videoId = UuidCodec::newV7();
+        $evidenceId = UuidCodec::newV7();
+        $video = new Video($videoId, 'youtube', '4NmkQFrNeWQ', 'https://www.youtube.com/watch?v=4NmkQFrNeWQ', 'Đồng hồ Odo 36/8', [
+            'editorial' => ['title' => 'Đồng hồ Odo 36/8', 'summary' => 'Bản ghi đúng phạm vi.', 'body' => 'Video này giữ phạm vi rõ ràng giữa nguồn video và chủ thể canonical.', 'why_this_matters' => 'Đối chiếu nguồn và chủ thể.'],
+            'content_quality' => ['status' => 'CONTENT_COMPLETE', 'blockers' => []],
+            'seo_projection' => ['canonical' => '/video/dong-ho-odo-36-8/'],
+            'source' => ['availability' => 'available', 'embeddable' => true, 'external_video_id' => '4NmkQFrNeWQ', 'canonical_source_url' => 'https://www.youtube.com/watch?v=4NmkQFrNeWQ'],
+            'semantic_attachments' => [['target_type' => 'variant', 'target_uuid' => UuidCodec::newV7(), 'predicate' => 'about', 'evidence_refs' => [['evidence_id' => $evidenceId]]]],
+        ]);
+        $videos = $this->createMock(VideoRepository::class);
+        $videos->method('findByCanonicalId')->willReturn($video);
+        $videos->method('findByExternalReference')->willReturn($video);
+        $identityRepository = new InMemoryCaptureIdentityRepository();
+        $identityRepository->seed([
+            'identity_id' => UuidCodec::newV7(), 'owner_kind' => 'video', 'owner_id' => $videoId,
+            'route_type' => 'video', 'collision_scope' => 'root', 'current_slug' => 'dong-ho-odo-36-8-am-thanh-dong-ho-co',
+            'current_path' => '/video/dong-ho-odo-36-8-am-thanh-dong-ho-co/', 'revision' => 1,
+        ]);
+        $service = new CaptureVideoPublicationVerifier(
+            $videos,
+            new PublicIdentityService($identityRepository, static fn (string $slug): bool => false),
+            $identityRepository,
+            null,
+            null,
+            static fn (string $id, string $path): array => ['public_eligible' => true, 'frontend_verified' => true, 'projection_readback' => true, 'blockers' => []],
+        );
+
+        $result = $service->verify(['capture_id' => UuidCodec::newV7(), 'assets' => [['kind' => 'video', 'video_id' => $videoId, 'video_proposal' => [
+            'operation' => 'ingest', 'payload' => ['canonical_id' => $videoId, 'metadata' => ['seo_projection' => ['canonical' => '/video/dong-ho-odo-36-8/']]],
+        ]]]]);
+
+        self::assertSame('verified', $result['status']);
+        self::assertSame('/video/dong-ho-odo-36-8-am-thanh-dong-ho-co/', $result['items'][0]['public_identity']['path']);
+        self::assertNotContains('PUBLIC_IDENTITY_PROJECTION_MISMATCH', $result['blockers']);
+    }
+
     public function test_frontend_canonical_owner_mismatch_remains_a_precise_public_blocker(): void
     {
         $videoId = UuidCodec::newV7();
