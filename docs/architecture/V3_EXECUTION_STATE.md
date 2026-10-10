@@ -26798,3 +26798,39 @@ Governance apply was attempted, and no deployment was performed.
 STATUS: `SOURCE_REVIEW_COMPLETE / PLAYBACK_REST_HANDLING_HARDENED /
 FOCUSED_REGRESSION_PASS / PUBLIC_AUDIO_NOT_AVAILABLE /
 REAL_BROWSER_PCM_BLOCKED_BY_RUNTIME / PUBLIC_COMPLETE_FALSE`
+
+# Checkpoint — 2026-10-10 — Grove relative-octave event validation
+
+SOURCE_WITNESS: The exact Wikisource LilyPond witness was re-read and retained
+as `\\relative f'' { fis4 e d a || d fis e a, d e fis d || fis d e a, a e'
+fis d fis e d a || d fis e a, d e fis d fis d e a, a e' fis d || d,1 }`.
+The documented relative rule was applied: nearest diatonic octave with an
+interval strictly smaller than a fifth, then explicit apostrophe/comma shift.
+
+IMPLEMENTED_LOCAL: Added the lineage-preserving research validator
+`docs/research/westminster/score-editions/parse_grove_relative_octaves.py` and
+its separate validation report. It emits a deterministic non-canonical
+structured packet with 41 events, Q1–Q4 plus Hour, no printed rests, 100 BPM /
+600 ms written-quarter timing, and resolved pitches Q1 `F#5 E5 D5 A4` through
+Hour `D4`. Event checksum:
+`99a73ed9ae4d5d22886df10a06f50b7e9f57af1d871fecbcc47a4d1ec8222b79`.
+The pre-existing research JSON, WAV files and manifest were not overwritten;
+their existing checksum validation still passes.
+
+VERIFIED_LOCAL: The focused Music/frontend suite passed 162 tests / 2,937
+assertions with five pre-existing warnings. The reference audio validator,
+JavaScript syntax check and diff check pass. The exact live page was inspected
+in Chrome: score section 0, interactive playback 0, audio elements 0 and zero
+console errors.
+
+RUNTIME_BLOCKER: No fresh server-issued signed Capture-bound score packet,
+owner read-back, rights decision or governed Media/MediaAsset delivery is
+available. The candidate therefore remains non-canonical and is not submitted
+as `VERIFIED`; the existing public projection correctly remains fail-closed.
+G-sharp/G, installation transposition, historical tuning and performance tempo
+remain separate source/edition decisions. No Governance apply, staging
+deployment or public completion was claimed.
+
+STATUS: `GROVE_RELATIVE_OCTAVE_VALIDATED / EVENT_PACKET_NON_CANONICAL /
+FOCUSED_REGRESSION_PASS / LIVE_PUBLIC_SCORE_ABSENT /
+FRESH_SIGNED_PACKET_REQUIRED / PUBLIC_COMPLETE_FALSE`
