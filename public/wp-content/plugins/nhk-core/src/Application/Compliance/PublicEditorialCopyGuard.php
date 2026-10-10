@@ -13,6 +13,7 @@ final class PublicEditorialCopyGuard
     ];
 
     private const STRUCTURAL_PATTERNS = [
+        '/\bthe source identifies this video as concerning\b/iu',
         '/\b(?:SOURCE_FACT|USER_HINT|CANONICAL_CONTEXT)\b/i',
         '/\bsubject_resolution_packet\b/i',
         '/\bstable_key\b/i',

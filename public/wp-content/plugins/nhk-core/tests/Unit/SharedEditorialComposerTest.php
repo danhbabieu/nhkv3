@@ -183,6 +183,27 @@ final class SharedEditorialComposerTest extends TestCase
         self::assertSame('review', $draft->status);
     }
 
+    public function test_legacy_provenance_boilerplate_is_rejected_without_role_metadata(): void
+    {
+        $plan = new EditorialPlan('available', 'video', ['id' => self::SUBJECT, 'type' => 'model'], 'Odo 36/8', [
+            ['id' => 'opening', 'claims' => [], 'claim_refs' => []],
+            ['id' => 'core', 'claims' => [[
+                'claim_id' => 'legacy-provenance',
+                'claim_revision' => 1,
+                'text' => 'The source identifies this Video as concerning canonical Odo 36/10.',
+                'eligibility' => 'eligible',
+                'publicly_composable' => true,
+                'applicability' => 'applicable',
+            ]], 'claim_refs' => ['legacy-provenance']],
+        ], ['raw_input' => 'Video giới thiệu đồng hồ Odo 36/8.']);
+
+        $draft = (new SharedEditorialComposer())->compose($plan);
+
+        self::assertStringNotContainsString('The source identifies this Video', $draft->body);
+        self::assertSame([], $draft->claimTrace);
+        self::assertSame('review', $draft->status);
+    }
+
     private function pack(string $profile, array $claims, array $input = [], array $visual = []): EditorialContextPack
     {
         return new EditorialContextPack('available', ['id' => self::SUBJECT, 'type' => 'model'], '3 phiên bản vách máy Odo 36', ['profile' => $profile], 'available', $claims, [], $input, $visual, [], ['policy_version' => 'test']);
