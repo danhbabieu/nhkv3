@@ -1,0 +1,26 @@
+{
+  "identity": {
+    "page_id": "123456789",
+    "page_name": "Đồng Hồ Nhà Kho",
+    "canonical_url": "https://www.facebook.com/donghonhakho.vn"
+  },
+  "access": {
+    "page_metadata": "GRANTED",
+    "page_posts": "GRANTED",
+    "engagement_metrics": "GRANTED",
+    "photos_videos": "GRANTED",
+    "reels": "UNSUPPORTED",
+    "insights": "DENIED",
+    "known_groups": "INACCESSIBLE",
+    "delete_capability": "DENIED"
+  },
+  "page_posts": [
+    {"post_id":"p-1","post_url":"https://www.facebook.com/donghonhakho.vn/posts/p-1","published_at":"2025-01-01T10:00:00+07:00","content_type":"PHOTO","text":"Mẫu đồng hồ A","media_references":["media-a"],"reaction_count":0,"comment_count":2,"share_count":1},
+    {"post_id":"p-2","post_url":"https://www.facebook.com/donghonhakho.vn/posts/p-2","published_at":"2025-02-01T10:00:00+07:00","content_type":"PHOTO","text":"Mẫu đồng hồ A","media_references":["media-a"],"reaction_count":4,"comment_count":1,"share_count":1},
+    {"post_id":"p-3","post_url":"https://www.facebook.com/donghonhakho.vn/posts/p-3","published_at":"2025-03-01T10:00:00+07:00","content_type":"VIDEO","text":"Video giới thiệu","media_references":["media-v"],"reaction_count":9,"comment_count":4,"share_count":2,"video_views":100}
+  ],
+  "group_posts": [
+    {"post_id":"g-1","group_id":"group-1","group_url":"https://www.facebook.com/groups/group-1","post_url":"https://www.facebook.com/groups/group-1/posts/g-1","published_at":"2025-04-01T10:00:00+07:00","content_type":"SHARED_POST","text":"Chia sẻ từ Page","media_references":[],"page_author_id":"123456789","page_author_verified":true,"group_post_kind":"PAGE_SHARED","reaction_count":2,"comment_count":0,"share_count":0},
+    {"post_id":"g-2","group_id":"group-2","group_url":"https://www.facebook.com/groups/group-2","post_url":"https://www.facebook.com/groups/group-2/posts/g-2","published_at":"2025-05-01T10:00:00+07:00","content_type":"TEXT","text":"Page đăng trong hội nhóm","media_references":[],"page_author_id":"123456789","page_author_verified":true,"group_post_kind":"PAGE_AUTHORED","reaction_count":null,"comment_count":{"state":"UNAVAILABLE"},"share_count":{"state":"INACCESSIBLE"}}
+  ]
+}
