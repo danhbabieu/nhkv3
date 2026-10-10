@@ -70,6 +70,29 @@ final class MusicReferenceContractTest extends TestCase
         self::assertSame([], $result['errors']);
     }
 
+    public function test_score_preserves_verified_playback_metadata_and_rests(): void
+    {
+        $score = $this->score();
+        $score['edition'] = 'verified-edition-1';
+        $score['arrangement_identity'] = 'melody-arrangement-a';
+        $score['events'][1] = ['rest' => true, 'start_ms' => 500, 'duration_ms' => 100, 'phrase' => 'gap'];
+        $score['segments'][0]['end_ms'] = 600;
+        $score['playback'] = [
+            'verification_status' => 'VERIFIED',
+            'rights' => 'NHK-owned synthesis method',
+            'method' => 'documented additive Web Audio synthesis',
+            'instruments' => ['PIANO', 'BELL', 'GONG'],
+        ];
+
+        $result = (new MusicReferenceContract())->normalize(['score' => $score]);
+
+        self::assertSame('AVAILABLE', $result['status']);
+        self::assertSame('verified-edition-1', $result['score']['edition']);
+        self::assertSame('melody-arrangement-a', $result['score']['arrangement_identity']);
+        self::assertTrue($result['score']['events'][1]['rest']);
+        self::assertSame(['PIANO', 'BELL', 'GONG'], $result['score']['playback']['instruments']);
+    }
+
     public function test_audio_requires_public_rights_and_verification(): void
     {
         $result = (new MusicReferenceContract())->normalize([

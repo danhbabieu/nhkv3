@@ -248,11 +248,19 @@ final class MusicDossierProjection
     /** @return array<string,mixed> */
     private function safeScore(array $value): array
     {
-        $result = $this->pick($value, ['version', 'source', 'verification_status', 'tuning', 'tempo_bpm']);
+        $result = $this->pick($value, ['version', 'edition', 'arrangement_identity', 'source', 'verification_status', 'tuning', 'tempo_bpm']);
+        if (is_array($value['playback'] ?? null)) {
+            $playback = $this->pick($value['playback'], ['verification_status', 'rights', 'method']);
+            $instruments = is_array($value['playback']['instruments'] ?? null) ? array_values(array_intersect($value['playback']['instruments'], ['PIANO', 'BELL', 'GONG'])) : [];
+            if (($playback['verification_status'] ?? '') === 'VERIFIED' && ($playback['rights'] ?? '') !== '' && ($playback['method'] ?? '') !== '' && $instruments !== []) {
+                $playback['instruments'] = $instruments;
+                $result['playback'] = $playback;
+            }
+        }
         $result['events'] = [];
         foreach (is_array($value['events'] ?? null) ? $value['events'] : [] as $event) {
             if (!is_array($event)) continue;
-            $safe = $this->pick($event, ['pitch_class', 'octave', 'start_ms', 'duration_ms', 'phrase']);
+            $safe = $this->pick($event, ['pitch_class', 'octave', 'start_ms', 'duration_ms', 'phrase', 'rest']);
             if ($safe !== []) $result['events'][] = $safe;
         }
         $result['segments'] = [];

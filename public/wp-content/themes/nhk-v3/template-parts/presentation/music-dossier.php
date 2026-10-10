@@ -76,6 +76,19 @@ $renderCards = static function (array $values, string $class, callable $items, c
     <?php $scoreEvents = array_values(array_filter((array) ($score['events'] ?? []), static fn(mixed $event): bool => is_array($event))); $scoreEventsJson = function_exists('wp_json_encode') ? wp_json_encode($scoreEvents) : json_encode($scoreEvents, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>
     <div class="music-score-staff" data-music-score data-score-events="<?php echo esc_attr(is_string($scoreEventsJson) ? $scoreEventsJson : '[]'); ?>" role="region" aria-label="Bản xem dạng khuông nhạc chuẩn hóa theo dữ liệu tham chiếu"></div>
     <p class="music-score-note">Bản xem dạng khuông nhạc chuẩn hóa; không thay thế bản khắc lịch sử hoặc xác nhận cao độ chuông.</p>
+    <?php $playback = is_array($score['playback'] ?? null) ? $score['playback'] : []; $playbackInstruments = is_array($playback['instruments'] ?? null) ? $playback['instruments'] : []; ?>
+    <?php if (($playback['verification_status'] ?? '') === 'VERIFIED' && $playbackInstruments !== []): ?>
+    <div class="music-playback" data-music-playback data-playback-method="<?php echo esc_attr((string) ($playback['method'] ?? '')); ?>" data-playback-rights="<?php echo esc_attr((string) ($playback['rights'] ?? '')); ?>" aria-label="Trình phát bản nhạc">
+      <div class="music-playback-controls">
+        <label>Nhạc cụ <select data-playback-instrument aria-label="Chọn nhạc cụ để phát bản nhạc"><?php foreach (['PIANO' => 'Piano', 'BELL' => 'Bell', 'GONG' => 'Gong/Côn'] as $instrumentKey => $instrumentLabel): if (in_array($instrumentKey, $playbackInstruments, true)): ?><option value="<?php echo esc_attr($instrumentKey); ?>"><?php echo esc_html($instrumentLabel); ?></option><?php endif; endforeach; ?></select></label>
+        <label>Nhịp độ <output data-playback-tempo-value>100%</output><input type="range" min="50" max="150" step="1" value="100" data-playback-tempo aria-label="Nhịp độ từ 50 đến 150 phần trăm"></label>
+        <label>Thời lượng <select data-playback-duration aria-label="Chọn thời lượng phát"><option value="15">15 phút</option><option value="30">30 phút</option><option value="45">45 phút</option><option value="60">60 phút</option></select></label>
+        <button type="button" data-playback-action="play">Phát</button><button type="button" data-playback-action="pause">Tạm dừng</button><button type="button" data-playback-action="stop">Dừng</button><button type="button" data-playback-action="replay">Phát lại</button>
+      </div>
+      <progress max="1" value="0" data-playback-progress aria-label="Tiến độ bản nhạc"></progress><span data-playback-time aria-live="off">0:00 / 15:00</span>
+      <p class="music-score-meta">Âm thanh tổng hợp theo phương pháp: <?php echo esc_html((string) ($playback['method'] ?? '')); ?> · Quyền: <?php echo esc_html((string) ($playback['rights'] ?? '')); ?> · Không phải bản ghi lịch sử.</p>
+    </div>
+    <?php endif; ?>
     <ol class="music-score-events" aria-label="Các sự kiện trong bản nhạc">
       <?php foreach ((array) $score['events'] as $event): if (!is_array($event)) continue; $start = (float) ($event['start_ms'] ?? 0); $end = $start + (float) ($event['duration_ms'] ?? 0); ?>
       <li><button type="button" class="music-score-event" data-start-ms="<?php echo esc_attr((string) $start); ?>" data-end-ms="<?php echo esc_attr((string) $end); ?>" aria-label="<?php echo esc_attr((string) ($event['pitch_class'] ?? '') . (string) ($event['octave'] ?? '') . ', ' . (string) ($event['phrase'] ?? '')); ?>"><strong><?php echo esc_html((string) ($event['pitch_class'] ?? '')); ?><?php echo esc_html((string) ($event['octave'] ?? '')); ?></strong><span><?php echo esc_html((string) ($event['phrase'] ?? '')); ?></span></button></li>

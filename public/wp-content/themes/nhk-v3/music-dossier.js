@@ -195,4 +195,103 @@
     instrumentSelector.addEventListener('change', activateInstrument);
     activateInstrument();
   }
+
+  // Interactive playback is deliberately score-driven. It never uses the
+  // historic/reference audio elements above, and tempo changes event spacing,
+  // not oscillator frequency, so pitch remains invariant.
+  const playback = root.querySelector('[data-music-playback]');
+  const scoreHost = root.querySelector('[data-music-score]');
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (playback && scoreHost && AudioContextClass) {
+    let scoreEvents = [];
+    try { scoreEvents = JSON.parse(scoreHost.dataset.scoreEvents || '[]'); } catch (error) { scoreEvents = []; }
+    scoreEvents = scoreEvents.filter((event) => event && Number.isFinite(Number(event.start_ms)) && Number.isFinite(Number(event.duration_ms)));
+    const playableEvents = scoreEvents.filter((event) => !event.rest && Number.isInteger(Number(event.octave)));
+    const instrument = playback.querySelector('[data-playback-instrument]');
+    const tempo = playback.querySelector('[data-playback-tempo]');
+    const tempoValue = playback.querySelector('[data-playback-tempo-value]');
+    const duration = playback.querySelector('[data-playback-duration]');
+    const progress = playback.querySelector('[data-playback-progress]');
+    const time = playback.querySelector('[data-playback-time]');
+    let context = null;
+    let master = null;
+    let scheduled = [];
+    let startedAt = 0;
+    let pausedAt = 0;
+    let raf = 0;
+    let state = 'stopped';
+    const midi = (event) => {
+      const base = { C: 0, 'C#': 1, Db: 1, D: 2, 'D#': 3, Eb: 3, E: 4, F: 5, 'F#': 6, Gb: 6, G: 7, 'G#': 8, Ab: 8, A: 9, 'A#': 10, Bb: 10, B: 11 };
+      return 12 * (Number(event.octave) + 1) + (base[String(event.pitch_class)] ?? 0);
+    };
+    const frequency = (event) => 440 * Math.pow(2, (midi(event) - 69) / 12);
+    const secondsPerSequence = () => {
+      if (!scoreEvents.length) return 0;
+      return Math.max(...scoreEvents.map((event) => Number(event.start_ms) + Number(event.duration_ms))) / 1000;
+    };
+    const selectedDuration = () => Math.max(15, Math.min(60, Number(duration?.value || 15))) * 60;
+    const tempoScale = () => Math.max(0.5, Math.min(1.5, Number(tempo?.value || 100) / 100));
+    const clearScheduled = () => { scheduled.forEach((node) => { try { node.stop(); } catch (error) {} try { node.disconnect(); } catch (error) {} }); scheduled = []; };
+    const envelope = (gain, start, length, peak) => { gain.gain.setValueAtTime(0.0001, start); gain.gain.exponentialRampToValueAtTime(peak, start + 0.012); gain.gain.exponentialRampToValueAtTime(0.0001, start + Math.max(0.03, length)); };
+    const voice = (event, when, length, kind) => {
+      if (!context || !master) return;
+      const fundamental = frequency(event);
+      const partials = kind === 'PIANO' ? [[1, 1], [2, 0.28], [3, 0.12], [4, 0.06]] : kind === 'BELL' ? [[1, 0.72], [2.01, 0.32], [2.74, 0.2], [4.07, 0.12]] : [[1, 0.8], [1.48, 0.38], [2.02, 0.22], [2.91, 0.13]];
+      partials.forEach(([ratio, level]) => {
+        const oscillator = context.createOscillator();
+        const gain = context.createGain();
+        oscillator.type = kind === 'PIANO' ? 'triangle' : 'sine';
+        oscillator.frequency.setValueAtTime(fundamental * ratio, when);
+        gain.connect(master);
+        oscillator.connect(gain);
+        envelope(gain, when, Math.min(length * (kind === 'PIANO' ? 1.25 : 1.8), kind === 'PIANO' ? 2.2 : 3.5), 0.16 * level);
+        oscillator.start(when);
+        oscillator.stop(when + Math.min(length * (kind === 'PIANO' ? 1.25 : 1.8), kind === 'PIANO' ? 2.2 : 3.5) + 0.04);
+        scheduled.push(oscillator);
+      });
+    };
+    const update = () => {
+      if (!context || state === 'stopped') return;
+      const elapsed = state === 'paused' ? pausedAt : Math.max(0, context.currentTime - startedAt);
+      const total = selectedDuration();
+      const ratio = Math.min(1, elapsed / total);
+      if (progress) progress.value = String(ratio);
+      if (time) time.textContent = `${formatTime(elapsed)} / ${formatTime(total)}`;
+      const activeMs = (elapsed % Math.max(1, secondsPerSequence() / tempoScale())) * 1000;
+      root.querySelectorAll('.music-score-event, [data-music-score-note]').forEach((event) => { const active = activeMs >= Number(event.dataset.startMs || 0) && activeMs < Number(event.dataset.endMs || 0); event.toggleAttribute('aria-current', active); event.classList.toggle('is-active', active); });
+      if (state === 'playing' && elapsed >= total) { stop(); return; }
+      raf = window.requestAnimationFrame(update);
+    };
+    const schedule = (offsetSeconds = 0) => {
+      if (!context || !playableEvents.length) return;
+      clearScheduled();
+      const scale = tempoScale();
+      const sequence = secondsPerSequence() / scale;
+      const limit = selectedDuration();
+      const start = context.currentTime + 0.04;
+      const first = Math.floor(offsetSeconds / sequence);
+      for (let loop = first; loop * sequence < limit; loop += 1) {
+        playableEvents.forEach((event) => {
+          const when = start + loop * sequence + (Number(event.start_ms) / 1000) / scale;
+          const length = (Number(event.duration_ms) / 1000) / scale;
+          if (when < start + limit && when + length > start) voice(event, when, length, instrument?.value || 'PIANO');
+        });
+      }
+      startedAt = context.currentTime - offsetSeconds;
+    };
+    const ensureContext = async () => { if (!context) { context = new AudioContextClass(); master = context.createGain(); master.gain.value = 0.72; master.connect(context.destination); } if (context.state === 'suspended') await context.resume(); };
+    const play = async (restart = false) => { if (!scoreEvents.length) return; await ensureContext(); if (restart) pausedAt = 0; if (state === 'playing') return; schedule(pausedAt); state = 'playing'; window.cancelAnimationFrame(raf); raf = window.requestAnimationFrame(update); };
+    const pause = () => { if (state !== 'playing' || !context) return; pausedAt = Math.max(0, context.currentTime - startedAt); clearScheduled(); state = 'paused'; update(); };
+    const stop = () => { clearScheduled(); window.cancelAnimationFrame(raf); pausedAt = 0; state = 'stopped'; if (progress) progress.value = '0'; if (time) time.textContent = `0:00 / ${formatTime(selectedDuration())}`; root.querySelectorAll('.music-score-event, [data-music-score-note]').forEach((event) => { event.removeAttribute('aria-current'); event.classList.remove('is-active'); }); };
+    const replay = () => { stop(); void play(true); };
+    playback.querySelectorAll('[data-playback-action="play"]').forEach((button) => button.addEventListener('click', () => { void play(); }));
+    playback.querySelectorAll('[data-playback-action="pause"]').forEach((button) => button.addEventListener('click', pause));
+    playback.querySelectorAll('[data-playback-action="stop"]').forEach((button) => button.addEventListener('click', stop));
+    playback.querySelectorAll('[data-playback-action="replay"]').forEach((button) => button.addEventListener('click', replay));
+    tempo?.addEventListener('input', () => { if (tempoValue) tempoValue.value = `${tempo.value}%`; if (state === 'playing') { pausedAt = Math.max(0, context.currentTime - startedAt); schedule(pausedAt); } });
+    duration?.addEventListener('change', () => { if (time && state !== 'playing') time.textContent = `0:00 / ${formatTime(selectedDuration())}`; if (state === 'playing') { pausedAt = Math.max(0, context.currentTime - startedAt); schedule(pausedAt); } });
+    instrument?.addEventListener('change', () => { if (state === 'playing') { pausedAt = Math.max(0, context.currentTime - startedAt); schedule(pausedAt); } });
+    root.__musicPlayback = { play, pause, stop, replay, getState: () => state, getScheduledCount: () => scheduled.length, getScorePitches: () => playableEvents.map((event) => `${event.pitch_class}${event.octave}`) };
+    if (tempoValue) tempoValue.value = '100%';
+  }
 })();

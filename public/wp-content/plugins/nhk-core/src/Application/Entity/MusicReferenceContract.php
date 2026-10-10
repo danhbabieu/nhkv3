@@ -82,20 +82,21 @@ final class MusicReferenceContract
                 $errors[] = 'SCORE_EVENT_INVALID';
                 continue;
             }
+            $isRest = ($event['rest'] ?? false) === true;
             $pitch = $this->text($event['pitch_class'] ?? null);
             $octave = $event['octave'] ?? null;
             $start = $event['start_ms'] ?? null;
             $duration = $event['duration_ms'] ?? null;
             $phrase = $this->text($event['phrase'] ?? null);
-            if (preg_match('/^[A-G](?:#|b)?$/', $pitch) !== 1) $errors[] = 'SCORE_EVENT_PITCH_INVALID';
-            if (!is_int($octave) || $octave < self::MIN_SCORE_OCTAVE || $octave > self::MAX_SCORE_OCTAVE) $errors[] = 'SCORE_EVENT_OCTAVE_INVALID';
+            if (!$isRest && preg_match('/^[A-G](?:#|b)?$/', $pitch) !== 1) $errors[] = 'SCORE_EVENT_PITCH_INVALID';
+            if (!$isRest && (!is_int($octave) || $octave < self::MIN_SCORE_OCTAVE || $octave > self::MAX_SCORE_OCTAVE)) $errors[] = 'SCORE_EVENT_OCTAVE_INVALID';
             if (!is_int($start) || $start < 0) $errors[] = 'SCORE_EVENT_START_INVALID';
             if (!is_int($duration) || $duration <= 0) $errors[] = 'SCORE_EVENT_DURATION_INVALID';
             if ($phrase === '') $errors[] = 'SCORE_EVENT_PHRASE_REQUIRED';
-            if (preg_match('/^[A-G](?:#|b)?$/', $pitch) !== 1 || !is_int($octave) || $octave < self::MIN_SCORE_OCTAVE || $octave > self::MAX_SCORE_OCTAVE || !is_int($start) || $start < 0 || !is_int($duration) || $duration <= 0 || $phrase === '') continue;
+            if ((!$isRest && (preg_match('/^[A-G](?:#|b)?$/', $pitch) !== 1 || !is_int($octave) || $octave < self::MIN_SCORE_OCTAVE || $octave > self::MAX_SCORE_OCTAVE)) || !is_int($start) || $start < 0 || !is_int($duration) || $duration <= 0 || $phrase === '') continue;
             if ($previousStart !== null && $start < $previousStart) $errors[] = 'SCORE_EVENT_ORDER_INVALID';
             if ($previousEnd !== null && $start < $previousEnd) $errors[] = 'SCORE_EVENT_OVERLAP';
-            $normalizedEvents[] = ['pitch_class' => $pitch, 'octave' => $octave, 'start_ms' => $start, 'duration_ms' => $duration, 'phrase' => $phrase];
+            $normalizedEvents[] = ['pitch_class' => $pitch, 'octave' => $octave, 'start_ms' => $start, 'duration_ms' => $duration, 'phrase' => $phrase, 'rest' => $isRest];
             $previousStart = $start;
             $previousEnd = $start + $duration;
         }
@@ -125,6 +126,20 @@ final class MusicReferenceContract
 
         if ($normalizedEvents === [] || $this->hasScoreErrors($errors)) return null;
 
+        $playback = null;
+        if (array_key_exists('playback', $input)) {
+            $candidate = is_array($input['playback']) ? $input['playback'] : [];
+            $rights = $this->text($candidate['rights'] ?? null);
+            $method = $this->text($candidate['method'] ?? null);
+            $status = $this->text($candidate['verification_status'] ?? null);
+            $instruments = is_array($candidate['instruments'] ?? null) ? array_values(array_intersect($candidate['instruments'], ['PIANO', 'BELL', 'GONG'])) : [];
+            if ($rights === '' || $method === '' || $status !== self::PUBLIC_SCORE_VERIFICATION || $instruments === []) {
+                $errors[] = 'SCORE_PLAYBACK_VERIFICATION_REQUIRED';
+            } else {
+                $playback = ['verification_status' => $status, 'rights' => $rights, 'method' => $method, 'instruments' => $instruments];
+            }
+        }
+
         return [
             'version' => $this->text($input['version']),
             'source' => $this->text($input['source']),
@@ -133,6 +148,9 @@ final class MusicReferenceContract
             'tempo_bpm' => (float) $input['tempo_bpm'],
             'events' => $normalizedEvents,
             'segments' => $segments,
+            ...($this->text($input['edition'] ?? null) !== '' ? ['edition' => $this->text($input['edition'])] : []),
+            ...($this->text($input['arrangement_identity'] ?? null) !== '' ? ['arrangement_identity' => $this->text($input['arrangement_identity'])] : []),
+            ...($playback !== null ? ['playback' => $playback] : []),
         ];
     }
 

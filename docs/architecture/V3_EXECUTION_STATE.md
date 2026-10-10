@@ -1,5 +1,33 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-10 — Westminster public completion re-audit
+
+READ_ONLY_REAUDIT: The requested Westminster end-to-end completion was
+rechecked against the current local HEAD `d571e6fd276b724f84f80759ca084879beb14e73`
+and the public route `https://demo.1945.vn/ban-nhac/westminster/`. The public
+page is reachable and retains the canonical route/title and existing scoped
+Music relations, but its live DOM has no score renderer (`score=0`) and no
+HTML audio source (`audio=0`); it displays the honest unavailable-audio state.
+
+LOCAL_VERIFICATION: The focused Music/Media/frontend contract selection passed
+90 tests / 601 assertions with four existing PHPUnit warnings. The local
+release preflight passed Composer/runtime classes and canonical documentation,
+but failed WordPress bootstrap, schema, authority hydration and REST bootstrap
+because this checkout has no authorized WordPress/database runtime.
+
+GOVERNANCE_BOUNDARY: The research Grove score and Piano WAV remain
+`NON_PUBLIC` with `RIGHTS_REVIEW_REQUIRED_BEFORE_GOVERNED_INGEST`. No signed
+Capture packet, current Music revision, Media/MediaAsset/MediaUsage identity,
+Human Approval/Eligibility, Controlled Apply or canonical read-back was
+available. No staging or production mutation, deployment, push, direct SQL,
+generic WordPress write, duplicate Music identity or stale-packet retry was
+performed. The four Knowledge repair dependencies and the terminal Capture
+remain untouched.
+
+STATUS: `PUBLIC_ROUTE_READBACK_PASS / PUBLIC_SCORE_AUDIO_FAIL /
+LOCAL_CONTRACTS_PASS / AUTHORIZED_RUNTIME_UNAVAILABLE /
+GOVERNED_MEDIA_HANDOFF_BLOCKED / PUBLIC_COMPLETE_FALSE`
+
 # Checkpoint — 2026-10-10 — Video recovery and public HTTPS verified
 
 IMPLEMENTED_RECOVERY_API: `nhk.capture.recover` is deployed and discoverable in
@@ -26699,3 +26727,39 @@ Source/Evidence mutation, Score/Audio mutation or public publish occurred.
 STATUS: `READ_ONLY_BLOCKERS_REPAIRED_LOCAL / FOCUSED_VERIFIED /
 STAGING_CONFIG_WRITE_BLOCKED / RELEASE_PARITY_PENDING /
 FRESH_PACKET_PENDING / NO_SEMANTIC_MUTATION / PUBLIC_COMPLETE_FALSE`
+
+# Checkpoint — 2026-10-10 — Universal interactive Music playback capability
+
+IMPLEMENTED_LOCAL: The existing read-only `MusicReferenceContract` and
+`MusicDossierProjection` now preserve optional verified playback metadata,
+edition/arrangement identity and explicit rest events without creating a new
+owner or writer. The public Music partial exposes a reusable Web Audio score
+player only when the projected score carries `VERIFIED` playback rights and a
+documented synthesis method. Piano, Bell and Gong/Côn share the same projected
+note-event data; tempo changes scheduling intervals rather than pitch; duration
+choices are bounded to 15/30/45/60 minutes; and scheduled oscillators are
+stopped/disconnected on pause, stop, replay and instrument/tempo changes.
+Historic/reference Media audio remains a separate path.
+
+VERIFIED_LOCAL: PHP lint, JavaScript syntax, `MusicReferenceContractTest` and
+`MusicDossierProjectionTest` passed: 21 tests / 123 assertions. `git diff
+--check` passed. The focused contract test covers verified playback metadata,
+rest preservation and the fail-closed segment range rule.
+
+RUNTIME_QA: The deployed Westminster page at
+`https://demo.1945.vn/ban-nhac/westminster/` was read-only inspected in Chrome.
+It currently shows the generic Music dossier and “Chưa có tệp âm thanh công
+khai để phát”; it has no canonical score events, verified playback metadata,
+Piano/Bell/Gong controls or public audio delivery. Therefore PCM, note-sequence,
+instrument-switch, tempo, quarter-duration, pause/resume, mobile and cleanup
+acceptance cannot honestly be claimed against the public page yet.
+
+BLOCKERS: No server-issued verified Westminster score/read-model packet,
+governed Media/MediaAsset public delivery or verified synthesis-rights packet
+was available. The local Grove JSON/WAV remains non-canonical per the active
+Music contracts. No deployment, Governance mutation, staging acceptance,
+canonical read-back or production publish was performed.
+
+STATUS: `INTERACTIVE_PLAYBACK_ENGINE_IMPLEMENTED_LOCAL /
+FOCUSED_VERIFIED / PUBLIC_AUDIO_NOT_AVAILABLE / STAGING_NOT_DEPLOYED /
+PUBLIC_COMPLETE_FALSE`
