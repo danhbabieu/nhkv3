@@ -1457,6 +1457,25 @@ final class GovernedCaptureContinuationService
                 // compatibility path; it never creates a replacement owner.
                 $source = $this->sourceRepository->findByStableKey('nhk:video-source:' . substr($stableKey, strlen('nhk:source:video:')));
             }
+            if ($source === null) {
+                // Last-resort recovery is still identity-bound: an exact
+                // locator/platform/external ID match may select one existing
+                // active Source, but ambiguity remains fail-closed.
+                $metadata = is_array($proposal->payload['metadata'] ?? null) ? $proposal->payload['metadata'] : [];
+                $platform = strtolower(trim((string) ($metadata['platform'] ?? '')));
+                $externalId = trim((string) ($metadata['external_video_id'] ?? ''));
+                $locator = trim((string) ($proposal->payload['locator'] ?? ''));
+                $matches = array_values(array_filter(
+                    $this->sourceRepository->list(true),
+                    static fn (mixed $candidate): bool => $candidate instanceof \NHK\Core\Domain\Knowledge\Source
+                        && $candidate->active
+                        && $locator !== ''
+                        && $candidate->locator === $locator
+                        && strtolower(trim((string) ($candidate->metadata['platform'] ?? ''))) === $platform
+                        && trim((string) ($candidate->metadata['external_video_id'] ?? '')) === $externalId,
+                ));
+                if (count($matches) === 1) $source = $matches[0];
+            }
             if ($source !== null && $source->active) {
                 return ['canonical_id' => $source->canonicalId, 'entity_type' => 'source', 'active' => true, 'revision' => $source->revision];
             }
