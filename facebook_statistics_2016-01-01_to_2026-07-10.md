@@ -16,22 +16,23 @@ Meta Content Library permits a maximum custom export range of 366 days. Therefor
 
 The currently available exports contain 1,776 source rows, but their parsed post dates begin at `06/09/2025`; they do not prove coverage of `01/01/2016–05/09/2025` or `11/07/2025–12/07/2025` where applicable. Existing exports are therefore partial evidence, not a complete historical census.
 
-Meta report history now records the requested bounded report `01/01/2025–05/09/2025` as `Không tìm thấy kết quả nào` (no results). It also confirms the yearly reports for `2021`, `2022`, `2023`, and `2024` as `Không tìm thấy kết quả nào`. The 2020 and 2019 reports have been submitted and are still processing; they are not yet counted as covered.
-
-The next report `01/01/2024–31/12/2024` is visible in Meta report history but remains `Đang xuất 0%`. Meta permits only one report in this queue, so later yearly reports cannot be started until this queued report resolves.
+Meta report history now records the bounded reports for `2016` through `2024`, plus
+`01/01/2025–05/09/2025`, as `Không tìm thấy kết quả nào` (no results). The
+reports were submitted as separate yearly/custom ranges because Meta limits a
+custom export to 366 days.
 
 | Interval | Status | Evidence |
 |---|---|---|
-| 01/01/2016–31/12/2016 | NOT_EXPORTED | No CSV evidence |
-| 01/01/2017–31/12/2017 | NOT_EXPORTED | No CSV evidence |
-| 01/01/2018–31/12/2018 | NOT_EXPORTED | No CSV evidence |
-| 01/01/2019–31/12/2019 | REPORT_PENDING | Submitted; Meta still processing |
-| 01/01/2020–31/12/2020 | REPORT_PENDING | Submitted; Meta still processing |
+| 01/01/2016–31/12/2016 | CONFIRMED_NO_RESULTS | Meta report history |
+| 01/01/2017–31/12/2017 | CONFIRMED_NO_RESULTS | Meta report history |
+| 01/01/2018–31/12/2018 | CONFIRMED_NO_RESULTS | Meta report history |
+| 01/01/2019–31/12/2019 | CONFIRMED_NO_RESULTS | Meta report history |
+| 01/01/2020–31/12/2020 | CONFIRMED_NO_RESULTS | Meta report history |
 | 01/01/2021–31/12/2021 | CONFIRMED_NO_RESULTS | Meta report history |
 | 01/01/2022–31/12/2022 | CONFIRMED_NO_RESULTS | Meta report history |
 | 01/01/2023–31/12/2023 | CONFIRMED_NO_RESULTS | Meta report history |
 | 01/01/2024–31/12/2024 | CONFIRMED_NO_RESULTS | Meta report history |
-| 01/01/2025–05/09/2025 | NOT_EXPORTED | Current earliest parsed date is 06/09/2025 |
+| 01/01/2025–05/09/2025 | CONFIRMED_NO_RESULTS | Meta report history |
 | 06/09/2025–10/07/2026 | PARTIAL_EXPORTS | Existing CSV exports; date windows are split and do not constitute one full native report |
 
 ## Current partial counts
@@ -46,4 +47,7 @@ These counts must not be presented as the complete 2016–10/07/2026 result unti
 
 ## Final status
 
-`PARTIAL_CLEANUP` — historical coverage is incomplete because Meta's 366-day export limit applies and the older intervals have not yet produced accessible CSV evidence.
+`PARTIAL_CLEANUP` — all requested pre-06/09/2025 bounded ranges are now
+confirmed by Meta as having no results. The aggregate CSV still represents
+available content exports only for 06/09/2025–10/07/2026, and is not evidence
+of complete group-post coverage or of metrics that Meta did not expose.
