@@ -1,5 +1,56 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-10 — Video recovery and public HTTPS verified
+
+IMPLEMENTED_RECOVERY_API: `nhk.capture.recover` is deployed and discoverable in
+the staging MCP catalog. It resumes by exact Capture ID and expected revision
+using the server-owned persisted idempotency identity; raw idempotency keys are
+not exposed. The governed continuation path preserves Capture/Video/external
+identities, uses CAS and replay fingerprints, and records audit receipts.
+
+CODE_COMMITS: `c39424d0` preserves required public/frontend outcome obligations
+when current child completion is recomputed; `d78af47a` preserves the canonical
+VideoObject SEO projection on video detail routes while archive routes retain
+CollectionPage SEO. Focused completion, capture continuation, governance,
+frontend, query and SEO tests pass; changed-file PHP lint and `git diff
+--check` pass.
+
+DEPLOYMENT_READBACK: The official verifier passed for staging target
+`demo.1945.vn`, database `erourxcg_nhkv3`, HTTPS identity, backup/recovery
+policy and migration no-op (`26/26`). Deployed source revision is
+`d78af47a0968171f9a55861ed9feead1ce51ede4`; build identity is
+`cf7cc043a77982a8e6c5ef935aa550588eee4cc2beb9657cc428b2fd14fb3863`;
+manifest hash is
+`e173187b8a9be04a6ebc16f0b64ba95bcd4debbe27d87f11609967888501bb13`;
+documentation version is
+`bb8ea2b07035fe257a282defa82ce08238fffd0387689a231415900790197e5a`.
+Runtime `tools/list` contains `nhk.capture.recover`,
+`nhk.video.frontend.reconcile` and `nhk.video.get`.
+
+CAPTURE_A: `01a12152-62e8-72b4-a8f5-1943eee56a9c` is `COMPLETE`, with Video
+`01a12152-6c7b-7b2a-8a77-5fb22ca9b0a5`, source/knowledge/evidence/video owner
+read-backs complete, and no blockers. Governed frontend reconciliation is
+`VERIFIED`; public detail and archive read back over HTTPS 200 at
+`/video/dong-ho-cong-cong-nhan-dien-bo-may/`, with canonical link, VideoObject
+JSON-LD and external identity `5CqjJDgzFcI`.
+
+CAPTURE_B: `01a120b2-6987-7f78-bb74-20640cdddfad` is `COMPLETE` at revision
+122, with the canonical Variant `852da54d-457a-4397-a16d-52d9452ba766`
+(`Đồng hồ Odo 36/8`) under the verified Odo brand/model chain and no blockers.
+Governed frontend reconciliation is `VERIFIED`; public detail and archive
+read back over HTTPS 200 at
+`/video/dong-ho-odo-36-8-am-thanh-dong-ho-co/`, with canonical link,
+VideoObject JSON-LD and external identity `MJ82AhKAwLk`.
+
+IDENTITY_NOTE: Local/deployed HEAD is the recovery branch commit above while
+`origin/main` remains at `3b757a0f`; the verifier deploys the explicitly
+verified local HEAD and does not require pushing it. The historical
+`493386ce` and `933c2a25` values are unrelated Facebook audit workbook commits
+in the same longer history (`933c2a25` is an ancestor of `493386ce`), not the
+current NHK Video deployment identity.
+
+STATUS: `PUBLIC_VERIFIED / GOVERNED_VIDEO_RECOVERY_COMPLETE / HTTPS_READBACK_COMPLETE`
+
 # Checkpoint — 2026-10-10 — Governed Capture recovery implementation
 
 IMPLEMENTED_LOCAL: Commit `ac021d60c34934f5e0c594d9550185f529486ea6` adds the
