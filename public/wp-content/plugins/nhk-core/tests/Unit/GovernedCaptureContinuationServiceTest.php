@@ -2129,6 +2129,34 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
         self::assertTrue($result['writes'][0]['idempotent']);
     }
 
+    public function test_applied_video_source_replay_rehydrates_typed_dependency_for_canonical_readback(): void
+    {
+        $proposalId = UuidCodec::newV7();
+        $sourceId = UuidCodec::newV7();
+        $payload = ['stable_key' => 'nhk:source:youtube:5CqjJDgzFcI', 'locator' => 'https://www.youtube.com/watch?v=5CqjJDgzFcI'];
+        $governance = $this->createMock(GovernedLifecycle::class);
+        $governance->expects(self::once())->method('review')->with($proposalId)->willReturn([
+            'state' => 'applied', 'entity_type' => 'source', 'operation' => 'ingest', 'subject_id' => $sourceId,
+            'payload' => $payload, 'content_fingerprint' => 'content', 'dependency_fingerprint' => 'dependency',
+        ]);
+        $service = new GovernedCaptureContinuationService(
+            $governance,
+            static fn (): array => throw new \LogicException('APPLIED proposal must not be applied again'),
+            $this->policies(),
+            static fn (): bool => true,
+            videoDependencyState: static function (array $plan) use ($sourceId, $payload): array {
+                self::assertSame($payload, $plan['capture_video_provenance']['dependencies'][0]['payload']);
+                return ['source' => ['canonical_id' => $sourceId, 'revision' => 1, 'active' => true]];
+            },
+        );
+
+        $result = $service->execute('capture-source-replay', 'replay', [], ['proposal_ids' => [$proposalId]]);
+
+        self::assertSame('APPLIED', $result['status'], json_encode($result, JSON_UNESCAPED_UNICODE));
+        self::assertSame($sourceId, $result['writes'][0]['canonical_id']);
+        self::assertTrue($result['writes'][0]['idempotent']);
+    }
+
     public function test_empty_semantic_assertions_cannot_plan_knowledge_or_graph_relation(): void
     {
         $service = new GovernedCaptureContinuationService($this->createMock(GovernedLifecycle::class), static fn (): array => [], $this->policies(), static fn (): bool => true);

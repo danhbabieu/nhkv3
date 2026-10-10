@@ -1446,7 +1446,24 @@ final class GovernedCaptureContinuationService
             return null;
         }
         if ($this->videoDependencyState === null) return null;
-        try { $state = ($this->videoDependencyState)($plan + ['proposal_id' => $proposal->id]); } catch (\Throwable) { return null; }
+        $lookupPlan = $plan + ['proposal_id' => $proposal->id];
+        // A replay of an already-applied dependency is resumed from its
+        // proposal ID, so the original capture provenance envelope is not
+        // present in the plan. Reconstruct only the typed dependency slot
+        // from the persisted proposal payload; this is read-only recovery
+        // state and cannot create or reapply a proposal.
+        if (!isset($lookupPlan['capture_video_provenance']) && is_array($proposal->payload)) {
+            $dependencies = [[], [], []];
+            $slot = match ($proposal->entityType) {
+                'source' => 0,
+                'knowledge' => 1,
+                'evidence' => 2,
+                default => null,
+            };
+            if ($slot !== null) $dependencies[$slot] = ['payload' => $proposal->payload];
+            if ($slot !== null) $lookupPlan['capture_video_provenance'] = ['dependencies' => $dependencies];
+        }
+        try { $state = ($this->videoDependencyState)($lookupPlan); } catch (\Throwable) { return null; }
         if (!is_array($state)) return null;
         $kind = $proposal->entityType === 'knowledge' ? 'claim' : $proposal->entityType;
         $record = $state[$kind] ?? null;
