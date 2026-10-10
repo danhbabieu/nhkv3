@@ -78,4 +78,21 @@ final class SemanticSpecificityPropagationTest extends TestCase
         self::assertSame('SUPPORTING_CONTEXT', $draft->claimTrace[0]['editorial_treatment']);
         self::assertNotContains('CONTEXTUAL_CLAIM_RENDERED_AS_EXACT', $quality->blockers);
     }
+
+    public function test_contextual_claim_with_missing_treatment_is_not_defaulted_to_direct_fact(): void
+    {
+        $claim = [
+            'claim_id' => 'context-missing-treatment', 'claim_revision' => 1, 'text' => 'Model rộng hơn có lịch sử riêng.',
+            'eligibility' => 'eligible', 'publicly_composable' => true, 'subject_id' => 'model-x', 'subject_type' => 'model',
+            'original_subject' => ['id' => 'model-x', 'type' => 'model'], 'resolved_primary_subject' => ['id' => 'variant-x', 'type' => 'variant'],
+            'scope' => 'model', 'facet' => 'history', 'retrieval_origin' => 'neighborhood',
+            'graph_path' => [['source' => 'variant:variant-x', 'predicate' => 'variant_of', 'target' => 'model:model-x']],
+            'evidence' => ['status' => 'eligible'], 'provenance' => 'CATALOG_SUPPORTED',
+            'retrieval_tier' => 'EXACT', 'coverage_kind' => 'exact', 'relevance_score' => 1.0,
+        ];
+        $pack = (new EditorialKnowledgeSelector())->select(['status' => 'available', 'items' => [$claim]], 'Variant-X', ['id' => 'variant-x', 'type' => 'variant'], ['profile' => 'article']);
+        $plan = (new ReaderJourneyPlanner())->plan($pack);
+        $draft = (new SharedEditorialComposer())->compose($plan);
+        self::assertSame('SUPPORTING_CONTEXT', $draft->claimTrace[0]['editorial_treatment']);
+    }
 }

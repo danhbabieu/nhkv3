@@ -136,7 +136,7 @@ final class EditorialKnowledgeSelector
             // as an exact public assertion, so normalize it at the selection
             // boundary before the claim enters a reader journey or composer.
             if ($claim['semantic_context_only'] === true
-                && strtoupper(trim((string) ($claim['editorial_treatment'] ?? ''))) === 'DIRECT_FACT') {
+                && !in_array(strtoupper(trim((string) ($claim['editorial_treatment'] ?? ''))), ['SUPPORTING_CONTEXT', 'BACKGROUND_CONTEXT', 'COMPARATIVE_CONTEXT'], true)) {
                 $claim['editorial_treatment'] = 'SUPPORTING_CONTEXT';
             }
             $claim['selection_reason'] = $isExactCoverage ? 'applicable KnowledgeUnit adds uncovered reader coverage' : 'applicable KnowledgeUnit provides bounded contextual support';

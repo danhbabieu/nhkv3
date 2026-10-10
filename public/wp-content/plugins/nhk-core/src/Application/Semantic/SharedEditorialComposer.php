@@ -47,6 +47,11 @@ final class SharedEditorialComposer
                 if ($text === '') { $traceFailure = true; continue; }
                 try { $guard->assertSafe($text); } catch (\Throwable) { $traceFailure = true; continue; }
 
+                $editorialTreatment = strtoupper(trim((string) ($claim['editorial_treatment'] ?? '')));
+                if (($claim['semantic_context_only'] ?? false) === true
+                    && !in_array($editorialTreatment, ['SUPPORTING_CONTEXT', 'BACKGROUND_CONTEXT', 'COMPARATIVE_CONTEXT'], true)) {
+                    $editorialTreatment = 'SUPPORTING_CONTEXT';
+                }
                 $trace[] = [
                     'claim_id' => (string) $claim['claim_id'],
                     'claim_revision' => max(1, (int) ($claim['claim_revision'] ?? 1)),
@@ -59,7 +64,7 @@ final class SharedEditorialComposer
                     'graph_path' => $claim['graph_path'] ?? [],
                     'retrieval_tier' => (string) ($claim['retrieval_tier'] ?? 'EXACT'),
                     'coverage_kind' => (string) ($claim['coverage_kind'] ?? 'exact'),
-                    'editorial_treatment' => (string) ($claim['editorial_treatment'] ?? 'DIRECT_FACT'),
+                    'editorial_treatment' => $editorialTreatment !== '' ? $editorialTreatment : 'DIRECT_FACT',
                     'semantic_context_only' => ($claim['semantic_context_only'] ?? false) === true,
                     'editorial_role' => (string) ($claim['editorial_role'] ?? ''),
                     'selection_reason' => (string) ($claim['selection_reason'] ?? ''),

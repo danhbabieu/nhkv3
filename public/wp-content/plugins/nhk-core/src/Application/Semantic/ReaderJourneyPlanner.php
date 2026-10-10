@@ -34,7 +34,7 @@ final class ReaderJourneyPlanner
             $unitClaims = array_map(static function (array $unitClaim) use ($claim): array {
                 $merged = array_replace($claim, $unitClaim, ['editorial_role' => $claim['editorial_role'] ?? 'CONTEXT', 'eligibility' => $unitClaim['eligibility'] ?? ($claim['eligibility'] ?? ''), 'publicly_composable' => $unitClaim['publicly_composable'] ?? ($claim['publicly_composable'] ?? true)]);
                 if (($merged['semantic_context_only'] ?? false) === true
-                    && strtoupper(trim((string) ($merged['editorial_treatment'] ?? ''))) === 'DIRECT_FACT') {
+                    && !in_array(strtoupper(trim((string) ($merged['editorial_treatment'] ?? ''))), ['SUPPORTING_CONTEXT', 'BACKGROUND_CONTEXT', 'COMPARATIVE_CONTEXT'], true)) {
                     $merged['editorial_treatment'] = 'SUPPORTING_CONTEXT';
                 }
                 return $merged;
