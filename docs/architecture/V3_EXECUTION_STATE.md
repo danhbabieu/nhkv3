@@ -26945,3 +26945,30 @@ Governance apply, or audio PASS was claimed.
 STATUS: `LOCAL_SCORE_ADMISSION_CAPTURE_BOUND / FOCUSED_REGRESSION_PASS /
 GLOBAL_BASELINE_ISOLATED / DEPLOYMENT_AND_RIGHTS_UNVERIFIED /
 PUBLIC_COMPLETE_FALSE`
+
+# Checkpoint — 2026-10-10 — Score release gate and public read-only recheck
+
+DEPLOYMENT_ATTEMPT: The authorized `scripts/nhk-deploy-verify` gate was invoked
+against source `fa1188f4d6fcb94db982af0169b9aee7945d46fd` for
+`https://demo.1945.vn`; it failed closed with `REMOTE_DEPLOYMENT_FAILED` before
+any deployment identity or live operation registration could be verified. No
+deployment is claimed.
+
+PUBLIC_READBACK: The live Westminster route returned its existing Music dossier
+and explicitly displayed no public score packet and no public audio file. No
+Piano, Bell or Gong controls were present; therefore no playback, tempo,
+quarter-hour sequence, mobile or browser audio PASS is claimed.
+
+RIGHTS_DECISION: The exact Grove-derived Wikisource transcription remains
+`RIGHTS_REVIEW_REQUIRED_BEFORE_GOVERNED_INGEST`. The access layer states CC
+BY-SA, but attribution, modification notice, ShareAlike compliance and the
+underlying historical edition's status still require an exact source/edition
+decision. No permission was fabricated and no score packet was submitted.
+
+LIVE_BLOCKER: Deployment failure prevents fresh source/build/catalog/
+capability/Music-revision read-back, signed-scope issuance, governed admission,
+canonical checksum read-back and public completion. Existing local research
+checksum evidence is not canonical Music read-back evidence.
+
+STATUS: `RELEASE_GATE_REMOTE_DEPLOYMENT_FAILED / PUBLIC_SCORE_ABSENT /
+RIGHTS_REVIEW_REQUIRED / NO_GOVERNED_MUTATION / PUBLIC_COMPLETE_FALSE`
