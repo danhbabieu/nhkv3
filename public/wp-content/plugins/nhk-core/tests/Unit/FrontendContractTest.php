@@ -284,6 +284,8 @@ final class FrontendContractTest extends TestCase
             self::assertStringContainsString('PublicSeoProjection', (string) file_get_contents($file), $file);
             self::assertStringContainsString("'seo_projection'", (string) file_get_contents($file), $file);
         }
+        $videoRoutes = (string) file_get_contents($root . '/src/Infrastructure/Http/PublicMediaVideoRoutes.php');
+        self::assertStringContainsString("is_array(\$video['seo_projection'] ?? null) ? \$video['seo_projection']", $videoRoutes);
     }
 
     public function test_theme_design_tokens_have_one_nhk_source(): void
