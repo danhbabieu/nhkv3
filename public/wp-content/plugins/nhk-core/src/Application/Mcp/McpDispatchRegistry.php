@@ -73,6 +73,7 @@ final class McpDispatchRegistry
         'nhk.system-wide.duplicate-audit' => 'nhk.system-wide.duplicate-audit',
         'nhk.article.ingest' => 'nhk.article.ingest',
         'nhk.capture.ingest' => 'nhk.capture.ingest',
+        'nhk.capture.recover' => 'nhk.capture.recover',
         'nhk.capture.get' => 'nhk.capture.get',
         'nhk.category.resolve' => 'nhk.category.resolve',
         'nhk.category.create' => 'nhk.category.create',

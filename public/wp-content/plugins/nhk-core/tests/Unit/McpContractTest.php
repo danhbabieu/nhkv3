@@ -5,7 +5,7 @@ namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Mcp\McpToolCatalog;
 use NHK\Core\Application\Mcp\McpAbilityRegistration;
-use NHK\Core\Application\Mcp\{McpDocumentationRegistry, McpGovernanceHandler, McpReadHandler, McpTransport, SingleEntryPointPolicy};
+use NHK\Core\Application\Mcp\{McpDocumentationRegistry, McpGovernanceHandler, McpReadHandler, McpSemanticContextResolver, McpTransport, SingleEntryPointPolicy};
 use NHK\Core\Application\Governance\ControlledApplyOperationRegistry;
 use NHK\Core\Application\Media\ImageIngestEntrypoint;
 use NHK\Core\Application\Governance\GovernanceService;
@@ -14,9 +14,9 @@ use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
 use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository, MediaUsageRepository};
 use NHK\Core\Contracts\Video\VideoRepository;
-use NHK\Core\Domain\Authority\EntityTypeRegistry;
+use NHK\Core\Domain\Authority\{AuthorityEntity, EntityTypeRegistry};
 use NHK\Core\Infrastructure\Media\WordPressMediaAttachmentIngestor as ConcreteWordPressMediaAttachmentIngestor;
-use NHK\Tests\Support\InMemoryProposalRepository;
+use NHK\Tests\Support\{InMemoryAuthorityRepository, InMemoryProposalRepository};
 use NHK\Core\Domain\Governance\{Proposal, ProposalState};
 use NHK\Core\Shared\Uuid\UuidCodec;
 use PHPUnit\Framework\TestCase;
@@ -104,6 +104,7 @@ final class McpContractTest extends TestCase
             'nhk.article.ingest',
             'nhk.capture.ingest',
             'nhk.capture.get',
+            'nhk.capture.recover',
             'nhk.category.resolve',
             'nhk.category.create',
             'nhk.category.update',
@@ -368,6 +369,51 @@ final class McpContractTest extends TestCase
         }
     }
 
+    public function test_recovery_candidate_packet_is_resolved_against_current_authority_revision(): void
+    {
+        $types = new EntityTypeRegistry();
+        \NHK\Core\Domain\Authority\CanonicalEntityTypeCatalog::registerInto($types);
+        $authority = new InMemoryAuthorityRepository();
+        $candidate = new AuthorityEntity(
+            '852da54d-457a-4397-a16d-52d9452ba766',
+            'variant',
+            'nhk:variant:odo.36.8',
+            'Đồng hồ Odo 36/8',
+            1,
+            ['aliases' => ['Odo 36/8']],
+            revision: 1,
+        );
+        $authority->create($candidate);
+        $read = new McpReadHandler(
+            $authority,
+            $types,
+            $this->createMock(MediaRepository::class), $this->createMock(MediaAssetRepository::class),
+            $this->createMock(MediaUsageRepository::class), $this->createMock(VideoRepository::class),
+            $this->createMock(KnowledgeRepository::class), $this->createMock(EvidenceRepository::class),
+            resolver: new McpSemanticContextResolver($authority, $types),
+        );
+        $transport = new McpTransport($read, new McpGovernanceHandler(new GovernanceService(new InMemoryProposalRepository())));
+        $normalize = new \ReflectionMethod($transport, 'normalizeRecoverySubjectCandidate');
+        $normalized = $normalize->invoke($transport, ['subject_reconciliation' => [
+            'confirmed' => true,
+            'candidate_uuid' => $candidate->canonicalId,
+            'canonical_candidate' => [
+                'id' => $candidate->canonicalId,
+                'type' => 'variant',
+                'stable_key' => $candidate->stableKey,
+                'name' => $candidate->canonicalName,
+                'revision' => 1,
+                'match' => 'exact_variant_name_reference',
+            ],
+        ]]);
+
+        self::assertArrayNotHasKey('canonical_candidate', $normalized['subject_reconciliation']);
+        self::assertSame('GOVERNED_SUBJECT_RECONCILIATION', $normalized['subject_reconciliation']['authority']);
+        self::assertSame($candidate->canonicalId, $normalized['subject_reconciliation']['packet']['canonical_subject_id']);
+        self::assertSame('variant', $normalized['subject_reconciliation']['packet']['entity_type']);
+        self::assertSame(1, $normalized['subject_reconciliation']['packet']['revision']);
+    }
+
     private function readHandler(): McpReadHandler
     {
         return new McpReadHandler(
@@ -619,6 +665,7 @@ final class McpContractTest extends TestCase
             'nhk-v3/public-url-reproject',
             'nhk-v3/article-ingest',
             'nhk-v3/capture-ingest',
+            'nhk-v3/capture-recover',
             'nhk-v3/category-create',
             'nhk-v3/category-update',
             'nhk-v3/category-assign',

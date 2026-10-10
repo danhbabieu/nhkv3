@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Capture\{AuthorityCaptureService, ContentPreparationOrchestrator, EditorialCaptureContinuationService, EditorialCaptureCoordinator};
-use NHK\Core\Application\Mcp\{McpDocumentationRegistry, McpGovernanceHandler, McpReadHandler, McpTransport};
+use NHK\Core\Application\Mcp\{McpAbilityRegistration, McpDocumentationRegistry, McpGovernanceHandler, McpReadHandler, McpToolCatalog, McpTransport};
 use NHK\Core\Application\Governance\GovernanceService;
 use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
 use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, SubjectResolutionService, TextInputInterpreter};
@@ -24,6 +24,119 @@ use PHPUnit\Framework\TestCase;
 
 final class EditorialCaptureContinuationTest extends TestCase
 {
+    public function test_capture_recovery_ability_resumes_by_capture_id_without_exposing_original_key_and_replays_safely(): void
+    {
+        $captures = new ContinuationCaptureRepository();
+        $capture = new CaptureRecord(
+            UuidCodec::newV7(),
+            'capture-a-original-idempotency-secret',
+            hash('sha256', 'capture-a-original-idempotency-secret'),
+            CaptureStage::SEMANTICS_RECONCILED->value,
+            'FAILED_RETRYABLE',
+            null,
+            null,
+            [],
+            [
+                'purpose' => 'EDITORIAL',
+                'raw_input' => 'Video recovery input.',
+                'content_intent' => ['intent' => 'VIDEO', 'article_required' => false],
+                'original_request' => ['intent' => 'VIDEO', 'video' => ['url' => 'https://www.youtube.com/watch?v=AbCdEfGhI12']],
+            ],
+            ['failure' => ['code' => 'CAPTURE_EXECUTION_INTERRUPTED']],
+        );
+        $captures->create($capture);
+        $events = [];
+        $documentation = new McpDocumentationRegistry();
+        $checkpoint = $documentation->bootstrap();
+        $transport = new McpTransport(
+            new McpReadHandler(
+                $this->createMock(AuthorityRepository::class), new EntityTypeRegistry(),
+                $this->createMock(MediaRepository::class), $this->createMock(MediaAssetRepository::class),
+                $this->createMock(MediaUsageRepository::class), $this->createMock(VideoRepository::class),
+                $this->createMock(KnowledgeRepository::class), $this->createMock(EvidenceRepository::class),
+                captures: $captures,
+            ),
+            new McpGovernanceHandler(new GovernanceService(new InMemoryProposalRepository())),
+            static fn (string $capability): bool => true,
+            documentation: $documentation,
+            capture: $this->coordinator($captures, $events),
+            captureContinuation: new EditorialCaptureContinuationService($captures, new ContinuationAddendumRepository(), $this->coordinator($captures, $events)),
+        );
+
+        $arguments = [
+            'capture_id' => $capture->captureId,
+            'expected_revision' => $capture->revision,
+            'resume_children' => ['video'],
+            'documentation_checkpoint' => ['manifest_hash' => $checkpoint['manifest_hash'], 'documentation_version' => $checkpoint['documentation_version']],
+        ];
+        $first = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/call', 'params' => ['name' => 'nhk.capture.recover', 'arguments' => $arguments]]);
+        $replay = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 2, 'method' => 'tools/call', 'params' => ['name' => 'nhk.capture.recover', 'arguments' => $arguments]]);
+
+        self::assertSame(200, $first['status']);
+        self::assertFalse($first['body']['result']['isError'] ?? false);
+        self::assertArrayNotHasKey('idempotency_key', $first['body']['result']['structuredContent']['capture']);
+        self::assertSame($capture->captureId, $first['body']['result']['structuredContent']['capture']['capture_id']);
+        self::assertArrayHasKey('recovery_audit', $first['body']['result']['structuredContent']['capture']['diagnostics']);
+        self::assertSame('REPLAYED', $replay['body']['result']['structuredContent']['recovery']['status']);
+        self::assertSame(1, $events['semantic'] ?? 0);
+        self::assertNotNull(McpAbilityRegistration::abilityNameForTool('nhk.capture.recover'));
+        self::assertSame('mutation', array_values(array_filter(McpToolCatalog::tools(), static fn (array $tool): bool => $tool['name'] === 'nhk.capture.recover'))[0]['kind']);
+    }
+
+    public function test_capture_recovery_rejects_stale_revision_and_non_internal_actor(): void
+    {
+        $tool = array_values(array_filter(McpToolCatalog::tools(), static fn (array $definition): bool => $definition['name'] === 'nhk.capture.recover'))[0] ?? null;
+        self::assertIsArray($tool);
+        self::assertSame(['capture_id', 'expected_revision', 'documentation_checkpoint'], $tool['inputSchema']['required']);
+
+        $documentation = new McpDocumentationRegistry();
+        $checkpoint = $documentation->bootstrap();
+        $transport = new McpTransport(
+            $this->readHandlerForContinuationTest(),
+            new McpGovernanceHandler(new GovernanceService(new InMemoryProposalRepository())),
+            static fn (string $capability): bool => $capability === 'read',
+            documentation: $documentation,
+        );
+        $result = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 3, 'method' => 'tools/call', 'params' => ['name' => 'nhk.capture.recover', 'arguments' => [
+            'capture_id' => UuidCodec::newV7(),
+            'expected_revision' => 1,
+            'documentation_checkpoint' => ['manifest_hash' => $checkpoint['manifest_hash'], 'documentation_version' => $checkpoint['documentation_version']],
+        ]]]);
+
+        self::assertSame(200, $result['status']);
+        self::assertSame('DIRECT_WRITE_BLOCKED', $result['body']['result']['structuredContent']['error']['code'] ?? null);
+    }
+
+    public function test_capture_recovery_rejects_an_authenticated_actor_who_does_not_own_the_capture(): void
+    {
+        $captures = new ContinuationCaptureRepository();
+        $capture = new CaptureRecord(
+            UuidCodec::newV7(),
+            'capture-owner-bound',
+            hash('sha256', 'capture-owner-bound'),
+            CaptureStage::SEMANTICS_RECONCILED->value,
+            'FAILED_RETRYABLE',
+            null,
+            null,
+            [],
+            ['owner_principal_id' => 'owner-42', 'content_intent' => ['intent' => 'VIDEO', 'article_required' => false]],
+            ['failure' => ['code' => 'CAPTURE_EXECUTION_INTERRUPTED']],
+        );
+        $captures->create($capture);
+        $events = [];
+        $service = new EditorialCaptureContinuationService($captures, new ContinuationAddendumRepository(), $this->coordinator($captures, $events));
+
+        $result = $service->recover([
+            'capture_id' => $capture->captureId,
+            'expected_revision' => $capture->revision,
+            '_internal_authorized' => true,
+            '_actor_id' => 'different-owner',
+        ]);
+
+        self::assertSame('CAPTURE_RECOVERY_OWNERSHIP_REQUIRED', $result['recovery']['code']);
+        self::assertSame($capture->revision, $captures->findById($capture->captureId)?->revision);
+    }
+
     public function test_rev18_review_reaches_production_transport_retry_boundary_before_downstream_gates(): void
     {
         $captures = new ContinuationCaptureRepository();
@@ -2001,6 +2114,16 @@ final class EditorialCaptureContinuationTest extends TestCase
             canonicalDependencies: $canonicalDependencies,
             videoPublicationVerifier: $videoVerifier ?? $videoPublication,
             contentPreparation: $preparation,
+        );
+    }
+
+    private function readHandlerForContinuationTest(): McpReadHandler
+    {
+        return new McpReadHandler(
+            $this->createMock(AuthorityRepository::class), new EntityTypeRegistry(),
+            $this->createMock(MediaRepository::class), $this->createMock(MediaAssetRepository::class),
+            $this->createMock(MediaUsageRepository::class), $this->createMock(VideoRepository::class),
+            $this->createMock(KnowledgeRepository::class), $this->createMock(EvidenceRepository::class),
         );
     }
 }

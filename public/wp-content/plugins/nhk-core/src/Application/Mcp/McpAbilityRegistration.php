@@ -40,6 +40,7 @@ final class McpAbilityRegistration
         'nhk-v3/proposal-submit',
         'nhk-v3/proposal-approve',
         'nhk-v3/proposal-apply',
+        'nhk-v3/capture-recover',
         // These direct semantic boundaries are explicit admin continuations,
         // not normal new-submission entry points. They remain opt-in and
         // capability-gated; marking them discoverable lets an authorized
@@ -397,6 +398,7 @@ final class McpAbilityRegistration
         'nhk.public-url.reproject' => 'nhk-v3/public-url-reproject',
         'nhk.article.ingest' => 'nhk-v3/article-ingest',
         'nhk.capture.ingest' => 'nhk-v3/capture-ingest',
+        'nhk.capture.recover' => 'nhk-v3/capture-recover',
         'nhk.category.create' => 'nhk-v3/category-create',
         'nhk.category.update' => 'nhk-v3/category-update',
         'nhk.category.assign' => 'nhk-v3/category-assign',
@@ -823,7 +825,7 @@ final class McpAbilityRegistration
         if (function_exists('current_user_can') && !current_user_can('read')) return false;
         if (SingleEntryPointPolicy::isInternalOnly($tool) && (!function_exists('current_user_can') || !current_user_can(SingleEntryPointPolicy::INTERNAL_CAPABILITY))) return false;
         $capability = match ($tool) {
-            'nhk.article.ingest', 'nhk.capture.ingest', 'nhk.category.create', 'nhk.category.update', 'nhk.category.assign', 'nhk.category.unassign', 'nhk.category.delete', 'nhk.article.draft.create', 'nhk.article.draft.update', 'nhk.article.publish', 'nhk.article.publish.review', 'nhk.article.publish.approve', 'nhk.article.trash', 'nhk.article.restore' => 'nhk_ingest_articles',
+            'nhk.article.ingest', 'nhk.capture.ingest', 'nhk.capture.recover', 'nhk.category.create', 'nhk.category.update', 'nhk.category.assign', 'nhk.category.unassign', 'nhk.category.delete', 'nhk.article.draft.create', 'nhk.article.draft.update', 'nhk.article.publish', 'nhk.article.publish.review', 'nhk.article.publish.approve', 'nhk.article.trash', 'nhk.article.restore' => 'nhk_ingest_articles',
             'nhk.proposal.submit' => 'nhk_submit_proposals',
             'nhk.proposal.approve', 'nhk.proposal.reject' => 'nhk_approve_proposals',
             'nhk.proposal.eligibility' => 'nhk_view_governance',
@@ -861,6 +863,7 @@ final class McpAbilityRegistration
                 'nhk.relation.backfill.dry_run' => $read->relationBackfillDryRun((array) ($input['records'] ?? [])),
                 'nhk.semantic.resolve' => $read->semanticResolve((array) ($input['context'] ?? [])),
                 'nhk.capture.get' => $read->captureGet((string) ($input['id'] ?? '')),
+                'nhk.capture.recover' => self::executeMcp('nhk.capture.recover', $input),
                 'nhk.documentation.bootstrap', 'nhk.documentation.get', 'nhk.documentation.list', 'nhk.docs.bootstrap', 'nhk.docs.get' => self::executeMcp($tool, $input),
                 'nhk.entity.neighborhood' => $read->entityNeighborhood((string) ($input['type'] ?? ''), (string) ($input['id'] ?? ''), (string) ($input['profile'] ?? ''), (int) ($input['max_hops'] ?? 2), (int) ($input['limit'] ?? 50)),
                 'nhk.article.preflight' => self::executeMcp($tool, $input),
@@ -927,6 +930,7 @@ final class McpAbilityRegistration
             'nhk.media.attachment.get' => 'NHK Media Read-back',
             'nhk.article.ingest' => 'NHK Article Ingest / Create Draft',
             'nhk.capture.ingest' => 'NHK Editorial Capture / Semantic Enrichment',
+            'nhk.capture.recover' => 'NHK Capture Governed Recovery',
             'nhk.category.create' => 'NHK Category Create',
             'nhk.category.update' => 'NHK Category Update',
             'nhk.category.assign' => 'NHK Category Assign',

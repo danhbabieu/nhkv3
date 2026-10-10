@@ -182,7 +182,7 @@ final class McpTransport
             'nhk.dictionary.semantic-relation.read', 'nhk.dictionary.semantic-relation.preview', 'nhk.dictionary.lexical-relation.read', 'nhk.dictionary.lexical-relation.preview' => 'nhk_view_governance',
             'nhk.dictionary.semantic-relation.apply', 'nhk.dictionary.lexical-relation.apply' => 'nhk_curate_dictionary',
             'nhk.article.ingest' => 'nhk_ingest_articles',
-            'nhk.capture.ingest' => 'nhk_ingest_articles',
+            'nhk.capture.ingest', 'nhk.capture.recover' => 'nhk_ingest_articles',
             'nhk.category.create', 'nhk.category.update', 'nhk.category.assign', 'nhk.category.unassign', 'nhk.category.delete', 'nhk.article.draft.create', 'nhk.article.draft.update', 'nhk.article.publish', 'nhk.article.publish.review', 'nhk.article.publish.approve', 'nhk.article.trash', 'nhk.article.restore' => 'nhk_ingest_articles',
             'nhk.proposal.create' => 'nhk_create_proposals',
             'nhk.media.ingest', 'nhk.media.update', 'nhk.media.bind', 'nhk.media.usage' => 'nhk_create_proposals',
@@ -272,6 +272,7 @@ final class McpTransport
             'nhk.article.preflight' => $this->article?->preflight($arguments) ?? throw new \RuntimeException('ARTICLE_INGEST_HANDLER_UNAVAILABLE'),
             'nhk.article.ingest' => $this->article?->ingest($arguments) ?? throw new \RuntimeException('ARTICLE_INGEST_HANDLER_UNAVAILABLE'),
             'nhk.capture.ingest' => $this->captureIngest($arguments, $files),
+            'nhk.capture.recover' => $this->captureRecovery($arguments),
             'nhk.category.resolve' => $this->categories?->resolve((array) ($arguments['selector'] ?? [])) ?? throw new \RuntimeException('CATEGORY_GATEWAY_UNAVAILABLE'),
             'nhk.category.create' => $this->categories?->create((string) ($arguments['name'] ?? ''), (string) ($arguments['slug'] ?? ''), (int) ($arguments['parent'] ?? 0)) ?? throw new \RuntimeException('CATEGORY_GATEWAY_UNAVAILABLE'),
             'nhk.category.update' => $this->categories?->update((int) ($arguments['id'] ?? 0), (array) ($arguments['changes'] ?? []), isset($arguments['expected_fingerprint']) ? (string) $arguments['expected_fingerprint'] : null) ?? throw new \RuntimeException('CATEGORY_GATEWAY_UNAVAILABLE'),
@@ -625,6 +626,61 @@ final class McpTransport
             return $this->captureContinuation->execute($arguments);
         }
         return $this->capture->execute($arguments)->toArray();
+    }
+
+    /** @return array<string,mixed> */
+    private function captureRecovery(array $arguments): array
+    {
+        if ($this->captureContinuation === null) throw new \RuntimeException('EDITORIAL_CAPTURE_CONTINUATION_UNAVAILABLE');
+        $arguments = $this->normalizeRecoverySubjectCandidate($arguments);
+        $arguments['_internal_authorized'] = true;
+        $arguments['_actor_id'] = function_exists('get_current_user_id') ? (string) get_current_user_id() : '0';
+        return $this->captureContinuation->recover($arguments);
+    }
+
+    /**
+     * A recovery operator may submit a canonical candidate packet obtained
+     * from the read-only Authority resolver. The resolver is the authority
+     * check: client text, type guesses, and stale revisions are never enough.
+     *
+     * @param array<string,mixed> $arguments
+     * @return array<string,mixed>
+     */
+    private function normalizeRecoverySubjectCandidate(array $arguments): array
+    {
+        $selection = is_array($arguments['subject_reconciliation'] ?? null) ? $arguments['subject_reconciliation'] : null;
+        $candidate = is_array($selection['canonical_candidate'] ?? null) ? $selection['canonical_candidate'] : null;
+        if ($candidate === null) return $arguments;
+
+        $id = trim((string) ($candidate['id'] ?? ''));
+        $type = trim((string) ($candidate['type'] ?? ''));
+        $resolved = $this->read->semanticResolve(['canonical_uuid' => $id]);
+        $authority = is_array($resolved['resolved'] ?? null) ? ($resolved['resolved'][$type] ?? null) : null;
+        if (!is_array($authority)
+            || !hash_equals($id, (string) ($authority['id'] ?? ''))
+            || !hash_equals((string) ($candidate['stable_key'] ?? ''), (string) ($authority['stable_key'] ?? ''))
+            || !hash_equals((string) ($candidate['name'] ?? ''), (string) ($authority['name'] ?? ''))
+            || (int) ($candidate['revision'] ?? 0) !== (int) ($authority['revision'] ?? 0)
+        ) {
+            throw new \InvalidArgumentException('CAPTURE_RECOVERY_CANDIDATE_PACKET_INVALID');
+        }
+
+        $selection['confirmed'] = true;
+        $selection['candidate_uuid'] = $id;
+        $selection['authority'] = 'GOVERNED_SUBJECT_RECONCILIATION';
+        $selection['packet'] = [
+            'status' => 'resolved',
+            'canonical_subject_id' => $authority['id'],
+            'entity_type' => $authority['type'],
+            'stable_key' => $authority['stable_key'],
+            'canonical_name' => $authority['name'],
+            'revision' => (int) $authority['revision'],
+            'match_reason' => (string) ($candidate['match'] ?? 'canonical_candidate_packet'),
+            'primary_source' => 'GOVERNED_SUBJECT_RECONCILIATION',
+        ];
+        unset($selection['canonical_candidate']);
+        $arguments['subject_reconciliation'] = $selection;
+        return $arguments;
     }
 
     private function assertDictionaryOwnerPlan(array $arguments): void

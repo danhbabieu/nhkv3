@@ -90,6 +90,102 @@ final class EditorialCaptureContinuationService
         }
     }
 
+    /**
+     * Resume one existing Capture through a recovery-only boundary.
+     *
+     * The caller supplies only the Capture identity and a CAS revision. The
+     * persisted original idempotency identity is intentionally used below the
+     * transport boundary and is never returned in this projection.
+     *
+     * @return array{capture:array<string,mixed>,recovery:array<string,mixed>}
+     */
+    public function recover(array $input): array
+    {
+        $captureId = trim((string) ($input['capture_id'] ?? ''));
+        $expectedRevision = (int) ($input['expected_revision'] ?? 0);
+        if (!UuidCodec::isValid($captureId)) return $this->recoveryFailure($captureId, 'CAPTURE_RECOVERY_CAPTURE_ID_INVALID');
+        if ($expectedRevision < 1) return $this->recoveryFailure($captureId, 'CAPTURE_RECOVERY_REVISION_REQUIRED');
+
+        $capture = $this->captures->findById($captureId);
+        if (!$capture instanceof CaptureRecord) return $this->recoveryFailure($captureId, 'CAPTURE_NOT_FOUND');
+        // The MCP transport supplies this only after the internal capability
+        // and one-entry-point guards have passed. An owner binding, when
+        // present, is still mandatory; legacy rows without one require the
+        // stronger internal recovery capability.
+        if (($input['_internal_authorized'] ?? false) !== true) return $this->recoveryFailure($captureId, 'CAPTURE_RECOVERY_AUTHORIZATION_REQUIRED', $capture);
+        $owner = trim((string) ($capture->context['owner_principal_id'] ?? ''));
+        $actor = trim((string) ($input['_actor_id'] ?? ''));
+        if ($owner !== '' && ($actor === '' || !hash_equals($owner, $actor))) return $this->recoveryFailure($captureId, 'CAPTURE_RECOVERY_OWNERSHIP_REQUIRED', $capture);
+
+        $children = array_values(array_unique(array_map('strtolower', array_map('strval', (array) ($input['resume_children'] ?? ['video'])))));
+        if ($children === []) $children = ['video'];
+        if (array_diff($children, ['video']) !== []) return $this->recoveryFailure($captureId, 'CAPTURE_RECOVERY_CHILD_NOT_SUPPORTED', $capture);
+        $operationFingerprint = hash('sha256', CommandCanonicalizer::canonicalize([
+            'capture_id' => $capture->captureId,
+            'capture_revision' => $expectedRevision,
+            'resume_children' => $children,
+            'subject_reconciliation' => is_array($input['subject_reconciliation'] ?? null) ? $input['subject_reconciliation'] : null,
+        ]));
+        $audit = is_array($capture->diagnostics['recovery_audit'] ?? null) ? $capture->diagnostics['recovery_audit'] : [];
+        foreach ($audit as $entry) {
+            if (!is_array($entry) || !hash_equals((string) ($entry['operation_fingerprint'] ?? ''), $operationFingerprint)) continue;
+            $current = $this->captures->findById($captureId) ?? $capture;
+            return ['capture' => $this->redactRecoveryCapture($current->toArray()), 'recovery' => ['status' => 'REPLAYED', 'audit_id' => (string) ($entry['audit_id'] ?? ''), 'operation_fingerprint' => $operationFingerprint]];
+        }
+        if ($capture->revision !== $expectedRevision) return $this->recoveryFailure($captureId, 'CAPTURE_RECOVERY_STALE_REVISION', $capture);
+
+        $auditId = UuidCodec::newV7();
+        $audit[] = [
+            'audit_id' => $auditId,
+            'operation_fingerprint' => $operationFingerprint,
+            'capture_revision' => $capture->revision,
+            'actor_id' => $actor !== '' ? $actor : 'internal-recovery',
+            'status' => 'STARTED',
+            'started_at' => gmdate('c'),
+        ];
+        $diagnostics = $capture->diagnostics;
+        $diagnostics['recovery_audit'] = $audit;
+        try {
+            $started = $this->captures->save(new CaptureRecord(
+                $capture->captureId, $capture->idempotencyKey, $capture->requestFingerprint,
+                $capture->stage, $capture->status, $capture->articleId, $capture->articleStateToken,
+                $capture->assets, $capture->context, $diagnostics, $capture->phaseReceipts,
+                $capture->revision + 1, $capture->createdAt, gmdate('Y-m-d H:i:s.u'),
+            ));
+            $retryInput = [
+                'capture_id' => $started->captureId,
+                'idempotency_key' => $started->idempotencyKey,
+                'resume_mode' => 'RETRY',
+                'resume_children' => $children,
+                'documentation_checkpoint' => is_array($input['documentation_checkpoint'] ?? null) ? $input['documentation_checkpoint'] : [],
+            ];
+            if (is_array($input['subject_reconciliation'] ?? null)) $retryInput['subject_reconciliation'] = $input['subject_reconciliation'];
+            $result = $this->retry($retryInput);
+            $current = $this->captures->findById($captureId);
+            if ($current instanceof CaptureRecord) {
+                $audit = is_array($current->diagnostics['recovery_audit'] ?? null) ? $current->diagnostics['recovery_audit'] : $audit;
+                foreach ($audit as &$entry) {
+                    if (is_array($entry) && ($entry['audit_id'] ?? '') === $auditId) {
+                        $entry['status'] = (string) ($result['retry']['status'] ?? 'COMPLETED');
+                        $entry['code'] = $result['retry']['code'] ?? null;
+                        $entry['finished_at'] = gmdate('c');
+                    }
+                }
+                unset($entry);
+                $current = $this->captures->save(new CaptureRecord(
+                    $current->captureId, $current->idempotencyKey, $current->requestFingerprint,
+                    $current->stage, $current->status, $current->articleId, $current->articleStateToken,
+                    $current->assets, $current->context, array_replace($current->diagnostics, ['recovery_audit' => $audit]),
+                    $current->phaseReceipts, $current->revision + 1, $current->createdAt, gmdate('Y-m-d H:i:s.u'),
+                ));
+            }
+            $captureProjection = $current instanceof CaptureRecord ? $current->toArray() : (array) ($result['capture'] ?? []);
+            return ['capture' => $this->redactRecoveryCapture($captureProjection), 'recovery' => ['status' => (string) ($result['retry']['status'] ?? 'COMPLETED'), 'code' => $result['retry']['code'] ?? null, 'audit_id' => $auditId, 'operation_fingerprint' => $operationFingerprint]];
+        } catch (Throwable $error) {
+            return $this->recoveryFailure($captureId, $this->code($error), $this->captures->findById($captureId), $auditId, $operationFingerprint);
+        }
+    }
+
     /** @return array{capture:array<string,mixed>,addendum:array<string,mixed>} */
     public function execute(array $input): array
     {
@@ -397,6 +493,22 @@ final class EditorialCaptureContinuationService
     private function retryFailure(string $captureId, string $code, ?CaptureRecord $capture = null): array
     {
         return ['capture' => $capture?->toArray() ?? ['capture_id' => $captureId, 'status' => 'unavailable'], 'retry' => ['mode' => 'RETRY', 'status' => 'FAILED', 'code' => $code]];
+    }
+
+    /** @return array{capture:array<string,mixed>,recovery:array<string,mixed>} */
+    private function recoveryFailure(string $captureId, string $code, ?CaptureRecord $capture = null, string $auditId = '', string $operationFingerprint = ''): array
+    {
+        return [
+            'capture' => $capture instanceof CaptureRecord ? $this->redactRecoveryCapture($capture->toArray()) : ['capture_id' => $captureId, 'status' => 'unavailable'],
+            'recovery' => ['status' => 'FAILED', 'code' => $code, 'audit_id' => $auditId !== '' ? $auditId : null, 'operation_fingerprint' => $operationFingerprint !== '' ? $operationFingerprint : null],
+        ];
+    }
+
+    /** @param array<string,mixed> $capture */
+    private function redactRecoveryCapture(array $capture): array
+    {
+        unset($capture['idempotency_key']);
+        return $capture;
     }
 
     private function fingerprint(array $input, ?CaptureAddendumRecord $existing = null): string

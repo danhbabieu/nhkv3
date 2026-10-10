@@ -18,6 +18,7 @@ final class SingleEntryPointPolicy
     /** @var list<string> */
     private const INTERNAL_ONLY_TOOLS = [
         'nhk.article.ingest',
+        'nhk.capture.recover',
         'nhk.category.create',
         'nhk.category.update',
         'nhk.category.assign',
