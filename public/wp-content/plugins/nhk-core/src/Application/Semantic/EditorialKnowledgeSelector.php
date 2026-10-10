@@ -131,6 +131,14 @@ final class EditorialKnowledgeSelector
             $claim['utility'] = ['information_gain' => $this->novelty($claim, $inputContext), 'reader_value' => round($this->score($claim, $topic, $inputContext), 6), 'semantic_coverage' => $aspects, 'total' => round($this->score($claim, $topic, $inputContext) + count($aspects), 6)];
             $claim['editorial_role'] = $isExactCoverage || $retrievalOrigin === 'neighborhood' ? $this->role($claim, $selected) : 'SUPPORTING_CONTEXT';
             $claim['semantic_context_only'] = !$isExactCoverage;
+            // A neighborhood/contextual claim must never retain the retrieval
+            // default DIRECT_FACT.  The quality gate treats that combination
+            // as an exact public assertion, so normalize it at the selection
+            // boundary before the claim enters a reader journey or composer.
+            if ($claim['semantic_context_only'] === true
+                && strtoupper(trim((string) ($claim['editorial_treatment'] ?? ''))) === 'DIRECT_FACT') {
+                $claim['editorial_treatment'] = 'SUPPORTING_CONTEXT';
+            }
             $claim['selection_reason'] = $isExactCoverage ? 'applicable KnowledgeUnit adds uncovered reader coverage' : 'applicable KnowledgeUnit provides bounded contextual support';
             $claim['state'] = EditorialSemanticRolePolicy::SELECTED;
             $claim['publicly_composable'] = true;

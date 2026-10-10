@@ -19,7 +19,7 @@ final class SemanticSpecificityPropagationTest extends TestCase
             'graph_path' => [['source' => 'variant:variant-x', 'predicate' => 'variant_of', 'target' => 'model:model-x']],
             'evidence' => ['status' => 'eligible'], 'provenance' => 'CATALOG_SUPPORTED',
             'retrieval_tier' => 'BACKGROUND_CONTEXT', 'coverage_kind' => 'contextual',
-            'editorial_treatment' => 'BACKGROUND_CONTEXT',
+            'editorial_treatment' => 'BACKGROUND_CONTEXT', 'relevance_score' => 1.0,
         ];
         $pack = (new EditorialKnowledgeSelector())->select(['status' => 'available', 'items' => [$claim], 'eligible_claims' => [$claim]], 'Variant-X', ['id' => 'variant-x', 'type' => 'variant'], ['profile' => 'article']);
         $selected = $pack->selectedClaims[0];
@@ -45,5 +45,37 @@ final class SemanticSpecificityPropagationTest extends TestCase
 
         $quality = (new EditorialQualityGate())->evaluate($pack, $plan, $draft, $seo);
         self::assertContains('INSUFFICIENT_READER_COVERAGE', $quality->warnings);
+    }
+
+    public function test_contextual_neighborhood_claim_with_direct_fact_default_is_normalized_before_quality_gate(): void
+    {
+        $claim = [
+            'claim_id' => 'context-default-direct', 'claim_revision' => 1, 'text' => 'Model rộng hơn có lịch sử riêng.',
+            'eligibility' => 'eligible', 'publicly_composable' => true, 'subject_id' => 'model-x', 'subject_type' => 'model',
+            'original_subject' => ['id' => 'model-x', 'type' => 'model'],
+            'resolved_primary_subject' => ['id' => 'variant-x', 'type' => 'variant'],
+            'scope' => 'model', 'facet' => 'history', 'retrieval_origin' => 'neighborhood',
+            'graph_path' => [['source' => 'variant:variant-x', 'predicate' => 'variant_of', 'target' => 'model:model-x']],
+            'evidence' => ['status' => 'eligible'], 'provenance' => 'CATALOG_SUPPORTED',
+            'retrieval_tier' => 'BACKGROUND_CONTEXT', 'coverage_kind' => 'contextual',
+            'editorial_treatment' => 'DIRECT_FACT', 'relevance_score' => 1.0,
+        ];
+
+        $pack = (new EditorialKnowledgeSelector())->select(
+            ['status' => 'available', 'items' => [$claim], 'eligible_claims' => [$claim]],
+            'Variant-X',
+            ['id' => 'variant-x', 'type' => 'variant'],
+            ['profile' => 'article']
+        );
+        self::assertSame('SUPPORTING_CONTEXT', $pack->selectedClaims[0]['editorial_treatment']);
+        self::assertTrue($pack->selectedClaims[0]['semantic_context_only']);
+
+        $plan = (new ReaderJourneyPlanner())->plan($pack);
+        $draft = (new SharedEditorialComposer())->compose($plan);
+        $seo = (new SemanticSeoPlanner())->plan($pack, $plan, $draft, ['structured_data' => ['type' => 'Article']]);
+        $quality = (new EditorialQualityGate())->evaluate($pack, $plan, $draft, $seo);
+
+        self::assertSame('SUPPORTING_CONTEXT', $draft->claimTrace[0]['editorial_treatment']);
+        self::assertNotContains('CONTEXTUAL_CLAIM_RENDERED_AS_EXACT', $quality->blockers);
     }
 }

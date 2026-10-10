@@ -32,7 +32,12 @@ final class ReaderJourneyPlanner
             $unitClaims = array_values(array_filter((array) ($unit['supporting_claims'] ?? []), 'is_array'));
             if ($unitClaims === []) $unitClaims = [$claim];
             $unitClaims = array_map(static function (array $unitClaim) use ($claim): array {
-                return array_replace($claim, $unitClaim, ['editorial_role' => $claim['editorial_role'] ?? 'CONTEXT', 'eligibility' => $unitClaim['eligibility'] ?? ($claim['eligibility'] ?? ''), 'publicly_composable' => $unitClaim['publicly_composable'] ?? ($claim['publicly_composable'] ?? true)]);
+                $merged = array_replace($claim, $unitClaim, ['editorial_role' => $claim['editorial_role'] ?? 'CONTEXT', 'eligibility' => $unitClaim['eligibility'] ?? ($claim['eligibility'] ?? ''), 'publicly_composable' => $unitClaim['publicly_composable'] ?? ($claim['publicly_composable'] ?? true)]);
+                if (($merged['semantic_context_only'] ?? false) === true
+                    && strtoupper(trim((string) ($merged['editorial_treatment'] ?? ''))) === 'DIRECT_FACT') {
+                    $merged['editorial_treatment'] = 'SUPPORTING_CONTEXT';
+                }
+                return $merged;
             }, $unitClaims);
             $sections[] = [
                 'id' => $this->sectionId($role, (string) ($claim['claim_id'] ?? $index), $roleIndex),
