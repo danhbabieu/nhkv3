@@ -12,7 +12,7 @@ use NHK\Core\Application\Knowledge\KnowledgeRepairPreviewService;
 use NHK\Core\Contracts\Governance\GovernedLifecycle;
 use NHK\Core\Contracts\Governance\PendingVideoProposalLookup;
 use NHK\Core\Contracts\Governance\VideoProposalReconciliationPort;
-use NHK\Core\Contracts\Knowledge\KnowledgeRepository;
+use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
 use NHK\Core\Domain\Governance\{CommandCanonicalizer, Proposal, ProposalState};
 use NHK\Core\Domain\Authority\{CanonicalEntityTypeCatalog, EntityTypeRegistry};
 use NHK\Core\Domain\Governance\ProposalSubjectBindingValidator;
@@ -68,6 +68,8 @@ final class GovernedCaptureContinuationService
         private $relationScopeIssuer = null,
         private ?CanonicalDependencyValidator $canonicalDependencies = null,
         private ?KnowledgeRepository $knowledgeRepository = null,
+        private ?SourceRepository $sourceRepository = null,
+        private ?EvidenceRepository $evidenceRepository = null,
         private ?KnowledgeRepairPreviewService $knowledgeRepairPreview = null,
         private ?EntityTypeRegistry $entityTypes = null,
     ) {
@@ -1442,6 +1444,22 @@ final class GovernedCaptureContinuationService
             $claim = $stableKey !== '' ? $this->knowledgeRepository->findByStableKey($stableKey) : null;
             if ($claim !== null && $claim->active) {
                 return ['canonical_id' => $claim->canonicalId, 'entity_type' => 'knowledge', 'active' => true, 'revision' => $claim->revision];
+            }
+            return null;
+        }
+        if ($proposal->entityType === 'source' && $this->sourceRepository !== null) {
+            $stableKey = trim((string) ($proposal->payload['stable_key'] ?? ''));
+            $source = $stableKey !== '' ? $this->sourceRepository->findByStableKey($stableKey) : null;
+            if ($source !== null && $source->active) {
+                return ['canonical_id' => $source->canonicalId, 'entity_type' => 'source', 'active' => true, 'revision' => $source->revision];
+            }
+            return null;
+        }
+        if ($proposal->entityType === 'evidence' && $this->evidenceRepository !== null) {
+            $canonicalId = trim((string) ($proposal->targetUuid ?? $proposal->subjectId));
+            $evidence = $canonicalId !== '' ? $this->evidenceRepository->findByCanonicalId($canonicalId) : null;
+            if ($evidence !== null && $evidence->active) {
+                return ['canonical_id' => $evidence->canonicalId, 'entity_type' => 'evidence', 'active' => true, 'revision' => $evidence->revision];
             }
             return null;
         }

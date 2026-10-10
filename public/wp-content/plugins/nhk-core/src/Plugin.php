@@ -1004,6 +1004,8 @@ final class Plugin {
                 },
                 canonicalDependencies: $canonicalDependencies,
                 knowledgeRepository: $claims,
+                sourceRepository: $sources,
+                evidenceRepository: $evidence,
                 knowledgeRepairPreview: $knowledgeRepairPreview,
             );
             $articleReceipts = new WpdbArticleOperationReceiptRepository($wpdb);

@@ -2133,7 +2133,10 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
     {
         $proposalId = UuidCodec::newV7();
         $sourceId = UuidCodec::newV7();
-        $payload = ['stable_key' => 'nhk:source:youtube:5CqjJDgzFcI', 'locator' => 'https://www.youtube.com/watch?v=5CqjJDgzFcI'];
+        $payload = ['stable_key' => 'nhk:source:youtube:5cqjjdgzfci', 'locator' => 'https://www.youtube.com/watch?v=5CqjJDgzFcI'];
+        $source = new Source($sourceId, $payload['stable_key'], 'Đồng hồ công cộng', locator: $payload['locator']);
+        $sources = $this->createMock(SourceRepository::class);
+        $sources->expects(self::once())->method('findByStableKey')->with($payload['stable_key'])->willReturn($source);
         $governance = $this->createMock(GovernedLifecycle::class);
         $governance->expects(self::once())->method('review')->with($proposalId)->willReturn([
             'state' => 'applied', 'entity_type' => 'source', 'operation' => 'ingest', 'subject_id' => $sourceId,
@@ -2144,6 +2147,7 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
             static fn (): array => throw new \LogicException('APPLIED proposal must not be applied again'),
             $this->policies(),
             static fn (): bool => true,
+            sourceRepository: $sources,
             videoDependencyState: static function (array $plan) use ($sourceId, $payload): array {
                 self::assertSame($payload, $plan['capture_video_provenance']['dependencies'][0]['payload']);
                 return ['source' => ['canonical_id' => $sourceId, 'revision' => 1, 'active' => true]];
