@@ -2133,10 +2133,13 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
     {
         $proposalId = UuidCodec::newV7();
         $sourceId = UuidCodec::newV7();
-        $payload = ['stable_key' => 'nhk:source:youtube:5cqjjdgzfci', 'locator' => 'https://www.youtube.com/watch?v=5CqjJDgzFcI'];
+        $payload = ['stable_key' => 'nhk:source:video:5cqjjdgzfci', 'locator' => 'https://www.youtube.com/watch?v=5CqjJDgzFcI'];
         $source = new Source($sourceId, $payload['stable_key'], 'Đồng hồ công cộng', locator: $payload['locator']);
         $sources = $this->createMock(SourceRepository::class);
-        $sources->expects(self::once())->method('findByStableKey')->with($payload['stable_key'])->willReturn($source);
+        $sources->expects(self::exactly(2))->method('findByStableKey')->willReturnMap([
+            [$payload['stable_key'], null],
+            ['nhk:video-source:5cqjjdgzfci', $source],
+        ]);
         $governance = $this->createMock(GovernedLifecycle::class);
         $governance->expects(self::once())->method('review')->with($proposalId)->willReturn([
             'state' => 'applied', 'entity_type' => 'source', 'operation' => 'ingest', 'subject_id' => $sourceId,

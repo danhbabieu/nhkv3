@@ -1451,6 +1451,12 @@ final class GovernedCaptureContinuationService
             $stableKey = trim((string) ($proposal->payload['stable_key'] ?? '')) ?: trim($proposal->subjectId);
             $canonicalId = trim((string) ($proposal->targetUuid ?? ''));
             $source = $canonicalId !== '' ? $this->sourceRepository->findByCanonicalId($canonicalId) : ($stableKey !== '' ? $this->sourceRepository->findByStableKey($stableKey) : null);
+            if ($source === null && str_starts_with($stableKey, 'nhk:source:video:')) {
+                // Preserve the already-owned Source created by the earlier
+                // video provenance contract. This is a read-only identity
+                // compatibility path; it never creates a replacement owner.
+                $source = $this->sourceRepository->findByStableKey('nhk:video-source:' . substr($stableKey, strlen('nhk:source:video:')));
+            }
             if ($source !== null && $source->active) {
                 return ['canonical_id' => $source->canonicalId, 'entity_type' => 'source', 'active' => true, 'revision' => $source->revision];
             }
