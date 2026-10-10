@@ -432,6 +432,7 @@ final class CompletionCoordinator
             'content_quality' => $packet['content_state'] ?? null,
             'public_state' => $packet['public_state'] ?? null,
             'frontend_state' => $packet['frontend_state'] ?? null,
+            'outcome_obligations' => is_array($packet['outcome_obligations'] ?? null) ? $packet['outcome_obligations'] : [],
             'blockers' => $packet['blockers'] ?? [],
             'owner_role' => ($packet['public_state'] ?? null) === 'NOT_APPLICABLE' && ($packet['frontend_state'] ?? null) === 'NOT_APPLICABLE' ? 'semantic_dependency' : null,
             'public_projection_owner' => !(($packet['public_state'] ?? null) === 'NOT_APPLICABLE' && ($packet['frontend_state'] ?? null) === 'NOT_APPLICABLE'),

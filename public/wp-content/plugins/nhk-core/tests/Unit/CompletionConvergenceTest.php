@@ -426,6 +426,40 @@ final class CompletionConvergenceTest extends TestCase
         self::assertTrue($packet['complete']);
     }
 
+    public function test_current_video_completion_recompute_preserves_required_public_obligations(): void
+    {
+        $plan = (new OutcomeObligationCompiler())->compile('capture-video-current', ['intent' => 'VIDEO'], [
+            'owner_types' => ['video'],
+            'owner_capabilities' => ['video' => ['public_capable' => true]],
+            'publish' => true,
+        ]);
+        $child = (new CompletionCoordinator())->finalize('video', 'video-1', [
+            'canonical_readback' => ['canonical_id' => 'video-1'],
+            'dependency_state' => 'COMPLETE',
+            'relation_or_usage_state' => 'COMPLETE',
+            'content_quality' => 'CONTENT_COMPLETE',
+            'public_eligible' => true,
+            'frontend_verified' => true,
+            'outcome_obligations' => $plan,
+        ]);
+
+        $packet = (new CompletionCoordinator())->aggregateCapture('capture-video-current', [[
+            'current_outcome' => true,
+            'completion' => $child,
+        ]], [
+            'canonical_state' => 'COMPLETE',
+            'canonical_readback' => ['canonical_id' => 'capture-video-current'],
+            'required_owners' => [['owner_type' => 'video', 'owner_id' => 'video-1']],
+            'outcome_obligations' => $plan,
+        ]);
+
+        self::assertTrue($packet['complete']);
+        self::assertSame('READY', $packet['public_state']);
+        self::assertSame('VERIFIED', $packet['frontend_state']);
+        self::assertSame([], $packet['blockers']);
+        self::assertSame($plan['fingerprint'], $packet['children'][0]['outcome_obligations']['fingerprint']);
+    }
+
     public function test_persisted_capture_path_keeps_current_dependency_over_later_historical_projection(): void
     {
         $captureId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
