@@ -134,6 +134,7 @@ final class EditorialCaptureContinuationService
             return ['capture' => $this->redactRecoveryCapture($current->toArray()), 'recovery' => ['status' => 'REPLAYED', 'audit_id' => (string) ($entry['audit_id'] ?? ''), 'operation_fingerprint' => $operationFingerprint]];
         }
         if ($capture->revision !== $expectedRevision) return $this->recoveryFailure($captureId, 'CAPTURE_RECOVERY_STALE_REVISION', $capture);
+        $capture = $this->promoteDocumentationCheckpoint($capture, (array) ($input['documentation_checkpoint'] ?? []));
 
         $auditId = UuidCodec::newV7();
         $audit[] = [
@@ -516,6 +517,35 @@ final class EditorialCaptureContinuationService
     {
         unset($capture['idempotency_key']);
         return $capture;
+    }
+
+    private function promoteDocumentationCheckpoint(CaptureRecord $capture, array $checkpoint): CaptureRecord
+    {
+        if ($checkpoint === []) return $capture;
+        $context = $capture->context;
+        $current = is_array($context['documentation_checkpoint'] ?? null) ? $context['documentation_checkpoint'] : [];
+        if ($current !== [] && CommandCanonicalizer::canonicalize($current) !== CommandCanonicalizer::canonicalize($checkpoint)) {
+            $history = is_array($context['documentation_checkpoint_history'] ?? null) ? $context['documentation_checkpoint_history'] : [];
+            $history[] = $current;
+            $context['documentation_checkpoint_history'] = array_values($history);
+        }
+        $context['documentation_checkpoint'] = $checkpoint;
+        return new CaptureRecord(
+            $capture->captureId,
+            $capture->idempotencyKey,
+            $capture->requestFingerprint,
+            $capture->stage,
+            $capture->status,
+            $capture->articleId,
+            $capture->articleStateToken,
+            $capture->assets,
+            $context,
+            $capture->diagnostics,
+            $capture->phaseReceipts,
+            $capture->revision,
+            $capture->createdAt,
+            $capture->updatedAt,
+        );
     }
 
     private function fingerprint(array $input, ?CaptureAddendumRecord $existing = null): string

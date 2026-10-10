@@ -367,6 +367,40 @@ final class EditorialCaptureContinuationTest extends TestCase
         self::assertSame($capture->captureId, $result['capture']['capture_id']);
     }
 
+    public function test_retry_promotes_current_checkpoint_while_retaining_previous_checkpoint_history(): void
+    {
+        $captures = new ContinuationCaptureRepository();
+        $capture = new CaptureRecord(
+            UuidCodec::newV7(),
+            'capture-checkpoint-history',
+            hash('sha256', 'capture-checkpoint-history'),
+            CaptureStage::SEMANTICS_RECONCILED->value,
+            'FAILED_RETRYABLE',
+            null,
+            null,
+            [],
+            [
+                'raw_input' => 'Video cần tiếp tục.',
+                'content_intent' => ['intent' => 'VIDEO', 'article_required' => false],
+                'original_request' => ['intent' => 'VIDEO', 'video' => []],
+                'documentation_checkpoint' => ['documentation_version' => 'old', 'manifest_hash' => 'old'],
+            ],
+            ['failure' => ['code' => 'CAPTURE_EXECUTION_INTERRUPTED']],
+        );
+        $captures->create($capture);
+        $current = ['documentation_version' => 'new', 'manifest_hash' => 'new'];
+        $events = [];
+        $service = new EditorialCaptureContinuationService($captures, new ContinuationAddendumRepository(), $this->coordinator($captures, $events));
+        $method = new \ReflectionMethod($service, 'promoteDocumentationCheckpoint');
+        $method->setAccessible(true);
+        $promoted = $method->invoke($service, $capture, $current);
+
+        self::assertSame($current, $promoted->context['documentation_checkpoint']);
+        self::assertSame([
+            ['documentation_version' => 'old', 'manifest_hash' => 'old'],
+        ], $promoted->context['documentation_checkpoint_history']);
+    }
+
     public function test_retry_accepts_equivalent_video_url_but_rejects_changed_external_identity(): void
     {
         $capture = new CaptureRecord(
