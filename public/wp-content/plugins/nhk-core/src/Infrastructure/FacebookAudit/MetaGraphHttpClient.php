@@ -42,7 +42,7 @@ final class MetaGraphHttpClient
     private function nativeGet(string $url, array $query): array
     {
         $context = stream_context_create(['http' => ['method' => 'GET', 'timeout' => 15, 'ignore_errors' => true]]);
-        $body = file_get_contents($url . '?' . http_build_query($query), false, $context);
+        $body = @file_get_contents($url . '?' . http_build_query($query), false, $context);
         $decoded = json_decode((string) $body, true);
         return is_array($decoded) ? $decoded : ['error_code' => 'META_INVALID_RESPONSE'];
     }
