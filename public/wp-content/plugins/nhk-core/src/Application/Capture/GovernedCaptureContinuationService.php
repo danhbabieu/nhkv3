@@ -1440,7 +1440,7 @@ final class GovernedCaptureContinuationService
     private function uncertainApplyReadback(array $plan, Proposal $proposal): ?array
     {
         if ($proposal->entityType === 'knowledge' && $this->knowledgeRepository !== null) {
-            $stableKey = trim((string) ($proposal->payload['stable_key'] ?? ''));
+            $stableKey = trim((string) ($proposal->payload['stable_key'] ?? '')) ?: trim($proposal->subjectId);
             $claim = $stableKey !== '' ? $this->knowledgeRepository->findByStableKey($stableKey) : null;
             if ($claim !== null && $claim->active) {
                 return ['canonical_id' => $claim->canonicalId, 'entity_type' => 'knowledge', 'active' => true, 'revision' => $claim->revision];
@@ -1448,8 +1448,9 @@ final class GovernedCaptureContinuationService
             return null;
         }
         if ($proposal->entityType === 'source' && $this->sourceRepository !== null) {
-            $stableKey = trim((string) ($proposal->payload['stable_key'] ?? ''));
-            $source = $stableKey !== '' ? $this->sourceRepository->findByStableKey($stableKey) : null;
+            $stableKey = trim((string) ($proposal->payload['stable_key'] ?? '')) ?: trim($proposal->subjectId);
+            $canonicalId = trim((string) ($proposal->targetUuid ?? ''));
+            $source = $canonicalId !== '' ? $this->sourceRepository->findByCanonicalId($canonicalId) : ($stableKey !== '' ? $this->sourceRepository->findByStableKey($stableKey) : null);
             if ($source !== null && $source->active) {
                 return ['canonical_id' => $source->canonicalId, 'entity_type' => 'source', 'active' => true, 'revision' => $source->revision];
             }
