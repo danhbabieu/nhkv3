@@ -1,5 +1,57 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-10 — Governed Capture recovery implementation
+
+IMPLEMENTED_LOCAL: Commit `ac021d60c34934f5e0c594d9550185f529486ea6` adds the
+internal/admin-only `nhk.capture.recover` Ability and MCP dispatch. It binds
+Capture ID, expected revision, persisted request fingerprint and server-owned
+idempotency identity inside `EditorialCaptureContinuationService`; the raw
+idempotency key is neither accepted nor returned. Recovery records an append-only
+Capture audit entry, enforces internal capability plus owner binding when
+present, uses CAS/replay fingerprints, and re-enters the existing Capture →
+Video workflow. A canonical subject candidate packet is accepted only after
+current Authority UUID/stable-key/name/revision read-back; no Authority is
+created and no generic writer is used.
+
+CAPTURE_A_LOCAL: Recovery regression proves interrupted Video handoff resumes
+by Capture ID without operator-supplied idempotency, preserves identity,
+rejects stale/unauthorized/non-owner recovery, prevents duplicate semantic
+execution, and returns a redacted read-back. The supplied Capture A remains
+remote revision 8 with Video UUID
+`01a12152-6c7b-7b2a-8a77-5fb22ca9b0a5`; remote `nhk.video.get` currently
+returns `CANONICAL_RECORD_NOT_FOUND`.
+
+CAPTURE_B_READBACK: Remote persisted review exposes hints `ÔĐô 36/8`, `Odo
+36`, and `8 côn`, with `SUBJECT_CONFLICT_REVIEW_REQUIRED`, but no selected
+subject packet. Read-only Authority resolution confirms Brand Odo
+(`d2af7739-3d1b-4666-ad0a-aeda0758f4d8`, revision 3), Model Odo 36
+(`c01c109c-5d39-401e-a16e-6d61a0a52f50`, revision 1), and Variant Đồng hồ Odo
+36/8 (`852da54d-457a-4397-a16d-52d9452ba766`, revision 1). The new recovery
+candidate packet path validates this exact canonical chain before binding.
+
+VERIFIED_LOCAL: Recovery/subject/MCP contract suite passes 15 tests / 96
+assertions; the broader focused Capture/MCP boundary suite passes 125 tests /
+1,448 assertions; changed-file PHP lint and `git diff --check` pass. Full
+PHPUnit with 512 MB reports 3,950 tests / 24,935 assertions but remains
+environment/baseline blocked by 33 integration errors, 25 unrelated baseline
+failures, warnings/deprecations and 125 skips; the guarded WordPress runtime is
+not configured in this checkout.
+
+DEPLOYMENT_READBACK: Read-only SSH health passes against staging identity
+`staging` / `erourxcg_nhkv3` / `https://demo.1945.vn/`, migration `26/26`, and
+all storage/hydration/application/REST layers healthy. The remote deployed
+manifest still reports source revision `2b05e3451765812e556b40c56e3559d5aec0ab98`
+and its catalog does not contain `nhk.capture.recover`. The official verifier
+did not transfer the commit: it stopped before deployment with
+`STAGING_DEPLOYMENT_IDENTITY_REQUIRED` because `demo-deploy.ini` lacks
+`wp_home` and `wp_siteurl`. No deployment, migration, Capture mutation,
+Governance Apply, Public Identity change or direct WordPress/database write was
+performed.
+
+STATUS: `LOCAL_RECOVERY_IMPLEMENTED / LOCAL_REGRESSION_VERIFIED /
+STAGING_DEPLOYMENT_IDENTITY_REQUIRED / REMOTE_VIDEO_OWNER_MISSING /
+GOVERNANCE_AND_PUBLIC_HTTPS_UNVERIFIED / NO_SEMANTIC_MUTATION`
+
 # Checkpoint — 2026-10-10 — Supplied Capture A/B Video recovery baseline
 
 SCOPE: Fresh read-only baseline for the supplied Video recovery request. The
