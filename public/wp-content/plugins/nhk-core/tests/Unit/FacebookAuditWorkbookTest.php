@@ -19,6 +19,7 @@ final class FacebookAuditWorkbookTest extends TestCase
 
         foreach (['Tổng quan', 'Danh sách bài Fanpage', 'Danh sách bài hội nhóm', 'Bài tương tác thấp', 'Bài có rủi ro nhãn hiệu', 'Bài trùng lặp', 'Đề xuất xóa', 'Thiếu quyền truy cập', 'Chờ phê duyệt'] as $sheet) self::assertStringContainsString('name="' . $sheet . '"', $workbook);
         self::assertStringContainsString('Đồng hồ thử nghiệm', (string) $zip->getFromName('xl/worksheets/sheet2.xml'));
+        self::assertStringContainsString('collection_timestamp', (string) $zip->getFromName('xl/worksheets/sheet2.xml'));
         $zip->close();
         @unlink($path);
     }

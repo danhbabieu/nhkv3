@@ -20,7 +20,7 @@ final class FacebookAuditWorkbook
         $pageRows = self::mergeClassification($pagePosts, $classifiedById);
         $groupRows = self::mergeClassification($groupPosts, $classifiedById);
         $allRows = array_merge($pageRows, $groupRows);
-        $postHeaders = ['post_id', 'post_url', 'published_at', 'content_type', 'text', 'media_references', 'reaction_count', 'comment_count', 'share_count', 'video_views', 'source', 'classification', 'reason_codes'];
+        $postHeaders = ['post_id', 'post_url', 'published_at', 'content_type', 'text', 'media_references', 'reaction_count', 'comment_count', 'share_count', 'video_views', 'source', 'collection_timestamp', 'classification', 'reason_codes'];
         $groupHeaders = [...$postHeaders, 'group_id', 'group_url', 'group_post_kind', 'page_author_id', 'page_author_verified'];
         $low = array_values(array_filter($allRows, static fn (array $row): bool => ($row['classification'] ?? null) === 'LOW_ENGAGEMENT'));
         $trademark = array_values(array_filter($allRows, static fn (array $row): bool => ($row['classification'] ?? null) === 'TRADEMARK_REVIEW'));

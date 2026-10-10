@@ -11,7 +11,7 @@ and a GET-only Meta adapter. No semantic owner, schema, table, migration,
 Governance path, Admin UI, MCP endpoint or existing business pipeline was
 changed.
 
-VERIFIED_LOCAL: The Facebook focused suite passes 31 tests / 119 assertions
+VERIFIED_LOCAL: The Facebook focused suite passes 31 tests / 120 assertions
 after the Meta nested-metric mapping regression. Fixture CLI E2E produces a
 valid `.xlsx` with nine required sheets, direct hyperlinks, Unicode text,
 formula-injection escaping and no credentials. Changed-file PHP lint and

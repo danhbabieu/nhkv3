@@ -30,7 +30,7 @@ the nine required sheets. It reported `read_only=true` and `mutated=false`.
 
 ## Verification results
 
-- Focused Facebook suite: **PASS — 31 tests / 119 assertions**.
+- Focused Facebook suite: **PASS — 31 tests / 120 assertions**.
 - Fixture CLI E2E: **PASS — required overview keys and workbook ZIP opened**.
 - Changed-file PHP lint: **PASS**.
 - `composer lint`: **PASS**.
