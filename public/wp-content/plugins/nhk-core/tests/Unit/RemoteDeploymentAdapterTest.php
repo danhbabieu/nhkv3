@@ -59,7 +59,7 @@ final class RemoteDeploymentAdapterTest extends TestCase
         self::assertSame('pass', $result->status);
         self::assertCount(6, $commands);
         self::assertSame([
-            'rsync', '--archive', '--delete', '--checksum', '--safe-links',
+            'rsync', '--archive', '--delete', '--checksum', '--safe-links', '--chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r',
             '--exclude', 'tests/', '--exclude', '*.env', '--exclude', '*.pem',
             '-e', "'ssh' '-o' 'BatchMode=yes' '-i' '/dev/null'",
             dirname(__DIR__, 6) . '/public/wp-content/plugins/nhk-core/',
@@ -72,11 +72,13 @@ final class RemoteDeploymentAdapterTest extends TestCase
         self::assertCount(1, $muPluginCommands);
         self::assertSame('rsync', $muPluginCommands[0][0]);
         self::assertNotContains('--delete', $muPluginCommands[0]);
+        self::assertContains('--chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r', $muPluginCommands[0]);
         self::assertContains('demo.1945.vn:/srv/wp-content/mu-plugins/', $muPluginCommands[0]);
         self::assertSame('rsync', $commands[2][0]);
         self::assertContains(dirname(__DIR__, 6) . '/public/wp-content/themes/nhk-v3/', $commands[2]);
         self::assertContains('demo.1945.vn:/srv/wp-content/themes/nhk-v3/', $commands[2]);
         self::assertContains('--delete', $commands[2]);
+        self::assertContains('--chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r', $commands[2]);
         self::assertSame('ssh', $commands[3][0]);
         self::assertSame('test', $commands[3][6]);
         self::assertStringContainsString('nhk-core.php', implode(' ', $commands[3]));

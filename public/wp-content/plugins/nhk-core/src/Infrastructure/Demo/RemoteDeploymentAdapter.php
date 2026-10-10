@@ -81,19 +81,20 @@ final class RemoteDeploymentAdapter
         if ($config['ssh_key'] !== null) {
             $ssh = array_merge($ssh, ['-i', $config['ssh_key']]);
         }
-        $rsync = ['rsync', '--archive', '--delete', '--checksum', '--safe-links', '--exclude', 'tests/', '--exclude', '*.env', '--exclude', '*.pem', '-e', implode(' ', array_map('escapeshellarg', $ssh)), $source, $config['ssh_target'] . ':' . rtrim($config['remote_path'], '/') . '/'];
+        $permissions = '--chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r';
+        $rsync = ['rsync', '--archive', '--delete', '--checksum', '--safe-links', $permissions, '--exclude', 'tests/', '--exclude', '*.env', '--exclude', '*.pem', '-e', implode(' ', array_map('escapeshellarg', $ssh)), $source, $config['ssh_target'] . ':' . rtrim($config['remote_path'], '/') . '/'];
         $transfer = ($this->executor)($rsync);
         if ($transfer[0] !== 0) {
             return StageResult::failed('REMOTE_DEPLOYMENT_FAILED');
         }
         $remoteMuPluginPath = dirname(dirname(rtrim($config['remote_path'], '/'))) . '/mu-plugins';
-        $muPluginRsync = ['rsync', '--archive', '--checksum', '--safe-links', '-e', implode(' ', array_map('escapeshellarg', $ssh)), $muPluginSource, $config['ssh_target'] . ':' . $remoteMuPluginPath . '/'];
+        $muPluginRsync = ['rsync', '--archive', '--checksum', '--safe-links', $permissions, '-e', implode(' ', array_map('escapeshellarg', $ssh)), $muPluginSource, $config['ssh_target'] . ':' . $remoteMuPluginPath . '/'];
         $muPluginTransfer = ($this->executor)($muPluginRsync);
         if ($muPluginTransfer[0] !== 0) {
             return StageResult::failed('REMOTE_DEPLOYMENT_FAILED');
         }
         $remoteThemePath = dirname(dirname(rtrim($config['remote_path'], '/'))) . '/themes/nhk-v3';
-        $themeRsync = ['rsync', '--archive', '--delete', '--checksum', '--safe-links', '--exclude', '*.env', '--exclude', '*.pem', '-e', implode(' ', array_map('escapeshellarg', $ssh)), $themeSource, $config['ssh_target'] . ':' . $remoteThemePath . '/'];
+        $themeRsync = ['rsync', '--archive', '--delete', '--checksum', '--safe-links', $permissions, '--exclude', '*.env', '--exclude', '*.pem', '-e', implode(' ', array_map('escapeshellarg', $ssh)), $themeSource, $config['ssh_target'] . ':' . $remoteThemePath . '/'];
         $themeTransfer = ($this->executor)($themeRsync);
         if ($themeTransfer[0] !== 0) {
             return StageResult::failed('REMOTE_DEPLOYMENT_FAILED');
