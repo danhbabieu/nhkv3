@@ -22,6 +22,24 @@ final class CaptureCurrentOutcomeReducerTest extends TestCase
         self::assertSame(['OWNER_PUBLICATION_REQUIRED'], $reconciled['completion']['blockers']);
     }
 
+    public function test_internal_recovery_reopens_completed_video_projection_for_governed_reentry_only(): void
+    {
+        $videoId = UuidCodec::newV7();
+        $capture = new CaptureRecord(
+            UuidCodec::newV7(), 'completed-video-recovery', hash('sha256', 'completed-video-recovery'),
+            CaptureStage::SEMANTICS_RECONCILED->value, 'COMPLETE', null, null,
+            [['kind' => 'video', 'video_id' => $videoId]],
+            ['content_intent' => ['intent' => 'VIDEO']],
+            [
+                'semantic_write_back' => ['status' => 'APPLIED', 'canonical_readback' => ['canonical_id' => $videoId]],
+                'completion' => ['status' => 'PARTIAL', 'complete' => false, 'blockers' => ['VIDEO_EDITORIAL_READBACK_MISMATCH']],
+            ],
+        );
+
+        self::assertSame(['eligible' => false, 'reason' => 'CAPTURE_RETRY_NOT_ALLOWED'], CaptureCurrentOutcomeReducer::retryEligibility($capture));
+        self::assertSame(['eligible' => true, 'reason' => 'RECOVERY_GOVERNED_REENTRY'], CaptureCurrentOutcomeReducer::retryEligibility($capture, ['_recovery_mode' => true, 'resume_children' => ['video']]));
+    }
+
     public function test_reevaluable_knowledge_review_is_not_reported_as_terminal_when_retry_is_eligible(): void
     {
         $capture = new CaptureRecord(

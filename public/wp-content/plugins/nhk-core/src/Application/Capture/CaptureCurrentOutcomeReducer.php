@@ -31,6 +31,19 @@ final class CaptureCurrentOutcomeReducer
      */
     public static function currentDecision(CaptureRecord $capture, array $input = []): array
     {
+        // The recovery ability has already passed the internal capability,
+        // ownership and Capture CAS checks. It may reopen a completed-looking
+        // projection only when the persisted Video owner still has a bounded
+        // canonical completion retry. Ordinary retry/read callers retain the
+        // terminal COMPLETE rule below.
+        $recoveryMode = ($input['_recovery_mode'] ?? false) === true;
+        if ($recoveryMode && self::supportsCanonicalVideoCompletionRetry($capture) && !self::isHardBlockedReview($capture)) {
+            return [
+                'lifecycle_state' => 'RECOVERABLE_INTERRUPTED',
+                'retry' => ['eligible' => true, 'reason' => 'RECOVERY_GOVERNED_REENTRY'],
+                'blockers' => self::currentBlockers($capture->diagnostics, $capture->phaseReceipts, $capture, $input),
+            ];
+        }
         if ($capture->status === 'COMPLETE' || $capture->status === 'PUBLISHED'
             || in_array($capture->stage, ['READY_FOR_PUBLICATION', 'PUBLISHED'], true)
             && (($capture->diagnostics['completion']['complete'] ?? false) === true)) {

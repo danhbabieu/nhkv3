@@ -50,6 +50,7 @@ final class EditorialCaptureContinuationService
         $requestedChildren = array_values(array_unique(array_map('strtolower', array_map('strval', (array) ($input['resume_children'] ?? [])))));
         $subjectReconciliationProvided = array_key_exists('subject_reconciliation', $input);
         $videoCompletionRetry = !$subjectReconciliationProvided
+            && ($input['_recovery_mode'] ?? false) !== true
             && CaptureCurrentOutcomeReducer::supportsCanonicalVideoCompletionRetry($capture)
             && ($requestedChildren === [] || $requestedChildren === ['video']);
         if ($videoCompletionRetry) {
@@ -156,6 +157,11 @@ final class EditorialCaptureContinuationService
                 'capture_id' => $started->captureId,
                 'idempotency_key' => $started->idempotencyKey,
                 'resume_mode' => 'RETRY',
+                // Recovery is the privileged continuation boundary. It must
+                // re-enter the governed plan builder so a stale completion
+                // projection cannot bypass provenance and Video Proposal
+                // reconciliation.
+                '_recovery_mode' => true,
                 'resume_children' => $children,
                 'documentation_checkpoint' => is_array($input['documentation_checkpoint'] ?? null) ? $input['documentation_checkpoint'] : [],
             ];
@@ -366,6 +372,7 @@ final class EditorialCaptureContinuationService
             'video' => is_array($original['video'] ?? null) ? $original['video'] : [],
             'documentation_checkpoint' => is_array($control['documentation_checkpoint'] ?? null) ? $control['documentation_checkpoint'] : (is_array($context['documentation_checkpoint'] ?? null) ? $context['documentation_checkpoint'] : []),
             'governance' => $governance,
+            '_recovery_mode' => ($control['_recovery_mode'] ?? false) === true,
             'existing_capture_retry' => true,
             'existing_capture_continuation' => true,
             'continuation_idempotency_key' => $capture->idempotencyKey,
