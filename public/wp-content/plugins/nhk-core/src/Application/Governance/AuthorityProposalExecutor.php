@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Governance;
 
 use NHK\Core\Application\Authority\AuthorityService;
+use NHK\Core\Application\Entity\ScoreEditionAdmission;
 use NHK\Core\Application\Authority\SemanticMergeService;
 use NHK\Core\Application\Authority\SemanticRekeyMediaIsolation;
 use NHK\Core\Application\Graph\GraphService;
@@ -34,6 +35,22 @@ final class AuthorityProposalExecutor
         if ($proposal->entityType === 'wp_post' && $proposal->operation === 'subject_bind') {
             if (!$this->articleMediaSubjectBinding instanceof ArticleMediaSubjectReverseReconciliation) throw new \RuntimeException('ARTICLE_MEDIA_SUBJECT_BINDING_EXECUTOR_UNAVAILABLE');
             return $this->articleMediaSubjectBinding->apply($proposal);
+        }
+        if ($proposal->entityType === 'music' && $proposal->operation === 'score_admit') {
+            $current = $this->authority->find($proposal->targetUuid ?: $proposal->subjectId);
+            if (!$current instanceof AuthorityEntity || $current->entityType !== 'music' || !$current->active()) throw new \RuntimeException('MUSIC_NOT_FOUND');
+            if ($current->revision !== $proposal->expectedRevision) throw new \RuntimeException('MUSIC_REVISION_CONFLICT');
+            $edition = (new ScoreEditionAdmission())->admit(array_merge($proposal->payload, ['music_uuid' => $current->canonicalId]));
+            $editions = is_array($current->payload['score_editions'] ?? null) ? $current->payload['score_editions'] : [];
+            foreach ($editions as $existing) {
+                if (!is_array($existing) || ($existing['score_edition_id'] ?? '') !== $edition['score_edition_id']) continue;
+                if (($existing['score_checksum'] ?? '') === $edition['score_checksum']) return $current;
+                throw new \RuntimeException('SCORE_EDITION_IDEMPOTENCY_CONFLICT');
+            }
+            $editions[] = $edition;
+            $payload = $current->payload;
+            $payload['score_editions'] = array_values($editions);
+            return $this->authority->update($current->canonicalId, $payload, $proposal->expectedRevision);
         }
         if ($proposal->entityType === 'media' && $proposal->operation === 'ingest') {
             if (!$this->media) throw new \RuntimeException('Media executor is not configured.');

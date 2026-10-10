@@ -1,5 +1,33 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-10 — Canonical Score Admission implementation slice
+
+IMPLEMENTATION: Added the generic `music:score_admit` governed operation and
+`music_score_admission` family. It reuses the existing Music Authority as the
+canonical owner, validates a server-bound Score Edition packet (canonical Music
+UUID/revision, edition identity, source/provenance, note events/segments,
+arrangement metadata, verification, raw event-stream checksum, rights
+attribution/licence/modification/ShareAlike fields, idempotency and dependency
+bindings), and applies only through the existing Proposal/Eligibility/Controlled
+Apply path with canonical Music read-back. Public projection admits only
+`VERIFIED_SCORE_EDITION` + `CLEARED` packets; score-driven synthesis remains
+distinct from Recorded MediaAsset playback.
+
+LOCAL_VERIFICATION: Focused score/reference/MCP contract tests pass 15 tests /
+86 assertions; PHP lint and `git diff --check` pass. The full Unit suite reached
+3,780 tests / 24,935 assertions but retains one unrelated PHP 8.5 fixture type
+error and two unrelated pre-existing failures; the suite was also rerun with a
+512 MB memory limit. No migration is required because the additive
+`score_editions` field is stored in the existing Music Authority JSON payload;
+the executable Music schema contract is versioned to 2 and no data migration or
+live mutation was run.
+
+STAGING_STATUS: No release/deployment or semantic acceptance is claimed. A
+server-issued signed Capture-bound packet, exact current Music revision,
+rights-cleared source decision and deployed build identity are still required
+before Westminster can be admitted. Public/browser PCM acceptance therefore
+remains outstanding and fail-closed.
+
 # Checkpoint — 2026-10-10 — Westminster score admission/live playback re-audit
 
 READ_ONLY_CONTRACT_AUDIT: The current `MusicReferenceContract` is a

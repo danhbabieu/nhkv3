@@ -430,6 +430,7 @@ final class McpContractTest extends TestCase
         self::assertSame([
             'create',
             'ingest',
+            'score_admit',
             'relation_create',
             'rekey',
             'merge',

@@ -1,5 +1,17 @@
 # NHK V3 Current Documentation Status Index
 
+## 0.0.10 Canonical Score Admission implementation slice — 2026-10-10
+
+The local executable runtime now registers generic `music:score_admit` under
+`music_score_admission`, validates checksum-bound verified Score Editions and
+applies them through the existing Music Authority + Governance lifecycle. The
+public Music dossier projects only rights-cleared verified editions and keeps
+score synthesis separate from Recorded MediaAsset playback. This is a local
+implementation checkpoint only: no migration, deployment, staging mutation,
+Westminster canonical read-back or public/browser acceptance is claimed until a
+fresh server-issued Capture-bound packet, rights decision and verified release
+identity are available.
+
 > **NON-NORMATIVE ROUTER / STATUS INDEX — 2026-09-14.**
 > This file is not a second Constitution and does not create semantic vocabulary,
 > operations, predicates, storage, routes or data. Its purpose is to tell

@@ -16,6 +16,8 @@ Meta Content Library permits a maximum custom export range of 366 days. Therefor
 
 The currently available exports contain 1,776 source rows, but their parsed post dates begin at `06/09/2025`; they do not prove coverage of `01/01/2016–05/09/2025` or `11/07/2025–12/07/2025` where applicable. Existing exports are therefore partial evidence, not a complete historical census.
 
+Meta report history now records the requested bounded report `01/01/2025–05/09/2025` as `Không tìm thấy kết quả nào` (no results). This is evidence for that exact bounded interval, but the older yearly intervals still need their own no-result or CSV confirmation before the whole 2016–2025 period can be marked covered.
+
 | Interval | Status | Evidence |
 |---|---|---|
 | 01/01/2016–31/12/2016 | NOT_EXPORTED | No CSV evidence |

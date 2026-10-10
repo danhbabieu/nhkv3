@@ -86,6 +86,14 @@ final class EntityDossierBootstrap
             }
             if ($entity->entityType === 'music' && ($value['dossier']['status'] ?? '') === 'AVAILABLE') {
                 $packet = apply_filters('nhk_v3_music_reference_packet', null, $entity, $value['dossier']);
+                if (!is_array($packet)) {
+                    $editions = is_array($entity->payload['score_editions'] ?? null) ? $entity->payload['score_editions'] : [];
+                    foreach ($editions as $edition) {
+                        if (!is_array($edition) || ($edition['canonical_status'] ?? '') !== 'VERIFIED_SCORE_EDITION' || ($edition['rights_status'] ?? '') !== 'CLEARED') continue;
+                        $packet = ['score' => $edition];
+                        break;
+                    }
+                }
                 $value['dossier'] = $musicProjection->forEntity($entity, $value['dossier'], is_array($packet) ? $packet : null);
             }
             return $value;

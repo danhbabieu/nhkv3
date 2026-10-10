@@ -24,15 +24,15 @@ final class AuthorityStagingAdmission
         if ($admitted) return true;
         if (($scope['approved'] ?? false) !== true
             || ($scope['environment'] ?? '') !== 'staging'
-            || ($scope['operation_family'] ?? '') !== 'governed_authority_plan'
+            || !in_array((string) ($scope['operation_family'] ?? ''), ['governed_authority_plan', 'music_score_admission'], true)
             || ($scope['writer'] ?? '') !== 'canonical_governed'
             || ($scope['entrypoint'] ?? '') !== 'nhk.capture.ingest'
-            || !in_array(strtoupper((string) ($scope['intent'] ?? '')), ['AUTHORITY', 'MIXED'], true)
+            || !in_array(strtoupper((string) ($scope['intent'] ?? '')), ['AUTHORITY', 'MUSIC', 'SCORE', 'MIXED'], true)
             || ($scope['capture_id'] ?? '') !== $capture->captureId
             || ($scope['capture_fingerprint'] ?? '') !== $capture->requestFingerprint
             || ($scope['request_fingerprint'] ?? $scope['capture_fingerprint'] ?? '') !== $capture->requestFingerprint
             || preg_match('/^[a-f0-9]{64}$/i', (string) ($scope['plan_fingerprint'] ?? '')) !== 1
-            || !in_array((string) ($capture->context['purpose'] ?? ''), ['AUTHORITY', 'MIXED'], true)) return false;
+            || !in_array((string) ($capture->context['purpose'] ?? ''), ['AUTHORITY', 'MUSIC', 'SCORE', 'MIXED'], true)) return false;
 
         $bindings = array_values(array_filter((array) ($scope['candidate_bindings'] ?? []), 'is_array'));
         if ($bindings === []) return false;
@@ -51,6 +51,7 @@ final class AuthorityStagingAdmission
                 || $policy === null || !$policy->captureStagingAllowed
                 || ($entityType === 'relation' && $policy->operationFamily !== 'capture_child_relation')) return false;
             $candidateIds[] = $candidateId;
+            if ($entityType === 'music' && $operation === 'score_admit' && function_exists('current_user_can') && !current_user_can('nhk_admit_scores')) return false;
             if (!preg_match('/^[a-f0-9]{64}$/i', (string) ($binding['candidate_payload_fingerprint'] ?? ''))
                 || !preg_match('/^[a-f0-9]{64}$/i', (string) ($binding['dependency_fingerprint'] ?? ''))
                 || !$this->bindingFingerprintMatches($binding)) return false;

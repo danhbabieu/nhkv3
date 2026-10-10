@@ -50,6 +50,7 @@ final class GovernedOperationPolicyRegistry implements OperationCompatibility
             $add($entity, 'retire', 'governed_authority_plan', 'RETIRE', 'CURRENT_REQUIRED', 'CANONICAL_UUID', true);
             $add($entity, 'reactivate', 'governed_authority_plan', 'REACTIVATE', 'CURRENT_REQUIRED', 'CANONICAL_UUID', true);
         }
+        $add('music', 'score_admit', 'music_score_admission', 'MUTATE_EXISTING', 'CURRENT_REQUIRED', 'CANONICAL_UUID', true, ['nhk_admit_scores']);
 
         foreach (['knowledge', 'source', 'evidence'] as $entity) {
             $family = $entity === 'knowledge' ? 'knowledge_delta' : 'source_evidence_reconciliation';
