@@ -40,6 +40,20 @@ final class CaptureCurrentOutcomeReducerTest extends TestCase
         self::assertSame(['eligible' => true, 'reason' => 'RECOVERY_GOVERNED_REENTRY'], CaptureCurrentOutcomeReducer::retryEligibility($capture, ['_recovery_mode' => true, 'resume_children' => ['video']]));
     }
 
+    public function test_confirmed_subject_packet_reopens_failed_video_handoff(): void
+    {
+        $capture = new CaptureRecord(
+            UuidCodec::newV7(), 'failed-video-subject-recovery', hash('sha256', 'failed-video-subject-recovery'),
+            CaptureStage::MEDIA_ADOPTED->value, 'FAILED_RETRYABLE', null, null, [],
+            ['content_intent' => ['intent' => 'VIDEO']],
+            ['completion' => ['status' => 'BLOCKED', 'blockers' => ['CANONICAL_READBACK_UNVERIFIED']]],
+        );
+
+        self::assertSame(['eligible' => true, 'reason' => null], CaptureCurrentOutcomeReducer::retryEligibility($capture, [
+            'subject_reconciliation' => ['confirmed' => true, 'candidate_uuid' => UuidCodec::newV7()],
+        ]));
+    }
+
     public function test_reevaluable_knowledge_review_is_not_reported_as_terminal_when_retry_is_eligible(): void
     {
         $capture = new CaptureRecord(

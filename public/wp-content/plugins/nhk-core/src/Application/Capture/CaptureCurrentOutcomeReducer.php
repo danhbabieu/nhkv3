@@ -69,7 +69,7 @@ final class CaptureCurrentOutcomeReducer
                 'blockers' => $blockers,
             ];
         }
-        $subjectReconciliation = in_array($capture->status, ['APPLIED', 'REVIEW_REQUIRED'], true)
+        $subjectReconciliation = in_array($capture->status, ['FAILED_RETRYABLE', 'APPLIED', 'REVIEW_REQUIRED'], true)
             && is_array($input['subject_reconciliation'] ?? null)
             && ($input['subject_reconciliation']['confirmed'] ?? false) === true;
         $recoverableRetryableFailure = $capture->status === 'FAILED_RETRYABLE' && !self::isHardBlockedReview($capture);
