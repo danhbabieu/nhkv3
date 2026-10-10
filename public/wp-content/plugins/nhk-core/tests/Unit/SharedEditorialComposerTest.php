@@ -161,6 +161,28 @@ final class SharedEditorialComposerTest extends TestCase
         self::assertSame('review', $draft->status);
     }
 
+    public function test_stale_provenance_role_cannot_leak_into_public_composition(): void
+    {
+        $plan = new EditorialPlan('available', 'video', ['id' => self::SUBJECT, 'type' => 'model'], 'Odo 36/8', [
+            ['id' => 'opening', 'claims' => [], 'claim_refs' => []],
+            ['id' => 'core', 'claims' => [[
+                'claim_id' => 'provenance',
+                'claim_revision' => 1,
+                'text' => 'The source identifies this Video as concerning canonical Odo 36/8.',
+                'semantic_role' => 'PROVENANCE_ONLY',
+                'eligibility' => 'eligible',
+                'publicly_composable' => true,
+                'applicability' => 'applicable',
+            ]], 'claim_refs' => ['provenance']],
+        ], ['raw_input' => 'Video giới thiệu đồng hồ Odo 36/8.']);
+
+        $draft = (new SharedEditorialComposer())->compose($plan);
+
+        self::assertStringNotContainsString('The source identifies this Video', $draft->body);
+        self::assertSame([], $draft->claimTrace);
+        self::assertSame('review', $draft->status);
+    }
+
     private function pack(string $profile, array $claims, array $input = [], array $visual = []): EditorialContextPack
     {
         return new EditorialContextPack('available', ['id' => self::SUBJECT, 'type' => 'model'], '3 phiên bản vách máy Odo 36', ['profile' => $profile], 'available', $claims, [], $input, $visual, [], ['policy_version' => 'test']);

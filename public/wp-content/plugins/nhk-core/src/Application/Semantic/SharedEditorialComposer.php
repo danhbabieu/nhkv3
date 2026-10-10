@@ -43,6 +43,17 @@ final class SharedEditorialComposer
                     $traceFailure = true;
                     continue;
                 }
+                // Public composition remains fail-closed for legacy/stale
+                // packets that incorrectly mark internal grounding as public.
+                $semanticRole = strtoupper(trim((string) ($claim['semantic_role'] ?? '')));
+                if (in_array($semanticRole, [
+                    EditorialSemanticRolePolicy::PROVENANCE_ONLY,
+                    EditorialSemanticRolePolicy::GROUNDING,
+                    EditorialSemanticRolePolicy::CONTROL_ONLY,
+                ], true)) {
+                    $traceFailure = true;
+                    continue;
+                }
                 $text = trim((string) ($claim['text'] ?? $claim['claim_text'] ?? ''));
                 if ($text === '') { $traceFailure = true; continue; }
                 try { $guard->assertSafe($text); } catch (\Throwable) { $traceFailure = true; continue; }
