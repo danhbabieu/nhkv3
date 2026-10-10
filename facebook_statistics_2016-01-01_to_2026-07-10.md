@@ -16,7 +16,7 @@ Meta Content Library permits a maximum custom export range of 366 days. Therefor
 
 The currently available exports contain 1,776 source rows, but their parsed post dates begin at `06/09/2025`; they do not prove coverage of `01/01/2016–05/09/2025` or `11/07/2025–12/07/2025` where applicable. Existing exports are therefore partial evidence, not a complete historical census.
 
-Meta report history now records the requested bounded report `01/01/2025–05/09/2025` as `Không tìm thấy kết quả nào` (no results). This is evidence for that exact bounded interval, but the older yearly intervals still need their own no-result or CSV confirmation before the whole 2016–2025 period can be marked covered.
+Meta report history now records the requested bounded report `01/01/2025–05/09/2025` as `Không tìm thấy kết quả nào` (no results). It also confirms the yearly reports for `2021`, `2022`, `2023`, and `2024` as `Không tìm thấy kết quả nào`. The 2020 and 2019 reports have been submitted and are still processing; they are not yet counted as covered.
 
 The next report `01/01/2024–31/12/2024` is visible in Meta report history but remains `Đang xuất 0%`. Meta permits only one report in this queue, so later yearly reports cannot be started until this queued report resolves.
 
@@ -25,12 +25,12 @@ The next report `01/01/2024–31/12/2024` is visible in Meta report history but 
 | 01/01/2016–31/12/2016 | NOT_EXPORTED | No CSV evidence |
 | 01/01/2017–31/12/2017 | NOT_EXPORTED | No CSV evidence |
 | 01/01/2018–31/12/2018 | NOT_EXPORTED | No CSV evidence |
-| 01/01/2019–31/12/2019 | NOT_EXPORTED | No CSV evidence |
-| 01/01/2020–31/12/2020 | NOT_EXPORTED | No CSV evidence |
-| 01/01/2021–31/12/2021 | NOT_EXPORTED | No CSV evidence |
-| 01/01/2022–31/12/2022 | NOT_EXPORTED | No CSV evidence |
-| 01/01/2023–31/12/2023 | NOT_EXPORTED | No CSV evidence |
-| 01/01/2024–31/12/2024 | NOT_EXPORTED | No CSV evidence |
+| 01/01/2019–31/12/2019 | REPORT_PENDING | Submitted; Meta still processing |
+| 01/01/2020–31/12/2020 | REPORT_PENDING | Submitted; Meta still processing |
+| 01/01/2021–31/12/2021 | CONFIRMED_NO_RESULTS | Meta report history |
+| 01/01/2022–31/12/2022 | CONFIRMED_NO_RESULTS | Meta report history |
+| 01/01/2023–31/12/2023 | CONFIRMED_NO_RESULTS | Meta report history |
+| 01/01/2024–31/12/2024 | CONFIRMED_NO_RESULTS | Meta report history |
 | 01/01/2025–05/09/2025 | NOT_EXPORTED | Current earliest parsed date is 06/09/2025 |
 | 06/09/2025–10/07/2026 | PARTIAL_EXPORTS | Existing CSV exports; date windows are split and do not constitute one full native report |
 
