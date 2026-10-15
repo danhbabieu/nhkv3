@@ -5,6 +5,7 @@ namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Capture\{CaptureDictionaryCreatePrecondition, CaptureEnrichmentPlanningEnvelope};
 use NHK\Core\Domain\Dictionary\DictionaryPreCreateResolution;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class CaptureDictionaryCreatePreconditionTest extends TestCase
@@ -54,16 +55,36 @@ final class CaptureDictionaryCreatePreconditionTest extends TestCase
         (new CaptureDictionaryCreatePrecondition())->assert($envelope, $currentResolution, 'CREATE_ENTRY_WITH_SENSE');
     }
 
+    #[DataProvider('dictionaryOwnerOperationProvider')]
+    public function test_registered_dictionary_owner_operations_are_admitted(string $operation, string $action, string $internalOperation): void
+    {
+        $resolution = $this->resolution($action);
+        $envelope = $this->envelope($resolution->toArray(), $operation);
+
+        (new CaptureDictionaryCreatePrecondition())->assert($envelope, $resolution, $internalOperation);
+        self::assertTrue(true);
+    }
+
+    public static function dictionaryOwnerOperationProvider(): array
+    {
+        return [
+            'CREATE' => ['CREATE', DictionaryPreCreateResolution::CREATE_NEW, 'CREATE_ENTRY_WITH_SENSE'],
+            'ADD_FORM' => ['ADD_FORM', DictionaryPreCreateResolution::ADD_FORM_TO_ENTRY, 'ADD_FORM_TO_ENTRY'],
+            'ADD_SENSE' => ['ADD_SENSE', DictionaryPreCreateResolution::ADD_SENSE_TO_ENTRY, 'ADD_SENSE_TO_ENTRY'],
+            'ENRICH' => ['ENRICH', DictionaryPreCreateResolution::ENRICH_EXISTING, 'ENRICH_EXISTING'],
+        ];
+    }
+
     private function resolution(string $action): DictionaryPreCreateResolution
     {
         return DictionaryPreCreateResolution::fromDecision($action, 'kính rào', ['domain' => 'clock'], [], [], ['reason' => $action]);
     }
 
-    private function envelope(?array $packet): CaptureEnrichmentPlanningEnvelope
+    private function envelope(?array $packet, string $operation = 'CREATE'): CaptureEnrichmentPlanningEnvelope
     {
         $requestFingerprint = hash('sha256', 'capture-request');
         $track = ['status' => 'READ_BACK_VERIFIED', 'expected_revision' => 0, 'dependency_revisions' => [], 'depends_on' => [], 'request_fingerprint' => $requestFingerprint];
-        if ($packet !== null) $track['pre_create_resolution'] = $packet + ['operation' => 'CREATE', 'resolution_fingerprint' => (string) ($packet['fingerprint'] ?? '')];
+        if ($packet !== null) $track['pre_create_resolution'] = $packet + ['operation' => $operation, 'resolution_fingerprint' => (string) ($packet['fingerprint'] ?? '')];
         return CaptureEnrichmentPlanningEnvelope::fromArray([
             'capture_id' => 'capture-dictionary-1',
             'request_fingerprint' => $requestFingerprint,

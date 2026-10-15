@@ -16,6 +16,21 @@ final class ContentIntentRouter
     public function route(array $input, array $interpretation, array $assets): array
     {
         $explicit = strtoupper(trim((string) ($input['intent'] ?? '')));
+        $dictionaryPlan = is_array($input['dictionary_owner_plan'] ?? null) ? $input['dictionary_owner_plan'] : [];
+        $dictionaryOperation = strtoupper(trim((string) ($dictionaryPlan['operation'] ?? '')));
+        if ($dictionaryOperation !== '' && ($input['_dictionary_owner_plan_typed'] ?? false) === true) {
+            if (!in_array($dictionaryOperation, ['CREATE', 'ADD_FORM', 'ADD_SENSE', 'ENRICH'], true)) {
+                throw new \InvalidArgumentException('DICTIONARY_OWNER_OPERATION_INVALID');
+            }
+            if ($explicit !== '' && $explicit !== ContentIntent::KNOWLEDGE_DELTA->value) {
+                throw new \InvalidArgumentException('DICTIONARY_OWNER_INTENT_CONFLICT');
+            }
+            $result = $this->result(ContentIntent::KNOWLEDGE_DELTA, 'DICTIONARY_OWNER', $this->signals($input, $interpretation, $assets));
+            $result['dictionary_only'] = true;
+            $result['dictionary_operation'] = $dictionaryOperation;
+            $result['semantic_delta'] = ['status' => 'NONE'];
+            return $result;
+        }
         $repairPlan = is_array($input['repair_plan'] ?? null) ? $input['repair_plan'] : [];
         $knowledgeRepair = is_array($input['knowledge_repair'] ?? null) ? $input['knowledge_repair'] : [];
         if ($explicit === '' && ($repairPlan !== [] || $knowledgeRepair !== [])) {
@@ -56,6 +71,11 @@ final class ContentIntentRouter
         $signals = is_array($persisted['signals'] ?? null) ? $persisted['signals'] : [];
         $result = $this->result($intent, 'PERSISTED_CAPTURE', $signals);
         $result['intent_reused'] = true;
+        if (($persisted['dictionary_only'] ?? false) === true) {
+            $result['dictionary_only'] = true;
+            $result['dictionary_operation'] = strtoupper(trim((string) ($persisted['dictionary_operation'] ?? '')));
+            $result['semantic_delta'] = ['status' => 'NONE'];
+        }
         return $result;
     }
 

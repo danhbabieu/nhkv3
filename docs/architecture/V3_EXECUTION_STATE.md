@@ -1,5 +1,36 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-10-15 — Dictionary Capture CREATE routing (LOCAL)
+
+ROOT_CAUSE: `ContentIntentRouter` selected article/knowledge heuristics before
+considering a typed `dictionary_owner_plan`, and
+`EditorialCaptureCoordinator` discarded the server-replanned typed Dictionary
+plan before the pre-create packet boundary. Consequently standalone Dictionary
+CREATE could route as `TEXT_ARTICLE` or enter Knowledge subject resolution and
+stop at `PRIMARY_SUBJECT_AMBIGUOUS`.
+
+IMPLEMENTATION: Typed Dictionary owner operations `CREATE`, `ADD_FORM`,
+`ADD_SENSE` and `ENRICH` now route through the existing `KNOWLEDGE_DELTA`
+intent with a bounded lexical-only marker and `semantic_delta=NONE`. The
+coordinator preserves the re-planned server-owned packet, skips subject,
+claim, semantic write-back, article and video work for this lexical route, and
+finalizes only after the existing Dictionary owner apply/read-back boundary.
+The existing Governance/CAS/idempotency path remains authoritative; no
+Article, Knowledge Fact or Graph Relation is created, and Dictionary entries
+remain private by default. Natural-language Dictionary planning remains on its
+existing subject-review path.
+
+LOCAL_VERIFICATION: Focused routing/coordinator/precondition and related
+Dictionary/MCP suite passes 164 tests / 1,336 assertions. PHP lint and
+`git diff --check` pass. The full suite completed with 3,973 tests, 25,171
+assertions, 33 environment/type errors, 25 failures, 29 warnings and 125
+skips; the errors are existing WordPress/test-runtime setup failures and the
+one ordinary unit failure is outside the changed Capture/Dictionary scope.
+No migration, staging/production mutation, deployment or push was performed.
+
+STATUS: `LOCAL_SOURCE_GREEN / FULL_SUITE_ENVIRONMENT_BLOCKED /
+DEPLOYMENT_PENDING / LIVE_ACCEPTANCE_NOT_RUN`
+
 # Checkpoint — 2026-10-10 — Guarded Dictionary curator Entry CRUD (LOCAL)
 
 IMPLEMENTATION: Added the bounded `nhk.dictionary.entry.get` read model and

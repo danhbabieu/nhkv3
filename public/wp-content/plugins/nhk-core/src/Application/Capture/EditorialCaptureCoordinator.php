@@ -130,6 +130,7 @@ final class EditorialCaptureCoordinator
                     'intent' => trim((string) ($input['intent'] ?? '')),
                     'publish' => ($input['publish'] ?? false) === true,
                     'video' => is_array($input['video'] ?? null) ? $this->withoutBody($input['video']) : [],
+                    'dictionary_owner_plan' => is_array($input['dictionary_owner_plan'] ?? null) ? $this->withoutBody($input['dictionary_owner_plan']) : [],
                 ],
             ],
         ));
@@ -433,10 +434,34 @@ final class EditorialCaptureCoordinator
                     // status/resolution/revision fields and re-plan through
                     // the canonical Dictionary owner before apply.
                     $typed = $input['dictionary_owner_plan'];
-                    $command = ['operation' => strtoupper(trim((string) ($typed['operation'] ?? ''))), 'term' => (string) ($typed['term'] ?? $typed['preferred_form'] ?? ''), 'form' => (string) ($typed['form'] ?? ''), 'definition' => (string) ($typed['definition'] ?? ''), 'enrichment_field' => (string) ($typed['enrichment_field'] ?? 'definition_refinement')];
-                    $naturalOwnerPlan = DictionaryObservationRegistry::ownerPlan('CAPTURE', $record->captureId, $text, $this->dictionaryObservationContext($record, $input), $dictionaryObservation + ['natural_owner_command' => $command]);
+                    $input['_dictionary_owner_plan_typed'] = true;
+                    $command = [
+                        'operation' => strtoupper(trim((string) ($typed['operation'] ?? ''))),
+                        'term' => (string) ($typed['term'] ?? $typed['preferred_form'] ?? $typed['form'] ?? ''),
+                        'form' => (string) ($typed['form'] ?? ''),
+                        'definition' => (string) ($typed['definition'] ?? ''),
+                        'enrichment_field' => (string) ($typed['enrichment_field'] ?? 'definition_refinement'),
+                    ];
+                    foreach (['entry_id', 'sense_id', 'concept_id', 'semantic_type', 'semantic_id', 'context', 'semantic_track'] as $field) {
+                        if (array_key_exists($field, $typed)) $command[$field] = $typed[$field];
+                    }
+                    $ownerContext = $this->dictionaryObservationContext($record, $input);
+                    if (is_array($typed['context'] ?? null)) $ownerContext = array_replace($ownerContext, $typed['context']);
+                    $naturalOwnerPlan = DictionaryObservationRegistry::ownerPlan('CAPTURE', $record->captureId, $text, $ownerContext, $dictionaryObservation + ['natural_owner_command' => $command]);
                     $input['dictionary_owner_plan'] = $naturalOwnerPlan;
+                    $diagnostics['dictionary_natural_owner_plan'] = $this->withoutBody($naturalOwnerPlan);
                     $diagnostics['dictionary_typed_owner_plan'] = $this->withoutBody($naturalOwnerPlan);
+                    if (($naturalOwnerPlan['status'] ?? '') === 'READY') {
+                        $resolutionPacket = is_array($naturalOwnerPlan['pre_create_resolution'] ?? null) ? $naturalOwnerPlan['pre_create_resolution'] : [];
+                        $resolution = DictionaryPreCreateResolution::fromArray($resolutionPacket);
+                        $diagnostics['dictionary_pre_create_resolution'] = $resolution->toArray() + [
+                            'operation' => strtoupper((string) ($naturalOwnerPlan['operation'] ?? '')),
+                            'request_fingerprint' => $record->requestFingerprint,
+                            'resolution_fingerprint' => $resolution->fingerprint(),
+                            'dependency_revisions' => $resolution->dependencyRevisions,
+                            'expected_revision' => (int) ($naturalOwnerPlan['expected_revision'] ?? 0),
+                        ];
+                    }
                 } else {
                     $naturalOwnerPlan = DictionaryObservationRegistry::ownerPlan('CAPTURE', $record->captureId, $text, $this->dictionaryObservationContext($record, $input), $dictionaryObservation);
                     if (in_array(strtoupper(trim((string) ($naturalOwnerPlan['operation'] ?? ''))), ['CREATE', 'ADD_FORM', 'ADD_SENSE', 'ENRICH', 'REUSE'], true)) {
@@ -550,6 +575,28 @@ final class EditorialCaptureCoordinator
             $articleRequired = ($intent['article_required'] ?? false) === true;
             $isVideoIntent = ($intent['intent'] ?? '') === 'VIDEO';
             $videoInput = $isVideoIntent && is_array($input['video'] ?? null) ? $input['video'] : [];
+            if (($intent['dictionary_only'] ?? false) === true) {
+                $dictionaryPlanStatus = strtoupper(trim((string) ($naturalOwnerPlan['status'] ?? '')));
+                if (!isset($diagnostics['dictionary_owner_apply']) && $dictionaryPlanStatus !== 'READY') {
+                    $failureCode = trim((string) (($naturalOwnerPlan['diagnostics'][0] ?? '') ?: 'DICTIONARY_OWNER_PLAN_' . ($dictionaryPlanStatus !== '' ? $dictionaryPlanStatus : 'UNAVAILABLE')));
+                    return $this->save($record, CaptureStage::INTERPRETED, $assets, $diagnostics, $receipts, 'DICTIONARY_OWNER_PLAN', $record->articleId, $record->articleStateToken, 'REVIEW_REQUIRED', 'REVIEW_REQUIRED', null, $failureCode);
+                }
+                $diagnostics['subjects'] = ['status' => 'not_requested', 'reason' => 'DICTIONARY_LEXICAL_OWNER'];
+                $diagnostics['claim_retrieval'] = ['status' => 'not_requested', 'items' => [], 'selected_claims' => []];
+                $diagnostics['semantic_write_back'] = ['status' => 'SKIPPED', 'writes' => [], 'blockers' => [], 'canonical_readback' => null];
+                $diagnostics['video_publication'] = ['status' => 'not_requested', 'items' => [], 'blockers' => []];
+                return $this->finishNonArticleIntent(
+                    $record,
+                    $assets,
+                    $diagnostics,
+                    $receipts,
+                    $intent,
+                    $diagnostics['claim_retrieval'],
+                    $diagnostics['semantic_write_back'],
+                    $diagnostics['video_publication'],
+                    $diagnostics['subjects'],
+                );
+            }
             $persistedPacket = $this->persistedSubjectPacket($record);
             $preparationResult = null;
             if ($videoOnlyResume && is_array($record->context['content_preparation'] ?? null)) {
@@ -1464,6 +1511,7 @@ final class EditorialCaptureCoordinator
             'intent' => (string) ($intent['intent'] ?? ($original['intent'] ?? '')),
             'publish' => ($original['publish'] ?? false) === true,
             'video' => is_array($original['video'] ?? null) ? $original['video'] : [],
+            'dictionary_owner_plan' => is_array($original['dictionary_owner_plan'] ?? null) ? $original['dictionary_owner_plan'] : [],
             'media_bindings' => is_array($context['media_bindings'] ?? null) ? $context['media_bindings'] : [],
             'media_operations' => is_array($context['media_operations'] ?? null) ? $context['media_operations'] : [],
         ];
@@ -1787,6 +1835,15 @@ final class EditorialCaptureCoordinator
             'semantic_dependency_owner_types' => strtoupper(trim((string) ($intent['intent'] ?? ''))) === 'VIDEO' ? ['source', 'knowledge', 'evidence'] : [],
             'outcome_obligations' => is_array($diagnostics['outcome_obligations'] ?? null) ? $diagnostics['outcome_obligations'] : (array) ($record->context['outcome_obligations'] ?? []),
         ]);
+        if (($intent['dictionary_only'] ?? false) === true
+            && in_array(strtoupper(trim((string) ($diagnostics['dictionary_owner_apply']['status'] ?? ''))), ['APPLIED', 'REUSED'], true)
+            && ($final['status'] ?? '') === 'verified') {
+            $completion['complete'] = true;
+            $completion['status'] = 'COMPLETE';
+            $completion['blockers'] = [];
+            $completion['missing_required_owners'] = [];
+            $completion['dependency_state'] = 'COMPLETE';
+        }
         $diagnostics['completion'] = $completion;
         // A Capture-level frontend/final callback cannot promote an absent
         // governed owner to VERIFIED. Keep canonical-owner verification
@@ -1831,13 +1888,14 @@ final class EditorialCaptureCoordinator
     private function compileOutcomeObligations(CaptureRecord $record, array $input, array $intent): array
     {
         $intentName = strtoupper(trim((string) ($intent['intent'] ?? $input['intent'] ?? '')));
-        $ownerTypes = is_array($input['owner_types'] ?? null) ? $input['owner_types'] : match ($intentName) {
+        $dictionaryOnly = ($intent['dictionary_only'] ?? false) === true;
+        $ownerTypes = $dictionaryOnly ? [] : (is_array($input['owner_types'] ?? null) ? $input['owner_types'] : match ($intentName) {
             'VIDEO' => ['video'],
             'MEDIA_ENRICHMENT' => ['media'],
             'KNOWLEDGE_DELTA' => ['knowledge'],
             'TEXT_ARTICLE', 'IMAGE_ARTICLE' => ['wp_post'],
             default => [],
-        };
+        });
         $publicCapableTypes = ['wp_post', 'media', 'video'];
         $capabilities = [];
         foreach ($ownerTypes as $ownerType) {
@@ -1854,7 +1912,7 @@ final class EditorialCaptureCoordinator
             'frontend_request' => ($input['frontend_request'] ?? false) === true,
             'homepage_request' => ($input['homepage_request'] ?? false) === true,
             'homepage_policy_required' => ($input['homepage_policy_required'] ?? false) === true,
-            'governance_requested' => in_array($intentName, ['VIDEO', 'KNOWLEDGE_DELTA'], true),
+            'governance_requested' => !$dictionaryOnly && in_array($intentName, ['VIDEO', 'KNOWLEDGE_DELTA'], true),
         ]);
     }
 
@@ -1889,6 +1947,7 @@ final class EditorialCaptureCoordinator
      */
     private function requiredOwners(array $intent, CaptureRecord $record, array $assets, array $media, array $videoPublication, array $writes = []): array
     {
+        if (($intent['dictionary_only'] ?? false) === true) return [];
         $videoOwnerId = $this->videoOwnerId($assets, $videoPublication, $writes);
         $mediaOwners = array_map(
             static fn (string $mediaId): array => ['owner_type' => 'media', 'owner_id' => $mediaId],
@@ -1916,6 +1975,20 @@ final class EditorialCaptureCoordinator
         return array_values(array_filter($required, static function (array $owner): bool {
             return !array_key_exists('owner_id', $owner) || trim((string) $owner['owner_id']) !== '';
         }));
+    }
+
+    /** @param array<string,mixed> $intent @param mixed $readback */
+    private function dictionaryReadbackIsComplete(array $intent, mixed $readback): bool
+    {
+        if (!is_array($readback)) return false;
+        $operation = strtoupper(trim((string) ($intent['dictionary_operation'] ?? '')));
+        $has = static fn (string $key): bool => trim((string) ($readback[$key] ?? '')) !== '';
+        return match ($operation) {
+            'CREATE' => $has('entry_id') && is_array($readback['sense_ids'] ?? null) && $readback['sense_ids'] !== [],
+            'ADD_FORM' => $has('entry_id') && $has('form'),
+            'ADD_SENSE', 'ENRICH' => $has('sense_id'),
+            default => false,
+        };
     }
 
     /** @return list<array{owner_type:string,owner_id?:string}> */
