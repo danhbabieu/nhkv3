@@ -154,6 +154,47 @@ final class ContentIntentRouterTest extends TestCase
         self::assertFalse($route['article_required']);
     }
 
+    public function test_dictionary_create_plan_routes_as_standalone_lexical_capture(): void
+    {
+        $text = 'Bính boong là tiếng chuông có hai âm luân phiên.';
+        $route = (new ContentIntentRouter())->route(
+            [
+                '_dictionary_owner_plan_typed' => true,
+                'dictionary_owner_plan' => [
+                    'operation' => 'CREATE',
+                    'term' => 'Bính boong',
+                    'definition' => 'Từ tượng thanh dùng trong giới chơi đồng hồ cơ để mô phỏng tiếng chuông có hai âm luân phiên hoặc hai tiếng nối tiếp; không tự xác định bản nhạc hay cấu hình bộ gõ.',
+                ],
+                'text' => $text,
+            ],
+            (new TextInputInterpreter())->interpret($text),
+            [],
+        );
+
+        self::assertSame('KNOWLEDGE_DELTA', $route['intent']);
+        self::assertSame('DICTIONARY_OWNER', $route['source']);
+        self::assertTrue($route['dictionary_only']);
+        self::assertFalse($route['article_required']);
+        self::assertSame('NONE', $route['semantic_delta']['status']);
+    }
+
+    public function test_persisted_dictionary_intent_keeps_lexical_only_route_on_retry(): void
+    {
+        $route = (new ContentIntentRouter())->reusePersisted(
+            [
+                'intent' => 'KNOWLEDGE_DELTA',
+                'dictionary_only' => true,
+                'dictionary_operation' => 'CREATE',
+                'signals' => ['has_text' => true],
+            ],
+            [],
+        );
+
+        self::assertTrue($route['dictionary_only']);
+        self::assertSame('CREATE', $route['dictionary_operation']);
+        self::assertSame('NONE', $route['semantic_delta']['status']);
+    }
+
     public function test_valid_youtube_url_defaults_to_video_without_article_intent(): void
     {
         $route = (new ContentIntentRouter())->route(

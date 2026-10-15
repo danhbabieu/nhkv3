@@ -1096,16 +1096,61 @@ final class EditorialCaptureSemanticCoreTest extends TestCase
         self::assertArrayNotHasKey('dictionary_owner_apply', $result->diagnostics);
     }
 
-    private function registerNaturalDictionaryPlan(int &$ownerCalls): void
+    public function test_standalone_dictionary_create_does_not_require_subject_or_create_article_knowledge_or_graph(): void
     {
-        $resolution = DictionaryPreCreateResolution::fromDecision(DictionaryPreCreateResolution::CREATE_NEW, 'kính rào', [], [], [], ['reason' => 'TEST_SERVER_PLAN']);
+        $ownerCalls = 0;
+        $definition = 'Từ tượng thanh dùng trong giới chơi đồng hồ cơ để mô phỏng tiếng chuông có hai âm luân phiên hoặc hai tiếng nối tiếp; không tự xác định bản nhạc hay cấu hình bộ gõ.';
+        $this->registerNaturalDictionaryPlan($ownerCalls, 'Bính boong', $definition);
+        $draftCalls = 0;
+        $knowledgeCalls = 0;
+        $coordinator = new EditorialCaptureCoordinator(
+            new InMemoryCaptureRepository(),
+            static fn (array $input): array => ['items' => []],
+            static function (array $input) use (&$draftCalls): array { ++$draftCalls; return ['post_id' => 99, 'state_token' => 'token-99', 'post' => ['post_id' => 99]]; },
+            new TextInputInterpreter(),
+            new SubjectResolutionService(static fn (string $hint): array => []),
+            new ClaimRetrievalEngine(static fn (array $subject): array => ['status' => 'available', 'items' => []], static fn (array $subject, array $neighborhood): array => []),
+            static function (array $context) use (&$knowledgeCalls): array { ++$knowledgeCalls; return ['status' => 'APPLIED', 'writes' => []]; },
+            new ArticleComposer(),
+            static fn (array $context): array => ['status' => 'RECONCILED'],
+            static fn (array $context): array => ['eligible' => false, 'blockers' => ['OWNER_PUBLICATION_REQUIRED']],
+            static fn (array $context): array => ['status' => 'verified'],
+        );
+
+        $input = [
+            'idempotency_key' => 'capture-binh-boong-create',
+            'text' => 'Bính boong là tiếng chuông có hai âm luân phiên.',
+            'dictionary_owner_plan' => [
+                'operation' => 'CREATE',
+                'term' => 'Bính boong',
+                'definition' => $definition,
+            ],
+        ];
+        $result = $coordinator->execute($input);
+        $replay = $coordinator->execute($input);
+
+        self::assertSame('APPLIED', $result->diagnostics['dictionary_owner_apply']['status'] ?? null, json_encode($result->toArray(), JSON_UNESCAPED_UNICODE));
+        self::assertSame('entry-readback', $result->diagnostics['dictionary_owner_apply']['canonical_readback']['entry_id'] ?? null);
+        self::assertSame(1, $ownerCalls);
+        self::assertSame('entry-readback', $replay->diagnostics['dictionary_owner_apply']['canonical_readback']['entry_id'] ?? null);
+        self::assertSame($result->diagnostics['dictionary_owner_apply']['canonical_readback'], $replay->diagnostics['dictionary_owner_apply']['canonical_readback']);
+        self::assertSame(0, $draftCalls);
+        self::assertSame(0, $knowledgeCalls);
+        self::assertSame('COMPLETE', $result->status, json_encode($result->toArray(), JSON_UNESCAPED_UNICODE));
+        self::assertNotContains('PRIMARY_SUBJECT_AMBIGUOUS', (array) ($result->diagnostics['failure_code'] ?? ''));
+        self::assertSame('DRAFT', $result->diagnostics['dictionary_owner_apply']['canonical_readback']['status'] ?? 'DRAFT');
+    }
+
+    private function registerNaturalDictionaryPlan(int &$ownerCalls, string $term = 'kính rào', string $definition = 'một chi tiết'): void
+    {
+        $resolution = DictionaryPreCreateResolution::fromDecision(DictionaryPreCreateResolution::CREATE_NEW, $term, [], [], [], ['reason' => 'TEST_SERVER_PLAN']);
         DictionaryObservationRegistry::register(
             static fn (string $kind, string $id, string $text, array $context = [], array $hints = []): array => ['status' => 'AVAILABLE', 'blocking' => false],
             static fn (string $kind, string $text, array $context = [], array $hints = []): array => ['status' => 'AVAILABLE'],
-            static function (string $kind, string $id, string $text, array $context = [], array $observation = []) use ($resolution): array {
-                return ['status' => 'READY', 'operation' => 'CREATE', 'term' => 'kính rào', 'preferred_form' => 'kính rào', 'definition' => 'một chi tiết', 'context' => [], 'expected_revision' => 0, 'pre_create_resolution' => $resolution->toArray()];
+            static function (string $kind, string $id, string $text, array $context = [], array $observation = []) use ($resolution, $term, $definition): array {
+                return ['status' => 'READY', 'operation' => 'CREATE', 'term' => $term, 'preferred_form' => $term, 'definition' => $definition, 'context' => [], 'expected_revision' => 0, 'pre_create_resolution' => $resolution->toArray()];
             },
-            static function (array $plan, string $key) use (&$ownerCalls): array { ++$ownerCalls; return ['status' => 'APPLIED', 'dictionary_mutation' => true, 'canonical_readback' => ['entry_id' => 'entry-readback', 'revision' => 2]]; },
+            static function (array $plan, string $key) use (&$ownerCalls): array { ++$ownerCalls; return ['status' => 'APPLIED', 'dictionary_mutation' => true, 'canonical_readback' => ['entry_id' => 'entry-readback', 'sense_ids' => ['sense-readback'], 'revision' => 2]]; },
         );
     }
 
